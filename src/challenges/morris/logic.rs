@@ -42,8 +42,7 @@ pub fn process_input(game: &mut MorrisGame, input: MorrisInput) -> bool {
             process_cancel(game);
         }
         MorrisInput::Other => {
-            // Any other key cancels forfeit pending
-            game.forfeit_pending = false;
+            crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
         }
     }
     true
@@ -51,13 +50,14 @@ pub fn process_input(game: &mut MorrisGame, input: MorrisInput) -> bool {
 
 /// Process Esc key: clear selection or initiate/confirm forfeit.
 fn process_cancel(game: &mut MorrisGame) {
-    if game.forfeit_pending {
-        game.game_result = Some(MorrisResult::Loss);
-    } else if game.selected_position.is_some() {
+    if game.selected_position.is_some() && !game.forfeit_pending {
         game.clear_selection();
-        game.forfeit_pending = false;
     } else {
-        game.forfeit_pending = true;
+        crate::challenges::handle_forfeit(
+            &mut game.game_result,
+            &mut game.forfeit_pending,
+            MorrisResult::Loss,
+        );
     }
 }
 

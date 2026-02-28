@@ -6,18 +6,30 @@
 //! presentation layer (main.rs) can update the UI without game logic depending
 //! on any UI types.
 
+use super::tick_context::TickContext;
 use super::tick_stages;
 pub use super::tick_types::{TickEvent, TickResult};
 use crate::achievements::Achievements;
-use crate::challenges::ActiveMinigame;
-use crate::combat::events::CombatBonuses;
-use crate::combat::logic::update_combat;
-use crate::core::constants::{HAVEN_MIN_PRESTIGE_RANK, TICKS_PER_SECOND, TICK_INTERVAL_MS};
+use crate::core::constants::TICK_INTERVAL_MS;
 use crate::core::game_logic::spawn_enemy_if_needed;
 use crate::core::game_state::GameState;
 use crate::haven::Haven;
-use crate::stormglass::sigils::SigilBonuses;
 use rand::Rng;
+
+/// New entry point using TickContext. Delegates to the existing game_tick().
+#[allow(dead_code)]
+pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> TickResult {
+    game_tick(
+        ctx.state,
+        ctx.tick_counter,
+        ctx.haven,
+        ctx.enhancement,
+        ctx.deep,
+        ctx.achievements,
+        ctx.debug_mode,
+        rng,
+    )
+}
 
 /// Processes a single 100ms game tick.
 ///
@@ -62,54 +74,18 @@ pub fn game_tick<R: Rng>(
 ) -> TickResult {
     let mut result = TickResult::default();
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
-    let mut haven_bonuses = haven.compute_bonuses();
-    let sigil_bonuses = SigilBonuses::compute(&state.storm_sigils);
 
-    // Inject sigil bonuses into haven_bonuses for fields that flow through
-    // process_item_drop (drop_rate) and process_fishing_tick (fishing speed)
-    haven_bonuses.drop_rate_percent += sigil_bonuses.drop_rate_percent;
-    haven_bonuses.fishing_timer_reduction += sigil_bonuses.fishing_speed_percent;
+    // ── 0. Compute merged Haven + Sigil bonuses ─────────────────
+    let (haven_bonuses, sigil_bonuses) = tick_stages::compute_merged_bonuses(haven, state);
 
     // ── 1. Process challenge AI thinking ────────────────────────
-    match &mut state.active_minigame {
-        Some(ActiveMinigame::Chess(game)) => {
-            crate::challenges::chess::logic::process_ai_thinking(game, rng);
-        }
-        Some(ActiveMinigame::Morris(game)) => {
-            crate::challenges::morris::logic::process_ai_thinking(game, rng);
-        }
-        Some(ActiveMinigame::Gomoku(game)) => {
-            crate::challenges::gomoku::logic::process_ai_thinking(game, rng);
-        }
-        Some(ActiveMinigame::Go(game)) => {
-            crate::challenges::go::process_ai_thinking(game, rng);
-        }
-        _ => {}
-    }
+    tick_stages::tick_challenge_ai(state, rng);
 
     // ── 2. Try challenge discovery (skipped during Chrono Surge) ─
-    if !state.chrono_surge_active {
-        let haven_discovery = haven_bonuses.challenge_discovery_percent;
-        if let Some(challenge_type) =
-            crate::challenges::menu::try_discover_challenge_with_haven(state, rng, haven_discovery)
-        {
-            let icon = challenge_type.icon();
-            let flavor = challenge_type.discovery_flavor();
-            result.events.push(TickEvent::ChallengeDiscovered {
-                challenge_type,
-                message: format!("{} {}", icon, flavor),
-                follow_up: format!("{} Press [Tab] to view pending challenges", icon),
-            });
-        }
-    }
+    tick_stages::tick_challenge_discovery(state, &haven_bonuses, rng, &mut result);
 
     // ── 3. Sync player max HP with cached derived stats ─────────
-    if state.derived_stats_dirty {
-        state.recalculate_derived_stats(&enhancement.levels);
-        state.recalculate_prestige_bonuses();
-    }
-    let derived = state.cached_derived_stats;
-    state.combat_state.update_max_hp(derived.max_hp);
+    tick_stages::sync_derived_stats(state, enhancement);
 
     // ── 4. Update dungeon exploration ───────────────────────────
     tick_stages::process_dungeon_events(state, delta_time, &haven_bonuses, &mut result, rng);
@@ -131,57 +107,11 @@ pub fn game_tick<R: Rng>(
     }
 
     // ── 6. Combat ───────────────────────────────────────────────
-    let prestige_combat = state.cached_prestige_bonuses;
-    let combat_bonuses = CombatBonuses {
-        // Haven bonuses
-        hp_regen_percent: haven_bonuses.hp_regen_percent,
-        hp_regen_delay_reduction: haven_bonuses.hp_regen_delay_reduction,
-        damage_percent: haven_bonuses.damage_percent + sigil_bonuses.damage_percent,
-        crit_chance_percent: haven_bonuses.crit_chance_percent
-            + sigil_bonuses.crit_chance_percent
-            + prestige_combat.crit_chance,
-        double_strike_chance: haven_bonuses.double_strike_chance
-            + sigil_bonuses.double_strike_percent,
-        xp_gain_percent: haven_bonuses.xp_gain_percent + sigil_bonuses.xp_percent,
-        // God item bonuses
-        early_damage_percent: crate::god_items::equipped_god_item_damage_percent(&state.equipment),
-        damage_reduction_percent: crate::god_items::equipped_god_item_dr(&state.equipment)
-            + sigil_bonuses.damage_reduction_percent,
-        attack_speed_percent: crate::god_items::equipped_god_item_attack_speed_percent(
-            &state.equipment,
-        ) + sigil_bonuses.attack_speed_percent,
-        regen_reduction_percent: crate::god_items::equipped_god_item_regen_reduction_percent(
-            &state.equipment,
-        ) + sigil_bonuses.regen_delay_percent,
-        // Prestige flat bonuses
-        flat_damage: prestige_combat.flat_damage,
-        flat_defense: prestige_combat.flat_defense,
-        flat_hp: prestige_combat.flat_hp,
-    };
-    // Apply flat HP bonus to combat max HP (not in DerivedStats to avoid enemy scaling)
-    if combat_bonuses.flat_hp > 0 {
-        let boosted_max = derived.max_hp + combat_bonuses.flat_hp;
-        state.combat_state.update_max_hp(boosted_max);
-    }
-    // Apply sigil max HP% bonus on top of current max HP
-    if sigil_bonuses.max_hp_percent > 0.0 {
-        let current_max = state.combat_state.player_max_hp;
-        let boosted = (current_max as f64 * (1.0 + sigil_bonuses.max_hp_percent / 100.0)) as u32;
-        state.combat_state.update_max_hp(boosted);
-    }
-    let combat_events = update_combat(
-        rng,
+    tick_stages::run_combat(
         state,
         delta_time,
-        &combat_bonuses,
-        achievements,
-        &derived,
-    );
-
-    tick_stages::process_combat_events(
-        state,
-        combat_events,
         &haven_bonuses,
+        &sigil_bonuses,
         achievements,
         deep,
         debug_mode,
@@ -196,135 +126,30 @@ pub fn game_tick<R: Rng>(
     spawn_enemy_if_needed(state);
 
     // ── 8. Update play time ─────────────────────────────────────
-    *tick_counter += 1;
-    if *tick_counter >= TICKS_PER_SECOND {
-        state.play_time_seconds += 1;
-        if state.combat_seconds_this_tick {
-            state.xp_rate_samples.push_back(state.xp_this_second);
-            if state.xp_rate_samples.len() > crate::core::constants::XP_RATE_WINDOW_SECONDS {
-                state.xp_rate_samples.pop_front();
-            }
-        }
-        state.xp_this_second = 0;
-        state.combat_seconds_this_tick = false;
-        *tick_counter = 0;
-    }
+    tick_stages::update_play_time(state, tick_counter);
 
     // ── 9. Collect achievement notifications ────────────────────
     tick_stages::collect_achievement_events(achievements, &mut result);
 
     // ── 10. Haven discovery check ────────────────────────────────
-    // Independent roll per tick, only when eligible (P10+, no active content)
-    if !haven.discovered
-        && state.prestige_rank >= HAVEN_MIN_PRESTIGE_RANK
-        && state.active_dungeon.is_none()
-        && state.active_fishing.is_none()
-        && state.active_minigame.is_none()
-        && crate::haven::try_discover_haven(haven, state.prestige_rank, rng)
-    {
-        // Track Haven discovery achievement
-        achievements.on_haven_discovered(Some(&state.character_name));
-        result.events.push(TickEvent::HavenDiscovered);
-        result.haven_changed = true;
-        if !debug_mode {
-            result.achievements_changed = true;
-        }
-    }
+    tick_stages::tick_haven_discovery(state, haven, achievements, debug_mode, &mut result, rng);
 
     // ── 11. Soulforge discovery check ────────────────────────────
-    // Independent roll per tick, only when eligible (P15+, no active content)
-    if !enhancement.discovered
-        && state.prestige_rank >= crate::enhancement::SOULFORGE_MIN_PRESTIGE_RANK
-        && state.active_dungeon.is_none()
-        && state.active_fishing.is_none()
-        && state.active_minigame.is_none()
-        && crate::enhancement::try_discover_soulforge(enhancement, state.prestige_rank, rng)
-    {
-        // Track Soulforge discovery achievement
-        achievements.on_soulforge_discovered(Some(&state.character_name));
-        result.events.push(TickEvent::SoulforgeDiscovered);
-        result.enhancement_changed = true;
-        if !debug_mode {
-            result.achievements_changed = true;
-        }
-    }
+    tick_stages::tick_soulforge_discovery(
+        state,
+        enhancement,
+        achievements,
+        debug_mode,
+        &mut result,
+        rng,
+    );
 
     // ── 11b. Deep discovery ───────────────────────────────────────
     // Discovery is triggered by defeating The Expanse cycle boss.
     // No per-tick random roll.
 
     // ── 11c. Deep mission ticking ──────────────────────────────────
-    // Tick active missions (wall-clock based), resolve completions,
-    // and fire achievement handlers.
-    if deep.persistent.discovered {
-        let now = chrono::Utc::now();
-        let pending_before = deep.prestige.pending_results.len();
-        let summary = crate::deep::missions::tick_all_missions(
-            &mut deep.prestige,
-            &mut deep.persistent,
-            now,
-            rng,
-        );
-
-        if summary.missions_completed > 0 || summary.events_fired > 0 {
-            result.deep_changed = true;
-        }
-
-        // Fire achievement handlers for completed missions
-        for _ in 0..summary.missions_completed {
-            achievements.on_deep_mission_complete(Some(&state.character_name));
-        }
-        for layer in &summary.breakthroughs {
-            achievements.on_deep_breakthrough(*layer, Some(&state.character_name));
-        }
-        for _ in 0..summary.mercs_lost {
-            achievements.on_deep_merc_lost(Some(&state.character_name));
-        }
-        if summary.gateway_opened {
-            achievements.on_deep_gateway_opened(Some(&state.character_name));
-        }
-
-        if (summary.missions_completed > 0 || summary.mercs_lost > 0) && !debug_mode {
-            result.achievements_changed = true;
-        }
-
-        // Emit tick events for newly completed missions
-        for pending in deep.prestige.pending_results.iter().skip(pending_before) {
-            if let Some(ref res) = pending.result {
-                let outcome_str = match res.outcome {
-                    crate::deep::MissionOutcome::Success => "Success",
-                    crate::deep::MissionOutcome::PartialSuccess => "Partial Success",
-                    crate::deep::MissionOutcome::Failure => "Failure",
-                };
-                result.events.push(TickEvent::DeepMissionComplete {
-                    message: format!(
-                        "\u{1F4DC} Mission complete: {} ({})",
-                        pending.mission_type.display_name(),
-                        outcome_str
-                    ),
-                });
-            }
-        }
-
-        // Check whether the mission pool needs a 6-hour refresh.
-        if crate::deep::missions::maybe_refresh_mission_pool(
-            &mut deep.prestige,
-            &deep.persistent,
-            now,
-            rng,
-        ) {
-            result.deep_changed = true;
-        }
-
-        if crate::deep::missions::run_softlock_safeguards(
-            &mut deep.prestige,
-            &mut deep.persistent,
-            now,
-            rng,
-        ) {
-            result.deep_changed = true;
-        }
-    }
+    tick_stages::tick_deep_missions(state, deep, achievements, debug_mode, &mut result, rng);
 
     // ── 12. Achievement modal accumulation ────────────────────────
     if achievements.is_modal_ready() {
@@ -429,6 +254,50 @@ mod tests {
         );
 
         assert!(state.combat_state.current_enemy.is_some());
+    }
+
+    #[test]
+    fn test_game_tick_with_context_matches_direct_call() {
+        use crate::core::tick_context::TickContext;
+
+        let mut state1 = GameState::new("Test1".to_string(), 0);
+        let mut state2 = state1.clone();
+        let mut tc1: u32 = 0;
+        let mut tc2: u32 = 0;
+        let mut haven1 = Haven::default();
+        let mut haven2 = haven1.clone();
+        let mut enh1 = EnhancementProgress::new();
+        let mut enh2 = enh1.clone();
+        let mut deep1 = DeepState::new();
+        let mut deep2 = deep1.clone();
+        let mut ach1 = Achievements::default();
+        let mut ach2 = ach1.clone();
+        let mut rng1 = ChaCha8Rng::seed_from_u64(42);
+        let mut rng2 = ChaCha8Rng::seed_from_u64(42);
+
+        let result1 = game_tick(
+            &mut state1,
+            &mut tc1,
+            &mut haven1,
+            &mut enh1,
+            &mut deep1,
+            &mut ach1,
+            false,
+            &mut rng1,
+        );
+
+        let mut ctx = TickContext {
+            state: &mut state2,
+            tick_counter: &mut tc2,
+            haven: &mut haven2,
+            enhancement: &mut enh2,
+            deep: &mut deep2,
+            achievements: &mut ach2,
+            debug_mode: false,
+        };
+        let result2 = game_tick_with_context(&mut ctx, &mut rng2);
+
+        assert_eq!(result1.events.len(), result2.events.len());
     }
 
     #[test]

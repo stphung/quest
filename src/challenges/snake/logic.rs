@@ -40,48 +40,44 @@ pub fn process_input(game: &mut SnakeGame, input: SnakeInput) {
     match input {
         SnakeInput::Up => {
             if game.forfeit_pending {
-                game.forfeit_pending = false;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             } else if game.direction != Direction::Down {
                 game.next_direction = Direction::Up;
             }
         }
         SnakeInput::Down => {
             if game.forfeit_pending {
-                game.forfeit_pending = false;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             } else if game.direction != Direction::Up {
                 game.next_direction = Direction::Down;
             }
         }
         SnakeInput::Left => {
             if game.forfeit_pending {
-                game.forfeit_pending = false;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             } else if game.direction != Direction::Right {
                 game.next_direction = Direction::Left;
             }
         }
         SnakeInput::Right => {
             if game.forfeit_pending {
-                game.forfeit_pending = false;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             } else if game.direction != Direction::Left {
                 game.next_direction = Direction::Right;
             }
         }
         SnakeInput::Select => {
-            if game.forfeit_pending {
-                game.forfeit_pending = false;
-            }
+            crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
         }
         SnakeInput::Forfeit => {
-            if game.forfeit_pending {
-                game.game_result = Some(SnakeResult::Loss); // Confirm forfeit
-            } else {
-                game.forfeit_pending = true;
-            }
+            crate::challenges::handle_forfeit(
+                &mut game.game_result,
+                &mut game.forfeit_pending,
+                SnakeResult::Loss,
+            );
         }
         SnakeInput::Other => {
-            if game.forfeit_pending {
-                game.forfeit_pending = false; // Cancel forfeit
-            }
+            crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
         }
     }
 }

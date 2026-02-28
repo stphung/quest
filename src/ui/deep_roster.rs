@@ -480,6 +480,16 @@ fn render_roster_split(
         return;
     };
 
+    render_merc_detail_panel(buffer, detail_inner_left, content_top, merc, deep);
+}
+
+fn render_merc_detail_panel(
+    buffer: &mut [Vec<SceneCell>],
+    detail_inner_left: i32,
+    content_top: i32,
+    merc: &Mercenary,
+    deep: &DeepState,
+) {
     let mut row = content_top;
     let (ql, _qlc) = quality_label(merc);
     let (qg, qc) = quality_glyph(merc);

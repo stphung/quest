@@ -30,6 +30,7 @@
 pub mod discovery;
 pub mod economy;
 pub mod events;
+pub mod facade;
 pub mod layers;
 pub mod mercenaries;
 pub mod missions;

@@ -462,6 +462,34 @@ fn render_exchange_menu(
     clear_row_chars(&mut buffer, 10); // description line 2
     clear_row_chars(&mut buffer, (h as i32) - 1); // help
 
+    render_exchange_menu_items(&mut buffer, w, h, millis, exchange_ui, state);
+
+    // Help row at bottom
+    let help_row = (h as i32) - 1;
+    put_text_centered(
+        &mut buffer,
+        help_row,
+        w,
+        "[\u{2191}\u{2193}] Select  [Enter] Exchange  [Esc] Close",
+        Color::DarkGray,
+    );
+
+    render_buffer(frame, inner, &buffer);
+
+    render_exchange_flavor_text(frame, inner, h, millis);
+    render_exchange_description(frame, inner, h, exchange_ui);
+}
+
+/// Render the four menu item rows: cursor, label, right-aligned cost, selection highlight with
+/// electric sweep animation.
+fn render_exchange_menu_items(
+    buffer: &mut [Vec<SceneCell>],
+    w: usize,
+    h: usize,
+    millis: u128,
+    exchange_ui: &ExchangeUiState,
+    state: &GameState,
+) {
     // Menu items (rows 4-6): (display_text, cost_text, affordable)
     // Wide emoji icons (2 terminal cols) get 1 space before label;
     // narrow icons (1 terminal col) get 2 spaces — so labels align.
@@ -501,7 +529,7 @@ fn render_exchange_menu(
 
         // Cursor
         if is_selected {
-            put_text(&mut buffer, row, 0, "> ", Color::Yellow);
+            put_text(buffer, row, 0, "> ", Color::Yellow);
         }
 
         let fg = if *affordable {
@@ -511,7 +539,7 @@ fn render_exchange_menu(
         };
 
         // Icon + label as one string so terminal width is handled naturally
-        put_text(&mut buffer, row, text_col, display, fg);
+        put_text(buffer, row, text_col, display, fg);
 
         // Right-aligned cost
         let cost_fg = if *affordable {
@@ -520,7 +548,7 @@ fn render_exchange_menu(
             Color::DarkGray
         };
         let cost_col = (w as i32) - cost.chars().count() as i32 - 1;
-        put_text(&mut buffer, row, cost_col, cost, cost_fg);
+        put_text(buffer, row, cost_col, cost, cost_fg);
 
         // Selected row highlight
         if is_selected {
@@ -549,20 +577,10 @@ fn render_exchange_menu(
             }
         }
     }
+}
 
-    // Help row at bottom
-    let help_row = (h as i32) - 1;
-    put_text_centered(
-        &mut buffer,
-        help_row,
-        w,
-        "[\u{2191}\u{2193}] Select  [Enter] Exchange  [Esc] Close",
-        Color::DarkGray,
-    );
-
-    render_buffer(frame, inner, &buffer);
-
-    // Flavor text overlay (rows 1-2) — rendered as Paragraph widget for italic + wrapping
+/// Render the pulsing italic flavor text overlay (rows 1-2 inside the exchange panel).
+fn render_exchange_flavor_text(frame: &mut Frame, inner: Rect, h: usize, millis: u128) {
     let pulse_t = ((millis as f64 / 2000.0).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
     let flavor_rgb = lerp_rgb((100, 140, 200), (150, 200, 255), pulse_t);
     let flavor_fg = Color::Rgb(flavor_rgb.0, flavor_rgb.1, flavor_rgb.2);
@@ -578,8 +596,15 @@ fn render_exchange_menu(
         .wrap(ratatui::widgets::Wrap { trim: true });
         frame.render_widget(flavor, flavor_area);
     }
+}
 
-    // Description overlay (rows 9-10) — changes based on selected item
+/// Render the context-sensitive description overlay (rows 9-10) based on the selected menu item.
+fn render_exchange_description(
+    frame: &mut Frame,
+    inner: Rect,
+    h: usize,
+    exchange_ui: &ExchangeUiState,
+) {
     if h > 10 {
         let desc = match exchange_ui.selected_item {
             0 => "Spend Stormglass to invoke a choice of three challenges.",

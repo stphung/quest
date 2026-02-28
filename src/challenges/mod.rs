@@ -119,6 +119,7 @@ macro_rules! impl_apply_game_result {
 }
 
 pub mod chess;
+pub mod facade;
 pub mod flappy;
 pub mod go;
 pub mod gomoku;
@@ -310,6 +311,31 @@ pub fn apply_challenge_rewards(
         })
     } else {
         None
+    }
+}
+
+/// Shared forfeit confirmation handler.
+/// Returns true if the forfeit was confirmed (game_result set to loss).
+/// Call this when the player presses Esc/Forfeit.
+pub fn handle_forfeit<R>(
+    game_result: &mut Option<R>,
+    forfeit_pending: &mut bool,
+    loss_variant: R,
+) -> bool {
+    if *forfeit_pending {
+        *game_result = Some(loss_variant);
+        true
+    } else {
+        *forfeit_pending = true;
+        false
+    }
+}
+
+/// Cancel a pending forfeit. Call this on any non-Esc input
+/// when forfeit_pending is true.
+pub fn cancel_forfeit_if_pending(forfeit_pending: &mut bool) {
+    if *forfeit_pending {
+        *forfeit_pending = false;
     }
 }
 
@@ -554,5 +580,49 @@ mod tests {
         apply_challenge_rewards(&mut state, make_info(true, reward));
         assert!(state.character_xp > old_xp);
         assert_eq!(state.stormglass, old_sg);
+    }
+
+    mod forfeit_tests {
+        use super::super::*;
+
+        #[derive(Debug, PartialEq)]
+        #[allow(dead_code)]
+        enum TestResult {
+            Win,
+            Loss,
+        }
+
+        #[test]
+        fn test_handle_forfeit_first_press_sets_pending() {
+            let mut result: Option<TestResult> = None;
+            let mut pending = false;
+            let confirmed = handle_forfeit(&mut result, &mut pending, TestResult::Loss);
+            assert!(!confirmed);
+            assert!(pending);
+            assert!(result.is_none());
+        }
+
+        #[test]
+        fn test_handle_forfeit_second_press_confirms() {
+            let mut result: Option<TestResult> = None;
+            let mut pending = true;
+            let confirmed = handle_forfeit(&mut result, &mut pending, TestResult::Loss);
+            assert!(confirmed);
+            assert_eq!(result, Some(TestResult::Loss));
+        }
+
+        #[test]
+        fn test_cancel_forfeit_clears_pending() {
+            let mut pending = true;
+            cancel_forfeit_if_pending(&mut pending);
+            assert!(!pending);
+        }
+
+        #[test]
+        fn test_cancel_forfeit_noop_when_not_pending() {
+            let mut pending = false;
+            cancel_forfeit_if_pending(&mut pending);
+            assert!(!pending);
+        }
     }
 }

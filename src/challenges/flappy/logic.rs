@@ -35,22 +35,20 @@ pub fn process_input(game: &mut FlappyBirdGame, input: FlappyBirdInput) {
     match input {
         FlappyBirdInput::Flap => {
             if game.forfeit_pending {
-                game.forfeit_pending = false; // Cancel forfeit
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             } else {
                 game.flap_queued = true;
             }
         }
         FlappyBirdInput::Forfeit => {
-            if game.forfeit_pending {
-                game.game_result = Some(FlappyBirdResult::Loss); // Confirm forfeit
-            } else {
-                game.forfeit_pending = true;
-            }
+            crate::challenges::handle_forfeit(
+                &mut game.game_result,
+                &mut game.forfeit_pending,
+                FlappyBirdResult::Loss,
+            );
         }
         FlappyBirdInput::Other => {
-            if game.forfeit_pending {
-                game.forfeit_pending = false; // Cancel forfeit
-            }
+            crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
         }
     }
 }

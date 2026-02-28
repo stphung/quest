@@ -1835,6 +1835,89 @@ fn render_new_mission_split(
     let detail_width = width.saturating_sub(list_width);
     let staging = ui.staging_mission_index.is_some();
 
+    // Panel chrome: backgrounds, outlines, divider, and headings.
+    let left_heading = render_split_panel_chrome(
+        buffer,
+        width,
+        detail_left,
+        content_top,
+        content_bottom,
+        staging,
+    );
+
+    let list_inner_top = content_top + 1;
+
+    if !staging {
+        render_mission_list_left(
+            buffer,
+            available,
+            ui.selected_index,
+            list_width,
+            list_inner_top,
+            content_bottom,
+        );
+    } else {
+        render_squad_assembly_left(
+            buffer,
+            deep,
+            ui,
+            available,
+            left_heading,
+            list_width,
+            content_top,
+            list_inner_top,
+            content_bottom,
+        );
+    }
+
+    // Right panel
+    let detail_inner_left = detail_left + 1;
+    let detail_inner_w = detail_width.saturating_sub(2) as i32;
+
+    if detail_inner_w <= 0 {
+        return;
+    }
+
+    let detail_idx = ui.staging_mission_index.unwrap_or(ui.selected_index);
+    let Some(m) = available.get(detail_idx) else {
+        return;
+    };
+
+    if !staging {
+        render_mission_detail_phase1(
+            buffer,
+            deep,
+            m,
+            detail_inner_left,
+            detail_inner_w,
+            content_top,
+            content_bottom,
+            ui.mission_visit_count,
+        );
+    } else {
+        render_squad_summary_panel(
+            buffer,
+            deep,
+            ui,
+            m,
+            detail_inner_left,
+            detail_inner_w,
+            content_top + 1,
+            content_bottom,
+        );
+    }
+}
+
+/// Render split-panel chrome: staging backgrounds/outlines, vertical divider, and headings.
+/// Returns the left heading string (needed by squad assembly for positioning).
+fn render_split_panel_chrome(
+    buffer: &mut [Vec<SceneCell>],
+    width: usize,
+    detail_left: i32,
+    content_top: i32,
+    content_bottom: i32,
+    staging: bool,
+) -> &'static str {
     // In squad-staging mode, visibly emphasize the active left panel.
     if staging {
         let panel_top = content_top;
@@ -1905,198 +1988,182 @@ fn render_new_mission_split(
             Color::DarkGray,
         );
     }
-    let list_inner_top = content_top + 1;
 
-    if !staging {
-        // Phase 1: mission list on left
-        let mut row = list_inner_top;
-        let mut last_layer: Option<u32> = None;
-        for (i, m) in available.iter().enumerate() {
+    left_heading
+}
+
+/// Phase 1 left panel: available missions grouped by layer.
+fn render_mission_list_left(
+    buffer: &mut [Vec<SceneCell>],
+    available: &[AvailableMission],
+    selected_index: usize,
+    list_width: usize,
+    list_inner_top: i32,
+    content_bottom: i32,
+) {
+    let mut row = list_inner_top;
+    let mut last_layer: Option<u32> = None;
+    for (i, m) in available.iter().enumerate() {
+        if row >= content_bottom {
+            break;
+        }
+        if last_layer != Some(m.layer) {
+            let role_line =
+                truncate_text(&mission_layer_header(m.layer), list_width.saturating_sub(2));
+            put_text(
+                buffer,
+                row,
+                1,
+                &role_line,
+                mission_layer_header_color(m.layer),
+            );
+            row += 1;
+            last_layer = Some(m.layer);
             if row >= content_bottom {
                 break;
             }
-            if last_layer != Some(m.layer) {
-                let role_line =
-                    truncate_text(&mission_layer_header(m.layer), list_width.saturating_sub(2));
-                put_text(
-                    buffer,
-                    row,
-                    1,
-                    &role_line,
-                    mission_layer_header_color(m.layer),
-                );
-                row += 1;
-                last_layer = Some(m.layer);
-                if row >= content_bottom {
-                    break;
-                }
-            }
-            let is_sel = i == ui.selected_index;
+        }
+        let is_sel = i == selected_index;
+        let tc = mission_type_color(m.mission_type);
+        let rt = m.mission_type.risk_tier();
+        let ri = risk_icon(rt);
+        let line = format_available_mission_row(m, is_sel, list_width.saturating_sub(2));
+        put_text(buffer, row, 1, &line, tc);
+        put_text(
+            buffer,
+            row,
+            1,
+            if is_sel { "\u{25b6} " } else { "  " },
+            if is_sel { Color::Cyan } else { Color::DarkGray },
+        );
+        // Recolor risk icon
+        put_text(buffer, row, 3, ri, risk_color(rt));
+        row += 1;
+    }
+}
+
+/// Phase 2 left panel: squad assembly with available/unavailable merc groups.
+#[allow(clippy::too_many_arguments)]
+fn render_squad_assembly_left(
+    buffer: &mut [Vec<SceneCell>],
+    deep: &DeepState,
+    ui: &DeepUiState,
+    available: &[AvailableMission],
+    left_heading: &str,
+    list_width: usize,
+    content_top: i32,
+    list_inner_top: i32,
+    content_bottom: i32,
+) {
+    if let Some(mi) = ui.staging_mission_index {
+        if let Some(m) = available.get(mi) {
             let tc = mission_type_color(m.mission_type);
-            let rt = m.mission_type.risk_tier();
-            let ri = risk_icon(rt);
-            let line = format_available_mission_row(m, is_sel, list_width.saturating_sub(2));
-            put_text(buffer, row, 1, &line, tc);
+            let cost_label = if m.marks_cost > 0 {
+                format!("{} Warband Marks", m.marks_cost)
+            } else {
+                "Free".to_string()
+            };
             put_text(
                 buffer,
-                row,
-                1,
-                if is_sel { "\u{25b6} " } else { "  " },
-                if is_sel { Color::Cyan } else { Color::DarkGray },
+                content_top,
+                left_heading.len() as i32 + 3,
+                &format!(
+                    "{}  L{}  Cost: {}",
+                    mission_type_label(m.mission_type),
+                    m.layer,
+                    cost_label
+                ),
+                tc,
             );
-            // Recolor risk icon
-            put_text(buffer, row, 3, ri, risk_color(rt));
-            row += 1;
         }
-    } else {
-        // Phase 2: merc list on left with available/unavailable groups
-        if let Some(mi) = ui.staging_mission_index {
-            if let Some(m) = available.get(mi) {
-                let tc = mission_type_color(m.mission_type);
-                let cost_label = if m.marks_cost > 0 {
-                    format!("{} Warband Marks", m.marks_cost)
-                } else {
-                    "Free".to_string()
-                };
-                put_text(
-                    buffer,
-                    content_top,
-                    left_heading.len() as i32 + 3,
-                    &format!(
-                        "{}  L{}  Cost: {}",
-                        mission_type_label(m.mission_type),
-                        m.layer,
-                        cost_label
-                    ),
-                    tc,
-                );
-            }
+    }
+
+    let mut row = list_inner_top;
+
+    // Available mercs (selectable)
+    let mut avail_idx = 0usize;
+    for merc in deep.prestige.roster.iter() {
+        if !merc.is_available() {
+            continue;
         }
+        if row >= content_bottom - 1 {
+            break;
+        }
+        let is_sel = avail_idx == ui.selected_index;
+        let is_assigned = ui.staged_squad.contains(&merc.id);
+        let cursor = if is_sel { "\u{25b6} " } else { "  " };
+        let check = if is_assigned { "[\u{2713}] " } else { "[ ] " };
+        let arch_str = format!("  {} L{}", merc.archetype.display_name(), merc.level);
+        let merc_color = Color::White;
+        let arch_color = archetype_color(merc.archetype);
+        let name_line = format!("{}{}{}", cursor, check, merc.name);
+        put_text(buffer, row, 1, &name_line, merc_color);
+        put_text(
+            buffer,
+            row,
+            1,
+            cursor,
+            if is_sel { Color::Cyan } else { Color::DarkGray },
+        );
+        put_text(
+            buffer,
+            row,
+            3,
+            check,
+            if is_assigned {
+                Color::Green
+            } else {
+                Color::DarkGray
+            },
+        );
+        put_text(
+            buffer,
+            row,
+            3 + check.len() as i32 + merc.name.len() as i32,
+            &arch_str,
+            arch_color,
+        );
+        row += 1;
+        avail_idx += 1;
+    }
 
-        let mut row = list_inner_top;
+    // Separator and unavailable mercs
+    let has_unavailable = deep.prestige.roster.iter().any(|m| !m.is_available());
+    if has_unavailable && row < content_bottom - 1 {
+        let sep_str: String = "\u{2500} ".repeat((list_width / 2).max(4));
+        let sep_display = truncate_text(&sep_str, list_width);
+        put_text(buffer, row, 1, &sep_display, Color::Rgb(40, 60, 80));
+        row += 1;
 
-        // Available mercs (selectable)
-        let mut avail_idx = 0usize;
         for merc in deep.prestige.roster.iter() {
-            if !merc.is_available() {
+            if merc.is_available() {
                 continue;
             }
-            if row >= content_bottom - 1 {
+            if row >= content_bottom {
                 break;
             }
-            let is_sel = avail_idx == ui.selected_index;
-            let is_assigned = ui.staged_squad.contains(&merc.id);
-            let cursor = if is_sel { "\u{25b6} " } else { "  " };
-            let check = if is_assigned { "[\u{2713}] " } else { "[ ] " };
-            let arch_str = format!("  {} L{}", merc.archetype.display_name(), merc.level);
-            let merc_color = Color::White;
-            let arch_color = archetype_color(merc.archetype);
-            let name_line = format!("{}{}{}", cursor, check, merc.name);
-            put_text(buffer, row, 1, &name_line, merc_color);
-            put_text(
-                buffer,
-                row,
-                1,
-                cursor,
-                if is_sel { Color::Cyan } else { Color::DarkGray },
-            );
+            let avail_str = match &merc.status {
+                MercStatus::OnMission(_) => "(on mission)".to_string(),
+                MercStatus::Injured { missions_remaining } => {
+                    format!("(injured: {})", missions_remaining)
+                }
+                MercStatus::Lost => "(lost)".to_string(),
+                _ => String::new(),
+            };
             put_text(
                 buffer,
                 row,
                 3,
-                check,
-                if is_assigned {
-                    Color::Green
-                } else {
-                    Color::DarkGray
-                },
-            );
-            put_text(
-                buffer,
-                row,
-                3 + check.len() as i32 + merc.name.len() as i32,
-                &arch_str,
-                arch_color,
+                &format!(
+                    "    {:14} {:8} {}",
+                    truncate_text(&merc.name, 14),
+                    merc.archetype.display_name(),
+                    avail_str
+                ),
+                Color::Rgb(50, 60, 70),
             );
             row += 1;
-            avail_idx += 1;
         }
-
-        // Separator and unavailable mercs
-        let has_unavailable = deep.prestige.roster.iter().any(|m| !m.is_available());
-        if has_unavailable && row < content_bottom - 1 {
-            let sep_str: String = "\u{2500} ".repeat((list_width / 2).max(4));
-            let sep_display = truncate_text(&sep_str, list_width);
-            put_text(buffer, row, 1, &sep_display, Color::Rgb(40, 60, 80));
-            row += 1;
-
-            for merc in deep.prestige.roster.iter() {
-                if merc.is_available() {
-                    continue;
-                }
-                if row >= content_bottom {
-                    break;
-                }
-                let avail_str = match &merc.status {
-                    MercStatus::OnMission(_) => "(on mission)".to_string(),
-                    MercStatus::Injured { missions_remaining } => {
-                        format!("(injured: {})", missions_remaining)
-                    }
-                    MercStatus::Lost => "(lost)".to_string(),
-                    _ => String::new(),
-                };
-                put_text(
-                    buffer,
-                    row,
-                    3,
-                    &format!(
-                        "    {:14} {:8} {}",
-                        truncate_text(&merc.name, 14),
-                        merc.archetype.display_name(),
-                        avail_str
-                    ),
-                    Color::Rgb(50, 60, 70),
-                );
-                row += 1;
-            }
-        }
-    }
-
-    // Right panel
-    let detail_inner_left = detail_left + 1;
-    let detail_inner_w = detail_width.saturating_sub(2) as i32;
-
-    if detail_inner_w <= 0 {
-        return;
-    }
-
-    let detail_idx = ui.staging_mission_index.unwrap_or(ui.selected_index);
-    let Some(m) = available.get(detail_idx) else {
-        return;
-    };
-
-    if !staging {
-        render_mission_detail_phase1(
-            buffer,
-            deep,
-            m,
-            detail_inner_left,
-            detail_inner_w,
-            content_top,
-            content_bottom,
-            ui.mission_visit_count,
-        );
-    } else {
-        render_squad_summary_panel(
-            buffer,
-            deep,
-            ui,
-            m,
-            detail_inner_left,
-            detail_inner_w,
-            content_top + 1,
-            content_bottom,
-        );
     }
 }
 

@@ -91,6 +91,10 @@ impl CharacterManager {
             storm_sigils: save_data.storm_sigils,
             chrono_surge_active: false,
             debug_force_overcharge: false,
+            player: None,
+            combat_ctx: None,
+            prog: None,
+            sess: None,
         })
     }
 

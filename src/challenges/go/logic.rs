@@ -375,17 +375,17 @@ pub fn process_input(game: &mut GoGame, input: GoInput) -> bool {
     if game.forfeit_pending {
         match input {
             GoInput::Forfeit => {
-                // Second Esc - confirm forfeit
-                game.game_result = Some(GoResult::Loss);
-                game.forfeit_pending = false;
-                return true;
+                crate::challenges::handle_forfeit(
+                    &mut game.game_result,
+                    &mut game.forfeit_pending,
+                    GoResult::Loss,
+                );
             }
             _ => {
-                // Any other key cancels forfeit
-                game.forfeit_pending = false;
-                return true;
+                crate::challenges::cancel_forfeit_if_pending(&mut game.forfeit_pending);
             }
         }
+        return true;
     }
 
     match input {
@@ -408,7 +408,11 @@ pub fn process_input(game: &mut GoGame, input: GoInput) -> bool {
         GoInput::PlaceStone => process_human_move(game),
         GoInput::Pass => process_human_pass(game),
         GoInput::Forfeit => {
-            game.forfeit_pending = true;
+            crate::challenges::handle_forfeit(
+                &mut game.game_result,
+                &mut game.forfeit_pending,
+                GoResult::Loss,
+            );
             true
         }
         GoInput::Other => false,

@@ -131,6 +131,22 @@ pub struct GameState {
     /// When the game-over screen was first shown (for dismiss cooldown)
     #[serde(skip)]
     pub game_over_shown_at: Option<std::time::Instant>,
+
+    // === Composed sub-structs (Phase 2 refactoring) ===
+    // These group existing fields for clearer module boundaries.
+    // During migration, both flat fields and sub-struct fields exist.
+    #[serde(skip)]
+    #[allow(dead_code)]
+    pub player: Option<()>, // placeholder — will be populated later
+    #[serde(skip)]
+    #[allow(dead_code)]
+    pub combat_ctx: Option<()>,
+    #[serde(skip)]
+    #[allow(dead_code)]
+    pub prog: Option<()>,
+    #[serde(skip)]
+    #[allow(dead_code)]
+    pub sess: Option<()>,
 }
 
 impl GameState {
@@ -178,6 +194,10 @@ impl GameState {
             game_over_shown_at: None,
             chrono_surge_active: false,
             debug_force_overcharge: false,
+            player: None,
+            combat_ctx: None,
+            prog: None,
+            sess: None,
         }
     }
 
@@ -219,6 +239,30 @@ impl GameState {
     /// Recalculate and cache prestige combat bonuses from current prestige rank.
     pub fn recalculate_prestige_bonuses(&mut self) {
         self.cached_prestige_bonuses = PrestigeCombatBonuses::from_rank(self.prestige_rank);
+    }
+}
+
+/// Grouped accessors — these provide the same data organized by domain.
+/// New code should prefer these over direct field access.
+#[allow(dead_code)]
+impl GameState {
+    // --- Player Identity ---
+    pub fn player_level(&self) -> u32 {
+        self.character_level
+    }
+    pub fn player_xp(&self) -> u64 {
+        self.character_xp
+    }
+    pub fn player_name(&self) -> &str {
+        &self.character_name
+    }
+    pub fn player_prestige_rank(&self) -> u32 {
+        self.prestige_rank
+    }
+
+    // --- Combat Context ---
+    pub fn current_zone_id(&self) -> u32 {
+        self.zone_progression.current_zone_id
     }
 }
 
