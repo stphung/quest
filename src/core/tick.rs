@@ -86,7 +86,7 @@ pub fn game_tick<R: Rng>(
     tick_stages::tick_challenge_discovery(state, &haven_bonuses, rng, &mut result);
 
     // ── 3. Sync player max HP with cached derived stats ─────────
-    tick_stages::sync_derived_stats(state, enhancement);
+    tick_stages::sync_derived_stats(state, enhancement, &sigil_bonuses);
 
     // ── 4. Update dungeon exploration ───────────────────────────
     tick_stages::process_dungeon_events(state, delta_time, &haven_bonuses, &mut result, rng);

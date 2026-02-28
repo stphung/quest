@@ -1068,12 +1068,12 @@ fn high_prestige_combined_bonuses_no_overflow() {
     let bonuses = CombatBonuses {
         flat_damage,
         flat_defense,
-        flat_hp,
         crit_chance_percent: 15.0, // Capped prestige crit
         ..CombatBonuses::default()
     };
 
     let mut state = state_with_enemy(100_000, 100, 10);
+    // flat_hp is now applied in tick Stage 3, not in CombatBonuses
     state.combat_state.player_max_hp += flat_hp;
     state.combat_state.player_current_hp = state.combat_state.player_max_hp;
 

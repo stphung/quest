@@ -29,10 +29,6 @@ pub struct CombatBonuses {
     /// Damage reduction % applied after defense subtraction (e.g. Divine Bulwark 30%)
     pub damage_reduction_percent: f64,
 
-    // --- HP (tick.rs) ---
-    /// Flat HP added to combat max HP (prestige)
-    pub flat_hp: u32,
-
     // --- Attack speed (orchestration.rs) ---
     /// +% attack speed (e.g. Windborne 100%)
     pub attack_speed_percent: f64,
@@ -62,7 +58,6 @@ impl Default for CombatBonuses {
             xp_gain_percent: 0.0,
             flat_defense: 0,
             damage_reduction_percent: 0.0,
-            flat_hp: 0,
             attack_speed_percent: 0.0,
             hp_regen_percent: 0.0,
             hp_regen_delay_reduction: 0.0,
