@@ -97,10 +97,24 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     // Character actions (prestige, levels)
     DebugAction::SetPrestige(1),
     DebugAction::SetPrestige(5),
-    DebugAction::SetPrestige(10),
+    DebugAction::SetPrestige(25),
+    DebugAction::SetPrestige(50),
     DebugAction::SetPrestige(100),
-    DebugAction::SetLevel(10),
+    DebugAction::SetPrestige(250),
+    DebugAction::SetPrestige(500),
+    DebugAction::SetPrestige(1000),
+    DebugAction::SetPrestige(2500),
+    DebugAction::SetPrestige(5000),
+    DebugAction::SetLevel(1),
+    DebugAction::SetLevel(5),
+    DebugAction::SetLevel(25),
     DebugAction::SetLevel(50),
+    DebugAction::SetLevel(100),
+    DebugAction::SetLevel(250),
+    DebugAction::SetLevel(500),
+    DebugAction::SetLevel(1000),
+    DebugAction::SetLevel(2500),
+    DebugAction::SetLevel(5000),
     DebugAction::MaxAttributes,
 ];
 
@@ -159,13 +173,40 @@ const ZONE_ACTIONS: &[DebugAction] = &[
 const CHARACTER_ACTIONS: &[DebugAction] = &[
     DebugAction::SetPrestige(1),
     DebugAction::SetPrestige(5),
-    DebugAction::SetPrestige(10),
+    DebugAction::SetPrestige(25),
+    DebugAction::SetPrestige(50),
     DebugAction::SetPrestige(100),
-    DebugAction::SetLevel(10),
+    DebugAction::SetPrestige(250),
+    DebugAction::SetPrestige(500),
+    DebugAction::SetPrestige(1000),
+    DebugAction::SetPrestige(2500),
+    DebugAction::SetPrestige(5000),
+    DebugAction::SetLevel(1),
+    DebugAction::SetLevel(5),
+    DebugAction::SetLevel(25),
     DebugAction::SetLevel(50),
+    DebugAction::SetLevel(100),
+    DebugAction::SetLevel(250),
+    DebugAction::SetLevel(500),
+    DebugAction::SetLevel(1000),
+    DebugAction::SetLevel(2500),
+    DebugAction::SetLevel(5000),
     DebugAction::MaxAttributes,
 ];
 const BORDER_OPTION_START_INDEX: usize = DEBUG_ACTIONS.len();
+
+const SET_VALUES: &[u32] = &[1, 5, 25, 50, 100, 250, 500, 1000, 2500, 5000];
+
+const fn set_value_index(value: u32) -> usize {
+    let mut i = 0;
+    while i < SET_VALUES.len() {
+        if SET_VALUES[i] == value {
+            return i;
+        }
+        i += 1;
+    }
+    0 // fallback
+}
 
 impl DebugAction {
     const fn option_index(self) -> usize {
@@ -200,20 +241,9 @@ impl DebugAction {
             Self::TriggerDeepClearFrontierLayer => 27,
             Self::TriggerDeepCompleteActiveMissions => 28,
             Self::TravelToZone(zone_id) => 29 + zone_id as usize - 1, // 29-39
-            Self::SetPrestige(amount) => match amount {
-                1 => 40,
-                5 => 41,
-                10 => 42,
-                _ => 43, // 100
-            },
-            Self::SetLevel(amount) => {
-                if amount == 10 {
-                    44
-                } else {
-                    45
-                }
-            }
-            Self::MaxAttributes => 46,
+            Self::SetPrestige(amount) => 40 + set_value_index(amount),
+            Self::SetLevel(amount) => 50 + set_value_index(amount),
+            Self::MaxAttributes => 60,
         }
     }
 
@@ -265,16 +295,27 @@ impl DebugAction {
             Self::SetPrestige(amount) => match amount {
                 1 => "Set Prestige to P1",
                 5 => "Set Prestige to P5",
-                10 => "Set Prestige to P10",
-                _ => "Set Prestige to P100",
+                25 => "Set Prestige to P25",
+                50 => "Set Prestige to P50",
+                100 => "Set Prestige to P100",
+                250 => "Set Prestige to P250",
+                500 => "Set Prestige to P500",
+                1000 => "Set Prestige to P1000",
+                2500 => "Set Prestige to P2500",
+                _ => "Set Prestige to P5000",
             },
-            Self::SetLevel(amount) => {
-                if amount == 10 {
-                    "Set Level to 10"
-                } else {
-                    "Set Level to 50"
-                }
-            }
+            Self::SetLevel(amount) => match amount {
+                1 => "Set Level to 1",
+                5 => "Set Level to 5",
+                25 => "Set Level to 25",
+                50 => "Set Level to 50",
+                100 => "Set Level to 100",
+                250 => "Set Level to 250",
+                500 => "Set Level to 500",
+                1000 => "Set Level to 1000",
+                2500 => "Set Level to 2500",
+                _ => "Set Level to 5000",
+            },
             Self::MaxAttributes => "Max All Attributes",
         }
     }
@@ -936,8 +977,14 @@ fn trigger_set_prestige(
     match rank {
         1 => "Set Prestige to P1!",
         5 => "Set Prestige to P5!",
-        10 => "Set Prestige to P10!",
-        _ => "Set Prestige to P100!",
+        25 => "Set Prestige to P25!",
+        50 => "Set Prestige to P50!",
+        100 => "Set Prestige to P100!",
+        250 => "Set Prestige to P250!",
+        500 => "Set Prestige to P500!",
+        1000 => "Set Prestige to P1000!",
+        2500 => "Set Prestige to P2500!",
+        _ => "Set Prestige to P5000!",
     }
 }
 
@@ -955,10 +1002,17 @@ fn trigger_set_level(
     state.character_xp = 0;
     state.recalculate_derived_stats(&enhancement.levels);
 
-    if target_level == 10 {
-        "Set Level to 10!"
-    } else {
-        "Set Level to 50!"
+    match target_level {
+        1 => "Set Level to 1!",
+        5 => "Set Level to 5!",
+        25 => "Set Level to 25!",
+        50 => "Set Level to 50!",
+        100 => "Set Level to 100!",
+        250 => "Set Level to 250!",
+        500 => "Set Level to 500!",
+        1000 => "Set Level to 1000!",
+        2500 => "Set Level to 2500!",
+        _ => "Set Level to 5000!",
     }
 }
 
@@ -1430,28 +1484,30 @@ mod tests {
         let enhancement = EnhancementProgress::new();
         assert_eq!(state.character_level, 1);
 
-        let msg = trigger_set_level(&mut state, &enhancement, 10);
-        assert_eq!(msg, "Set Level to 10!");
-        assert_eq!(state.character_level, 10);
+        let msg = trigger_set_level(&mut state, &enhancement, 25);
+        assert_eq!(msg, "Set Level to 25!");
+        assert_eq!(state.character_level, 25);
     }
 
     #[test]
     fn test_trigger_set_level_distributes_attributes() {
         let mut state = GameState::new("Test".to_string(), 0);
         let enhancement = EnhancementProgress::new();
+        // Bump prestige so attribute cap doesn't interfere
+        state.prestige_rank = 10; // cap = 20 + 50 = 70
         let initial_sum: u32 = crate::character::attributes::AttributeType::all()
             .iter()
             .map(|a| state.attributes.get(*a))
             .sum();
 
-        trigger_set_level(&mut state, &enhancement, 10);
+        trigger_set_level(&mut state, &enhancement, 25);
 
         let final_sum: u32 = crate::character::attributes::AttributeType::all()
             .iter()
             .map(|a| state.attributes.get(*a))
             .sum();
-        // 9 levels (1->10) * 3 points = 27 attribute points gained
-        assert_eq!(final_sum, initial_sum + 27);
+        // 24 levels (1->25) * 3 points = 72 attribute points gained
+        assert_eq!(final_sum, initial_sum + 72);
     }
 
     #[test]
@@ -1460,14 +1516,14 @@ mod tests {
         let enhancement = EnhancementProgress::new();
         state.character_level = 50;
 
-        trigger_set_level(&mut state, &enhancement, 10);
+        trigger_set_level(&mut state, &enhancement, 25);
         // Should not lower level — noop when already above target
         assert_eq!(state.character_level, 50);
     }
 
     #[test]
-    fn test_character_category_has_7_options() {
-        assert_eq!(option_count_for_category(DebugCategory::Character), 7);
+    fn test_character_category_has_21_options() {
+        assert_eq!(option_count_for_category(DebugCategory::Character), 21);
     }
 
     #[test]
