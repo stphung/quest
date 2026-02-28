@@ -580,4 +580,47 @@ mod tests {
         assert!(state.character_xp > old_xp);
         assert_eq!(state.stormglass, old_sg);
     }
+
+    mod forfeit_tests {
+        use super::super::*;
+
+        #[derive(Debug, PartialEq)]
+        enum TestResult {
+            Win,
+            Loss,
+        }
+
+        #[test]
+        fn test_handle_forfeit_first_press_sets_pending() {
+            let mut result: Option<TestResult> = None;
+            let mut pending = false;
+            let confirmed = handle_forfeit(&mut result, &mut pending, TestResult::Loss);
+            assert!(!confirmed);
+            assert!(pending);
+            assert!(result.is_none());
+        }
+
+        #[test]
+        fn test_handle_forfeit_second_press_confirms() {
+            let mut result: Option<TestResult> = None;
+            let mut pending = true;
+            let confirmed = handle_forfeit(&mut result, &mut pending, TestResult::Loss);
+            assert!(confirmed);
+            assert_eq!(result, Some(TestResult::Loss));
+        }
+
+        #[test]
+        fn test_cancel_forfeit_clears_pending() {
+            let mut pending = true;
+            cancel_forfeit_if_pending(&mut pending);
+            assert!(!pending);
+        }
+
+        #[test]
+        fn test_cancel_forfeit_noop_when_not_pending() {
+            let mut pending = false;
+            cancel_forfeit_if_pending(&mut pending);
+            assert!(!pending);
+        }
+    }
 }
