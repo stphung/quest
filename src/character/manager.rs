@@ -79,7 +79,13 @@ impl CharacterManager {
 }
 
 /// Account-level JSON files that are not character saves
-pub(super) const ACCOUNT_FILES: &[&str] = &["haven.json", "achievements.json", ".cloud.json"];
+pub(super) const ACCOUNT_FILES: &[&str] = &[
+    "haven.json",
+    "achievements.json",
+    "enhancement.json",
+    "deep.json",
+    ".cloud.json",
+];
 
 #[cfg(test)]
 mod tests {
