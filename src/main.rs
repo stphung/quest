@@ -1,4 +1,5 @@
 mod achievements;
+mod ascension;
 mod challenges;
 mod character;
 mod combat;

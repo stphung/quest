@@ -1,6 +1,7 @@
 //! Prestige and fishing panel rendering helpers for the stats panel.
 
 use crate::achievements::{get_achievements_by_category, AchievementCategory, AchievementId};
+use crate::ascension::types::ascension_combat_multiplier;
 use crate::character::attributes::AttributeType;
 use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::{get_next_prestige_tier, get_prestige_tier};
@@ -154,19 +155,36 @@ pub(super) fn draw_prestige_info(
     };
 
     let prestige_text = vec![
-        Line::from(vec![
-            Span::styled("🏆 Rank: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::styled(
-                format!("{} ({})", game_state.prestige_rank, tier.name),
-                Style::default().fg(Color::Yellow),
-            ),
-            Span::styled(" | ", Style::default().fg(Color::DarkGray)),
-            Span::styled("🔄 ", Style::default()),
-            Span::styled(
-                format!("{}", game_state.total_prestige_count),
-                Style::default().fg(Color::Magenta),
-            ),
-        ]),
+        Line::from({
+            let mut rank_spans = vec![
+                Span::styled("🏆 Rank: ", Style::default().add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    format!("{} ({})", game_state.prestige_rank, tier.name),
+                    Style::default().fg(Color::Yellow),
+                ),
+                Span::styled(" | ", Style::default().fg(Color::DarkGray)),
+                Span::styled("🔄 ", Style::default()),
+                Span::styled(
+                    format!("{}", game_state.total_prestige_count),
+                    Style::default().fg(Color::Magenta),
+                ),
+            ];
+            if game_state.ascension_level > 0 {
+                let asc_mult = ascension_combat_multiplier(game_state.ascension_level);
+                rank_spans.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
+                rank_spans.push(Span::styled(
+                    format!(
+                        "Asc {} ({:.1}x)",
+                        to_roman(game_state.ascension_level),
+                        asc_mult
+                    ),
+                    Style::default()
+                        .fg(Color::Rgb(255, 215, 0))
+                        .add_modifier(Modifier::BOLD),
+                ));
+            }
+            rank_spans
+        }),
         Line::from({
             let mut spans = vec![
                 Span::styled("⚡ XP: ", Style::default().add_modifier(Modifier::BOLD)),
@@ -481,6 +499,37 @@ fn build_leviathan_trophy_line() -> Line<'static> {
     Line::from(spans)
 }
 
+/// Converts a small positive integer to a Roman numeral string.
+fn to_roman(n: u32) -> String {
+    if n == 0 {
+        return "0".to_string();
+    }
+    const VALS: [(u32, &str); 13] = [
+        (1000, "M"),
+        (900, "CM"),
+        (500, "D"),
+        (400, "CD"),
+        (100, "C"),
+        (90, "XC"),
+        (50, "L"),
+        (40, "XL"),
+        (10, "X"),
+        (9, "IX"),
+        (5, "V"),
+        (4, "IV"),
+        (1, "I"),
+    ];
+    let mut result = String::new();
+    let mut remaining = n;
+    for &(val, sym) in &VALS {
+        while remaining >= val {
+            result.push_str(sym);
+            remaining -= val;
+        }
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -502,5 +551,21 @@ mod tests {
         achievements.unlock(AchievementId::Prestige10000, Some("Hero".to_string()));
 
         assert_eq!(highest_prestige_badge(&achievements), Some("🔱"));
+    }
+
+    #[test]
+    fn test_to_roman() {
+        assert_eq!(to_roman(1), "I");
+        assert_eq!(to_roman(3), "III");
+        assert_eq!(to_roman(4), "IV");
+        assert_eq!(to_roman(6), "VI");
+        assert_eq!(to_roman(7), "VII");
+        assert_eq!(to_roman(9), "IX");
+        assert_eq!(to_roman(10), "X");
+    }
+
+    #[test]
+    fn test_to_roman_zero() {
+        assert_eq!(to_roman(0), "0");
     }
 }
