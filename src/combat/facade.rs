@@ -9,3 +9,10 @@ pub struct CombatInput<'a> {
     pub derived: &'a DerivedStats,
     pub prestige_rank: u32,
 }
+
+/// Facade: update combat with explicit inputs.
+pub fn update_combat_facade(
+    _input: &mut CombatInput,
+) -> Option<()> {
+    todo!("Wire to existing update_combat")
+}

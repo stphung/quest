@@ -119,6 +119,7 @@ macro_rules! impl_apply_game_result {
 }
 
 pub mod chess;
+pub mod facade;
 pub mod flappy;
 pub mod go;
 pub mod gomoku;

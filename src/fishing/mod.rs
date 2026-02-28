@@ -4,6 +4,7 @@
 
 pub mod discovery;
 pub mod drops;
+pub mod facade;
 pub mod generation;
 pub mod logic;
 pub mod rank;

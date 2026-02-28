@@ -2,6 +2,7 @@
 
 #![allow(unused_imports)]
 
+pub mod facade;
 pub mod generation;
 pub mod logic;
 pub mod pathfinding;

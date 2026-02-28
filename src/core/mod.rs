@@ -4,6 +4,7 @@
 
 pub mod constants;
 pub mod discoveries;
+pub mod discovery_facade;
 pub mod enemy_spawning;
 pub mod game_logic;
 pub mod game_state;
