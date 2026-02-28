@@ -91,13 +91,13 @@ mod tests {
     }
 
     #[test]
-    fn test_creation_cancel_without_existing_characters_continues() {
+    fn test_creation_cancel_without_existing_characters_quits() {
         let mut screen = CharacterCreationScreen::new();
         let (manager, _dir) = temp_manager();
 
         let result = process_creation_input(&mut screen, CreationInput::Cancel, &manager, false);
 
-        assert_eq!(result, CreationResult::Continue);
+        assert_eq!(result, CreationResult::Quit);
     }
 
     #[test]

@@ -27,6 +27,8 @@ pub enum CreationResult {
     Created,
     /// Cancelled, go back to select screen (only if characters exist)
     Cancelled,
+    /// Quit the app (cancel with no existing characters)
+    Quit,
     /// Save failed with error message
     SaveFailed(String),
 }
@@ -71,7 +73,7 @@ pub fn process_creation_input(
             if has_existing_characters {
                 CreationResult::Cancelled
             } else {
-                CreationResult::Continue
+                CreationResult::Quit
             }
         }
         CreationInput::Other => CreationResult::Continue,
@@ -152,13 +154,13 @@ mod tests {
     }
 
     #[test]
-    fn test_creation_cancel_without_existing_characters_continues() {
+    fn test_creation_cancel_without_existing_characters_quits() {
         let mut screen = CharacterCreationScreen::new();
         let (manager, _dir) = temp_manager();
 
         let result = process_creation_input(&mut screen, CreationInput::Cancel, &manager, false);
 
-        assert_eq!(result, CreationResult::Continue);
+        assert_eq!(result, CreationResult::Quit);
     }
 
     #[test]

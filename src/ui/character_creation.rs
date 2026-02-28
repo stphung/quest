@@ -12,6 +12,7 @@ pub struct CharacterCreationScreen {
     pub name_input: String,
     pub cursor_position: usize,
     pub validation_error: Option<String>,
+    pub has_existing_characters: bool,
 }
 
 #[allow(dead_code)]
@@ -21,6 +22,7 @@ impl CharacterCreationScreen {
             name_input: String::new(),
             cursor_position: 0,
             validation_error: None,
+            has_existing_characters: false,
         }
     }
 
@@ -85,7 +87,12 @@ impl CharacterCreationScreen {
         self.render_validation(f, chunks[5]);
 
         // Controls
-        let controls = Paragraph::new("[Enter] Create Character    [Esc] Cancel")
+        let esc_label = if self.has_existing_characters {
+            "Cancel"
+        } else {
+            "Quit"
+        };
+        let controls = Paragraph::new(format!("[Enter] Create Character    [Esc] {}", esc_label))
             .alignment(Alignment::Center)
             .style(Style::default().fg(Color::Gray));
         f.render_widget(controls, chunks[7]);
@@ -141,7 +148,12 @@ impl CharacterCreationScreen {
         self.render_validation(f, chunks[3]);
 
         // Controls
-        let controls = Paragraph::new("[Enter] Create    [Esc] Cancel")
+        let esc_label = if self.has_existing_characters {
+            "Cancel"
+        } else {
+            "Quit"
+        };
+        let controls = Paragraph::new(format!("[Enter] Create    [Esc] {}", esc_label))
             .alignment(Alignment::Center)
             .style(Style::default().fg(Color::Gray));
         f.render_widget(controls, chunks[5]);
@@ -189,7 +201,12 @@ impl CharacterCreationScreen {
         f.render_widget(rules, chunks[4]);
 
         // Controls
-        let controls = Paragraph::new("[Enter] Create  [Esc] Cancel")
+        let esc_label = if self.has_existing_characters {
+            "Cancel"
+        } else {
+            "Quit"
+        };
+        let controls = Paragraph::new(format!("[Enter] Create  [Esc] {}", esc_label))
             .alignment(Alignment::Center)
             .style(Style::default().fg(Color::Gray));
         f.render_widget(controls, chunks[6]);
