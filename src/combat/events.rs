@@ -7,7 +7,7 @@ use crate::zones::BossDefeatResult;
 /// 2. `damage_percent` — applied after early_damage_percent (e.g. Haven Armory)
 ///
 /// Numeric fields default to 0 (no bonus).
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub struct CombatBonuses {
     // --- Damage pipeline (player_attack.rs) ---
     /// +% base damage, applied first (e.g. Giant's Might 150%)
@@ -44,6 +44,32 @@ pub struct CombatBonuses {
     pub hp_regen_delay_reduction: f64,
     /// -% regen duration (e.g. Sleipnir Swiftstrider)
     pub regen_reduction_percent: f64,
+
+    // --- Ascension multiplier (player_attack.rs, enemy_attack.rs) ---
+    /// Ascension combat multiplier applied to damage, defense, and HP.
+    /// Defaults to 1.0 (no ascension).
+    pub ascension_multiplier: f64,
+}
+
+impl Default for CombatBonuses {
+    fn default() -> Self {
+        Self {
+            early_damage_percent: 0.0,
+            damage_percent: 0.0,
+            flat_damage: 0,
+            crit_chance_percent: 0.0,
+            double_strike_chance: 0.0,
+            xp_gain_percent: 0.0,
+            flat_defense: 0,
+            damage_reduction_percent: 0.0,
+            flat_hp: 0,
+            attack_speed_percent: 0.0,
+            hp_regen_percent: 0.0,
+            hp_regen_delay_reduction: 0.0,
+            regen_reduction_percent: 0.0,
+            ascension_multiplier: 1.0,
+        }
+    }
 }
 
 pub enum CombatEvent {

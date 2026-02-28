@@ -858,6 +858,8 @@ pub(super) fn run_combat<R: Rng>(
         flat_damage: prestige_combat.flat_damage,
         flat_defense: prestige_combat.flat_defense,
         flat_hp: prestige_combat.flat_hp,
+        // Ascension multiplier — wired in Task 14 to use ascension_combat_multiplier()
+        ascension_multiplier: 1.0,
     };
     // Apply flat HP bonus to combat max HP (not in DerivedStats to avoid enemy scaling)
     if combat_bonuses.flat_hp > 0 {

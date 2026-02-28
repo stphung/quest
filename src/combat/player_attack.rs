@@ -50,8 +50,10 @@ pub(crate) fn resolve_player_attack<R: Rng>(
     let boosted_damage =
         (early_boosted_damage as f64 * (1.0 + bonuses.damage_percent / 100.0)) as u32;
     // 3. Apply flat damage bonus (e.g. prestige), added after % bonuses, before defense
-    let pre_crit_damage = boosted_damage + bonuses.flat_damage;
-    // 4. Apply enemy defense: min damage floor of 1
+    let pre_defense_damage = boosted_damage + bonuses.flat_damage;
+    // 4. Apply Ascension multiplier to damage
+    let pre_crit_damage = (pre_defense_damage as f64 * bonuses.ascension_multiplier) as u32;
+    // 5. Apply enemy defense: min damage floor of 1
     let enemy_def = state
         .combat_state
         .current_enemy
