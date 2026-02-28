@@ -8,7 +8,7 @@ const ASCENSION_DEEP_GATES: [u32; 6] = [3, 7, 12, 18, 25, 30];
 
 /// Prestige rank cost to Ascend to the given level.
 pub fn ascension_cost(level: u32) -> u32 {
-    if level >= 1 && level <= 6 {
+    if (1..=6).contains(&level) {
         ASCENSION_COSTS[(level - 1) as usize]
     } else if level > 6 {
         65 + 15 * (level - 6)
@@ -19,7 +19,7 @@ pub fn ascension_cost(level: u32) -> u32 {
 
 /// Deep layer gate for the given Ascension level. None means no Deep gate (PR only).
 pub fn ascension_deep_gate(level: u32) -> Option<u32> {
-    if level >= 1 && level <= 6 {
+    if (1..=6).contains(&level) {
         Some(ASCENSION_DEEP_GATES[(level - 1) as usize])
     } else {
         None
