@@ -76,8 +76,7 @@ pub(super) fn handle_vault_selection(
                     // Re-sync postgame zone unlocks after prestige reset
                     crate::zones::sync_account_zone_unlocks(
                         &mut state.zone_progression,
-                        achievements
-                            .is_unlocked(crate::achievements::AchievementId::StormsEnd),
+                        achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
                         deep.persistent.postgame_zone_cap,
                     );
                     *overlay = GameOverlay::None;
