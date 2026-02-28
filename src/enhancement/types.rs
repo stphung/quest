@@ -220,3 +220,99 @@ impl SoulforgeUiState {
         self.soul_tithe = false;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn enhancement_progress_clamps_levels_and_tracks_highest() {
+        let mut progress = EnhancementProgress::new();
+
+        progress.set_level(2, 7);
+        progress.set_level(4, MAX_ENHANCEMENT_LEVEL + 5);
+        progress.set_level(99, 3);
+
+        assert_eq!(progress.level(2), 7);
+        assert_eq!(progress.level(4), MAX_ENHANCEMENT_LEVEL);
+        assert_eq!(progress.level(99), 0);
+        assert_eq!(progress.highest_level_reached, MAX_ENHANCEMENT_LEVEL);
+    }
+
+    #[test]
+    fn lookup_helpers_return_zero_or_none_out_of_range() {
+        assert_eq!(success_rate(0), 0.0);
+        assert_eq!(success_rate(11), 0.0);
+        assert_eq!(success_rate(5), 0.70);
+
+        assert_eq!(enhancement_cost(0), 0);
+        assert_eq!(enhancement_cost(11), 0);
+        assert_eq!(enhancement_cost(10), 5);
+
+        assert_eq!(soul_tithe_cost(0), None);
+        assert_eq!(soul_tithe_cost(8), None);
+        assert_eq!(soul_tithe_cost(6), Some(6));
+
+        assert_eq!(fail_penalty(0), 0);
+        assert_eq!(fail_penalty(11), 0);
+        assert_eq!(fail_penalty(10), 2);
+    }
+
+    #[test]
+    fn display_helpers_cover_all_color_tiers() {
+        assert_eq!(enhancement_multiplier(0), 1.0);
+        assert_eq!(enhancement_multiplier(MAX_ENHANCEMENT_LEVEL), 2.5);
+
+        assert_eq!(enhancement_prefix(0), "");
+        assert_eq!(enhancement_prefix(8), "+8 ");
+
+        assert_eq!(enhancement_color_tier(0), 0);
+        assert_eq!(enhancement_color_tier(4), 1);
+        assert_eq!(enhancement_color_tier(7), 2);
+        assert_eq!(enhancement_color_tier(9), 3);
+        assert_eq!(enhancement_color_tier(10), 4);
+        assert_eq!(enhancement_color_rgb(10), (255, 215, 0));
+    }
+
+    #[test]
+    fn soulforge_ui_open_and_close_reset_transient_state() {
+        let mut ui = SoulforgeUiState::new();
+        ui.selected_slot = 4;
+        ui.phase = SoulforgePhase::ResultFailure;
+        ui.animation_tick = 9;
+        ui.last_result = Some(EnhancementResult {
+            slot_index: 4,
+            success: false,
+            old_level: 8,
+            new_level: 6,
+            cost: 5,
+        });
+        ui.soul_tithe = true;
+
+        ui.open();
+        assert!(ui.open);
+        assert_eq!(ui.selected_slot, 0);
+        assert_eq!(ui.phase, SoulforgePhase::Menu);
+        assert_eq!(ui.animation_tick, 0);
+        assert!(ui.last_result.is_none());
+        assert!(!ui.soul_tithe);
+
+        ui.selected_slot = 3;
+        ui.phase = SoulforgePhase::Hammering;
+        ui.last_result = Some(EnhancementResult {
+            slot_index: 3,
+            success: true,
+            old_level: 4,
+            new_level: 5,
+            cost: 2,
+        });
+        ui.soul_tithe = true;
+
+        ui.close();
+        assert!(!ui.open);
+        assert_eq!(ui.selected_slot, 3);
+        assert_eq!(ui.phase, SoulforgePhase::Menu);
+        assert!(ui.last_result.is_none());
+        assert!(!ui.soul_tithe);
+    }
+}

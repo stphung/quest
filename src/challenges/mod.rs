@@ -38,7 +38,7 @@ macro_rules! difficulty_enum_impl {
 /// - `reward`: `ChallengeReward` (for chess stats that reference prestige earned)
 ///
 /// # Usage
-/// ```ignore
+/// ```text
 /// impl_apply_game_result! {
 ///     variant: Gomoku;
 ///     result_body: |result, state, reward| {
@@ -55,7 +55,7 @@ macro_rules! difficulty_enum_impl {
 /// ```
 ///
 /// For a custom function name (e.g., Go uses `apply_go_result`):
-/// ```ignore
+/// ```text
 /// impl_apply_game_result! {
 ///     fn apply_go_result;
 ///     variant: Go;

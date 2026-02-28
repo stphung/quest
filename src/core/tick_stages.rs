@@ -739,3 +739,163 @@ pub(super) fn collect_achievement_events(achievements: &mut Achievements, result
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::achievements::AchievementId;
+    use crate::combat::Enemy;
+    use crate::haven::Haven;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    #[test]
+    fn apply_xp_and_check_levelup_emits_event_and_unlocks_level_milestone() {
+        let mut rng = ChaCha8Rng::seed_from_u64(17);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        state.character_level = 9;
+        state.character_xp = 0;
+
+        apply_xp_and_check_levelup(
+            &mut rng,
+            &mut state,
+            crate::core::xp::xp_for_next_level(9) as f64,
+            &mut achievements,
+            &mut result,
+        );
+
+        assert_eq!(state.character_level, 10);
+        assert!(matches!(
+            result.events.as_slice(),
+            [TickEvent::LeveledUp { new_level: 10 }]
+        ));
+        assert!(achievements
+            .take_newly_unlocked()
+            .contains(&AchievementId::Level10));
+    }
+
+    #[test]
+    fn apply_xp_and_check_levelup_no_level_emits_no_event() {
+        let mut rng = ChaCha8Rng::seed_from_u64(18);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        apply_xp_and_check_levelup(
+            &mut rng,
+            &mut state,
+            (crate::core::xp::xp_for_next_level(1) - 1) as f64,
+            &mut achievements,
+            &mut result,
+        );
+
+        assert_eq!(state.character_level, 1);
+        assert!(result.events.is_empty());
+        assert!(achievements.take_newly_unlocked().is_empty());
+    }
+
+    #[test]
+    fn process_combat_events_maps_non_random_combat_events() {
+        let mut rng = ChaCha8Rng::seed_from_u64(23);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut deep = crate::deep::DeepState::new();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        state.combat_state.current_enemy = Some(Enemy::new("Shade".to_string(), 40, 8));
+
+        process_combat_events(
+            &mut state,
+            vec![
+                CombatEvent::PlayerAttackBlocked {
+                    weapon_needed: "Relic Blade".to_string(),
+                },
+                CombatEvent::PlayerAttack {
+                    damage: 12,
+                    was_crit: false,
+                },
+                CombatEvent::EnemyAttack { damage: 7 },
+                CombatEvent::DamageReflected { damage: 3 },
+                CombatEvent::RegenComplete { healed: 9 },
+                CombatEvent::PlayerDiedInDungeon,
+                CombatEvent::PlayerDied,
+                CombatEvent::CombatRetreat {
+                    zone_name: "Meadow".to_string(),
+                },
+            ],
+            &haven_bonuses,
+            &mut achievements,
+            &mut deep,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert_eq!(result.events.len(), 8);
+        assert!(matches!(
+            result.events[0],
+            TickEvent::PlayerAttackBlocked { .. }
+        ));
+        assert!(matches!(
+            result.events[1],
+            TickEvent::PlayerAttack {
+                damage: 12,
+                was_crit: false,
+                ..
+            }
+        ));
+        assert!(matches!(
+            result.events[2],
+            TickEvent::EnemyAttack {
+                damage: 7,
+                ref enemy_name,
+                ..
+            } if enemy_name == "Shade"
+        ));
+        assert!(matches!(
+            result.events[3],
+            TickEvent::DamageReflected { damage: 3, .. }
+        ));
+        assert!(matches!(
+            result.events[4],
+            TickEvent::RegenComplete { healed: 9 }
+        ));
+        assert!(matches!(
+            result.events[5],
+            TickEvent::PlayerDiedInDungeon { .. }
+        ));
+        assert!(matches!(result.events[6], TickEvent::PlayerDied { .. }));
+        assert!(matches!(
+            result.events[7],
+            TickEvent::CombatRetreat {
+                ref zone_name,
+                ..
+            } if zone_name == "Meadow"
+        ));
+    }
+
+    #[test]
+    fn collect_achievement_events_drains_queue_and_sets_dirty_flag() {
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+        let expected_name = crate::achievements::get_achievement_def(AchievementId::Level10)
+            .unwrap()
+            .name;
+
+        achievements.unlock(AchievementId::Level10, Some("Hero".to_string()));
+
+        collect_achievement_events(&mut achievements, &mut result);
+
+        assert!(result.achievements_changed);
+        assert!(matches!(
+            result.events.as_slice(),
+            [TickEvent::AchievementUnlocked { name, message }]
+                if name == expected_name && message.contains("Achievement Unlocked")
+        ));
+        assert!(achievements.take_newly_unlocked().is_empty());
+    }
+}

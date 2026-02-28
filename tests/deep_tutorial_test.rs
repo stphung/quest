@@ -7,8 +7,9 @@
 //! 4. Guild rank properties (roster caps, concurrent missions, advancement)
 //! 5. Type-level API contracts (mercs, missions, events, infrastructure)
 //!
-//! Tests that require tick integration (deep_changed flag, mission generation/logic)
-//! are marked #[ignore] until Tasks #10, #12, #13, #14 land.
+//! Earlier drafts expected some tick-integration cases to stay gated until
+//! Tasks #10, #12, #13, and #14 landed. Those paths are now covered directly
+//! in the active suite, so this file contains no ignored tests.
 //!
 //! These tests follow the same patterns as haven/soulforge discovery tests in
 //! tick_stage_coverage_test.rs and game_loop_orchestration_test.rs.
