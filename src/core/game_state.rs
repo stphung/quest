@@ -238,6 +238,30 @@ impl GameState {
     }
 }
 
+/// Grouped accessors — these provide the same data organized by domain.
+/// New code should prefer these over direct field access.
+#[allow(dead_code)]
+impl GameState {
+    // --- Player Identity ---
+    pub fn player_level(&self) -> u32 {
+        self.character_level
+    }
+    pub fn player_xp(&self) -> u64 {
+        self.character_xp
+    }
+    pub fn player_name(&self) -> &str {
+        &self.character_name
+    }
+    pub fn player_prestige_rank(&self) -> u32 {
+        self.prestige_rank
+    }
+
+    // --- Combat Context ---
+    pub fn current_zone_id(&self) -> u32 {
+        self.zone_progression.current_zone_id
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
