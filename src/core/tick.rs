@@ -17,7 +17,22 @@ use crate::core::game_logic::spawn_enemy_if_needed;
 use crate::core::game_state::GameState;
 use crate::haven::Haven;
 use crate::stormglass::sigils::SigilBonuses;
+use super::tick_context::TickContext;
 use rand::Rng;
+
+/// New entry point using TickContext. Delegates to the existing game_tick().
+pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> TickResult {
+    game_tick(
+        ctx.state,
+        ctx.tick_counter,
+        ctx.haven,
+        ctx.enhancement,
+        ctx.deep,
+        ctx.achievements,
+        ctx.debug_mode,
+        rng,
+    )
+}
 
 /// Processes a single 100ms game tick.
 ///
@@ -429,6 +444,50 @@ mod tests {
         );
 
         assert!(state.combat_state.current_enemy.is_some());
+    }
+
+    #[test]
+    fn test_game_tick_with_context_matches_direct_call() {
+        use crate::core::tick_context::TickContext;
+
+        let mut state1 = GameState::new("Test1".to_string(), 0);
+        let mut state2 = state1.clone();
+        let mut tc1: u32 = 0;
+        let mut tc2: u32 = 0;
+        let mut haven1 = Haven::default();
+        let mut haven2 = haven1.clone();
+        let mut enh1 = EnhancementProgress::new();
+        let mut enh2 = enh1.clone();
+        let mut deep1 = DeepState::new();
+        let mut deep2 = deep1.clone();
+        let mut ach1 = Achievements::default();
+        let mut ach2 = ach1.clone();
+        let mut rng1 = ChaCha8Rng::seed_from_u64(42);
+        let mut rng2 = ChaCha8Rng::seed_from_u64(42);
+
+        let result1 = game_tick(
+            &mut state1,
+            &mut tc1,
+            &mut haven1,
+            &mut enh1,
+            &mut deep1,
+            &mut ach1,
+            false,
+            &mut rng1,
+        );
+
+        let mut ctx = TickContext {
+            state: &mut state2,
+            tick_counter: &mut tc2,
+            haven: &mut haven2,
+            enhancement: &mut enh2,
+            deep: &mut deep2,
+            achievements: &mut ach2,
+            debug_mode: false,
+        };
+        let result2 = game_tick_with_context(&mut ctx, &mut rng2);
+
+        assert_eq!(result1.events.len(), result2.events.len());
     }
 
     #[test]
