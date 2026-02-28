@@ -692,7 +692,9 @@ fn main() -> io::Result<()> {
                                                 achievements: &mut global_achievements,
                                                 debug_mode,
                                             };
-                                            let tick_result = core::tick::game_tick_with_context(&mut ctx, &mut rng);
+                                            let tick_result = core::tick::game_tick_with_context(
+                                                &mut ctx, &mut rng,
+                                            );
                                             let surge = chrono_surge.as_mut().unwrap();
                                             tally_chrono_surge_events(surge, &tick_result.events);
                                             surge.ticks_remaining -= 1;
@@ -1703,7 +1705,8 @@ fn main() -> io::Result<()> {
                                     achievements: &mut global_achievements,
                                     debug_mode,
                                 };
-                                let tick_result = core::tick::game_tick_with_context(&mut ctx, &mut rng);
+                                let tick_result =
+                                    core::tick::game_tick_with_context(&mut ctx, &mut rng);
 
                                 // Keep surge path headless (same semantics as [Esc] skip):
                                 // collect summary counters only and avoid per-tick UI work.
@@ -1795,7 +1798,8 @@ fn main() -> io::Result<()> {
                                     achievements: &mut global_achievements,
                                     debug_mode,
                                 };
-                                let tick_result = core::tick::game_tick_with_context(&mut ctx, &mut rng);
+                                let tick_result =
+                                    core::tick::game_tick_with_context(&mut ctx, &mut rng);
 
                                 let tick_flags = apply_tick_events(&mut state, &tick_result.events);
 

@@ -133,7 +133,8 @@ impl CharacterManager {
                 xp_this_second: 0,
                 ticker: crate::core::ticker::Ticker::new(),
                 cached_derived_stats: crate::character::derived_stats::DerivedStats::default(),
-                cached_prestige_bonuses: crate::character::prestige::PrestigeCombatBonuses::default(),
+                cached_prestige_bonuses: crate::character::prestige::PrestigeCombatBonuses::default(
+                ),
                 derived_stats_dirty: true,
                 combat_seconds_this_tick: false,
                 game_over_shown_at: None,

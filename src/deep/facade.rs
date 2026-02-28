@@ -77,8 +77,7 @@ mod tests {
         let mut achievements = Achievements::default();
         let mut rng = ChaCha8Rng::seed_from_u64(42);
 
-        let result =
-            tick_deep_facade(&mut deep, &mut achievements, "TestHero", false, &mut rng);
+        let result = tick_deep_facade(&mut deep, &mut achievements, "TestHero", false, &mut rng);
 
         assert!(!result.deep_changed);
         assert!(!result.achievements_changed);
@@ -92,8 +91,7 @@ mod tests {
         let mut achievements = Achievements::default();
         let mut rng = ChaCha8Rng::seed_from_u64(42);
 
-        let result =
-            tick_deep_facade(&mut deep, &mut achievements, "TestHero", false, &mut rng);
+        let result = tick_deep_facade(&mut deep, &mut achievements, "TestHero", false, &mut rng);
 
         // No active missions, so nothing should change
         assert!(!result.deep_changed);

@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 use crate::dungeon::logic::DungeonEvent;
-use crate::dungeon::pathfinding::{find_next_room, move_to_room, ROOM_MOVE_INTERVAL, ROOM_TRAVEL_INTERVAL};
+use crate::dungeon::pathfinding::{
+    find_next_room, move_to_room, ROOM_MOVE_INTERVAL, ROOM_TRAVEL_INTERVAL,
+};
 use crate::dungeon::types::{Dungeon, RoomState};
 
 /// Explicit inputs for the dungeon tick facade.
@@ -123,7 +125,9 @@ mod tests {
         // (generated dungeons always have at least entrance + some rooms)
         if !events.is_empty() {
             assert!(
-                events.iter().any(|e| matches!(e, DungeonEvent::EnteredRoom { .. })),
+                events
+                    .iter()
+                    .any(|e| matches!(e, DungeonEvent::EnteredRoom { .. })),
                 "Expected an EnteredRoom event"
             );
             // Timer should have been reset
@@ -146,7 +150,9 @@ mod tests {
         // (provided there is a next room)
         if !events.is_empty() {
             assert!(
-                events.iter().any(|e| matches!(e, DungeonEvent::EnteredRoom { .. })),
+                events
+                    .iter()
+                    .any(|e| matches!(e, DungeonEvent::EnteredRoom { .. })),
                 "Expected an EnteredRoom event with speed bonus"
             );
         }

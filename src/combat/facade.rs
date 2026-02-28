@@ -30,7 +30,14 @@ pub fn update_combat_facade<R: Rng>(
     achievements: &mut Achievements,
     derived: &DerivedStats,
 ) -> Vec<CombatEvent> {
-    crate::combat::orchestration::update_combat(rng, state, delta_time, bonuses, achievements, derived)
+    crate::combat::orchestration::update_combat(
+        rng,
+        state,
+        delta_time,
+        bonuses,
+        achievements,
+        derived,
+    )
 }
 
 #[cfg(test)]
@@ -48,7 +55,12 @@ mod tests {
         let derived = DerivedStats::default();
         let mut achievements = crate::achievements::Achievements::default();
         let events = update_combat_facade(
-            &mut rng, &mut state, 0.1, &bonuses, &mut achievements, &derived,
+            &mut rng,
+            &mut state,
+            0.1,
+            &bonuses,
+            &mut achievements,
+            &derived,
         );
         assert!(events.is_empty(), "No events when no enemy");
     }
@@ -70,7 +82,12 @@ mod tests {
         // Run enough ticks for an attack to happen
         for _ in 0..20 {
             let _events = update_combat_facade(
-                &mut rng, &mut state, 0.1, &bonuses, &mut achievements, &derived,
+                &mut rng,
+                &mut state,
+                0.1,
+                &bonuses,
+                &mut achievements,
+                &derived,
             );
         }
         // Should have processed some combat -- just verify no panic

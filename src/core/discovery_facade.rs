@@ -114,7 +114,13 @@ mod tests {
         }
 
         // With 1000 rolls at 1% and 5%, we should see at least one of each
-        assert!(any_dungeon, "Expected at least one dungeon discovery in 1000 rolls at 1%");
-        assert!(any_fishing, "Expected at least one fishing spot discovery in 1000 rolls at 5%");
+        assert!(
+            any_dungeon,
+            "Expected at least one dungeon discovery in 1000 rolls at 1%"
+        );
+        assert!(
+            any_fishing,
+            "Expected at least one fishing spot discovery in 1000 rolls at 5%"
+        );
     }
 }
