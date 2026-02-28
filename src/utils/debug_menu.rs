@@ -12,6 +12,7 @@ use crate::fishing::generation::generate_fishing_session;
 use crate::god_items;
 use crate::haven::Haven;
 use crate::items;
+use crate::zones::get_all_zones;
 use chrono::{Duration, Utc};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,6 +46,10 @@ enum DebugAction {
     TriggerDeepRefreshRecruits,
     TriggerDeepClearFrontierLayer,
     TriggerDeepCompleteActiveMissions,
+    TravelToZone(u32),
+    SetPrestige(u32),
+    SetLevel(u32),
+    MaxAttributes,
 }
 
 const DEBUG_ACTIONS: &[DebugAction] = &[
@@ -77,6 +82,40 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerDeepRefreshRecruits,
     DebugAction::TriggerDeepClearFrontierLayer,
     DebugAction::TriggerDeepCompleteActiveMissions,
+    // Zone travel actions
+    DebugAction::TravelToZone(1),
+    DebugAction::TravelToZone(2),
+    DebugAction::TravelToZone(3),
+    DebugAction::TravelToZone(4),
+    DebugAction::TravelToZone(5),
+    DebugAction::TravelToZone(6),
+    DebugAction::TravelToZone(7),
+    DebugAction::TravelToZone(8),
+    DebugAction::TravelToZone(9),
+    DebugAction::TravelToZone(10),
+    DebugAction::TravelToZone(11),
+    // Character actions (prestige, levels)
+    DebugAction::SetPrestige(1),
+    DebugAction::SetPrestige(5),
+    DebugAction::SetPrestige(25),
+    DebugAction::SetPrestige(50),
+    DebugAction::SetPrestige(100),
+    DebugAction::SetPrestige(250),
+    DebugAction::SetPrestige(500),
+    DebugAction::SetPrestige(1000),
+    DebugAction::SetPrestige(2500),
+    DebugAction::SetPrestige(5000),
+    DebugAction::SetLevel(1),
+    DebugAction::SetLevel(5),
+    DebugAction::SetLevel(25),
+    DebugAction::SetLevel(50),
+    DebugAction::SetLevel(100),
+    DebugAction::SetLevel(250),
+    DebugAction::SetLevel(500),
+    DebugAction::SetLevel(1000),
+    DebugAction::SetLevel(2500),
+    DebugAction::SetLevel(5000),
+    DebugAction::MaxAttributes,
 ];
 
 const CHALLENGE_ACTIONS: &[DebugAction] = &[
@@ -118,7 +157,56 @@ const DEEP_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerDeepClearFrontierLayer,
     DebugAction::TriggerDeepCompleteActiveMissions,
 ];
+const ZONE_ACTIONS: &[DebugAction] = &[
+    DebugAction::TravelToZone(1),
+    DebugAction::TravelToZone(2),
+    DebugAction::TravelToZone(3),
+    DebugAction::TravelToZone(4),
+    DebugAction::TravelToZone(5),
+    DebugAction::TravelToZone(6),
+    DebugAction::TravelToZone(7),
+    DebugAction::TravelToZone(8),
+    DebugAction::TravelToZone(9),
+    DebugAction::TravelToZone(10),
+    DebugAction::TravelToZone(11),
+];
+const CHARACTER_ACTIONS: &[DebugAction] = &[
+    DebugAction::SetPrestige(1),
+    DebugAction::SetPrestige(5),
+    DebugAction::SetPrestige(25),
+    DebugAction::SetPrestige(50),
+    DebugAction::SetPrestige(100),
+    DebugAction::SetPrestige(250),
+    DebugAction::SetPrestige(500),
+    DebugAction::SetPrestige(1000),
+    DebugAction::SetPrestige(2500),
+    DebugAction::SetPrestige(5000),
+    DebugAction::SetLevel(1),
+    DebugAction::SetLevel(5),
+    DebugAction::SetLevel(25),
+    DebugAction::SetLevel(50),
+    DebugAction::SetLevel(100),
+    DebugAction::SetLevel(250),
+    DebugAction::SetLevel(500),
+    DebugAction::SetLevel(1000),
+    DebugAction::SetLevel(2500),
+    DebugAction::SetLevel(5000),
+    DebugAction::MaxAttributes,
+];
 const BORDER_OPTION_START_INDEX: usize = DEBUG_ACTIONS.len();
+
+const SET_VALUES: &[u32] = &[1, 5, 25, 50, 100, 250, 500, 1000, 2500, 5000];
+
+const fn set_value_index(value: u32) -> usize {
+    let mut i = 0;
+    while i < SET_VALUES.len() {
+        if SET_VALUES[i] == value {
+            return i;
+        }
+        i += 1;
+    }
+    0 // fallback
+}
 
 impl DebugAction {
     const fn option_index(self) -> usize {
@@ -152,6 +240,10 @@ impl DebugAction {
             Self::TriggerDeepRefreshRecruits => 26,
             Self::TriggerDeepClearFrontierLayer => 27,
             Self::TriggerDeepCompleteActiveMissions => 28,
+            Self::TravelToZone(zone_id) => 29 + zone_id as usize - 1, // 29-39
+            Self::SetPrestige(amount) => 40 + set_value_index(amount),
+            Self::SetLevel(amount) => 50 + set_value_index(amount),
+            Self::MaxAttributes => 60,
         }
     }
 
@@ -186,6 +278,45 @@ impl DebugAction {
             Self::TriggerDeepRefreshRecruits => "Refresh Recruit Pool",
             Self::TriggerDeepClearFrontierLayer => "Clear Current Frontier Layer",
             Self::TriggerDeepCompleteActiveMissions => "Complete Active Missions",
+            Self::TravelToZone(zone_id) => match zone_id {
+                1 => "Travel to Meadow (Zone 1)",
+                2 => "Travel to Dark Forest (Zone 2)",
+                3 => "Travel to Mountain Pass (Zone 3)",
+                4 => "Travel to Ancient Ruins (Zone 4)",
+                5 => "Travel to Volcanic Wastes (Zone 5)",
+                6 => "Travel to Frozen Tundra (Zone 6)",
+                7 => "Travel to Crystal Caverns (Zone 7)",
+                8 => "Travel to Sunken Kingdom (Zone 8)",
+                9 => "Travel to Floating Isles (Zone 9)",
+                10 => "Travel to Storm Citadel (Zone 10)",
+                11 => "Travel to The Expanse (Zone 11)",
+                _ => "Travel to Unknown Zone",
+            },
+            Self::SetPrestige(amount) => match amount {
+                1 => "Set Prestige to P1",
+                5 => "Set Prestige to P5",
+                25 => "Set Prestige to P25",
+                50 => "Set Prestige to P50",
+                100 => "Set Prestige to P100",
+                250 => "Set Prestige to P250",
+                500 => "Set Prestige to P500",
+                1000 => "Set Prestige to P1000",
+                2500 => "Set Prestige to P2500",
+                _ => "Set Prestige to P5000",
+            },
+            Self::SetLevel(amount) => match amount {
+                1 => "Set Level to 1",
+                5 => "Set Level to 5",
+                25 => "Set Level to 25",
+                50 => "Set Level to 50",
+                100 => "Set Level to 100",
+                250 => "Set Level to 250",
+                500 => "Set Level to 500",
+                1000 => "Set Level to 1000",
+                2500 => "Set Level to 2500",
+                _ => "Set Level to 5000",
+            },
+            Self::MaxAttributes => "Max All Attributes",
         }
     }
 
@@ -226,6 +357,10 @@ impl DebugAction {
             Self::TriggerDeepRefreshRecruits => trigger_deep_refresh_recruit_pool(deep),
             Self::TriggerDeepClearFrontierLayer => trigger_deep_clear_frontier_layer(deep),
             Self::TriggerDeepCompleteActiveMissions => trigger_deep_complete_active_missions(deep),
+            Self::TravelToZone(zone_id) => trigger_travel_to_zone(state, enhancement, zone_id),
+            Self::SetPrestige(amount) => trigger_set_prestige(state, enhancement, amount),
+            Self::SetLevel(amount) => trigger_set_level(state, enhancement, amount),
+            Self::MaxAttributes => trigger_max_attributes(state, enhancement),
         }
     }
 }
@@ -263,6 +398,8 @@ pub fn option_count_for_category(category: DebugCategory) -> usize {
         DebugCategory::Resources => RESOURCE_ACTIONS.len(),
         DebugCategory::Items => ITEM_ACTIONS.len(),
         DebugCategory::Deep => DEEP_ACTIONS.len(),
+        DebugCategory::Zones => ZONE_ACTIONS.len(),
+        DebugCategory::Character => CHARACTER_ACTIONS.len(),
         DebugCategory::Borders => SELECTABLE_UI_BORDER_STYLES.len(),
     }
 }
@@ -274,6 +411,8 @@ pub enum DebugCategory {
     Resources,
     Items,
     Deep,
+    Zones,
+    Character,
     Borders,
 }
 
@@ -285,6 +424,8 @@ impl DebugCategory {
             Self::Resources => "Resources",
             Self::Items => "Items",
             Self::Deep => "The Deep",
+            Self::Zones => "Zones",
+            Self::Character => "Character",
             Self::Borders => "Borders",
         }
     }
@@ -296,6 +437,8 @@ pub const DEBUG_CATEGORIES: &[DebugCategory] = &[
     DebugCategory::Resources,
     DebugCategory::Items,
     DebugCategory::Deep,
+    DebugCategory::Zones,
+    DebugCategory::Character,
     DebugCategory::Borders,
 ];
 
@@ -378,6 +521,8 @@ impl DebugMenu {
             DebugCategory::Resources => RESOURCE_ACTIONS[visible_index].option_index(),
             DebugCategory::Items => ITEM_ACTIONS[visible_index].option_index(),
             DebugCategory::Deep => DEEP_ACTIONS[visible_index].option_index(),
+            DebugCategory::Zones => ZONE_ACTIONS[visible_index].option_index(),
+            DebugCategory::Character => CHARACTER_ACTIONS[visible_index].option_index(),
             DebugCategory::Borders => BORDER_OPTION_START_INDEX + visible_index,
         }
     }
@@ -750,6 +895,139 @@ fn trigger_force_overcharge(state: &mut GameState) -> &'static str {
     "Next Chrono Surge will be Overcharged!"
 }
 
+fn trigger_travel_to_zone(
+    state: &mut GameState,
+    enhancement: &EnhancementProgress,
+    zone_id: u32,
+) -> &'static str {
+    let zones = get_all_zones();
+    let zone = match zones.iter().find(|z| z.id == zone_id) {
+        Some(z) => z,
+        None => return "Invalid zone ID!",
+    };
+
+    // Clear active content
+    state.active_dungeon = None;
+    state.active_fishing = None;
+    state.combat_state.current_enemy = None;
+
+    // Auto-bump prestige if needed
+    if state.prestige_rank < zone.prestige_requirement {
+        state.prestige_rank = zone.prestige_requirement;
+        state.recalculate_prestige_bonuses();
+    }
+
+    // Zone 11 is achievement-gated (not prestige-gated), but needs high prestige to survive
+    if zone_id == 11 && state.prestige_rank < 20 {
+        state.prestige_rank = 20;
+        state.recalculate_prestige_bonuses();
+    }
+
+    // Unlock the target zone (and all zones at or below its prestige tier)
+    for z in zones {
+        if z.prestige_requirement <= state.prestige_rank {
+            state.zone_progression.unlock_zone(z.id);
+        }
+    }
+
+    // Travel to subzone 1
+    state.zone_progression.current_zone_id = zone_id;
+    state.zone_progression.current_subzone_id = 1;
+    state.zone_progression.kills_in_subzone = 0;
+    state.zone_progression.fighting_boss = false;
+
+    // Recalculate stats
+    state.recalculate_derived_stats(&enhancement.levels);
+
+    match zone_id {
+        1 => "Traveled to Meadow (Zone 1)",
+        2 => "Traveled to Dark Forest (Zone 2)",
+        3 => "Traveled to Mountain Pass (Zone 3, P5)",
+        4 => "Traveled to Ancient Ruins (Zone 4, P5)",
+        5 => "Traveled to Volcanic Wastes (Zone 5, P10)",
+        6 => "Traveled to Frozen Tundra (Zone 6, P10)",
+        7 => "Traveled to Crystal Caverns (Zone 7, P15)",
+        8 => "Traveled to Sunken Kingdom (Zone 8, P15)",
+        9 => "Traveled to Floating Isles (Zone 9, P20)",
+        10 => "Traveled to Storm Citadel (Zone 10, P20)",
+        11 => "Traveled to The Expanse (Zone 11)",
+        _ => "Traveled to unknown zone",
+    }
+}
+
+fn trigger_set_prestige(
+    state: &mut GameState,
+    enhancement: &EnhancementProgress,
+    rank: u32,
+) -> &'static str {
+    state.prestige_rank = rank;
+    state.recalculate_prestige_bonuses();
+
+    // Unlock zones accessible at new prestige rank
+    let zones = get_all_zones();
+    for z in zones {
+        if z.prestige_requirement <= state.prestige_rank {
+            state.zone_progression.unlock_zone(z.id);
+        }
+    }
+
+    // Recalculate stats
+    state.recalculate_derived_stats(&enhancement.levels);
+
+    match rank {
+        1 => "Set Prestige to P1!",
+        5 => "Set Prestige to P5!",
+        25 => "Set Prestige to P25!",
+        50 => "Set Prestige to P50!",
+        100 => "Set Prestige to P100!",
+        250 => "Set Prestige to P250!",
+        500 => "Set Prestige to P500!",
+        1000 => "Set Prestige to P1000!",
+        2500 => "Set Prestige to P2500!",
+        _ => "Set Prestige to P5000!",
+    }
+}
+
+fn trigger_set_level(
+    state: &mut GameState,
+    enhancement: &EnhancementProgress,
+    target_level: u32,
+) -> &'static str {
+    let mut rng = rand::rng();
+    // Grant levels up to target, distributing attribute points for each
+    while state.character_level < target_level {
+        state.character_level += 1;
+        crate::core::xp::distribute_level_up_points(&mut rng, state);
+    }
+    state.character_xp = 0;
+    state.recalculate_derived_stats(&enhancement.levels);
+
+    match target_level {
+        1 => "Set Level to 1!",
+        5 => "Set Level to 5!",
+        25 => "Set Level to 25!",
+        50 => "Set Level to 50!",
+        100 => "Set Level to 100!",
+        250 => "Set Level to 250!",
+        500 => "Set Level to 500!",
+        1000 => "Set Level to 1000!",
+        2500 => "Set Level to 2500!",
+        _ => "Set Level to 5000!",
+    }
+}
+
+fn trigger_max_attributes(
+    state: &mut GameState,
+    enhancement: &EnhancementProgress,
+) -> &'static str {
+    let cap = state.get_attribute_cap();
+    for attr in crate::character::attributes::AttributeType::all() {
+        state.attributes.set(attr, cap);
+    }
+    state.recalculate_derived_stats(&enhancement.levels);
+    "All attributes set to cap!"
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -807,17 +1085,20 @@ mod tests {
         assert_eq!(menu.current_category(), DebugCategory::Borders);
 
         menu.navigate_prev_category();
-        assert_eq!(menu.current_category(), DebugCategory::Deep);
+        assert_eq!(menu.current_category(), DebugCategory::Character);
 
         menu.navigate_prev_category();
-        assert_eq!(menu.current_category(), DebugCategory::Items);
+        assert_eq!(menu.current_category(), DebugCategory::Zones);
+
+        menu.navigate_prev_category();
+        assert_eq!(menu.current_category(), DebugCategory::Deep);
     }
 
     #[test]
     fn test_border_preview_does_not_close_menu() {
         let mut menu = DebugMenu::new();
         menu.open();
-        for _ in 0..5 {
+        for _ in 0..7 {
             menu.navigate_next_category();
         }
         assert_eq!(menu.current_category(), DebugCategory::Borders);
@@ -1121,5 +1402,157 @@ mod tests {
             .layer_record(frontier)
             .map(|r| r.cleared)
             .unwrap_or(false));
+    }
+
+    #[test]
+    fn test_trigger_travel_to_zone_basic() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+        assert_eq!(state.zone_progression.current_zone_id, 1);
+
+        let msg = trigger_travel_to_zone(&mut state, &enhancement, 5);
+        assert_eq!(msg, "Traveled to Volcanic Wastes (Zone 5, P10)");
+        assert_eq!(state.zone_progression.current_zone_id, 5);
+        assert_eq!(state.zone_progression.current_subzone_id, 1);
+        // Prestige auto-bumped to P10
+        assert_eq!(state.prestige_rank, 10);
+    }
+
+    #[test]
+    fn test_trigger_travel_clears_active_content() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+        state.active_dungeon = Some(generate_dungeon(1, 0, 1));
+
+        trigger_travel_to_zone(&mut state, &enhancement, 1);
+        assert!(state.active_dungeon.is_none());
+    }
+
+    #[test]
+    fn test_trigger_travel_no_prestige_downgrade() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+        state.prestige_rank = 20;
+
+        trigger_travel_to_zone(&mut state, &enhancement, 1);
+        // Traveling to P0 zone should not lower prestige
+        assert_eq!(state.prestige_rank, 20);
+    }
+
+    #[test]
+    fn test_trigger_travel_unlocks_intermediate_zones() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+
+        trigger_travel_to_zone(&mut state, &enhancement, 7);
+        // Should unlock zones 1-8 (all P0, P5, P10, P15 zones)
+        for zone_id in 1..=8 {
+            assert!(
+                state.zone_progression.is_zone_unlocked(zone_id),
+                "Zone {zone_id} should be unlocked after traveling to Zone 7 (P15)"
+            );
+        }
+    }
+
+    #[test]
+    fn test_trigger_set_prestige() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+
+        let msg = trigger_set_prestige(&mut state, &enhancement, 5);
+        assert_eq!(msg, "Set Prestige to P5!");
+        assert_eq!(state.prestige_rank, 5);
+
+        // Zones 3-4 (P5) should now be unlocked
+        assert!(state.zone_progression.is_zone_unlocked(3));
+        assert!(state.zone_progression.is_zone_unlocked(4));
+    }
+
+    #[test]
+    fn test_trigger_set_prestige_overwrites() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+
+        trigger_set_prestige(&mut state, &enhancement, 10);
+        trigger_set_prestige(&mut state, &enhancement, 5);
+        assert_eq!(state.prestige_rank, 5);
+    }
+
+    #[test]
+    fn test_trigger_set_level() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+        assert_eq!(state.character_level, 1);
+
+        let msg = trigger_set_level(&mut state, &enhancement, 25);
+        assert_eq!(msg, "Set Level to 25!");
+        assert_eq!(state.character_level, 25);
+    }
+
+    #[test]
+    fn test_trigger_set_level_distributes_attributes() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+        // Bump prestige so attribute cap doesn't interfere
+        state.prestige_rank = 10; // cap = 20 + 50 = 70
+        let initial_sum: u32 = crate::character::attributes::AttributeType::all()
+            .iter()
+            .map(|a| state.attributes.get(*a))
+            .sum();
+
+        trigger_set_level(&mut state, &enhancement, 25);
+
+        let final_sum: u32 = crate::character::attributes::AttributeType::all()
+            .iter()
+            .map(|a| state.attributes.get(*a))
+            .sum();
+        // 24 levels (1->25) * 3 points = 72 attribute points gained
+        assert_eq!(final_sum, initial_sum + 72);
+    }
+
+    #[test]
+    fn test_trigger_set_level_noop_if_already_at_target() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+        state.character_level = 50;
+
+        trigger_set_level(&mut state, &enhancement, 25);
+        // Should not lower level — noop when already above target
+        assert_eq!(state.character_level, 50);
+    }
+
+    #[test]
+    fn test_character_category_has_21_options() {
+        assert_eq!(option_count_for_category(DebugCategory::Character), 21);
+    }
+
+    #[test]
+    fn test_zones_category_has_11_options() {
+        assert_eq!(option_count_for_category(DebugCategory::Zones), 11);
+    }
+
+    #[test]
+    fn test_trigger_set_prestige_100() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+
+        let msg = trigger_set_prestige(&mut state, &enhancement, 100);
+        assert_eq!(msg, "Set Prestige to P100!");
+        assert_eq!(state.prestige_rank, 100);
+    }
+
+    #[test]
+    fn test_trigger_max_attributes() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+        state.prestige_rank = 10;
+
+        let msg = trigger_max_attributes(&mut state, &enhancement);
+        assert_eq!(msg, "All attributes set to cap!");
+
+        let cap = state.get_attribute_cap(); // 20 + 10*5 = 70
+        for attr in crate::character::attributes::AttributeType::all() {
+            assert_eq!(state.attributes.get(attr), cap);
+        }
     }
 }
