@@ -371,15 +371,24 @@ Individual JSON files per character stored in `~/.quest/`. Maximum 3 characters.
 The game runs a 100ms tick loop. Each tick calls `game_tick()` in `src/core/tick.rs`, which orchestrates all game systems and returns a `TickResult`.
 
 The tick implementation is split across several files:
-- `tick.rs` -- Orchestrator: calls each stage in order, returns `TickResult`
+- `tick.rs` -- Orchestrator: calls named stage functions in order, returns `TickResult`. Also provides `game_tick_with_context()` using `TickContext`
+- `tick_context.rs` -- `TickContext` struct bundling all mutable parameters for `game_tick()` into a single struct
 - `tick_types.rs` -- `TickEvent` enum (42 variants) and `TickResult` struct
-- `tick_stages.rs` -- Processing stages 4-6 and helper functions (`process_item_drop`, `process_discoveries`, etc.)
+- `tick_stages.rs` -- All tick processing stages extracted into named functions (compute_merged_bonuses, tick_challenge_ai, sync_derived_stats, run_combat, etc.)
 - `xp.rs` -- XP calculation, leveling logic, combat kill XP
 - `discoveries.rs` -- Discovery rolls for dungeons, fishing spots, Haven, Soulforge
 - `enemy_spawning.rs` -- Enemy generation and spawning (spawn_enemy_if_needed, try_discover_dungeon)
 - `offline.rs` -- Offline XP progression
 - `recent_drops.rs` -- RecentDrop struct and deque management
 - `ticker.rs` -- XP rate sampling and rolling window
+
+Phase 2 refactoring scaffolds (sub-struct definitions, not yet wired):
+- `player_identity.rs` -- PlayerIdentity sub-struct (character identity fields)
+- `combat_context.rs` -- CombatContext sub-struct (combat-related state)
+- `progression_state.rs` -- ProgressionState sub-struct (fishing, stormglass, challenges)
+- `session_state.rs` -- SessionState sub-struct (caches, timers, UI state)
+- `game_state_serde.rs` -- FlatGameState serde helper for backward-compatible save format
+- `discovery_facade.rs` -- DiscoveryInput struct and discovery facade (placeholder)
 
 ### game_tick() Signature
 
@@ -430,24 +439,27 @@ pub struct TickResult {
 
 ### Processing Stages
 
-| Stage | What it does | File |
-|-------|-------------|------|
-| 1. Challenge AI | Ticks AI thinking for active Chess, Morris, Gomoku, or Go games | tick.rs |
-| 2. Challenge discovery | Rolls for new challenge discovery (P1+ required, Haven bonus applied) | tick.rs |
-| 3. Sync player HP | Recalculates DerivedStats and updates player_max_hp | tick.rs |
-| 4. Dungeon exploration | Processes room entry, treasure, keys, boss unlock, completion/failure | tick_stages.rs |
-| 5. Fishing | If fishing active: ticks session, handles catches/items/rank-ups/Leviathan, **returns early** (skips combat) | tick_stages.rs |
-| 6. Combat | Maps CombatEvent to TickEvent, applies XP, handles kills/deaths, processes item drops and discoveries | tick_stages.rs |
-| 7. Enemy spawn | Spawns enemy if no enemy and not regenerating | tick.rs |
-| 8. Play time | Increments tick counter; at 10 ticks, increments play_time_seconds | tick.rs |
-| 9. Achievement collection | Drains newly unlocked achievements into TickResult.events | tick.rs |
-| 10. Haven discovery | Rolls for Haven discovery (P10+, no active content) | tick.rs |
-| 11. Soulforge discovery | Rolls for Soulforge discovery (P15+, no active content) | tick.rs |
-| 12. Deep discovery hook | No per-tick roll; discovery is triggered during Stage 6 combat processing on first Expanse cycle boss kill at P15+ | tick.rs / tick_stages.rs |
-| 13. Deep missions | Ticks active Deep missions, processes completions and events | tick.rs |
-| 14. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display | tick.rs |
+All stage logic is extracted into named functions in `tick_stages.rs`. The `game_tick()` body is a clean sequence of function calls:
 
-**Important**: Stage 5 (fishing) returns early, skipping stages 6-7. Fishing and combat are mutually exclusive.
+| Stage | Function | What it does |
+|-------|----------|-------------|
+| 0. Merged bonuses | `compute_merged_bonuses()` | Merge Haven + Sigil bonuses, inject sigil drop/fishing bonuses |
+| 1. Challenge AI | `tick_challenge_ai()` | Ticks AI thinking for active Chess, Morris, Gomoku, or Go games |
+| 2. Challenge discovery | `tick_challenge_discovery()` | Rolls for new challenge discovery (P1+ required, skipped during Chrono Surge) |
+| 3. Sync player HP | `sync_derived_stats()` | Recalculates DerivedStats if dirty, syncs max HP |
+| 4. Dungeon exploration | `process_dungeon_events()` | Processes room entry, treasure, keys, boss unlock, completion/failure |
+| 5. Fishing | `process_fishing_tick()` | If fishing active: ticks session, handles catches/items/rank-ups/Leviathan, **returns early** (skips combat) |
+| 6. Combat | `run_combat()` | Builds unified CombatBonuses, calls update_combat(), processes events (XP, kills, deaths, drops, discoveries) |
+| 7. HUD decay | inline | Decays HUD flash timers |
+| 8. Enemy spawn | `spawn_enemy_if_needed()` | Spawns enemy if no enemy and not regenerating |
+| 9. Play time | `update_play_time()` | Increments tick counter; at 10 ticks, increments play_time_seconds |
+| 10. Achievement collection | `collect_achievement_events()` | Drains newly unlocked achievements into TickResult.events |
+| 11. Haven discovery | `tick_haven_discovery()` | Rolls for Haven discovery (P10+, no active content) |
+| 12. Soulforge discovery | `tick_soulforge_discovery()` | Rolls for Soulforge discovery (P15+, no active content) |
+| 13. Deep missions | `tick_deep_missions()` | Ticks active Deep missions, resolves completions, fires achievements |
+| 14. Achievement modal | inline | Checks if 500ms accumulation window has elapsed for modal display |
+
+**Important**: Stage 5 (fishing) returns early, skipping stages 6-8. Fishing and combat are mutually exclusive.
 
 ### Event Mapping (tick_events.rs)
 

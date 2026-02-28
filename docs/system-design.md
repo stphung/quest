@@ -102,22 +102,23 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
     │  main.rs: Process Input → call game_tick() → Render     │
     └──────────────────────────┬──────────────────────────────┘
                                │
-               game_tick() 14-stage pipeline:
+               game_tick() pipeline (all stages extracted to named functions):
                                │
     ┌──────────────────────────┴──────────────────────────────┐
-    │  1. Challenge AI        Tick AI thinking for active game │
-    │  2. Challenge Discovery Roll for new challenge (P1+)    │
-    │  3. Sync Player HP      Recalculate DerivedStats        │
-    │  4. Dungeon Exploration Process rooms, keys, boss       │
-    │  5. Fishing             Tick session (EARLY RETURN)     │
-    │  6. Combat              Attack cycle, kills, deaths     │
-    │  7. Enemy Spawn         Spawn if idle + not regen       │
-    │  8. Play Time           Increment tick/second counters  │
-    │  9. Achievement Collect Drain newly unlocked into events│
-    │ 10. Haven Discovery     Roll for Haven (P10+)           │
-    │ 11. Soulforge Discovery Roll for Soulforge (P15+)      │
-    │ 12. Deep Discovery      Trigger hook (no per-tick roll) │
-    │ 13. Deep Missions       Tick active missions, events    │
+    │  0. Merged Bonuses      compute_merged_bonuses()        │
+    │  1. Challenge AI        tick_challenge_ai()              │
+    │  2. Challenge Discovery tick_challenge_discovery()       │
+    │  3. Sync Player HP      sync_derived_stats()            │
+    │  4. Dungeon Exploration process_dungeon_events()        │
+    │  5. Fishing             process_fishing_tick() (EARLY)  │
+    │  6. Combat              run_combat()                    │
+    │  7. HUD Decay           tick_hud() (inline)             │
+    │  8. Enemy Spawn         spawn_enemy_if_needed()         │
+    │  9. Play Time           update_play_time()              │
+    │ 10. Achievement Collect collect_achievement_events()    │
+    │ 11. Haven Discovery     tick_haven_discovery()           │
+    │ 12. Soulforge Discovery tick_soulforge_discovery()      │
+    │ 13. Deep Missions       tick_deep_missions()            │
     │ 14. Achievement Modal   Check 500ms accumulation window │
     └─────────────────────────────────────────────────────────┘
                                │
@@ -951,10 +952,17 @@ quest/
 │   ├── core/                # Core game systems
 │   │   ├── constants.rs     # All game balance constants
 │   │   ├── game_logic.rs    # Thin re-export wrapper for submodules
-│   │   ├── game_state.rs    # Main GameState struct
-│   │   ├── tick.rs          # game_tick() orchestrator
+│   │   ├── game_state.rs    # Main GameState struct, grouped accessor methods
+│   │   ├── tick.rs          # game_tick() and game_tick_with_context() orchestrator
+│   │   ├── tick_context.rs  # TickContext parameter bundling struct
 │   │   ├── tick_types.rs    # TickEvent enum (42 variants), TickResult struct
-│   │   ├── tick_stages.rs   # Tick processing stages 4-6 + helpers
+│   │   ├── tick_stages.rs   # All tick processing stages as named functions
+│   │   ├── player_identity.rs # PlayerIdentity sub-struct (Phase 2 scaffold)
+│   │   ├── combat_context.rs  # CombatContext sub-struct (Phase 2 scaffold)
+│   │   ├── progression_state.rs # ProgressionState sub-struct (Phase 2 scaffold)
+│   │   ├── session_state.rs # SessionState sub-struct (Phase 2 scaffold)
+│   │   ├── game_state_serde.rs # FlatGameState serde compatibility layer
+│   │   ├── discovery_facade.rs # Discovery facade (placeholder)
 │   │   ├── xp.rs            # XP calculation, leveling, combat kill XP
 │   │   ├── discoveries.rs   # Discovery rolls (dungeon, fishing, Haven, Soulforge)
 │   │   ├── enemy_spawning.rs # Enemy generation and spawning
@@ -988,7 +996,8 @@ quest/
 │   │   ├── enemy_attack.rs  # Enemy attack resolution
 │   │   ├── damage.rs        # Shared damage calculation, enemy death handling
 │   │   ├── events.rs        # CombatEvent, CombatBonuses (unified struct)
-│   │   └── regen.rs         # HP regeneration after combat
+│   │   ├── regen.rs         # HP regeneration after combat
+│   │   └── facade.rs        # Combat facade (placeholder)
 │   ├── zones/               # Zone system
 │   │   ├── data.rs          # Zone definitions
 │   │   ├── progression.rs   # Zone progression
@@ -1000,14 +1009,16 @@ quest/
 │   │   ├── generation.rs    # Procedural generation
 │   │   ├── logic.rs         # Room clearing, key system
 │   │   ├── pathfinding.rs   # BFS-based dungeon navigation
-│   │   └── rewards.rs       # Dungeon XP, item generation, treasure rooms
+│   │   ├── rewards.rs       # Dungeon XP, item generation, treasure rooms
+│   │   └── facade.rs        # Dungeon facade (placeholder)
 │   ├── fishing/             # Fishing system
 │   │   ├── types.rs         # Fish, phases, ranks
 │   │   ├── generation.rs    # Fish generation, Leviathan
 │   │   ├── logic.rs         # Session tick processing
 │   │   ├── discovery.rs     # Fishing spot discovery logic
 │   │   ├── drops.rs         # Item drops from fishing
-│   │   └── rank.rs          # Rank progression and tier definitions
+│   │   ├── rank.rs          # Rank progression and tier definitions
+│   │   └── facade.rs        # Fishing facade (placeholder)
 │   ├── items/               # Item system
 │   │   ├── types.rs         # Items, slots, affixes
 │   │   ├── equipment.rs     # Equipment container
@@ -1016,7 +1027,9 @@ quest/
 │   │   ├── names.rs         # Name generation
 │   │   └── scoring.rs       # Power scoring and auto-equip scoring
 │   ├── challenges/          # Challenge minigames
+│   │   ├── mod.rs           # Shared forfeit handler, impl_apply_game_result! macro
 │   │   ├── menu.rs          # Challenge menu
+│   │   ├── facade.rs        # Challenge AI tick facade (placeholder)
 │   │   ├── chess/           # Chess minigame
 │   │   ├── go/              # Go (Territory Control)
 │   │   ├── morris/          # Nine Men's Morris (includes ai.rs)
@@ -1044,8 +1057,9 @@ quest/
 │   │   ├── missions.rs      # Mission creation, assignment, resolution
 │   │   ├── events.rs        # Check-in events and event choices
 │   │   ├── economy.rs       # Warband Marks economy, costs, rewards
-│   │   ├── discovery.rs     # Discovery roll logic, starter roster
-│   │   └── persistence.rs   # Save/load from ~/.quest/deep.json
+│   │   ├── discovery.rs     # Discovery logic (boss-trigger), starter roster
+│   │   ├── persistence.rs   # Save/load from ~/.quest/deep.json
+│   │   └── facade.rs        # Deep facade (placeholder)
 │   ├── stormglass/          # Stormglass currency and Storm Sigils
 │   │   ├── types.rs         # Stormglass state, daily rotation
 │   │   ├── sigils.rs        # Storm Sigil definitions and bonuses
@@ -1070,6 +1084,7 @@ quest/
 │   │   └── debug_menu.rs    # Debug menu
 │   └── ui/                  # UI components (terminal-coupled, not in lib.rs)
 │       ├── mod.rs           # Layout coordinator
+│       ├── overlay_layout.rs # Shared overlay layout helpers
 │       ├── game_common.rs   # Shared minigame layout
 │       ├── stats_panel.rs   # Character stats
 │       ├── stats_attributes.rs # Stats panel attribute rendering

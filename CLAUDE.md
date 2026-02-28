@@ -81,11 +81,18 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 
 ### Core Module (`src/core/`)
 
-- `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
+- `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment), grouped accessor methods
 - `game_logic.rs` — Thin re-export wrapper (XP curve, leveling, spawning, offline logic extracted to submodules)
-- `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 14 processing stages. Zero UI imports, zero file I/O — fully decoupled from rendering
+- `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` orchestrator calling named stage functions. Also provides `game_tick_with_context()` using `TickContext`. Zero UI imports, zero file I/O — fully decoupled from rendering
+- `tick_context.rs` — `TickContext` struct bundling all mutable parameters for `game_tick()` into a single struct
 - `tick_types.rs` — TickEvent enum (42 variants) and TickResult struct
-- `tick_stages.rs` — Tick processing stages 4-6 and helper functions (process_item_drop, process_discoveries, etc.)
+- `tick_stages.rs` — All tick processing stages extracted into named functions (compute_merged_bonuses, tick_challenge_ai, tick_challenge_discovery, sync_derived_stats, process_dungeon_events, process_fishing_tick, run_combat, update_play_time, tick_haven_discovery, tick_soulforge_discovery, tick_deep_missions, plus helpers)
+- `player_identity.rs` — PlayerIdentity sub-struct grouping character identity fields (Phase 2 refactoring scaffold)
+- `combat_context.rs` — CombatContext sub-struct grouping combat-related state (Phase 2 refactoring scaffold)
+- `progression_state.rs` — ProgressionState sub-struct grouping non-combat progression (Phase 2 refactoring scaffold)
+- `session_state.rs` — SessionState sub-struct grouping transient session state (Phase 2 refactoring scaffold)
+- `game_state_serde.rs` — FlatGameState intermediate for backward-compatible serialization during sub-struct migration
+- `discovery_facade.rs` — Discovery facade with explicit DiscoveryInput struct (placeholder, not yet wired)
 - `xp.rs` — XP calculation, leveling logic, combat kill XP
 - `discoveries.rs` — Discovery rolls for dungeons, fishing spots, Haven, Soulforge, The Deep
 - `enemy_spawning.rs` — Enemy generation and spawning (spawn_enemy_if_needed, try_discover_dungeon)
@@ -150,6 +157,7 @@ CLI: `--hours N`, `--seed N`, `--strategy STR` (rush/balanced/infrastructure), `
 - `damage.rs` — Shared damage calculation and enemy death handling
 - `events.rs` — CombatEvent enum, CombatBonuses (unified struct replacing HavenCombatBonuses, GodItemCombatBonuses, PrestigeCombatBonuses)
 - `regen.rs` — HP regeneration after combat
+- `facade.rs` — CombatInput struct and update_combat_facade() placeholder for facade pattern migration
 
 ### Zone System (`src/zones/`)
 
@@ -174,6 +182,7 @@ CLI: `--hours N`, `--seed N`, `--strategy STR` (rush/balanced/infrastructure), `
 - `logic.rs` — Room clearing, key system, safe death (no prestige loss)
 - `pathfinding.rs` — BFS-based dungeon navigation, room exploration priority, auto-exploration
 - `rewards.rs` — Dungeon boss XP rewards, item generation, treasure room handling
+- `facade.rs` — DungeonInput struct and tick_dungeon_facade() placeholder for facade pattern migration
 
 **Dungeon Sizes:** Small 5×5, Medium 7×7, Large 9×9, Epic 11×11, Legendary 13×13 (based on level and prestige)
 
@@ -185,6 +194,7 @@ CLI: `--hours N`, `--seed N`, `--strategy STR` (rush/balanced/infrastructure), `
 - `discovery.rs` — Fishing spot discovery logic (try_discover_fishing)
 - `drops.rs` — Item drop chance and generation from fish catches
 - `rank.rs` — Rank-up checking and max rank calculation
+- `facade.rs` — FishingInput struct and tick_fishing_facade() placeholder for facade pattern migration
 
 **Fishing Ranks:** 40 ranks across 8 tiers (Novice 1-5, Apprentice 6-10, Journeyman 11-15, Expert 16-20, Master 21-25, Grandmaster 26-30 base max, Mythic 31-35, Transcendent 36-40 with Fishing Dock T4). Storm Leviathan encounter at rank 40.
 
@@ -217,6 +227,7 @@ Account-level equipment enhancement system (Soulforge) that persists across char
 - `layers.rs` — Layer difficulty (power thresholds L1-25 + Void scaling), familiarity system (Unknown/Mapped/Familiar/Mastered), mission durations (base + multiplicative modifiers), infrastructure building (validation, costs, Watchtower familiarity bonus)
 - `persistence.rs` — Save/load from `~/.quest/deep.json`
 - `discovery.rs` — Discovery logic (complete_discovery), starter roster initialisation (3 mercs: Vanguard, Scout, Medic)
+- `facade.rs` — DeepInput struct and tick_deep_facade() placeholder for facade pattern migration
 
 An endgame (P15+) system where players recruit and manage a mercenary company, sending squads on long-duration missions (2-24h wall-clock time) into a vast underground structure. Two-tier persistence: `DeepPersistent` (guild rank, cleared layers, infrastructure — survives prestige) and `DeepPrestige` (mercs, missions, Warband Marks — resets on prestige). Five mercenary archetypes (Vanguard, Scout, Arcanist, Medic, Saboteur) with 4 quality tiers. Six layer tiers (Shallows through The Void). Five mission types (Supply Run, Recon, Expedition, Breakthrough, Construction). Four infrastructure types (Outpost, SupplyCache, Watchtower, Bridge). Discovered on first Endless kill (Zone 11 boss) at P15+.
 
@@ -245,8 +256,9 @@ God items are created via debug menu (discovery/forging system not yet designed,
 
 ### Challenge Minigames (`src/challenges/`) — [detailed docs](src/challenges/CLAUDE.md)
 
-- `mod.rs` — `impl_apply_game_result!` macro standardizing `apply_game_result()` across all 10 challenge types. Challenge wins award Stormglass currency (in addition to PR/FR rewards)
+- `mod.rs` — `impl_apply_game_result!` macro standardizing `apply_game_result()` across all 10 challenge types. Shared `handle_forfeit()` and `cancel_forfeit_if_pending()` functions centralizing forfeit confirmation logic. Challenge wins award Stormglass currency (in addition to PR/FR rewards)
 - `menu.rs` — Generic challenge menu system (pending challenges, extensible challenge types)
+- `facade.rs` — Challenge AI tick facade placeholder for facade pattern migration
 - `chess/` — Chess minigame (4 difficulty levels: Novice→Master, ~500-1350 ELO), requires P1+
 - `go/` — Go (Territory Control) on 9×9 board, MCTS AI with heuristics (500-20k simulations), requires P1+
 - `morris/` — Nine Men's Morris (board layout, mill detection, phases), `ai.rs` (minimax with alpha-beta pruning), requires P1+
@@ -331,6 +343,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 ### UI (`src/ui/`) — [detailed docs](src/ui/CLAUDE.md)
 
 - `mod.rs` — Layout coordinator (stats panel left 50%, combat scene right 50%), centralized `rarity_color()` function
+- `overlay_layout.rs` — Shared overlay layout helpers: `centered_overlay()` for modal positioning, `two_panel_split()` for left/right panel layouts
 - `game_common.rs` — Shared minigame layout, status bars, game-over overlays
 - `stats_panel.rs` — Character stats display (delegates to submodules)
 - `stats_attributes.rs` — Attribute rendering helpers for stats panel
@@ -396,7 +409,7 @@ module/
 All challenge minigames use 4 difficulty levels: Novice, Apprentice, Journeyman, Master.
 
 ### Forfeit Pattern
-All interactive minigames: first Esc sets `forfeit_pending`, second Esc confirms, any other key cancels.
+All interactive minigames: first Esc sets `forfeit_pending`, second Esc confirms, any other key cancels. All 10 challenge types use the shared `handle_forfeit()` and `cancel_forfeit_if_pending()` functions in `challenges/mod.rs`.
 
 ### Haven Bonus Injection
 Haven bonuses are passed as explicit parameters rather than accessed globally. This keeps modules decoupled.
@@ -474,9 +487,16 @@ quest/
 │   │   ├── constants.rs     # Game balance constants
 │   │   ├── game_logic.rs    # Re-export wrapper
 │   │   ├── game_state.rs    # Main game state
-│   │   ├── tick.rs          # Per-tick game engine (game_tick)
+│   │   ├── tick.rs          # Per-tick game engine (game_tick, game_tick_with_context)
+│   │   ├── tick_context.rs  # TickContext parameter bundling struct
 │   │   ├── tick_types.rs    # TickEvent enum, TickResult struct
-│   │   ├── tick_stages.rs   # Tick processing stages 4-6
+│   │   ├── tick_stages.rs   # All tick processing stages as named functions
+│   │   ├── player_identity.rs # PlayerIdentity sub-struct (Phase 2 scaffold)
+│   │   ├── combat_context.rs  # CombatContext sub-struct (Phase 2 scaffold)
+│   │   ├── progression_state.rs # ProgressionState sub-struct (Phase 2 scaffold)
+│   │   ├── session_state.rs # SessionState sub-struct (Phase 2 scaffold)
+│   │   ├── game_state_serde.rs # FlatGameState serde compatibility layer
+│   │   ├── discovery_facade.rs # Discovery facade (placeholder)
 │   │   ├── xp.rs            # XP calculation, leveling
 │   │   ├── discoveries.rs   # Discovery rolls
 │   │   ├── enemy_spawning.rs # Enemy generation
@@ -510,7 +530,8 @@ quest/
 │   │   ├── enemy_attack.rs  # Enemy attack resolution
 │   │   ├── damage.rs        # Shared damage calculations
 │   │   ├── events.rs        # CombatEvent, CombatBonuses (unified)
-│   │   └── regen.rs         # HP regeneration
+│   │   ├── regen.rs         # HP regeneration
+│   │   └── facade.rs        # Combat facade (placeholder)
 │   ├── zones/               # Zone system
 │   │   ├── data.rs          # Zone definitions
 │   │   ├── progression.rs   # Zone progression
@@ -522,14 +543,16 @@ quest/
 │   │   ├── generation.rs    # Procedural generation
 │   │   ├── logic.rs         # Room clearing, key system
 │   │   ├── pathfinding.rs   # BFS-based dungeon navigation
-│   │   └── rewards.rs       # Dungeon XP, item generation, treasure rooms
+│   │   ├── rewards.rs       # Dungeon XP, item generation, treasure rooms
+│   │   └── facade.rs        # Dungeon facade (placeholder)
 │   ├── fishing/             # Fishing system
 │   │   ├── types.rs         # Fish, phases, ranks
 │   │   ├── generation.rs    # Fish generation
 │   │   ├── logic.rs         # Session processing
 │   │   ├── discovery.rs     # Fishing spot discovery
 │   │   ├── drops.rs         # Item drops from catches
-│   │   └── rank.rs          # Rank-up logic
+│   │   ├── rank.rs          # Rank-up logic
+│   │   └── facade.rs        # Fishing facade (placeholder)
 │   ├── items/               # Item system [CLAUDE.md]
 │   │   ├── types.rs         # Items, slots, affixes
 │   │   ├── equipment.rs     # Equipment container
@@ -542,15 +565,16 @@ quest/
 │   │   ├── logic.rs         # Enhancement rolling, discovery
 │   │   └── persistence.rs   # Save/load
 │   ├── deep/                # The Deep — Mercenary Expedition System [CLAUDE.md]
-│   │   ├── types.rs         # All data structures (DeepState, Mercenary, Mission, etc.)
 │   │   ├── mod.rs           # Public API re-exports
+│   │   ├── types.rs         # All data structures (DeepState, Mercenary, Mission, etc.)
 │   │   ├── mercenaries.rs   # Merc generation, recruitment, leveling, injuries
 │   │   ├── missions.rs      # Mission creation, assignment, completion, resolution
 │   │   ├── events.rs        # Check-in event generation and resolution
 │   │   ├── economy.rs       # Warband Marks economy, rewards, costs
 │   │   ├── layers.rs        # Layer difficulty, familiarity, infrastructure, durations
 │   │   ├── persistence.rs   # Save/load from ~/.quest/deep.json
-│   │   └── discovery.rs     # Discovery logic (boss-trigger), starter roster
+│   │   ├── discovery.rs     # Discovery logic (boss-trigger), starter roster
+│   │   └── facade.rs        # Deep facade (placeholder)
 │   ├── stormglass/          # Stormglass currency and Storm Sigils
 │   │   ├── types.rs         # Stormglass state, daily rotation
 │   │   ├── sigils.rs        # Storm Sigil definitions and bonuses
@@ -564,8 +588,9 @@ quest/
 │   │   ├── types.rs         # CommitInfo, TimelineInfo
 │   │   └── cloud.rs         # GitHub cloud sync
 │   ├── challenges/          # Challenge minigames [CLAUDE.md]
-│   │   ├── mod.rs           # Challenge menu, impl_apply_game_result! macro
+│   │   ├── mod.rs           # Challenge menu, impl_apply_game_result! macro, shared forfeit handler
 │   │   ├── menu.rs          # Challenge menu UI
+│   │   ├── facade.rs        # Challenge AI tick facade (placeholder)
 │   │   ├── chess/           # Chess minigame
 │   │   ├── go/              # Go (Territory Control)
 │   │   ├── morris/          # Nine Men's Morris (ai.rs: minimax)
@@ -598,6 +623,7 @@ quest/
 │   │   ├── updater.rs       # Self-update
 │   │   └── debug_menu.rs    # Debug menu
 │   └── ui/                  # UI components [CLAUDE.md]
+│       ├── overlay_layout.rs # Shared overlay layout helpers (centered_overlay, two_panel_split)
 │       ├── game_common.rs   # Shared minigame layout
 │       ├── responsive.rs    # Responsive layout tiers
 │       ├── stats_panel.rs   # Character stats (delegates to submodules)
@@ -639,7 +665,7 @@ quest/
 │       ├── bug_report_scene.rs # Bug report overlay
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (49 test files, 5,642+ tests)
+├── tests/                   # Integration tests (49 test files, 5,700+ tests)
 │   ├── game_loop_orchestration_test.rs  # 36 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
 │   ├── zone_progression_test.rs         # Zone advancement tests

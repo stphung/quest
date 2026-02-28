@@ -20,11 +20,15 @@
 //! ```text
 //! src/deep/
 //! ├── mod.rs          — Public API re-exports (this file)
-//! ├── types.rs        — All data structures, enums, and helper methods
-//! ├── generation.rs   — Merc, mission, and event generation
-//! ├── logic.rs        — Mission ticking, event resolution, squad validation
+//! ├── types.rs        — All data structures, enums, constants, and helper methods
+//! ├── mercenaries.rs  — Merc generation, recruit pools, leveling, injuries, roster management
+//! ├── missions.rs     — Mission creation, assignment, completion, resolution, offline processing
+//! ├── events.rs       — Check-in event generation and resolution
+//! ├── economy.rs      — Warband Marks economy, rewards, costs
+//! ├── layers.rs       — Layer difficulty, familiarity system, infrastructure, mission durations
+//! ├── discovery.rs    — Discovery logic (complete_discovery), starter roster init
 //! ├── persistence.rs  — Save/load from ~/.quest/deep.json
-//! └── discovery.rs    — Discovery roll logic
+//! └── facade.rs       — DeepInput struct and tick_deep_facade() placeholder
 //! ```
 
 pub mod discovery;

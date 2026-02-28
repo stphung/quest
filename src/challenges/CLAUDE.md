@@ -243,9 +243,22 @@ fn trigger_newgame_challenge(state: &mut GameState) -> &'static str {
 - Always provide visual feedback via `render_thinking_status_bar`
 
 ### Forfeit Flow
-1. First Esc press: set `forfeit_pending = true`
-2. Second Esc: confirm forfeit, set result to `Loss` (not a separate Forfeit variant)
-3. Any other key: cancel forfeit (`forfeit_pending = false`)
+All 10 challenge types use the shared `handle_forfeit()` and `cancel_forfeit_if_pending()` functions in `mod.rs`:
+
+```rust
+// In logic.rs input handling:
+if input == NewGameInput::Forfeit {
+    if handle_forfeit(&mut game.game_result, &mut game.forfeit_pending, NewGameResult::Loss) {
+        // Forfeit confirmed — game_result is now Some(Loss)
+    }
+} else {
+    cancel_forfeit_if_pending(&mut game.forfeit_pending);
+}
+```
+
+1. First Esc press: `handle_forfeit()` sets `forfeit_pending = true`, returns `false`
+2. Second Esc: `handle_forfeit()` sets `game_result = Some(Loss)`, returns `true`
+3. Any other key: `cancel_forfeit_if_pending()` resets `forfeit_pending = false`
 4. Use `render_forfeit_status_bar` for consistent UI
 5. UI checks `forfeit_pending` flag on Loss result to display "Forfeit" vs "Defeat"
 

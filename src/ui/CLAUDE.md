@@ -7,6 +7,7 @@ Terminal UI rendering using Ratatui + Crossterm. All rendering is separated from
 ```
 src/ui/
 ├── mod.rs                      # Main draw_ui_with_update(), layout coordinator
+├── overlay_layout.rs           # Shared overlay layout helpers: centered_overlay(), two_panel_split()
 ├── responsive.rs               # Responsive layout: SizeTier enum, LayoutContext, size thresholds
 ├── game_common.rs              # Shared minigame layout components (IMPORTANT)
 ├── stats_panel.rs              # Left panel: layout orchestration (delegates to helpers below)
