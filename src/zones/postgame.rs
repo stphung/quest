@@ -125,15 +125,27 @@ mod tests {
 
     #[test]
     fn test_region_from_layer() {
-        assert_eq!(PostgameRegion::from_layer(3), Some(PostgameRegion::RedFault));
-        assert_eq!(PostgameRegion::from_layer(7), Some(PostgameRegion::MirrorScar));
-        assert_eq!(PostgameRegion::from_layer(13), Some(PostgameRegion::BlackMouth));
+        assert_eq!(
+            PostgameRegion::from_layer(3),
+            Some(PostgameRegion::RedFault)
+        );
+        assert_eq!(
+            PostgameRegion::from_layer(7),
+            Some(PostgameRegion::MirrorScar)
+        );
+        assert_eq!(
+            PostgameRegion::from_layer(13),
+            Some(PostgameRegion::BlackMouth)
+        );
         assert_eq!(PostgameRegion::from_layer(5), None);
     }
 
     #[test]
     fn test_unlock_headline() {
-        assert_eq!(PostgameRegion::RedFault.unlock_headline(), "THE RED FAULT OPENS");
+        assert_eq!(
+            PostgameRegion::RedFault.unlock_headline(),
+            "THE RED FAULT OPENS"
+        );
     }
 
     #[test]
