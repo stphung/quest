@@ -460,7 +460,7 @@ pub const FORFEIT_CONTROLS: &[(&str, &str)] = &[("[Esc]", "Confirm"), ("[Any]", 
 /// Use this at the start of your status bar function for consistent forfeit UI.
 ///
 /// # Example
-/// ```ignore
+/// ```text
 /// fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &MyGame) {
 ///     if render_forfeit_status_bar(frame, area, game.forfeit_pending) {
 ///         return;

@@ -112,3 +112,49 @@ pub fn on_treasure_room_entered<R: Rng>(
 
     Some((item_clone, equipped))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::GameState;
+    use crate::dungeon::types::{Dungeon, DungeonSize};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    #[test]
+    fn boost_rarity_caps_at_legendary_and_preserves_mythic() {
+        assert_eq!(boost_rarity(Rarity::Common, 0), Rarity::Common);
+        assert_eq!(boost_rarity(Rarity::Common, 2), Rarity::Rare);
+        assert_eq!(boost_rarity(Rarity::Epic, 5), Rarity::Legendary);
+        assert_eq!(boost_rarity(Rarity::Legendary, 3), Rarity::Legendary);
+        assert_eq!(boost_rarity(Rarity::Mythic, 3), Rarity::Mythic);
+    }
+
+    #[test]
+    fn treasure_room_collects_item_into_active_dungeon() {
+        let mut rng = ChaCha8Rng::seed_from_u64(7);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.zone_progression.current_zone_id = 7;
+        state.active_dungeon = Some(Dungeon::new(DungeonSize::Large));
+
+        let (item, _equipped) = on_treasure_room_entered(&mut rng, &mut state, 0.0).unwrap();
+        let dungeon = state.active_dungeon.as_ref().unwrap();
+
+        assert_eq!(item.ilvl, ilvl_for_zone(7));
+        assert_eq!(dungeon.collected_items.len(), 1);
+        assert_eq!(dungeon.collected_items[0].display_name, item.display_name);
+        assert_eq!(dungeon.collected_items[0].ilvl, item.ilvl);
+    }
+
+    #[test]
+    fn treasure_room_without_active_dungeon_still_returns_item() {
+        let mut rng = ChaCha8Rng::seed_from_u64(11);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.zone_progression.current_zone_id = 3;
+
+        let (item, _equipped) = on_treasure_room_entered(&mut rng, &mut state, 0.0).unwrap();
+
+        assert_eq!(item.ilvl, ilvl_for_zone(3));
+        assert!(state.active_dungeon.is_none());
+    }
+}

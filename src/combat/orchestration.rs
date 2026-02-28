@@ -155,3 +155,131 @@ fn resolve_boss_enrage(
         enemy_name,
     }]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::achievements::Achievements;
+    use crate::combat::Enemy;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    fn state_with_enemy(enemy_name: &str) -> GameState {
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.combat_state.current_enemy = Some(Enemy::new(enemy_name.to_string(), 50, 5));
+        state.combat_state.player_max_hp = 120;
+        state.combat_state.player_current_hp = 17;
+        state
+    }
+
+    #[test]
+    fn resolve_combat_retreat_falls_back_to_zone_one() {
+        let mut state = state_with_enemy("Dire Wolf");
+        state.zone_progression.current_zone_id = 6;
+        state.zone_progression.current_subzone_id = 3;
+        state.zone_progression.kills_in_subzone = 8;
+        state.combat_state.player_attack_timer = 1.0;
+        state.combat_state.enemy_attack_timer = 2.0;
+        state.combat_state.current_fight_elapsed = 12.0;
+        state.consecutive_deaths = 4;
+
+        let events = resolve_combat_retreat(&mut state);
+
+        assert!(matches!(
+            events.as_slice(),
+            [CombatEvent::CombatRetreat { zone_name }] if zone_name == "Meadow"
+        ));
+        assert_eq!(state.zone_progression.current_zone_id, 1);
+        assert_eq!(state.zone_progression.current_subzone_id, 1);
+        assert_eq!(state.zone_progression.kills_in_subzone, 0);
+        assert!(!state.zone_progression.fighting_boss);
+        assert_eq!(
+            state.combat_state.player_current_hp,
+            state.combat_state.player_max_hp
+        );
+        assert!(state.combat_state.current_enemy.is_none());
+        assert_eq!(state.consecutive_deaths, 0);
+    }
+
+    #[test]
+    fn resolve_combat_retreat_uses_highest_defeated_zone() {
+        let mut state = state_with_enemy("Dire Wolf");
+        state.zone_progression.defeated_bosses.push((3, 3));
+        state.zone_progression.defeated_bosses.push((5, 2));
+
+        let events = resolve_combat_retreat(&mut state);
+        let expected_zone = crate::zones::get_zone(5).unwrap().name.to_string();
+
+        assert!(matches!(
+            events.as_slice(),
+            [CombatEvent::CombatRetreat { zone_name }] if zone_name == &expected_zone
+        ));
+        assert_eq!(state.zone_progression.current_zone_id, 5);
+    }
+
+    #[test]
+    fn update_combat_triggers_boss_enrage_before_attack_resolution() {
+        let mut rng = ChaCha8Rng::seed_from_u64(5);
+        let mut state = state_with_enemy("Warden");
+        state.zone_progression.fighting_boss = true;
+        state.zone_progression.current_zone_id = 1;
+        state.zone_progression.current_subzone_id = 4;
+        state.zone_progression.kills_in_subzone = 9;
+        state.combat_state.player_attack_timer = 10.0;
+        state.combat_state.enemy_attack_timer = 10.0;
+        state.combat_state.boss_fight_timer = BOSS_ENRAGE_SECONDS - 0.1;
+
+        let events = update_combat(
+            &mut rng,
+            &mut state,
+            0.1,
+            &CombatBonuses::default(),
+            &mut Achievements::default(),
+            &DerivedStats::default(),
+        );
+
+        assert!(matches!(
+            events.as_slice(),
+            [CombatEvent::BossEnrage {
+                weapon_blocked: false,
+                enemy_name
+            }] if enemy_name == "Warden"
+        ));
+        assert!(state.combat_state.current_enemy.is_none());
+        assert_eq!(state.combat_state.boss_fight_timer, 0.0);
+        assert_eq!(
+            state.combat_state.player_current_hp,
+            state.combat_state.player_max_hp
+        );
+        assert!(!state.zone_progression.fighting_boss);
+        assert_eq!(state.zone_progression.current_subzone_id, 1);
+        assert_eq!(state.zone_progression.kills_in_subzone, 0);
+    }
+
+    #[test]
+    fn update_combat_retreats_to_safe_zone_after_mob_timeout() {
+        let mut rng = ChaCha8Rng::seed_from_u64(9);
+        let mut state = state_with_enemy("Bandit");
+        state.zone_progression.current_zone_id = 6;
+        state.zone_progression.current_subzone_id = 2;
+        state.zone_progression.defeated_bosses.push((4, 3));
+        state.combat_state.current_fight_elapsed = MOB_FIGHT_TIMEOUT_SECONDS - 0.05;
+
+        let events = update_combat(
+            &mut rng,
+            &mut state,
+            0.05,
+            &CombatBonuses::default(),
+            &mut Achievements::default(),
+            &DerivedStats::default(),
+        );
+
+        let expected_zone = crate::zones::get_zone(4).unwrap().name.to_string();
+        assert!(matches!(
+            events.as_slice(),
+            [CombatEvent::CombatRetreat { zone_name }] if zone_name == &expected_zone
+        ));
+        assert_eq!(state.zone_progression.current_zone_id, 4);
+        assert!(state.combat_state.current_enemy.is_none());
+    }
+}

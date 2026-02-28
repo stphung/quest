@@ -20,8 +20,9 @@
 //!   - Seeded `ChaCha8Rng` for all random-dependent code paths.
 //!   - Wall-clock time is represented as `DateTime<Utc>` constructed from a fixed anchor
 //!     so no test depends on the real system clock.
-//!   - Tests that require `src/deep/logic.rs` / `src/deep/generation.rs` (Task #10) are
-//!     marked `#[ignore]` and will be activated once that task is merged.
+//!   - Earlier drafts expected some cases to remain gated on
+//!     `src/deep/logic.rs` / `src/deep/generation.rs` (Task #10). Those paths
+//!     are now part of the active suite, so this file contains no ignored tests.
 
 use chrono::{Duration, TimeZone, Utc};
 use quest::deep::{

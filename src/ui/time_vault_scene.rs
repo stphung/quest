@@ -1209,3 +1209,83 @@ fn draw_controls(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
     let paragraph = Paragraph::new(controls).alignment(Alignment::Center);
     frame.render_widget(paragraph, area);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::{backend::TestBackend, Terminal};
+
+    fn sample_commit() -> CommitInfo {
+        CommitInfo {
+            id: "abc1234".to_string(),
+            message: "Manual save | Lv12 P3 Z4-1 1h00m @Hero".to_string(),
+            timestamp: 0,
+            level: 12,
+            prestige: 3,
+            zone: 4,
+            playtime: 3600,
+        }
+    }
+
+    fn buffer_text(terminal: &Terminal<TestBackend>) -> String {
+        let buffer = terminal.backend().buffer();
+        let mut out = String::new();
+        for y in 0..buffer.area.height {
+            for x in 0..buffer.area.width {
+                out.push_str(buffer[(x, y)].symbol());
+            }
+            out.push('\n');
+        }
+        out
+    }
+
+    #[test]
+    fn time_vault_state_selection_helpers_follow_indices() {
+        let commit = sample_commit();
+        let branches = vec![
+            TimelineInfo {
+                name: "main".to_string(),
+                is_active: true,
+                head_commit: Some(commit.clone()),
+            },
+            TimelineInfo {
+                name: "fork".to_string(),
+                is_active: false,
+                head_commit: None,
+            },
+        ];
+        let mut state = TimeVaultState::new(branches, vec![commit]);
+
+        assert_eq!(state.selected_branch_name(), Some("main"));
+        assert_eq!(state.selected_commit_id(), Some("abc1234"));
+        assert!(state.selected_branch_is_main());
+        assert!(state.selected_branch_is_active());
+
+        state.selected_branch = 1;
+        assert_eq!(state.selected_branch_name(), Some("fork"));
+        assert!(!state.selected_branch_is_main());
+        assert!(!state.selected_branch_is_active());
+    }
+
+    #[test]
+    fn draw_time_vault_renders_core_labels_and_branch_data() {
+        let commit = sample_commit();
+        let branches = vec![TimelineInfo {
+            name: "main".to_string(),
+            is_active: true,
+            head_commit: Some(commit.clone()),
+        }];
+        let state = TimeVaultState::new(branches, vec![commit]);
+        let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+
+        terminal
+            .draw(|frame| draw_time_vault(frame, frame.area(), &state))
+            .unwrap();
+
+        let rendered = buffer_text(&terminal);
+        assert!(rendered.contains("TIME VAULT"));
+        assert!(rendered.contains("Branches"));
+        assert!(rendered.contains("main"));
+        assert!(rendered.contains("abc1234"));
+    }
+}
