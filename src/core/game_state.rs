@@ -284,6 +284,54 @@ impl GameState {
         self.derived_stats_dirty = true;
     }
 
+    /// Copies flat field values into sub-struct fields.
+    /// Call after any mutation that changes flat fields (level-up, prestige, equip).
+    #[allow(dead_code)]
+    pub fn sync_sub_structs(&mut self) {
+        // PlayerIdentity
+        self.player.character_id = self.character_id.clone();
+        self.player.character_name = self.character_name.clone();
+        self.player.character_level = self.character_level;
+        self.player.character_xp = self.character_xp;
+        self.player.attributes = self.attributes;
+        self.player.prestige_rank = self.prestige_rank;
+        self.player.total_prestige_count = self.total_prestige_count;
+
+        // CombatContext
+        self.combat_ctx.combat_state = self.combat_state.clone();
+        self.combat_ctx.equipment = self.equipment.clone();
+        self.combat_ctx.zone_progression = self.zone_progression.clone();
+        self.combat_ctx.active_dungeon = self.active_dungeon.clone();
+        self.combat_ctx.session_kills = self.session_kills;
+        self.combat_ctx.consecutive_deaths = self.consecutive_deaths;
+
+        // ProgressionState
+        self.prog.fishing = self.fishing.clone();
+        self.prog.active_fishing = self.active_fishing.clone();
+        self.prog.stormglass = self.stormglass;
+        self.prog.stormglass_discovered = self.stormglass_discovered;
+        self.prog.storm_sigils = self.storm_sigils.clone();
+        self.prog.challenge_menu = self.challenge_menu.clone();
+        self.prog.chess_stats = self.chess_stats.clone();
+        self.prog.active_minigame = self.active_minigame.clone();
+        self.prog.last_minigame_win = self.last_minigame_win.clone();
+
+        // SessionState
+        self.sess.last_save_time = self.last_save_time;
+        self.sess.play_time_seconds = self.play_time_seconds;
+        self.sess.chrono_surge_active = self.chrono_surge_active;
+        self.sess.debug_force_overcharge = self.debug_force_overcharge;
+        self.sess.recent_drops = self.recent_drops.clone();
+        self.sess.xp_rate_samples = self.xp_rate_samples.clone();
+        self.sess.xp_this_second = self.xp_this_second;
+        self.sess.ticker = self.ticker.clone();
+        self.sess.cached_derived_stats = self.cached_derived_stats;
+        self.sess.cached_prestige_bonuses = self.cached_prestige_bonuses;
+        self.sess.derived_stats_dirty = self.derived_stats_dirty;
+        self.sess.combat_seconds_this_tick = self.combat_seconds_this_tick;
+        self.sess.game_over_shown_at = self.game_over_shown_at;
+    }
+
     /// Recalculate and cache prestige combat bonuses from current prestige rank.
     pub fn recalculate_prestige_bonuses(&mut self) {
         self.cached_prestige_bonuses = PrestigeCombatBonuses::from_rank(self.prestige_rank);
@@ -792,5 +840,20 @@ mod tests {
         assert!(!state.sess.debug_force_overcharge);
         assert!(!state.sess.combat_seconds_this_tick);
         assert!(state.sess.game_over_shown_at.is_none());
+    }
+
+    #[test]
+    fn test_sync_sub_structs() {
+        let mut state = GameState::new("SyncTest".to_string(), 0);
+        // Mutate flat fields
+        state.character_level = 42;
+        state.prestige_rank = 5;
+        // Sub-struct should be out of sync
+        assert_ne!(state.player.character_level, 42);
+        // Sync
+        state.sync_sub_structs();
+        // Now sub-struct should match
+        assert_eq!(state.player.character_level, 42);
+        assert_eq!(state.player.prestige_rank, 5);
     }
 }
