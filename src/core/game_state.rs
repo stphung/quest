@@ -14,6 +14,7 @@ use crate::stormglass::sigils::StormSigils;
 use crate::core::combat_context::CombatContext;
 use crate::core::player_identity::PlayerIdentity;
 use crate::core::progression_state::ProgressionState;
+use crate::core::session_state::SessionState;
 use crate::zones::ZoneProgression;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -149,7 +150,7 @@ pub struct GameState {
     pub prog: ProgressionState,
     #[serde(skip)]
     #[allow(dead_code)]
-    pub sess: Option<()>,
+    pub sess: SessionState,
 }
 
 impl GameState {
@@ -230,7 +231,21 @@ impl GameState {
                 active_minigame: None,
                 last_minigame_win: None,
             },
-            sess: None,
+            sess: SessionState {
+                last_save_time: current_time,
+                play_time_seconds: 0,
+                chrono_surge_active: false,
+                debug_force_overcharge: false,
+                recent_drops: VecDeque::with_capacity(5),
+                xp_rate_samples: VecDeque::new(),
+                xp_this_second: 0,
+                ticker: Ticker::new(),
+                cached_derived_stats: DerivedStats::default(),
+                cached_prestige_bonuses: PrestigeCombatBonuses::default(),
+                derived_stats_dirty: true,
+                combat_seconds_this_tick: false,
+                game_over_shown_at: None,
+            },
         }
     }
 
@@ -765,5 +780,17 @@ mod tests {
         assert_eq!(state.player.total_prestige_count, 0);
         // character_id should match the top-level field
         assert_eq!(state.player.character_id, state.character_id);
+    }
+
+    #[test]
+    fn test_session_state_populated() {
+        let state = GameState::new("TestHero".to_string(), 1000);
+        assert_eq!(state.sess.last_save_time, 1000);
+        assert_eq!(state.sess.play_time_seconds, 0);
+        assert!(state.sess.derived_stats_dirty);
+        assert!(!state.sess.chrono_surge_active);
+        assert!(!state.sess.debug_force_overcharge);
+        assert!(!state.sess.combat_seconds_this_tick);
+        assert!(state.sess.game_over_shown_at.is_none());
     }
 }

@@ -160,7 +160,7 @@ mod tests {
                 active_minigame: None,
                 last_minigame_win: None,
             },
-            sess: None,
+            sess: crate::core::session_state::SessionState::default(),
         }
     }
 

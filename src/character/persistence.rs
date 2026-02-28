@@ -123,7 +123,21 @@ impl CharacterManager {
                 active_minigame: None,
                 last_minigame_win: None,
             },
-            sess: None,
+            sess: crate::core::session_state::SessionState {
+                last_save_time: save_data.last_save_time,
+                play_time_seconds: save_data.play_time_seconds,
+                chrono_surge_active: false,
+                debug_force_overcharge: false,
+                recent_drops: std::collections::VecDeque::with_capacity(5),
+                xp_rate_samples: std::collections::VecDeque::new(),
+                xp_this_second: 0,
+                ticker: crate::core::ticker::Ticker::new(),
+                cached_derived_stats: crate::character::derived_stats::DerivedStats::default(),
+                cached_prestige_bonuses: crate::character::prestige::PrestigeCombatBonuses::default(),
+                derived_stats_dirty: true,
+                combat_seconds_this_tick: false,
+                game_over_shown_at: None,
+            },
         })
     }
 
