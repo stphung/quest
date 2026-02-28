@@ -7,8 +7,10 @@ pub mod advancement;
 pub mod boss_defeat;
 mod data;
 pub mod gates;
+pub mod postgame;
 mod progression;
 
 pub use boss_defeat::BossDefeatResult;
 pub use data::{get_all_zones, get_zone, Subzone, Zone};
+pub use postgame::PostgameRegion;
 pub use progression::ZoneProgression;

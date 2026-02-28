@@ -100,7 +100,7 @@ pub const MOB_FIGHT_TIMEOUT_SECONDS: f64 = 30.0;
 // Zone enemy base stats: (base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)
 // Index 0 = Zone 1, Index 10 = Zone 11 (The Expanse)
 // hp_step/dmg_step/def_step are per-subzone depth increments above depth 1
-pub const ZONE_ENEMY_STATS: [(u32, u32, u32, u32, u32, u32); 11] = [
+pub const ZONE_ENEMY_STATS: [(u32, u32, u32, u32, u32, u32); 20] = [
     (55, 9, 7, 2, 0, 0),           // Zone 1: Meadow
     (90, 14, 13, 3, 2, 1),         // Zone 2: Dark Forest
     (160, 22, 22, 4, 6, 2),        // Zone 3: Mountain Pass
@@ -112,6 +112,16 @@ pub const ZONE_ENEMY_STATS: [(u32, u32, u32, u32, u32, u32); 11] = [
     (685, 63, 92, 13, 43, 6),      // Zone 9: Floating Isles
     (810, 72, 109, 14, 52, 7),     // Zone 10: Storm Citadel
     (5000, 400, 500, 80, 250, 30), // Zone 11: The Expanse (endgame wall)
+    // Postgame zones — 1.6x exponential scaling from Zone 11
+    (8000, 640, 800, 128, 400, 48),          // Zone 12: Splintered Rim
+    (12800, 1024, 1280, 205, 640, 77),       // Zone 13: Ember Ravine
+    (20480, 1638, 2048, 328, 1024, 123),     // Zone 14: Heart of the Fault
+    (32768, 2621, 3277, 524, 1638, 197),     // Zone 15: Shard Fields
+    (52429, 4194, 5243, 839, 2621, 315),     // Zone 16: Refraction Steps
+    (83886, 6711, 8389, 1342, 4194, 503),    // Zone 17: Hall of Second Suns
+    (134218, 10737, 13422, 2148, 6711, 805), // Zone 18: Ashen Verge
+    (214748, 17180, 21475, 3436, 10737, 1289), // Zone 19: Throat of the World
+    (343597, 27488, 34360, 5498, 17180, 2062), // Zone 20: The Black Mouth
 ];
 
 // Boss multipliers: (hp_mult, dmg_mult, def_mult)
@@ -191,6 +201,9 @@ pub const LEVEL_UP_MAX_DISTRIBUTION_ATTEMPTS: u32 = 100;
 // Zone identifiers
 pub const FINAL_ZONE_ID: u32 = 10;
 pub const EXPANSE_ZONE_ID: u32 = 11;
+pub const FIRST_POSTGAME_ZONE_ID: u32 = 12;
+pub const LAST_POSTGAME_ZONE_ID: u32 = 20;
+pub const POSTGAME_ZONE_STAT_MULTIPLIER: f64 = 1.6;
 
 // Ticks per second (reciprocal of TICK_INTERVAL_MS / 1000)
 pub const TICKS_PER_SECOND: u32 = 10;
@@ -225,5 +238,34 @@ pub fn wiki_url_for_browser() -> String {
         WIKI_URL.to_string()
     } else {
         format!("https://{WIKI_URL}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_zone_enemy_stats_has_20_entries() {
+        assert_eq!(ZONE_ENEMY_STATS.len(), 20);
+    }
+
+    #[test]
+    fn test_postgame_zone_stats_zone_12() {
+        let z12 = ZONE_ENEMY_STATS[11]; // Index 11 = Zone 12
+        assert_eq!(z12, (8000, 640, 800, 128, 400, 48));
+    }
+
+    #[test]
+    fn test_postgame_zone_stats_zone_20() {
+        let z20 = ZONE_ENEMY_STATS[19]; // Index 19 = Zone 20
+        assert_eq!(z20, (343597, 27488, 34360, 5498, 17180, 2062));
+    }
+
+    #[test]
+    fn test_postgame_constants_exist() {
+        assert_eq!(FIRST_POSTGAME_ZONE_ID, 12);
+        assert_eq!(LAST_POSTGAME_ZONE_ID, 20);
+        assert!((POSTGAME_ZONE_STAT_MULTIPLIER - 1.6).abs() < 1e-10);
     }
 }
