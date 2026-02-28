@@ -152,6 +152,20 @@ pub fn game_tick<R: Rng>(
     // ── 11c. Deep mission ticking ──────────────────────────────────
     tick_stages::tick_deep_missions(state, deep, achievements, debug_mode, &mut result, rng);
 
+    // ── 11d. Postgame region unlock consumption ──────────────────
+    if let Some(region) = deep.persistent.pending_postgame_region_unlock.take() {
+        crate::zones::sync_account_zone_unlocks(
+            &mut state.zone_progression,
+            achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
+            deep.persistent.postgame_zone_cap,
+        );
+        result.events.push(TickEvent::PostgameRegionUnlocked {
+            region,
+            message: format!("\u{1f30b} {}", region.unlock_log_line()),
+        });
+        result.deep_changed = true;
+    }
+
     // ── 12. Achievement modal accumulation ────────────────────────
     if achievements.is_modal_ready() {
         result.achievement_modal_ready = achievements.take_modal_queue();
