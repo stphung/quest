@@ -936,17 +936,17 @@ fn trigger_unlock_deep_layer(
         crate::deep::mark_layer_cleared(&mut deep.persistent, frontier);
     }
 
-    // Set postgame zone cap based on the region this layer unlocks
-    if let Some(region) = crate::zones::PostgameRegion::from_layer(target_layer) {
+    // Set fracture zone cap based on the region this layer unlocks
+    if let Some(region) = crate::zones::FractureRegion::from_layer(target_layer) {
         let cap = region.end_zone_id();
-        if deep.persistent.postgame_zone_cap < cap {
-            deep.persistent.postgame_zone_cap = cap;
+        if deep.persistent.fracture_zone_cap < cap {
+            deep.persistent.fracture_zone_cap = cap;
         }
         // Unlock the zones
         crate::zones::access::sync_account_zone_unlocks(
             &mut state.zone_progression,
             true,
-            deep.persistent.postgame_zone_cap,
+            deep.persistent.fracture_zone_cap,
         );
     }
 
@@ -1016,16 +1016,16 @@ fn trigger_travel_to_zone(
         state.recalculate_prestige_bonuses();
     }
 
-    // Postgame zones 12+: auto-set Deep postgame_zone_cap and discover Deep
+    // Fracture zones 12+: auto-set Deep fracture_zone_cap and discover Deep
     if zone_id >= 12 {
         if !deep.persistent.discovered {
             let mut rng = rand::rng();
             crate::deep::complete_discovery(deep, &mut rng);
         }
-        if deep.persistent.postgame_zone_cap < zone_id {
-            deep.persistent.postgame_zone_cap = zone_id;
+        if deep.persistent.fracture_zone_cap < zone_id {
+            deep.persistent.fracture_zone_cap = zone_id;
         }
-        // Ensure high enough prestige to survive postgame
+        // Ensure high enough prestige to survive fracture zones
         if state.prestige_rank < 20 {
             state.prestige_rank = 20;
             state.recalculate_prestige_bonuses();
@@ -1039,11 +1039,11 @@ fn trigger_travel_to_zone(
         }
     }
 
-    // Unlock postgame zones up to the cap
+    // Unlock fracture zones up to the cap
     crate::zones::access::sync_account_zone_unlocks(
         &mut state.zone_progression,
         true,
-        deep.persistent.postgame_zone_cap,
+        deep.persistent.fracture_zone_cap,
     );
 
     // Travel to subzone 1
@@ -1584,7 +1584,7 @@ mod tests {
     }
 
     #[test]
-    fn test_trigger_travel_to_postgame_zone() {
+    fn test_trigger_travel_to_fracture_zone() {
         let mut state = GameState::new("Test".to_string(), 0);
         let enhancement = EnhancementProgress::new();
         let mut deep = DeepState::new();
@@ -1592,9 +1592,9 @@ mod tests {
         let msg = trigger_travel_to_zone(&mut state, &enhancement, &mut deep, 15);
         assert_eq!(msg, "Traveled to Shard Fields (Zone 15)");
         assert_eq!(state.zone_progression.current_zone_id, 15);
-        // Deep auto-discovered and postgame_zone_cap set
+        // Deep auto-discovered and fracture_zone_cap set
         assert!(deep.persistent.discovered);
-        assert!(deep.persistent.postgame_zone_cap >= 15);
+        assert!(deep.persistent.fracture_zone_cap >= 15);
         // Zone 15 should be unlocked
         assert!(state.zone_progression.is_zone_unlocked(15));
     }
@@ -1610,7 +1610,7 @@ mod tests {
             "Cleared to Deep L3 \u{2014} Red Fault unlocked (Z12-14)!"
         );
         assert!(deep.persistent.discovered);
-        assert!(deep.persistent.postgame_zone_cap >= 14);
+        assert!(deep.persistent.fracture_zone_cap >= 14);
         // Zones 12-14 should be unlocked
         for zone_id in 12..=14 {
             assert!(
@@ -1621,16 +1621,16 @@ mod tests {
     }
 
     #[test]
-    fn test_trigger_unlock_deep_layer_13() {
+    fn test_trigger_unlock_deep_layer_12() {
         let mut state = GameState::new("Test".to_string(), 0);
         let mut deep = DeepState::new();
 
-        trigger_unlock_deep_layer(&mut deep, &mut state, 13);
-        assert!(deep.persistent.postgame_zone_cap >= 20);
+        trigger_unlock_deep_layer(&mut deep, &mut state, 12);
+        assert!(deep.persistent.fracture_zone_cap >= 20);
         for zone_id in 12..=20 {
             assert!(
                 state.zone_progression.is_zone_unlocked(zone_id),
-                "Zone {zone_id} should be unlocked after Deep L13"
+                "Zone {zone_id} should be unlocked after Deep L12"
             );
         }
     }

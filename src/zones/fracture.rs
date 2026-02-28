@@ -35,7 +35,7 @@ impl FractureRegion {
             Self::BlackMouth => 20,
             Self::HollowThrone => 23,
             Self::WailingReach => 26,
-            Self::OriginWound => 30,
+            Self::OriginWound => 30, // 4 zones (Z27-30), finale chapter
         }
     }
 
