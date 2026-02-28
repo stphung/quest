@@ -6,6 +6,7 @@
 #![allow(dead_code)]
 
 pub mod achievements;
+pub mod ascension;
 pub mod challenges;
 pub mod character;
 pub mod combat;
