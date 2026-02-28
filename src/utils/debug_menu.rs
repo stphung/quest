@@ -47,8 +47,8 @@ enum DebugAction {
     TriggerDeepClearFrontierLayer,
     TriggerDeepCompleteActiveMissions,
     TravelToZone(u32),
-    GrantPrestige(u32),
-    GrantLevels(u32),
+    SetPrestige(u32),
+    SetLevel(u32),
     MaxAttributes,
 }
 
@@ -95,12 +95,12 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::TravelToZone(10),
     DebugAction::TravelToZone(11),
     // Character actions (prestige, levels)
-    DebugAction::GrantPrestige(1),
-    DebugAction::GrantPrestige(5),
-    DebugAction::GrantPrestige(10),
-    DebugAction::GrantPrestige(100),
-    DebugAction::GrantLevels(10),
-    DebugAction::GrantLevels(50),
+    DebugAction::SetPrestige(1),
+    DebugAction::SetPrestige(5),
+    DebugAction::SetPrestige(10),
+    DebugAction::SetPrestige(100),
+    DebugAction::SetLevel(10),
+    DebugAction::SetLevel(50),
     DebugAction::MaxAttributes,
 ];
 
@@ -157,12 +157,12 @@ const ZONE_ACTIONS: &[DebugAction] = &[
     DebugAction::TravelToZone(11),
 ];
 const CHARACTER_ACTIONS: &[DebugAction] = &[
-    DebugAction::GrantPrestige(1),
-    DebugAction::GrantPrestige(5),
-    DebugAction::GrantPrestige(10),
-    DebugAction::GrantPrestige(100),
-    DebugAction::GrantLevels(10),
-    DebugAction::GrantLevels(50),
+    DebugAction::SetPrestige(1),
+    DebugAction::SetPrestige(5),
+    DebugAction::SetPrestige(10),
+    DebugAction::SetPrestige(100),
+    DebugAction::SetLevel(10),
+    DebugAction::SetLevel(50),
     DebugAction::MaxAttributes,
 ];
 const BORDER_OPTION_START_INDEX: usize = DEBUG_ACTIONS.len();
@@ -200,13 +200,13 @@ impl DebugAction {
             Self::TriggerDeepClearFrontierLayer => 27,
             Self::TriggerDeepCompleteActiveMissions => 28,
             Self::TravelToZone(zone_id) => 29 + zone_id as usize - 1, // 29-39
-            Self::GrantPrestige(amount) => match amount {
+            Self::SetPrestige(amount) => match amount {
                 1 => 40,
                 5 => 41,
                 10 => 42,
                 _ => 43, // 100
             },
-            Self::GrantLevels(amount) => {
+            Self::SetLevel(amount) => {
                 if amount == 10 {
                     44
                 } else {
@@ -262,17 +262,17 @@ impl DebugAction {
                 11 => "Travel to The Expanse (Zone 11)",
                 _ => "Travel to Unknown Zone",
             },
-            Self::GrantPrestige(amount) => match amount {
-                1 => "+1 Prestige Rank",
-                5 => "+5 Prestige Ranks",
-                10 => "+10 Prestige Ranks",
-                _ => "+100 Prestige Ranks",
+            Self::SetPrestige(amount) => match amount {
+                1 => "Set Prestige to P1",
+                5 => "Set Prestige to P5",
+                10 => "Set Prestige to P10",
+                _ => "Set Prestige to P100",
             },
-            Self::GrantLevels(amount) => {
+            Self::SetLevel(amount) => {
                 if amount == 10 {
-                    "+10 Levels"
+                    "Set Level to 10"
                 } else {
-                    "+50 Levels"
+                    "Set Level to 50"
                 }
             }
             Self::MaxAttributes => "Max All Attributes",
@@ -317,8 +317,8 @@ impl DebugAction {
             Self::TriggerDeepClearFrontierLayer => trigger_deep_clear_frontier_layer(deep),
             Self::TriggerDeepCompleteActiveMissions => trigger_deep_complete_active_missions(deep),
             Self::TravelToZone(zone_id) => trigger_travel_to_zone(state, enhancement, zone_id),
-            Self::GrantPrestige(amount) => trigger_grant_prestige(state, enhancement, amount),
-            Self::GrantLevels(amount) => trigger_grant_levels(state, enhancement, amount),
+            Self::SetPrestige(amount) => trigger_set_prestige(state, enhancement, amount),
+            Self::SetLevel(amount) => trigger_set_level(state, enhancement, amount),
             Self::MaxAttributes => trigger_max_attributes(state, enhancement),
         }
     }
@@ -914,12 +914,12 @@ fn trigger_travel_to_zone(
     }
 }
 
-fn trigger_grant_prestige(
+fn trigger_set_prestige(
     state: &mut GameState,
     enhancement: &EnhancementProgress,
-    amount: u32,
+    rank: u32,
 ) -> &'static str {
-    state.prestige_rank += amount;
+    state.prestige_rank = rank;
     state.recalculate_prestige_bonuses();
 
     // Unlock zones accessible at new prestige rank
@@ -933,31 +933,32 @@ fn trigger_grant_prestige(
     // Recalculate stats
     state.recalculate_derived_stats(&enhancement.levels);
 
-    match amount {
-        1 => "Granted +1 Prestige Rank!",
-        5 => "Granted +5 Prestige Ranks!",
-        10 => "Granted +10 Prestige Ranks!",
-        _ => "Granted +100 Prestige Ranks!",
+    match rank {
+        1 => "Set Prestige to P1!",
+        5 => "Set Prestige to P5!",
+        10 => "Set Prestige to P10!",
+        _ => "Set Prestige to P100!",
     }
 }
 
-fn trigger_grant_levels(
+fn trigger_set_level(
     state: &mut GameState,
     enhancement: &EnhancementProgress,
-    count: u32,
+    target_level: u32,
 ) -> &'static str {
     let mut rng = rand::rng();
-    for _ in 0..count {
+    // Grant levels up to target, distributing attribute points for each
+    while state.character_level < target_level {
         state.character_level += 1;
         crate::core::xp::distribute_level_up_points(&mut rng, state);
     }
-    state.character_xp = 0; // Reset partial XP to avoid confusion
+    state.character_xp = 0;
     state.recalculate_derived_stats(&enhancement.levels);
 
-    if count == 10 {
-        "Granted +10 Levels!"
+    if target_level == 10 {
+        "Set Level to 10!"
     } else {
-        "Granted +50 Levels!"
+        "Set Level to 50!"
     }
 }
 
@@ -1400,12 +1401,12 @@ mod tests {
     }
 
     #[test]
-    fn test_trigger_grant_prestige() {
+    fn test_trigger_set_prestige() {
         let mut state = GameState::new("Test".to_string(), 0);
         let enhancement = EnhancementProgress::new();
 
-        let msg = trigger_grant_prestige(&mut state, &enhancement, 5);
-        assert_eq!(msg, "Granted +5 Prestige Ranks!");
+        let msg = trigger_set_prestige(&mut state, &enhancement, 5);
+        assert_eq!(msg, "Set Prestige to P5!");
         assert_eq!(state.prestige_rank, 5);
 
         // Zones 3-4 (P5) should now be unlocked
@@ -1414,28 +1415,28 @@ mod tests {
     }
 
     #[test]
-    fn test_trigger_grant_prestige_stacks() {
+    fn test_trigger_set_prestige_overwrites() {
         let mut state = GameState::new("Test".to_string(), 0);
         let enhancement = EnhancementProgress::new();
 
-        trigger_grant_prestige(&mut state, &enhancement, 5);
-        trigger_grant_prestige(&mut state, &enhancement, 10);
-        assert_eq!(state.prestige_rank, 15);
+        trigger_set_prestige(&mut state, &enhancement, 10);
+        trigger_set_prestige(&mut state, &enhancement, 5);
+        assert_eq!(state.prestige_rank, 5);
     }
 
     #[test]
-    fn test_trigger_grant_levels() {
+    fn test_trigger_set_level() {
         let mut state = GameState::new("Test".to_string(), 0);
         let enhancement = EnhancementProgress::new();
         assert_eq!(state.character_level, 1);
 
-        let msg = trigger_grant_levels(&mut state, &enhancement, 10);
-        assert_eq!(msg, "Granted +10 Levels!");
-        assert_eq!(state.character_level, 11);
+        let msg = trigger_set_level(&mut state, &enhancement, 10);
+        assert_eq!(msg, "Set Level to 10!");
+        assert_eq!(state.character_level, 10);
     }
 
     #[test]
-    fn test_trigger_grant_levels_distributes_attributes() {
+    fn test_trigger_set_level_distributes_attributes() {
         let mut state = GameState::new("Test".to_string(), 0);
         let enhancement = EnhancementProgress::new();
         let initial_sum: u32 = crate::character::attributes::AttributeType::all()
@@ -1443,14 +1444,25 @@ mod tests {
             .map(|a| state.attributes.get(*a))
             .sum();
 
-        trigger_grant_levels(&mut state, &enhancement, 10);
+        trigger_set_level(&mut state, &enhancement, 10);
 
         let final_sum: u32 = crate::character::attributes::AttributeType::all()
             .iter()
             .map(|a| state.attributes.get(*a))
             .sum();
-        // 10 levels * 3 points = 30 attribute points gained
-        assert_eq!(final_sum, initial_sum + 30);
+        // 9 levels (1->10) * 3 points = 27 attribute points gained
+        assert_eq!(final_sum, initial_sum + 27);
+    }
+
+    #[test]
+    fn test_trigger_set_level_noop_if_already_at_target() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+        state.character_level = 50;
+
+        trigger_set_level(&mut state, &enhancement, 10);
+        // Should not lower level — noop when already above target
+        assert_eq!(state.character_level, 50);
     }
 
     #[test]
@@ -1464,12 +1476,12 @@ mod tests {
     }
 
     #[test]
-    fn test_trigger_grant_prestige_100() {
+    fn test_trigger_set_prestige_100() {
         let mut state = GameState::new("Test".to_string(), 0);
         let enhancement = EnhancementProgress::new();
 
-        let msg = trigger_grant_prestige(&mut state, &enhancement, 100);
-        assert_eq!(msg, "Granted +100 Prestige Ranks!");
+        let msg = trigger_set_prestige(&mut state, &enhancement, 100);
+        assert_eq!(msg, "Set Prestige to P100!");
         assert_eq!(state.prestige_rank, 100);
     }
 
