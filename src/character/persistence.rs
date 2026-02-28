@@ -55,6 +55,16 @@ impl CharacterManager {
         let save_data: CharacterSaveData = serde_json::from_str(&json_content)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
+        let player = crate::core::player_identity::PlayerIdentity {
+            character_id: save_data.character_id.clone(),
+            character_name: save_data.character_name.clone(),
+            character_level: save_data.character_level,
+            character_xp: save_data.character_xp,
+            attributes: save_data.attributes,
+            prestige_rank: save_data.prestige_rank,
+            total_prestige_count: save_data.total_prestige_count,
+        };
+
         Ok(crate::core::game_state::GameState {
             character_id: save_data.character_id,
             character_name: save_data.character_name,
@@ -91,7 +101,7 @@ impl CharacterManager {
             storm_sigils: save_data.storm_sigils,
             chrono_surge_active: false,
             debug_force_overcharge: false,
-            player: None,
+            player,
             combat_ctx: None,
             prog: None,
             sess: None,

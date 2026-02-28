@@ -11,6 +11,7 @@ use crate::fishing::types::{FishingSession, FishingState};
 use crate::items::equipment::Equipment;
 use crate::items::types::Rarity;
 use crate::stormglass::sigils::StormSigils;
+use crate::core::player_identity::PlayerIdentity;
 use crate::zones::ZoneProgression;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -137,7 +138,7 @@ pub struct GameState {
     // During migration, both flat fields and sub-struct fields exist.
     #[serde(skip)]
     #[allow(dead_code)]
-    pub player: Option<()>, // placeholder — will be populated later
+    pub player: PlayerIdentity,
     #[serde(skip)]
     #[allow(dead_code)]
     pub combat_ctx: Option<()>,
@@ -154,12 +155,23 @@ impl GameState {
     pub fn new(character_name: String, current_time: i64) -> Self {
         use uuid::Uuid;
 
+        let character_id = Uuid::new_v4().to_string();
         let attributes = Attributes::new();
         let combat_state = CombatState::new(crate::core::constants::BASE_HP as u32);
         let equipment = Equipment::new();
 
+        let player = PlayerIdentity {
+            character_id: character_id.clone(),
+            character_name: character_name.clone(),
+            character_level: 1,
+            character_xp: 0,
+            attributes,
+            prestige_rank: 0,
+            total_prestige_count: 0,
+        };
+
         Self {
-            character_id: Uuid::new_v4().to_string(),
+            character_id,
             character_name,
             character_level: 1,
             character_xp: 0,
@@ -194,7 +206,7 @@ impl GameState {
             game_over_shown_at: None,
             chrono_surge_active: false,
             debug_force_overcharge: false,
-            player: None,
+            player,
             combat_ctx: None,
             prog: None,
             sess: None,
@@ -698,5 +710,17 @@ mod tests {
         let json = serde_json::to_string(&gs).unwrap();
         let loaded: GameState = serde_json::from_str(&json).unwrap();
         assert_eq!(loaded.consecutive_deaths, 0); // transient, not saved
+    }
+
+    #[test]
+    fn test_player_identity_populated() {
+        let state = GameState::new("TestHero".to_string(), 1000);
+        assert_eq!(state.player.character_name, "TestHero");
+        assert_eq!(state.player.character_level, 1);
+        assert_eq!(state.player.character_xp, 0);
+        assert_eq!(state.player.prestige_rank, 0);
+        assert_eq!(state.player.total_prestige_count, 0);
+        // character_id should match the top-level field
+        assert_eq!(state.player.character_id, state.character_id);
     }
 }

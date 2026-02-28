@@ -93,8 +93,19 @@ mod tests {
         use crate::core::game_state::GameState;
         use crate::items::Equipment;
 
+        let character_id = format!("test-{}", sanitize_name(name));
+        let player = crate::core::player_identity::PlayerIdentity {
+            character_id: character_id.clone(),
+            character_name: name.to_string(),
+            character_level: 1,
+            character_xp: 0,
+            attributes: Attributes::new(),
+            prestige_rank: 0,
+            total_prestige_count: 0,
+        };
+
         GameState {
-            character_id: format!("test-{}", sanitize_name(name)),
+            character_id,
             character_name: name.to_string(),
             character_level: 1,
             character_xp: 0,
@@ -129,7 +140,7 @@ mod tests {
             storm_sigils: crate::stormglass::sigils::StormSigils::new(),
             chrono_surge_active: false,
             debug_force_overcharge: false,
-            player: None,
+            player,
             combat_ctx: None,
             prog: None,
             sess: None,
