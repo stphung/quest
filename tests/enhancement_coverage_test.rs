@@ -806,3 +806,202 @@ fn test_enhancement_progress_debug_format() {
     assert!(debug_str.contains("discovered"));
     assert!(debug_str.contains("levels"));
 }
+
+// =========================================================================
+// game_tick integration — Soulforge discovery via the tick engine
+// =========================================================================
+
+mod soulforge_tick_integration {
+    use quest::achievements::Achievements;
+    use quest::core::game_state::GameState;
+    use quest::core::tick::game_tick_with_context;
+    use quest::core::tick_context::TickContext;
+    use quest::core::tick_types::TickEvent;
+    use quest::deep::DeepState;
+    use quest::dungeon::generation::generate_dungeon;
+    use quest::enhancement::EnhancementProgress;
+    use quest::haven::Haven;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    fn make_rng(seed: u64) -> ChaCha8Rng {
+        ChaCha8Rng::seed_from_u64(seed)
+    }
+
+    /// Run ticks until Soulforge is discovered or max_ticks is exhausted.
+    /// Returns (ticks_elapsed, discovered).
+    fn run_until_soulforge_discovered(
+        state: &mut GameState,
+        enhancement: &mut EnhancementProgress,
+        max_ticks: u32,
+    ) -> (u32, bool) {
+        let mut tick_counter = 0u32;
+        let mut haven = Haven::default();
+        let mut achievements = Achievements::default();
+        let mut deep = DeepState::new();
+        // Use a fixed seed that hits discovery quickly at P15+
+        let mut rng = make_rng(1);
+
+        for tick in 0..max_ticks {
+            let mut ctx = TickContext {
+                state,
+                tick_counter: &mut tick_counter,
+                haven: &mut haven,
+                enhancement,
+                deep: &mut deep,
+                achievements: &mut achievements,
+                debug_mode: false,
+            };
+            let result = game_tick_with_context(&mut ctx, &mut rng);
+
+            if result
+                .events
+                .iter()
+                .any(|e| matches!(e, TickEvent::SoulforgeDiscovered))
+            {
+                return (tick, true);
+            }
+        }
+        (max_ticks, false)
+    }
+
+    /// Verify that game_tick emits SoulforgeDiscovered and sets enhancement_changed
+    /// when prestige_rank >= SOULFORGE_MIN_PRESTIGE_RANK (15).
+    #[test]
+    fn game_tick_emits_soulforge_discovered_at_p15_plus() {
+        let mut state = GameState::new("Forge Hero".to_string(), 0);
+        state.prestige_rank = 15;
+        let mut enhancement = EnhancementProgress::new();
+
+        // At P15, discovery base chance = 0.000014/tick. With a fixed seed and
+        // enough ticks (1M = 100k seconds) we should discover it.
+        let (_, discovered) =
+            run_until_soulforge_discovered(&mut state, &mut enhancement, 1_000_000);
+
+        assert!(
+            discovered,
+            "Soulforge should be discovered within 1M ticks at P15"
+        );
+        assert!(
+            enhancement.discovered,
+            "EnhancementProgress.discovered should be true after game_tick discovery"
+        );
+    }
+
+    /// At P15+, when discovery fires, the tick result must set enhancement_changed = true.
+    #[test]
+    fn game_tick_sets_enhancement_changed_on_soulforge_discovery() {
+        let mut state = GameState::new("Forge Hero".to_string(), 0);
+        state.prestige_rank = 20; // Higher rank = faster discovery
+        let mut tick_counter = 0u32;
+        let mut haven = Haven::default();
+        let mut enhancement = EnhancementProgress::new();
+        let mut achievements = Achievements::default();
+        let mut deep = DeepState::new();
+        let mut rng = make_rng(1);
+
+        // Run until discovery fires and capture that specific TickResult
+        for _ in 0..500_000 {
+            let mut ctx = TickContext {
+                state: &mut state,
+                tick_counter: &mut tick_counter,
+                haven: &mut haven,
+                enhancement: &mut enhancement,
+                deep: &mut deep,
+                achievements: &mut achievements,
+                debug_mode: false,
+            };
+            let result = game_tick_with_context(&mut ctx, &mut rng);
+
+            if result
+                .events
+                .iter()
+                .any(|e| matches!(e, TickEvent::SoulforgeDiscovered))
+            {
+                assert!(
+                    result.enhancement_changed,
+                    "enhancement_changed must be true on the tick that discovers Soulforge"
+                );
+                return;
+            }
+        }
+        panic!("Soulforge was not discovered within 500K ticks at P20");
+    }
+
+    /// Soulforge discovery is blocked when an active dungeon is running,
+    /// even at qualifying prestige rank.
+    #[test]
+    fn game_tick_soulforge_discovery_blocked_by_active_dungeon() {
+        let mut state = GameState::new("Dungeon Blocker".to_string(), 0);
+        state.prestige_rank = 50; // Very high — would discover quickly without blockage
+        state.active_dungeon = Some(generate_dungeon(1, 0, 1));
+
+        let mut tick_counter = 0u32;
+        let mut haven = Haven::default();
+        let mut enhancement = EnhancementProgress::new();
+        let mut achievements = Achievements::default();
+        let mut deep = DeepState::new();
+        let mut rng = make_rng(42);
+
+        // Run a large number of ticks; dungeon blocks Soulforge discovery.
+        // Re-set the dungeon each tick to ensure it stays active (dungeons can complete/fail).
+        for _ in 0..1_000 {
+            state.active_dungeon = Some(generate_dungeon(1, 0, 1));
+            let mut ctx = TickContext {
+                state: &mut state,
+                tick_counter: &mut tick_counter,
+                haven: &mut haven,
+                enhancement: &mut enhancement,
+                deep: &mut deep,
+                achievements: &mut achievements,
+                debug_mode: false,
+            };
+            let result = game_tick_with_context(&mut ctx, &mut rng);
+            assert!(
+                !result
+                    .events
+                    .iter()
+                    .any(|e| matches!(e, TickEvent::SoulforgeDiscovered)),
+                "Soulforge discovery must be blocked while dungeon is active"
+            );
+        }
+        assert!(
+            !enhancement.discovered,
+            "enhancement.discovered must remain false while dungeon blocks discovery"
+        );
+    }
+
+    /// Once already discovered, game_tick never re-emits SoulforgeDiscovered.
+    #[test]
+    fn game_tick_soulforge_discovery_idempotent_after_discovery() {
+        let mut state = GameState::new("Already Found".to_string(), 0);
+        state.prestige_rank = 50;
+        let mut tick_counter = 0u32;
+        let mut haven = Haven::default();
+        let mut enhancement = EnhancementProgress::new();
+        enhancement.discovered = true; // Pre-discovered
+        let mut achievements = Achievements::default();
+        let mut deep = DeepState::new();
+        let mut rng = make_rng(42);
+
+        for _ in 0..500 {
+            let mut ctx = TickContext {
+                state: &mut state,
+                tick_counter: &mut tick_counter,
+                haven: &mut haven,
+                enhancement: &mut enhancement,
+                deep: &mut deep,
+                achievements: &mut achievements,
+                debug_mode: false,
+            };
+            let result = game_tick_with_context(&mut ctx, &mut rng);
+            assert!(
+                !result
+                    .events
+                    .iter()
+                    .any(|e| matches!(e, TickEvent::SoulforgeDiscovered)),
+                "SoulforgeDiscovered must not re-fire once already discovered"
+            );
+        }
+    }
+}
