@@ -23,6 +23,8 @@ pub enum BossDefeatResult {
     WeaponRequired { weapon_name: String },
     /// Completed a cycle of The Expanse (Zone 11) - returns to subzone 1
     ExpanseCycle,
+    /// Completed a postgame cycle (cap zone loops) — returns to subzone 1
+    PostgameCycle { zone_id: u32 },
 }
 
 impl ZoneProgression {
@@ -104,6 +106,119 @@ impl ZoneProgression {
         self.advance_to_next_subzone();
         BossDefeatResult::SubzoneComplete {
             new_subzone_id: self.current_subzone_id,
+        }
+    }
+
+    /// Handles boss defeat with postgame zone cap awareness.
+    ///
+    /// `postgame_zone_cap` is the highest zone the player can access (from DeepPersistent).
+    /// When the cap is 11, this behaves identically to `on_boss_defeated()`.
+    /// When higher, postgame zones advance forward until the cap zone, which cycles.
+    pub fn on_boss_defeated_with_cap(
+        &mut self,
+        prestige_rank: u32,
+        achievements: &mut Achievements,
+        postgame_zone_cap: u32,
+    ) -> BossDefeatResult {
+        let zone_id = self.current_zone_id;
+        let subzone_id = self.current_subzone_id;
+
+        let zones = get_all_zones();
+        let Some(zone) = zones.iter().find(|z| z.id == zone_id) else {
+            return BossDefeatResult::SubzoneComplete {
+                new_subzone_id: self.current_subzone_id,
+            };
+        };
+
+        let is_zone_boss = subzone_id == zone.subzones.len() as u32;
+
+        // Check for Zone 10 weapon requirement
+        let has_stormbreaker = achievements.is_unlocked(AchievementId::TheStormbreaker);
+        if zone.requires_weapon && is_zone_boss && !has_stormbreaker {
+            self.fighting_boss = false;
+            self.kills_in_subzone = 0;
+            return BossDefeatResult::WeaponRequired {
+                weapon_name: zone.weapon_name.unwrap_or("legendary weapon").to_string(),
+            };
+        }
+
+        self.defeat_boss(zone_id, subzone_id);
+
+        if !is_zone_boss {
+            self.advance_to_next_subzone();
+            return BossDefeatResult::SubzoneComplete {
+                new_subzone_id: self.current_subzone_id,
+            };
+        }
+
+        // Zone boss defeated — handle progression
+
+        // Zone 10: StormsEnd
+        if zone_id == FINAL_ZONE_ID {
+            achievements.unlock(AchievementId::StormsEnd, None);
+            self.unlock_zone(EXPANSE_ZONE_ID);
+            self.current_zone_id = EXPANSE_ZONE_ID;
+            self.current_subzone_id = 1;
+            return BossDefeatResult::StormsEnd;
+        }
+
+        // Zone 11 (Expanse) with no postgame unlocked: classic cycle
+        if zone_id == EXPANSE_ZONE_ID && postgame_zone_cap <= EXPANSE_ZONE_ID {
+            self.current_subzone_id = 1;
+            self.kills_in_subzone = 0;
+            return BossDefeatResult::ExpanseCycle;
+        }
+
+        // Zone 11 (Expanse) with postgame unlocked: advance to zone 12
+        if zone_id == EXPANSE_ZONE_ID && postgame_zone_cap > EXPANSE_ZONE_ID {
+            let next = 12;
+            if self.is_zone_unlocked(next) {
+                self.current_zone_id = next;
+                self.current_subzone_id = 1;
+                return BossDefeatResult::ZoneComplete {
+                    old_zone: zone.name.to_string(),
+                    new_zone_id: next,
+                };
+            }
+            // Fallback: cycle Expanse if zone 12 not unlocked yet
+            self.current_subzone_id = 1;
+            self.kills_in_subzone = 0;
+            return BossDefeatResult::ExpanseCycle;
+        }
+
+        // Current zone is the cap zone (postgame) — cycle
+        if zone_id == postgame_zone_cap && zone_id > EXPANSE_ZONE_ID {
+            self.current_subzone_id = 1;
+            self.kills_in_subzone = 0;
+            return BossDefeatResult::PostgameCycle { zone_id };
+        }
+
+        // Try to advance to next zone (works for both pre-game and postgame zones)
+        if self.advance_to_next_zone(prestige_rank) {
+            return BossDefeatResult::ZoneComplete {
+                old_zone: zone.name.to_string(),
+                new_zone_id: self.current_zone_id,
+            };
+        }
+
+        // Fallback for pre-game zones: prestige-gated
+        if zone_id < EXPANSE_ZONE_ID {
+            let next_zone = zones.iter().find(|z| z.id == zone_id + 1);
+            if let Some(next) = next_zone {
+                return BossDefeatResult::ZoneCompleteButGated {
+                    zone_name: zone.name.to_string(),
+                    required_prestige: next.prestige_requirement,
+                };
+            }
+        }
+
+        // Fallback: cycle in place
+        self.current_subzone_id = 1;
+        self.kills_in_subzone = 0;
+        if zone_id > EXPANSE_ZONE_ID {
+            BossDefeatResult::PostgameCycle { zone_id }
+        } else {
+            BossDefeatResult::ExpanseCycle
         }
     }
 }
