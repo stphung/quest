@@ -313,6 +313,31 @@ pub fn apply_challenge_rewards(
     }
 }
 
+/// Shared forfeit confirmation handler.
+/// Returns true if the forfeit was confirmed (game_result set to loss).
+/// Call this when the player presses Esc/Forfeit.
+pub fn handle_forfeit<R>(
+    game_result: &mut Option<R>,
+    forfeit_pending: &mut bool,
+    loss_variant: R,
+) -> bool {
+    if *forfeit_pending {
+        *game_result = Some(loss_variant);
+        true
+    } else {
+        *forfeit_pending = true;
+        false
+    }
+}
+
+/// Cancel a pending forfeit. Call this on any non-Esc input
+/// when forfeit_pending is true.
+pub fn cancel_forfeit_if_pending(forfeit_pending: &mut bool) {
+    if *forfeit_pending {
+        *forfeit_pending = false;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
