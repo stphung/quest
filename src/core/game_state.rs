@@ -11,6 +11,7 @@ use crate::fishing::types::{FishingSession, FishingState};
 use crate::items::equipment::Equipment;
 use crate::items::types::Rarity;
 use crate::stormglass::sigils::StormSigils;
+use crate::core::combat_context::CombatContext;
 use crate::core::player_identity::PlayerIdentity;
 use crate::zones::ZoneProgression;
 use serde::{Deserialize, Serialize};
@@ -141,7 +142,7 @@ pub struct GameState {
     pub player: PlayerIdentity,
     #[serde(skip)]
     #[allow(dead_code)]
-    pub combat_ctx: Option<()>,
+    pub combat_ctx: CombatContext,
     #[serde(skip)]
     #[allow(dead_code)]
     pub prog: Option<()>,
@@ -168,6 +169,15 @@ impl GameState {
             attributes,
             prestige_rank: 0,
             total_prestige_count: 0,
+        };
+
+        let combat_ctx = CombatContext {
+            combat_state: combat_state.clone(),
+            equipment: equipment.clone(),
+            zone_progression: ZoneProgression::new(),
+            active_dungeon: None,
+            session_kills: 0,
+            consecutive_deaths: 0,
         };
 
         Self {
@@ -207,7 +217,7 @@ impl GameState {
             chrono_surge_active: false,
             debug_force_overcharge: false,
             player,
-            combat_ctx: None,
+            combat_ctx,
             prog: None,
             sess: None,
         }
@@ -710,6 +720,20 @@ mod tests {
         let json = serde_json::to_string(&gs).unwrap();
         let loaded: GameState = serde_json::from_str(&json).unwrap();
         assert_eq!(loaded.consecutive_deaths, 0); // transient, not saved
+    }
+
+    #[test]
+    fn test_combat_context_populated() {
+        let state = GameState::new("TestHero".to_string(), 1000);
+        assert_eq!(state.combat_ctx.session_kills, 0);
+        assert_eq!(state.combat_ctx.consecutive_deaths, 0);
+        assert!(state.combat_ctx.active_dungeon.is_none());
+        assert_eq!(state.combat_ctx.zone_progression.current_zone_id, 1);
+        // combat_state and equipment should match the top-level fields
+        assert_eq!(
+            state.combat_ctx.combat_state.player_max_hp,
+            state.combat_state.player_max_hp
+        );
     }
 
     #[test]

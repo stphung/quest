@@ -65,6 +65,15 @@ impl CharacterManager {
             total_prestige_count: save_data.total_prestige_count,
         };
 
+        let combat_ctx = crate::core::combat_context::CombatContext {
+            combat_state: save_data.combat_state.clone(),
+            equipment: save_data.equipment.clone(),
+            zone_progression: save_data.zone_progression.clone(),
+            active_dungeon: None,
+            session_kills: 0,
+            consecutive_deaths: 0,
+        };
+
         Ok(crate::core::game_state::GameState {
             character_id: save_data.character_id,
             character_name: save_data.character_name,
@@ -102,7 +111,7 @@ impl CharacterManager {
             chrono_surge_active: false,
             debug_force_overcharge: false,
             player,
-            combat_ctx: None,
+            combat_ctx,
             prog: None,
             sess: None,
         })

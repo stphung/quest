@@ -141,7 +141,14 @@ mod tests {
             chrono_surge_active: false,
             debug_force_overcharge: false,
             player,
-            combat_ctx: None,
+            combat_ctx: crate::core::combat_context::CombatContext {
+                combat_state: CombatState::new(50),
+                equipment: Equipment::new(),
+                zone_progression: crate::zones::ZoneProgression::new(),
+                active_dungeon: None,
+                session_kills: 0,
+                consecutive_deaths: 0,
+            },
             prog: None,
             sess: None,
         }
