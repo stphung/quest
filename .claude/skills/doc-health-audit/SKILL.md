@@ -112,7 +112,7 @@ rm -rf quest.wiki
 git submodule update --init quest.wiki
 ```
 
-### Wiki Pages (15):
+### Wiki Pages (18):
 
 | Page | Content |
 |------|---------|
@@ -127,10 +127,12 @@ git submodule update --init quest.wiki
 | `Haven.md` | 14-room skill tree, bonuses per tier, build order recommendations |
 | `Soulforge.md` | Enhancement +0 to +10, success rates, costs, strategy |
 | `Challenges.md` | All 10 minigames, controls, difficulties, rewards |
-| `Achievements.md` | 5 categories, 80+ achievements |
+| `Achievements.md` | 7 categories, 168 achievements, score system, titles |
 | `Strategy-Guide.md` | 5-phase progression guide (early→endgame), pro tips |
 | `Stormbreaker-Path.md` | Step-by-step walkthrough, PR cost breakdown, checklist |
 | `Controls-and-UI.md` | Full keyboard reference for every screen and minigame |
+| `The-Deep.md` | Mercenary system, missions, layers, infrastructure, guild ranks |
+| `Stormglass.md` | Stormglass currency, Storm Sigils, earning/spending, strategy |
 
 ### What to check:
 - New game systems, challenges, or mechanics not yet documented in the wiki
@@ -163,3 +165,20 @@ git submodule update --init quest.wiki
 - Clean up any `_research_*.md` temp files before pushing
 - Commit directly to `quest.wiki/` (wiki repos have no branch protection)
 - Push to `origin master` (wiki repos use `master`, not `main`)
+
+## Phase 5: Update Wiki Submodule Pointer
+
+After pushing wiki changes, the main quest repo's submodule pointer must be updated to track the new wiki commit. **Include this in the same docs PR branch** (not a separate PR).
+
+```bash
+# From the main quest repo root:
+cd /path/to/quest
+
+# Stage the updated submodule pointer
+git add quest.wiki
+
+# Include in the docs commit (or add a follow-up commit on the same branch)
+git commit -m "docs: update quest.wiki submodule pointer"
+```
+
+**Important:** Do this BEFORE creating the PR, so the submodule pointer update is part of the same PR as the dev doc changes. This avoids needing a separate PR just for the pointer.

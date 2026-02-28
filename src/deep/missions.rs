@@ -1851,7 +1851,7 @@ mod tests {
         DeepPersistent, DeepPrestige, GuildRank, MercArchetype, MercStatus, Mercenary,
         MissionOutcome, MissionStatus, MissionType,
     };
-    use chrono::Utc;
+    use chrono::{TimeZone, Utc};
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
 
@@ -3154,8 +3154,9 @@ mod tests {
 
     #[test]
     fn test_daily_supply_run_not_available_same_day() {
-        let now = Utc::now();
-        // Used just now (within same day).
+        // Use a fixed time far from midnight to avoid flakiness when CI runs near 00:00 UTC.
+        let now = Utc.with_ymd_and_hms(2025, 6, 15, 12, 0, 0).unwrap();
+        // Used 30 minutes ago (same calendar day).
         let used_at = now - Duration::minutes(30);
         assert!(!is_daily_supply_run_available(Some(used_at), now));
     }
