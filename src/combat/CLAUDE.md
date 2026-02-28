@@ -89,15 +89,18 @@ Zone 11 has dramatically higher stats than Zone 10 (~6.2x HP, ~4.6x DMG, ~4.8x D
 - **early_damage_percent**: Applied to base damage first (e.g. Giant's Might 150%)
 - **damage_percent**: Applied after early_damage_percent (e.g. Haven Armory, sigils)
 - **flat_damage**: Added after % multipliers, before enemy defense (prestige)
+- **ascension_multiplier**: Applied after flat_damage, before enemy defense (from Ascension system, default 1.0)
 - **crit_chance_percent**: Haven Watchtower + prestige crit + sigils
 - **double_strike_chance**: Haven War Room + sigils
 - **xp_gain_percent**: Haven Training Yard + sigils
 
 **Defense pipeline** (`enemy_attack.rs`):
 - **flat_defense**: Added to DEX-based defense (prestige)
+- **ascension_multiplier**: Applied to total defense (from Ascension system, default 1.0)
 - **damage_reduction_percent**: After defense subtraction (e.g. Divine Bulwark 30%, sigils)
 
 **Other**:
+- **ascension_multiplier**: Also applied to player max HP in `core/tick.rs` (default 1.0x, up to 64x+ at Ascension VI)
 - **flat_hp**: Applied to `combat_state.player_max_hp` in `core/tick.rs`
 - **attack_speed_percent**: Windborne + sigils
 - **hp_regen_percent**, **hp_regen_delay_reduction**, **regen_reduction_percent**: Regen modifiers from Haven, sigils, Sleipnir
@@ -121,10 +124,11 @@ pub fn update_combat<R: Rng>(
     bonuses: &CombatBonuses,
     achievements: &mut Achievements,
     derived: &DerivedStats,
+    postgame_zone_cap: u32,
 ) -> Vec<CombatEvent>
 ```
 
-Called from `core/tick.rs` each tick. Takes a generic `R: Rng` and a single unified `&CombatBonuses` that aggregates Haven, prestige, god item, and sigil bonuses. Returns `Vec<CombatEvent>` that tick.rs maps to `TickEvent` variants.
+Called from `core/tick.rs` each tick. Takes a generic `R: Rng` and a single unified `&CombatBonuses` that aggregates Haven, prestige, god item, sigil, and ascension bonuses. The `postgame_zone_cap` parameter controls boss defeat cycling for postgame zones (passed through to `on_boss_defeated_with_cap()`). Returns `Vec<CombatEvent>` that tick.rs maps to `TickEvent` variants.
 
 ## Integration Points
 

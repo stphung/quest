@@ -29,6 +29,7 @@ pub fn update_combat_facade<R: Rng>(
     bonuses: &CombatBonuses,
     achievements: &mut Achievements,
     derived: &DerivedStats,
+    postgame_zone_cap: u32,
 ) -> Vec<CombatEvent> {
     crate::combat::orchestration::update_combat(
         rng,
@@ -37,6 +38,7 @@ pub fn update_combat_facade<R: Rng>(
         bonuses,
         achievements,
         derived,
+        postgame_zone_cap,
     )
 }
 
@@ -61,6 +63,7 @@ mod tests {
             &bonuses,
             &mut achievements,
             &derived,
+            11,
         );
         assert!(events.is_empty(), "No events when no enemy");
     }
@@ -88,6 +91,7 @@ mod tests {
                 &bonuses,
                 &mut achievements,
                 &derived,
+                11,
             );
         }
         // Should have processed some combat -- just verify no panic

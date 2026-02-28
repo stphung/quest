@@ -76,6 +76,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 - [`src/achievements/CLAUDE.md`](src/achievements/CLAUDE.md) — Achievement tracking, persistence
 - [`src/enhancement/CLAUDE.md`](src/enhancement/CLAUDE.md) — Soulforge enhancement system
 - [`src/deep/CLAUDE.md`](src/deep/CLAUDE.md) — The Deep mercenary expedition system
+- [`src/ascension/CLAUDE.md`](src/ascension/CLAUDE.md) — Ascension combat power multiplier system
 - [`src/stormglass/CLAUDE.md`](src/stormglass/CLAUDE.md) — Stormglass currency, Storm Sigils, daily rotation
 - [`src/ui/CLAUDE.md`](src/ui/CLAUDE.md) — Shared game layout components, color conventions
 
@@ -84,7 +85,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 - `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
 - `game_logic.rs` — Thin re-export wrapper (XP curve, leveling, spawning, offline logic extracted to submodules)
 - `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 14 processing stages. Zero UI imports, zero file I/O — fully decoupled from rendering
-- `tick_types.rs` — TickEvent enum (42 variants) and TickResult struct
+- `tick_types.rs` — TickEvent enum (44 variants) and TickResult struct
 - `tick_stages.rs` — Tick processing stages 4-6 and helper functions (process_item_drop, process_discoveries, etc.)
 - `xp.rs` — XP calculation, leveling logic, combat kill XP
 - `discoveries.rs` — Discovery rolls for dungeons, fishing spots, Haven, Soulforge, The Deep
@@ -92,7 +93,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 - `offline.rs` — Offline XP progression (calculate_offline_xp, process_offline_progression)
 - `recent_drops.rs` — RecentDrop struct and deque management
 - `ticker.rs` — Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
-- `constants.rs` — Game balance constants (tick rate, attack intervals, XP rates, item drop rates, zone enemy stats, boss multipliers, prestige combat bonuses, update check jitter)
+- `constants.rs` — Game balance constants (tick rate, attack intervals, XP rates, item drop rates, zone enemy stats for 20 zones, boss multipliers, prestige combat bonuses, postgame zone scaling, update check jitter)
 
 ### Simulator (`src/bin/simulator.rs`)
 
@@ -151,13 +152,15 @@ CLI: `--hours N`, `--seed N`, `--strategy STR` (rush/balanced/infrastructure), `
 - `events.rs` — CombatEvent enum, CombatBonuses (unified struct replacing HavenCombatBonuses, GodItemCombatBonuses, PrestigeCombatBonuses)
 - `regen.rs` — HP regeneration after combat
 
-### Zone System (`src/zones/`)
+### Zone System (`src/zones/`) — [detailed docs](src/zones/CLAUDE.md)
 
-- `data.rs` — 11 zones with 3-4 subzones each, prestige requirements, boss definitions
+- `data.rs` — 20 zones with 3-5 subzones each, prestige requirements, boss definitions
 - `progression.rs` — Zone/subzone progression state, kill tracking (10 kills → boss spawn, 5 kills to retry after boss death)
 - `advancement.rs` — Zone/subzone advancement logic, `travel_to()`, `advance_to_next_subzone()`
-- `boss_defeat.rs` — `BossDefeatResult` enum and `on_boss_defeated()` handler
+- `boss_defeat.rs` — `BossDefeatResult` enum, `on_boss_defeated()` and `on_boss_defeated_with_cap()` handlers
 - `gates.rs` — Weapon gate queries (`boss_weapon_blocked()`), zone unlock checks
+- `postgame.rs` — `PostgameRegion` enum (RedFault, MirrorScar, BlackMouth) with chapter metadata
+- `access.rs` — `sync_account_zone_unlocks()` — account-level zone access synchronization
 
 **Zone Tiers:**
 - P0: Meadow, Dark Forest (3 subzones each)
@@ -166,6 +169,9 @@ CLI: `--hours N`, `--seed N`, `--strategy STR` (rush/balanced/infrastructure), `
 - P15: Crystal Caverns, Sunken Kingdom (4 subzones each)
 - P20: Floating Isles, Storm Citadel (4 subzones each, Zone 10 requires Stormbreaker)
 - Post-game: The Expanse (Zone 11, 4 subzones, cycles infinitely, endgame difficulty wall)
+- Ch.1 The Red Fault: Splintered Rim, Ember Ravine, Heart of the Fault (Z12-14, 5 subzones each, Deep Layer 3)
+- Ch.2 The Mirror Scar: Shard Fields, Refraction Steps, Hall of Second Suns (Z15-17, 5 subzones each, Deep Layer 7)
+- Ch.3 The Black Mouth: Ashen Verge, Throat of the World, The Black Mouth (Z18-20, 5 subzones each, Deep Layer 13)
 
 ### Dungeon Module (`src/dungeon/`) — [detailed docs](src/dungeon/CLAUDE.md)
 
@@ -207,6 +213,14 @@ CLI: `--hours N`, `--seed N`, `--strategy STR` (rush/balanced/infrastructure), `
 
 Account-level equipment enhancement system (Soulforge) that persists across characters. Each of 7 equipment slots can be enhanced from +0 to +10. Levels +1-4 are 100% success rate; +5-10 have decreasing success rates (70%/55%/40%/30%/20%/10%) and failure penalties (-1 or -2 levels). Levels +5-7 offer a "Soul Tithe" option for guaranteed success at higher PR cost (4/6/8 PR). Costs prestige ranks. Discovered at P15+. Enhancement multipliers boost equipment stats in `derived_stats.rs`.
 
+### Ascension Module (`src/ascension/`) — [detailed docs](src/ascension/CLAUDE.md)
+
+- `types.rs` — Constants (cost table, gate table, multiplier formula), helper functions
+- `logic.rs` — Eligibility checks (`can_ascend`), execution (`ascend`), `AscendResult` enum
+- `mod.rs` — Public re-exports
+
+Per-character combat power multiplier purchased with prestige ranks, gated by Deep layer milestones. Each Ascension level doubles all combat stats (damage, defense, HP) for levels I-VI (2x to 64x), with diminishing 1.5x returns at VII+. Total PR cost for I-VI: 200 PR. Ascension level survives prestige. Stored as `ascension_level: u32` on `GameState`.
+
 ### The Deep Module (`src/deep/`) — [detailed docs](src/deep/CLAUDE.md)
 
 - `types.rs` — All data structures: `DeepState`, `DeepPersistent`, `DeepPrestige`, `GuildRank`, `Mercenary`, `MercArchetype`, `MercStatus`, `Layer`, `LayerRecord`, `LayerTier`, `Infrastructure`, `Mission`, `MissionType`, `MissionStatus`, `MissionOutcome`, `CheckInEvent`, `EventChoice`, `MissionResult`, `AvailableMission`, `RecruitPool`, `DeepUiState`, `DeepView`, discovery constants
@@ -218,7 +232,7 @@ Account-level equipment enhancement system (Soulforge) that persists across char
 - `persistence.rs` — Save/load from `~/.quest/deep.json`
 - `discovery.rs` — Discovery logic (complete_discovery), starter roster initialisation (3 mercs: Vanguard, Scout, Medic)
 
-An endgame (P15+) system where players recruit and manage a mercenary company, sending squads on long-duration missions (2-24h wall-clock time) into a vast underground structure. Two-tier persistence: `DeepPersistent` (guild rank, cleared layers, infrastructure — survives prestige) and `DeepPrestige` (mercs, missions, Warband Marks — resets on prestige). Five mercenary archetypes (Vanguard, Scout, Arcanist, Medic, Saboteur) with 4 quality tiers. Six layer tiers (Shallows through The Void). Five mission types (Supply Run, Recon, Expedition, Breakthrough, Construction). Four infrastructure types (Outpost, SupplyCache, Watchtower, Bridge). Discovered on first Endless kill (Zone 11 boss) at P15+.
+An endgame (P15+) system where players recruit and manage a mercenary company, sending squads on long-duration missions (2-24h wall-clock time) into a vast underground structure. Two-tier persistence: `DeepPersistent` (guild rank, cleared layers, infrastructure, `postgame_zone_cap`, `pending_postgame_region_unlock` — survives prestige) and `DeepPrestige` (mercs, missions, Warband Marks — resets on prestige). Five mercenary archetypes (Vanguard, Scout, Arcanist, Medic, Saboteur) with 4 quality tiers. Six layer tiers (Shallows through The Void). Five mission types (Supply Run, Recon, Expedition, Breakthrough, Construction). Four infrastructure types (Outpost, SupplyCache, Watchtower, Bridge). Discovered on first Endless kill (Zone 11 boss) at P15+. Deep layer breakthroughs unlock postgame zones: Layer 3 → Zones 12-14, Layer 7 → Zones 15-17, Layer 13 → Zones 18-20.
 
 ### Stormglass Module (`src/stormglass/`)
 
@@ -269,7 +283,7 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 
 ### Achievement Module (`src/achievements/`)
 
-- `types.rs` — AchievementId enum (168 variants), categories, unlock tracking, `selected_title` field
+- `types.rs` — AchievementId enum (194 variants), categories, unlock tracking, `selected_title` field
 - `data.rs` — Achievement database with descriptions and unlock conditions
 - `handlers.rs` — Event handlers (on_enemy_killed, on_boss_killed, on_level_up, etc.) and check_milestones
 - `milestones.rs` — MinigameType, MinigameDifficulty enums, milestone threshold arrays
@@ -280,7 +294,7 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 - `unlock.rs` — Core unlock machinery (is_unlocked, unlock, check_milestones)
 - `persistence.rs` — Save/load from `~/.quest/achievements.json`
 
-Account-level achievement system that persists across characters. 7 categories (Combat, Level, Progression, Challenges, Exploration, Deep, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, Soulforge enhancements, and Deep milestones (discovery, layers, guild ranks). Includes modal notification system with 500ms accumulation window. Includes a title system where 50 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select. Achievement score system: each of the 168 achievements has a point value (7 tiers: 5/10/25/50/100/250/500), computed at runtime. Shown in browser title bar, unlock modal, detail panel, and stats view.
+Account-level achievement system that persists across characters. 8 categories (Combat, Level, Prestige, Progression, Challenges, Exploration, Deep, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, Soulforge enhancements, Deep milestones (discovery, layers, guild ranks), postgame zone completions (Z12-Z20), and Ascension milestones (I, III, VI). Includes modal notification system with 500ms accumulation window. Includes a title system where 59 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select. Achievement score system: each of the 194 achievements has a point value (7 tiers: 5/10/25/50/100/250/500), computed at runtime. Shown in browser title bar, unlock modal, detail panel, and stats view.
 
 ### History / Time Vault (`src/history/`)
 
@@ -370,7 +384,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `stormglass_scene.rs` — Stormglass Exchange overlay with animations (Invoke Trial rolling, Chrono Surge speed ramp/fast-forward, Storm Sigils daily rotation, Storm Lure)
 - `time_vault_scene.rs` — Time Vault overlay UI (branch/commit browser, restore, fork, GitHub cloud sync)
 - `scene_fx.rs` — Shared utilities for layered ASCII scene rendering (scene buffer, backdrop effects, wide character support)
-- `zone_bg.rs` — Stylized zone background scenes with 6-layer compositing pipeline for all 11 zones
+- `zone_bg.rs` — Stylized zone background scenes with 6-layer compositing pipeline for all 20 zones
 - `debug_menu_scene.rs` — Debug menu overlay with tabbed categories
 - `bug_report_scene.rs` — Bug report overlay with game-state preview and clipboard status
 - `throbber.rs` — Shared spinner animations and atmospheric messages
@@ -425,12 +439,19 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - Enhancement Soul Tithe: +5/+6/+7 can pay 4/6/8 PR for guaranteed 100% success
 - Stormglass: currency earned from challenge rewards, gated behind P15+
 - Storm Lure: 50,000 Stormglass consumable, guarantees Leviathan encounters at fishing rank 40
+- Postgame zone stat scaling: 1.6x per zone from Zone 11 base (POSTGAME_ZONE_STAT_MULTIPLIER)
+- Postgame zone unlock: Deep Layer 3 → Z12-14, Layer 7 → Z15-17, Layer 13 → Z18-20
+- Ascension cost: [10, 15, 25, 35, 50, 65] PR for I-VI; 65 + 15*(level-6) PR for VII+
+- Ascension deep gate: [3, 7, 12, 18, 25, 30] layers for I-VI; none for VII+
+- Ascension multiplier: 2^level for I-VI (2x to 64x); 64 * 1.5^(level-6) for VII+
 
 ## Combat Mechanics
 
-- **Enemy scaling**: Static zone-based stats from `ZONE_ENEMY_STATS` table (not player-HP-based). Each zone has `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)` tuples; subzone depth adds incremental stats
-- **Combat bonuses**: `CombatBonuses` is a unified struct (replacing the former `PrestigeCombatBonuses`, `HavenCombatBonuses`, and `GodItemCombatBonuses`) injected into `update_combat()` — carries all bonus sources (prestige, Haven, god items, sigils) in a single parameter
-- **Damage pipeline**: base damage → Giant's Might % → Haven Armory % → prestige flat damage → enemy defense → min 1 → Divine Bulwark DR → crit (2x)
+- **Enemy scaling**: Static zone-based stats from `ZONE_ENEMY_STATS` table (not player-HP-based). Each zone has `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)` tuples; subzone depth adds incremental stats. Zones 12-20 scale at 1.6x per zone from Zone 11 base
+- **Combat bonuses**: `CombatBonuses` is a unified struct (replacing the former `PrestigeCombatBonuses`, `HavenCombatBonuses`, and `GodItemCombatBonuses`) injected into `update_combat()` — carries all bonus sources (prestige, Haven, god items, sigils, ascension) in a single parameter
+- **Damage pipeline**: base damage → Giant's Might % → Haven Armory % → prestige flat damage → ascension multiplier → enemy defense → min 1 → Divine Bulwark DR → crit (2x)
+- **Defense pipeline**: base defense → prestige flat defense → ascension multiplier → damage reduction %
+- **Ascension multiplier**: Also applied to player max HP in `core/tick.rs` (default 1.0x, up to 64x+ at Ascension VI)
 - **Enemy attack intervals**: Vary by tier (2.0s normal, 1.8s boss, 1.5s zone boss, 1.6s dungeon elite, 1.4s dungeon boss)
 - **Boss enrage timer**: Bosses enrage after 60 seconds of combat, increasing their damage output
 - **Death to Boss**: Resets player to subzone 1 of the current zone, preserves prestige
@@ -438,6 +459,7 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - **Weapon Gates**: Zone 10 final boss requires Stormbreaker (checked via TheStormbreaker achievement)
 - **Stormbreaker Path**: Max fishing rank → catch Storm Leviathan (10 encounters) → build Storm Forge in Haven → forge Stormbreaker
 - **Zone 11 (The Expanse)**: Endgame wall with ~6.2x HP, ~4.6x DMG, ~4.8x DEF over Zone 10. Requires very high prestige (P50+) to farm comfortably
+- **Zones 12-20 (Postgame)**: Three chapters unlocked by Deep layer breakthroughs. Enemy stats scale 1.6x per zone from Zone 11. Cap zones cycle infinitely; non-cap zones advance forward. Requires Ascension system for adequate combat power
 
 ## Project Structure
 
@@ -511,12 +533,14 @@ quest/
 │   │   ├── damage.rs        # Shared damage calculations
 │   │   ├── events.rs        # CombatEvent, CombatBonuses (unified)
 │   │   └── regen.rs         # HP regeneration
-│   ├── zones/               # Zone system
-│   │   ├── data.rs          # Zone definitions
+│   ├── zones/               # Zone system [CLAUDE.md]
+│   │   ├── data.rs          # Zone definitions (20 zones)
 │   │   ├── progression.rs   # Zone progression
 │   │   ├── advancement.rs   # Zone/subzone advancement and travel
 │   │   ├── boss_defeat.rs   # Boss defeat handling
-│   │   └── gates.rs         # Weapon gate queries, access checks
+│   │   ├── gates.rs         # Weapon gate queries, access checks
+│   │   ├── postgame.rs      # PostgameRegion enum (RedFault, MirrorScar, BlackMouth)
+│   │   └── access.rs        # sync_account_zone_unlocks()
 │   ├── dungeon/             # Dungeon system [CLAUDE.md]
 │   │   ├── types.rs         # Room types, dungeon sizes
 │   │   ├── generation.rs    # Procedural generation
@@ -541,6 +565,10 @@ quest/
 │   │   ├── types.rs         # Enhancement progress, constants, UI state
 │   │   ├── logic.rs         # Enhancement rolling, discovery
 │   │   └── persistence.rs   # Save/load
+│   ├── ascension/           # Ascension combat multiplier system [CLAUDE.md]
+│   │   ├── mod.rs           # Public re-exports
+│   │   ├── types.rs         # Cost table, gate table, multiplier formula
+│   │   └── logic.rs         # can_ascend(), ascend(), AscendResult
 │   ├── deep/                # The Deep — Mercenary Expedition System [CLAUDE.md]
 │   │   ├── types.rs         # All data structures (DeepState, Mercenary, Mission, etc.)
 │   │   ├── mod.rs           # Public API re-exports

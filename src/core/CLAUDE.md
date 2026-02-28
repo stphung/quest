@@ -16,7 +16,7 @@ src/core/
 ├── recent_drops.rs  # RecentDrop struct, recent drops deque management
 ├── tick.rs          # game_tick() orchestration — coordinates all stages
 ├── tick_stages.rs   # Tick processing stages 4-6 and helper functions
-├── tick_types.rs    # TickEvent enum (42 variants) and TickResult struct
+├── tick_types.rs    # TickEvent enum (44 variants) and TickResult struct
 ├── ticker.rs        # Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
 └── xp.rs            # XP curves, leveling, combat kill XP, distribute_level_up_points
 ```
@@ -49,6 +49,7 @@ pub struct GameState {
     pub stormglass_discovered: bool,
     pub storm_sigils: StormSigils,
     pub consecutive_deaths: u32,           // Death loop tracking
+    pub ascension_level: u32,              // Ascension level (0 = no ascension, persists through prestige)
 
     // Transient (serde(skip), reset on load)
     pub active_fishing: Option<FishingSession>,
@@ -109,7 +110,7 @@ pub struct OfflineReport {
 
 ### `TickEvent` (`tick_types.rs`)
 
-Enum with 42 variants describing everything that can happen in a single tick. The presentation layer (main.rs) maps these to combat log entries and visual effects. Game logic never touches UI types.
+Enum with 44 variants describing everything that can happen in a single tick. The presentation layer (main.rs) maps these to combat log entries and visual effects. Game logic never touches UI types.
 
 **Categories:**
 - **Combat**: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`, `DamageReflected`, `RegenComplete`, `BossEnrage`, `CombatRetreat`
@@ -120,6 +121,8 @@ Enum with 42 variants describing everything that can happen in a single tick. Th
 - **Discovery**: `ChallengeDiscovered`, `DungeonDiscovered`, `FishingSpotDiscovered`, `HavenDiscovered`, `SoulforgeDiscovered`, `StormglassDiscovered`
 - **The Deep**: `DeepMissionComplete`, `DeepEventPending`, `DeepMercInjured`, `DeepMercLost`, `DeepBreakthrough`, `DeepGuildRankUp`
 - **Stormglass**: `StormglassSalvaged`, `StormglassDungeonCache`
+- **Postgame Zones**: `PostgameRegionUnlocked` (with `PostgameRegion`)
+- **Ascension**: `Ascended` (with level and message)
 - **Achievements**: `AchievementUnlocked`
 - **Level Up**: `LeveledUp`
 
@@ -165,10 +168,10 @@ pub fn game_tick<R: Rng>(
 |-------|-------------|
 | 1. Challenge AI | Ticks AI thinking for active Chess, Morris, Gomoku, or Go games |
 | 2. Challenge discovery | Rolls for new challenge discovery (P1+ required, Haven bonus applied) |
-| 3. Sync player HP | Recalculates `DerivedStats` (with `enhancement.levels`), builds unified `CombatBonuses` (prestige, Haven, god items, sigils), applies `flat_hp` to `combat_state.player_max_hp` |
+| 3. Sync player HP | Recalculates `DerivedStats` (with `enhancement.levels`), builds unified `CombatBonuses` (prestige, Haven, god items, sigils, ascension multiplier), applies `flat_hp` and ascension multiplier to `combat_state.player_max_hp` |
 | 4. Dungeon exploration | Calls `update_dungeon()`, processes room entry, treasure, keys, boss unlock, completion/failure |
 | 5. Fishing | If fishing active: ticks session, handles catches/items/rank-ups/Leviathan, updates play time, **returns early** (skips combat) |
-| 6. Combat | Calls `update_combat(rng, state, dt, &bonuses, achievements, derived)`, maps `CombatEvent` to `TickEvent`, applies XP, handles kills/deaths, processes item drops and discoveries |
+| 6. Combat | Calls `update_combat(rng, state, dt, &bonuses, achievements, derived, postgame_zone_cap)`, maps `CombatEvent` to `TickEvent`, applies XP, handles kills/deaths, processes item drops and discoveries |
 | 7. Enemy spawn | Calls `spawn_enemy_if_needed()` if no enemy and not regenerating |
 | 8. Play time | Increments tick counter; at 10 ticks, increments `play_time_seconds` |
 | 9. Achievement collection | Drains newly unlocked achievements into `TickResult.events` |
@@ -176,6 +179,8 @@ pub fn game_tick<R: Rng>(
 | 11. Soulforge discovery | Rolls for Soulforge discovery (P15+, no active content), emits `SoulforgeDiscovered`, sets `enhancement_changed` |
 | 12. Deep discovery hook | No per-tick roll; discovery is triggered during Stage 6 combat processing on first Expanse cycle boss kill at P15+ |
 | 13. Deep event check | Checks for pending Deep check-in events on active missions |
+| 13b. Deep mission tick | Ticks Deep missions (check-ins, completions, breakthroughs triggering postgame region unlocks) |
+| 13c. Postgame region unlock | Consumes `pending_postgame_region_unlock`, calls `sync_account_zone_unlocks`, emits `PostgameRegionUnlocked` |
 | 14. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display |
 
 **Important**: Stage 5 (fishing) returns early, skipping stages 6-7. Fishing and combat are mutually exclusive.
@@ -284,7 +289,7 @@ All functions above are re-exported through `game_logic.rs` for backward compati
 ### Zone Enemy Stats
 | Constant | Value | Notes |
 |----------|-------|-------|
-| `ZONE_ENEMY_STATS` | `[(u32,u32,u32,u32,u32,u32); 11]` | Per-zone `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)`. Index 0=Zone 1, Index 10=Zone 11. Steps are per-subzone-depth increments above depth 1 |
+| `ZONE_ENEMY_STATS` | `[(u32,u32,u32,u32,u32,u32); 20]` | Per-zone `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)`. Index 0=Zone 1, Index 19=Zone 20. Zones 12-20 scale at 1.6x per zone from Zone 11 base. Steps are per-subzone-depth increments above depth 1 |
 
 Zone 11 (The Expanse) is an endgame wall: `(5000, 400, 500, 80, 250, 30)` — roughly 6.2x HP, 4.6x DMG, 4.8x DEF over Zone 10.
 
@@ -328,7 +333,7 @@ Zone 11 (The Expanse) is an endgame wall: `(5000, 400, 500, 80, 250, 30)` — ro
 ## Integration Points
 
 ### tick.rs depends on (inputs)
-- **combat** (`combat::logic`): `update_combat(rng, state, dt, &bonuses, achievements, derived)` returns `Vec<CombatEvent>`, `CombatBonuses` unified struct
+- **combat** (`combat::logic`): `update_combat(rng, state, dt, &bonuses, achievements, derived, postgame_zone_cap)` returns `Vec<CombatEvent>`, `CombatBonuses` unified struct
 - **character** (`character::prestige`): `PrestigeCombatBonuses::from_rank()` — computed each tick for combat bonuses
 - **character** (`character::derived_stats`): `DerivedStats::calculate_derived_stats()`
 - **dungeon** (`dungeon::logic`): `update_dungeon()`, `on_room_enemy_defeated()`, `on_elite_defeated()`, `on_boss_defeated()`, `add_dungeon_xp()`, `calculate_boss_xp_reward()`, `on_treasure_room_entered()`

@@ -275,6 +275,7 @@ fn test_combat_to_prestige_full_loop() {
             &CombatBonuses::default(),
             &mut achievements,
             &derived,
+            11,
         );
 
         // Apply XP from kills (mimics main.rs game loop)
@@ -357,6 +358,7 @@ fn test_combat_to_prestige_full_loop() {
             &CombatBonuses::default(),
             &mut achievements,
             &derived,
+            11,
         );
         for event in &events {
             if matches!(event, CombatEvent::EnemyDied { .. }) {

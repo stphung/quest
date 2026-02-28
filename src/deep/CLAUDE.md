@@ -53,6 +53,10 @@ Key methods:
 ### `DeepPersistent` (`types.rs`)
 Account-level state. Owned by the game's account-level save, not character saves.
 
+Key fields (postgame-related):
+- `postgame_zone_cap: u32` — Highest postgame zone accessible (default 11 = Expanse only). Raised by Deep breakthroughs at layers 3/7/13 to 14/17/20 respectively. `#[serde(default = "default_postgame_zone_cap")]`
+- `pending_postgame_region_unlock: Option<PostgameRegion>` — Set when a breakthrough unlocks a new chapter; consumed by tick to show world-event modal. `#[serde(default)]`
+
 Key methods:
 - `layer_record_mut(index)` — Get or lazily create a `LayerRecord` (vec grows on demand)
 - `layer_record(index)` — Read-only lookup; returns `None` for index 0 or unreached layers

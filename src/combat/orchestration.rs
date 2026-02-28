@@ -17,6 +17,7 @@ pub fn update_combat<R: Rng>(
     bonuses: &CombatBonuses,
     achievements: &mut crate::achievements::Achievements,
     derived: &DerivedStats,
+    postgame_zone_cap: u32,
 ) -> Vec<CombatEvent> {
     let mut events = Vec::new();
 
@@ -63,8 +64,14 @@ pub fn update_combat<R: Rng>(
 
     // --- Phase 3: Player attack (if ready) ---
     if player_attacks {
-        let (attack_events, enemy_died) =
-            super::player_attack::resolve_player_attack(rng, state, bonuses, achievements, derived);
+        let (attack_events, enemy_died) = super::player_attack::resolve_player_attack(
+            rng,
+            state,
+            bonuses,
+            achievements,
+            derived,
+            postgame_zone_cap,
+        );
         events.extend(attack_events);
         if enemy_died {
             return events;
@@ -73,8 +80,14 @@ pub fn update_combat<R: Rng>(
 
     // --- Phase 4: Enemy attack (if ready) ---
     if enemy_attacks {
-        let attack_events =
-            super::enemy_attack::resolve_enemy_attack(rng, state, bonuses, achievements, derived);
+        let attack_events = super::enemy_attack::resolve_enemy_attack(
+            rng,
+            state,
+            bonuses,
+            achievements,
+            derived,
+            postgame_zone_cap,
+        );
         events.extend(attack_events);
     }
 
@@ -236,6 +249,7 @@ mod tests {
             &CombatBonuses::default(),
             &mut Achievements::default(),
             &DerivedStats::default(),
+            11,
         );
 
         assert!(matches!(
@@ -272,6 +286,7 @@ mod tests {
             &CombatBonuses::default(),
             &mut Achievements::default(),
             &DerivedStats::default(),
+            11,
         );
 
         let expected_zone = crate::zones::get_zone(4).unwrap().name.to_string();

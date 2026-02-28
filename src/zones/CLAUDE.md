@@ -1,17 +1,19 @@
 # Zone System
 
-Zone and subzone progression with prestige-gated tiers, boss encounters, and the Stormbreaker weapon gate.
+Zone and subzone progression with prestige-gated tiers, boss encounters, the Stormbreaker weapon gate, and Deep-unlocked postgame zones 12-20.
 
 ## Module Structure
 
 ```
 src/zones/
-├── mod.rs          # Public re-exports (Zone, Subzone, ZoneProgression, BossDefeatResult)
-├── data.rs         # Zone/subzone definitions, boss data, lookup functions
+├── mod.rs          # Public re-exports (Zone, Subzone, ZoneProgression, BossDefeatResult, PostgameRegion)
+├── data.rs         # Zone/subzone definitions (20 zones), boss data, lookup functions
 ├── progression.rs  # Progression state, kill tracking, prestige reset
 ├── advancement.rs  # Zone/subzone advancement logic, travel_to(), advance_to_next_subzone()
-├── boss_defeat.rs  # BossDefeatResult enum and on_boss_defeated() handler
-└── gates.rs        # boss_weapon_blocked(), zone unlock queries
+├── boss_defeat.rs  # BossDefeatResult enum, on_boss_defeated(), on_boss_defeated_with_cap()
+├── gates.rs        # boss_weapon_blocked(), zone unlock queries
+├── postgame.rs     # PostgameRegion enum (RedFault, MirrorScar, BlackMouth) with chapter metadata
+└── access.rs       # sync_account_zone_unlocks() — account-level zone access synchronization
 ```
 
 ## Key Types
@@ -19,7 +21,7 @@ src/zones/
 ### `Zone` (`data.rs`)
 ```rust
 pub struct Zone {
-    pub id: u32,                        // 1-11
+    pub id: u32,                        // 1-20
     pub name: &'static str,
     pub subzones: Vec<Subzone>,
     pub prestige_requirement: u32,      // Minimum prestige rank to unlock
@@ -53,13 +55,22 @@ Serializable state tracking the player's position and progress:
 - `has_stormbreaker: bool` -- legacy flag (achievement-based check preferred)
 
 ### `BossDefeatResult` (`boss_defeat.rs`)
-Enum returned by `on_boss_defeated()`:
+Enum returned by `on_boss_defeated()` / `on_boss_defeated_with_cap()`:
 - **SubzoneComplete** -- advanced to next subzone
 - **ZoneComplete** -- completed zone, advanced to next
 - **ZoneCompleteButGated** -- zone done but next requires higher prestige
 - **WeaponRequired** -- Zone 10 boss needs Stormbreaker
 - **StormsEnd** -- completed Zone 10, unlocks Zone 11
 - **ExpanseCycle** -- completed Zone 11 cycle, loops back to subzone 1
+- **PostgameCycle { zone_id }** -- completed a postgame cap zone cycle, loops back to subzone 1
+
+### `PostgameRegion` (`postgame.rs`)
+Named postgame chapters, each containing 3 zones:
+- `RedFault` (Zones 12-14, unlocked by Deep Layer 3)
+- `MirrorScar` (Zones 15-17, unlocked by Deep Layer 7)
+- `BlackMouth` (Zones 18-20, unlocked by Deep Layer 13)
+
+Methods: `start_zone_id()`, `end_zone_id()`, `unlock_layer()`, `from_layer()`, `unlock_headline()`, `unlock_atmospheric()`, `unlock_mechanical()`, `unlock_log_line()`, `unlock_ticker_text()`
 
 ## Zone Tiers and Prestige Requirements
 
@@ -71,6 +82,9 @@ Enum returned by `on_boss_defeated()`:
 | 4: Hidden Depths | P15 | Crystal Caverns, Sunken Kingdom | 4 each | 85-115 |
 | 5: Ascending | P20 | Floating Isles, Storm Citadel | 4 each | 115-150 |
 | Post-game | StormsEnd achievement | The Expanse (Zone 11) | 4 | 150+ |
+| Ch.1: The Red Fault | Deep Layer 3 | Splintered Rim, Ember Ravine, Heart of the Fault (Z12-14) | 5 each | 165-210 |
+| Ch.2: The Mirror Scar | Deep Layer 7 | Shard Fields, Refraction Steps, Hall of Second Suns (Z15-17) | 5 each | 210-255 |
+| Ch.3: The Black Mouth | Deep Layer 13 | Ashen Verge, Throat of the World, The Black Mouth (Z18-20) | 5 each | 255+ |
 
 ## Kill Tracking and Boss Spawn
 
@@ -119,6 +133,32 @@ Infinite post-game zone unlocked by completing Zone 10:
 - Has 4 subzones that cycle infinitely (`ExpanseCycle` result loops to subzone 1)
 - `prestige_requirement: 0` because access is achievement-gated, not prestige-gated
 - `max_level: u32::MAX` for unbounded scaling
+- When postgame zones are unlocked (`postgame_zone_cap > 11`), Expanse stops cycling and advances to Zone 12
+
+## Postgame Zones 12-20
+
+Nine zones across three chapters, unlocked by Deep layer breakthroughs. Enemy stats scale at 1.6x per zone from Zone 11.
+
+**Unlock cadence:**
+1. Deep Layer 3 breakthrough -> Zones 12-14 (The Red Fault), cap = 14
+2. Deep Layer 7 breakthrough -> Zones 15-17 (The Mirror Scar), cap = 17
+3. Deep Layer 13 breakthrough -> Zones 18-20 (The Black Mouth), cap = 20
+
+**Progression semantics:**
+- Only the current cap zone cycles (returns `PostgameCycle`)
+- All other postgame zones advance forward when their boss is defeated
+- Zone 20 becomes the permanent postgame loop cap
+- `prestige_requirement: 0` for all postgame zones (access managed by `sync_account_zone_unlocks()`)
+
+**Boss defeat with cap awareness:** `on_boss_defeated_with_cap(prestige_rank, achievements, postgame_zone_cap)` extends the original `on_boss_defeated()` to handle postgame cycling logic.
+
+## Zone Access Sync (`access.rs`)
+
+`sync_account_zone_unlocks(prog, storms_end_unlocked, postgame_zone_cap)`:
+- Called at: character load, prestige reset, StormsEnd, postgame region unlock
+- If `storms_end_unlocked`, unlocks Zone 11
+- Unlocks every zone in `12..=postgame_zone_cap`
+- Never unlocks above cap, never removes earlier unlocks
 
 ## Prestige Reset
 
@@ -130,7 +170,7 @@ Infinite post-game zone unlocked by completing Zone 10:
 
 ## Lookup Functions (`data.rs`)
 
-- `get_all_zones()` -- returns all 11 zones (allocates a new Vec each call)
+- `get_all_zones()` -- returns all 20 zones (static slice, no allocation)
 - `get_zone(zone_id)` -- find by ID
 - `get_subzone(zone_id, subzone_id)` -- returns `(Zone, Subzone)` pair
 
@@ -145,4 +185,6 @@ Infinite post-game zone unlocked by completing Zone 10:
 - **Achievements** (`achievements/types.rs`): `TheStormbreaker` gates Zone 10 boss, `StormsEnd` unlocked on Zone 10 completion
 - **Fishing** (`fishing/logic.rs`): Storm Leviathan path feeds into Stormbreaker forging
 - **Haven** (`haven/types.rs`): Storm Forge room enables Stormbreaker creation
-- **UI** (`ui/stats_panel.rs`): Displays current zone/subzone names and kill progress
+- **Ascension** (`ascension/`): Ascension multiplier provides the combat power to progress through postgame zones
+- **Deep** (`deep/types.rs`): `DeepPersistent.postgame_zone_cap` and `pending_postgame_region_unlock` control zone access
+- **UI** (`ui/stats_panel.rs`): Displays current zone/subzone names, kill progress, and POST row for zones 12-20

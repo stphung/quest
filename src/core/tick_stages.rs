@@ -894,6 +894,7 @@ pub(super) fn run_combat<R: Rng>(
         &combat_bonuses,
         achievements,
         &derived,
+        deep.persistent.postgame_zone_cap,
     );
 
     process_combat_events(
