@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 /// Flat JSON representation matching the original GameState format.
 /// Used as an intermediate for serialization/deserialization.
 #[derive(Serialize, Deserialize)]
+#[allow(dead_code)]
 pub(crate) struct FlatGameState {
     pub character_id: String,
     pub character_name: String,

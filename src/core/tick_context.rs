@@ -5,6 +5,7 @@ use crate::enhancement::types::EnhancementProgress;
 use crate::haven::types::Haven;
 
 /// Bundles all mutable references needed by game_tick() into one parameter.
+#[allow(dead_code)]
 pub struct TickContext<'a> {
     pub state: &'a mut GameState,
     pub tick_counter: &'a mut u32,

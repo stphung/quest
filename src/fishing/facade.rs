@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use rand::Rng;
 
 use crate::fishing::logic::HavenFishingBonuses;
@@ -15,10 +16,7 @@ pub struct FishingInput<'a> {
 }
 
 /// Facade: tick the fishing system with explicit inputs.
-pub fn tick_fishing_facade<R: Rng>(
-    _input: &mut FishingInput,
-    _rng: &mut R,
-) -> Option<()> {
+pub fn tick_fishing_facade<R: Rng>(_input: &mut FishingInput, _rng: &mut R) -> Option<()> {
     // Will delegate to existing tick_fishing_with_haven_result()
     // Not wired yet — this establishes the API surface
     todo!("Wire to existing tick_fishing_with_haven_result")

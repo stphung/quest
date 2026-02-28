@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 /// Character identity and progression fields.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct PlayerIdentity {
     pub character_id: String,
     pub character_name: String,

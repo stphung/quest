@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 /// Non-combat progression state grouping.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ProgressionState {
     #[serde(default)]
     pub fishing: FishingState,

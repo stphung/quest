@@ -8,6 +8,7 @@ use std::time::Instant;
 
 /// Transient session state — caches, timers, UI state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct SessionState {
     pub last_save_time: i64,
     pub play_time_seconds: u64,

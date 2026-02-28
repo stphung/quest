@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::dungeon::types::Dungeon;
 
 /// Explicit inputs for the dungeon tick facade.
@@ -9,8 +10,6 @@ pub struct DungeonInput<'a> {
 }
 
 /// Facade: tick dungeon exploration with explicit inputs.
-pub fn tick_dungeon_facade(
-    _input: &mut DungeonInput,
-) -> Option<()> {
+pub fn tick_dungeon_facade(_input: &mut DungeonInput) -> Option<()> {
     todo!("Wire to existing update_dungeon")
 }

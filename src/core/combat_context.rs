@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 /// Combat-related state grouping.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct CombatContext {
     pub combat_state: CombatState,
     pub equipment: Equipment,

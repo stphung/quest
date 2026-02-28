@@ -1,6 +1,7 @@
+#![allow(dead_code)]
+use crate::character::derived_stats::DerivedStats;
 use crate::combat::events::CombatBonuses;
 use crate::combat::types::CombatState;
-use crate::character::derived_stats::DerivedStats;
 
 /// Explicit inputs for the combat update facade.
 pub struct CombatInput<'a> {
@@ -11,8 +12,6 @@ pub struct CombatInput<'a> {
 }
 
 /// Facade: update combat with explicit inputs.
-pub fn update_combat_facade(
-    _input: &mut CombatInput,
-) -> Option<()> {
+pub fn update_combat_facade(_input: &mut CombatInput) -> Option<()> {
     todo!("Wire to existing update_combat")
 }

@@ -1862,7 +1862,7 @@ fn render_new_mission_split(
             deep,
             ui,
             available,
-            &left_heading,
+            left_heading,
             list_width,
             content_top,
             list_inner_top,

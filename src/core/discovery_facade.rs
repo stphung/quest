@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// Explicit inputs for discovery rolls.
 pub struct DiscoveryInput {
     pub prestige_rank: u32,
@@ -9,8 +10,6 @@ pub struct DiscoveryInput {
 }
 
 /// Facade: roll for discoveries with explicit inputs.
-pub fn roll_discoveries_facade(
-    _input: &DiscoveryInput,
-) -> Option<()> {
+pub fn roll_discoveries_facade(_input: &DiscoveryInput) -> Option<()> {
     todo!("Wire to existing discovery roll functions")
 }

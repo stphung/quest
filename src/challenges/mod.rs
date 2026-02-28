@@ -586,6 +586,7 @@ mod tests {
         use super::super::*;
 
         #[derive(Debug, PartialEq)]
+        #[allow(dead_code)]
         enum TestResult {
             Win,
             Loss,

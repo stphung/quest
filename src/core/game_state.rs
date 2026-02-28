@@ -136,12 +136,16 @@ pub struct GameState {
     // These group existing fields for clearer module boundaries.
     // During migration, both flat fields and sub-struct fields exist.
     #[serde(skip)]
-    pub player: Option<()>,  // placeholder — will be populated later
+    #[allow(dead_code)]
+    pub player: Option<()>, // placeholder — will be populated later
     #[serde(skip)]
+    #[allow(dead_code)]
     pub combat_ctx: Option<()>,
     #[serde(skip)]
+    #[allow(dead_code)]
     pub prog: Option<()>,
     #[serde(skip)]
+    #[allow(dead_code)]
     pub sess: Option<()>,
 }
 

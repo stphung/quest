@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use ratatui::layout::Rect;
 
 /// Layout for a centered overlay with title and footer regions.
@@ -65,7 +66,7 @@ mod tests {
         assert_eq!(layout.outer.width, 80);
         assert_eq!(layout.outer.height, 30);
         assert_eq!(layout.outer.x, 20); // centered: (120 - 80) / 2
-        assert_eq!(layout.outer.y, 5);  // centered: (40 - 30) / 2
+        assert_eq!(layout.outer.y, 5); // centered: (40 - 30) / 2
         assert_eq!(layout.title_bar.height, 2);
         assert_eq!(layout.footer.height, 1);
         assert_eq!(layout.content.height, 27); // 30 - 2 - 1
