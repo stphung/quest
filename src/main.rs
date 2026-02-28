@@ -287,19 +287,34 @@ fn main() -> io::Result<()> {
 
     // If no characters exist, go straight to creation first
     let initial_characters = character_manager.list_characters()?;
+    let mut quit_early = false;
     if initial_characters.is_empty() {
         play_screen_transition(&mut terminal)?;
         terminal.clear()?;
         let mut creation_screen = CharacterCreationScreen::new();
         loop {
             let t = handle_creation_frame(&mut terminal, &mut creation_screen, &character_manager)?;
-            if let ScreenTransition::GoToSelect = t {
-                select_screen = CharacterSelectScreen::new();
-                break;
+            match t {
+                ScreenTransition::GoToSelect => {
+                    select_screen = CharacterSelectScreen::new();
+                    break;
+                }
+                ScreenTransition::Quit => {
+                    quit_early = true;
+                    break;
+                }
+                ScreenTransition::Stay => {}
             }
         }
         play_screen_transition(&mut terminal)?;
         terminal.clear()?;
+    }
+
+    if quit_early {
+        disable_raw_mode()?;
+        terminal.backend_mut().execute(LeaveAlternateScreen)?;
+        println!("Goodbye!");
+        return Ok(());
     }
 
     // Main loop: splash screen → sub-screens → game → back to splash
@@ -338,9 +353,15 @@ fn main() -> io::Result<()> {
                         &mut creation_screen,
                         &character_manager,
                     )?;
-                    if let ScreenTransition::GoToSelect = t {
-                        select_screen = CharacterSelectScreen::new();
-                        break;
+                    match t {
+                        ScreenTransition::GoToSelect => {
+                            select_screen = CharacterSelectScreen::new();
+                            break;
+                        }
+                        ScreenTransition::Quit => {
+                            break;
+                        }
+                        ScreenTransition::Stay => {}
                     }
                 }
                 play_screen_transition(&mut terminal)?;

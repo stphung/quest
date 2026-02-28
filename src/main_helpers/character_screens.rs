@@ -26,6 +26,8 @@ pub enum ScreenTransition {
     Stay,
     /// Return to the splash/select screen.
     GoToSelect,
+    /// Quit the application.
+    Quit,
 }
 
 /// Handle one frame of the character creation screen.
@@ -37,6 +39,9 @@ pub fn handle_creation_frame(
     creation_screen: &mut CharacterCreationScreen,
     character_manager: &CharacterManager,
 ) -> io::Result<ScreenTransition> {
+    let has_existing = !character_manager.list_characters()?.is_empty();
+    creation_screen.has_existing_characters = has_existing;
+
     // Draw character creation screen
     terminal.draw(|f| {
         let area = f.area();
@@ -57,14 +62,15 @@ pub fn handle_creation_frame(
                 KeyCode::Esc => CreationInput::Cancel,
                 _ => CreationInput::Other,
             };
-
-            let has_existing = !character_manager.list_characters()?.is_empty();
             let result =
                 process_creation_input(creation_screen, input, character_manager, has_existing);
 
             match result {
                 CreationResult::Created | CreationResult::Cancelled => {
                     return Ok(ScreenTransition::GoToSelect);
+                }
+                CreationResult::Quit => {
+                    return Ok(ScreenTransition::Quit);
                 }
                 CreationResult::Continue | CreationResult::SaveFailed(_) => {}
             }
