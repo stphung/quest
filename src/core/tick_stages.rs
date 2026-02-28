@@ -858,13 +858,19 @@ pub(super) fn run_combat<R: Rng>(
         flat_damage: prestige_combat.flat_damage,
         flat_defense: prestige_combat.flat_defense,
         flat_hp: prestige_combat.flat_hp,
-        // Ascension multiplier — wired in Task 14 to use ascension_combat_multiplier()
-        ascension_multiplier: 1.0,
+        // Ascension multiplier from per-character Ascension level
+        ascension_multiplier: crate::ascension::ascension_combat_multiplier(state.ascension_level),
     };
     // Apply flat HP bonus to combat max HP (not in DerivedStats to avoid enemy scaling)
     if combat_bonuses.flat_hp > 0 {
         let boosted_max = derived.max_hp + combat_bonuses.flat_hp;
         state.combat_state.update_max_hp(boosted_max);
+    }
+    // Apply Ascension multiplier to max HP
+    if combat_bonuses.ascension_multiplier > 1.0 {
+        let current_max = state.combat_state.player_max_hp;
+        let boosted = (current_max as f64 * combat_bonuses.ascension_multiplier) as u32;
+        state.combat_state.update_max_hp(boosted);
     }
     // Apply sigil max HP% bonus on top of current max HP
     if sigil_bonuses.max_hp_percent > 0.0 {
