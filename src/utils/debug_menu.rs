@@ -46,6 +46,7 @@ enum DebugAction {
     TriggerDeepRefreshRecruits,
     TriggerDeepClearFrontierLayer,
     TriggerDeepCompleteActiveMissions,
+    UnlockDeepLayer(u32),
     TravelToZone(u32),
     SetPrestige(u32),
     SetLevel(u32),
@@ -82,6 +83,9 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerDeepRefreshRecruits,
     DebugAction::TriggerDeepClearFrontierLayer,
     DebugAction::TriggerDeepCompleteActiveMissions,
+    DebugAction::UnlockDeepLayer(3),
+    DebugAction::UnlockDeepLayer(7),
+    DebugAction::UnlockDeepLayer(13),
     // Zone travel actions
     DebugAction::TravelToZone(1),
     DebugAction::TravelToZone(2),
@@ -94,6 +98,15 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::TravelToZone(9),
     DebugAction::TravelToZone(10),
     DebugAction::TravelToZone(11),
+    DebugAction::TravelToZone(12),
+    DebugAction::TravelToZone(13),
+    DebugAction::TravelToZone(14),
+    DebugAction::TravelToZone(15),
+    DebugAction::TravelToZone(16),
+    DebugAction::TravelToZone(17),
+    DebugAction::TravelToZone(18),
+    DebugAction::TravelToZone(19),
+    DebugAction::TravelToZone(20),
     // Character actions (prestige, levels)
     DebugAction::SetPrestige(1),
     DebugAction::SetPrestige(5),
@@ -156,6 +169,9 @@ const DEEP_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerDeepRefreshRecruits,
     DebugAction::TriggerDeepClearFrontierLayer,
     DebugAction::TriggerDeepCompleteActiveMissions,
+    DebugAction::UnlockDeepLayer(3),
+    DebugAction::UnlockDeepLayer(7),
+    DebugAction::UnlockDeepLayer(13),
 ];
 const ZONE_ACTIONS: &[DebugAction] = &[
     DebugAction::TravelToZone(1),
@@ -169,6 +185,15 @@ const ZONE_ACTIONS: &[DebugAction] = &[
     DebugAction::TravelToZone(9),
     DebugAction::TravelToZone(10),
     DebugAction::TravelToZone(11),
+    DebugAction::TravelToZone(12),
+    DebugAction::TravelToZone(13),
+    DebugAction::TravelToZone(14),
+    DebugAction::TravelToZone(15),
+    DebugAction::TravelToZone(16),
+    DebugAction::TravelToZone(17),
+    DebugAction::TravelToZone(18),
+    DebugAction::TravelToZone(19),
+    DebugAction::TravelToZone(20),
 ];
 const CHARACTER_ACTIONS: &[DebugAction] = &[
     DebugAction::SetPrestige(1),
@@ -240,10 +265,15 @@ impl DebugAction {
             Self::TriggerDeepRefreshRecruits => 26,
             Self::TriggerDeepClearFrontierLayer => 27,
             Self::TriggerDeepCompleteActiveMissions => 28,
-            Self::TravelToZone(zone_id) => 29 + zone_id as usize - 1, // 29-39
-            Self::SetPrestige(amount) => 40 + set_value_index(amount),
-            Self::SetLevel(amount) => 50 + set_value_index(amount),
-            Self::MaxAttributes => 60,
+            Self::UnlockDeepLayer(layer) => match layer {
+                3 => 29,
+                7 => 30,
+                _ => 31, // 13
+            },
+            Self::TravelToZone(zone_id) => 32 + zone_id as usize - 1, // 32-51
+            Self::SetPrestige(amount) => 52 + set_value_index(amount),
+            Self::SetLevel(amount) => 62 + set_value_index(amount),
+            Self::MaxAttributes => 72,
         }
     }
 
@@ -278,6 +308,11 @@ impl DebugAction {
             Self::TriggerDeepRefreshRecruits => "Refresh Recruit Pool",
             Self::TriggerDeepClearFrontierLayer => "Clear Current Frontier Layer",
             Self::TriggerDeepCompleteActiveMissions => "Complete Active Missions",
+            Self::UnlockDeepLayer(layer) => match layer {
+                3 => "Unlock Deep L3 (Red Fault)",
+                7 => "Unlock Deep L7 (Mirror Scar)",
+                _ => "Unlock Deep L13 (Black Mouth)",
+            },
             Self::TravelToZone(zone_id) => match zone_id {
                 1 => "Travel to Meadow (Zone 1)",
                 2 => "Travel to Dark Forest (Zone 2)",
@@ -290,6 +325,15 @@ impl DebugAction {
                 9 => "Travel to Floating Isles (Zone 9)",
                 10 => "Travel to Storm Citadel (Zone 10)",
                 11 => "Travel to The Expanse (Zone 11)",
+                12 => "Travel to Splintered Rim (Zone 12)",
+                13 => "Travel to Ember Ravine (Zone 13)",
+                14 => "Travel to Heart of the Fault (Zone 14)",
+                15 => "Travel to Shard Fields (Zone 15)",
+                16 => "Travel to Refraction Steps (Zone 16)",
+                17 => "Travel to Hall of Second Suns (Zone 17)",
+                18 => "Travel to Ashen Verge (Zone 18)",
+                19 => "Travel to Throat of the World (Zone 19)",
+                20 => "Travel to The Black Mouth (Zone 20)",
                 _ => "Travel to Unknown Zone",
             },
             Self::SetPrestige(amount) => match amount {
@@ -357,7 +401,10 @@ impl DebugAction {
             Self::TriggerDeepRefreshRecruits => trigger_deep_refresh_recruit_pool(deep),
             Self::TriggerDeepClearFrontierLayer => trigger_deep_clear_frontier_layer(deep),
             Self::TriggerDeepCompleteActiveMissions => trigger_deep_complete_active_missions(deep),
-            Self::TravelToZone(zone_id) => trigger_travel_to_zone(state, enhancement, zone_id),
+            Self::UnlockDeepLayer(layer) => trigger_unlock_deep_layer(deep, state, layer),
+            Self::TravelToZone(zone_id) => {
+                trigger_travel_to_zone(state, enhancement, deep, zone_id)
+            }
             Self::SetPrestige(amount) => trigger_set_prestige(state, enhancement, amount),
             Self::SetLevel(amount) => trigger_set_level(state, enhancement, amount),
             Self::MaxAttributes => trigger_max_attributes(state, enhancement),
@@ -872,6 +919,51 @@ fn trigger_deep_complete_active_missions(deep: &mut DeepState) -> &'static str {
     }
 }
 
+fn trigger_unlock_deep_layer(
+    deep: &mut DeepState,
+    state: &mut GameState,
+    target_layer: u32,
+) -> &'static str {
+    // Auto-discover The Deep if needed
+    if !deep.persistent.discovered {
+        let mut rng = rand::rng();
+        crate::deep::complete_discovery(deep, &mut rng);
+    }
+
+    // Clear layers up to and including the target
+    while deep.persistent.frontier_layer() <= target_layer {
+        let frontier = deep.persistent.frontier_layer();
+        crate::deep::mark_layer_cleared(&mut deep.persistent, frontier);
+    }
+
+    // Set postgame zone cap based on the region this layer unlocks
+    if let Some(region) = crate::zones::PostgameRegion::from_layer(target_layer) {
+        let cap = region.end_zone_id();
+        if deep.persistent.postgame_zone_cap < cap {
+            deep.persistent.postgame_zone_cap = cap;
+        }
+        // Unlock the zones
+        crate::zones::access::sync_account_zone_unlocks(
+            &mut state.zone_progression,
+            true,
+            deep.persistent.postgame_zone_cap,
+        );
+    }
+
+    // Refresh mission pool for new layers
+    let mut rng = rand::rng();
+    deep.prestige.available_missions =
+        crate::deep::generate_mission_pool(&deep.persistent, &mut rng);
+    deep.prestige.pool_refreshed_at = Some(Utc::now());
+
+    match target_layer {
+        3 => "Cleared to Deep L3 — Red Fault unlocked (Z12-14)!",
+        7 => "Cleared to Deep L7 — Mirror Scar unlocked (Z15-17)!",
+        13 => "Cleared to Deep L13 — Black Mouth unlocked (Z18-20)!",
+        _ => "Deep layers cleared!",
+    }
+}
+
 fn trigger_etch_s_plus_sigil(state: &mut GameState) -> &'static str {
     use crate::stormglass::sigils::{Sigil, SigilEffectType, SigilGrade};
 
@@ -898,6 +990,7 @@ fn trigger_force_overcharge(state: &mut GameState) -> &'static str {
 fn trigger_travel_to_zone(
     state: &mut GameState,
     enhancement: &EnhancementProgress,
+    deep: &mut DeepState,
     zone_id: u32,
 ) -> &'static str {
     let zones = get_all_zones();
@@ -923,12 +1016,35 @@ fn trigger_travel_to_zone(
         state.recalculate_prestige_bonuses();
     }
 
+    // Postgame zones 12+: auto-set Deep postgame_zone_cap and discover Deep
+    if zone_id >= 12 {
+        if !deep.persistent.discovered {
+            let mut rng = rand::rng();
+            crate::deep::complete_discovery(deep, &mut rng);
+        }
+        if deep.persistent.postgame_zone_cap < zone_id {
+            deep.persistent.postgame_zone_cap = zone_id;
+        }
+        // Ensure high enough prestige to survive postgame
+        if state.prestige_rank < 20 {
+            state.prestige_rank = 20;
+            state.recalculate_prestige_bonuses();
+        }
+    }
+
     // Unlock the target zone (and all zones at or below its prestige tier)
     for z in zones {
         if z.prestige_requirement <= state.prestige_rank {
             state.zone_progression.unlock_zone(z.id);
         }
     }
+
+    // Unlock postgame zones up to the cap
+    crate::zones::access::sync_account_zone_unlocks(
+        &mut state.zone_progression,
+        true,
+        deep.persistent.postgame_zone_cap,
+    );
 
     // Travel to subzone 1
     state.zone_progression.current_zone_id = zone_id;
@@ -951,6 +1067,15 @@ fn trigger_travel_to_zone(
         9 => "Traveled to Floating Isles (Zone 9, P20)",
         10 => "Traveled to Storm Citadel (Zone 10, P20)",
         11 => "Traveled to The Expanse (Zone 11)",
+        12 => "Traveled to Splintered Rim (Zone 12)",
+        13 => "Traveled to Ember Ravine (Zone 13)",
+        14 => "Traveled to Heart of the Fault (Zone 14)",
+        15 => "Traveled to Shard Fields (Zone 15)",
+        16 => "Traveled to Refraction Steps (Zone 16)",
+        17 => "Traveled to Hall of Second Suns (Zone 17)",
+        18 => "Traveled to Ashen Verge (Zone 18)",
+        19 => "Traveled to Throat of the World (Zone 19)",
+        20 => "Traveled to The Black Mouth (Zone 20)",
         _ => "Traveled to unknown zone",
     }
 }
@@ -1408,9 +1533,10 @@ mod tests {
     fn test_trigger_travel_to_zone_basic() {
         let mut state = GameState::new("Test".to_string(), 0);
         let enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
         assert_eq!(state.zone_progression.current_zone_id, 1);
 
-        let msg = trigger_travel_to_zone(&mut state, &enhancement, 5);
+        let msg = trigger_travel_to_zone(&mut state, &enhancement, &mut deep, 5);
         assert_eq!(msg, "Traveled to Volcanic Wastes (Zone 5, P10)");
         assert_eq!(state.zone_progression.current_zone_id, 5);
         assert_eq!(state.zone_progression.current_subzone_id, 1);
@@ -1422,9 +1548,10 @@ mod tests {
     fn test_trigger_travel_clears_active_content() {
         let mut state = GameState::new("Test".to_string(), 0);
         let enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
         state.active_dungeon = Some(generate_dungeon(1, 0, 1));
 
-        trigger_travel_to_zone(&mut state, &enhancement, 1);
+        trigger_travel_to_zone(&mut state, &enhancement, &mut deep, 1);
         assert!(state.active_dungeon.is_none());
     }
 
@@ -1432,9 +1559,10 @@ mod tests {
     fn test_trigger_travel_no_prestige_downgrade() {
         let mut state = GameState::new("Test".to_string(), 0);
         let enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
         state.prestige_rank = 20;
 
-        trigger_travel_to_zone(&mut state, &enhancement, 1);
+        trigger_travel_to_zone(&mut state, &enhancement, &mut deep, 1);
         // Traveling to P0 zone should not lower prestige
         assert_eq!(state.prestige_rank, 20);
     }
@@ -1443,13 +1571,66 @@ mod tests {
     fn test_trigger_travel_unlocks_intermediate_zones() {
         let mut state = GameState::new("Test".to_string(), 0);
         let enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
 
-        trigger_travel_to_zone(&mut state, &enhancement, 7);
+        trigger_travel_to_zone(&mut state, &enhancement, &mut deep, 7);
         // Should unlock zones 1-8 (all P0, P5, P10, P15 zones)
         for zone_id in 1..=8 {
             assert!(
                 state.zone_progression.is_zone_unlocked(zone_id),
                 "Zone {zone_id} should be unlocked after traveling to Zone 7 (P15)"
+            );
+        }
+    }
+
+    #[test]
+    fn test_trigger_travel_to_postgame_zone() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
+
+        let msg = trigger_travel_to_zone(&mut state, &enhancement, &mut deep, 15);
+        assert_eq!(msg, "Traveled to Shard Fields (Zone 15)");
+        assert_eq!(state.zone_progression.current_zone_id, 15);
+        // Deep auto-discovered and postgame_zone_cap set
+        assert!(deep.persistent.discovered);
+        assert!(deep.persistent.postgame_zone_cap >= 15);
+        // Zone 15 should be unlocked
+        assert!(state.zone_progression.is_zone_unlocked(15));
+    }
+
+    #[test]
+    fn test_trigger_unlock_deep_layer_3() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let mut deep = DeepState::new();
+
+        let msg = trigger_unlock_deep_layer(&mut deep, &mut state, 3);
+        assert_eq!(
+            msg,
+            "Cleared to Deep L3 \u{2014} Red Fault unlocked (Z12-14)!"
+        );
+        assert!(deep.persistent.discovered);
+        assert!(deep.persistent.postgame_zone_cap >= 14);
+        // Zones 12-14 should be unlocked
+        for zone_id in 12..=14 {
+            assert!(
+                state.zone_progression.is_zone_unlocked(zone_id),
+                "Zone {zone_id} should be unlocked after Deep L3"
+            );
+        }
+    }
+
+    #[test]
+    fn test_trigger_unlock_deep_layer_13() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let mut deep = DeepState::new();
+
+        trigger_unlock_deep_layer(&mut deep, &mut state, 13);
+        assert!(deep.persistent.postgame_zone_cap >= 20);
+        for zone_id in 12..=20 {
+            assert!(
+                state.zone_progression.is_zone_unlocked(zone_id),
+                "Zone {zone_id} should be unlocked after Deep L13"
             );
         }
     }
@@ -1527,8 +1708,8 @@ mod tests {
     }
 
     #[test]
-    fn test_zones_category_has_11_options() {
-        assert_eq!(option_count_for_category(DebugCategory::Zones), 11);
+    fn test_zones_category_has_20_options() {
+        assert_eq!(option_count_for_category(DebugCategory::Zones), 20);
     }
 
     #[test]

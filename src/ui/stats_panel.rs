@@ -284,17 +284,33 @@ pub(super) fn draw_zone_info(
         )]));
     }
 
-    let mut bar_spans: Vec<Span> = Vec::new();
-    let mut label_spans: Vec<Span> = Vec::new();
+    // Dot track: ● = completed (green), ○ = current (yellow), · = unlocked (white), · = locked (gray)
+    let max_postgame_zone = (12..=20u32)
+        .rev()
+        .find(|&zid| prog.is_zone_unlocked(zid))
+        .unwrap_or(0);
 
-    for zid in 1..=11u32 {
-        if zid > 1 {
-            bar_spans.push(Span::raw(" "));
+    let mut dot_spans: Vec<Span> = Vec::new();
+    let last_base_zone = 11u32;
+    let zone_range: Vec<u32> = if max_postgame_zone >= 12 {
+        (1..=last_base_zone).chain(12..=max_postgame_zone).collect()
+    } else {
+        (1..=last_base_zone).collect()
+    };
+
+    for (i, &zid) in zone_range.iter().enumerate() {
+        // Separator between base and postgame
+        if zid == 12 {
+            dot_spans.push(Span::styled(
+                " \u{2502} ",
+                Style::default().fg(Color::DarkGray),
+            ));
+        } else if i > 0 {
+            dot_spans.push(Span::raw(" "));
         }
 
         let zone_data = zones.iter().find(|z| z.id == zid);
         let num_subzones = zone_data.map(|z| z.subzones.len()).unwrap_or(3);
-
         let defeated_count = zone_data
             .map(|z| {
                 z.subzones
@@ -312,53 +328,26 @@ pub(super) fn draw_zone_info(
             prog.is_zone_unlocked(zid)
         };
 
-        let filled = if is_completed {
-            3
-        } else if defeated_count == 0 {
-            0
-        } else {
-            ((defeated_count as f64 / num_subzones as f64) * 3.0).ceil() as usize
-        }
-        .min(3);
-
-        let (fill_char, empty_char, fg) = if is_completed {
-            ("\u{2588}", "\u{2588}", Color::Green)
-        } else if is_current {
-            ("\u{2588}", "\u{2591}", Color::Yellow)
+        let (dot, fg, bold) = if is_current {
+            ("\u{25cb}", Color::Yellow, true) // ○
+        } else if is_completed {
+            ("\u{25cf}", Color::Green, false) // ●
         } else if is_unlocked {
-            ("\u{2591}", "\u{2591}", Color::White)
+            ("\u{00b7}", Color::White, false) // ·
         } else {
-            ("\u{2591}", "\u{2591}", Color::DarkGray)
+            ("\u{00b7}", Color::DarkGray, false) // ·
         };
 
-        let segment: String = fill_char.repeat(filled) + &empty_char.repeat(3 - filled);
-        let segment_style = if is_current {
+        let style = if bold {
             Style::default().fg(fg).add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(fg)
         };
-        bar_spans.push(Span::styled(segment, segment_style));
-
-        let label_fg = if is_current {
-            Color::Yellow
-        } else if is_completed {
-            Color::Green
-        } else if is_unlocked {
-            Color::White
-        } else {
-            Color::DarkGray
-        };
-        if zid > 1 {
-            let sep = if zid == 10 { "  " } else { " " };
-            label_spans.push(Span::raw(sep));
-        }
-        let label = format!("{:^3}", zid);
-        label_spans.push(Span::styled(label, Style::default().fg(label_fg)));
+        dot_spans.push(Span::styled(dot, style));
     }
 
     zone_lines.push(Line::from(""));
-    zone_lines.push(Line::from(bar_spans));
-    zone_lines.push(Line::from(label_spans));
+    zone_lines.push(Line::from(dot_spans));
 
     let location_title = match highest_zone_badge(achievements) {
         Some(icon) => format!(" Location {} ", icon),
