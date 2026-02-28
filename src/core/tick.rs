@@ -17,7 +17,6 @@ use crate::haven::Haven;
 use rand::Rng;
 
 /// New entry point using TickContext. Delegates to the existing game_tick().
-#[allow(dead_code)]
 pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> TickResult {
     game_tick(
         ctx.state,

@@ -683,16 +683,16 @@ fn main() -> io::Result<()> {
                                         let mut rng = rand::rng();
                                         let sg_before_skip = state.stormglass;
                                         while chrono_surge.as_ref().unwrap().ticks_remaining > 0 {
-                                            let tick_result = core::tick::game_tick(
-                                                &mut state,
-                                                &mut tick_counter,
-                                                &mut haven,
-                                                &mut enhancement,
-                                                &mut deep_state,
-                                                &mut global_achievements,
+                                            let mut ctx = core::tick_context::TickContext {
+                                                state: &mut state,
+                                                tick_counter: &mut tick_counter,
+                                                haven: &mut haven,
+                                                enhancement: &mut enhancement,
+                                                deep: &mut deep_state,
+                                                achievements: &mut global_achievements,
                                                 debug_mode,
-                                                &mut rng,
-                                            );
+                                            };
+                                            let tick_result = core::tick::game_tick_with_context(&mut ctx, &mut rng);
                                             let surge = chrono_surge.as_mut().unwrap();
                                             tally_chrono_surge_events(surge, &tick_result.events);
                                             surge.ticks_remaining -= 1;
@@ -1694,16 +1694,16 @@ fn main() -> io::Result<()> {
                             let sg_before_batch = state.stormglass;
 
                             for _ in 0..batch {
-                                let tick_result = core::tick::game_tick(
-                                    &mut state,
-                                    &mut tick_counter,
-                                    &mut haven,
-                                    &mut enhancement,
-                                    &mut deep_state,
-                                    &mut global_achievements,
+                                let mut ctx = core::tick_context::TickContext {
+                                    state: &mut state,
+                                    tick_counter: &mut tick_counter,
+                                    haven: &mut haven,
+                                    enhancement: &mut enhancement,
+                                    deep: &mut deep_state,
+                                    achievements: &mut global_achievements,
                                     debug_mode,
-                                    &mut rng,
-                                );
+                                };
+                                let tick_result = core::tick::game_tick_with_context(&mut ctx, &mut rng);
 
                                 // Keep surge path headless (same semantics as [Esc] skip):
                                 // collect summary counters only and avoid per-tick UI work.
@@ -1786,16 +1786,16 @@ fn main() -> io::Result<()> {
                                     | GameOverlay::LeviathanCatchMiss { .. }
                             ) {
                                 let mut rng = rand::rng();
-                                let tick_result = core::tick::game_tick(
-                                    &mut state,
-                                    &mut tick_counter,
-                                    &mut haven,
-                                    &mut enhancement,
-                                    &mut deep_state,
-                                    &mut global_achievements,
+                                let mut ctx = core::tick_context::TickContext {
+                                    state: &mut state,
+                                    tick_counter: &mut tick_counter,
+                                    haven: &mut haven,
+                                    enhancement: &mut enhancement,
+                                    deep: &mut deep_state,
+                                    achievements: &mut global_achievements,
                                     debug_mode,
-                                    &mut rng,
-                                );
+                                };
+                                let tick_result = core::tick::game_tick_with_context(&mut ctx, &mut rng);
 
                                 let tick_flags = apply_tick_events(&mut state, &tick_result.events);
 
