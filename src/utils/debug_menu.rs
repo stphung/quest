@@ -81,7 +81,7 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerDeepRefreshRecruits,
     DebugAction::TriggerDeepClearFrontierLayer,
     DebugAction::TriggerDeepCompleteActiveMissions,
-    // Character actions (zone travel, prestige, levels)
+    // Zone travel actions
     DebugAction::TravelToZone(1),
     DebugAction::TravelToZone(2),
     DebugAction::TravelToZone(3),
@@ -93,9 +93,11 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::TravelToZone(9),
     DebugAction::TravelToZone(10),
     DebugAction::TravelToZone(11),
+    // Character actions (prestige, levels)
     DebugAction::GrantPrestige(1),
     DebugAction::GrantPrestige(5),
     DebugAction::GrantPrestige(10),
+    DebugAction::GrantPrestige(100),
     DebugAction::GrantLevels(10),
     DebugAction::GrantLevels(50),
 ];
@@ -139,7 +141,7 @@ const DEEP_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerDeepClearFrontierLayer,
     DebugAction::TriggerDeepCompleteActiveMissions,
 ];
-const CHARACTER_ACTIONS: &[DebugAction] = &[
+const ZONE_ACTIONS: &[DebugAction] = &[
     DebugAction::TravelToZone(1),
     DebugAction::TravelToZone(2),
     DebugAction::TravelToZone(3),
@@ -151,9 +153,12 @@ const CHARACTER_ACTIONS: &[DebugAction] = &[
     DebugAction::TravelToZone(9),
     DebugAction::TravelToZone(10),
     DebugAction::TravelToZone(11),
+];
+const CHARACTER_ACTIONS: &[DebugAction] = &[
     DebugAction::GrantPrestige(1),
     DebugAction::GrantPrestige(5),
     DebugAction::GrantPrestige(10),
+    DebugAction::GrantPrestige(100),
     DebugAction::GrantLevels(10),
     DebugAction::GrantLevels(50),
 ];
@@ -195,13 +200,14 @@ impl DebugAction {
             Self::GrantPrestige(amount) => match amount {
                 1 => 40,
                 5 => 41,
-                _ => 42, // 10
+                10 => 42,
+                _ => 43, // 100
             },
             Self::GrantLevels(amount) => {
                 if amount == 10 {
-                    43
-                } else {
                     44
+                } else {
+                    45
                 }
             }
         }
@@ -255,7 +261,8 @@ impl DebugAction {
             Self::GrantPrestige(amount) => match amount {
                 1 => "+1 Prestige Rank",
                 5 => "+5 Prestige Ranks",
-                _ => "+10 Prestige Ranks",
+                10 => "+10 Prestige Ranks",
+                _ => "+100 Prestige Ranks",
             },
             Self::GrantLevels(amount) => {
                 if amount == 10 {
@@ -344,6 +351,7 @@ pub fn option_count_for_category(category: DebugCategory) -> usize {
         DebugCategory::Resources => RESOURCE_ACTIONS.len(),
         DebugCategory::Items => ITEM_ACTIONS.len(),
         DebugCategory::Deep => DEEP_ACTIONS.len(),
+        DebugCategory::Zones => ZONE_ACTIONS.len(),
         DebugCategory::Character => CHARACTER_ACTIONS.len(),
         DebugCategory::Borders => SELECTABLE_UI_BORDER_STYLES.len(),
     }
@@ -356,6 +364,7 @@ pub enum DebugCategory {
     Resources,
     Items,
     Deep,
+    Zones,
     Character,
     Borders,
 }
@@ -368,6 +377,7 @@ impl DebugCategory {
             Self::Resources => "Resources",
             Self::Items => "Items",
             Self::Deep => "The Deep",
+            Self::Zones => "Zones",
             Self::Character => "Character",
             Self::Borders => "Borders",
         }
@@ -380,6 +390,7 @@ pub const DEBUG_CATEGORIES: &[DebugCategory] = &[
     DebugCategory::Resources,
     DebugCategory::Items,
     DebugCategory::Deep,
+    DebugCategory::Zones,
     DebugCategory::Character,
     DebugCategory::Borders,
 ];
@@ -463,6 +474,7 @@ impl DebugMenu {
             DebugCategory::Resources => RESOURCE_ACTIONS[visible_index].option_index(),
             DebugCategory::Items => ITEM_ACTIONS[visible_index].option_index(),
             DebugCategory::Deep => DEEP_ACTIONS[visible_index].option_index(),
+            DebugCategory::Zones => ZONE_ACTIONS[visible_index].option_index(),
             DebugCategory::Character => CHARACTER_ACTIONS[visible_index].option_index(),
             DebugCategory::Borders => BORDER_OPTION_START_INDEX + visible_index,
         }
@@ -918,7 +930,8 @@ fn trigger_grant_prestige(
     match amount {
         1 => "Granted +1 Prestige Rank!",
         5 => "Granted +5 Prestige Ranks!",
-        _ => "Granted +10 Prestige Ranks!",
+        10 => "Granted +10 Prestige Ranks!",
+        _ => "Granted +100 Prestige Ranks!",
     }
 }
 
@@ -1002,6 +1015,9 @@ mod tests {
         assert_eq!(menu.current_category(), DebugCategory::Character);
 
         menu.navigate_prev_category();
+        assert_eq!(menu.current_category(), DebugCategory::Zones);
+
+        menu.navigate_prev_category();
         assert_eq!(menu.current_category(), DebugCategory::Deep);
     }
 
@@ -1009,7 +1025,7 @@ mod tests {
     fn test_border_preview_does_not_close_menu() {
         let mut menu = DebugMenu::new();
         menu.open();
-        for _ in 0..6 {
+        for _ in 0..7 {
             menu.navigate_next_category();
         }
         assert_eq!(menu.current_category(), DebugCategory::Borders);
@@ -1420,7 +1436,22 @@ mod tests {
     }
 
     #[test]
-    fn test_character_category_has_16_options() {
-        assert_eq!(option_count_for_category(DebugCategory::Character), 16);
+    fn test_character_category_has_6_options() {
+        assert_eq!(option_count_for_category(DebugCategory::Character), 6);
+    }
+
+    #[test]
+    fn test_zones_category_has_11_options() {
+        assert_eq!(option_count_for_category(DebugCategory::Zones), 11);
+    }
+
+    #[test]
+    fn test_trigger_grant_prestige_100() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+
+        let msg = trigger_grant_prestige(&mut state, &enhancement, 100);
+        assert_eq!(msg, "Granted +100 Prestige Ranks!");
+        assert_eq!(state.prestige_rank, 100);
     }
 }
