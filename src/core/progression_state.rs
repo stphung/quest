@@ -29,3 +29,19 @@ pub struct ProgressionState {
     #[serde(skip)]
     pub last_minigame_win: Option<MinigameWinInfo>,
 }
+
+impl Default for ProgressionState {
+    fn default() -> Self {
+        Self {
+            fishing: FishingState::default(),
+            active_fishing: None,
+            stormglass: 0,
+            stormglass_discovered: false,
+            storm_sigils: StormSigils::new(),
+            challenge_menu: ChallengeMenu::new(),
+            chess_stats: ChessStats::default(),
+            active_minigame: None,
+            last_minigame_win: None,
+        }
+    }
+}

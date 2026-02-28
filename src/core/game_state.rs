@@ -13,6 +13,7 @@ use crate::items::types::Rarity;
 use crate::stormglass::sigils::StormSigils;
 use crate::core::combat_context::CombatContext;
 use crate::core::player_identity::PlayerIdentity;
+use crate::core::progression_state::ProgressionState;
 use crate::zones::ZoneProgression;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -145,7 +146,7 @@ pub struct GameState {
     pub combat_ctx: CombatContext,
     #[serde(skip)]
     #[allow(dead_code)]
-    pub prog: Option<()>,
+    pub prog: ProgressionState,
     #[serde(skip)]
     #[allow(dead_code)]
     pub sess: Option<()>,
@@ -218,7 +219,17 @@ impl GameState {
             debug_force_overcharge: false,
             player,
             combat_ctx,
-            prog: None,
+            prog: ProgressionState {
+                fishing: FishingState::default(),
+                active_fishing: None,
+                stormglass: 0,
+                stormglass_discovered: false,
+                storm_sigils: StormSigils::new(),
+                challenge_menu: ChallengeMenu::new(),
+                chess_stats: ChessStats::default(),
+                active_minigame: None,
+                last_minigame_win: None,
+            },
             sess: None,
         }
     }
@@ -709,6 +720,14 @@ mod tests {
         assert_eq!(sigil.effect, SigilEffectType::CritChancePercent);
         assert!((sigil.value - 5.5).abs() < 1e-10);
         assert_eq!(sigil.grade, SigilGrade::APlus);
+    }
+
+    #[test]
+    fn test_progression_state_populated() {
+        let state = GameState::new("TestHero".to_string(), 1000);
+        assert_eq!(state.prog.stormglass, 0);
+        assert!(!state.prog.stormglass_discovered);
+        assert!(state.prog.active_fishing.is_none());
     }
 
     #[test]

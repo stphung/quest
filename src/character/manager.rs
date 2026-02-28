@@ -149,7 +149,17 @@ mod tests {
                 session_kills: 0,
                 consecutive_deaths: 0,
             },
-            prog: None,
+            prog: crate::core::progression_state::ProgressionState {
+                fishing: crate::fishing::types::FishingState::default(),
+                active_fishing: None,
+                stormglass: 0,
+                stormglass_discovered: false,
+                storm_sigils: crate::stormglass::sigils::StormSigils::new(),
+                challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
+                chess_stats: crate::challenges::chess::ChessStats::default(),
+                active_minigame: None,
+                last_minigame_win: None,
+            },
             sess: None,
         }
     }
