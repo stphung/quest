@@ -300,6 +300,13 @@ fn test_prestige_milestones_all() {
         (70, AchievementId::PrestigeLXX),
         (90, AchievementId::PrestigeXC),
         (100, AchievementId::Eternal),
+        (150, AchievementId::Prestige150),
+        (200, AchievementId::Prestige200),
+        (300, AchievementId::Prestige300),
+        (500, AchievementId::Prestige500),
+        (700, AchievementId::Prestige700),
+        (1000, AchievementId::Prestige1000),
+        (10000, AchievementId::Prestige10000),
     ];
     for (rank, id) in milestones {
         ach.on_prestige(rank, Some("Hero"));
@@ -1336,10 +1343,13 @@ fn test_count_by_category_combat_after_kills() {
 fn test_count_by_category_does_not_cross_categories() {
     let mut ach = Achievements::default();
     ach.on_level_up(10, Some("Hero")); // Level10 is in Level category
+    ach.on_prestige(1, Some("Hero")); // FirstPrestige is in Prestige category
     let (combat_unlocked, _) = ach.count_by_category(AchievementCategory::Combat);
     assert_eq!(combat_unlocked, 0);
     let (level_unlocked, _) = ach.count_by_category(AchievementCategory::Level);
     assert!(level_unlocked > 0);
+    let (prestige_unlocked, _) = ach.count_by_category(AchievementCategory::Prestige);
+    assert!(prestige_unlocked > 0);
 }
 
 #[test]

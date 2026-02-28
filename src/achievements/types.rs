@@ -8,6 +8,7 @@ use std::collections::HashMap;
 pub enum AchievementCategory {
     Combat,
     Level,
+    Prestige,
     Progression,
     Challenges,
     Exploration,
@@ -17,9 +18,10 @@ pub enum AchievementCategory {
 
 impl AchievementCategory {
     /// All categories in display order.
-    pub const ALL: [AchievementCategory; 7] = [
+    pub const ALL: [AchievementCategory; 8] = [
         AchievementCategory::Combat,
         AchievementCategory::Level,
+        AchievementCategory::Prestige,
         AchievementCategory::Progression,
         AchievementCategory::Challenges,
         AchievementCategory::Exploration,
@@ -32,6 +34,7 @@ impl AchievementCategory {
         match self {
             AchievementCategory::Combat => "Combat",
             AchievementCategory::Level => "Level",
+            AchievementCategory::Prestige => "Prestige",
             AchievementCategory::Progression => "Progression",
             AchievementCategory::Challenges => "Challenges",
             AchievementCategory::Exploration => "Exploration",
@@ -89,6 +92,13 @@ pub enum AchievementId {
     Level750,
     Level1000,
     Level1500,
+    Level2000,
+    Level3000,
+    Level5000,
+    Level7500,
+    Level10000,
+    Level20000,
+    Level100000,
 
     // Prestige achievements
     FirstPrestige,
@@ -103,6 +113,13 @@ pub enum AchievementId {
     PrestigeLXX,
     PrestigeXC,
     Eternal,
+    Prestige150,
+    Prestige200,
+    Prestige300,
+    Prestige500,
+    Prestige700,
+    Prestige1000,
+    Prestige10000,
     // Zone completion achievements (one per zone)
     Zone1Complete,  // Meadow
     Zone2Complete,  // Dark Forest
@@ -257,7 +274,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 168;
+    pub const VARIANT_COUNT: usize = 182;
 }
 
 /// Static definition of an achievement.
@@ -537,11 +554,29 @@ mod tests {
     fn test_category_names() {
         assert_eq!(AchievementCategory::Combat.name(), "Combat");
         assert_eq!(AchievementCategory::Level.name(), "Level");
+        assert_eq!(AchievementCategory::Prestige.name(), "Prestige");
         assert_eq!(AchievementCategory::Progression.name(), "Progression");
         assert_eq!(AchievementCategory::Challenges.name(), "Challenges");
         assert_eq!(AchievementCategory::Exploration.name(), "Exploration");
         assert_eq!(AchievementCategory::Deep.name(), "The Deep");
         assert_eq!(AchievementCategory::Stats.name(), "Stats");
+    }
+
+    #[test]
+    fn test_category_order_includes_prestige_after_level() {
+        assert_eq!(
+            AchievementCategory::ALL,
+            [
+                AchievementCategory::Combat,
+                AchievementCategory::Level,
+                AchievementCategory::Prestige,
+                AchievementCategory::Progression,
+                AchievementCategory::Challenges,
+                AchievementCategory::Exploration,
+                AchievementCategory::Deep,
+                AchievementCategory::Stats,
+            ]
+        );
     }
 
     #[test]
@@ -922,6 +957,13 @@ mod tests {
             (750, AchievementId::Level750),
             (1000, AchievementId::Level1000),
             (1500, AchievementId::Level1500),
+            (2000, AchievementId::Level2000),
+            (3000, AchievementId::Level3000),
+            (5000, AchievementId::Level5000),
+            (7500, AchievementId::Level7500),
+            (10000, AchievementId::Level10000),
+            (20000, AchievementId::Level20000),
+            (100000, AchievementId::Level100000),
         ];
 
         for (level, achievement_id) in milestones {
@@ -956,6 +998,13 @@ mod tests {
             (70, AchievementId::PrestigeLXX),
             (90, AchievementId::PrestigeXC),
             (100, AchievementId::Eternal),
+            (150, AchievementId::Prestige150),
+            (200, AchievementId::Prestige200),
+            (300, AchievementId::Prestige300),
+            (500, AchievementId::Prestige500),
+            (700, AchievementId::Prestige700),
+            (1000, AchievementId::Prestige1000),
+            (10000, AchievementId::Prestige10000),
         ];
 
         for (rank, achievement_id) in milestones {
@@ -1016,6 +1065,16 @@ mod tests {
         assert!(achievements.is_unlocked(AchievementId::PrestigeXV));
         // But not P20+
         assert!(!achievements.is_unlocked(AchievementId::PrestigeXX));
+    }
+
+    #[test]
+    fn test_sync_from_game_state_new_endgame_achievements() {
+        let mut achievements = Achievements::default();
+
+        achievements.sync_from_game_state(100000, 10000, 1, 0, &[], Some("Hero"));
+
+        assert!(achievements.is_unlocked(AchievementId::Level100000));
+        assert!(achievements.is_unlocked(AchievementId::Prestige10000));
     }
 
     #[test]
@@ -1332,6 +1391,8 @@ mod tests {
         // Other categories unaffected
         let (level_unlocked, _) = achievements.count_by_category(AchievementCategory::Level);
         assert_eq!(level_unlocked, 0);
+        let (prestige_unlocked, _) = achievements.count_by_category(AchievementCategory::Prestige);
+        assert_eq!(prestige_unlocked, 0);
     }
 
     // =========================================================================
@@ -1374,6 +1435,7 @@ mod tests {
         achievements.unlock(AchievementId::SlayerI, Some("Hero".to_string()));
         achievements.unlock(AchievementId::BossHunterI, Some("Hero".to_string()));
         achievements.unlock(AchievementId::Level10, Some("Hero".to_string()));
+        achievements.unlock(AchievementId::FirstPrestige, Some("Hero".to_string()));
 
         achievements.clear_pending_notifications();
 
@@ -1383,6 +1445,10 @@ mod tests {
         );
         assert_eq!(
             achievements.count_recently_unlocked_by_category(AchievementCategory::Level),
+            1
+        );
+        assert_eq!(
+            achievements.count_recently_unlocked_by_category(AchievementCategory::Prestige),
             1
         );
         assert_eq!(

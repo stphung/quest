@@ -28,6 +28,26 @@ pub const ALL_TITLES: &[TitleDef] = &[
         title_text: "Transcendent",
     },
     TitleDef {
+        achievement_id: AchievementId::Level2000,
+        title_text: "Ascendant",
+    },
+    TitleDef {
+        achievement_id: AchievementId::Level5000,
+        title_text: "Worldshaper",
+    },
+    TitleDef {
+        achievement_id: AchievementId::Level10000,
+        title_text: "Godmarch",
+    },
+    TitleDef {
+        achievement_id: AchievementId::Level20000,
+        title_text: "Infinite",
+    },
+    TitleDef {
+        achievement_id: AchievementId::Level100000,
+        title_text: "Unfathomable",
+    },
+    TitleDef {
         achievement_id: AchievementId::PrestigeX,
         title_text: "Silver-Forged",
     },
@@ -42,6 +62,22 @@ pub const ALL_TITLES: &[TitleDef] = &[
     TitleDef {
         achievement_id: AchievementId::Eternal,
         title_text: "Everlasting",
+    },
+    TitleDef {
+        achievement_id: AchievementId::Prestige200,
+        title_text: "Aeonforged",
+    },
+    TitleDef {
+        achievement_id: AchievementId::Prestige500,
+        title_text: "Voidforged",
+    },
+    TitleDef {
+        achievement_id: AchievementId::Prestige1000,
+        title_text: "Boundless",
+    },
+    TitleDef {
+        achievement_id: AchievementId::Prestige10000,
+        title_text: "Omegaforged",
     },
     TitleDef {
         achievement_id: AchievementId::StormsEnd,
@@ -246,6 +282,14 @@ mod tests {
     #[test]
     fn test_get_title_text_exists() {
         assert_eq!(get_title_text(AchievementId::Eternal), Some("Everlasting"));
+        assert_eq!(
+            get_title_text(AchievementId::Level100000),
+            Some("Unfathomable")
+        );
+        assert_eq!(
+            get_title_text(AchievementId::Prestige10000),
+            Some("Omegaforged")
+        );
         assert_eq!(get_title_text(AchievementId::SlayerV), Some("Battleborn"));
     }
 

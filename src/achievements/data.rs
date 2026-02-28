@@ -341,6 +341,62 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         icon: "\u{267e}\u{fe0f}",
         points: 500,
     },
+    AchievementDef {
+        id: AchievementId::Level2000,
+        name: "Ascendant",
+        description: "Reach level 2,000",
+        category: AchievementCategory::Level,
+        icon: "🌠",
+        points: 250,
+    },
+    AchievementDef {
+        id: AchievementId::Level3000,
+        name: "Paragon",
+        description: "Reach level 3,000",
+        category: AchievementCategory::Level,
+        icon: "✨",
+        points: 250,
+    },
+    AchievementDef {
+        id: AchievementId::Level5000,
+        name: "Worldshaper",
+        description: "Reach level 5,000",
+        category: AchievementCategory::Level,
+        icon: "🪐",
+        points: 500,
+    },
+    AchievementDef {
+        id: AchievementId::Level7500,
+        name: "Starforged",
+        description: "Reach level 7,500",
+        category: AchievementCategory::Level,
+        icon: "🌌",
+        points: 500,
+    },
+    AchievementDef {
+        id: AchievementId::Level10000,
+        name: "Godmarch",
+        description: "Reach level 10,000",
+        category: AchievementCategory::Level,
+        icon: "☄️",
+        points: 500,
+    },
+    AchievementDef {
+        id: AchievementId::Level20000,
+        name: "Infinite",
+        description: "Reach level 20,000 - Mortal scale has long since failed to describe you",
+        category: AchievementCategory::Level,
+        icon: "♾️",
+        points: 500,
+    },
+    AchievementDef {
+        id: AchievementId::Level100000,
+        name: "Unfathomable",
+        description: "Reach level 100,000 - You have gone beyond all useful measurement",
+        category: AchievementCategory::Level,
+        icon: "🌌",
+        points: 500,
+    },
     // ═══════════════════════════════════════════════════════════════
     // PRESTIGE ACHIEVEMENTS
     // ═══════════════════════════════════════════════════════════════
@@ -348,7 +404,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         id: AchievementId::FirstPrestige,
         name: "Rebirth",
         description: "Prestige for the first time",
-        category: AchievementCategory::Level,
+        category: AchievementCategory::Prestige,
         icon: "🔄",
         points: 5,
     },
@@ -356,7 +412,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         id: AchievementId::PrestigeV,
         name: "Bronze Rank",
         description: "Reach Prestige Rank 5",
-        category: AchievementCategory::Level,
+        category: AchievementCategory::Prestige,
         icon: "🥉",
         points: 10,
     },
@@ -364,7 +420,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         id: AchievementId::PrestigeX,
         name: "Silver Rank",
         description: "Reach Prestige Rank 10",
-        category: AchievementCategory::Level,
+        category: AchievementCategory::Prestige,
         icon: "🥈",
         points: 25,
     },
@@ -372,7 +428,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         id: AchievementId::PrestigeXV,
         name: "Gold Rank",
         description: "Reach Prestige Rank 15",
-        category: AchievementCategory::Level,
+        category: AchievementCategory::Prestige,
         icon: "🥇",
         points: 50,
     },
@@ -380,7 +436,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         id: AchievementId::PrestigeXX,
         name: "Platinum Rank",
         description: "Reach Prestige Rank 20",
-        category: AchievementCategory::Level,
+        category: AchievementCategory::Prestige,
         icon: "💎",
         points: 50,
     },
@@ -388,7 +444,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         id: AchievementId::PrestigeXXV,
         name: "Diamond Rank",
         description: "Reach Prestige Rank 25",
-        category: AchievementCategory::Level,
+        category: AchievementCategory::Prestige,
         icon: "💠",
         points: 50,
     },
@@ -396,7 +452,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         id: AchievementId::PrestigeXXX,
         name: "Ruby Rank",
         description: "Reach Prestige Rank 30",
-        category: AchievementCategory::Level,
+        category: AchievementCategory::Prestige,
         icon: "❤️",
         points: 50,
     },
@@ -404,7 +460,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         id: AchievementId::PrestigeXL,
         name: "Sapphire Rank",
         description: "Reach Prestige Rank 40",
-        category: AchievementCategory::Level,
+        category: AchievementCategory::Prestige,
         icon: "💙",
         points: 100,
     },
@@ -412,7 +468,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         id: AchievementId::PrestigeL,
         name: "Emerald Rank",
         description: "Reach Prestige Rank 50",
-        category: AchievementCategory::Level,
+        category: AchievementCategory::Prestige,
         icon: "💚",
         points: 100,
     },
@@ -420,7 +476,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         id: AchievementId::PrestigeLXX,
         name: "Obsidian Rank",
         description: "Reach Prestige Rank 70",
-        category: AchievementCategory::Level,
+        category: AchievementCategory::Prestige,
         icon: "🖤",
         points: 250,
     },
@@ -428,7 +484,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         id: AchievementId::PrestigeXC,
         name: "Celestial Rank",
         description: "Reach Prestige Rank 90",
-        category: AchievementCategory::Level,
+        category: AchievementCategory::Prestige,
         icon: "💜",
         points: 250,
     },
@@ -436,8 +492,64 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         id: AchievementId::Eternal,
         name: "Eternal",
         description: "Reach Prestige Rank 100 - Your legend echoes through eternity",
-        category: AchievementCategory::Level,
+        category: AchievementCategory::Prestige,
         icon: "♾️",
+        points: 500,
+    },
+    AchievementDef {
+        id: AchievementId::Prestige150,
+        name: "Empyrean Rank",
+        description: "Reach Prestige Rank 150",
+        category: AchievementCategory::Prestige,
+        icon: "🧿",
+        points: 250,
+    },
+    AchievementDef {
+        id: AchievementId::Prestige200,
+        name: "Aeonic Rank",
+        description: "Reach Prestige Rank 200",
+        category: AchievementCategory::Prestige,
+        icon: "⏳",
+        points: 250,
+    },
+    AchievementDef {
+        id: AchievementId::Prestige300,
+        name: "Paragon Rank",
+        description: "Reach Prestige Rank 300",
+        category: AchievementCategory::Prestige,
+        icon: "🌑",
+        points: 500,
+    },
+    AchievementDef {
+        id: AchievementId::Prestige500,
+        name: "Void Rank",
+        description: "Reach Prestige Rank 500",
+        category: AchievementCategory::Prestige,
+        icon: "🌌",
+        points: 500,
+    },
+    AchievementDef {
+        id: AchievementId::Prestige700,
+        name: "Infinite Rank",
+        description: "Reach Prestige Rank 700",
+        category: AchievementCategory::Prestige,
+        icon: "♾️",
+        points: 500,
+    },
+    AchievementDef {
+        id: AchievementId::Prestige1000,
+        name: "Boundless Rank",
+        description: "Reach Prestige Rank 1,000 - Rebirth itself answers to you now",
+        category: AchievementCategory::Prestige,
+        icon: "👑",
+        points: 500,
+    },
+    AchievementDef {
+        id: AchievementId::Prestige10000,
+        name: "Omega Rank",
+        description: "Reach Prestige Rank 10,000 - The cycle no longer contains you",
+        category: AchievementCategory::Prestige,
+        icon: "🔱",
         points: 500,
     },
     // Zone completion achievements (one per zone)
@@ -1460,6 +1572,21 @@ mod tests {
         for a in combat {
             assert_eq!(a.category, AchievementCategory::Combat);
         }
+
+        let level = get_achievements_by_category(AchievementCategory::Level);
+        assert!(level.iter().any(|a| a.id == AchievementId::Level10));
+        assert!(level.iter().any(|a| a.id == AchievementId::Level100000));
+        assert!(!level.iter().any(|a| a.id == AchievementId::FirstPrestige));
+
+        let prestige = get_achievements_by_category(AchievementCategory::Prestige);
+        assert!(prestige
+            .iter()
+            .any(|a| a.id == AchievementId::FirstPrestige));
+        assert!(prestige.iter().any(|a| a.id == AchievementId::Eternal));
+        assert!(prestige
+            .iter()
+            .any(|a| a.id == AchievementId::Prestige10000));
+        assert!(!prestige.iter().any(|a| a.id == AchievementId::Level10));
     }
 
     /// Verify every `AchievementId` variant has exactly one entry in
@@ -1536,6 +1663,13 @@ mod tests {
             AchievementId::Level750,
             AchievementId::Level1000,
             AchievementId::Level1500,
+            AchievementId::Level2000,
+            AchievementId::Level3000,
+            AchievementId::Level5000,
+            AchievementId::Level7500,
+            AchievementId::Level10000,
+            AchievementId::Level20000,
+            AchievementId::Level100000,
             AchievementId::FirstPrestige,
             AchievementId::PrestigeV,
             AchievementId::PrestigeX,
@@ -1548,6 +1682,13 @@ mod tests {
             AchievementId::PrestigeLXX,
             AchievementId::PrestigeXC,
             AchievementId::Eternal,
+            AchievementId::Prestige150,
+            AchievementId::Prestige200,
+            AchievementId::Prestige300,
+            AchievementId::Prestige500,
+            AchievementId::Prestige700,
+            AchievementId::Prestige1000,
+            AchievementId::Prestige10000,
             AchievementId::Zone1Complete,
             AchievementId::Zone2Complete,
             AchievementId::Zone3Complete,

@@ -280,6 +280,11 @@ fn build_stats_left_lines(
     let boss_kills_str = format_number(achievements.total_bosses_defeated);
     let highest_level_str = format_number(achievements.highest_level as u64);
     let highest_prestige_str = format_number(achievements.highest_prestige_rank as u64);
+    let (level_unlocked, level_total) = achievements.count_by_category(AchievementCategory::Level);
+    let (prestige_unlocked, prestige_total) =
+        achievements.count_by_category(AchievementCategory::Prestige);
+    let level_achievements_str = format!("{level_unlocked}/{level_total}");
+    let prestige_achievements_str = format!("{prestige_unlocked}/{prestige_total}");
     let expanse_cycles_str = format_number(achievements.expanse_cycles_completed);
     let total_fish_str = format_number(achievements.total_fish_caught);
     let highest_fishing_rank_str = format_number(achievements.highest_fishing_rank as u64);
@@ -328,6 +333,20 @@ fn build_stats_left_lines(
         stat_line(
             "Highest Prestige",
             &highest_prestige_str,
+            label_style,
+            value_style,
+            width,
+        ),
+        stat_line(
+            "Level Achievements",
+            &level_achievements_str,
+            label_style,
+            value_style,
+            width,
+        ),
+        stat_line(
+            "Prestige Achievements",
+            &prestige_achievements_str,
             label_style,
             value_style,
             width,
@@ -715,6 +734,7 @@ fn build_stats_right_lines(
     for cat in &[
         AchievementCategory::Combat,
         AchievementCategory::Level,
+        AchievementCategory::Prestige,
         AchievementCategory::Progression,
         AchievementCategory::Challenges,
         AchievementCategory::Exploration,

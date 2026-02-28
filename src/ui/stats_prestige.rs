@@ -1,6 +1,6 @@
 //! Prestige and fishing panel rendering helpers for the stats panel.
 
-use crate::achievements::AchievementId;
+use crate::achievements::{get_achievements_by_category, AchievementCategory, AchievementId};
 use crate::character::attributes::AttributeType;
 use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::{get_next_prestige_tier, get_prestige_tier};
@@ -20,27 +20,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub(super) fn highest_prestige_badge(
     achievements: &crate::achievements::Achievements,
 ) -> Option<&'static str> {
-    use crate::achievements::AchievementId;
-
-    // Ordered from highest to lowest so we return the first match
-    let prestige_achievements = [
-        AchievementId::Eternal,
-        AchievementId::PrestigeXC,
-        AchievementId::PrestigeLXX,
-        AchievementId::PrestigeL,
-        AchievementId::PrestigeXL,
-        AchievementId::PrestigeXXX,
-        AchievementId::PrestigeXXV,
-        AchievementId::PrestigeXX,
-        AchievementId::PrestigeXV,
-        AchievementId::PrestigeX,
-        AchievementId::PrestigeV,
-        AchievementId::FirstPrestige,
-    ];
-
-    for id in prestige_achievements {
-        if achievements.is_unlocked(id) {
-            return crate::achievements::data::get_achievement_def(id).map(|def| def.icon);
+    for def in get_achievements_by_category(AchievementCategory::Prestige)
+        .into_iter()
+        .rev()
+    {
+        if achievements.is_unlocked(def.id) {
+            return Some(def.icon);
         }
     }
     None
@@ -494,4 +479,28 @@ fn build_leviathan_trophy_line() -> Line<'static> {
     ));
 
     Line::from(spans)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::achievements::Achievements;
+
+    #[test]
+    fn test_highest_prestige_badge_uses_existing_top_rank() {
+        let mut achievements = Achievements::default();
+        achievements.unlock(AchievementId::PrestigeX, Some("Hero".to_string()));
+        achievements.unlock(AchievementId::Eternal, Some("Hero".to_string()));
+
+        assert_eq!(highest_prestige_badge(&achievements), Some("♾️"));
+    }
+
+    #[test]
+    fn test_highest_prestige_badge_uses_new_capstone() {
+        let mut achievements = Achievements::default();
+        achievements.unlock(AchievementId::Eternal, Some("Hero".to_string()));
+        achievements.unlock(AchievementId::Prestige10000, Some("Hero".to_string()));
+
+        assert_eq!(highest_prestige_badge(&achievements), Some("🔱"));
+    }
 }
