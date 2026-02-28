@@ -1409,6 +1409,11 @@ fn test_achievement_count_by_category_after_multiple_unlocks() {
         level_unlocked, 0,
         "No Level achievements should be unlocked"
     );
+    let (prestige_unlocked, _) = achievements.count_by_category(AchievementCategory::Prestige);
+    assert_eq!(
+        prestige_unlocked, 0,
+        "No Prestige achievements should be unlocked"
+    );
 
     // Now level up to 10
     achievements.on_level_up(10, Some("Hero"));
@@ -1527,14 +1532,19 @@ fn achievements_count_recently_unlocked_by_category_zero_for_empty() {
         ach.count_recently_unlocked_by_category(AchievementCategory::Level),
         0
     );
+    assert_eq!(
+        ach.count_recently_unlocked_by_category(AchievementCategory::Prestige),
+        0
+    );
 }
 
 #[test]
 fn achievements_count_recently_unlocked_by_category_counts_correctly() {
     let mut ach = Achievements::default();
-    // SlayerI is Combat, Level10 is Level, Zone1Complete is Progression
+    // SlayerI is Combat, Level10 is Level, FirstPrestige is Prestige, Zone1Complete is Progression
     ach.unlock(AchievementId::SlayerI, None);
     ach.unlock(AchievementId::Level10, None);
+    ach.unlock(AchievementId::FirstPrestige, None);
     ach.unlock(AchievementId::Zone1Complete, None);
     ach.clear_pending_notifications();
 
@@ -1544,6 +1554,10 @@ fn achievements_count_recently_unlocked_by_category_counts_correctly() {
     );
     assert_eq!(
         ach.count_recently_unlocked_by_category(AchievementCategory::Level),
+        1
+    );
+    assert_eq!(
+        ach.count_recently_unlocked_by_category(AchievementCategory::Prestige),
         1
     );
     assert_eq!(

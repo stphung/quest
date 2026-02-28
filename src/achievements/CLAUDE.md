@@ -23,11 +23,11 @@ src/achievements/
 
 ### `AchievementId` (`types.rs`)
 
-Enum with 168 variants covering all trackable milestones. Organized by domain:
+Enum with 182 variants covering all trackable milestones. Organized by domain:
 
 - **Combat**: `SlayerI`..`SlayerXV` (100 to 1B kills), `BossHunterI`..`BossHunterXV` (1 to 10M bosses)
-- **Level**: `Level10`..`Level1500` (11 milestones)
-- **Prestige**: `FirstPrestige`..`Eternal` (P1 to P100, 12 milestones)
+- **Level**: `Level10`..`Level100000` (18 milestones)
+- **Prestige**: `FirstPrestige`..`Prestige10000` (P1 to P10000, 19 milestones)
 - **Zones**: `Zone1Complete`..`Zone10Complete`, `TheStormbreaker`, `StormsEnd`, `BeyondInfinity`
 - **Challenges**: 4 difficulties per game type (chess, morris, gomoku, minesweeper, rune, go, flappy_bird, snake, jezzball, runic_shift) + `GrandChampion` (100 wins)
 - **Enhancement**: `SoulforgeDiscovered`, `ApprenticeSmith` (+1), `FullyTempered` (+4 all), `JourneymanSmith` (+5), `SoulforgeAdept` (+6), `SoulforgeSavant` (+7), `SoulforgeMaster` (+8), `SoulforgeGrandmaster` (+9), `SoulforgeAscendant` (+10), `SoulConvergence` (+7 all), `PersistentHammering` (100 attempts)
@@ -38,11 +38,11 @@ Enum with 168 variants covering all trackable milestones. Organized by domain:
 
 ### `AchievementCategory` (`types.rs`)
 
-Seven categories for browsing: `Combat`, `Level`, `Progression`, `Challenges`, `Exploration`, `Deep`, `Stats`.
+Eight categories for browsing: `Combat`, `Level`, `Prestige`, `Progression`, `Challenges`, `Exploration`, `Deep`, `Stats`.
 
 ### `AchievementDef` (`data.rs`)
 
-Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 168 achievements total.
+Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 182 achievements total.
 
 ### `Achievements` (`types.rs`)
 
@@ -119,7 +119,7 @@ Additionally, `newly_unlocked` is drained each tick by `collect_achievement_even
 
 Titles are display names earned by unlocking specific achievements. Players can select one title to display after their character name (e.g., "Hero, Godslayer"). Titles are account-wide and persist in `selected_title` on the `Achievements` struct.
 
-- `ALL_TITLES`: const slice of `TitleDef { achievement_id, title_text }` — 50 curated titles across combat, challenges, exploration, enhancement, and Deep categories
+- `ALL_TITLES`: const slice of `TitleDef { achievement_id, title_text }` — 59 curated titles across level, prestige, combat, challenges, exploration, enhancement, and Deep categories
 - `get_title_text(id)`: returns the title text for an achievement, if it grants a title
 - `get_unlocked_titles(achievements)`: returns all titles the player has earned, in display order
 - `validate_selected_title(achievements)`: clears `selected_title` if the achievement isn't unlocked or doesn't grant a title (called on load)

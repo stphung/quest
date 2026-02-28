@@ -95,6 +95,13 @@ pub const LEVEL_MILESTONES: &[(u64, AchievementId)] = &[
     (750, AchievementId::Level750),
     (1000, AchievementId::Level1000),
     (1500, AchievementId::Level1500),
+    (2000, AchievementId::Level2000),
+    (3000, AchievementId::Level3000),
+    (5000, AchievementId::Level5000),
+    (7500, AchievementId::Level7500),
+    (10000, AchievementId::Level10000),
+    (20000, AchievementId::Level20000),
+    (100000, AchievementId::Level100000),
 ];
 
 /// Prestige rank milestones for prestige achievements.
@@ -111,6 +118,13 @@ pub const PRESTIGE_MILESTONES: &[(u64, AchievementId)] = &[
     (70, AchievementId::PrestigeLXX),
     (90, AchievementId::PrestigeXC),
     (100, AchievementId::Eternal),
+    (150, AchievementId::Prestige150),
+    (200, AchievementId::Prestige200),
+    (300, AchievementId::Prestige300),
+    (500, AchievementId::Prestige500),
+    (700, AchievementId::Prestige700),
+    (1000, AchievementId::Prestige1000),
+    (10000, AchievementId::Prestige10000),
 ];
 
 /// Fish catch count milestones for fish catcher achievements.

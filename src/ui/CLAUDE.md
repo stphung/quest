@@ -28,10 +28,10 @@ src/ui/
 ├── haven_scene.rs              # Haven base building overlay (delegates to helpers below)
 ├── haven_details.rs            # Haven room detail panel rendering
 ├── haven_tree.rs               # Haven skill tree panel rendering
-├── achievement_browser_scene.rs # Achievement browsing (delegates to helpers below)
-├── achievement_details.rs      # Achievement browser detail panel and stats view
+├── achievement_browser_scene.rs # Achievement browsing (Combat/Level/Prestige/...) and stats tab
+├── achievement_details.rs      # Achievement browser detail panel and split Level/Prestige stats view
 ├── achievement_list.rs         # Achievement browser list panel
-├── achievement_tabs.rs         # Achievement browser category tabs
+├── achievement_tabs.rs         # Achievement browser category tabs, counts, and recent badges
 ├── title_browser_scene.rs      # Title browser overlay (select display title from unlocked achievements)
 ├── deep_scene.rs               # The Deep overlay coordinator, backdrop, view routing
 ├── deep_missions.rs            # Deep active missions panel and new mission creation

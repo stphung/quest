@@ -181,10 +181,11 @@ fn test_count_recently_unlocked_by_category_returns_zero_for_empty() {
 #[test]
 fn test_count_recently_unlocked_by_category_filters_correctly() {
     let mut ach = Achievements::default();
-    // SlayerI, BossHunterI => Combat; Level10 => Level; HavenDiscovered => Exploration
+    // SlayerI, BossHunterI => Combat; Level10 => Level; FirstPrestige => Prestige; HavenDiscovered => Exploration
     ach.unlock(AchievementId::SlayerI, Some("Hero".to_string()));
     ach.unlock(AchievementId::BossHunterI, Some("Hero".to_string()));
     ach.unlock(AchievementId::Level10, Some("Hero".to_string()));
+    ach.unlock(AchievementId::FirstPrestige, Some("Hero".to_string()));
     ach.unlock(AchievementId::HavenDiscovered, Some("Hero".to_string()));
 
     ach.clear_pending_notifications();
@@ -195,6 +196,10 @@ fn test_count_recently_unlocked_by_category_filters_correctly() {
     );
     assert_eq!(
         ach.count_recently_unlocked_by_category(AchievementCategory::Level),
+        1
+    );
+    assert_eq!(
+        ach.count_recently_unlocked_by_category(AchievementCategory::Prestige),
         1
     );
     assert_eq!(
@@ -307,10 +312,15 @@ fn test_count_by_category_returns_positive_totals_for_most_categories() {
 fn test_count_by_category_tracks_unlocks_accurately() {
     let mut ach = Achievements::default();
     ach.unlock(AchievementId::Level10, Some("Hero".to_string()));
+    ach.unlock(AchievementId::FirstPrestige, Some("Hero".to_string()));
 
     let (level_unlocked, level_total) = ach.count_by_category(AchievementCategory::Level);
     assert_eq!(level_unlocked, 1);
     assert!(level_total >= 1);
+
+    let (prestige_unlocked, prestige_total) = ach.count_by_category(AchievementCategory::Prestige);
+    assert_eq!(prestige_unlocked, 1);
+    assert!(prestige_total >= 1);
 
     let (combat_unlocked, _) = ach.count_by_category(AchievementCategory::Combat);
     assert_eq!(combat_unlocked, 0);
