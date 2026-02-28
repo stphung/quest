@@ -3,7 +3,7 @@
 use crate::core::constants::CHARACTER_NAME_MAX_LENGTH;
 
 /// Reserved names that cannot be used for characters (would conflict with system files)
-pub const RESERVED_NAMES: &[&str] = &["haven", "achievements"];
+pub const RESERVED_NAMES: &[&str] = &["haven", "achievements", "enhancement", "deep"];
 
 pub fn validate_name(name: &str) -> Result<(), String> {
     let trimmed = name.trim();
@@ -163,11 +163,23 @@ mod tests {
         assert!(validate_name("ACHIEVEMENTS").is_err());
         assert!(validate_name("  achievements  ").is_err()); // With whitespace
 
+        // "enhancement" is reserved (conflicts with enhancement.json)
+        assert!(validate_name("enhancement").is_err());
+        assert!(validate_name("Enhancement").is_err());
+        assert!(validate_name("ENHANCEMENT").is_err());
+
+        // "deep" is reserved (conflicts with deep.json)
+        assert!(validate_name("deep").is_err());
+        assert!(validate_name("Deep").is_err());
+        assert!(validate_name("DEEP").is_err());
+
         // Similar names that don't conflict should be fine
         assert!(validate_name("haven2").is_ok());
         assert!(validate_name("myhaven").is_ok());
         assert!(validate_name("the-haven").is_ok());
         assert!(validate_name("achievements2").is_ok());
         assert!(validate_name("myachievements").is_ok());
+        assert!(validate_name("enhanced").is_ok());
+        assert!(validate_name("deeper").is_ok());
     }
 }

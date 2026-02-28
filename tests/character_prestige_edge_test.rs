@@ -798,10 +798,11 @@ fn validate_name_mixed_valid_chars() {
 }
 
 #[test]
-fn validate_name_reserved_deep_is_not_reserved() {
-    // "deep" and "enhancement" are not reserved names
-    assert!(validate_name("deep").is_ok());
-    assert!(validate_name("enhancement").is_ok());
+fn validate_name_reserved_deep_and_enhancement() {
+    // "deep" and "enhancement" are reserved (conflict with account-level .json files)
+    assert!(validate_name("deep").is_err());
+    assert!(validate_name("enhancement").is_err());
+    // "stormglass" has no account-level file, so it's fine
     assert!(validate_name("stormglass").is_ok());
 }
 
