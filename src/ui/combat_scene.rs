@@ -6,7 +6,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Gauge, Paragraph},
+    widgets::{Block, Borders, Gauge, Paragraph, Wrap},
     Frame,
 };
 
@@ -445,7 +445,12 @@ pub fn render_fracture_region_unlock_modal(
     // Determine whether to show ascension hint
     let asc_unlocked = region.ascension_level_unlocked();
     let show_ascension = ascension_level < asc_unlocked;
-    let modal_height = if show_ascension { 20u16 } else { 16u16 };
+    let extra_zones = (region.end_zone_id() - region.start_zone_id() + 1).saturating_sub(3) as u16;
+    let modal_height = if show_ascension {
+        22u16 + extra_zones
+    } else {
+        18u16 + extra_zones
+    };
 
     let modal_width = 58u16.min(area.width.saturating_sub(4));
     let modal_height = modal_height.min(area.height.saturating_sub(4));
@@ -531,6 +536,8 @@ pub fn render_fracture_region_unlock_modal(
         Style::default().fg(Color::DarkGray),
     )));
 
-    let text = Paragraph::new(lines).alignment(Alignment::Center);
+    let text = Paragraph::new(lines)
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: true });
     frame.render_widget(text, inner);
 }

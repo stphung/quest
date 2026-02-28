@@ -70,11 +70,16 @@ pub fn draw_stats_panel(
     match ctx.height_tier {
         SizeTier::XL | SizeTier::L => {
             let etched = game_state.storm_sigils.etched_count();
+            let prestige_height = if game_state.ascension_level > 0 {
+                7 // 5 inner rows + 2 border
+            } else {
+                6 // 4 inner rows + 2 border
+            };
             let mut constraints = vec![
-                Constraint::Length(4), // Header
-                Constraint::Length(6), // Prestige (4 inner + 2 border)
-                Constraint::Length(4), // Fishing
-                Constraint::Length(5), // Attributes
+                Constraint::Length(4),               // Header
+                Constraint::Length(prestige_height), // Prestige
+                Constraint::Length(4),               // Fishing
+                Constraint::Length(5),               // Attributes
             ];
             if etched > 0 {
                 constraints.push(Constraint::Length(
@@ -285,69 +290,115 @@ pub(super) fn draw_zone_info(
     }
 
     // Dot track: ● = completed (green), ○ = current (yellow), · = unlocked (white), · = locked (gray)
-    let max_fracture_zone = (12..=20u32)
+    // Chapter separators │ between base zones, zone 11, and each fracture chapter.
+    // Second row shows zone range labels aligned under each group.
+    let max_fracture_zone = (12..=30u32)
         .rev()
         .find(|&zid| prog.is_zone_unlocked(zid))
         .unwrap_or(0);
 
-    let mut dot_spans: Vec<Span> = Vec::new();
-    let last_base_zone = 11u32;
-    let zone_range: Vec<u32> = if max_fracture_zone >= 12 {
-        (1..=last_base_zone).chain(12..=max_fracture_zone).collect()
-    } else {
-        (1..=last_base_zone).collect()
-    };
+    // Define zone groups: (start, end) inclusive
+    let mut groups: Vec<(u32, u32)> = vec![(1, 11)];
+    if max_fracture_zone >= 12 {
+        // Fracture chapter boundaries
+        let chapter_starts: &[u32] = &[12, 15, 18, 21, 24, 27];
+        let chapter_ends: &[u32] = &[14, 17, 20, 23, 26, 30];
+        for (&start, &end) in chapter_starts.iter().zip(chapter_ends.iter()) {
+            if max_fracture_zone >= start {
+                groups.push((start, end.min(max_fracture_zone)));
+            }
+        }
+    }
 
-    for (i, &zid) in zone_range.iter().enumerate() {
-        // Separator between base and fracture
-        if zid == 12 {
+    let mut dot_spans: Vec<Span> = Vec::new();
+    let mut label_parts: Vec<(usize, String)> = Vec::new(); // (char_offset, label)
+    let mut char_pos: usize = 0;
+
+    for (gi, &(g_start, g_end)) in groups.iter().enumerate() {
+        // Separator between groups
+        if gi > 0 {
             dot_spans.push(Span::styled(
                 " \u{2502} ",
                 Style::default().fg(Color::DarkGray),
             ));
-        } else if i > 0 {
-            dot_spans.push(Span::raw(" "));
+            char_pos += 3; // " │ " is 3 chars
         }
 
-        let zone_data = zones.iter().find(|z| z.id == zid);
-        let num_subzones = zone_data.map(|z| z.subzones.len()).unwrap_or(3);
-        let defeated_count = zone_data
-            .map(|z| {
-                z.subzones
-                    .iter()
-                    .filter(|s| prog.is_boss_defeated(zid, s.id))
-                    .count()
-            })
-            .unwrap_or(0);
+        let group_start_pos = char_pos;
 
-        let is_current = zid == prog.current_zone_id;
-        let is_completed = defeated_count == num_subzones;
-        let is_unlocked = if zid == 11 {
-            achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd)
-        } else {
-            prog.is_zone_unlocked(zid)
-        };
+        for zid in g_start..=g_end {
+            if zid > g_start {
+                dot_spans.push(Span::raw(" "));
+                char_pos += 1;
+            }
 
-        let (dot, fg, bold) = if is_current {
-            ("\u{25cb}", Color::Yellow, true) // ○
-        } else if is_completed {
-            ("\u{25cf}", Color::Green, false) // ●
-        } else if is_unlocked {
-            ("\u{00b7}", Color::White, false) // ·
-        } else {
-            ("\u{00b7}", Color::DarkGray, false) // ·
-        };
+            let zone_data = zones.iter().find(|z| z.id == zid);
+            let num_subzones = zone_data.map(|z| z.subzones.len()).unwrap_or(3);
+            let defeated_count = zone_data
+                .map(|z| {
+                    z.subzones
+                        .iter()
+                        .filter(|s| prog.is_boss_defeated(zid, s.id))
+                        .count()
+                })
+                .unwrap_or(0);
 
-        let style = if bold {
-            Style::default().fg(fg).add_modifier(Modifier::BOLD)
+            let is_current = zid == prog.current_zone_id;
+            let is_completed = defeated_count == num_subzones;
+            let is_unlocked = if zid == 11 {
+                achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd)
+            } else {
+                prog.is_zone_unlocked(zid)
+            };
+
+            let (dot, fg, bold) = if is_current {
+                ("\u{25cb}", Color::Yellow, true) // ○
+            } else if is_completed {
+                ("\u{25cf}", Color::Green, false) // ●
+            } else if is_unlocked {
+                ("\u{00b7}", Color::White, false) // ·
+            } else {
+                ("\u{00b7}", Color::DarkGray, false) // ·
+            };
+
+            let style = if bold {
+                Style::default().fg(fg).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(fg)
+            };
+            dot_spans.push(Span::styled(dot, style));
+            char_pos += 1; // each dot is 1 char wide
+        }
+
+        // Build label for this group
+        let label = if g_start == g_end {
+            format!("{}", g_start)
         } else {
-            Style::default().fg(fg)
+            format!("{}-{}", g_start, g_end)
         };
-        dot_spans.push(Span::styled(dot, style));
+        let group_width = char_pos - group_start_pos;
+        label_parts.push((group_start_pos, center_label(&label, group_width)));
     }
+
+    // Build the label line by placing each label at its offset
+    let total_width = char_pos;
+    let mut label_chars: Vec<u8> = vec![b' '; total_width];
+    for (offset, label) in &label_parts {
+        for (i, ch) in label.bytes().enumerate() {
+            let pos = offset + i;
+            if pos < total_width {
+                label_chars[pos] = ch;
+            }
+        }
+    }
+    let label_str = String::from_utf8(label_chars).unwrap_or_default();
 
     zone_lines.push(Line::from(""));
     zone_lines.push(Line::from(dot_spans));
+    zone_lines.push(Line::from(Span::styled(
+        label_str,
+        Style::default().fg(Color::DarkGray),
+    )));
 
     let location_title = match highest_zone_badge(achievements) {
         Some(icon) => format!(" Location {} ", icon),
@@ -365,6 +416,15 @@ pub(super) fn draw_zone_info(
 
     frame.render_widget(zone_widget, area);
     super::apply_themed_border_fx(frame, area, zone_color, super::BorderFxContext);
+}
+
+/// Center a label within a given width, padding with spaces.
+fn center_label(label: &str, width: usize) -> String {
+    if label.len() >= width {
+        return label[..width].to_string();
+    }
+    let pad = (width - label.len()) / 2;
+    format!("{:>width$}", label, width = pad + label.len())
 }
 
 /// Returns the icon of the highest unlocked zone completion achievement, if any.

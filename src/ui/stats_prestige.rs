@@ -154,68 +154,68 @@ pub(super) fn draw_prestige_info(
         }
     };
 
-    let prestige_text = vec![
-        Line::from({
-            let mut rank_spans = vec![
-                Span::styled("🏆 Rank: ", Style::default().add_modifier(Modifier::BOLD)),
-                Span::styled(
-                    format!("{} ({})", game_state.prestige_rank, tier.name),
-                    Style::default().fg(Color::Yellow),
+    let mut prestige_text = vec![Line::from(vec![
+        Span::styled("🏆 Rank: ", Style::default().add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{} ({})", game_state.prestige_rank, tier.name),
+            Style::default().fg(Color::Yellow),
+        ),
+        Span::styled(" | ", Style::default().fg(Color::DarkGray)),
+        Span::styled("🔄 ", Style::default()),
+        Span::styled(
+            format!("{}", game_state.total_prestige_count),
+            Style::default().fg(Color::Magenta),
+        ),
+    ])];
+    if game_state.ascension_level > 0 {
+        let asc_mult = ascension_combat_multiplier(game_state.ascension_level);
+        prestige_text.push(Line::from(vec![
+            Span::styled(
+                format!(
+                    "\u{2726} Ascension {} ",
+                    to_roman(game_state.ascension_level)
                 ),
-                Span::styled(" | ", Style::default().fg(Color::DarkGray)),
-                Span::styled("🔄 ", Style::default()),
-                Span::styled(
-                    format!("{}", game_state.total_prestige_count),
-                    Style::default().fg(Color::Magenta),
-                ),
-            ];
-            if game_state.ascension_level > 0 {
-                let asc_mult = ascension_combat_multiplier(game_state.ascension_level);
-                rank_spans.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
-                rank_spans.push(Span::styled(
-                    format!(
-                        "Asc {} ({:.1}x)",
-                        to_roman(game_state.ascension_level),
-                        asc_mult
-                    ),
-                    Style::default()
-                        .fg(Color::Rgb(255, 215, 0))
-                        .add_modifier(Modifier::BOLD),
-                ));
-            }
-            rank_spans
-        }),
-        Line::from({
-            let mut spans = vec![
-                Span::styled("⚡ XP: ", Style::default().add_modifier(Modifier::BOLD)),
-                Span::styled(
-                    format!("{:.2}x", tier.multiplier),
-                    Style::default().fg(Color::Cyan),
-                ),
-            ];
-            if cha_mod != 0 {
-                spans.push(Span::styled(
-                    format!(" +{:.1} CHA", cha_mod as f64 * 0.1),
-                    Style::default().fg(Color::Yellow),
-                ));
-            }
-            spans.push(Span::styled(
-                " \u{2192} ",
-                Style::default().fg(Color::DarkGray),
-            ));
-            spans.push(Span::styled(
-                format!("{:.2}x", effective_multiplier),
                 Style::default()
-                    .fg(Color::Green)
+                    .fg(Color::Rgb(255, 215, 0))
                     .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("\u{2014} ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("\u{00d7}{:.1} all combat stats", asc_mult),
+                Style::default().fg(Color::Rgb(255, 215, 0)),
+            ),
+        ]));
+    }
+    prestige_text.push(Line::from({
+        let mut spans = vec![
+            Span::styled("⚡ XP: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("{:.2}x", tier.multiplier),
+                Style::default().fg(Color::Cyan),
+            ),
+        ];
+        if cha_mod != 0 {
+            spans.push(Span::styled(
+                format!(" +{:.1} CHA", cha_mod as f64 * 0.1),
+                Style::default().fg(Color::Yellow),
             ));
-            spans
-        }),
-        Line::from(Span::styled(
-            unlock_hint,
+        }
+        spans.push(Span::styled(
+            " \u{2192} ",
             Style::default().fg(Color::DarkGray),
-        )),
-    ];
+        ));
+        spans.push(Span::styled(
+            format!("{:.2}x", effective_multiplier),
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ));
+        spans
+    }));
+    prestige_text.push(Line::from(Span::styled(
+        unlock_hint,
+        Style::default().fg(Color::DarkGray),
+    )));
 
     // Prestige level progress bar (next_prestige already computed above for unlock hint)
     let prestige_ratio =
@@ -255,35 +255,39 @@ pub(super) fn draw_prestige_info(
         .label(prestige_label)
         .ratio(prestige_ratio);
 
-    if inner.height >= 4 {
+    let text_count = prestige_text.len(); // 3 without ascension, 4 with
+    let total_rows = text_count + 1; // +1 for gauge
+
+    if inner.height as usize >= total_rows {
+        // Full layout: all text lines + gauge
+        let constraints: Vec<Constraint> = (0..total_rows).map(|_| Constraint::Length(1)).collect();
         let inner_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1),
-                Constraint::Length(1),
-                Constraint::Length(1),
-                Constraint::Length(1),
-            ])
+            .constraints(constraints)
             .split(inner);
 
-        frame.render_widget(Paragraph::new(prestige_text[0].clone()), inner_chunks[0]);
-        frame.render_widget(Paragraph::new(prestige_text[1].clone()), inner_chunks[1]);
-        frame.render_widget(Paragraph::new(prestige_text[2].clone()), inner_chunks[2]);
-        frame.render_widget(prestige_gauge, inner_chunks[3]);
+        for (i, line) in prestige_text.iter().enumerate() {
+            frame.render_widget(Paragraph::new(line.clone()), inner_chunks[i]);
+        }
+        frame.render_widget(prestige_gauge, inner_chunks[text_count]);
     } else if inner.height >= 3 {
-        // Fallback: skip unlock hint if not enough space
+        // Compact: rank + ascension (if present) + gauge, skip unlock hint and XP
+        let rows = inner.height as usize;
+        let constraints: Vec<Constraint> = (0..rows).map(|_| Constraint::Length(1)).collect();
         let inner_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1),
-                Constraint::Length(1),
-                Constraint::Length(1),
-            ])
+            .constraints(constraints)
             .split(inner);
 
+        // Always show rank (row 0) and gauge (last row)
         frame.render_widget(Paragraph::new(prestige_text[0].clone()), inner_chunks[0]);
-        frame.render_widget(Paragraph::new(prestige_text[1].clone()), inner_chunks[1]);
-        frame.render_widget(prestige_gauge, inner_chunks[2]);
+        // Fill middle rows with remaining text lines in order
+        for i in 1..rows - 1 {
+            if i < text_count {
+                frame.render_widget(Paragraph::new(prestige_text[i].clone()), inner_chunks[i]);
+            }
+        }
+        frame.render_widget(prestige_gauge, inner_chunks[rows - 1]);
     } else {
         // Show as many text lines as fit, rank first
         let lines_to_show = inner.height as usize;
