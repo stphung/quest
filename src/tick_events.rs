@@ -19,6 +19,7 @@ pub struct TickEventFlags {
     pub soulforge_discovered: bool,
     pub stormglass_discovered: bool,
     pub deep_discovered: bool,
+    #[allow(dead_code)]
     pub postgame_region_unlocked: Option<crate::zones::PostgameRegion>,
 }
 

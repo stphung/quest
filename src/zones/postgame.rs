@@ -10,6 +10,7 @@ pub enum PostgameRegion {
     BlackMouth,
 }
 
+#[allow(dead_code)]
 impl PostgameRegion {
     /// First zone ID in this region.
     pub fn start_zone_id(&self) -> u32 {

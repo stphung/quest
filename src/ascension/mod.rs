@@ -1,6 +1,8 @@
 //! Ascension system — per-character combat power multiplier gated by Deep milestones.
 
+#[allow(dead_code)]
 pub mod logic;
+#[allow(dead_code)]
 pub mod types;
 
 // Re-exports consumed by tick pipeline (Task 14), achievements (Task 13), and UI (Task 17)

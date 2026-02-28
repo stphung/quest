@@ -201,8 +201,11 @@ pub const LEVEL_UP_MAX_DISTRIBUTION_ATTEMPTS: u32 = 100;
 // Zone identifiers
 pub const FINAL_ZONE_ID: u32 = 10;
 pub const EXPANSE_ZONE_ID: u32 = 11;
+#[allow(dead_code)]
 pub const FIRST_POSTGAME_ZONE_ID: u32 = 12;
+#[allow(dead_code)]
 pub const LAST_POSTGAME_ZONE_ID: u32 = 20;
+#[allow(dead_code)]
 pub const POSTGAME_ZONE_STAT_MULTIPLIER: f64 = 1.6;
 
 // Ticks per second (reciprocal of TICK_INTERVAL_MS / 1000)

@@ -32,6 +32,7 @@ impl ZoneProgression {
     /// Returns a description of what happened (for UI feedback).
     ///
     /// Uses achievements to check for Stormbreaker and to unlock StormsEnd.
+    #[allow(dead_code)]
     pub fn on_boss_defeated(
         &mut self,
         prestige_rank: u32,
