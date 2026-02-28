@@ -108,6 +108,16 @@ fn get_zone_enemy_prefixes(zone_id: u32) -> &'static [&'static str] {
         18 => &["Char", "Gloam", "Ashen", "Cinder", "Veil"],
         19 => &["Maw", "Tooth", "Sable", "Gullet", "Windpipe"],
         20 => &["Void", "Jawbone", "Unlit", "First", "Mouth"],
+        21 => &["Amber", "Pilgrim", "Candlebone", "Crown", "Processional"],
+        22 => &["Index", "Sealed", "Theorem", "Pale", "Forbidden"],
+        23 => &["Echo", "Dust", "Obsidian", "Crowned", "Hollow"],
+        24 => &["Tideless", "Brine", "Stillborn", "Abyssal", "Salt"],
+        25 => &["Harmonic", "Choir", "Resonant", "Petrified", "Oscillating"],
+        26 => &["Fraying", "Liminal", "Static", "Flickering", "Wailing"],
+        27 => &["Root", "Splinter", "Taproot", "Fossilized", "Scar"],
+        28 => &["Echo", "Reverb", "Temporal", "Infinite", "Ancient"],
+        29 => &["Dimming", "Hushed", "Shadow", "Silent", "Final"],
+        30 => &["Fissure", "Primordial", "Wound", "Unbroken", "Origin"],
         _ => &["Wild", "Fierce", "Dark", "Savage", "Grim"],
     }
 }
@@ -212,6 +222,16 @@ fn get_zone_enemy_suffixes(zone_id: u32) -> &'static [&'static str] {
         18 => &["Wing", "Revenant", "Forger", "Giant", "Shade"],
         19 => &["Warden", "Behemoth", "Herd", "Devourer", "Judge"],
         20 => &["Hunger", "Colossus", "Choir", "Crawler", "Remnant"],
+        21 => &["Sentinel", "Warden", "Knight", "Colossus", "Procession"],
+        22 => &["Wraith", "Censor", "Construct", "Eater", "Archivist"],
+        23 => &["Warden", "Chancellor", "Guardian", "Absence", "Sovereign"],
+        24 => &["Wanderer", "Phantom", "Leviathan", "Depthless", "Mother"],
+        25 => &["Hound", "Dissonant", "Resonant", "Warden", "Chorus"],
+        26 => &["Stalker", "Undefined", "Bloom", "Flickerer", "Voice"],
+        27 => &["Creeper", "Horror", "Warden", "Rupture", "Root"],
+        28 => &["Echo", "Dweller", "Noise", "Once-Slain", "Reverberation"],
+        29 => &["Walker", "Muted", "Beast", "Frequency", "Warden"],
+        30 => &["Guardian", "Titan", "Unbroken", "Heart", "Final"],
         _ => &[
             "Beast",
             "Horror",
@@ -457,8 +477,8 @@ mod tests {
     }
 
     #[test]
-    fn test_postgame_zones_have_unique_prefixes() {
-        for zone_id in 12..=20 {
+    fn test_fracture_zones_have_unique_prefixes() {
+        for zone_id in 12..=30 {
             let prefixes = get_zone_enemy_prefixes(zone_id);
             assert!(
                 prefixes.len() >= 5,
@@ -476,8 +496,8 @@ mod tests {
     }
 
     #[test]
-    fn test_postgame_zones_have_unique_suffixes() {
-        for zone_id in 12..=20 {
+    fn test_fracture_zones_have_unique_suffixes() {
+        for zone_id in 12..=30 {
             let suffixes = get_zone_enemy_suffixes(zone_id);
             assert!(
                 suffixes.len() >= 5,

@@ -216,10 +216,10 @@ pub enum TickEvent {
     /// An achievement was unlocked during this tick.
     AchievementUnlocked { name: String, message: String },
 
-    // ── Postgame Zones ───────────────────────────────────────────
-    /// A postgame region was unlocked by a Deep breakthrough.
-    PostgameRegionUnlocked {
-        region: crate::zones::PostgameRegion,
+    // ── Fracture Zones ───────────────────────────────────────────
+    /// A fracture region was unlocked by a Deep breakthrough.
+    FractureRegionUnlocked {
+        region: crate::zones::FractureRegion,
         message: String,
     },
 

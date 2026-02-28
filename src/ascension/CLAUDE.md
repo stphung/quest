@@ -37,19 +37,19 @@ Returned by `ascend()`:
 
 | Level | Deep Gate | PR Cost | Cumulative Mult |
 |-------|-----------|---------|-----------------|
-| I | Layer 3 (Shallows) | 10 PR | 2x |
-| II | Layer 7 (Warrens) | 15 PR | 4x |
-| III | Layer 12 (Hollows) | 25 PR | 8x |
-| IV | Layer 18 (Sunken Reach) | 35 PR | 16x |
-| V | Layer 25 (Abyss) | 50 PR | 32x |
-| VI | Layer 30 (Gateway) | 65 PR | 64x |
-| VII+ | None (PR only) | 80+ PR (+15 each) | x1.5 each |
+| I | Layer 3 (Shallows) | 35 PR | 2x |
+| II | Layer 7 (Warrens) | 65 PR | 4x |
+| III | Layer 12 (Hollows) | 120 PR | 8x |
+| IV | Layer 18 (Sunken Reach) | 200 PR | 16x |
+| V | Layer 25 (Abyss) | 325 PR | 32x |
+| VI | Layer 30 (Gateway) | 500 PR | 64x |
+| VII+ | None (PR only) | 575+ PR (+75 each) | x1.5 each |
 
-Total PR for I-VI: 200 PR.
+Total PR for I-VI: 1,245 PR.
 
 ## Formulas
 
-- **Cost**: Levels 1-6 from lookup table `[10, 15, 25, 35, 50, 65]`; levels 7+ = `65 + 15 * (level - 6)`
+- **Cost**: Levels 1-6 from lookup table `[35, 65, 120, 200, 325, 500]`; levels 7+ = `500 + 75 * (level - 6)`
 - **Deep gate**: Levels 1-6 from lookup table `[3, 7, 12, 18, 25, 30]`; levels 7+ = no gate
 - **Multiplier**: Levels 1-6 = `2^level`; levels 7+ = `64 * 1.5^(level - 6)`
 

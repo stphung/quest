@@ -85,7 +85,10 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerDeepCompleteActiveMissions,
     DebugAction::UnlockDeepLayer(3),
     DebugAction::UnlockDeepLayer(7),
-    DebugAction::UnlockDeepLayer(13),
+    DebugAction::UnlockDeepLayer(12),
+    DebugAction::UnlockDeepLayer(18),
+    DebugAction::UnlockDeepLayer(25),
+    DebugAction::UnlockDeepLayer(30),
     // Zone travel actions
     DebugAction::TravelToZone(1),
     DebugAction::TravelToZone(2),
@@ -107,6 +110,16 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::TravelToZone(18),
     DebugAction::TravelToZone(19),
     DebugAction::TravelToZone(20),
+    DebugAction::TravelToZone(21),
+    DebugAction::TravelToZone(22),
+    DebugAction::TravelToZone(23),
+    DebugAction::TravelToZone(24),
+    DebugAction::TravelToZone(25),
+    DebugAction::TravelToZone(26),
+    DebugAction::TravelToZone(27),
+    DebugAction::TravelToZone(28),
+    DebugAction::TravelToZone(29),
+    DebugAction::TravelToZone(30),
     // Character actions (prestige, levels)
     DebugAction::SetPrestige(1),
     DebugAction::SetPrestige(5),
@@ -171,7 +184,10 @@ const DEEP_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerDeepCompleteActiveMissions,
     DebugAction::UnlockDeepLayer(3),
     DebugAction::UnlockDeepLayer(7),
-    DebugAction::UnlockDeepLayer(13),
+    DebugAction::UnlockDeepLayer(12),
+    DebugAction::UnlockDeepLayer(18),
+    DebugAction::UnlockDeepLayer(25),
+    DebugAction::UnlockDeepLayer(30),
 ];
 const ZONE_ACTIONS: &[DebugAction] = &[
     DebugAction::TravelToZone(1),
@@ -194,6 +210,16 @@ const ZONE_ACTIONS: &[DebugAction] = &[
     DebugAction::TravelToZone(18),
     DebugAction::TravelToZone(19),
     DebugAction::TravelToZone(20),
+    DebugAction::TravelToZone(21),
+    DebugAction::TravelToZone(22),
+    DebugAction::TravelToZone(23),
+    DebugAction::TravelToZone(24),
+    DebugAction::TravelToZone(25),
+    DebugAction::TravelToZone(26),
+    DebugAction::TravelToZone(27),
+    DebugAction::TravelToZone(28),
+    DebugAction::TravelToZone(29),
+    DebugAction::TravelToZone(30),
 ];
 const CHARACTER_ACTIONS: &[DebugAction] = &[
     DebugAction::SetPrestige(1),
@@ -268,12 +294,15 @@ impl DebugAction {
             Self::UnlockDeepLayer(layer) => match layer {
                 3 => 29,
                 7 => 30,
-                _ => 31, // 13
+                12 => 31,
+                18 => 32,
+                25 => 33,
+                _ => 34, // 30
             },
-            Self::TravelToZone(zone_id) => 32 + zone_id as usize - 1, // 32-51
-            Self::SetPrestige(amount) => 52 + set_value_index(amount),
-            Self::SetLevel(amount) => 62 + set_value_index(amount),
-            Self::MaxAttributes => 72,
+            Self::TravelToZone(zone_id) => 35 + zone_id as usize - 1, // 35-64
+            Self::SetPrestige(amount) => 65 + set_value_index(amount),
+            Self::SetLevel(amount) => 75 + set_value_index(amount),
+            Self::MaxAttributes => 85,
         }
     }
 
@@ -311,7 +340,10 @@ impl DebugAction {
             Self::UnlockDeepLayer(layer) => match layer {
                 3 => "Unlock Deep L3 (Red Fault)",
                 7 => "Unlock Deep L7 (Mirror Scar)",
-                _ => "Unlock Deep L13 (Black Mouth)",
+                12 => "Unlock Deep L12 (Black Mouth)",
+                18 => "Unlock Deep L18 (Hollow Throne)",
+                25 => "Unlock Deep L25 (Wailing Reach)",
+                _ => "Unlock Deep L30 (Origin Wound)",
             },
             Self::TravelToZone(zone_id) => match zone_id {
                 1 => "Travel to Meadow (Zone 1)",
@@ -334,6 +366,16 @@ impl DebugAction {
                 18 => "Travel to Ashen Verge (Zone 18)",
                 19 => "Travel to Throat of the World (Zone 19)",
                 20 => "Travel to The Black Mouth (Zone 20)",
+                21 => "Travel to Sunken Processional (Zone 21)",
+                22 => "Travel to The Pale Archive (Zone 22)",
+                23 => "Travel to The Hollow Throne (Zone 23)",
+                24 => "Travel to The Stillborn Sea (Zone 24)",
+                25 => "Travel to Resonance Fault (Zone 25)",
+                26 => "Travel to The Wailing Reach (Zone 26)",
+                27 => "Travel to The Scar Root (Zone 27)",
+                28 => "Travel to Echoing Abyss (Zone 28)",
+                29 => "Travel to Threshold of Silence (Zone 29)",
+                30 => "Travel to The Origin Wound (Zone 30)",
                 _ => "Travel to Unknown Zone",
             },
             Self::SetPrestige(amount) => match amount {
@@ -957,9 +999,12 @@ fn trigger_unlock_deep_layer(
     deep.prestige.pool_refreshed_at = Some(Utc::now());
 
     match target_layer {
-        3 => "Cleared to Deep L3 — Red Fault unlocked (Z12-14)!",
-        7 => "Cleared to Deep L7 — Mirror Scar unlocked (Z15-17)!",
-        13 => "Cleared to Deep L13 — Black Mouth unlocked (Z18-20)!",
+        3 => "Cleared to Deep L3 \u{2014} Red Fault unlocked (Z12-14)!",
+        7 => "Cleared to Deep L7 \u{2014} Mirror Scar unlocked (Z15-17)!",
+        12 => "Cleared to Deep L12 \u{2014} Black Mouth unlocked (Z18-20)!",
+        18 => "Cleared to Deep L18 \u{2014} Hollow Throne unlocked (Z21-23)!",
+        25 => "Cleared to Deep L25 \u{2014} Wailing Reach unlocked (Z24-26)!",
+        30 => "Cleared to Deep L30 \u{2014} Origin Wound unlocked (Z27-30)!",
         _ => "Deep layers cleared!",
     }
 }
@@ -1708,8 +1753,8 @@ mod tests {
     }
 
     #[test]
-    fn test_zones_category_has_20_options() {
-        assert_eq!(option_count_for_category(DebugCategory::Zones), 20);
+    fn test_zones_category_has_30_options() {
+        assert_eq!(option_count_for_category(DebugCategory::Zones), 30);
     }
 
     #[test]

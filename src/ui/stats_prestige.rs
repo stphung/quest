@@ -500,7 +500,7 @@ fn build_leviathan_trophy_line() -> Line<'static> {
 }
 
 /// Converts a small positive integer to a Roman numeral string.
-fn to_roman(n: u32) -> String {
+pub(crate) fn to_roman(n: u32) -> String {
     if n == 0 {
         return "0".to_string();
     }

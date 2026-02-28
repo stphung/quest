@@ -23,8 +23,8 @@ pub enum BossDefeatResult {
     WeaponRequired { weapon_name: String },
     /// Completed a cycle of The Expanse (Zone 11) - returns to subzone 1
     ExpanseCycle,
-    /// Completed a postgame cycle (cap zone loops) — returns to subzone 1
-    PostgameCycle { zone_id: u32 },
+    /// Completed a fracture cycle (cap zone loops) — returns to subzone 1
+    FractureCycle { zone_id: u32 },
 }
 
 impl ZoneProgression {
@@ -110,16 +110,16 @@ impl ZoneProgression {
         }
     }
 
-    /// Handles boss defeat with postgame zone cap awareness.
+    /// Handles boss defeat with fracture zone cap awareness.
     ///
-    /// `postgame_zone_cap` is the highest zone the player can access (from DeepPersistent).
+    /// `fracture_zone_cap` is the highest zone the player can access (from DeepPersistent).
     /// When the cap is 11, this behaves identically to `on_boss_defeated()`.
-    /// When higher, postgame zones advance forward until the cap zone, which cycles.
+    /// When higher, fracture zones advance forward until the cap zone, which cycles.
     pub fn on_boss_defeated_with_cap(
         &mut self,
         prestige_rank: u32,
         achievements: &mut Achievements,
-        postgame_zone_cap: u32,
+        fracture_zone_cap: u32,
     ) -> BossDefeatResult {
         let zone_id = self.current_zone_id;
         let subzone_id = self.current_subzone_id;
@@ -163,15 +163,15 @@ impl ZoneProgression {
             return BossDefeatResult::StormsEnd;
         }
 
-        // Zone 11 (Expanse) with no postgame unlocked: classic cycle
-        if zone_id == EXPANSE_ZONE_ID && postgame_zone_cap <= EXPANSE_ZONE_ID {
+        // Zone 11 (Expanse) with no fracture zones unlocked: classic cycle
+        if zone_id == EXPANSE_ZONE_ID && fracture_zone_cap <= EXPANSE_ZONE_ID {
             self.current_subzone_id = 1;
             self.kills_in_subzone = 0;
             return BossDefeatResult::ExpanseCycle;
         }
 
-        // Zone 11 (Expanse) with postgame unlocked: advance to zone 12
-        if zone_id == EXPANSE_ZONE_ID && postgame_zone_cap > EXPANSE_ZONE_ID {
+        // Zone 11 (Expanse) with fracture zones unlocked: advance to zone 12
+        if zone_id == EXPANSE_ZONE_ID && fracture_zone_cap > EXPANSE_ZONE_ID {
             let next = 12;
             if self.is_zone_unlocked(next) {
                 self.current_zone_id = next;
@@ -187,14 +187,14 @@ impl ZoneProgression {
             return BossDefeatResult::ExpanseCycle;
         }
 
-        // Current zone is the cap zone (postgame) — cycle
-        if zone_id == postgame_zone_cap && zone_id > EXPANSE_ZONE_ID {
+        // Current zone is the cap zone (fracture) — cycle
+        if zone_id == fracture_zone_cap && zone_id > EXPANSE_ZONE_ID {
             self.current_subzone_id = 1;
             self.kills_in_subzone = 0;
-            return BossDefeatResult::PostgameCycle { zone_id };
+            return BossDefeatResult::FractureCycle { zone_id };
         }
 
-        // Try to advance to next zone (works for both pre-game and postgame zones)
+        // Try to advance to next zone (works for both pre-game and fracture zones)
         if self.advance_to_next_zone(prestige_rank) {
             return BossDefeatResult::ZoneComplete {
                 old_zone: zone.name.to_string(),
@@ -217,7 +217,7 @@ impl ZoneProgression {
         self.current_subzone_id = 1;
         self.kills_in_subzone = 0;
         if zone_id > EXPANSE_ZONE_ID {
-            BossDefeatResult::PostgameCycle { zone_id }
+            BossDefeatResult::FractureCycle { zone_id }
         } else {
             BossDefeatResult::ExpanseCycle
         }

@@ -29,7 +29,7 @@ pub fn update_combat_facade<R: Rng>(
     bonuses: &CombatBonuses,
     achievements: &mut Achievements,
     derived: &DerivedStats,
-    postgame_zone_cap: u32,
+    fracture_zone_cap: u32,
 ) -> Vec<CombatEvent> {
     crate::combat::orchestration::update_combat(
         rng,
@@ -38,7 +38,7 @@ pub fn update_combat_facade<R: Rng>(
         bonuses,
         achievements,
         derived,
-        postgame_zone_cap,
+        fracture_zone_cap,
     )
 }
 

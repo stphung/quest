@@ -3,17 +3,17 @@ use quest::GameState;
 
 #[test]
 fn test_can_ascend_basic() {
-    // Level 0 -> 1: needs 10 PR and Deep layer 3
-    assert!(can_ascend(0, 10, 3));
-    assert!(!can_ascend(0, 9, 3)); // insufficient PR
-    assert!(!can_ascend(0, 10, 2)); // deep gate not met
+    // Level 0 -> 1: needs 35 PR and Deep layer 3
+    assert!(can_ascend(0, 35, 3));
+    assert!(!can_ascend(0, 34, 3)); // insufficient PR
+    assert!(!can_ascend(0, 35, 2)); // deep gate not met
 }
 
 #[test]
 fn test_can_ascend_level_7_no_deep_gate() {
-    // Level 6 -> 7: needs 80 PR, no Deep gate
-    assert!(can_ascend(6, 80, 0)); // deepest_layer doesn't matter
-    assert!(!can_ascend(6, 79, 30)); // PR insufficient
+    // Level 6 -> 7: needs 575 PR, no Deep gate
+    assert!(can_ascend(6, 575, 0)); // deepest_layer doesn't matter
+    assert!(!can_ascend(6, 574, 30)); // PR insufficient
 }
 
 #[test]
@@ -30,25 +30,25 @@ fn test_ascend_deducts_pr() {
             multiplier: 2.0
         }
     );
-    assert_eq!(state.prestige_rank, 40); // 50 - 10
+    assert_eq!(state.prestige_rank, 15); // 50 - 35
     assert_eq!(state.ascension_level, 1);
 }
 
 #[test]
 fn test_ascend_insufficient_pr() {
     let mut state = GameState::new("Test".to_string(), 0);
-    state.prestige_rank = 5;
+    state.prestige_rank = 30;
     state.ascension_level = 0;
 
     let result = ascend(&mut state, 3);
     assert_eq!(
         result,
         AscendResult::InsufficientPR {
-            needed: 10,
-            have: 5
+            needed: 35,
+            have: 30
         }
     );
-    assert_eq!(state.prestige_rank, 5); // unchanged
+    assert_eq!(state.prestige_rank, 30); // unchanged
     assert_eq!(state.ascension_level, 0); // unchanged
 }
 

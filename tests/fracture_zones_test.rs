@@ -1,4 +1,4 @@
-//! Integration tests for postgame zone boss defeat and cycling logic.
+//! Integration tests for fracture zone boss defeat and cycling logic.
 
 use quest::achievements::Achievements;
 use quest::core::constants::{EXPANSE_ZONE_ID, KILLS_FOR_BOSS};
@@ -37,7 +37,7 @@ fn test_zone_11_boss_with_cap_14_advances_to_zone_12() {
 }
 
 #[test]
-fn test_zone_14_boss_with_cap_14_returns_postgame_cycle() {
+fn test_zone_14_boss_with_cap_14_returns_fracture_cycle() {
     let mut prog = ZoneProgression::new();
     let mut achievements = Achievements::default();
     prog.current_zone_id = 14;
@@ -46,7 +46,7 @@ fn test_zone_14_boss_with_cap_14_returns_postgame_cycle() {
     prog.fighting_boss = true;
 
     let result = prog.on_boss_defeated_with_cap(20, &mut achievements, 14);
-    assert_eq!(result, BossDefeatResult::PostgameCycle { zone_id: 14 });
+    assert_eq!(result, BossDefeatResult::FractureCycle { zone_id: 14 });
     assert_eq!(prog.current_subzone_id, 1);
 }
 
@@ -70,7 +70,7 @@ fn test_zone_14_boss_with_cap_17_advances_to_zone_15() {
 }
 
 #[test]
-fn test_zone_20_boss_with_cap_20_returns_postgame_cycle() {
+fn test_zone_20_boss_with_cap_20_returns_fracture_cycle() {
     let mut prog = ZoneProgression::new();
     let mut achievements = Achievements::default();
     prog.current_zone_id = 20;
@@ -79,11 +79,110 @@ fn test_zone_20_boss_with_cap_20_returns_postgame_cycle() {
     prog.fighting_boss = true;
 
     let result = prog.on_boss_defeated_with_cap(50, &mut achievements, 20);
-    assert_eq!(result, BossDefeatResult::PostgameCycle { zone_id: 20 });
+    assert_eq!(result, BossDefeatResult::FractureCycle { zone_id: 20 });
 }
 
 #[test]
-fn test_postgame_subzone_advance() {
+fn test_zone_20_boss_with_cap_23_advances_to_zone_21() {
+    let mut prog = ZoneProgression::new();
+    let mut achievements = Achievements::default();
+    prog.current_zone_id = 20;
+    prog.current_subzone_id = 5;
+    prog.unlock_zone(20);
+    prog.unlock_zone(21);
+    prog.fighting_boss = true;
+
+    let result = prog.on_boss_defeated_with_cap(50, &mut achievements, 23);
+    match result {
+        BossDefeatResult::ZoneComplete { new_zone_id, .. } => {
+            assert_eq!(new_zone_id, 21);
+        }
+        _ => panic!("Expected ZoneComplete to zone 21, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_zone_23_boss_with_cap_23_returns_fracture_cycle() {
+    let mut prog = ZoneProgression::new();
+    let mut achievements = Achievements::default();
+    prog.current_zone_id = 23;
+    prog.current_subzone_id = 5;
+    prog.unlock_zone(23);
+    prog.fighting_boss = true;
+
+    let result = prog.on_boss_defeated_with_cap(50, &mut achievements, 23);
+    assert_eq!(result, BossDefeatResult::FractureCycle { zone_id: 23 });
+    assert_eq!(prog.current_subzone_id, 1);
+}
+
+#[test]
+fn test_zone_23_boss_with_cap_26_advances_to_zone_24() {
+    let mut prog = ZoneProgression::new();
+    let mut achievements = Achievements::default();
+    prog.current_zone_id = 23;
+    prog.current_subzone_id = 5;
+    prog.unlock_zone(23);
+    prog.unlock_zone(24);
+    prog.fighting_boss = true;
+
+    let result = prog.on_boss_defeated_with_cap(50, &mut achievements, 26);
+    match result {
+        BossDefeatResult::ZoneComplete { new_zone_id, .. } => {
+            assert_eq!(new_zone_id, 24);
+        }
+        _ => panic!("Expected ZoneComplete to zone 24, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_zone_26_boss_with_cap_26_returns_fracture_cycle() {
+    let mut prog = ZoneProgression::new();
+    let mut achievements = Achievements::default();
+    prog.current_zone_id = 26;
+    prog.current_subzone_id = 5;
+    prog.unlock_zone(26);
+    prog.fighting_boss = true;
+
+    let result = prog.on_boss_defeated_with_cap(50, &mut achievements, 26);
+    assert_eq!(result, BossDefeatResult::FractureCycle { zone_id: 26 });
+    assert_eq!(prog.current_subzone_id, 1);
+}
+
+#[test]
+fn test_zone_26_boss_with_cap_30_advances_to_zone_27() {
+    let mut prog = ZoneProgression::new();
+    let mut achievements = Achievements::default();
+    prog.current_zone_id = 26;
+    prog.current_subzone_id = 5;
+    prog.unlock_zone(26);
+    prog.unlock_zone(27);
+    prog.fighting_boss = true;
+
+    let result = prog.on_boss_defeated_with_cap(50, &mut achievements, 30);
+    match result {
+        BossDefeatResult::ZoneComplete { new_zone_id, .. } => {
+            assert_eq!(new_zone_id, 27);
+        }
+        _ => panic!("Expected ZoneComplete to zone 27, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_zone_30_boss_with_cap_30_returns_fracture_cycle() {
+    let mut prog = ZoneProgression::new();
+    let mut achievements = Achievements::default();
+    prog.current_zone_id = 30;
+    prog.current_subzone_id = 5;
+    prog.unlock_zone(30);
+    prog.fighting_boss = true;
+
+    let result = prog.on_boss_defeated_with_cap(50, &mut achievements, 30);
+    assert_eq!(result, BossDefeatResult::FractureCycle { zone_id: 30 });
+    assert_eq!(prog.current_subzone_id, 1);
+}
+
+#[test]
+fn test_fracture_subzone_advance() {
     let mut prog = ZoneProgression::new();
     let mut achievements = Achievements::default();
     prog.current_zone_id = 12;
@@ -120,7 +219,7 @@ fn test_zone_12_boss_advances_to_13() {
 }
 
 #[test]
-fn test_zone_17_boss_with_cap_17_returns_postgame_cycle() {
+fn test_zone_17_boss_with_cap_17_returns_fracture_cycle() {
     let mut prog = ZoneProgression::new();
     let mut achievements = Achievements::default();
     prog.current_zone_id = 17;
@@ -129,7 +228,7 @@ fn test_zone_17_boss_with_cap_17_returns_postgame_cycle() {
     prog.fighting_boss = true;
 
     let result = prog.on_boss_defeated_with_cap(50, &mut achievements, 17);
-    assert_eq!(result, BossDefeatResult::PostgameCycle { zone_id: 17 });
+    assert_eq!(result, BossDefeatResult::FractureCycle { zone_id: 17 });
     assert_eq!(prog.current_subzone_id, 1);
 }
 
@@ -153,7 +252,7 @@ fn test_zone_17_boss_with_cap_20_advances_to_zone_18() {
 }
 
 #[test]
-fn test_postgame_cycle_resets_kills_and_subzone() {
+fn test_fracture_cycle_resets_kills_and_subzone() {
     let mut prog = ZoneProgression::new();
     let mut achievements = Achievements::default();
     prog.current_zone_id = 14;
@@ -163,7 +262,7 @@ fn test_postgame_cycle_resets_kills_and_subzone() {
     prog.fighting_boss = true;
 
     let result = prog.on_boss_defeated_with_cap(20, &mut achievements, 14);
-    assert_eq!(result, BossDefeatResult::PostgameCycle { zone_id: 14 });
+    assert_eq!(result, BossDefeatResult::FractureCycle { zone_id: 14 });
     assert_eq!(prog.current_subzone_id, 1);
     assert_eq!(prog.kills_in_subzone, 0);
 }

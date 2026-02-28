@@ -5,20 +5,20 @@ use crate::core::constants::EXPANSE_ZONE_ID;
 
 /// Synchronize zone unlocks from account-level state.
 ///
-/// Called at: character load, prestige reset, StormsEnd, postgame region unlock.
+/// Called at: character load, prestige reset, StormsEnd, fracture region unlock.
 ///
 /// - If `storms_end_unlocked`, unlocks Zone 11
-/// - Unlocks every zone in `12..=postgame_zone_cap`
+/// - Unlocks every zone in `12..=fracture_zone_cap`
 /// - Never unlocks above cap, never removes earlier unlocks
 pub fn sync_account_zone_unlocks(
     prog: &mut ZoneProgression,
     storms_end_unlocked: bool,
-    postgame_zone_cap: u32,
+    fracture_zone_cap: u32,
 ) {
     if storms_end_unlocked {
         prog.unlock_zone(EXPANSE_ZONE_ID);
     }
-    for zone_id in 12..=postgame_zone_cap {
+    for zone_id in 12..=fracture_zone_cap {
         prog.unlock_zone(zone_id);
     }
 }
@@ -53,7 +53,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sync_unlocks_all_postgame_when_cap_20() {
+    fn test_sync_unlocks_all_fracture_when_cap_20() {
         let mut prog = ZoneProgression::new();
         sync_account_zone_unlocks(&mut prog, true, 20);
         for z in 11..=20 {

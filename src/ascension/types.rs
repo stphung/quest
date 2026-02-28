@@ -1,7 +1,7 @@
 //! Ascension system constants and helper types.
 
 /// PR cost lookup for Ascension levels 1-6.
-const ASCENSION_COSTS: [u32; 6] = [10, 15, 25, 35, 50, 65];
+const ASCENSION_COSTS: [u32; 6] = [35, 65, 120, 200, 325, 500];
 
 /// Deep layer gate lookup for Ascension levels 1-6.
 const ASCENSION_DEEP_GATES: [u32; 6] = [3, 7, 12, 18, 25, 30];
@@ -11,7 +11,7 @@ pub fn ascension_cost(level: u32) -> u32 {
     if (1..=6).contains(&level) {
         ASCENSION_COSTS[(level - 1) as usize]
     } else if level > 6 {
-        65 + 15 * (level - 6)
+        500 + 75 * (level - 6)
     } else {
         0
     }
@@ -44,19 +44,19 @@ mod tests {
 
     #[test]
     fn test_ascension_cost_levels_1_through_6() {
-        assert_eq!(ascension_cost(1), 10);
-        assert_eq!(ascension_cost(2), 15);
-        assert_eq!(ascension_cost(3), 25);
-        assert_eq!(ascension_cost(4), 35);
-        assert_eq!(ascension_cost(5), 50);
-        assert_eq!(ascension_cost(6), 65);
+        assert_eq!(ascension_cost(1), 35);
+        assert_eq!(ascension_cost(2), 65);
+        assert_eq!(ascension_cost(3), 120);
+        assert_eq!(ascension_cost(4), 200);
+        assert_eq!(ascension_cost(5), 325);
+        assert_eq!(ascension_cost(6), 500);
     }
 
     #[test]
     fn test_ascension_cost_level_7_plus() {
-        assert_eq!(ascension_cost(7), 80); // 65 + 15*(7-6) = 80
-        assert_eq!(ascension_cost(8), 95); // 65 + 15*(8-6) = 95
-        assert_eq!(ascension_cost(10), 125); // 65 + 15*(10-6) = 125
+        assert_eq!(ascension_cost(7), 575); // 500 + 75*(7-6) = 575
+        assert_eq!(ascension_cost(8), 650); // 500 + 75*(8-6) = 650
+        assert_eq!(ascension_cost(10), 800); // 500 + 75*(10-6) = 800
     }
 
     #[test]
@@ -95,6 +95,6 @@ mod tests {
     #[test]
     fn test_total_pr_for_levels_1_through_6() {
         let total: u32 = (1..=6).map(ascension_cost).sum();
-        assert_eq!(total, 200);
+        assert_eq!(total, 1245);
     }
 }

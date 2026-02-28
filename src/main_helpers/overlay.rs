@@ -195,6 +195,18 @@ pub fn draw_game_overlays(
         GameOverlay::DeepDiscovery => {
             ui::deep_scene::render_deep_discovery_modal(frame, area, ctx);
         }
+        GameOverlay::FractureRegionUnlock { region } => {
+            ui::combat_scene::render_fracture_region_unlock_modal(
+                frame,
+                area,
+                *region,
+                state.ascension_level,
+                ctx,
+            );
+        }
+        GameOverlay::AscensionConfirm => {
+            ui::ascension_scene::render_ascension_confirm(frame, area, state, deep_state, ctx);
+        }
         GameOverlay::None => {}
     }
 

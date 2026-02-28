@@ -91,6 +91,12 @@ pub enum GameOverlay {
     StormglassDiscovery,
     /// The Deep discovery celebration modal
     DeepDiscovery,
+    /// Fracture region unlock celebration modal
+    FractureRegionUnlock {
+        region: crate::zones::FractureRegion,
+    },
+    /// Ascension confirmation dialog
+    AscensionConfirm,
     /// Quit confirmation when pending challenges exist
     QuitConfirm,
     /// Bug report overlay with game state summary

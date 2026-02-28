@@ -117,6 +117,69 @@ fn test_layer_12_breakthrough_sets_cap_to_20() {
 }
 
 #[test]
+fn test_layer_18_breakthrough_sets_cap_to_23() {
+    let mut deep = DeepState::new();
+    deep.persistent.discovered = true;
+    deep.persistent.fracture_zone_cap = 20;
+
+    if let Some(region) = FractureRegion::from_layer(18) {
+        let new_cap = region.end_zone_id();
+        if new_cap > deep.persistent.fracture_zone_cap {
+            deep.persistent.fracture_zone_cap = new_cap;
+            deep.persistent.pending_fracture_region_unlock = Some(region);
+        }
+    }
+
+    assert_eq!(deep.persistent.fracture_zone_cap, 23);
+    assert_eq!(
+        deep.persistent.pending_fracture_region_unlock,
+        Some(FractureRegion::HollowThrone)
+    );
+}
+
+#[test]
+fn test_layer_25_breakthrough_sets_cap_to_26() {
+    let mut deep = DeepState::new();
+    deep.persistent.discovered = true;
+    deep.persistent.fracture_zone_cap = 23;
+
+    if let Some(region) = FractureRegion::from_layer(25) {
+        let new_cap = region.end_zone_id();
+        if new_cap > deep.persistent.fracture_zone_cap {
+            deep.persistent.fracture_zone_cap = new_cap;
+            deep.persistent.pending_fracture_region_unlock = Some(region);
+        }
+    }
+
+    assert_eq!(deep.persistent.fracture_zone_cap, 26);
+    assert_eq!(
+        deep.persistent.pending_fracture_region_unlock,
+        Some(FractureRegion::WailingReach)
+    );
+}
+
+#[test]
+fn test_layer_30_breakthrough_sets_cap_to_30() {
+    let mut deep = DeepState::new();
+    deep.persistent.discovered = true;
+    deep.persistent.fracture_zone_cap = 26;
+
+    if let Some(region) = FractureRegion::from_layer(30) {
+        let new_cap = region.end_zone_id();
+        if new_cap > deep.persistent.fracture_zone_cap {
+            deep.persistent.fracture_zone_cap = new_cap;
+            deep.persistent.pending_fracture_region_unlock = Some(region);
+        }
+    }
+
+    assert_eq!(deep.persistent.fracture_zone_cap, 30);
+    assert_eq!(
+        deep.persistent.pending_fracture_region_unlock,
+        Some(FractureRegion::OriginWound)
+    );
+}
+
+#[test]
 fn test_repeated_breakthrough_does_not_downgrade_cap() {
     let mut deep = DeepState::new();
     deep.persistent.fracture_zone_cap = 17;
@@ -163,14 +226,14 @@ fn test_non_unlock_layer_does_nothing() {
 // Unlike the unit tests above which re-implement the logic inline, these call
 // game_tick() and verify end-to-end behavior.
 
-/// Create an overpowered mercenary assigned to a mission.
-fn test_merc(id: u64, mission_id: u64) -> Mercenary {
+/// Create a mercenary with specified power assigned to a mission.
+fn test_merc_with_power(id: u64, mission_id: u64, power: u32) -> Mercenary {
     Mercenary {
         id,
         name: format!("TestMerc{}", id),
         archetype: MercArchetype::Vanguard,
-        power: 500, // Way above any layer threshold for guaranteed success
-        resilience: 500,
+        power,
+        resilience: power,
         expertise: 100,
         level: 1,
         missions_completed: 0,
@@ -196,9 +259,8 @@ fn elapsed_breakthrough(id: u64, layer: u32, squad: Vec<u64>) -> Mission {
     }
 }
 
-/// Set up a DeepState with a single elapsed Breakthrough mission on the given layer.
-/// Returns (deep, mission_id) so the caller can verify post-tick state.
-fn deep_with_breakthrough(layer: u32, initial_cap: u32) -> DeepState {
+/// Set up a DeepState with a single elapsed Breakthrough mission and specified merc power.
+fn deep_with_breakthrough_power(layer: u32, initial_cap: u32, merc_power: u32) -> DeepState {
     let mut deep = DeepState::new();
     deep.persistent.discovered = true;
     deep.persistent.fracture_zone_cap = initial_cap;
@@ -206,8 +268,12 @@ fn deep_with_breakthrough(layer: u32, initial_cap: u32) -> DeepState {
     deep.persistent.mission_id_counter = 2;
 
     let mission_id = 1;
-    deep.prestige.roster.push(test_merc(1, mission_id));
-    deep.prestige.roster.push(test_merc(2, mission_id));
+    deep.prestige
+        .roster
+        .push(test_merc_with_power(1, mission_id, merc_power));
+    deep.prestige
+        .roster
+        .push(test_merc_with_power(2, mission_id, merc_power));
     deep.prestige
         .active_missions
         .push(elapsed_breakthrough(mission_id, layer, vec![1, 2]));
@@ -222,6 +288,15 @@ fn run_tick_with_successful_breakthrough(
     layer: u32,
     initial_cap: u32,
 ) -> (GameState, DeepState, Achievements, Vec<TickEvent>) {
+    run_tick_with_successful_breakthrough_power(layer, initial_cap, 500)
+}
+
+/// Run game_tick with specified merc power and find a seed that produces a successful Breakthrough.
+fn run_tick_with_successful_breakthrough_power(
+    layer: u32,
+    initial_cap: u32,
+    merc_power: u32,
+) -> (GameState, DeepState, Achievements, Vec<TickEvent>) {
     for seed in 0..20 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let mut state = GameState::new("FractureTest".to_string(), 0);
@@ -229,7 +304,7 @@ fn run_tick_with_successful_breakthrough(
         let mut haven = Haven::default();
         let mut enhancement = EnhancementProgress::new();
         let mut achievements = Achievements::default();
-        let mut deep = deep_with_breakthrough(layer, initial_cap);
+        let mut deep = deep_with_breakthrough_power(layer, initial_cap, merc_power);
 
         let mut ctx = TickContext {
             state: &mut state,
@@ -326,6 +401,82 @@ fn test_game_tick_layer_12_breakthrough_unlocks_black_mouth() {
     assert!(state.zone_progression.is_zone_unlocked(18));
     assert!(state.zone_progression.is_zone_unlocked(19));
     assert!(state.zone_progression.is_zone_unlocked(20));
+    assert!(!state.zone_progression.is_zone_unlocked(21));
+}
+
+#[test]
+fn test_game_tick_layer_18_breakthrough_unlocks_hollow_throne() {
+    // Layer 18 breakthrough threshold is 495, use 2000 power for guaranteed success
+    let (state, deep, _achievements, events) =
+        run_tick_with_successful_breakthrough_power(18, 20, 2000);
+
+    assert_eq!(deep.persistent.fracture_zone_cap, 23);
+    assert!(deep.persistent.pending_fracture_region_unlock.is_none());
+
+    let fracture_events: Vec<_> = events
+        .iter()
+        .filter_map(|e| match e {
+            TickEvent::FractureRegionUnlocked { region, .. } => Some(region),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(fracture_events.len(), 1);
+    assert_eq!(*fracture_events[0], FractureRegion::HollowThrone);
+
+    assert!(state.zone_progression.is_zone_unlocked(21));
+    assert!(state.zone_progression.is_zone_unlocked(22));
+    assert!(state.zone_progression.is_zone_unlocked(23));
+    assert!(!state.zone_progression.is_zone_unlocked(24));
+}
+
+#[test]
+fn test_game_tick_layer_25_breakthrough_unlocks_wailing_reach() {
+    // Layer 25 breakthrough threshold is 930, use 5000 power for guaranteed success
+    let (state, deep, _achievements, events) =
+        run_tick_with_successful_breakthrough_power(25, 23, 5000);
+
+    assert_eq!(deep.persistent.fracture_zone_cap, 26);
+    assert!(deep.persistent.pending_fracture_region_unlock.is_none());
+
+    let fracture_events: Vec<_> = events
+        .iter()
+        .filter_map(|e| match e {
+            TickEvent::FractureRegionUnlocked { region, .. } => Some(region),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(fracture_events.len(), 1);
+    assert_eq!(*fracture_events[0], FractureRegion::WailingReach);
+
+    assert!(state.zone_progression.is_zone_unlocked(24));
+    assert!(state.zone_progression.is_zone_unlocked(25));
+    assert!(state.zone_progression.is_zone_unlocked(26));
+    assert!(!state.zone_progression.is_zone_unlocked(27));
+}
+
+#[test]
+fn test_game_tick_layer_30_breakthrough_unlocks_origin_wound() {
+    // Layer 30 is Void tier (700 + 60*5 = 1000 threshold), use 5000 power
+    let (state, deep, _achievements, events) =
+        run_tick_with_successful_breakthrough_power(30, 26, 5000);
+
+    assert_eq!(deep.persistent.fracture_zone_cap, 30);
+    assert!(deep.persistent.pending_fracture_region_unlock.is_none());
+
+    let fracture_events: Vec<_> = events
+        .iter()
+        .filter_map(|e| match e {
+            TickEvent::FractureRegionUnlocked { region, .. } => Some(region),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(fracture_events.len(), 1);
+    assert_eq!(*fracture_events[0], FractureRegion::OriginWound);
+
+    assert!(state.zone_progression.is_zone_unlocked(27));
+    assert!(state.zone_progression.is_zone_unlocked(28));
+    assert!(state.zone_progression.is_zone_unlocked(29));
+    assert!(state.zone_progression.is_zone_unlocked(30));
 }
 
 #[test]
@@ -338,7 +489,7 @@ fn test_game_tick_layer_5_breakthrough_emits_no_fracture_event() {
         let mut haven = Haven::default();
         let mut enhancement = EnhancementProgress::new();
         let mut achievements = Achievements::default();
-        let mut deep = deep_with_breakthrough(5, 11);
+        let mut deep = deep_with_breakthrough_power(5, 11, 500);
 
         let mut ctx = TickContext {
             state: &mut state,

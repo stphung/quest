@@ -136,16 +136,26 @@ pub enum AchievementId {
     // The Expanse achievement
     BeyondInfinity, // Complete a cycle of The Expanse
 
-    // Postgame zone completion achievements (zones 12-20)
-    PostgameZone12, // Rimbreaker
-    PostgameZone13, // Cinderfall
-    PostgameZone14, // Heart Piercer
-    PostgameZone15, // Shard Breaker
-    PostgameZone16, // Light Bender
-    PostgameZone17, // Sunslayer
-    PostgameZone18, // Ashen Sentinel
-    PostgameZone19, // Throat Runner
-    PostgameZone20, // Maw Closer
+    // Fracture zone completion achievements (zones 12-20)
+    FractureZone12, // Rimbreaker
+    FractureZone13, // Cinderfall
+    FractureZone14, // Heart Piercer
+    FractureZone15, // Shard Breaker
+    FractureZone16, // Light Bender
+    FractureZone17, // Sunslayer
+    FractureZone18, // Ashen Sentinel
+    FractureZone19, // Throat Runner
+    FractureZone20, // Maw Closer
+    FractureZone21, // Amber March
+    FractureZone22, // Pale Scholar
+    FractureZone23, // Thronebreaker
+    FractureZone24, // Stillwater
+    FractureZone25, // Resonance Breaker
+    FractureZone26, // Edge Walker
+    FractureZone27, // Scar Render
+    FractureZone28, // Echo Silencer
+    FractureZone29, // Last Listener
+    FractureZone30, // Wound Closer
     // Ascension milestone achievements
     AscensionI,   // First Ascension
     AscensionIII, // Deepborn
@@ -289,7 +299,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 194;
+    pub const VARIANT_COUNT: usize = 204;
 }
 
 /// Static definition of an achievement.

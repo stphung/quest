@@ -285,21 +285,21 @@ pub(super) fn draw_zone_info(
     }
 
     // Dot track: ● = completed (green), ○ = current (yellow), · = unlocked (white), · = locked (gray)
-    let max_postgame_zone = (12..=20u32)
+    let max_fracture_zone = (12..=20u32)
         .rev()
         .find(|&zid| prog.is_zone_unlocked(zid))
         .unwrap_or(0);
 
     let mut dot_spans: Vec<Span> = Vec::new();
     let last_base_zone = 11u32;
-    let zone_range: Vec<u32> = if max_postgame_zone >= 12 {
-        (1..=last_base_zone).chain(12..=max_postgame_zone).collect()
+    let zone_range: Vec<u32> = if max_fracture_zone >= 12 {
+        (1..=last_base_zone).chain(12..=max_fracture_zone).collect()
     } else {
         (1..=last_base_zone).collect()
     };
 
     for (i, &zid) in zone_range.iter().enumerate() {
-        // Separator between base and postgame
+        // Separator between base and fracture
         if zid == 12 {
             dot_spans.push(Span::styled(
                 " \u{2502} ",
@@ -819,6 +819,15 @@ pub fn draw_footer(
         Span::styled("[A] Achievements", Style::default().fg(Color::Magenta))
     };
 
+    let ascend_text = if !matches!(deep_indicator, DeepIndicatorStatus::Hidden) {
+        Span::styled(
+            "    [U] Ascend",
+            Style::default().fg(Color::Rgb(255, 215, 0)),
+        )
+    } else {
+        Span::raw("")
+    };
+
     let footer_text = vec![
         Line::from(vec![
             prestige_text,
@@ -831,6 +840,7 @@ pub fn draw_footer(
         Line::from(vec![
             achievements_text,
             Span::styled("    [T] Time Vault", Style::default().fg(Color::Cyan)),
+            ascend_text,
             Span::styled("    [W] Wiki", Style::default().fg(Color::DarkGray)),
             Span::styled("    [!] Bug", Style::default().fg(Color::DarkGray)),
         ]),

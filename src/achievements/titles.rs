@@ -230,6 +230,11 @@ pub const ALL_TITLES: &[TitleDef] = &[
         achievement_id: AchievementId::SoulforgeAscendant,
         title_text: "Soulforged",
     },
+    // Fracture Zones
+    TitleDef {
+        achievement_id: AchievementId::FractureZone30,
+        title_text: "Wound Closer",
+    },
     // The Deep
     TitleDef {
         achievement_id: AchievementId::GuildRank5,

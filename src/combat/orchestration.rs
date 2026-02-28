@@ -17,7 +17,7 @@ pub fn update_combat<R: Rng>(
     bonuses: &CombatBonuses,
     achievements: &mut crate::achievements::Achievements,
     derived: &DerivedStats,
-    postgame_zone_cap: u32,
+    fracture_zone_cap: u32,
 ) -> Vec<CombatEvent> {
     let mut events = Vec::new();
 
@@ -70,7 +70,7 @@ pub fn update_combat<R: Rng>(
             bonuses,
             achievements,
             derived,
-            postgame_zone_cap,
+            fracture_zone_cap,
         );
         events.extend(attack_events);
         if enemy_died {
@@ -86,7 +86,7 @@ pub fn update_combat<R: Rng>(
             bonuses,
             achievements,
             derived,
-            postgame_zone_cap,
+            fracture_zone_cap,
         );
         events.extend(attack_events);
     }

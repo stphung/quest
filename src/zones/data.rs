@@ -1085,7 +1085,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             description: "The surface has stopped merely breaking. It has opened wide enough to show hunger.",
             prestige_requirement: 0,
             min_level: 285,
-            max_level: u32::MAX,
+            max_level: 300,
             requires_weapon: false,
             weapon_name: None,
             subzones: vec![
@@ -1141,10 +1141,633 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 },
             ],
         },
+        // ── Chapter 4: The Hollow Throne (Zones 21-23) ─────────────────
+        Zone {
+            id: 21,
+            name: "Sunken Processional",
+            description: "A grand ceremonial road descending into a buried kingdom. The walls are crystallized amber. Faded grandeur preserved in perfect silence.",
+            prestige_requirement: 0,
+            min_level: 300,
+            max_level: 315,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Pilgrim's Descent",
+                    description: "A spiraling road worn smooth by countless feet that walked it before the world above existed.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Processional Sentinel",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Amber Gallery",
+                    description: "The walls are thick with fossilized amber. Shapes move inside it \u{2014} not insects, but people.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Entombed Warden",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Candlebone Walk",
+                    description: "Pillars of luminescent bone light the way. They have burned for longer than living memory.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Tallow Knight",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Crown Gate",
+                    description: "A gate carved from a single gemstone the size of a cathedral. It is open. It was never meant to be.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Gate Colossus",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "Sunken Processional",
+                    description: "The road ends at a vast courtyard. The sky above is stone. The silence is absolute.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Stone Procession",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 22,
+            name: "The Pale Archive",
+            description: "Libraries of crystallized knowledge carved into burial niches. Each niche holds a crystal tablet instead of a body. The guardians here protect not from invasion but from understanding.",
+            prestige_requirement: 0,
+            min_level: 315,
+            max_level: 330,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Index Catacombs",
+                    description: "Endless shelves carved into burial niches. Each holds a crystal tablet instead of a body.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Scroll Wraith",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Hall of Sealed Words",
+                    description: "Words too dangerous to speak are preserved here in solid form. They hum.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "The Censor",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Theorem Vault",
+                    description: "Mathematical proofs have crystallized into physical objects. Some of them are wrong. Those ones move.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Paradox Construct",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "The Forbidden Index",
+                    description: "The section that was locked when the kingdom still lived. The lock is broken now.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Memory Eater",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Pale Archive",
+                    description: "The central reading room. The tablets here contain the kingdom's final entry. It is one word, repeated.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Archivist Eternal",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 23,
+            name: "The Hollow Throne",
+            description: "The seat of power. The palace is intact but empty. Whatever sat here left willingly \u{2014} or was removed. The room defends its throne as though something still sits there.",
+            prestige_requirement: 0,
+            min_level: 330,
+            max_level: 345,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Antechamber of Echoes",
+                    description: "A waiting room where visitors once stood. Their conversations still play on loop.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Echo Warden",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Council of Dust",
+                    description: "A round table where advisors sat. Their chairs hold impressions. Their dust holds opinions.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "The Dustbound Chancellor",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Royal Causeway",
+                    description: "A bridge of polished obsidian leading to the inner sanctum. It reflects nothing.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Void Mirror Guardian",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Coronation Steps",
+                    description: "Steps leading to the throne. Each is engraved with a name. The final name has been scratched out.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "The Crowned Absence",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Hollow Throne",
+                    description: "The throne is empty but the room defends it as though something still sits there.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Hollow Sovereign",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        // ── Chapter 5: The Wailing Reach (Zones 24-26) ─────────────────
+        Zone {
+            id: 24,
+            name: "The Stillborn Sea",
+            description: "An underground ocean that never came alive. No waves, no life, no temperature. Walking on its surface is like walking on solid grief.",
+            prestige_requirement: 0,
+            min_level: 345,
+            max_level: 360,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Tideless Shore",
+                    description: "A beach of grey sand touching water that has never moved. No wind has ever blown here.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Drowned Wanderer",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Salt Meridian",
+                    description: "A line of crystallized salt runs across the sea. On either side, the water is different colors.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Brine Phantom",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "The Unborn Reef",
+                    description: "Coral formations that grew and then stopped. They are shaped like things that were never alive.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Calcified Leviathan",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Abyssal Shelf",
+                    description: "The sea floor drops away into depths that have no bottom. The water below is not water.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "The Depthless",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Stillborn Sea",
+                    description: "The center of the sea. The water is perfectly transparent. What lies beneath is visible and should not be.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "Mother of Still Waters",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 25,
+            name: "Resonance Fault",
+            description: "Sound has crystallized into physical structures. Footsteps create visible ripples. Voices from ages past still echo, frozen in crystal.",
+            prestige_requirement: 0,
+            min_level: 360,
+            max_level: 375,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Harmonic Crust",
+                    description: "The ground vibrates at a frequency just below hearing. Your teeth ache. Your bones hum.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Frequency Hound",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Choir Stone",
+                    description: "Stone pillars that sing when the wind passes through. There is no wind.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "The Dissonant",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Oscillation Bridge",
+                    description: "A bridge that exists only when a specific note is sustained. Silence drops you into nothing.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Null Resonant",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "The Petrified Scream",
+                    description: "A scream from millennia ago, frozen in crystal. It is still screaming.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Scream Warden",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "Resonance Fault",
+                    description: "The source of all sound in this place. A crack that hums with every frequency at once.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Unheard Chorus",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 26,
+            name: "The Wailing Reach",
+            description: "The boundary between existence and void. Things here flicker between real and not. The wailing is the sound of matter deciding whether it exists.",
+            prestige_requirement: 0,
+            min_level: 375,
+            max_level: 390,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Fraying Edge",
+                    description: "The ground has gaps \u{2014} not holes, but places where the ground simply isn't. They move.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Border Stalker",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Liminal Corridor",
+                    description: "A hallway always the same length no matter how far you walk. The walls are forgetting to be walls.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "The Undefined",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Static Garden",
+                    description: "A garden where flowers are made of frozen static. They grow, bloom, and die in visual noise.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Entropy Bloom",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "The Last Light",
+                    description: "A single point of light hovering in vast dark. The last thing here certain it exists.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "The Flickering One",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Wailing Reach",
+                    description: "The boundary itself. One step more and things stop being things. The wailing is loudest here.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Voice at the Edge",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        // ── Chapter 6: The Origin Wound (Zones 27-30) ──────────────────
+        Zone {
+            id: 27,
+            name: "The Scar Root",
+            description: "Petrified tendrils of primordial fracture energy radiate outward like the root system of a dead tree. This is where the cracks began spreading.",
+            prestige_requirement: 0,
+            min_level: 390,
+            max_level: 405,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Rootthread Pass",
+                    description: "Thin veins of fracture energy wind through stone. They pulse with a rhythm older than heartbeats.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Root Creeper",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Splinter Nest",
+                    description: "A tangle of petrified fracture-roots knotted into a den. Something has been living in the cracks.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Nestbound Horror",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Taproot Chamber",
+                    description: "A central root as wide as a river descends into darkness. It feeds on something below.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Taproot Warden",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Fossilized Eruption",
+                    description: "A frozen moment: the instant the first crack split the world. The energy is still here, arrested.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "The Calcified Rupture",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Scar Root",
+                    description: "The root's origin point. Not rock, not energy \u{2014} the idea of breaking, made physical.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "Root of All Scars",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 28,
+            name: "Echoing Abyss",
+            description: "A vast emptiness where everything reverberates forever. Actions echo forward and backward in time. Your footsteps arrive before you do.",
+            prestige_requirement: 0,
+            min_level: 405,
+            max_level: 420,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "First Echo",
+                    description: "Your footsteps arrive before you do. The echoes here precede their causes.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Precursor Echo",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Reverberation Well",
+                    description: "A pit where sound falls forever. Drop a stone and you hear it land yesterday.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Well Dweller",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Temporal Silt",
+                    description: "The ground is made of compacted echoes. Dig and you hear conversations from before language.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "The Ancient Noise",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "The Infinite Repeat",
+                    description: "A chamber where everything happens again. The monsters here have died a thousand times and remember each.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "The Once-Slain",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "Echoing Abyss",
+                    description: "The center of all echoes. Here, the echo and the original are the same event.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Eternal Reverberation",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 29,
+            name: "Threshold of Silence",
+            description: "The last place where sound and light exist. Beyond this, there is only the wound.",
+            prestige_requirement: 0,
+            min_level: 420,
+            max_level: 435,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Dimming Walk",
+                    description: "Each step forward, the light dims. Not because darkness grows, but because light has less reason to be.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Fade Walker",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Hush Fields",
+                    description: "A plain where sound softens with every yard. At the center, even thought is quiet.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "The Muted",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Shadow of Sound",
+                    description: "Not shadow from light \u{2014} shadow from sound. An area where noise casts visible darkness.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Soundshadow Beast",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "The Final Frequency",
+                    description: "A single note hangs in the air. The last sound that will ever be heard in this place.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Frequency's End",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "Threshold of Silence",
+                    description: "The threshold. One step more and there is no more sound, no more light. Just the wound.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Silent Warden",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 30,
+            name: "The Origin Wound",
+            description: "The primordial break. Not a place but an event fossilized into geography. The wound is open, patient, and eternal. It was here before the world it broke.",
+            prestige_requirement: 0,
+            min_level: 435,
+            max_level: u32::MAX,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "The First Crack",
+                    description: "The original fracture. Barely wider than a sword, but everything else grew from it.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Fissure Guardian",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Primordial Scar",
+                    description: "The scar tissue of the universe. Layered over itself a billion times, never healing, always growing.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Scar Titan",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Memory of Wholeness",
+                    description: "A pocket where reality remembers being unbroken. It hurts to be here. Wholeness is heavy.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "The Unbroken",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Wound's Heart",
+                    description: "The center of the original break. Not stone, not void \u{2014} a state of matter that exists only here.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Heart of the Wound",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Origin Wound",
+                    description: "The wound itself. Open, patient, eternal. Something guards the entrance to eternity.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The First and Final",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
     ]
 });
 
-/// Returns all zones in the game (zones 1-20).
+/// Returns all zones in the game (zones 1-30).
 /// Returns a static slice reference — no allocation on each call.
 pub fn get_all_zones() -> &'static [Zone] {
     &ALL_ZONES
@@ -1169,7 +1792,7 @@ mod tests {
     #[test]
     fn test_zone_count() {
         let zones = get_all_zones();
-        assert_eq!(zones.len(), 20); // Zones 1-11 + Postgame Zones 12-20
+        assert_eq!(zones.len(), 30); // Zones 1-11 + Fracture Zones 12-30
     }
 
     #[test]
@@ -1259,7 +1882,10 @@ mod tests {
         assert!(get_zone(12).is_some());
         assert_eq!(get_zone(12).unwrap().name, "Splintered Rim");
         assert!(get_zone(20).is_some());
-        assert!(get_zone(21).is_none());
+        assert!(get_zone(21).is_some());
+        assert_eq!(get_zone(21).unwrap().name, "Sunken Processional");
+        assert!(get_zone(30).is_some());
+        assert!(get_zone(31).is_none());
         assert!(get_zone(0).is_none());
     }
 
@@ -1284,15 +1910,22 @@ mod tests {
         assert_eq!(zone.name, "The Expanse");
         assert_eq!(subzone.name, "Void's Edge");
 
-        // Postgame zone exists
+        // Fracture zone exists
         let result = get_subzone(12, 1);
         assert!(result.is_some());
         let (zone, subzone) = result.unwrap();
         assert_eq!(zone.name, "Splintered Rim");
         assert_eq!(subzone.name, "Rimwatch Scree");
 
+        // New zones exist
+        let result = get_subzone(21, 1);
+        assert!(result.is_some());
+        let (zone, subzone) = result.unwrap();
+        assert_eq!(zone.name, "Sunken Processional");
+        assert_eq!(subzone.name, "Pilgrim's Descent");
+
         // Invalid zone
-        assert!(get_subzone(21, 1).is_none());
+        assert!(get_subzone(31, 1).is_none());
         // Invalid subzone
         assert!(get_subzone(1, 5).is_none());
     }
@@ -1318,7 +1951,7 @@ mod tests {
     }
 
     #[test]
-    fn test_postgame_zone_12() {
+    fn test_fracture_zone_12() {
         let zone = get_zone(12).unwrap();
         assert_eq!(zone.name, "Splintered Rim");
         assert_eq!(zone.subzones.len(), 5);
@@ -1328,16 +1961,24 @@ mod tests {
     }
 
     #[test]
-    fn test_postgame_zone_20() {
+    fn test_fracture_zone_20() {
         let zone = get_zone(20).unwrap();
         assert_eq!(zone.name, "The Black Mouth");
+        assert_eq!(zone.subzones.len(), 5);
+        assert_eq!(zone.max_level, 300);
+    }
+
+    #[test]
+    fn test_fracture_zone_30() {
+        let zone = get_zone(30).unwrap();
+        assert_eq!(zone.name, "The Origin Wound");
         assert_eq!(zone.subzones.len(), 5);
         assert_eq!(zone.max_level, u32::MAX);
     }
 
     #[test]
-    fn test_all_postgame_zones_have_5_subzones() {
-        for zone_id in 12..=20 {
+    fn test_all_fracture_zones_have_5_subzones() {
+        for zone_id in 12..=30 {
             let zone = get_zone(zone_id).unwrap();
             assert_eq!(
                 zone.subzones.len(),
@@ -1350,8 +1991,8 @@ mod tests {
     }
 
     #[test]
-    fn test_all_postgame_zones_have_zone_boss() {
-        for zone_id in 12..=20 {
+    fn test_all_fracture_zones_have_zone_boss() {
+        for zone_id in 12..=30 {
             let zone = get_zone(zone_id).unwrap();
             let last = zone.subzones.last().unwrap();
             assert!(
@@ -1363,8 +2004,8 @@ mod tests {
     }
 
     #[test]
-    fn test_postgame_zones_prestige_requirement_zero() {
-        for zone_id in 12..=20 {
+    fn test_fracture_zones_prestige_requirement_zero() {
+        for zone_id in 12..=30 {
             let zone = get_zone(zone_id).unwrap();
             assert_eq!(
                 zone.prestige_requirement, 0,
@@ -1375,8 +2016,8 @@ mod tests {
     }
 
     #[test]
-    fn test_postgame_zones_no_weapon_required() {
-        for zone_id in 12..=20 {
+    fn test_fracture_zones_no_weapon_required() {
+        for zone_id in 12..=30 {
             let zone = get_zone(zone_id).unwrap();
             assert!(
                 !zone.requires_weapon,

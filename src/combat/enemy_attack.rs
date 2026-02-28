@@ -26,7 +26,7 @@ pub(crate) fn resolve_enemy_attack<R: Rng>(
     bonuses: &CombatBonuses,
     achievements: &mut crate::achievements::Achievements,
     derived: &DerivedStats,
-    postgame_zone_cap: u32,
+    fracture_zone_cap: u32,
 ) -> Vec<CombatEvent> {
     let mut events = Vec::new();
 
@@ -69,7 +69,7 @@ pub(crate) fn resolve_enemy_attack<R: Rng>(
                 state,
                 achievements,
                 bonuses.xp_gain_percent,
-                postgame_zone_cap,
+                fracture_zone_cap,
             );
             events.extend(death_events);
             return events;

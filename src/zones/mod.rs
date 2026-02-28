@@ -7,13 +7,13 @@ pub mod access;
 pub mod advancement;
 pub mod boss_defeat;
 mod data;
+pub mod fracture;
 pub mod gates;
-pub mod postgame;
 mod progression;
 
 #[allow(unused_imports)]
 pub use access::sync_account_zone_unlocks;
 pub use boss_defeat::BossDefeatResult;
 pub use data::{get_all_zones, get_zone, Subzone, Zone};
-pub use postgame::PostgameRegion;
+pub use fracture::FractureRegion;
 pub use progression::ZoneProgression;

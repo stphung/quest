@@ -1,9 +1,9 @@
-//! Integration tests for prestige reset syncing postgame zone access.
+//! Integration tests for prestige reset syncing fracture zone access.
 //!
-//! Verifies that after prestige, postgame zones (11-20) remain accessible
+//! Verifies that after prestige, fracture zones (11-20) remain accessible
 //! when the account has earned them via StormsEnd achievement and Deep breakthroughs.
 //!
-//! Note: Currently postgame zones have `prestige_requirement: 0`, so
+//! Note: Currently fracture zones have `prestige_requirement: 0`, so
 //! `reset_for_prestige()` already unlocks them. `sync_account_zone_unlocks()`
 //! provides a redundant safety net ensuring account-level unlocks are applied.
 
@@ -45,12 +45,12 @@ fn test_prestige_then_sync_preserves_zone_11() {
 }
 
 #[test]
-fn test_prestige_then_sync_preserves_postgame_zones_12_through_14() {
+fn test_prestige_then_sync_preserves_fracture_zones_12_through_14() {
     let mut state = make_state_ready_to_prestige(20);
     let mut achievements = Achievements::default();
     achievements.unlock(AchievementId::StormsEnd, None);
 
-    // Unlock postgame zones before prestige
+    // Unlock fracture zones before prestige
     for z in 11..=14 {
         state.zone_progression.unlock_zone(z);
     }
@@ -71,7 +71,7 @@ fn test_prestige_then_sync_preserves_postgame_zones_12_through_14() {
 }
 
 #[test]
-fn test_prestige_then_sync_preserves_all_postgame_zones_cap_20() {
+fn test_prestige_then_sync_preserves_all_fracture_zones_cap_20() {
     let mut state = make_state_ready_to_prestige(20);
     let mut achievements = Achievements::default();
     achievements.unlock(AchievementId::StormsEnd, None);
@@ -140,7 +140,7 @@ fn test_prestige_resets_position_but_sync_keeps_zone_access() {
 }
 
 #[test]
-fn test_multiple_prestiges_preserve_postgame_access() {
+fn test_multiple_prestiges_preserve_fracture_access() {
     let mut state = make_state_ready_to_prestige(20);
     let mut achievements = Achievements::default();
     achievements.unlock(AchievementId::StormsEnd, None);

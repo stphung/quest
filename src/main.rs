@@ -1929,6 +1929,9 @@ fn main() -> io::Result<()> {
                                     if tick_flags.deep_discovered {
                                         overlay = GameOverlay::DeepDiscovery;
                                     }
+                                    if let Some(region) = tick_flags.fracture_region_unlocked {
+                                        overlay = GameOverlay::FractureRegionUnlock { region };
+                                    }
                                 }
 
                                 if matches!(overlay, GameOverlay::None)

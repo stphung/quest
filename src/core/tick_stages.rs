@@ -570,7 +570,7 @@ pub fn process_combat_events<R: Rng>(
                             xp_gained
                         )
                     }
-                    BossDefeatResult::PostgameCycle { zone_id } => {
+                    BossDefeatResult::FractureCycle { zone_id } => {
                         let zone_name = crate::zones::get_zone(*zone_id)
                             .map(|z| z.name)
                             .unwrap_or("Unknown");
@@ -894,7 +894,7 @@ pub(super) fn run_combat<R: Rng>(
         &combat_bonuses,
         achievements,
         &derived,
-        deep.persistent.postgame_zone_cap,
+        deep.persistent.fracture_zone_cap,
     );
 
     process_combat_events(
@@ -1008,12 +1008,12 @@ pub(super) fn tick_deep_missions(
     }
     for layer in &summary.breakthroughs {
         achievements.on_deep_breakthrough(*layer, Some(&state.character_name));
-        // Check if this breakthrough unlocks a postgame region
-        if let Some(region) = crate::zones::PostgameRegion::from_layer(*layer) {
+        // Check if this breakthrough unlocks a fracture region
+        if let Some(region) = crate::zones::FractureRegion::from_layer(*layer) {
             let new_cap = region.end_zone_id();
-            if new_cap > deep.persistent.postgame_zone_cap {
-                deep.persistent.postgame_zone_cap = new_cap;
-                deep.persistent.pending_postgame_region_unlock = Some(region);
+            if new_cap > deep.persistent.fracture_zone_cap {
+                deep.persistent.fracture_zone_cap = new_cap;
+                deep.persistent.pending_fracture_region_unlock = Some(region);
                 result.deep_changed = true;
             }
         }
