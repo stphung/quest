@@ -814,8 +814,10 @@ fn test_enhancement_progress_debug_format() {
 mod soulforge_tick_integration {
     use quest::achievements::Achievements;
     use quest::core::game_state::GameState;
-    use quest::core::tick::game_tick;
+    use quest::core::tick::game_tick_with_context;
+    use quest::core::tick_context::TickContext;
     use quest::core::tick_types::TickEvent;
+    use quest::deep::DeepState;
     use quest::dungeon::generation::generate_dungeon;
     use quest::enhancement::EnhancementProgress;
     use quest::haven::Haven;
@@ -836,20 +838,21 @@ mod soulforge_tick_integration {
         let mut tick_counter = 0u32;
         let mut haven = Haven::default();
         let mut achievements = Achievements::default();
+        let mut deep = DeepState::new();
         // Use a fixed seed that hits discovery quickly at P15+
         let mut rng = make_rng(1);
 
         for tick in 0..max_ticks {
-            let result = game_tick(
+            let mut ctx = TickContext {
                 state,
-                &mut tick_counter,
-                &mut haven,
+                tick_counter: &mut tick_counter,
+                haven: &mut haven,
                 enhancement,
-                &mut quest::deep::DeepState::new(),
-                &mut achievements,
-                false,
-                &mut rng,
-            );
+                deep: &mut deep,
+                achievements: &mut achievements,
+                debug_mode: false,
+            };
+            let result = game_tick_with_context(&mut ctx, &mut rng);
 
             if result
                 .events
@@ -894,20 +897,21 @@ mod soulforge_tick_integration {
         let mut haven = Haven::default();
         let mut enhancement = EnhancementProgress::new();
         let mut achievements = Achievements::default();
+        let mut deep = DeepState::new();
         let mut rng = make_rng(1);
 
         // Run until discovery fires and capture that specific TickResult
         for _ in 0..500_000 {
-            let result = game_tick(
-                &mut state,
-                &mut tick_counter,
-                &mut haven,
-                &mut enhancement,
-                &mut quest::deep::DeepState::new(),
-                &mut achievements,
-                false,
-                &mut rng,
-            );
+            let mut ctx = TickContext {
+                state: &mut state,
+                tick_counter: &mut tick_counter,
+                haven: &mut haven,
+                enhancement: &mut enhancement,
+                deep: &mut deep,
+                achievements: &mut achievements,
+                debug_mode: false,
+            };
+            let result = game_tick_with_context(&mut ctx, &mut rng);
 
             if result
                 .events
@@ -936,22 +940,23 @@ mod soulforge_tick_integration {
         let mut haven = Haven::default();
         let mut enhancement = EnhancementProgress::new();
         let mut achievements = Achievements::default();
+        let mut deep = DeepState::new();
         let mut rng = make_rng(42);
 
         // Run a large number of ticks; dungeon blocks Soulforge discovery.
         // Re-set the dungeon each tick to ensure it stays active (dungeons can complete/fail).
         for _ in 0..1_000 {
             state.active_dungeon = Some(generate_dungeon(1, 0, 1));
-            let result = game_tick(
-                &mut state,
-                &mut tick_counter,
-                &mut haven,
-                &mut enhancement,
-                &mut quest::deep::DeepState::new(),
-                &mut achievements,
-                false,
-                &mut rng,
-            );
+            let mut ctx = TickContext {
+                state: &mut state,
+                tick_counter: &mut tick_counter,
+                haven: &mut haven,
+                enhancement: &mut enhancement,
+                deep: &mut deep,
+                achievements: &mut achievements,
+                debug_mode: false,
+            };
+            let result = game_tick_with_context(&mut ctx, &mut rng);
             assert!(
                 !result
                     .events
@@ -976,19 +981,20 @@ mod soulforge_tick_integration {
         let mut enhancement = EnhancementProgress::new();
         enhancement.discovered = true; // Pre-discovered
         let mut achievements = Achievements::default();
+        let mut deep = DeepState::new();
         let mut rng = make_rng(42);
 
         for _ in 0..500 {
-            let result = game_tick(
-                &mut state,
-                &mut tick_counter,
-                &mut haven,
-                &mut enhancement,
-                &mut quest::deep::DeepState::new(),
-                &mut achievements,
-                false,
-                &mut rng,
-            );
+            let mut ctx = TickContext {
+                state: &mut state,
+                tick_counter: &mut tick_counter,
+                haven: &mut haven,
+                enhancement: &mut enhancement,
+                deep: &mut deep,
+                achievements: &mut achievements,
+                debug_mode: false,
+            };
+            let result = game_tick_with_context(&mut ctx, &mut rng);
             assert!(
                 !result
                     .events
