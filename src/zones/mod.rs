@@ -11,8 +11,9 @@ pub mod gates;
 pub mod postgame;
 mod progression;
 
+#[allow(unused_imports)]
+pub use access::sync_account_zone_unlocks;
 pub use boss_defeat::BossDefeatResult;
 pub use data::{get_all_zones, get_zone, Subzone, Zone};
-pub use access::sync_account_zone_unlocks;
 pub use postgame::PostgameRegion;
 pub use progression::ZoneProgression;

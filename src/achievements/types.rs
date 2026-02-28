@@ -136,6 +136,21 @@ pub enum AchievementId {
     // The Expanse achievement
     BeyondInfinity, // Complete a cycle of The Expanse
 
+    // Postgame zone completion achievements (zones 12-20)
+    PostgameZone12, // Rimbreaker
+    PostgameZone13, // Cinderfall
+    PostgameZone14, // Heart Piercer
+    PostgameZone15, // Shard Breaker
+    PostgameZone16, // Light Bender
+    PostgameZone17, // Sunslayer
+    PostgameZone18, // Ashen Sentinel
+    PostgameZone19, // Throat Runner
+    PostgameZone20, // Maw Closer
+    // Ascension milestone achievements
+    AscensionI,   // First Ascension
+    AscensionIII, // Deepborn
+    AscensionVI,  // Transcendent
+
     // Challenge achievements - Chess
     ChessNovice,
     ChessApprentice,
@@ -274,7 +289,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 182;
+    pub const VARIANT_COUNT: usize = 194;
 }
 
 /// Static definition of an achievement.

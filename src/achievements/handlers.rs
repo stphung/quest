@@ -111,7 +111,7 @@ impl Achievements {
             return;
         }
 
-        // Individual zone completion achievements (zones 1-10)
+        // Individual zone completion achievements (zones 1-10, 12-20)
         let achievement = match zone_id {
             1 => Some(AchievementId::Zone1Complete),
             2 => Some(AchievementId::Zone2Complete),
@@ -123,6 +123,16 @@ impl Achievements {
             8 => Some(AchievementId::Zone8Complete),
             9 => Some(AchievementId::Zone9Complete),
             10 => Some(AchievementId::Zone10Complete),
+            // Postgame zone completion achievements (zones 12-20)
+            12 => Some(AchievementId::PostgameZone12),
+            13 => Some(AchievementId::PostgameZone13),
+            14 => Some(AchievementId::PostgameZone14),
+            15 => Some(AchievementId::PostgameZone15),
+            16 => Some(AchievementId::PostgameZone16),
+            17 => Some(AchievementId::PostgameZone17),
+            18 => Some(AchievementId::PostgameZone18),
+            19 => Some(AchievementId::PostgameZone19),
+            20 => Some(AchievementId::PostgameZone20),
             _ => None,
         };
 
@@ -134,6 +144,23 @@ impl Achievements {
     /// Called when the game is completed (Zone 10 boss defeated with Stormbreaker).
     pub fn on_storms_end(&mut self, character_name: Option<&str>) {
         self.unlock_with_name(AchievementId::StormsEnd, character_name);
+    }
+
+    /// Called when the character Ascends to a new level.
+    #[allow(dead_code)] // Will be called by tick pipeline once ascension input is wired
+    pub fn on_ascended(&mut self, new_level: u32, character_name: Option<&str>) {
+        match new_level {
+            1 => {
+                self.unlock_with_name(AchievementId::AscensionI, character_name);
+            }
+            3 => {
+                self.unlock_with_name(AchievementId::AscensionIII, character_name);
+            }
+            6 => {
+                self.unlock_with_name(AchievementId::AscensionVI, character_name);
+            }
+            _ => {}
+        }
     }
 
     // =========================================================================

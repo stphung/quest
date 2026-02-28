@@ -570,6 +570,15 @@ pub fn process_combat_events<R: Rng>(
                             xp_gained
                         )
                     }
+                    BossDefeatResult::PostgameCycle { zone_id } => {
+                        let zone_name = crate::zones::get_zone(*zone_id)
+                            .map(|z| z.name)
+                            .unwrap_or("Unknown");
+                        format!(
+                            "\u{1f451} {} conquered! +{} XP \u{2014} Zone cycles anew...",
+                            zone_name, xp_gained
+                        )
+                    }
                 };
                 result.events.push(TickEvent::SubzoneBossDefeated {
                     xp_gained,
@@ -998,6 +1007,15 @@ pub(super) fn tick_deep_missions(
     }
     for layer in &summary.breakthroughs {
         achievements.on_deep_breakthrough(*layer, Some(&state.character_name));
+        // Check if this breakthrough unlocks a postgame region
+        if let Some(region) = crate::zones::PostgameRegion::from_layer(*layer) {
+            let new_cap = region.end_zone_id();
+            if new_cap > deep.persistent.postgame_zone_cap {
+                deep.persistent.postgame_zone_cap = new_cap;
+                deep.persistent.pending_postgame_region_unlock = Some(region);
+                result.deep_changed = true;
+            }
+        }
     }
     for _ in 0..summary.mercs_lost {
         achievements.on_deep_merc_lost(Some(&state.character_name));
