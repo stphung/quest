@@ -80,6 +80,8 @@ pub struct GameState {
     pub stormglass_discovered: bool,
     /// Storm Sigils — persistent sigil slots (character-level, survives prestige)
     pub storm_sigils: StormSigils,
+    /// Ascension level — per-character combat power multiplier (0 = no ascension)
+    pub ascension_level: u32,
     /// Active challenge minigame (transient, not saved)
     pub active_minigame: Option<ActiveMinigame>,
     /// Session kill count (transient, not saved)
@@ -174,6 +176,7 @@ impl GameState {
             stormglass: 0,
             stormglass_discovered: false,
             storm_sigils: StormSigils::new(),
+            ascension_level: 0,
             active_minigame: None,
             session_kills: 0,
             consecutive_deaths: 0,

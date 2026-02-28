@@ -33,6 +33,8 @@ pub(crate) struct FlatGameState {
     pub stormglass_discovered: bool,
     #[serde(default)]
     pub storm_sigils: crate::stormglass::sigils::StormSigils,
+    #[serde(default)]
+    pub ascension_level: u32,
 }
 
 impl From<&crate::core::game_state::GameState> for FlatGameState {
@@ -55,6 +57,7 @@ impl From<&crate::core::game_state::GameState> for FlatGameState {
             stormglass: state.stormglass,
             stormglass_discovered: state.stormglass_discovered,
             storm_sigils: state.storm_sigils.clone(),
+            ascension_level: state.ascension_level,
         }
     }
 }
@@ -139,6 +142,7 @@ impl FlatGameState {
             stormglass: self.stormglass,
             stormglass_discovered: self.stormglass_discovered,
             storm_sigils: self.storm_sigils,
+            ascension_level: self.ascension_level,
             // Transient fields — defaults
             active_fishing: None,
             challenge_menu: ChallengeMenu::new(),

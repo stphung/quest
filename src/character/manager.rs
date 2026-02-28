@@ -33,6 +33,8 @@ pub(super) struct CharacterSaveData {
     pub(super) stormglass_discovered: bool,
     #[serde(default)]
     pub(super) storm_sigils: crate::stormglass::sigils::StormSigils,
+    #[serde(default)]
+    pub(super) ascension_level: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -144,6 +146,7 @@ mod tests {
             stormglass: 0,
             stormglass_discovered: false,
             storm_sigils: crate::stormglass::sigils::StormSigils::new(),
+            ascension_level: 0,
             chrono_surge_active: false,
             debug_force_overcharge: false,
             player,
