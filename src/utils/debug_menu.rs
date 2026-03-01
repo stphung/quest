@@ -450,7 +450,9 @@ impl DebugAction {
             Self::TriggerDeepRefreshRecruits => trigger_deep_refresh_recruit_pool(deep),
             Self::TriggerDeepClearFrontierLayer => trigger_deep_clear_frontier_layer(deep),
             Self::TriggerDeepCompleteActiveMissions => trigger_deep_complete_active_missions(deep),
-            Self::UnlockDeepLayer(layer) => trigger_unlock_deep_layer(deep, state, layer),
+            Self::UnlockDeepLayer(layer) => {
+                trigger_unlock_deep_layer(deep, state, achievements, layer)
+            }
             Self::TravelToZone(zone_id) => {
                 trigger_travel_to_zone(state, enhancement, deep, zone_id)
             }
@@ -1002,6 +1004,7 @@ fn trigger_deep_complete_active_missions(deep: &mut DeepState) -> &'static str {
 fn trigger_unlock_deep_layer(
     deep: &mut DeepState,
     state: &mut GameState,
+    achievements: &mut crate::achievements::Achievements,
     target_layer: u32,
 ) -> &'static str {
     // Auto-discover The Deep if needed
@@ -1015,6 +1018,9 @@ fn trigger_unlock_deep_layer(
         let frontier = deep.persistent.frontier_layer();
         crate::deep::mark_layer_cleared(&mut deep.persistent, frontier);
     }
+
+    // Unlock layer achievements (triggers Power Core activation)
+    achievements.on_deep_breakthrough(target_layer, Some(&state.character_name));
 
     // Set fracture zone cap based on the region this layer unlocks
     if let Some(region) = crate::zones::FractureRegion::from_layer(target_layer) {
@@ -1700,8 +1706,9 @@ mod tests {
         let mut state = GameState::new("Test".to_string(), 0);
         state.prestige_rank = 50; // Meet P50 requirement for zones 12-14
         let mut deep = DeepState::new();
+        let mut achievements = crate::achievements::Achievements::default();
 
-        let msg = trigger_unlock_deep_layer(&mut deep, &mut state, 3);
+        let msg = trigger_unlock_deep_layer(&mut deep, &mut state, &mut achievements, 3);
         assert_eq!(
             msg,
             "Cleared to Deep L3 \u{2014} Red Fault unlocked (Z12-14)!"
@@ -1715,6 +1722,8 @@ mod tests {
                 "Zone {zone_id} should be unlocked after Deep L3"
             );
         }
+        // Power Core achievement should be unlocked
+        assert!(achievements.is_unlocked(crate::achievements::AchievementId::PowerCoreI));
     }
 
     #[test]
@@ -1722,8 +1731,9 @@ mod tests {
         let mut state = GameState::new("Test".to_string(), 0);
         state.prestige_rank = 100; // Meet P100 requirement for zones 18-20
         let mut deep = DeepState::new();
+        let mut achievements = crate::achievements::Achievements::default();
 
-        trigger_unlock_deep_layer(&mut deep, &mut state, 12);
+        trigger_unlock_deep_layer(&mut deep, &mut state, &mut achievements, 12);
         assert!(deep.persistent.fracture_zone_cap >= 20);
         for zone_id in 12..=20 {
             assert!(
@@ -1731,6 +1741,13 @@ mod tests {
                 "Zone {zone_id} should be unlocked after Deep L12"
             );
         }
+        // Layer achievements up to layer 10 should be unlocked
+        assert!(achievements.is_unlocked(crate::achievements::AchievementId::Layer5Cleared));
+        assert!(achievements.is_unlocked(crate::achievements::AchievementId::Layer10Cleared));
+        // Power Core achievements up to layer 12 should be unlocked
+        assert!(achievements.is_unlocked(crate::achievements::AchievementId::PowerCoreI));
+        assert!(achievements.is_unlocked(crate::achievements::AchievementId::PowerCoreII));
+        assert!(achievements.is_unlocked(crate::achievements::AchievementId::PowerCoreIII));
     }
 
     #[test]

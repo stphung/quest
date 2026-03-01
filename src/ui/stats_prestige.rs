@@ -8,6 +8,7 @@ use crate::character::prestige::{get_next_prestige_tier, get_prestige_tier};
 use crate::core::game_logic::xp_for_next_level;
 use crate::core::game_state::GameState;
 use crate::fishing::types::{FishingState, RANK_NAMES};
+use crate::power_cores::{fill_duration_secs, PowerCoreState, ALL_POWER_CORES};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -532,6 +533,128 @@ pub(crate) fn to_roman(n: u32) -> String {
         }
     }
     result
+}
+
+/// Draws the Power Cores section showing each unlocked core's fill progress.
+///
+/// Only renders when the player has ≥1 unlocked power core.
+/// Returns the number of lines rendered (0 if no cores).
+pub(super) fn draw_power_cores_panel(
+    frame: &mut Frame,
+    area: Rect,
+    achievements: &crate::achievements::Achievements,
+    power_cores: &PowerCoreState,
+) {
+    const AMBER: Color = Color::Rgb(255, 165, 0);
+    const BAR_WIDTH: usize = 16;
+
+    // Only show the panel once at least one core is unlocked.
+    let has_any = ALL_POWER_CORES
+        .iter()
+        .any(|c| achievements.is_unlocked(c.achievement_id));
+    if !has_any {
+        return;
+    }
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Power Cores ")
+        .border_style(Style::default().fg(super::themed_border_color(AMBER)));
+    let inner = super::render_themed_block(frame, area, block, AMBER, super::BorderFxContext);
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    for core in ALL_POWER_CORES {
+        let is_unlocked = achievements.is_unlocked(core.achievement_id);
+
+        let mut spans: Vec<Span<'static>> = Vec::new();
+
+        if is_unlocked {
+            // ❂ CoreName      [████░░░░░░░░] Xh Xm
+            spans.push(Span::styled(
+                "\u{2742} ",
+                Style::default().fg(AMBER).add_modifier(Modifier::BOLD),
+            ));
+
+            let name_padded = format!("{:<14}", core.name);
+            spans.push(Span::styled(name_padded, Style::default().fg(AMBER)));
+
+            let fill_secs = fill_duration_secs(core.pr_per_day);
+            let last_granted = power_cores
+                .last_granted_at
+                .get(&core.achievement_id)
+                .copied()
+                .unwrap_or(0);
+
+            let elapsed = (now - last_granted).max(0);
+            let ratio = if fill_secs > 0 {
+                (elapsed as f64 / fill_secs as f64).min(1.0)
+            } else {
+                1.0
+            };
+
+            let filled = (ratio * BAR_WIDTH as f64).round() as usize;
+            let empty = BAR_WIDTH.saturating_sub(filled);
+
+            let remaining_secs = (fill_secs - elapsed).max(0);
+            let hours = remaining_secs / 3600;
+            let mins = (remaining_secs % 3600) / 60;
+            let time_str = if ratio >= 1.0 {
+                "Ready!".to_string()
+            } else if hours > 0 {
+                format!("{}h {}m", hours, mins)
+            } else {
+                format!("{}m", mins)
+            };
+
+            spans.push(Span::styled("[", Style::default().fg(Color::DarkGray)));
+            spans.push(Span::styled(
+                "\u{2588}".repeat(filled),
+                Style::default().fg(AMBER),
+            ));
+            spans.push(Span::styled(
+                "\u{2591}".repeat(empty),
+                Style::default().fg(Color::DarkGray),
+            ));
+            spans.push(Span::styled("] ", Style::default().fg(Color::DarkGray)));
+
+            let time_style = if ratio >= 1.0 {
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            };
+            spans.push(Span::styled(time_str, time_style));
+        } else {
+            // ◇ CoreName      Layer XX
+            spans.push(Span::styled(
+                "\u{25c7} ",
+                Style::default().fg(Color::DarkGray),
+            ));
+
+            let name_padded = format!("{:<14}", core.name);
+            spans.push(Span::styled(
+                name_padded,
+                Style::default().fg(Color::DarkGray),
+            ));
+
+            spans.push(Span::styled(
+                format!("The Deep \u{00b7} L{}", core.required_layer),
+                Style::default().fg(Color::DarkGray),
+            ));
+        }
+
+        lines.push(Line::from(spans));
+    }
+
+    let para = Paragraph::new(lines);
+    frame.render_widget(para, inner);
 }
 
 #[cfg(test)]

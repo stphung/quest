@@ -229,6 +229,13 @@ pub enum TickEvent {
     // ── Level Up ────────────────────────────────────────────────
     /// Player leveled up (may occur multiple times per tick from large XP gains).
     LeveledUp { new_level: u32 },
+
+    // ── Power Cores ─────────────────────────────────────────────
+    /// A Power Core completed a cycle and granted +1 prestige rank.
+    PowerCoreGranted {
+        /// Display name of the core that fired (e.g. "Red Fault").
+        core_name: &'static str,
+    },
 }
 
 /// Result of processing a single game tick.
@@ -263,6 +270,9 @@ pub struct TickResult {
 
     /// True if Deep state was modified (discovery) and should be persisted.
     pub deep_changed: bool,
+
+    /// True if Power Core state was modified and should be persisted.
+    pub power_cores_changed: bool,
 
     /// Achievement IDs ready to be shown in a modal overlay.
     /// Populated when the 500ms accumulation window has elapsed.

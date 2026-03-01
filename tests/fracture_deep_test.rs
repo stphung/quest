@@ -8,6 +8,7 @@ use quest::deep::{
 };
 use quest::enhancement::EnhancementProgress;
 use quest::haven::Haven;
+use quest::power_cores::PowerCoreState;
 use quest::zones::FractureRegion;
 use quest::GameState;
 use rand::SeedableRng;
@@ -307,6 +308,7 @@ fn run_tick_with_successful_breakthrough_power(
         let mut achievements = Achievements::default();
         let mut deep = deep_with_breakthrough_power(layer, initial_cap, merc_power);
 
+        let mut power_cores = PowerCoreState::default();
         let mut ctx = TickContext {
             state: &mut state,
             tick_counter: &mut tick_counter,
@@ -314,6 +316,7 @@ fn run_tick_with_successful_breakthrough_power(
             enhancement: &mut enhancement,
             deep: &mut deep,
             achievements: &mut achievements,
+            power_cores: &mut power_cores,
             debug_mode: false,
         };
         let result = game_tick_with_context(&mut ctx, &mut rng);
@@ -492,6 +495,7 @@ fn test_game_tick_layer_5_breakthrough_emits_no_fracture_event() {
         let mut achievements = Achievements::default();
         let mut deep = deep_with_breakthrough_power(5, 11, 500);
 
+        let mut power_cores = PowerCoreState::default();
         let mut ctx = TickContext {
             state: &mut state,
             tick_counter: &mut tick_counter,
@@ -499,6 +503,7 @@ fn test_game_tick_layer_5_breakthrough_emits_no_fracture_event() {
             enhancement: &mut enhancement,
             deep: &mut deep,
             achievements: &mut achievements,
+            power_cores: &mut power_cores,
             debug_mode: false,
         };
         let result = game_tick_with_context(&mut ctx, &mut rng);

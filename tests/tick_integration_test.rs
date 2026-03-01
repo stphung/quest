@@ -15,6 +15,7 @@ use quest::core::tick::{game_tick, TickEvent, TickResult};
 use quest::dungeon::generation::generate_dungeon;
 use quest::enhancement::EnhancementProgress;
 use quest::haven::Haven;
+use quest::power_cores::PowerCoreState;
 use quest::GameState;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -53,6 +54,7 @@ fn run_ticks(
             &mut enhancement,
             &mut quest::deep::DeepState::new(),
             achievements,
+            &mut PowerCoreState::default(),
             false,
             rng,
         );
@@ -84,6 +86,7 @@ where
             &mut enhancement,
             &mut quest::deep::DeepState::new(),
             achievements,
+            &mut PowerCoreState::default(),
             false,
             rng,
         );
@@ -115,6 +118,7 @@ fn test_game_tick_returns_tick_result() {
         &mut EnhancementProgress::new(),
         &mut quest::deep::DeepState::new(),
         &mut achievements,
+        &mut PowerCoreState::default(),
         false,
         &mut rng,
     );
@@ -141,6 +145,7 @@ fn test_game_tick_spawns_enemy_on_first_tick() {
         &mut EnhancementProgress::new(),
         &mut quest::deep::DeepState::new(),
         &mut achievements,
+        &mut PowerCoreState::default(),
         false,
         &mut rng,
     );
@@ -166,6 +171,7 @@ fn test_game_tick_increments_tick_counter() {
         &mut EnhancementProgress::new(),
         &mut quest::deep::DeepState::new(),
         &mut achievements,
+        &mut PowerCoreState::default(),
         false,
         &mut rng,
     );
@@ -191,6 +197,7 @@ fn test_game_tick_play_time_after_10_ticks() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
+            &mut PowerCoreState::default(),
             false,
             &mut rng,
         );
@@ -218,6 +225,7 @@ fn test_game_tick_play_time_not_incremented_before_10_ticks() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
+            &mut PowerCoreState::default(),
             false,
             &mut rng,
         );
@@ -578,6 +586,7 @@ fn test_game_tick_fishing_produces_events() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
+            &mut PowerCoreState::default(),
             false,
             &mut rng,
         );
@@ -644,6 +653,7 @@ fn test_game_tick_fishing_skips_combat() {
         &mut EnhancementProgress::new(),
         &mut quest::deep::DeepState::new(),
         &mut achievements,
+        &mut PowerCoreState::default(),
         false,
         &mut rng,
     );
@@ -704,6 +714,7 @@ fn test_game_tick_fishing_still_tracks_play_time() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
+            &mut PowerCoreState::default(),
             false,
             &mut rng,
         );
@@ -743,6 +754,7 @@ fn test_game_tick_fish_caught_event_has_rarity() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
+            &mut PowerCoreState::default(),
             false,
             &mut rng,
         );
@@ -837,6 +849,7 @@ fn test_game_tick_dungeon_failed_event_on_death() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
+            &mut PowerCoreState::default(),
             false,
             &mut rng,
         );
@@ -997,6 +1010,7 @@ fn test_game_tick_achievements_changed_flag() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
+            &mut PowerCoreState::default(),
             false,
             &mut rng,
         );
@@ -1036,6 +1050,7 @@ fn test_game_tick_debug_mode_suppresses_achievement_save() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
+            &mut quest::power_cores::PowerCoreState::default(),
             true, // debug_mode = true
             &mut rng,
         );
@@ -1114,6 +1129,7 @@ fn test_simulator_rng_param_is_used_for_challenge_ai() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
+            &mut PowerCoreState::default(),
             false,
             &mut rng,
         );
@@ -1149,6 +1165,7 @@ fn test_simulator_different_seeds_produce_different_results() {
                 &mut EnhancementProgress::new(),
                 &mut quest::deep::DeepState::new(),
                 &mut achievements,
+                &mut PowerCoreState::default(),
                 false,
                 &mut rng,
             );
@@ -1194,6 +1211,7 @@ fn test_game_tick_syncs_max_hp_with_attributes() {
         &mut EnhancementProgress::new(),
         &mut quest::deep::DeepState::new(),
         &mut achievements,
+        &mut PowerCoreState::default(),
         false,
         &mut rng,
     );
@@ -1233,6 +1251,7 @@ fn test_game_tick_returns_events_in_chronological_order() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
+            &mut PowerCoreState::default(),
             false,
             &mut rng,
         );

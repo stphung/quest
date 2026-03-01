@@ -338,11 +338,9 @@ pub fn render_offline_welcome(
 ) {
     // Centered modal box
     let modal_width = 44u16;
-    let modal_height = if report.level_before < report.level_after {
-        11
-    } else {
-        10
-    };
+    let has_levels = report.level_before < report.level_after;
+    let has_power_cores = report.power_core_pr > 0;
+    let modal_height = 10 + if has_levels { 1 } else { 0 } + if has_power_cores { 1 } else { 0 };
     let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
     let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
     let modal_area = Rect::new(x, y, modal_width, modal_height);
@@ -413,6 +411,16 @@ pub fn render_offline_welcome(
                 )
             ),
             Style::default().fg(Color::Green),
+        )));
+    }
+
+    if report.power_core_pr > 0 {
+        lines.push(Line::from(Span::styled(
+            format!(
+                "  \u{25c6}  Power Cores: {:>10}",
+                format!("+{} PR", report.power_core_pr)
+            ),
+            Style::default().fg(Color::Rgb(255, 191, 0)),
         )));
     }
 

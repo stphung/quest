@@ -6,6 +6,7 @@ use crate::achievements::{
 use crate::character::prestige::get_prestige_tier;
 use crate::enhancement::EnhancementProgress;
 use crate::fishing::types::fishing_tier_name;
+use crate::power_cores::get_power_core_def;
 use crate::zones::get_all_zones;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -207,6 +208,18 @@ pub(super) fn render_achievement_detail(
         lines.push(Line::from(Span::styled(
             format!("\u{2726} Grants Title: \"{title}\""),
             Style::default().fg(Color::Magenta),
+        )));
+    }
+
+    // Power Core info
+    if let Some(core) = get_power_core_def(def.id) {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            format!(
+                "\u{2b21} Grants Power Core: \"{}\" ({} PR/day)",
+                core.name, core.pr_per_day
+            ),
+            Style::default().fg(Color::Rgb(255, 165, 0)),
         )));
     }
 

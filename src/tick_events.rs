@@ -644,6 +644,17 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     segments: None,
                 });
             }
+            TickEvent::PowerCoreGranted { core_name } => {
+                let message = format!("\u{26A1} Power Core [{}] granted +1 PR", core_name);
+                game_state.combat_state.add_log_entry(message, false, true);
+                game_state.ticker.push(TickerEntry {
+                    icon: "\u{26A1}",
+                    text: format!("{} Core!", core_name),
+                    color: Color::Rgb(255, 165, 0),
+                    bold: true,
+                    segments: None,
+                });
+            }
         }
     }
     TickEventFlags {

@@ -22,6 +22,8 @@ pub struct OfflineReport {
     pub offline_rate_percent: f64,
     /// Haven bonus percentage (0.0 if Haven not discovered)
     pub haven_bonus_percent: f64,
+    /// Prestige ranks granted by Power Cores while offline (0 if none)
+    pub power_core_pr: u32,
 }
 
 /// Calculates the XP gained during offline time.
@@ -92,6 +94,7 @@ pub fn process_offline_progression<R: Rng>(
         level_after,
         offline_rate_percent,
         haven_bonus_percent: haven_offline_xp_percent,
+        power_core_pr: 0,
     }
 }
 

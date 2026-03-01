@@ -23,6 +23,7 @@ use quest::core::game_state::GameState;
 use quest::core::tick::{game_tick, TickEvent, TickResult};
 use quest::enhancement::EnhancementProgress;
 use quest::haven::{try_build_room, Haven, HavenRoomId};
+use quest::power_cores::PowerCoreState;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::collections::HashMap;
@@ -442,6 +443,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
     let mut enhancement = EnhancementProgress::new();
     let mut deep_state = quest::deep::DeepState::new();
     let mut achievements = Achievements::default();
+    let mut power_cores = PowerCoreState::default();
 
     // Force-unlock Stormbreaker achievement if requested
     if config.stormbreaker {
@@ -483,6 +485,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
             &mut enhancement,
             &mut deep_state,
             &mut achievements,
+            &mut power_cores,
             false,
             &mut rng,
         );

@@ -383,6 +383,7 @@ pub fn draw_ui_with_update(
     deep_state: &crate::deep::DeepState,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
+    power_cores: &crate::power_cores::PowerCoreState,
 ) {
     set_global_ui_border_style(achievements.ui_border_style);
 
@@ -411,6 +412,7 @@ pub fn draw_ui_with_update(
                 deep_indicator,
                 achievements,
                 enhancement_levels,
+                power_cores,
             );
         }
         SizeTier::M => {
@@ -449,6 +451,7 @@ fn draw_xl_l_layout(
     deep_indicator: stats_panel::DeepIndicatorStatus,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
+    power_cores: &crate::power_cores::PowerCoreState,
 ) {
     let size = frame.area();
 
@@ -504,6 +507,7 @@ fn draw_xl_l_layout(
         ctx,
         enhancement_levels,
         achievements,
+        power_cores,
     );
 
     // Draw ticker

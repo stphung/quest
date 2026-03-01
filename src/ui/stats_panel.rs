@@ -3,12 +3,15 @@
 use super::responsive::{LayoutContext, SizeTier};
 use super::stats_attributes::draw_attributes_compact;
 use super::stats_equipment::draw_equipment_names_only;
-use super::stats_prestige::{draw_fishing_panel, draw_prestige_info, format_eta};
+use super::stats_prestige::{
+    draw_fishing_panel, draw_power_cores_panel, draw_prestige_info, format_eta,
+};
 use super::stats_sigils::draw_sigils_panel;
 use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::{get_adventurer_rank, get_prestige_tier};
 use crate::core::game_logic::xp_for_next_level;
 use crate::core::game_state::GameState;
+use crate::power_cores::PowerCoreState;
 use crate::utils::updater::UpdateInfo;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -66,6 +69,7 @@ pub fn draw_stats_panel(
     ctx: &LayoutContext,
     enhancement_levels: &[u8; 7],
     achievements: &crate::achievements::Achievements,
+    power_cores: &PowerCoreState,
 ) {
     match ctx.height_tier {
         SizeTier::XL | SizeTier::L => {
@@ -75,12 +79,22 @@ pub fn draw_stats_panel(
             } else {
                 6 // 4 inner rows + 2 border
             };
+            let unlocked_cores = crate::power_cores::get_unlocked_cores(achievements).len();
+            let power_cores_height = if unlocked_cores > 0 {
+                crate::power_cores::ALL_POWER_CORES.len() as u16 + 2 // all 6 cores + 2 border rows
+            } else {
+                0
+            };
+
             let mut constraints = vec![
                 Constraint::Length(5), // Header (name, level+power, time+rate, XP gauge)
                 Constraint::Length(prestige_height), // Prestige
                 Constraint::Length(4), // Fishing
-                Constraint::Length(5), // Attributes
             ];
+            if power_cores_height > 0 {
+                constraints.push(Constraint::Length(power_cores_height)); // Power Cores
+            }
+            constraints.push(Constraint::Length(5)); // Attributes
             if etched > 0 {
                 constraints.push(Constraint::Length(
                     crate::stormglass::sigils::MAX_SIGIL_SLOTS as u16 + 2,
@@ -100,6 +114,10 @@ pub fn draw_stats_panel(
             idx += 1;
             draw_fishing_panel(frame, chunks[idx], game_state, achievements);
             idx += 1;
+            if power_cores_height > 0 {
+                draw_power_cores_panel(frame, chunks[idx], achievements, power_cores);
+                idx += 1;
+            }
             draw_attributes_compact(frame, chunks[idx], game_state);
             idx += 1;
             if etched > 0 {

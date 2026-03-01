@@ -896,6 +896,7 @@ mod tick_tests {
     use quest::core::tick_types::TickResult;
     use quest::enhancement::EnhancementProgress;
     use quest::haven::Haven;
+    use quest::power_cores::PowerCoreState;
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
 
@@ -921,6 +922,7 @@ mod tick_tests {
             &mut enhancement,
             &mut quest::deep::DeepState::new(),
             &mut achievements,
+            &mut PowerCoreState::default(),
             true,
             &mut rng,
         );
@@ -949,6 +951,7 @@ mod tick_tests {
             &mut enhancement,
             &mut quest::deep::DeepState::new(),
             &mut achievements,
+            &mut PowerCoreState::default(),
             false,
             &mut rng,
         );
@@ -975,6 +978,7 @@ mod tick_tests {
             &mut enhancement,
             &mut quest::deep::DeepState::new(),
             &mut achievements,
+            &mut PowerCoreState::default(),
             false,
             &mut rng,
         );
@@ -998,6 +1002,7 @@ mod tick_tests {
             &mut enhancement,
             &mut quest::deep::DeepState::new(),
             &mut achievements,
+            &mut PowerCoreState::default(),
             false,
             &mut rng,
         );
@@ -1024,6 +1029,7 @@ mod tick_tests {
                 &mut enhancement,
                 &mut quest::deep::DeepState::new(),
                 &mut achievements,
+                &mut PowerCoreState::default(),
                 false,
                 &mut rng,
             );
@@ -1063,6 +1069,7 @@ mod tick_tests {
                 &mut enhancement,
                 &mut quest::deep::DeepState::new(),
                 &mut achievements,
+                &mut PowerCoreState::default(),
                 false,
                 &mut rng,
             );
@@ -1089,6 +1096,7 @@ mod tick_tests {
                 &mut enhancement,
                 &mut quest::deep::DeepState::new(),
                 &mut achievements,
+                &mut PowerCoreState::default(),
                 false,
                 &mut rng,
             );
@@ -1114,6 +1122,7 @@ mod tick_tests {
                 &mut enhancement,
                 &mut quest::deep::DeepState::new(),
                 &mut achievements,
+                &mut PowerCoreState::default(),
                 false,
                 &mut rng,
             );

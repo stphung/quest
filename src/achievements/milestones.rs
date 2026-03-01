@@ -180,13 +180,22 @@ pub const DEEP_MISSION_MILESTONES: &[(u64, AchievementId)] = &[
 
 /// Deep layer progression milestones.
 pub const DEEP_LAYER_MILESTONES: &[(u64, AchievementId)] = &[
-    (3, AchievementId::Layer3Cleared),
-    (7, AchievementId::Layer7Cleared),
-    (12, AchievementId::Layer12Cleared),
-    (18, AchievementId::Layer18Cleared),
+    (5, AchievementId::Layer5Cleared),
+    (10, AchievementId::Layer10Cleared),
+    (15, AchievementId::Layer15Cleared),
+    (20, AchievementId::Layer20Cleared),
     (25, AchievementId::Layer25Cleared),
     (26, AchievementId::VoidExplorer),
-    (30, AchievementId::Layer30Cleared),
+];
+
+/// Power Core milestones — tied to fracture zone unlock layers.
+pub const POWER_CORE_MILESTONES: &[(u64, AchievementId)] = &[
+    (3, AchievementId::PowerCoreI),
+    (7, AchievementId::PowerCoreII),
+    (12, AchievementId::PowerCoreIII),
+    (18, AchievementId::PowerCoreIV),
+    (25, AchievementId::PowerCoreV),
+    (30, AchievementId::PowerCoreVI),
 ];
 
 /// Deep guild rank milestones.

@@ -276,12 +276,11 @@ pub enum AchievementId {
     DeepMissionsL,        // Complete 50 missions
     DeepMissionsC,        // Complete 100 missions
     FirstBreakthrough,    // Complete first breakthrough mission
-    Layer3Cleared,        // Reach Layer 3 (unlocks Red Fault)
-    Layer7Cleared,        // Reach Layer 7 (unlocks Mirror Scar)
-    Layer12Cleared,       // Reach Layer 12 (unlocks Black Mouth)
-    Layer18Cleared,       // Reach Layer 18 (unlocks Hollow Throne)
-    Layer25Cleared,       // Reach Layer 25 (unlocks Wailing Reach)
-    Layer30Cleared,       // Reach Layer 30 (unlocks Origin Wound)
+    Layer5Cleared,        // Reach Layer 5
+    Layer10Cleared,       // Reach Layer 10
+    Layer15Cleared,       // Reach Layer 15
+    Layer20Cleared,       // Reach Layer 20
+    Layer25Cleared,       // Reach Layer 25 (The Abyss)
     VoidExplorer,         // Reach Layer 26 (The Void)
     GuildRank2,           // Reach Guild Rank 2 (Company)
     GuildRank3,           // Reach Guild Rank 3 (Battalion)
@@ -289,6 +288,13 @@ pub enum AchievementId {
     GuildRank5,           // Reach Guild Rank 5 (Vanguard)
     FirstMercLost,        // Lose a mercenary for the first time
     GatewayOpened,        // Opened the Gateway beneath the world
+    // Power Cores — unlocked at fracture zone unlock layers
+    PowerCoreI,   // Deep Layer 3 — Red Fault core
+    PowerCoreII,  // Deep Layer 7 — Mirror Scar core
+    PowerCoreIII, // Deep Layer 12 — Black Mouth core
+    PowerCoreIV,  // Deep Layer 18 — Hollow Throne core
+    PowerCoreV,   // Deep Layer 25 — Wailing Reach core
+    PowerCoreVI,  // Deep Layer 30 — Origin Wound core
 }
 
 impl AchievementId {
@@ -303,7 +309,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 208;
+    pub const VARIANT_COUNT: usize = 213;
 }
 
 /// Static definition of an achievement.

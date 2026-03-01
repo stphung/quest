@@ -15,8 +15,8 @@
 use super::milestones::{
     MinigameDifficulty, MinigameType, BOSS_HUNTER_MILESTONES, DEEP_GUILD_RANK_MILESTONES,
     DEEP_LAYER_MILESTONES, DEEP_MISSION_MILESTONES, DUNGEON_MILESTONES, FISHERMAN_MILESTONES,
-    FISH_CATCHER_MILESTONES, GRAND_CHAMPION_MILESTONES, LEVEL_MILESTONES, PRESTIGE_MILESTONES,
-    SLAYER_MILESTONES,
+    FISH_CATCHER_MILESTONES, GRAND_CHAMPION_MILESTONES, LEVEL_MILESTONES, POWER_CORE_MILESTONES,
+    PRESTIGE_MILESTONES, SLAYER_MILESTONES,
 };
 use super::types::{AchievementId, Achievements};
 
@@ -368,6 +368,7 @@ impl Achievements {
         }
 
         self.check_milestones(new_layer as u64, DEEP_LAYER_MILESTONES, character_name);
+        self.check_milestones(new_layer as u64, POWER_CORE_MILESTONES, character_name);
     }
 
     /// Called when the guild rank increases in The Deep.
