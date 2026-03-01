@@ -30,6 +30,14 @@ pub fn resolve_deep_offline(
     }
     for layer in &summary.breakthroughs {
         achievements.on_deep_breakthrough(*layer, Some(character_name));
+        // Check if this breakthrough unlocks a fracture region (mirrors tick_stages.rs)
+        if let Some(region) = crate::zones::FractureRegion::from_layer(*layer) {
+            let new_cap = region.end_zone_id();
+            if new_cap > deep.persistent.fracture_zone_cap {
+                deep.persistent.fracture_zone_cap = new_cap;
+                deep.persistent.pending_fracture_region_unlock = Some(region);
+            }
+        }
     }
     for _ in 0..summary.mercs_lost {
         achievements.on_deep_merc_lost(Some(character_name));
