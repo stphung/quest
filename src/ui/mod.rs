@@ -810,6 +810,8 @@ fn draw_challenge_banner(
 
 /// Draws the right panel with a stable 2-part layout: zone info and content.
 /// The content area changes based on activity but zone info stays fixed.
+/// When a minigame is active, zone info is hidden to give the minigame
+/// the full vertical space (prevents grid clipping on shorter terminals).
 fn draw_right_panel(
     frame: &mut Frame,
     area: Rect,
@@ -817,6 +819,12 @@ fn draw_right_panel(
     achievements: &crate::achievements::Achievements,
     ctx: &LayoutContext,
 ) {
+    // Skip zone info during minigames to maximise content area
+    if game_state.active_minigame.is_some() {
+        draw_right_content(frame, area, game_state, achievements, ctx);
+        return;
+    }
+
     // Zone info + progress bar at top
     let zone_height = if ctx.tier >= SizeTier::XL { 9 } else { 10 };
     let chunks = Layout::default()
