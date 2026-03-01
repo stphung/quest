@@ -16,6 +16,8 @@ pub mod tick_types;
 pub mod ticker;
 pub mod xp;
 
+pub mod power_rating;
+
 pub mod combat_context;
 pub mod game_state_serde;
 pub mod player_identity;

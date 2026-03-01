@@ -143,6 +143,7 @@ mod tests {
             xp_this_second: 0,
             combat_seconds_this_tick: false,
             game_over_shown_at: None,
+            cached_power_rating: 0.0,
             stormglass: 0,
             stormglass_discovered: false,
             storm_sigils: crate::stormglass::sigils::StormSigils::new(),

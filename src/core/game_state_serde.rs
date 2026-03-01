@@ -162,6 +162,7 @@ impl FlatGameState {
             xp_this_second: 0,
             combat_seconds_this_tick: false,
             game_over_shown_at: None,
+            cached_power_rating: 0.0,
             // Sub-structs
             player,
             combat_ctx,
