@@ -129,6 +129,14 @@ pub fn handle_game_input(
         return handle_bug_report_overlay(key, overlay);
     }
 
+    // 0.8b. Browser link fallback modal
+    if matches!(overlay, GameOverlay::BrowserLink { .. }) {
+        if matches!(key.code, KeyCode::Esc) {
+            *overlay = GameOverlay::None;
+        }
+        return InputResult::Continue;
+    }
+
     // 0.85. Time Vault overlay
     if let GameOverlay::TimeVault { ref mut browser } = overlay {
         use time_vault_input::{handle_time_vault_input, TimeVaultAction};
@@ -441,11 +449,9 @@ fn handle_bug_report_overlay(key: KeyEvent, overlay: &mut GameOverlay) -> InputR
         KeyCode::Enter => {
             if let GameOverlay::BugReport { ref summary, .. } = overlay {
                 let url = crate::utils::bug_report::build_issue_url(summary);
-                if let Err(e) = crate::utils::bug_report::open_browser(&url) {
-                    *overlay = GameOverlay::BugReport {
-                        summary: String::new(),
-                        clipboard_ready: false,
-                        error: Some(format!("Failed to open browser: {e}")),
+                if crate::utils::bug_report::open_browser(&url).is_err() {
+                    *overlay = GameOverlay::BrowserLink {
+                        url: "https://github.com/stphung/quest/issues/new".to_string(),
                     };
                 } else {
                     *overlay = GameOverlay::None;
@@ -601,9 +607,10 @@ fn handle_base_game(
             InputResult::Continue
         }
         KeyCode::Char('w') | KeyCode::Char('W') => {
-            let _ = crate::utils::bug_report::open_browser(
-                &crate::core::constants::wiki_url_for_browser(),
-            );
+            let url = crate::core::constants::wiki_url_for_browser();
+            if crate::utils::bug_report::open_browser(&url).is_err() {
+                *overlay = GameOverlay::BrowserLink { url };
+            }
             InputResult::Continue
         }
         KeyCode::Char('!') => {
