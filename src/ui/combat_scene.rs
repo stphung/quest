@@ -519,7 +519,7 @@ pub fn render_fracture_region_unlock_modal(
         lines.push(Line::from(""));
         lines.push(Line::from(vec![Span::styled(
             format!(
-                "\u{2726} ASCENSION {}  \u{2014}  \u{00d7}{:.1} all combat stats",
+                "\u{2726} ASCENSION {}  \u{2014}  \u{00d7}{:.1} power",
                 roman, mult
             ),
             Style::default().fg(GOLD).add_modifier(Modifier::BOLD),

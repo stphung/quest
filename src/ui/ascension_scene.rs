@@ -84,7 +84,7 @@ pub fn render_ascension_confirm(
         )));
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
-            format!("All combat stats \u{00d7}{:.1}", current_mult),
+            format!("Power \u{00d7}{:.1}", current_mult),
             Style::default().fg(Color::Cyan),
         )));
         lines.push(Line::from(""));
@@ -158,7 +158,7 @@ pub fn render_ascension_confirm(
         // Multiplier jump
         lines.push(Line::from(Span::styled(
             format!(
-                "All combat stats \u{00d7}{:.1} \u{2192} \u{00d7}{:.1}",
+                "Power \u{00d7}{:.1} \u{2192} \u{00d7}{:.1}",
                 current_mult, next_mult
             ),
             Style::default().fg(Color::Cyan),

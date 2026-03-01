@@ -76,10 +76,10 @@ pub fn draw_stats_panel(
                 6 // 4 inner rows + 2 border
             };
             let mut constraints = vec![
-                Constraint::Length(4),               // Header
+                Constraint::Length(5), // Header (name, level+power, time+rate, XP gauge)
                 Constraint::Length(prestige_height), // Prestige
-                Constraint::Length(4),               // Fishing
-                Constraint::Length(5),               // Attributes
+                Constraint::Length(4), // Fishing
+                Constraint::Length(5), // Attributes
             ];
             if etched > 0 {
                 constraints.push(Constraint::Length(
@@ -150,18 +150,32 @@ fn draw_header(
     frame.render_widget(header_block, area);
     super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
 
-    let header_text = vec![Line::from(vec![
+    // Row 1: Level + Power rating (right-aligned)
+    let power = game_state.cached_power_rating as u64;
+    let power_str = format!(
+        "\u{2694} Power: {}",
+        super::game_common::format_number_short(power)
+    );
+    let level_str = format!("Level {} {}", game_state.character_level, rank);
+    // Pad power to right-align within inner width
+    let gap = (inner.width as usize).saturating_sub(level_str.len() + power_str.len());
+    let row1 = Line::from(vec![
         Span::styled(
-            format!("Level {} {}", game_state.character_level, rank),
+            level_str,
             Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::raw(" | "),
-        Span::styled("\u{23f1}\u{fe0f} ", Style::default().fg(Color::Cyan)),
-        Span::styled(play_time, Style::default().fg(Color::Cyan)),
-    ])];
+        Span::raw(" ".repeat(gap)),
+        Span::styled(
+            power_str,
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+    ]);
 
+    // Row 2: Play time + XP rate
     let rate_suffix = match game_state.xp_per_hour() {
         Some(rate) => {
             let xp_remaining = xp_needed.saturating_sub(game_state.character_xp);
@@ -179,14 +193,19 @@ fn draw_header(
         }
         None => String::new(),
     };
+    let row2 = Line::from(vec![
+        Span::styled("\u{23f1}\u{fe0f} ", Style::default().fg(Color::Cyan)),
+        Span::styled(play_time, Style::default().fg(Color::Cyan)),
+        Span::styled(rate_suffix, Style::default().fg(Color::Cyan)),
+    ]);
+
+    // Row 3: XP gauge
     let xp_label = format!(
-        "XP: {}/{} ({:.1}%){}",
+        "XP: {}/{} ({:.1}%)",
         game_state.character_xp,
         xp_needed,
         xp_ratio * 100.0,
-        rate_suffix
     );
-
     let xp_gauge = Gauge::default()
         .gauge_style(
             Style::default()
@@ -196,18 +215,21 @@ fn draw_header(
         .label(xp_label)
         .ratio(xp_ratio);
 
-    if inner.height >= 2 {
+    if inner.height >= 3 {
         let inner_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Length(1)])
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+            ])
             .split(inner);
 
-        let header_paragraph = Paragraph::new(header_text);
-        frame.render_widget(header_paragraph, inner_chunks[0]);
-        frame.render_widget(xp_gauge, inner_chunks[1]);
-    } else if inner.height == 1 {
-        let header_paragraph = Paragraph::new(header_text);
-        frame.render_widget(header_paragraph, inner);
+        frame.render_widget(Paragraph::new(vec![row1]), inner_chunks[0]);
+        frame.render_widget(Paragraph::new(vec![row2]), inner_chunks[1]);
+        frame.render_widget(xp_gauge, inner_chunks[2]);
+    } else if inner.height >= 1 {
+        frame.render_widget(Paragraph::new(vec![row1]), inner);
     }
 }
 

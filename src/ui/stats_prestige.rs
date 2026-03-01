@@ -181,7 +181,7 @@ pub(super) fn draw_prestige_info(
             ),
             Span::styled("\u{2014} ", Style::default().fg(Color::DarkGray)),
             Span::styled(
-                format!("\u{00d7}{:.1} all combat stats", asc_mult),
+                format!("\u{00d7}{:.1} power", asc_mult),
                 Style::default().fg(Color::Rgb(255, 215, 0)),
             ),
         ]));
