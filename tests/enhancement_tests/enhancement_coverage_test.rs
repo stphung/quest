@@ -407,7 +407,8 @@ fn test_try_discover_soulforge_high_prestige_discovers_faster() {
 
     let mut ep_low = EnhancementProgress::new();
     let mut ticks_low = 0u64;
-    for i in 0..1_000_000u64 {
+    // At P15, expected discovery in ~71K ticks; 200K gives ample margin
+    for i in 0..200_000u64 {
         if try_discover_soulforge(&mut ep_low, 15, &mut rng_low) {
             ticks_low = i;
             break;
@@ -416,7 +417,8 @@ fn test_try_discover_soulforge_high_prestige_discovers_faster() {
 
     let mut ep_high = EnhancementProgress::new();
     let mut ticks_high = 0u64;
-    for i in 0..1_000_000u64 {
+    // At P50, expected discovery in ~3.9K ticks; 50K gives ample margin
+    for i in 0..50_000u64 {
         if try_discover_soulforge(&mut ep_high, 50, &mut rng_high) {
             ticks_high = i;
             break;
@@ -455,7 +457,10 @@ fn test_try_discover_soulforge_at_prestige_14_never_discovers() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut ep = EnhancementProgress::new();
 
-    for _ in 0..100_000 {
+    // Probability is exactly 0.0 at P14 (below min prestige rank),
+    // so this always returns false via an early-return guard clause.
+    // 1,000 iterations is sufficient to verify the guard.
+    for _ in 0..1_000 {
         assert!(!try_discover_soulforge(&mut ep, 14, &mut rng));
     }
     assert!(!ep.discovered);
@@ -872,17 +877,16 @@ mod soulforge_tick_integration {
     #[test]
     fn game_tick_emits_soulforge_discovered_at_p15_plus() {
         let mut state = GameState::new("Forge Hero".to_string(), 0);
-        state.prestige_rank = 15;
+        state.prestige_rank = 100; // Higher prestige for faster discovery
         let mut enhancement = EnhancementProgress::new();
 
-        // At P15, discovery base chance = 0.000014/tick. With a fixed seed and
-        // enough ticks (1M = 100k seconds) we should discover it.
-        let (_, discovered) =
-            run_until_soulforge_discovered(&mut state, &mut enhancement, 1_000_000);
+        // At P100, discovery chance = 0.000609/tick. Expected within ~1.6K ticks.
+        // 50K gives ample margin while still testing the same code path.
+        let (_, discovered) = run_until_soulforge_discovered(&mut state, &mut enhancement, 50_000);
 
         assert!(
             discovered,
-            "Soulforge should be discovered within 1M ticks at P15"
+            "Soulforge should be discovered within 50K ticks at P100"
         );
         assert!(
             enhancement.discovered,
@@ -894,7 +898,7 @@ mod soulforge_tick_integration {
     #[test]
     fn game_tick_sets_enhancement_changed_on_soulforge_discovery() {
         let mut state = GameState::new("Forge Hero".to_string(), 0);
-        state.prestige_rank = 20; // Higher rank = faster discovery
+        state.prestige_rank = 100; // Higher rank = much faster discovery
         let mut tick_counter = 0u32;
         let mut haven = Haven::default();
         let mut enhancement = EnhancementProgress::new();
@@ -903,8 +907,9 @@ mod soulforge_tick_integration {
         let mut power_cores = quest::power_cores::PowerCoreState::default();
         let mut rng = make_rng(1);
 
-        // Run until discovery fires and capture that specific TickResult
-        for _ in 0..500_000 {
+        // Run until discovery fires and capture that specific TickResult.
+        // At P100, discovery chance is ~0.000609/tick, so expected within ~1,640 ticks.
+        for _ in 0..50_000 {
             let mut ctx = TickContext {
                 state: &mut state,
                 tick_counter: &mut tick_counter,
@@ -929,7 +934,7 @@ mod soulforge_tick_integration {
                 return;
             }
         }
-        panic!("Soulforge was not discovered within 500K ticks at P20");
+        panic!("Soulforge was not discovered within 50K ticks at P100");
     }
 
     /// Soulforge discovery is blocked when an active dungeon is running,

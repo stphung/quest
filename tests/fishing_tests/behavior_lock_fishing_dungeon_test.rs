@@ -739,14 +739,16 @@ fn test_challenge_discovery_can_succeed_at_p1() {
 
 #[test]
 fn test_challenge_discovery_returns_valid_challenge_type() {
-    // Behavior: discovery returns a ChallengeType from the weighted table (line 1034)
+    // Behavior: discovery returns a ChallengeType from the weighted table.
+    // Use high haven bonus to boost discovery rate from ~0.0014% to ~14%,
+    // reducing iterations from 100K to 100 while testing the same code path.
     let mut state = create_test_state();
     state.prestige_rank = 1;
 
     let mut found_type = None;
-    for seed in 0..100_000u64 {
+    for seed in 0..100u64 {
         let mut rng = create_seeded_rng(seed);
-        if let Some(ct) = try_discover_challenge(&mut state, &mut rng) {
+        if let Some(ct) = try_discover_challenge_with_haven(&mut state, &mut rng, 1_000_000.0) {
             found_type = Some(ct);
             break;
         }
