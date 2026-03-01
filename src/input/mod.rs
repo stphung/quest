@@ -509,6 +509,18 @@ fn handle_debug_menu(
                 *overlay = GameOverlay::FractureRegionUnlock {
                     region: crate::zones::FractureRegion::BlackMouth,
                 };
+            } else if msg.contains("Hollow Throne unlocked") {
+                *overlay = GameOverlay::FractureRegionUnlock {
+                    region: crate::zones::FractureRegion::HollowThrone,
+                };
+            } else if msg.contains("Wailing Reach unlocked") {
+                *overlay = GameOverlay::FractureRegionUnlock {
+                    region: crate::zones::FractureRegion::WailingReach,
+                };
+            } else if msg.contains("Origin Wound unlocked") {
+                *overlay = GameOverlay::FractureRegionUnlock {
+                    region: crate::zones::FractureRegion::OriginWound,
+                };
             }
         }
         KeyCode::Esc => debug_menu.close(),
