@@ -887,7 +887,7 @@ fn mission_description(mission_type: MissionType, layer: u32) -> &'static str {
         (MissionType::GatewayExpedition, _) => "Breach the sealed gateway at the root of The Deep.",
         (MissionType::SupplyRun, _) => "Recover resources from previously cleared sections.",
         (MissionType::Recon, LayerTier::Shallows) => {
-            "Survey the Shallows for intel and entry points."
+            "Survey the Shallows for familiarity and entry points."
         }
         (MissionType::Recon, LayerTier::Warrens) => "Map the warren tunnels and catalogue threats.",
         (MissionType::Recon, LayerTier::Hollows) => {
@@ -896,7 +896,7 @@ fn mission_description(mission_type: MissionType, layer: u32) -> &'static str {
         (MissionType::Recon, LayerTier::SunkenReach) => {
             "Survey flooded vaults and note guardian positions."
         }
-        (MissionType::Recon, _) => "Gather intelligence on the deep structure ahead.",
+        (MissionType::Recon, _) => "Scout the deep structure ahead and build familiarity.",
         (MissionType::Expedition, LayerTier::Shallows) => {
             "Push through the Shallows, securing resources."
         }
@@ -920,7 +920,7 @@ fn mission_description(mission_type: MissionType, layer: u32) -> &'static str {
             "Cache supplies to improve resource yields on this layer."
         }
         (MissionType::Construction(Infrastructure::Watchtower), _) => {
-            "Build a watchtower to improve intel and auto-resolve quality."
+            "Build a watchtower to boost familiarity and auto-resolve quality."
         }
         (MissionType::Construction(Infrastructure::Bridge), _) => {
             "Construct a shortcut bridge to bypass this layer."
