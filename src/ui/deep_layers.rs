@@ -894,12 +894,12 @@ fn render_layers_split(
                         .filter(|l| l.has_infrastructure(Infrastructure::Bridge))
                         .count();
                     if bridge_count == 0 {
-                        "First bridge: -10% on deeper missions".to_string()
+                        "First bridge: -2% on deeper missions".to_string()
                     } else {
                         format!(
-                            "Bridge #{}: compounds to -{:.0}% total",
+                            "Bridge #{}: -{}% total",
                             bridge_count + 1,
-                            (1.0 - (0.9_f64).powi((bridge_count + 1) as i32)) * 100.0
+                            ((bridge_count + 1) as u32).min(15) * 2
                         )
                     }
                 }
@@ -951,12 +951,12 @@ fn render_layers_split(
                         .filter(|l| l.has_infrastructure(Infrastructure::Bridge))
                         .count();
                     if bridge_count == 0 {
-                        "Skip this layer on deeper missions (-10% duration)".to_string()
+                        "Skip this layer on deeper missions (-2% duration)".to_string()
                     } else {
-                        let new_reduction = 1.0 - (0.9_f64).powi((bridge_count + 1) as i32);
+                        let new_reduction = ((bridge_count + 1) as u32).min(15) * 2;
                         format!(
-                            "Skip layer (-{:.0}% total with {} bridge{})",
-                            new_reduction * 100.0,
+                            "Skip layer (-{}% total with {} bridge{})",
+                            new_reduction,
                             bridge_count + 1,
                             if bridge_count == 0 { "" } else { "s" },
                         )
@@ -1025,7 +1025,7 @@ fn render_layers_split(
         if fam_reduction > 0 {
             modifiers.push(format!("-{}% Familiarity", fam_reduction));
         }
-        let bridge_pct = bridge_count.min(5) * 10;
+        let bridge_pct = bridge_count.min(15) * 2;
         if bridge_pct > 0 {
             modifiers.push(format!("-{}% Bridge", bridge_pct));
         }

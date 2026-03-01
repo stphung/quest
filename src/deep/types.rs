@@ -262,7 +262,7 @@ impl Infrastructure {
                 "Boosts familiarity (+40); improves auto-resolve outcomes."
             }
             Infrastructure::Bridge => {
-                "Unlocks a shortcut; -10% mission duration per bridged layer (max -50%)."
+                "Unlocks a shortcut; -2% mission duration per bridged layer (max -30%)."
             }
         }
     }
