@@ -259,14 +259,14 @@ Passive prestige rank generation system tied to Deep layer milestones. Six Power
 
 | Core | Name | Deep Layer | PR/Day | Fill Time |
 |------|------|-----------|--------|-----------|
-| I | Red Fault | 3 | 1 | 24h |
-| II | Mirror Scar | 7 | 2 | 12h |
-| III | Black Mouth | 12 | 3 | 8h |
-| IV | Hollow Throne | 18 | 4 | 6h |
-| V | Wailing Reach | 25 | 5 | ~4.8h |
-| VI | Origin Wound | 30 | 6 | 4h |
+| I | Red Fault | 3 | 2 | 12h |
+| II | Mirror Scar | 7 | 3 | 8h |
+| III | Black Mouth | 12 | 5 | ~4.8h |
+| IV | Hollow Throne | 18 | 8 | 3h |
+| V | Wailing Reach | 25 | 12 | 2h |
+| VI | Origin Wound | 30 | 18 | ~1.3h |
 
-Total at all 6 cores: 21 PR/day (max).
+Total at all 6 cores: 48 PR/day (max).
 
 ### God Items Module (`src/god_items/`)
 
@@ -471,7 +471,7 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - Ascension cost: [35, 65, 120, 200, 325, 500] PR for I-VI; 500 + 75*(level-6) PR for VII+
 - Ascension deep gate: [3, 7, 12, 18, 25, 30] layers for I-VI; none for VII+
 - Ascension multiplier: 2^level for I-VI (2x to 64x); 64 * 1.5^(level-6) for VII+
-- Power Cores: 6 cores (1-6 PR/day), unlocked at Deep Layers 3/7/12/18/25/30, max 21 PR/day total
+- Power Cores: 6 cores (2-18 PR/day), unlocked at Deep Layers 3/7/12/18/25/30, max 48 PR/day total
 
 ## Combat Mechanics
 

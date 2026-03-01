@@ -1742,7 +1742,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     AchievementDef {
         id: AchievementId::PowerCoreI,
         name: "Power Core I",
-        description: "Reach Deep Layer 3 \u{2014} activate the Red Fault power core",
+        description: "Reach Deep Layer 3 \u{2014} activate the Red Fault power core (2 PR/day)",
         category: AchievementCategory::Deep,
         icon: "\u{2B21}",
         points: 10,
@@ -1750,7 +1750,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     AchievementDef {
         id: AchievementId::PowerCoreII,
         name: "Power Core II",
-        description: "Reach Deep Layer 7 \u{2014} activate the Mirror Scar power core",
+        description: "Reach Deep Layer 7 \u{2014} activate the Mirror Scar power core (3 PR/day)",
         category: AchievementCategory::Deep,
         icon: "\u{2B21}",
         points: 25,
@@ -1758,7 +1758,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     AchievementDef {
         id: AchievementId::PowerCoreIII,
         name: "Power Core III",
-        description: "Reach Deep Layer 12 \u{2014} activate the Black Mouth power core",
+        description: "Reach Deep Layer 12 \u{2014} activate the Black Mouth power core (5 PR/day)",
         category: AchievementCategory::Deep,
         icon: "\u{2B21}",
         points: 50,
@@ -1766,7 +1766,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     AchievementDef {
         id: AchievementId::PowerCoreIV,
         name: "Power Core IV",
-        description: "Reach Deep Layer 18 \u{2014} activate the Hollow Throne power core",
+        description: "Reach Deep Layer 18 \u{2014} activate the Hollow Throne power core (8 PR/day)",
         category: AchievementCategory::Deep,
         icon: "\u{2B21}",
         points: 100,
@@ -1774,7 +1774,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     AchievementDef {
         id: AchievementId::PowerCoreV,
         name: "Power Core V",
-        description: "Reach Deep Layer 25 \u{2014} activate the Wailing Reach power core",
+        description: "Reach Deep Layer 25 \u{2014} activate the Wailing Reach power core (12 PR/day)",
         category: AchievementCategory::Deep,
         icon: "\u{2B21}",
         points: 250,
@@ -1782,7 +1782,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     AchievementDef {
         id: AchievementId::PowerCoreVI,
         name: "Power Core VI",
-        description: "Reach Deep Layer 30 \u{2014} activate the Origin Wound power core",
+        description: "Reach Deep Layer 30 \u{2014} activate the Origin Wound power core (18 PR/day)",
         category: AchievementCategory::Deep,
         icon: "\u{2B21}",
         points: 500,
