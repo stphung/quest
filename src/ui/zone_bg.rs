@@ -1134,17 +1134,149 @@ fn overlay_void_pulse(buffer: &mut [Vec<SceneCell>], millis: f64) {
     }
 }
 
-fn overlay_heat_distortion(_buffer: &mut [Vec<SceneCell>], _millis: f64) {}
+fn overlay_heat_distortion(buffer: &mut [Vec<SceneCell>], millis: f64) {
+    let height = buffer.len();
+    let distort_start = (height as f64 * 0.5) as usize;
 
-fn overlay_mirror_flash(_buffer: &mut [Vec<SceneCell>], _millis: f64) {}
+    for (row_idx, row_cells) in buffer.iter_mut().enumerate().skip(distort_start) {
+        let row_t = (row_idx - distort_start) as f64 / (height - distort_start).max(1) as f64;
+        let wave = (millis * 0.003 + row_idx as f64 * 0.4).sin();
+        let shift = (wave * 8.0 * row_t) as i16;
 
-fn overlay_consuming_dark(_buffer: &mut [Vec<SceneCell>], _millis: f64) {}
+        for cell in row_cells.iter_mut() {
+            if let Color::Rgb(r, g, b) = cell.bg {
+                cell.bg = Color::Rgb(
+                    clamp_u8(r as i16 + shift),
+                    clamp_u8(g as i16 + shift / 3),
+                    clamp_u8(b as i16 - shift / 2),
+                );
+            }
+        }
+    }
+}
 
-fn overlay_hollow_echo(_buffer: &mut [Vec<SceneCell>], _millis: f64) {}
+fn overlay_mirror_flash(buffer: &mut [Vec<SceneCell>], millis: f64) {
+    let height = buffer.len();
+    let width = if height > 0 { buffer[0].len() } else { return };
 
-fn overlay_reality_tear(_buffer: &mut [Vec<SceneCell>], _millis: f64) {}
+    // 3 flash points that cycle
+    for i in 0..3u32 {
+        let cycle = 3000.0 + i as f64 * 1100.0;
+        let phase = millis % cycle;
+        let flash_duration = 120.0;
 
-fn overlay_wound_pulse(_buffer: &mut [Vec<SceneCell>], _millis: f64) {}
+        if phase > flash_duration {
+            continue;
+        }
+
+        let intensity = (1.0 - phase / flash_duration) * 40.0;
+        let amount = intensity as i16;
+
+        let flash_row = (hash2d(i as usize + 7, (millis / cycle) as usize) % height as u32) as usize;
+        let flash_col = (hash2d((millis / cycle) as usize, i as usize + 3) % width as u32) as usize;
+
+        // Horizontal streak
+        let streak_len = 4 + (i as usize % 3);
+        for dc in 0..streak_len {
+            let col = flash_col + dc;
+            if flash_row < height && col < width {
+                if let Color::Rgb(r, g, b) = buffer[flash_row][col].bg {
+                    buffer[flash_row][col].bg = Color::Rgb(
+                        clamp_u8(r as i16 + amount),
+                        clamp_u8(g as i16 + amount),
+                        clamp_u8(b as i16 + amount),
+                    );
+                }
+            }
+        }
+    }
+}
+
+fn overlay_consuming_dark(buffer: &mut [Vec<SceneCell>], millis: f64) {
+    let height = buffer.len();
+    let pulse = (millis * 0.001).sin() * 0.15 + 0.7; // 0.55 to 0.85
+    let dark_start = (height as f64 * pulse) as usize;
+
+    for (row_idx, row_cells) in buffer.iter_mut().enumerate().skip(dark_start) {
+        let row_t = (row_idx - dark_start) as f64 / (height - dark_start).max(1) as f64;
+        let darken = (row_t * 30.0) as i16;
+
+        for cell in row_cells.iter_mut() {
+            if let Color::Rgb(r, g, b) = cell.bg {
+                cell.bg = Color::Rgb(
+                    clamp_u8(r as i16 - darken),
+                    clamp_u8(g as i16 - darken),
+                    clamp_u8(b as i16 - darken),
+                );
+            }
+        }
+    }
+}
+
+fn overlay_hollow_echo(buffer: &mut [Vec<SceneCell>], millis: f64) {
+    let width = if !buffer.is_empty() { buffer[0].len() } else { return };
+    let wave_pos = ((millis * 0.0004).sin() * 0.5 + 0.5) * width as f64;
+
+    for row_cells in buffer.iter_mut() {
+        for (col, cell) in row_cells.iter_mut().enumerate() {
+            let dist = ((col as f64 - wave_pos).abs() / width as f64).min(1.0);
+            if dist > 0.15 {
+                continue;
+            }
+            // Desaturate: pull all channels toward their average
+            if let Color::Rgb(r, g, b) = cell.bg {
+                let avg = ((r as u16 + g as u16 + b as u16) / 3) as i16;
+                let blend = (1.0 - dist / 0.15) * 0.4; // max 40% desaturation
+                cell.bg = Color::Rgb(
+                    clamp_u8(r as i16 + ((avg - r as i16) as f64 * blend) as i16),
+                    clamp_u8(g as i16 + ((avg - g as i16) as f64 * blend) as i16),
+                    clamp_u8(b as i16 + ((avg - b as i16) as f64 * blend) as i16),
+                );
+            }
+        }
+    }
+}
+
+fn overlay_reality_tear(buffer: &mut [Vec<SceneCell>], millis: f64) {
+    let height = buffer.len();
+    let phase = (millis / 200.0) as usize;
+
+    for (row_idx, row_cells) in buffer.iter_mut().enumerate() {
+        // Only affect certain rows, cycling rapidly
+        let affected = hash2d(row_idx + phase, phase + 17).is_multiple_of(7);
+        if !affected {
+            continue;
+        }
+
+        for cell in row_cells.iter_mut() {
+            if let Color::Rgb(r, g, b) = cell.bg {
+                // Partial inversion: shift toward complement
+                cell.bg = Color::Rgb(
+                    clamp_u8(255i16 - r as i16 * 2 / 3 - 85),
+                    clamp_u8(g as i16), // keep green stable for less nausea
+                    clamp_u8(255i16 - b as i16 * 2 / 3 - 85),
+                );
+            }
+        }
+    }
+}
+
+fn overlay_wound_pulse(buffer: &mut [Vec<SceneCell>], millis: f64) {
+    let pulse = (millis * 0.0006).sin() * 0.5 + 0.5; // 0..1, very slow
+    let darken = ((1.0 - pulse) * 20.0) as i16;
+
+    for row_cells in buffer.iter_mut() {
+        for cell in row_cells.iter_mut() {
+            if let Color::Rgb(r, g, b) = cell.bg {
+                cell.bg = Color::Rgb(
+                    clamp_u8(r as i16 - darken),
+                    clamp_u8(g as i16 - darken),
+                    clamp_u8(b as i16 - darken),
+                );
+            }
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Zone Configs
@@ -1648,16 +1780,100 @@ fn config_heart_of_the_fault() -> ZoneSceneConfig {
 // Chapter 2: The Mirror Scar (Zones 15-17)
 // ---------------------------------------------------------------------------
 
+/// Zone 15: Shard Fields -- scattered mirror crystals, cold blue, glass shards falling.
 fn config_shard_fields() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (140, 160, 190),
+        sky_bottom: (60, 70, 90),
+        celestial: CelestialType::CrackedSky,
+        far_terrain: TerrainProfile {
+            glyph: '\u{25c6}', // ◆
+            color: (120, 150, 200),
+            base_height: 0.46,
+            amplitude: 0.09,
+            frequency: 0.20,
+            speed: 0.00005,
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '\u{2502}', // │
+            color: (80, 100, 150),
+            base_height: 0.62,
+            amplitude: 0.07,
+            frequency: 0.25,
+            speed: 0.00004,
+            fill: false,
+        },
+        ground_glyphs: &['*', '.'],
+        ground_color: (140, 160, 200),
+        weather: WeatherType::GlassShards,
+        weather_intensity: 0.8,
+        overlay: Some(overlay_mirror_flash),
+    }
 }
 
+/// Zone 16: Refraction Steps -- bending light, prismatic, bioluminescent.
 fn config_refraction_steps() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (180, 200, 240),
+        sky_bottom: (30, 20, 80),
+        celestial: CelestialType::BioLuminescent,
+        far_terrain: TerrainProfile {
+            glyph: '\u{25bd}', // ▽
+            color: (100, 140, 200),
+            base_height: 0.50,
+            amplitude: 0.08,
+            frequency: 0.16,
+            speed: 0.00006,
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '\u{2591}', // ░
+            color: (70, 100, 170),
+            base_height: 0.64,
+            amplitude: 0.06,
+            frequency: 0.20,
+            speed: 0.00005,
+            fill: true,
+        },
+        ground_glyphs: &[':', '*'],
+        ground_color: (110, 140, 210),
+        weather: WeatherType::GlassShards,
+        weather_intensity: 1.2,
+        overlay: Some(overlay_crystal_shimmer),
+    }
 }
 
+/// Zone 17: Hall of Second Suns -- blinding prismatic light, heavy sparkles.
 fn config_hall_of_second_suns() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (220, 230, 250),
+        sky_bottom: (80, 160, 180),
+        celestial: CelestialType::CrackedSky,
+        far_terrain: TerrainProfile {
+            glyph: '\u{2550}', // ═
+            color: (200, 210, 240),
+            base_height: 0.48,
+            amplitude: 0.05,
+            frequency: 0.12,
+            speed: 0.00008,
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '\u{2592}', // ▒
+            color: (120, 160, 200),
+            base_height: 0.66,
+            amplitude: 0.06,
+            frequency: 0.15,
+            speed: 0.00005,
+            fill: true,
+        },
+        ground_glyphs: &['*', '\u{00b7}'],
+        ground_color: (180, 200, 240),
+        weather: WeatherType::Sparkles,
+        weather_intensity: 2.0,
+        overlay: Some(overlay_mirror_flash),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1864,16 +2080,100 @@ fn config_the_hollow_throne() -> ZoneSceneConfig {
 // Chapter 5: The Wailing Reach (Zones 24-26)
 // ---------------------------------------------------------------------------
 
+/// Zone 24: The Stillborn Sea -- flat grey lifeless sea, absolute stillness, no weather.
 fn config_the_stillborn_sea() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (85, 85, 88),
+        sky_bottom: (70, 70, 73),
+        celestial: CelestialType::None,
+        far_terrain: TerrainProfile {
+            glyph: '~',
+            color: (80, 80, 85),
+            base_height: 0.55,
+            amplitude: 0.02, // nearly flat -- still water
+            frequency: 0.08,
+            speed: 0.00001, // barely moving
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '▒', // ▒
+            color: (65, 65, 70),
+            base_height: 0.70,
+            amplitude: 0.03,
+            frequency: 0.06,
+            speed: 0.00001,
+            fill: true,
+        },
+        ground_glyphs: &['~', '.'],
+        ground_color: (75, 75, 80),
+        weather: WeatherType::None, // absolute stillness
+        weather_intensity: 1.0,
+        overlay: Some(overlay_hollow_echo),
+    }
 }
 
+/// Zone 25: Resonance Fault -- vibrating teal-purple, crystallized sound, light static.
 fn config_resonance_fault() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (30, 80, 100),
+        sky_bottom: (50, 20, 70),
+        celestial: CelestialType::Flicker,
+        far_terrain: TerrainProfile {
+            glyph: '│', // │
+            color: (60, 120, 140),
+            base_height: 0.46,
+            amplitude: 0.08,
+            frequency: 0.22,
+            speed: 0.00010, // vibrating
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '░', // ░
+            color: (40, 80, 100),
+            base_height: 0.63,
+            amplitude: 0.06,
+            frequency: 0.18,
+            speed: 0.00008,
+            fill: true,
+        },
+        ground_glyphs: &['*', ':'],
+        ground_color: (50, 100, 120),
+        weather: WeatherType::StaticNoise,
+        weather_intensity: 0.6,
+        overlay: Some(overlay_reality_tear),
+    }
 }
 
+/// Zone 26: The Wailing Reach -- flickering unstable reality, heavy static, reality tears.
 fn config_the_wailing_reach() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (50, 45, 60),
+        sky_bottom: (20, 15, 30),
+        celestial: CelestialType::Flicker,
+        far_terrain: TerrainProfile {
+            glyph: '╱', // ╱
+            color: (70, 50, 80),
+            base_height: 0.48,
+            amplitude: 0.10,
+            frequency: 0.20,
+            speed: 0.00012,
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '░', // ░
+            color: (40, 30, 50),
+            base_height: 0.64,
+            amplitude: 0.08,
+            frequency: 0.16,
+            speed: 0.00010,
+            fill: true,
+        },
+        ground_glyphs: &[],
+        ground_color: (0, 0, 0),
+        weather: WeatherType::StaticNoise,
+        weather_intensity: 1.6,
+        overlay: Some(overlay_reality_tear),
+    }
 }
 
 // ---------------------------------------------------------------------------
