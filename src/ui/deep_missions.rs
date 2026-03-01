@@ -860,24 +860,69 @@ pub(super) fn render_hub(
             }
         }
 
-        // Row 4: Next rank requirement (only if can advance)
+        // Row 4: Guild rank progress bar (visual advancement tracker)
         if rank.can_advance() {
             if let Some(next) = rank.next() {
                 if let Some(needed_layer) = next.required_breakthrough_layer() {
+                    // Header: "GUILD RANK  CurrentRank → NextRank"
+                    let rank_header = format!(
+                        "GUILD RANK  {} \u{2192} {}",
+                        rank.display_name(),
+                        next.display_name()
+                    );
+                    put_text(buffer, header_row, 1, &rank_header, SECTION_LABEL_COLOR);
+                    // Recolor current rank white, arrow and next rank in section color
                     put_text(
                         buffer,
                         header_row,
-                        1,
-                        &format!(
-                            "Advance to {}: complete Layer {} Breakthrough",
-                            next.display_name(),
-                            needed_layer
-                        ),
-                        Color::Rgb(50, 120, 60),
+                        "GUILD RANK  ".len() as i32 + 1,
+                        rank.display_name(),
+                        Color::White,
+                    );
+                    header_row += 1;
+
+                    // Progress bar: "Need: Layer X Breakthrough   ████░░░░ LY/LX"
+                    let label = format!("Need: Layer {} Breakthrough   ", needed_layer);
+                    put_text(buffer, header_row, 1, &label, Color::Rgb(80, 120, 80));
+                    let bar_col = 1 + label.len() as i32;
+                    let suffix = format!(" L{}/{}", deepest.max(1), needed_layer);
+                    let bar_width =
+                        (width as i32 - bar_col - suffix.len() as i32 - 2).max(6) as usize;
+                    let progress_ratio =
+                        (deepest.max(1) as f64 / needed_layer as f64).clamp(0.0, 1.0);
+                    let bar_color = if progress_ratio >= 1.0 {
+                        Color::Green
+                    } else {
+                        Color::Cyan
+                    };
+                    render_progress_bar(
+                        buffer,
+                        header_row,
+                        bar_col,
+                        bar_width,
+                        progress_ratio,
+                        bar_color,
+                    );
+                    put_text(
+                        buffer,
+                        header_row,
+                        bar_col + bar_width as i32,
+                        &suffix,
+                        Color::DarkGray,
                     );
                     header_row += 1;
                 }
             }
+        } else {
+            // Max rank reached
+            put_text(
+                buffer,
+                header_row,
+                1,
+                &format!("GUILD RANK  {} \u{2014} MAX", rank.display_name()),
+                Color::Rgb(255, 215, 0),
+            );
+            header_row += 1;
         }
 
         // Timeline strip for scannable operational context.
@@ -1144,8 +1189,10 @@ pub(super) fn render_hub(
             });
 
             for (display_idx, &(orig_idx, _has_event, _)) in display_order.iter().enumerate() {
-                let card_height = if is_compact { 2 } else { 3 };
-                if row + card_height > missions_bottom {
+                // Non-compact: 4-row card (border + 2 content + border via draw_deep_card)
+                // Compact: 2-row flat (no card borders)
+                let card_rows = if is_compact { 2 } else { 4 };
+                if row + card_rows > missions_bottom {
                     break;
                 }
                 let mission = &active[orig_idx];
@@ -1163,94 +1210,124 @@ pub(super) fn render_hub(
                 let (urgency_label, urgency_color) = mission_urgency_badge(mission, remaining_secs);
                 let card_left = 1i32;
                 let card_right = (width as i32 - 2).max(card_left + 8);
-                let card_top = row;
-                let card_bottom = row + card_height - 1;
-                let base_bg = if mission.has_pending_event() {
-                    Color::Rgb(18, 14, 12)
-                } else {
-                    Color::Rgb(7, 13, 24)
-                };
-                let selected_bg = if mission.has_pending_event() {
-                    Color::Rgb(30, 22, 18)
-                } else {
-                    Color::Rgb(16, 28, 46)
-                };
-                tint_panel_background(
-                    buffer,
-                    card_left,
-                    card_top,
-                    card_right,
-                    card_bottom,
-                    if is_selected { selected_bg } else { base_bg },
-                );
-                let border_color = if is_selected {
-                    Color::Rgb(95, 175, 235)
-                } else if mission.has_pending_event() {
-                    Color::Rgb(130, 98, 56)
-                } else {
-                    Color::Rgb(42, 68, 99)
-                };
-                draw_panel_outline(
-                    buffer,
-                    card_left,
-                    card_top,
-                    card_right,
-                    card_bottom,
-                    border_color,
-                );
-                let line_col = card_left + 2;
-
-                // Status glyph
-                let (glyph, glyph_color) = if mission.has_pending_event() {
-                    ("[!] ", Color::Yellow)
-                } else {
-                    ("[\u{25b6}] ", Color::Cyan)
-                };
-
-                // Line 1: glyph + priority + callsign identity + urgency badge.
-                put_text(buffer, row, line_col, glyph, glyph_color);
-                let prio = format!("[P{}] ", display_idx + 1);
-                put_text(
-                    buffer,
-                    row,
-                    line_col + glyph.len() as i32,
-                    &prio,
-                    urgency_color,
-                );
-                let info = format!(
-                    "{}  {} \u{00b7} L{} \u{00b7} {} {}",
-                    callsign,
-                    type_name,
-                    mission.layer,
-                    risk_icon(risk_tier),
-                    risk_label(risk_tier)
-                );
-                let urgency_badge = format!(" [{}]", urgency_label);
-                let reserved = urgency_badge.len() as i32;
-                let info_w =
-                    (card_right - line_col - glyph.len() as i32 - prio.len() as i32 - reserved - 2)
-                        .max(12) as usize;
-                let info_display = truncate_text(&info, info_w);
-                put_text(
-                    buffer,
-                    row,
-                    line_col + glyph.len() as i32 + prio.len() as i32,
-                    &info_display,
-                    tc,
-                );
-                let badge_col = (card_right - urgency_badge.len() as i32 - 1).max(
-                    line_col
-                        + glyph.len() as i32
-                        + prio.len() as i32
-                        + info_display.len() as i32
-                        + 1,
-                );
-                put_text(buffer, row, badge_col, &urgency_badge, urgency_color);
-                row += 1;
 
                 if !is_compact {
-                    // Line 2: progress bar + % + time
-                    let bar_width = (card_right - line_col - 17).max(12) as usize;
+                    // ── Themed card via draw_deep_card ──
+                    let card_top = row;
+                    let card_bottom = row + card_rows - 1;
+                    let fill_bg = if is_selected {
+                        if mission.has_pending_event() {
+                            Color::Rgb(30, 22, 18)
+                        } else {
+                            Color::Rgb(16, 28, 46)
+                        }
+                    } else if mission.has_pending_event() {
+                        Color::Rgb(18, 14, 12)
+                    } else {
+                        Color::Rgb(7, 13, 24)
+                    };
+                    let border_color = if is_selected {
+                        Color::Rgb(95, 175, 235)
+                    } else if mission.has_pending_event() {
+                        Color::Rgb(130, 98, 56)
+                    } else {
+                        Color::Rgb(42, 68, 99)
+                    };
+                    draw_deep_card(
+                        buffer,
+                        card_left,
+                        card_top,
+                        card_right,
+                        card_bottom,
+                        border_color,
+                        fill_bg,
+                        Some(&callsign),
+                    );
+
+                    // Urgency badge on the title row, right-aligned
+                    let urgency_badge = format!(" {} ", urgency_label);
+                    let badge_col =
+                        (card_right - urgency_badge.len() as i32 - 2).max(card_left + 4);
+                    put_text(buffer, card_top, badge_col, &urgency_badge, urgency_color);
+
+                    let line_col = card_left + 2;
+
+                    // Content line 1: squad + mission type + layer + risk
+                    let content_row1 = card_top + 1;
+                    let (glyph, glyph_color) = if mission.has_pending_event() {
+                        ("\u{26a1} ", Color::Yellow)
+                    } else {
+                        ("\u{2694} ", Color::Cyan)
+                    };
+                    put_text(buffer, content_row1, line_col, glyph, glyph_color);
+                    let crew_str = if squad_size > 1 {
+                        format!("{} ({}) +{}", leader, type_name, squad_size - 1)
+                    } else {
+                        format!("{} ({})", leader, type_name)
+                    };
+                    let layer_risk = format!(
+                        "L{} {} {}",
+                        mission.layer,
+                        risk_icon(risk_tier),
+                        risk_label(risk_tier)
+                    );
+                    let avail_w = (card_right - line_col - 2) as usize;
+                    let crew_w = avail_w.saturating_sub(layer_risk.len() + 3);
+                    let crew_display = truncate_text(&crew_str, crew_w);
+                    put_text(
+                        buffer,
+                        content_row1,
+                        line_col + glyph.chars().count() as i32,
+                        &crew_display,
+                        Color::White,
+                    );
+                    let risk_col = (card_right - layer_risk.len() as i32 - 1).max(
+                        line_col + glyph.chars().count() as i32 + crew_display.len() as i32 + 2,
+                    );
+                    put_text(
+                        buffer,
+                        content_row1,
+                        risk_col,
+                        &layer_risk,
+                        risk_color(risk_tier),
+                    );
+
+                    // Content line 2: progress bar + ETA + event hint
+                    let content_row2 = card_top + 2;
+
+                    // Build event hint
+                    let tier = LayerTier::from_layer(mission.layer);
+                    let triggers = event_trigger_points(mission.mission_type, tier);
+                    let event_hint = if mission.has_pending_event() {
+                        "\u{26a1} Event now!".to_string()
+                    } else if triggers.is_empty() {
+                        String::new()
+                    } else if let Some(&next_trigger) = triggers.iter().find(|&&t| t > progress) {
+                        let secs_to_event =
+                            ((next_trigger - progress) * total_secs as f64).round() as u64;
+                        format!("Evt ~{}", format_hours(secs_to_event))
+                    } else {
+                        String::new()
+                    };
+
+                    let time_str = if progress >= 1.0
+                        && !matches!(mission.status, MissionStatus::EventPending)
+                    {
+                        "Resolving...".to_string()
+                    } else if remaining_secs > 0 {
+                        let pct = (progress * 100.0) as u32;
+                        format!("{}% ~{}", pct, format_hours(remaining_secs))
+                    } else {
+                        let pct = (progress * 100.0) as u32;
+                        format!("{}% done", pct)
+                    };
+                    let suffix = if event_hint.is_empty() {
+                        format!("  {}", time_str)
+                    } else {
+                        format!("  {}  \u{00b7}  {}", time_str, event_hint)
+                    };
+                    let bar_width =
+                        (card_right - line_col - suffix.len() as i32 - 2).max(8) as usize;
                     // Pulse effect at >95% progress
                     let bar_color = if progress > 0.95 {
                         let pulse = (millis / 500).is_multiple_of(2);
@@ -1262,69 +1339,57 @@ pub(super) fn render_hub(
                     } else {
                         tc
                     };
-                    render_progress_bar(buffer, row, line_col + 2, bar_width, progress, bar_color);
-                    let time_str = if progress >= 1.0
-                        && !matches!(mission.status, MissionStatus::EventPending)
-                    {
-                        "  Resolving...".to_string()
-                    } else if remaining_secs > 0 {
-                        let pct = (progress * 100.0) as u32;
-                        format!("  {}%   ~{} left", pct, format_hours(remaining_secs))
+                    render_progress_bar(
+                        buffer,
+                        content_row2,
+                        line_col,
+                        bar_width,
+                        progress,
+                        bar_color,
+                    );
+                    put_text(
+                        buffer,
+                        content_row2,
+                        line_col + bar_width as i32,
+                        &suffix,
+                        Color::DarkGray,
+                    );
+                    // Recolor event hint if pending
+                    if mission.has_pending_event() && !event_hint.is_empty() {
+                        if let Some(pos) = suffix.find('\u{26a1}') {
+                            put_text(
+                                buffer,
+                                content_row2,
+                                line_col + bar_width as i32 + pos as i32,
+                                &event_hint,
+                                Color::Yellow,
+                            );
+                        }
+                    }
+
+                    row += card_rows;
+                } else {
+                    // ── Compact flat layout (no card borders) ──
+                    let line_col = card_left + 1;
+                    let (glyph, glyph_color) = if mission.has_pending_event() {
+                        ("[!] ", Color::Yellow)
                     } else {
-                        let pct = (progress * 100.0) as u32;
-                        format!("  {}%   done", pct)
+                        ("[\u{25b6}] ", Color::Cyan)
                     };
+                    let info = format!(
+                        "{} {} L{} [{}]",
+                        callsign, type_name, mission.layer, urgency_label
+                    );
+                    put_text(buffer, row, line_col, glyph, glyph_color);
                     put_text(
                         buffer,
                         row,
-                        line_col + 2 + bar_width as i32,
-                        &time_str,
-                        Color::DarkGray,
+                        line_col + glyph.len() as i32,
+                        &truncate_text(&info, (width - 6).max(10)),
+                        tc,
                     );
                     row += 1;
 
-                    // Event countdown line + squad identity
-                    let tier = LayerTier::from_layer(mission.layer);
-                    let triggers = event_trigger_points(mission.mission_type, tier);
-                    let event_hint = if mission.has_pending_event() {
-                        "\u{26a1} Event pending \u{2014} respond now!".to_string()
-                    } else if triggers.is_empty() {
-                        "No events (safe mission)".to_string()
-                    } else if let Some(&next_trigger) = triggers.iter().find(|&&t| t > progress) {
-                        let secs_to_event =
-                            ((next_trigger - progress) * total_secs as f64).round() as u64;
-                        let resolved = mission.events.iter().filter(|e| e.is_resolved()).count();
-                        format!(
-                            "Next event in ~{}  ({}/{})",
-                            format_hours(secs_to_event),
-                            resolved,
-                            triggers.len()
-                        )
-                    } else {
-                        let resolved = mission.events.iter().filter(|e| e.is_resolved()).count();
-                        format!("All events resolved ({}/{})", resolved, triggers.len())
-                    };
-                    let crew_hint = if squad_size > 1 {
-                        format!("Lead {} +{}", leader, squad_size - 1)
-                    } else {
-                        format!("Lead {}", leader)
-                    };
-                    let line3 = format!("{}  \u{00b7}  {}", crew_hint, event_hint);
-                    let line3_w = (card_right - (line_col + 2) - 1).max(12) as usize;
-                    let line3_display = truncate_text(&line3, line3_w);
-                    put_text(
-                        buffer,
-                        row,
-                        line_col + 2,
-                        &line3_display,
-                        Color::Rgb(60, 90, 130),
-                    );
-                    // Recolor the pending event line
-                    if mission.has_pending_event() {
-                        put_text(buffer, row, line_col + 2, &line3_display, Color::Yellow);
-                    }
-                    row += 1;
-                } else {
                     // Compact: bar + time on same row
                     let bar_width = 12usize;
                     let pct = (progress * 100.0) as u32;
