@@ -20,6 +20,7 @@ src/deep/
 ├── economy.rs      — Warband Marks economy, rewards, costs
 ├── layers.rs       — Layer difficulty, familiarity system, infrastructure, mission durations
 ├── discovery.rs    — Discovery logic (complete_discovery), starter roster init
+├── narratives.rs   — Mission narrative text for results modal
 └── persistence.rs  — Save/load from ~/.quest/deep.json
 ```
 
@@ -157,7 +158,7 @@ Four types, each buildable once per layer (persists across prestiges):
 | Outpost | -25% mission duration on this layer | 60 + 4*layer |
 | SupplyCache | Supply runs yield bonus resources | 80 + 5*layer |
 | Watchtower | Better intel, auto-resolve, +40 familiarity on build | 70 + 4*layer |
-| Bridge | Shortcut — missions can skip this layer | 100 + 5*layer |
+| Bridge | -2% mission duration per bridged layer (max -30%) | 100 + 5*layer |
 
 ### `MissionType` (`types.rs`)
 ```rust

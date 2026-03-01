@@ -73,7 +73,7 @@ Named fracture chapters, each containing 3-4 zones:
 - `WailingReach` (Zones 24-26, unlocked by P200 + Deep Layer 25)
 - `OriginWound` (Zones 27-30, unlocked by P300 + Deep Layer 30)
 
-Methods: `start_zone_id()`, `end_zone_id()`, `unlock_layer()`, `from_layer()`, `unlock_headline()`, `unlock_atmospheric()`, `unlock_mechanical()`, `unlock_log_line()`, `unlock_ticker_text()`
+Methods: `start_zone_id()`, `end_zone_id()`, `unlock_layer()`, `from_layer()`, `unlock_headline()`, `unlock_atmospheric()`, `power_core_narrative()`, `unlock_mechanical()`, `unlock_log_line()`, `unlock_ticker_text()`
 
 ## Zone Tiers and Prestige Requirements
 

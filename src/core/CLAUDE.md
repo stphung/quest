@@ -16,7 +16,7 @@ src/core/
 ├── recent_drops.rs  # RecentDrop struct, recent drops deque management
 ├── tick.rs          # game_tick() orchestration — coordinates all stages
 ├── tick_stages.rs   # Tick processing stages 4-6 and helper functions
-├── tick_types.rs    # TickEvent enum (44 variants) and TickResult struct
+├── tick_types.rs    # TickEvent enum (45 variants) and TickResult struct
 ├── ticker.rs        # Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
 ├── xp.rs            # XP curves, leveling, combat kill XP, distribute_level_up_points
 ├── power_rating.rs  # Character power rating (sqrt of DPS x eHP)
@@ -120,7 +120,7 @@ pub struct OfflineReport {
 
 ### `TickEvent` (`tick_types.rs`)
 
-Enum with 44 variants describing everything that can happen in a single tick. The presentation layer (main.rs) maps these to combat log entries and visual effects. Game logic never touches UI types.
+Enum with 45 variants describing everything that can happen in a single tick. The presentation layer (main.rs) maps these to combat log entries and visual effects. Game logic never touches UI types.
 
 **Categories:**
 - **Combat**: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`, `DamageReflected`, `RegenComplete`, `BossEnrage`, `CombatRetreat`
