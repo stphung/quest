@@ -1380,16 +1380,100 @@ fn config_the_expanse() -> ZoneSceneConfig {
 // Chapter 1: The Red Fault (Zones 12-14)
 // ---------------------------------------------------------------------------
 
+/// Zone 12: Splintered Rim -- cracked volcanic ridge, smoky, ash falling.
 fn config_splintered_rim() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (120, 70, 35),
+        sky_bottom: (40, 20, 10),
+        celestial: CelestialType::CrackedSky,
+        far_terrain: TerrainProfile {
+            glyph: '\u{25b2}', // ▲
+            color: (140, 60, 30),
+            base_height: 0.48,
+            amplitude: 0.10,
+            frequency: 0.16,
+            speed: 0.00008,
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '\u{2593}', // ▓
+            color: (60, 25, 15),
+            base_height: 0.65,
+            amplitude: 0.08,
+            frequency: 0.12,
+            speed: 0.00006,
+            fill: true,
+        },
+        ground_glyphs: &['=', ':'],
+        ground_color: (130, 70, 35),
+        weather: WeatherType::AshRain,
+        weather_intensity: 0.8,
+        overlay: Some(overlay_heat_distortion),
+    }
 }
 
+/// Zone 13: Ember Ravine -- deep molten ravine, heavy embers, lava glow.
 fn config_ember_ravine() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (150, 40, 10),
+        sky_bottom: (25, 5, 5),
+        celestial: CelestialType::EmberGlow,
+        far_terrain: TerrainProfile {
+            glyph: '~',
+            color: (180, 80, 20),
+            base_height: 0.52,
+            amplitude: 0.06,
+            frequency: 0.10,
+            speed: 0.00010,
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '\u{2588}', // █
+            color: (35, 10, 5),
+            base_height: 0.68,
+            amplitude: 0.10,
+            frequency: 0.11,
+            speed: 0.00007,
+            fill: true,
+        },
+        ground_glyphs: &['=', '~'],
+        ground_color: (170, 70, 25),
+        weather: WeatherType::Embers,
+        weather_intensity: 2.0,
+        overlay: Some(overlay_lava_glow),
+    }
 }
 
+/// Zone 14: Heart of the Fault -- the wound's burning core, crimson sky, heavy ash.
 fn config_heart_of_the_fault() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (180, 30, 20),
+        sky_bottom: (60, 8, 8),
+        celestial: CelestialType::EmberGlow,
+        far_terrain: TerrainProfile {
+            glyph: '\u{2571}', // ╱
+            color: (200, 60, 30),
+            base_height: 0.46,
+            amplitude: 0.09,
+            frequency: 0.18,
+            speed: 0.00010,
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '\u{2593}', // ▓
+            color: (50, 15, 10),
+            base_height: 0.64,
+            amplitude: 0.08,
+            frequency: 0.14,
+            speed: 0.00006,
+            fill: true,
+        },
+        ground_glyphs: &[':', '.'],
+        ground_color: (160, 50, 20),
+        weather: WeatherType::AshRain,
+        weather_intensity: 1.8,
+        overlay: Some(overlay_heat_distortion),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1412,8 +1496,36 @@ fn config_hall_of_second_suns() -> ZoneSceneConfig {
 // Chapter 3: The Black Mouth (Zones 18-20)
 // ---------------------------------------------------------------------------
 
+/// Zone 18: Ashen Verge -- dark grey, rolling ash dunes, consuming darkness.
 fn config_ashen_verge() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (70, 65, 60),
+        sky_bottom: (25, 22, 20),
+        celestial: CelestialType::Overcast,
+        far_terrain: TerrainProfile {
+            glyph: '~',
+            color: (80, 75, 70),
+            base_height: 0.52,
+            amplitude: 0.07,
+            frequency: 0.10,
+            speed: 0.00006,
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '\u{2593}', // ▓
+            color: (40, 38, 35),
+            base_height: 0.68,
+            amplitude: 0.08,
+            frequency: 0.09,
+            speed: 0.00004,
+            fill: true,
+        },
+        ground_glyphs: &['.', ';'],
+        ground_color: (65, 60, 55),
+        weather: WeatherType::DriftingAsh,
+        weather_intensity: 0.8,
+        overlay: Some(overlay_consuming_dark),
+    }
 }
 
 fn config_throat_of_the_world() -> ZoneSceneConfig {
