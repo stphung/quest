@@ -77,7 +77,7 @@ jobs:
             --fail-under-lines 90
 
   ci-pass:
-    name: CI
+    name: Check & Test
     if: always() && github.event_name == 'pull_request'
     needs: [fmt, clippy, test, audit, coverage]
     runs-on: ubuntu-latest
