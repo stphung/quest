@@ -80,6 +80,8 @@ pub struct GameState {
     pub stormglass_discovered: bool,
     /// Storm Sigils — persistent sigil slots (character-level, survives prestige)
     pub storm_sigils: StormSigils,
+    /// Ascension level — per-character combat power multiplier (0 = no ascension)
+    pub ascension_level: u32,
     /// Active challenge minigame (transient, not saved)
     pub active_minigame: Option<ActiveMinigame>,
     /// Session kill count (transient, not saved)
@@ -110,6 +112,10 @@ pub struct GameState {
     pub combat_seconds_this_tick: bool,
     /// When the game-over screen was first shown (for dismiss cooldown)
     pub game_over_shown_at: Option<std::time::Instant>,
+    /// Cached power rating — computed each tick from DPS × eHP formula
+    pub cached_power_rating: f64,
+    /// Cached fracture zone cap from Deep — used by UI for zone track rendering
+    pub cached_fracture_zone_cap: u32,
 
     // === Composed sub-structs (Phase 2 refactoring) ===
     // These group existing fields for clearer module boundaries.
@@ -174,6 +180,7 @@ impl GameState {
             stormglass: 0,
             stormglass_discovered: false,
             storm_sigils: StormSigils::new(),
+            ascension_level: 0,
             active_minigame: None,
             session_kills: 0,
             consecutive_deaths: 0,
@@ -187,6 +194,8 @@ impl GameState {
             xp_this_second: 0,
             combat_seconds_this_tick: false,
             game_over_shown_at: None,
+            cached_power_rating: 0.0,
+            cached_fracture_zone_cap: 0,
             chrono_surge_active: false,
             debug_force_overcharge: false,
             player,

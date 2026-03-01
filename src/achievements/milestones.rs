@@ -188,6 +188,16 @@ pub const DEEP_LAYER_MILESTONES: &[(u64, AchievementId)] = &[
     (26, AchievementId::VoidExplorer),
 ];
 
+/// Power Core milestones — tied to fracture zone unlock layers.
+pub const POWER_CORE_MILESTONES: &[(u64, AchievementId)] = &[
+    (3, AchievementId::PowerCoreI),
+    (7, AchievementId::PowerCoreII),
+    (12, AchievementId::PowerCoreIII),
+    (18, AchievementId::PowerCoreIV),
+    (25, AchievementId::PowerCoreV),
+    (30, AchievementId::PowerCoreVI),
+];
+
 /// Deep guild rank milestones.
 pub const DEEP_GUILD_RANK_MILESTONES: &[(u64, AchievementId)] = &[
     (2, AchievementId::GuildRank2),

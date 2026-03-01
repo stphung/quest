@@ -251,7 +251,7 @@ The StormForge is the ultimate Haven room that enables forging the Stormbreaker 
 
 ### Bonus Injection
 
-Haven bonuses are passed as explicit parameters to game systems rather than accessed globally. This keeps modules decoupled. Bonuses are computed per-tick from the Haven state and passed into the relevant functions (e.g., `HavenCombatBonuses`, `HavenFishingBonuses`). Changes to Haven state are signaled via `TickResult.haven_changed`, and the presentation layer (main.rs) handles persistence.
+Haven bonuses are passed as explicit parameters to game systems rather than accessed globally. This keeps modules decoupled. Bonuses are computed per-tick from the Haven state and injected into the unified `CombatBonuses` struct (which also carries prestige, god item, sigil, and ascension bonuses). Changes to Haven state are signaled via `TickResult.haven_changed`, and the presentation layer (main.rs) handles persistence.
 
 ## Stormglass System
 
@@ -311,13 +311,41 @@ Stored in `~/.quest/deep.json`. The `deep_changed` flag in `TickResult` signals 
 
 For detailed implementation documentation, see `src/deep/CLAUDE.md`.
 
+## Ascension System
+
+### Overview
+
+Per-character combat power multiplier purchased with prestige ranks and gated by Deep layer milestones. Each Ascension level multiplies all combat stats (damage, defense, HP). Ascension level survives prestige resets. Stored as `ascension_level: u32` on `GameState`.
+
+### Levels and Costs
+
+| Level | Multiplier | PR Cost | Deep Gate |
+|-------|-----------|---------|-----------|
+| I | 2x | 35 | Layer 3 |
+| II | 4x | 65 | Layer 7 |
+| III | 8x | 120 | Layer 12 |
+| IV | 16x | 200 | Layer 18 |
+| V | 32x | 325 | Layer 25 |
+| VI | 64x | 500 | Layer 30 |
+| VII+ | 64 x 1.5^(level-6) | 500 + 75*(level-6) | None |
+
+Total PR cost for levels I-VI: 1,245 PR.
+
+### Module Structure
+
+- `types.rs` -- Constants (cost table, gate table, multiplier formula), helper functions
+- `logic.rs` -- Eligibility checks (`can_ascend`), execution (`ascend`), `AscendResult` enum
+- `mod.rs` -- Public re-exports
+
+For detailed implementation documentation, see `src/ascension/CLAUDE.md`.
+
 ## Achievement System
 
 ### Overview
 
 Account-level achievement system that persists across all characters. Stored in `~/.quest/achievements.json`. Achievement tracking is driven by `on_*` event handlers (in `achievements/handlers.rs`) called from `tick.rs` during game processing. Milestone definitions and thresholds are in `achievements/milestones.rs`. Newly unlocked achievements are emitted as `TickEvent::AchievementUnlocked` events and collected by `collect_achievement_events()`. The `achievements_changed` flag in `TickResult` signals when the file needs to be saved.
 
-### Categories (7)
+### Categories (8)
 
 **Combat:**
 - Slayer I-XV: 100, 500, 1K, 5K, 10K, 50K, 100K, 500K, 1M, 2.5M, 10M, 50M, 100M, 500M, 1B kills. Unique icon progression per tier displayed as badges in the combat panel title
@@ -326,45 +354,27 @@ Account-level achievement system that persists across all characters. Stored in 
 **Level:**
 - Milestones: L10, L25, L50, L100, L150, L200, L250, L500, L750, L1000, L1500
 
-**Progression:**
+**Prestige:**
 - FirstPrestige, then P5, P10, P15, P20, P25, P30, P40, P50, P70, P90, Eternal (P100)
+- Ascension milestones: AscensionI through AscensionVI
 
 **Challenges:**
 - Per-game per-difficulty wins: ChessNovice through ChessMaster, MorrisNovice through MorrisMaster, etc. for all 10 challenge types (chess, morris, gomoku, minesweeper, rune, go, flappy_bird, snake, jezzball, runic_shift)
 - GrandChampion: 100 total minigame wins
 
 **Exploration:**
-- Zone1Complete through Zone10Complete
-- BeyondInfinity: Complete a cycle of Zone 11 (The Expanse)
-- StormLeviathan: Caught the Storm Leviathan
-- TheStormbreaker: Forged the Stormbreaker
-- StormsEnd: Defeated The Undying Storm with Stormbreaker
+- Zone1Complete through Zone10Complete, BeyondInfinity (Zone 11 cycle)
+- StormLeviathan, TheStormbreaker, StormsEnd
+- Fishing: GoneFishing, FishermanI-IV (Ranks 10/20/30/40), FishCatcherI-X (100 to 100M fish)
+- Dungeons: DungeonDiver, DungeonMasterI-X (1 to 1M dungeons)
+- Haven: HavenDiscovered, HavenBuilderI (all T1), HavenBuilderII (all T2), HavenArchitect (all T3)
 
-**Haven:**
-- HavenDiscovered, HavenBuilderI (all T1), HavenBuilderII (all T2), HavenArchitect (all T3)
-
-**Enhancement/Soulforge:**
-- SoulforgeDiscovered: Uncover an ancient Soulforge
-- ApprenticeSmith: Enhance any equipment to +1
-- FullyTempered: Enhance all 7 equipment slots to +4
-- JourneymanSmith: Enhance any equipment to +5
-- SoulforgeAdept: Enhance any equipment to +6
-- SoulforgeSavant: Enhance any equipment to +7
-- SoulforgeMaster: Enhance any equipment to +8
-- SoulforgeGrandmaster: Enhance any equipment to +9
-- SoulforgeAscendant: Enhance any equipment to +10
-- SoulConvergence: Enhance all 7 equipment slots to +7
-- PersistentHammering: Attempt 100 enhancements
+**Progression:**
+- Fracture zones: FractureZone12 through FractureZone30 (19 achievements, one per fracture zone)
+- Soulforge: SoulforgeDiscovered, ApprenticeSmith (+1), FullyTempered (all +4), JourneymanSmith (+5), SoulforgeAdept (+6), SoulforgeSavant (+7), SoulforgeMaster (+8), SoulforgeGrandmaster (+9), SoulforgeAscendant (+10), SoulConvergence (all +7), PersistentHammering (100 attempts)
 
 **Deep:**
 - DeepDiscovered, Layer5/10/15/20/25Cleared, DeepGuildRank2/3/4/5, DeepMerc10/25/50/100Missions, DeepVoidExplorer, DeepInfraBuilder (various infrastructure and progression milestones)
-
-**Fishing:**
-- FishermanI-IV: Ranks 10, 20, 30, 40
-- FishCatcherI-X: 100, 1K, 10K, 100K, 500K, 1M, 5M, 10M, 50M, 100M fish caught
-
-**Dungeons:**
-- DungeonDiver, DungeonMasterI-X: 1, 10, 50, 100, 1K, 5K, 10K, 25K, 100K, 500K, 1M dungeons cleared
 
 **Stats:**
 - Tracks cumulative gameplay statistics (kills, deaths, fish caught, dungeons cleared, etc.)
@@ -383,11 +393,11 @@ Each achievement has a `points` value assigned via a 7-tier system. Scores are c
 | Elite | 250 | 18 | Stormbreaker, Chess/Go Master, Grand Champion |
 | Pinnacle | 500 | 14 | Eternal, Death Incarnate, The Absolute |
 
-**Max score** across 168 achievements. Methods: `achievement_score()` (unlocked total), `max_achievement_score()` (grand total). Displayed in: browser title bar (`X/Y pts, Z%`), unlock modal (`+N pts`), detail panel (`Worth N pts`), stats view (score line).
+**Max score** across 207 achievements. Methods: `achievement_score()` (unlocked total), `max_achievement_score()` (grand total). Displayed in: browser title bar (`X/Y pts, Z%`), unlock modal (`+N pts`), detail panel (`Worth N pts`), stats view (score line).
 
 ### Title System
 
-Titles are display names earned by unlocking specific achievements. 50 curated titles across combat, challenges, exploration, enhancement, and Deep categories. Players select one title to display after their character name (e.g., "Hero, Godslayer"). Account-wide, persisted in `achievements.json`.
+Titles are display names earned by unlocking specific achievements. 63 curated titles across combat, challenges, exploration, enhancement, Deep, and ascension categories. Players select one title to display after their character name (e.g., "Hero, Godslayer"). Account-wide, persisted in `achievements.json`.
 
 - Title browser: overlay opened with [T] from achievement browser. Shows unlocked titles, preview, select with Enter, clear with Backspace
 - Titles shown in: stats panel header, character select screen, achievement browser (✦ indicator)

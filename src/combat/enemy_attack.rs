@@ -26,13 +26,15 @@ pub(crate) fn resolve_enemy_attack<R: Rng>(
     bonuses: &CombatBonuses,
     achievements: &mut crate::achievements::Achievements,
     derived: &DerivedStats,
+    fracture_zone_cap: u32,
 ) -> Vec<CombatEvent> {
     let mut events = Vec::new();
 
     state.combat_state.enemy_attack_timer = 0.0;
 
     if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
-        let total_defense = derived.defense + bonuses.flat_defense;
+        let base_defense = derived.defense + bonuses.flat_defense;
+        let total_defense = (base_defense as f64 * bonuses.ascension_multiplier) as u32;
         let base_damage = enemy.damage.saturating_sub(total_defense).max(1);
         // Apply damage reduction (e.g. Divine Bulwark)
         let enemy_damage = if bonuses.damage_reduction_percent > 0.0 {
@@ -67,6 +69,7 @@ pub(crate) fn resolve_enemy_attack<R: Rng>(
                 state,
                 achievements,
                 bonuses.xp_gain_percent,
+                fracture_zone_cap,
             );
             events.extend(death_events);
             return events;

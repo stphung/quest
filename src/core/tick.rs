@@ -26,6 +26,7 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
         ctx.enhancement,
         ctx.deep,
         ctx.achievements,
+        ctx.power_cores,
         ctx.debug_mode,
         rng,
     )
@@ -70,6 +71,7 @@ pub fn game_tick<R: Rng>(
     enhancement: &mut crate::enhancement::EnhancementProgress,
     deep: &mut crate::deep::DeepState,
     achievements: &mut Achievements,
+    power_cores: &mut crate::power_cores::PowerCoreState,
     debug_mode: bool,
     rng: &mut R,
 ) -> TickResult {
@@ -86,7 +88,7 @@ pub fn game_tick<R: Rng>(
     tick_stages::tick_challenge_discovery(state, &haven_bonuses, rng, &mut result);
 
     // ── 3. Sync player max HP with cached derived stats ─────────
-    tick_stages::sync_derived_stats(state, enhancement);
+    tick_stages::sync_derived_stats(state, enhancement, &sigil_bonuses);
 
     // ── 4. Update dungeon exploration ───────────────────────────
     tick_stages::process_dungeon_events(state, delta_time, &haven_bonuses, &mut result, rng);
@@ -152,6 +154,27 @@ pub fn game_tick<R: Rng>(
     // ── 11c. Deep mission ticking ──────────────────────────────────
     tick_stages::tick_deep_missions(state, deep, achievements, debug_mode, &mut result, rng);
 
+    // ── 11d. Fracture region unlock consumption ──────────────────
+    if let Some(region) = deep.persistent.pending_fracture_region_unlock.take() {
+        crate::zones::sync_account_zone_unlocks(
+            &mut state.zone_progression,
+            achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
+            deep.persistent.fracture_zone_cap,
+            state.prestige_rank,
+        );
+        result.events.push(TickEvent::FractureRegionUnlocked {
+            region,
+            message: format!("\u{1f30b} {}", region.unlock_log_line()),
+        });
+        result.deep_changed = true;
+    }
+
+    // Sync cached fracture zone cap for UI rendering
+    state.cached_fracture_zone_cap = deep.persistent.fracture_zone_cap;
+
+    // ── 12a. Power Cores tick ─────────────────────────────────────
+    crate::power_cores::tick::tick_power_cores(state, power_cores, achievements, &mut result);
+
     // ── 12. Achievement modal accumulation ────────────────────────
     if achievements.is_modal_ready() {
         result.achievement_modal_ready = achievements.take_modal_queue();
@@ -167,6 +190,7 @@ mod tests {
     use crate::deep::DeepState;
     use crate::enhancement::EnhancementProgress;
     use crate::haven::Haven;
+    use crate::power_cores::PowerCoreState;
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
 
@@ -182,6 +206,7 @@ mod tests {
         let mut enhancement = EnhancementProgress::new();
         let mut deep = DeepState::new();
         let mut achievements = Achievements::default();
+        let mut power_cores = PowerCoreState::default();
         let mut rng = test_rng();
 
         let result = game_tick(
@@ -191,6 +216,7 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut power_cores,
             false,
             &mut rng,
         );
@@ -211,6 +237,7 @@ mod tests {
         let mut enhancement = EnhancementProgress::new();
         let mut deep = DeepState::new();
         let mut achievements = Achievements::default();
+        let mut power_cores = PowerCoreState::default();
         let mut rng = test_rng();
 
         let initial_time = state.play_time_seconds;
@@ -223,6 +250,7 @@ mod tests {
                 &mut enhancement,
                 &mut deep,
                 &mut achievements,
+                &mut power_cores,
                 false,
                 &mut rng,
             );
@@ -240,6 +268,7 @@ mod tests {
         let mut enhancement = EnhancementProgress::new();
         let mut deep = DeepState::new();
         let mut achievements = Achievements::default();
+        let mut power_cores = PowerCoreState::default();
         let mut rng = test_rng();
 
         assert!(state.combat_state.current_enemy.is_none());
@@ -251,6 +280,7 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut power_cores,
             false,
             &mut rng,
         );
@@ -274,6 +304,7 @@ mod tests {
         let mut deep2 = deep1.clone();
         let mut ach1 = Achievements::default();
         let mut ach2 = ach1.clone();
+        let mut pc1 = PowerCoreState::default();
         let mut rng1 = ChaCha8Rng::seed_from_u64(42);
         let mut rng2 = ChaCha8Rng::seed_from_u64(42);
 
@@ -284,10 +315,12 @@ mod tests {
             &mut enh1,
             &mut deep1,
             &mut ach1,
+            &mut pc1,
             false,
             &mut rng1,
         );
 
+        let mut pc2 = PowerCoreState::default();
         let mut ctx = TickContext {
             state: &mut state2,
             tick_counter: &mut tc2,
@@ -295,6 +328,7 @@ mod tests {
             enhancement: &mut enh2,
             deep: &mut deep2,
             achievements: &mut ach2,
+            power_cores: &mut pc2,
             debug_mode: false,
         };
         let result2 = game_tick_with_context(&mut ctx, &mut rng2);
@@ -320,6 +354,7 @@ mod tests {
         let mut enhancement = EnhancementProgress::new();
         let mut deep = DeepState::new();
         let mut achievements = Achievements::default();
+        let mut power_cores = PowerCoreState::default();
         let mut rng = test_rng();
 
         let mut all_events = Vec::new();
@@ -331,6 +366,7 @@ mod tests {
                 &mut enhancement,
                 &mut deep,
                 &mut achievements,
+                &mut power_cores,
                 false,
                 &mut rng,
             );

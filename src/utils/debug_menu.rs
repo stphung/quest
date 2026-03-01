@@ -31,6 +31,7 @@ enum DebugAction {
     TriggerRunicShiftChallenge,
     TriggerHavenDiscovery,
     TriggerSoulforgeDiscovery,
+    TriggerForgeStormbreaker,
     TriggerForgeAsprika,
     TriggerForgeSleipnir,
     TriggerForgeMegingjord,
@@ -46,6 +47,7 @@ enum DebugAction {
     TriggerDeepRefreshRecruits,
     TriggerDeepClearFrontierLayer,
     TriggerDeepCompleteActiveMissions,
+    UnlockDeepLayer(u32),
     TravelToZone(u32),
     SetPrestige(u32),
     SetLevel(u32),
@@ -67,6 +69,7 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerRunicShiftChallenge,
     DebugAction::TriggerHavenDiscovery,
     DebugAction::TriggerSoulforgeDiscovery,
+    DebugAction::TriggerForgeStormbreaker,
     DebugAction::TriggerForgeAsprika,
     DebugAction::TriggerForgeSleipnir,
     DebugAction::TriggerForgeMegingjord,
@@ -82,6 +85,12 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerDeepRefreshRecruits,
     DebugAction::TriggerDeepClearFrontierLayer,
     DebugAction::TriggerDeepCompleteActiveMissions,
+    DebugAction::UnlockDeepLayer(3),
+    DebugAction::UnlockDeepLayer(7),
+    DebugAction::UnlockDeepLayer(12),
+    DebugAction::UnlockDeepLayer(18),
+    DebugAction::UnlockDeepLayer(25),
+    DebugAction::UnlockDeepLayer(30),
     // Zone travel actions
     DebugAction::TravelToZone(1),
     DebugAction::TravelToZone(2),
@@ -94,6 +103,25 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::TravelToZone(9),
     DebugAction::TravelToZone(10),
     DebugAction::TravelToZone(11),
+    DebugAction::TravelToZone(12),
+    DebugAction::TravelToZone(13),
+    DebugAction::TravelToZone(14),
+    DebugAction::TravelToZone(15),
+    DebugAction::TravelToZone(16),
+    DebugAction::TravelToZone(17),
+    DebugAction::TravelToZone(18),
+    DebugAction::TravelToZone(19),
+    DebugAction::TravelToZone(20),
+    DebugAction::TravelToZone(21),
+    DebugAction::TravelToZone(22),
+    DebugAction::TravelToZone(23),
+    DebugAction::TravelToZone(24),
+    DebugAction::TravelToZone(25),
+    DebugAction::TravelToZone(26),
+    DebugAction::TravelToZone(27),
+    DebugAction::TravelToZone(28),
+    DebugAction::TravelToZone(29),
+    DebugAction::TravelToZone(30),
     // Character actions (prestige, levels)
     DebugAction::SetPrestige(1),
     DebugAction::SetPrestige(5),
@@ -145,6 +173,7 @@ const RESOURCE_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerForceOvercharge,
 ];
 const ITEM_ACTIONS: &[DebugAction] = &[
+    DebugAction::TriggerForgeStormbreaker,
     DebugAction::TriggerForgeAsprika,
     DebugAction::TriggerForgeSleipnir,
     DebugAction::TriggerForgeMegingjord,
@@ -156,6 +185,12 @@ const DEEP_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerDeepRefreshRecruits,
     DebugAction::TriggerDeepClearFrontierLayer,
     DebugAction::TriggerDeepCompleteActiveMissions,
+    DebugAction::UnlockDeepLayer(3),
+    DebugAction::UnlockDeepLayer(7),
+    DebugAction::UnlockDeepLayer(12),
+    DebugAction::UnlockDeepLayer(18),
+    DebugAction::UnlockDeepLayer(25),
+    DebugAction::UnlockDeepLayer(30),
 ];
 const ZONE_ACTIONS: &[DebugAction] = &[
     DebugAction::TravelToZone(1),
@@ -169,6 +204,25 @@ const ZONE_ACTIONS: &[DebugAction] = &[
     DebugAction::TravelToZone(9),
     DebugAction::TravelToZone(10),
     DebugAction::TravelToZone(11),
+    DebugAction::TravelToZone(12),
+    DebugAction::TravelToZone(13),
+    DebugAction::TravelToZone(14),
+    DebugAction::TravelToZone(15),
+    DebugAction::TravelToZone(16),
+    DebugAction::TravelToZone(17),
+    DebugAction::TravelToZone(18),
+    DebugAction::TravelToZone(19),
+    DebugAction::TravelToZone(20),
+    DebugAction::TravelToZone(21),
+    DebugAction::TravelToZone(22),
+    DebugAction::TravelToZone(23),
+    DebugAction::TravelToZone(24),
+    DebugAction::TravelToZone(25),
+    DebugAction::TravelToZone(26),
+    DebugAction::TravelToZone(27),
+    DebugAction::TravelToZone(28),
+    DebugAction::TravelToZone(29),
+    DebugAction::TravelToZone(30),
 ];
 const CHARACTER_ACTIONS: &[DebugAction] = &[
     DebugAction::SetPrestige(1),
@@ -225,25 +279,34 @@ impl DebugAction {
             Self::TriggerRunicShiftChallenge => 11,
             Self::TriggerHavenDiscovery => 12,
             Self::TriggerSoulforgeDiscovery => 13,
-            Self::TriggerForgeAsprika => 14,
-            Self::TriggerForgeSleipnir => 15,
-            Self::TriggerForgeMegingjord => 16,
-            Self::TriggerGrantStormglass => 17,
-            Self::TriggerDiscoverStormglass => 18,
-            Self::TriggerGrant100kStormglass => 19,
-            Self::TriggerEtchRandomSigils => 20,
-            Self::TriggerEtchSPlusSigil => 21,
-            Self::TriggerForceOvercharge => 22,
-            Self::TriggerDeepDiscovery => 23,
-            Self::TriggerDeepGrantMarks => 24,
-            Self::TriggerDeepRefreshMissionPool => 25,
-            Self::TriggerDeepRefreshRecruits => 26,
-            Self::TriggerDeepClearFrontierLayer => 27,
-            Self::TriggerDeepCompleteActiveMissions => 28,
-            Self::TravelToZone(zone_id) => 29 + zone_id as usize - 1, // 29-39
-            Self::SetPrestige(amount) => 40 + set_value_index(amount),
-            Self::SetLevel(amount) => 50 + set_value_index(amount),
-            Self::MaxAttributes => 60,
+            Self::TriggerForgeStormbreaker => 14,
+            Self::TriggerForgeAsprika => 15,
+            Self::TriggerForgeSleipnir => 16,
+            Self::TriggerForgeMegingjord => 17,
+            Self::TriggerGrantStormglass => 18,
+            Self::TriggerDiscoverStormglass => 19,
+            Self::TriggerGrant100kStormglass => 20,
+            Self::TriggerEtchRandomSigils => 21,
+            Self::TriggerEtchSPlusSigil => 22,
+            Self::TriggerForceOvercharge => 23,
+            Self::TriggerDeepDiscovery => 24,
+            Self::TriggerDeepGrantMarks => 25,
+            Self::TriggerDeepRefreshMissionPool => 26,
+            Self::TriggerDeepRefreshRecruits => 27,
+            Self::TriggerDeepClearFrontierLayer => 28,
+            Self::TriggerDeepCompleteActiveMissions => 29,
+            Self::UnlockDeepLayer(layer) => match layer {
+                3 => 30,
+                7 => 31,
+                12 => 32,
+                18 => 33,
+                25 => 34,
+                _ => 35, // 30
+            },
+            Self::TravelToZone(zone_id) => 36 + zone_id as usize - 1, // 36-65
+            Self::SetPrestige(amount) => 66 + set_value_index(amount),
+            Self::SetLevel(amount) => 76 + set_value_index(amount),
+            Self::MaxAttributes => 86,
         }
     }
 
@@ -263,6 +326,7 @@ impl DebugAction {
             Self::TriggerRunicShiftChallenge => "Trigger Sigil Surge Challenge",
             Self::TriggerHavenDiscovery => "Trigger Haven Discovery",
             Self::TriggerSoulforgeDiscovery => "Trigger Soulforge Discovery",
+            Self::TriggerForgeStormbreaker => "Forge Stormbreaker",
             Self::TriggerForgeAsprika => "Forge Asprika (God Item)",
             Self::TriggerForgeSleipnir => "Forge Sleipnir (God Item)",
             Self::TriggerForgeMegingjord => "Forge Megingjord (God Item)",
@@ -278,6 +342,14 @@ impl DebugAction {
             Self::TriggerDeepRefreshRecruits => "Refresh Recruit Pool",
             Self::TriggerDeepClearFrontierLayer => "Clear Current Frontier Layer",
             Self::TriggerDeepCompleteActiveMissions => "Complete Active Missions",
+            Self::UnlockDeepLayer(layer) => match layer {
+                3 => "Unlock Deep L3 (Red Fault)",
+                7 => "Unlock Deep L7 (Mirror Scar)",
+                12 => "Unlock Deep L12 (Black Mouth)",
+                18 => "Unlock Deep L18 (Hollow Throne)",
+                25 => "Unlock Deep L25 (Wailing Reach)",
+                _ => "Unlock Deep L30 (Origin Wound)",
+            },
             Self::TravelToZone(zone_id) => match zone_id {
                 1 => "Travel to Meadow (Zone 1)",
                 2 => "Travel to Dark Forest (Zone 2)",
@@ -290,6 +362,25 @@ impl DebugAction {
                 9 => "Travel to Floating Isles (Zone 9)",
                 10 => "Travel to Storm Citadel (Zone 10)",
                 11 => "Travel to The Expanse (Zone 11)",
+                12 => "Travel to Splintered Rim (Zone 12)",
+                13 => "Travel to Ember Ravine (Zone 13)",
+                14 => "Travel to Heart of the Fault (Zone 14)",
+                15 => "Travel to Shard Fields (Zone 15)",
+                16 => "Travel to Refraction Steps (Zone 16)",
+                17 => "Travel to Hall of Second Suns (Zone 17)",
+                18 => "Travel to Ashen Verge (Zone 18)",
+                19 => "Travel to Throat of the World (Zone 19)",
+                20 => "Travel to The Black Mouth (Zone 20)",
+                21 => "Travel to Sunken Processional (Zone 21)",
+                22 => "Travel to The Pale Archive (Zone 22)",
+                23 => "Travel to The Hollow Throne (Zone 23)",
+                24 => "Travel to The Stillborn Sea (Zone 24)",
+                25 => "Travel to Resonance Fault (Zone 25)",
+                26 => "Travel to The Wailing Reach (Zone 26)",
+                27 => "Travel to The Scar Root (Zone 27)",
+                28 => "Travel to Echoing Abyss (Zone 28)",
+                29 => "Travel to Threshold of Silence (Zone 29)",
+                30 => "Travel to The Origin Wound (Zone 30)",
                 _ => "Travel to Unknown Zone",
             },
             Self::SetPrestige(amount) => match amount {
@@ -326,6 +417,7 @@ impl DebugAction {
         haven: &mut Haven,
         enhancement: &mut EnhancementProgress,
         deep: &mut DeepState,
+        achievements: &mut crate::achievements::Achievements,
     ) -> &'static str {
         match self {
             Self::TriggerDungeon => trigger_dungeon(state),
@@ -342,6 +434,7 @@ impl DebugAction {
             Self::TriggerRunicShiftChallenge => trigger_runic_shift_challenge(state),
             Self::TriggerHavenDiscovery => trigger_haven_discovery(haven),
             Self::TriggerSoulforgeDiscovery => trigger_soulforge_discovery(enhancement),
+            Self::TriggerForgeStormbreaker => trigger_forge_stormbreaker(achievements),
             Self::TriggerForgeAsprika => trigger_forge_asprika(state, enhancement),
             Self::TriggerForgeSleipnir => trigger_forge_sleipnir(state, enhancement),
             Self::TriggerForgeMegingjord => trigger_forge_megingjord(state, enhancement),
@@ -357,7 +450,12 @@ impl DebugAction {
             Self::TriggerDeepRefreshRecruits => trigger_deep_refresh_recruit_pool(deep),
             Self::TriggerDeepClearFrontierLayer => trigger_deep_clear_frontier_layer(deep),
             Self::TriggerDeepCompleteActiveMissions => trigger_deep_complete_active_missions(deep),
-            Self::TravelToZone(zone_id) => trigger_travel_to_zone(state, enhancement, zone_id),
+            Self::UnlockDeepLayer(layer) => {
+                trigger_unlock_deep_layer(deep, state, achievements, layer)
+            }
+            Self::TravelToZone(zone_id) => {
+                trigger_travel_to_zone(state, enhancement, deep, zone_id)
+            }
             Self::SetPrestige(amount) => trigger_set_prestige(state, enhancement, amount),
             Self::SetLevel(amount) => trigger_set_level(state, enhancement, amount),
             Self::MaxAttributes => trigger_max_attributes(state, enhancement),
@@ -550,8 +648,19 @@ impl DebugMenu {
         }
 
         let msg = action_for_option_index(selected_option)
-            .map(|action| action.run(state, haven, enhancement, deep))
+            .map(|action| action.run(state, haven, enhancement, deep, achievements))
             .unwrap_or("Unknown option");
+
+        // Re-sync zone unlocks after every action — any action may change
+        // prestige, achievements, or Deep state that affects zone access.
+        crate::zones::access::sync_account_zone_unlocks(
+            &mut state.zone_progression,
+            achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
+            deep.persistent.fracture_zone_cap,
+            state.prestige_rank,
+        );
+        state.cached_fracture_zone_cap = deep.persistent.fracture_zone_cap;
+
         self.close();
         msg
     }
@@ -705,6 +814,26 @@ fn trigger_soulforge_discovery(enhancement: &mut EnhancementProgress) -> &'stati
     }
     enhancement.discovered = true;
     "Soulforge discovered!"
+}
+
+fn trigger_forge_stormbreaker(
+    achievements: &mut crate::achievements::Achievements,
+) -> &'static str {
+    if achievements.is_unlocked(crate::achievements::AchievementId::TheStormbreaker) {
+        return "Stormbreaker already forged!";
+    }
+    achievements.unlock(
+        crate::achievements::AchievementId::TheStormbreaker,
+        Some("Debug".to_string()),
+    );
+    // Also unlock StormsEnd so Zone 11 becomes accessible
+    if !achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd) {
+        achievements.unlock(
+            crate::achievements::AchievementId::StormsEnd,
+            Some("Debug".to_string()),
+        );
+    }
+    "Forged Stormbreaker!"
 }
 
 fn trigger_forge_asprika(state: &mut GameState, enhancement: &EnhancementProgress) -> &'static str {
@@ -872,6 +1001,59 @@ fn trigger_deep_complete_active_missions(deep: &mut DeepState) -> &'static str {
     }
 }
 
+fn trigger_unlock_deep_layer(
+    deep: &mut DeepState,
+    state: &mut GameState,
+    achievements: &mut crate::achievements::Achievements,
+    target_layer: u32,
+) -> &'static str {
+    // Auto-discover The Deep if needed
+    if !deep.persistent.discovered {
+        let mut rng = rand::rng();
+        crate::deep::complete_discovery(deep, &mut rng);
+    }
+
+    // Clear layers up to and including the target
+    while deep.persistent.frontier_layer() <= target_layer {
+        let frontier = deep.persistent.frontier_layer();
+        crate::deep::mark_layer_cleared(&mut deep.persistent, frontier);
+    }
+
+    // Unlock layer achievements (triggers Power Core activation)
+    achievements.on_deep_breakthrough(target_layer, Some(&state.character_name));
+
+    // Set fracture zone cap based on the region this layer unlocks
+    if let Some(region) = crate::zones::FractureRegion::from_layer(target_layer) {
+        let cap = region.end_zone_id();
+        if deep.persistent.fracture_zone_cap < cap {
+            deep.persistent.fracture_zone_cap = cap;
+        }
+        // Unlock the zones
+        crate::zones::access::sync_account_zone_unlocks(
+            &mut state.zone_progression,
+            true,
+            deep.persistent.fracture_zone_cap,
+            state.prestige_rank,
+        );
+    }
+
+    // Refresh mission pool for new layers
+    let mut rng = rand::rng();
+    deep.prestige.available_missions =
+        crate::deep::generate_mission_pool(&deep.persistent, &mut rng);
+    deep.prestige.pool_refreshed_at = Some(Utc::now());
+
+    match target_layer {
+        3 => "Cleared to Deep L3 \u{2014} Red Fault unlocked (Z12-14)!",
+        7 => "Cleared to Deep L7 \u{2014} Mirror Scar unlocked (Z15-17)!",
+        12 => "Cleared to Deep L12 \u{2014} Black Mouth unlocked (Z18-20)!",
+        18 => "Cleared to Deep L18 \u{2014} Hollow Throne unlocked (Z21-23)!",
+        25 => "Cleared to Deep L25 \u{2014} Wailing Reach unlocked (Z24-26)!",
+        30 => "Cleared to Deep L30 \u{2014} Origin Wound unlocked (Z27-30)!",
+        _ => "Deep layers cleared!",
+    }
+}
+
 fn trigger_etch_s_plus_sigil(state: &mut GameState) -> &'static str {
     use crate::stormglass::sigils::{Sigil, SigilEffectType, SigilGrade};
 
@@ -898,6 +1080,7 @@ fn trigger_force_overcharge(state: &mut GameState) -> &'static str {
 fn trigger_travel_to_zone(
     state: &mut GameState,
     enhancement: &EnhancementProgress,
+    deep: &mut DeepState,
     zone_id: u32,
 ) -> &'static str {
     let zones = get_all_zones();
@@ -923,12 +1106,36 @@ fn trigger_travel_to_zone(
         state.recalculate_prestige_bonuses();
     }
 
+    // Fracture zones 12+: auto-set Deep fracture_zone_cap and discover Deep
+    if zone_id >= 12 {
+        if !deep.persistent.discovered {
+            let mut rng = rand::rng();
+            crate::deep::complete_discovery(deep, &mut rng);
+        }
+        if deep.persistent.fracture_zone_cap < zone_id {
+            deep.persistent.fracture_zone_cap = zone_id;
+        }
+        // Ensure high enough prestige to survive fracture zones
+        if state.prestige_rank < 20 {
+            state.prestige_rank = 20;
+            state.recalculate_prestige_bonuses();
+        }
+    }
+
     // Unlock the target zone (and all zones at or below its prestige tier)
     for z in zones {
         if z.prestige_requirement <= state.prestige_rank {
             state.zone_progression.unlock_zone(z.id);
         }
     }
+
+    // Unlock fracture zones up to the cap
+    crate::zones::access::sync_account_zone_unlocks(
+        &mut state.zone_progression,
+        true,
+        deep.persistent.fracture_zone_cap,
+        state.prestige_rank,
+    );
 
     // Travel to subzone 1
     state.zone_progression.current_zone_id = zone_id;
@@ -951,6 +1158,25 @@ fn trigger_travel_to_zone(
         9 => "Traveled to Floating Isles (Zone 9, P20)",
         10 => "Traveled to Storm Citadel (Zone 10, P20)",
         11 => "Traveled to The Expanse (Zone 11)",
+        12 => "Traveled to Splintered Rim (Zone 12)",
+        13 => "Traveled to Ember Ravine (Zone 13)",
+        14 => "Traveled to Heart of the Fault (Zone 14)",
+        15 => "Traveled to Shard Fields (Zone 15)",
+        16 => "Traveled to Refraction Steps (Zone 16)",
+        17 => "Traveled to Hall of Second Suns (Zone 17)",
+        18 => "Traveled to Ashen Verge (Zone 18)",
+        19 => "Traveled to Throat of the World (Zone 19)",
+        20 => "Traveled to The Black Mouth (Zone 20)",
+        21 => "Traveled to Sunken Processional (Zone 21)",
+        22 => "Traveled to The Pale Archive (Zone 22)",
+        23 => "Traveled to The Hollow Throne (Zone 23)",
+        24 => "Traveled to The Stillborn Sea (Zone 24)",
+        25 => "Traveled to Resonance Fault (Zone 25)",
+        26 => "Traveled to The Wailing Reach (Zone 26)",
+        27 => "Traveled to The Scar Root (Zone 27)",
+        28 => "Traveled to Echoing Abyss (Zone 28)",
+        29 => "Traveled to Threshold of Silence (Zone 29)",
+        30 => "Traveled to The Origin Wound (Zone 30)",
         _ => "Traveled to unknown zone",
     }
 }
@@ -963,10 +1189,11 @@ fn trigger_set_prestige(
     state.prestige_rank = rank;
     state.recalculate_prestige_bonuses();
 
-    // Unlock zones accessible at new prestige rank
+    // Unlock zones accessible at new prestige rank (skip fracture zones 12+,
+    // those are gated by Deep layer breakthroughs via sync_account_zone_unlocks)
     let zones = get_all_zones();
     for z in zones {
-        if z.prestige_requirement <= state.prestige_rank {
+        if z.id <= 11 && z.prestige_requirement <= state.prestige_rank {
             state.zone_progression.unlock_zone(z.id);
         }
     }
@@ -1408,9 +1635,10 @@ mod tests {
     fn test_trigger_travel_to_zone_basic() {
         let mut state = GameState::new("Test".to_string(), 0);
         let enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
         assert_eq!(state.zone_progression.current_zone_id, 1);
 
-        let msg = trigger_travel_to_zone(&mut state, &enhancement, 5);
+        let msg = trigger_travel_to_zone(&mut state, &enhancement, &mut deep, 5);
         assert_eq!(msg, "Traveled to Volcanic Wastes (Zone 5, P10)");
         assert_eq!(state.zone_progression.current_zone_id, 5);
         assert_eq!(state.zone_progression.current_subzone_id, 1);
@@ -1422,9 +1650,10 @@ mod tests {
     fn test_trigger_travel_clears_active_content() {
         let mut state = GameState::new("Test".to_string(), 0);
         let enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
         state.active_dungeon = Some(generate_dungeon(1, 0, 1));
 
-        trigger_travel_to_zone(&mut state, &enhancement, 1);
+        trigger_travel_to_zone(&mut state, &enhancement, &mut deep, 1);
         assert!(state.active_dungeon.is_none());
     }
 
@@ -1432,9 +1661,10 @@ mod tests {
     fn test_trigger_travel_no_prestige_downgrade() {
         let mut state = GameState::new("Test".to_string(), 0);
         let enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
         state.prestige_rank = 20;
 
-        trigger_travel_to_zone(&mut state, &enhancement, 1);
+        trigger_travel_to_zone(&mut state, &enhancement, &mut deep, 1);
         // Traveling to P0 zone should not lower prestige
         assert_eq!(state.prestige_rank, 20);
     }
@@ -1443,8 +1673,9 @@ mod tests {
     fn test_trigger_travel_unlocks_intermediate_zones() {
         let mut state = GameState::new("Test".to_string(), 0);
         let enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
 
-        trigger_travel_to_zone(&mut state, &enhancement, 7);
+        trigger_travel_to_zone(&mut state, &enhancement, &mut deep, 7);
         // Should unlock zones 1-8 (all P0, P5, P10, P15 zones)
         for zone_id in 1..=8 {
             assert!(
@@ -1452,6 +1683,71 @@ mod tests {
                 "Zone {zone_id} should be unlocked after traveling to Zone 7 (P15)"
             );
         }
+    }
+
+    #[test]
+    fn test_trigger_travel_to_fracture_zone() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
+
+        let msg = trigger_travel_to_zone(&mut state, &enhancement, &mut deep, 15);
+        assert_eq!(msg, "Traveled to Shard Fields (Zone 15)");
+        assert_eq!(state.zone_progression.current_zone_id, 15);
+        // Deep auto-discovered and fracture_zone_cap set
+        assert!(deep.persistent.discovered);
+        assert!(deep.persistent.fracture_zone_cap >= 15);
+        // Zone 15 should be unlocked
+        assert!(state.zone_progression.is_zone_unlocked(15));
+    }
+
+    #[test]
+    fn test_trigger_unlock_deep_layer_3() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.prestige_rank = 50; // Meet P50 requirement for zones 12-14
+        let mut deep = DeepState::new();
+        let mut achievements = crate::achievements::Achievements::default();
+
+        let msg = trigger_unlock_deep_layer(&mut deep, &mut state, &mut achievements, 3);
+        assert_eq!(
+            msg,
+            "Cleared to Deep L3 \u{2014} Red Fault unlocked (Z12-14)!"
+        );
+        assert!(deep.persistent.discovered);
+        assert!(deep.persistent.fracture_zone_cap >= 14);
+        // Zones 12-14 should be unlocked
+        for zone_id in 12..=14 {
+            assert!(
+                state.zone_progression.is_zone_unlocked(zone_id),
+                "Zone {zone_id} should be unlocked after Deep L3"
+            );
+        }
+        // Power Core achievement should be unlocked
+        assert!(achievements.is_unlocked(crate::achievements::AchievementId::PowerCoreI));
+    }
+
+    #[test]
+    fn test_trigger_unlock_deep_layer_12() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.prestige_rank = 100; // Meet P100 requirement for zones 18-20
+        let mut deep = DeepState::new();
+        let mut achievements = crate::achievements::Achievements::default();
+
+        trigger_unlock_deep_layer(&mut deep, &mut state, &mut achievements, 12);
+        assert!(deep.persistent.fracture_zone_cap >= 20);
+        for zone_id in 12..=20 {
+            assert!(
+                state.zone_progression.is_zone_unlocked(zone_id),
+                "Zone {zone_id} should be unlocked after Deep L12"
+            );
+        }
+        // Layer achievements up to layer 10 should be unlocked
+        assert!(achievements.is_unlocked(crate::achievements::AchievementId::Layer5Cleared));
+        assert!(achievements.is_unlocked(crate::achievements::AchievementId::Layer10Cleared));
+        // Power Core achievements up to layer 12 should be unlocked
+        assert!(achievements.is_unlocked(crate::achievements::AchievementId::PowerCoreI));
+        assert!(achievements.is_unlocked(crate::achievements::AchievementId::PowerCoreII));
+        assert!(achievements.is_unlocked(crate::achievements::AchievementId::PowerCoreIII));
     }
 
     #[test]
@@ -1527,8 +1823,8 @@ mod tests {
     }
 
     #[test]
-    fn test_zones_category_has_11_options() {
-        assert_eq!(option_count_for_category(DebugCategory::Zones), 11);
+    fn test_zones_category_has_30_options() {
+        assert_eq!(option_count_for_category(DebugCategory::Zones), 30);
     }
 
     #[test]
@@ -1553,6 +1849,486 @@ mod tests {
         let cap = state.get_attribute_cap(); // 20 + 10*5 = 70
         for attr in crate::character::attributes::AttributeType::all() {
             assert_eq!(state.attributes.get(attr), cap);
+        }
+    }
+
+    // Helper to build the canonical trigger_selected prerequisites
+    fn make_test_fixtures() -> (
+        GameState,
+        Haven,
+        EnhancementProgress,
+        DeepState,
+        crate::achievements::Achievements,
+    ) {
+        (
+            GameState::new("Test".to_string(), 0),
+            Haven::new(),
+            EnhancementProgress::new(),
+            DeepState::new(),
+            crate::achievements::Achievements::default(),
+        )
+    }
+
+    fn select_action(menu: &mut DebugMenu, action: DebugAction) {
+        // Navigate to the correct category and position for the given action
+        let global_idx = action.option_index();
+        // Find which category slice contains this action
+        let categories = [
+            (DebugCategory::Challenges, CHALLENGE_ACTIONS),
+            (DebugCategory::World, WORLD_ACTIONS),
+            (DebugCategory::Resources, RESOURCE_ACTIONS),
+            (DebugCategory::Items, ITEM_ACTIONS),
+            (DebugCategory::Deep, DEEP_ACTIONS),
+            (DebugCategory::Zones, ZONE_ACTIONS),
+            (DebugCategory::Character, CHARACTER_ACTIONS),
+        ];
+        for (cat, slice) in categories.iter() {
+            for (idx, a) in slice.iter().enumerate() {
+                if a.option_index() == global_idx {
+                    // Navigate to this category
+                    menu.open();
+                    while menu.current_category() != *cat {
+                        menu.navigate_next_category();
+                    }
+                    menu.selected_index = idx;
+                    return;
+                }
+            }
+        }
+        panic!("Action not found in any category slice");
+    }
+
+    // 1. Set P100 → Unlock L3 → verify zones 12-14 are unlocked
+    #[test]
+    fn test_set_p100_then_unlock_l3_unlocks_zones_12_to_14() {
+        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
+            make_test_fixtures();
+        let mut menu = DebugMenu::new();
+
+        // Set prestige to P100
+        trigger_set_prestige(&mut state, &enhancement, 100);
+        crate::zones::access::sync_account_zone_unlocks(
+            &mut state.zone_progression,
+            achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
+            deep.persistent.fracture_zone_cap,
+            state.prestige_rank,
+        );
+        state.cached_fracture_zone_cap = deep.persistent.fracture_zone_cap;
+        assert_eq!(state.prestige_rank, 100);
+
+        // Unlock Deep Layer 3 via trigger_selected
+        select_action(&mut menu, DebugAction::UnlockDeepLayer(3));
+        menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+
+        // Zones 12-14 should now be unlocked (prestige=100 >= 50 requirement)
+        for zone_id in 12..=14 {
+            assert!(
+                state.zone_progression.is_zone_unlocked(zone_id),
+                "Zone {zone_id} should be unlocked after SetP100 + UnlockL3"
+            );
+        }
+        // Zone 15 should NOT be unlocked (cap is 14)
+        assert!(
+            !state.zone_progression.is_zone_unlocked(15),
+            "Zone 15 should not be unlocked when cap is 14"
+        );
+    }
+
+    // 2. Unlock L3 → Set P100 (reverse order) → verify zones 12-14 are unlocked
+    #[test]
+    fn test_unlock_l3_then_set_p100_unlocks_zones_12_to_14() {
+        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
+            make_test_fixtures();
+        let mut menu = DebugMenu::new();
+
+        // First unlock L3 (Deep auto-discovered, but prestige=0 won't unlock zones yet)
+        select_action(&mut menu, DebugAction::UnlockDeepLayer(3));
+        menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+
+        // Zones 12-14 should NOT be unlocked yet (prestige=0 < 50 requirement)
+        for zone_id in 12..=14 {
+            assert!(
+                !state.zone_progression.is_zone_unlocked(zone_id),
+                "Zone {zone_id} should not be unlocked before setting prestige"
+            );
+        }
+
+        // Now set prestige to P100 via trigger_selected
+        select_action(&mut menu, DebugAction::SetPrestige(100));
+        menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+
+        // After sync (called inside trigger_selected), zones 12-14 should be unlocked
+        for zone_id in 12..=14 {
+            assert!(
+                state.zone_progression.is_zone_unlocked(zone_id),
+                "Zone {zone_id} should be unlocked after UnlockL3 + SetP100"
+            );
+        }
+    }
+
+    // 3. Forge Stormbreaker → verify both TheStormbreaker AND StormsEnd are unlocked
+    #[test]
+    fn test_forge_stormbreaker_unlocks_both_achievements() {
+        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
+            make_test_fixtures();
+        let mut menu = DebugMenu::new();
+
+        assert!(!achievements.is_unlocked(crate::achievements::AchievementId::TheStormbreaker));
+        assert!(!achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd));
+
+        select_action(&mut menu, DebugAction::TriggerForgeStormbreaker);
+        menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+
+        assert!(
+            achievements.is_unlocked(crate::achievements::AchievementId::TheStormbreaker),
+            "TheStormbreaker achievement should be unlocked"
+        );
+        assert!(
+            achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
+            "StormsEnd achievement should be unlocked"
+        );
+    }
+
+    // 4. Forge Stormbreaker at P25 → verify zone 11 is unlocked
+    #[test]
+    fn test_forge_stormbreaker_at_p25_unlocks_zone_11() {
+        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
+            make_test_fixtures();
+        let mut menu = DebugMenu::new();
+
+        // Set prestige to P25
+        trigger_set_prestige(&mut state, &enhancement, 25);
+
+        // Forge Stormbreaker via trigger_selected (which calls sync after)
+        select_action(&mut menu, DebugAction::TriggerForgeStormbreaker);
+        menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+
+        assert!(
+            achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
+            "StormsEnd should be unlocked"
+        );
+        // Zone 11 requires StormsEnd AND prestige >= 25
+        assert!(
+            state.zone_progression.is_zone_unlocked(11),
+            "Zone 11 should be unlocked after ForgeStormbreaker at P25"
+        );
+    }
+
+    // 5. Forge Stormbreaker at P0 → verify zone 11 is NOT unlocked (needs P25)
+    #[test]
+    fn test_forge_stormbreaker_at_p0_does_not_unlock_zone_11() {
+        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
+            make_test_fixtures();
+        let mut menu = DebugMenu::new();
+
+        // prestige_rank starts at 0
+        assert_eq!(state.prestige_rank, 0);
+
+        select_action(&mut menu, DebugAction::TriggerForgeStormbreaker);
+        menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+
+        assert!(
+            achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
+            "StormsEnd should still be unlocked by the forge action"
+        );
+        // Zone 11 needs prestige >= 25 (the Expanse's prestige_requirement)
+        assert!(
+            !state.zone_progression.is_zone_unlocked(11),
+            "Zone 11 should NOT be unlocked at P0 even with StormsEnd"
+        );
+    }
+
+    // 6. Set P100 → Unlock L3 → Forge Stormbreaker → verify full zone track accessible
+    #[test]
+    fn test_set_p100_unlock_l3_forge_stormbreaker_full_zone_track() {
+        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
+            make_test_fixtures();
+        let mut menu = DebugMenu::new();
+
+        // Step 1: Set prestige P100
+        select_action(&mut menu, DebugAction::SetPrestige(100));
+        menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+
+        // Step 2: Unlock Deep L3
+        select_action(&mut menu, DebugAction::UnlockDeepLayer(3));
+        menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+
+        // Step 3: Forge Stormbreaker
+        select_action(&mut menu, DebugAction::TriggerForgeStormbreaker);
+        menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+
+        // Zone 11 unlocked (StormsEnd + P100 >= P25)
+        assert!(
+            state.zone_progression.is_zone_unlocked(11),
+            "Zone 11 should be unlocked"
+        );
+        // Zones 12-14 unlocked (L3 + P100 >= P50)
+        for zone_id in 12..=14 {
+            assert!(
+                state.zone_progression.is_zone_unlocked(zone_id),
+                "Zone {zone_id} should be unlocked"
+            );
+        }
+        // Zone 15 NOT unlocked (cap=14)
+        assert!(
+            !state.zone_progression.is_zone_unlocked(15),
+            "Zone 15 should not be unlocked when cap is 14"
+        );
+    }
+
+    // 7. Unlock L30 at P300 → verify all zones 12-30 are unlocked
+    #[test]
+    fn test_unlock_l30_at_p300_unlocks_all_fracture_zones() {
+        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
+            make_test_fixtures();
+        let mut menu = DebugMenu::new();
+
+        // Set prestige to P300 first
+        trigger_set_prestige(&mut state, &enhancement, 300);
+
+        // Unlock Deep L30 via trigger_selected
+        select_action(&mut menu, DebugAction::UnlockDeepLayer(30));
+        menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+
+        // All zones 12-30 should be unlocked (P300 meets all prestige requirements)
+        for zone_id in 12..=30 {
+            assert!(
+                state.zone_progression.is_zone_unlocked(zone_id),
+                "Zone {zone_id} should be unlocked after UnlockL30 at P300"
+            );
+        }
+        assert_eq!(deep.persistent.fracture_zone_cap, 30);
+    }
+
+    // 8. Unlock L30 at P100 → verify only zones 12-20 unlocked (P100 < P150 for Z21+)
+    #[test]
+    fn test_unlock_l30_at_p100_only_unlocks_zones_up_to_20() {
+        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
+            make_test_fixtures();
+        let mut menu = DebugMenu::new();
+
+        // Set prestige to P100
+        trigger_set_prestige(&mut state, &enhancement, 100);
+
+        // Unlock Deep L30 via trigger_selected
+        select_action(&mut menu, DebugAction::UnlockDeepLayer(30));
+        menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+
+        // cap is 30 but prestige=100 only meets requirements up to Z20 (P100)
+        for zone_id in 12..=20 {
+            assert!(
+                state.zone_progression.is_zone_unlocked(zone_id),
+                "Zone {zone_id} should be unlocked at P100"
+            );
+        }
+        // Zones 21-30 require P150+ which we don't have
+        for zone_id in 21..=30 {
+            assert!(
+                !state.zone_progression.is_zone_unlocked(zone_id),
+                "Zone {zone_id} should NOT be unlocked at P100 (requires P150+)"
+            );
+        }
+    }
+
+    // 9. Verify cached_fracture_zone_cap is updated after unlock deep layer action
+    #[test]
+    fn test_cached_fracture_zone_cap_updated_after_unlock_deep_layer() {
+        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
+            make_test_fixtures();
+        let mut menu = DebugMenu::new();
+
+        assert_eq!(state.cached_fracture_zone_cap, 0);
+
+        // Unlock Deep L3
+        select_action(&mut menu, DebugAction::UnlockDeepLayer(3));
+        menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+
+        assert_eq!(
+            state.cached_fracture_zone_cap, 14,
+            "cached_fracture_zone_cap should be 14 after UnlockL3"
+        );
+
+        // Unlock Deep L7 (extends cap to 17)
+        select_action(&mut menu, DebugAction::UnlockDeepLayer(7));
+        menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+
+        assert_eq!(
+            state.cached_fracture_zone_cap, 17,
+            "cached_fracture_zone_cap should be 17 after UnlockL7"
+        );
+
+        // Unlock Deep L30 (extends cap to 30)
+        select_action(&mut menu, DebugAction::UnlockDeepLayer(30));
+        menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+
+        assert_eq!(
+            state.cached_fracture_zone_cap, 30,
+            "cached_fracture_zone_cap should be 30 after UnlockL30"
+        );
+    }
+
+    // 10. Forge Stormbreaker twice → second time returns "already forged" message
+    #[test]
+    fn test_forge_stormbreaker_twice_returns_already_forged() {
+        let (_state, _haven, _enhancement, _deep, mut achievements) = make_test_fixtures();
+
+        // First forge
+        let msg = trigger_forge_stormbreaker(&mut achievements);
+        assert_eq!(msg, "Forged Stormbreaker!");
+
+        // Second forge attempt
+        let msg2 = trigger_forge_stormbreaker(&mut achievements);
+        assert_eq!(msg2, "Stormbreaker already forged!");
+    }
+
+    // Bonus: verify trigger_selected version also returns "already forged" on second call
+    #[test]
+    fn test_trigger_selected_forge_stormbreaker_twice() {
+        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
+            make_test_fixtures();
+        let mut menu = DebugMenu::new();
+
+        // First forge via trigger_selected
+        select_action(&mut menu, DebugAction::TriggerForgeStormbreaker);
+        let msg = menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+        assert_eq!(msg, "Forged Stormbreaker!");
+
+        // Second forge via trigger_selected
+        select_action(&mut menu, DebugAction::TriggerForgeStormbreaker);
+        let msg2 = menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+        assert_eq!(msg2, "Stormbreaker already forged!");
+    }
+
+    // Additional: Verify that trigger_selected correctly syncs zone unlocks after SetPrestige
+    // when fracture cap was previously set
+    #[test]
+    fn test_zone_sync_happens_after_set_prestige_with_existing_fracture_cap() {
+        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
+            make_test_fixtures();
+        let mut menu = DebugMenu::new();
+
+        // First unlock L3 (cap=14, but prestige=0 won't unlock zones)
+        select_action(&mut menu, DebugAction::UnlockDeepLayer(3));
+        menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+        assert!(!state.zone_progression.is_zone_unlocked(12));
+
+        // Now bump prestige to P50 — sync inside trigger_selected should unlock 12-14
+        select_action(&mut menu, DebugAction::SetPrestige(50));
+        menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+        );
+
+        for zone_id in 12..=14 {
+            assert!(
+                state.zone_progression.is_zone_unlocked(zone_id),
+                "Zone {zone_id} should be unlocked after SetP50 with cap=14"
+            );
         }
     }
 }

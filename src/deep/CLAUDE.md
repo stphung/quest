@@ -53,6 +53,10 @@ Key methods:
 ### `DeepPersistent` (`types.rs`)
 Account-level state. Owned by the game's account-level save, not character saves.
 
+Key fields (fracture-related):
+- `fracture_zone_cap: u32` — Highest fracture zone accessible (default 11 = Expanse only). Raised by Deep breakthroughs at layers 3/7/12/18/25/30 to 14/17/20/23/26/30 respectively. `#[serde(default = "default_fracture_zone_cap")]`
+- `pending_fracture_region_unlock: Option<FractureRegion>` — Set when a breakthrough unlocks a new chapter; consumed by tick to show world-event modal. `#[serde(default)]`
+
 Key methods:
 - `layer_record_mut(index)` — Get or lazily create a `LayerRecord` (vec grows on demand)
 - `layer_record(index)` — Read-only lookup; returns `None` for index 0 or unreached layers

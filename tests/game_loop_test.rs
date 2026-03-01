@@ -45,6 +45,7 @@ fn simulate_tick_with_rng<R: rand::Rng>(state: &mut GameState, rng: &mut R) -> V
         &CombatBonuses::default(),
         &mut achievements,
         &derived,
+        11,
     )
 }
 

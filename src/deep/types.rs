@@ -658,6 +658,10 @@ impl LayerRecord {
 
 // ── Top-Level State ────────────────────────────────────────────────────────────
 
+fn default_fracture_zone_cap() -> u32 {
+    11
+}
+
 /// Account-level Deep state — **persists across prestiges**.
 ///
 /// Saved to `~/.quest/deep.json`.
@@ -689,6 +693,12 @@ pub struct DeepPersistent {
     /// Records of completed generations (capped at 10).
     #[serde(default)]
     pub generation_records: Vec<GenerationRecord>,
+    /// Highest fracture zone the player can access (default 11 = Expanse only).
+    #[serde(default = "default_fracture_zone_cap")]
+    pub fracture_zone_cap: u32,
+    /// Pending fracture region unlock notification (consumed by tick to show modal).
+    #[serde(default)]
+    pub pending_fracture_region_unlock: Option<crate::zones::FractureRegion>,
 }
 
 impl Default for DeepPersistent {
@@ -711,6 +721,8 @@ impl DeepPersistent {
             gateway_opened: false,
             first_orders_queued: false,
             generation_records: Vec::new(),
+            fracture_zone_cap: 11,
+            pending_fracture_region_unlock: None,
         }
     }
 

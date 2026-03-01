@@ -15,6 +15,7 @@ pub(super) fn handle_vault_selection(
     deep: &mut DeepState,
     deep_ui: &mut crate::deep::DeepUiState,
     overlay: &mut GameOverlay,
+    achievements: &crate::achievements::Achievements,
 ) -> InputResult {
     if let GameOverlay::VaultSelection {
         ref mut selected_index,
@@ -72,6 +73,13 @@ pub(super) fn handle_vault_selection(
                     // Reset prestige-scoped Deep state while preserving guild rank,
                     // layer progression, and infrastructure.
                     deep.on_prestige();
+                    // Re-sync fracture zone unlocks after prestige reset
+                    crate::zones::sync_account_zone_unlocks(
+                        &mut state.zone_progression,
+                        achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
+                        deep.persistent.fracture_zone_cap,
+                        state.prestige_rank,
+                    );
                     *overlay = GameOverlay::None;
                     let new_rank = state.prestige_rank;
                     state.combat_state.add_log_entry(
@@ -111,6 +119,7 @@ pub(super) fn handle_prestige_confirm(
     deep: &mut DeepState,
     deep_ui: &mut crate::deep::DeepUiState,
     overlay: &mut GameOverlay,
+    achievements: &crate::achievements::Achievements,
 ) -> InputResult {
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
@@ -144,6 +153,13 @@ pub(super) fn handle_prestige_confirm(
                 // Reset prestige-scoped Deep state while preserving guild rank,
                 // layer progression, and infrastructure.
                 deep.on_prestige();
+                // Re-sync fracture zone unlocks after prestige reset
+                crate::zones::sync_account_zone_unlocks(
+                    &mut state.zone_progression,
+                    achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
+                    deep.persistent.fracture_zone_cap,
+                    state.prestige_rank,
+                );
                 *overlay = GameOverlay::None;
                 let new_rank = state.prestige_rank;
                 state.combat_state.add_log_entry(

@@ -65,7 +65,7 @@ fn force_player_attack(
     state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
     state.combat_state.enemy_attack_timer = 0.0;
     let mut achievements = Achievements::default();
-    update_combat(rng, state, 0.0, bonuses, &mut achievements, &d)
+    update_combat(rng, state, 0.0, bonuses, &mut achievements, &d, 11)
 }
 
 /// Force a single enemy attack. Sets enemy timer to threshold, suppresses player timer.
@@ -78,7 +78,7 @@ fn force_enemy_attack(
     state.combat_state.player_attack_timer = 0.0;
     state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
     let mut achievements = Achievements::default();
-    update_combat(rng, state, 0.0, bonuses, &mut achievements, &d)
+    update_combat(rng, state, 0.0, bonuses, &mut achievements, &d, 11)
 }
 
 /// Force a player attack with explicit achievements (needed for weapon gate checks).
@@ -91,7 +91,7 @@ fn force_player_attack_with_achievements(
     let d = derived(state);
     state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
     state.combat_state.enemy_attack_timer = 0.0;
-    update_combat(rng, state, 0.0, bonuses, achievements, &d)
+    update_combat(rng, state, 0.0, bonuses, achievements, &d, 11)
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1068,12 +1068,12 @@ fn high_prestige_combined_bonuses_no_overflow() {
     let bonuses = CombatBonuses {
         flat_damage,
         flat_defense,
-        flat_hp,
         crit_chance_percent: 15.0, // Capped prestige crit
         ..CombatBonuses::default()
     };
 
     let mut state = state_with_enemy(100_000, 100, 10);
+    // flat_hp is now applied in tick Stage 3, not in CombatBonuses
     state.combat_state.player_max_hp += flat_hp;
     state.combat_state.player_current_hp = state.combat_state.player_max_hp;
 

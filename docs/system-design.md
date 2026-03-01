@@ -71,7 +71,7 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 
 ### Key Architectural Patterns
 
-- **Event-driven tick processing**: `game_tick()` returns a `TickResult` containing `Vec<TickEvent>` (41 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
+- **Event-driven tick processing**: `game_tick()` returns a `TickResult` containing `Vec<TickEvent>` (44 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
 - **Generic RNG**: `game_tick<R: Rng>()` uses a generic type parameter because `rand::Rng` is not dyn-compatible. Production uses `thread_rng()`, tests use seeded `ChaCha8Rng` for determinism.
 - **Haven bonus injection**: Haven bonuses are passed as explicit parameters to game systems rather than accessed globally, keeping modules decoupled.
 
@@ -147,7 +147,7 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
 
 ### Key Types
 
-**`TickEvent`** (42 variants):
+**`TickEvent`** (44 variants):
 - Combat: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `DamageReflected`, `RegenComplete`, `EnemyDefeated`, `BossEnrage`, `PlayerDied`, `PlayerDiedInDungeon`, `CombatRetreat`
 - Items: `ItemDropped`
 - Zones: `SubzoneBossDefeated`
@@ -156,6 +156,8 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
 - Discovery: `ChallengeDiscovered`, `DungeonDiscovered`, `FishingSpotDiscovered`, `HavenDiscovered`, `SoulforgeDiscovered`, `DeepDiscovered`, `StormglassDiscovered`
 - Stormglass: `StormglassSalvaged`, `StormglassDungeonCache`
 - Deep: `DeepMissionComplete`, `DeepEventPending`, `DeepMercInjured`, `DeepMercLost`, `DeepBreakthrough`, `DeepGuildRankUp`
+- Fracture Zones: `FractureRegionUnlocked`
+- Ascension: `Ascended`
 - Achievements: `AchievementUnlocked`
 - Level: `LeveledUp`
 
@@ -409,7 +411,7 @@ Tier 1 (P0)          Tier 2 (P5)          Tier 3 (P10)
                      │  (3 subs)   │      │  (4 subs)   │
                      └─────────────┘      └─────────────┘
 
-Tier 4 (P15)         Tier 5 (P20)         Post-Game
+Tier 4 (P15)         Tier 5 (P20)         Post-Game (Z11)
 ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
 │  Crystal    │      │  Floating   │      │    The      │
 │  Caverns    │      │   Isles     │      │  Expanse    │
@@ -423,13 +425,23 @@ Tier 4 (P15)         Tier 5 (P20)         Post-Game
                            ^
                     [Stormbreaker
                       Required]
+
+Fracture Zones (Z12-30, unlocked by Deep layer breakthroughs, 5 subzones each):
+Ch.1 The Red Fault (Deep L3):   Z12 Splintered Rim, Z13 Ember Ravine, Z14 Heart of the Fault
+Ch.2 The Mirror Scar (Deep L7): Z15 Shard Fields, Z16 Refraction Steps, Z17 Hall of Second Suns
+Ch.3 The Black Mouth (Deep L12):Z18 Ashen Verge, Z19 Throat of the World, Z20 The Black Mouth
+Ch.4 The Hollow Throne (Deep L18): Z21 Sunken Processional, Z22 The Pale Archive, Z23 The Hollow Throne
+Ch.5 The Wailing Reach (Deep L25): Z24 The Stillborn Sea, Z25 Resonance Fault, Z26 The Wailing Reach
+Ch.6 The Origin Wound (Deep L30): Z27 The Scar Root, Z28 Echoing Abyss, Z29 Threshold of Silence, Z30 The Origin Wound
 ```
 
 ### Subzone Progression
 
 - 10 kills per subzone triggers boss
 - Boss defeat advances to next subzone/zone
-- Zone 11 (The Expanse) cycles infinitely
+- Zone 11 (The Expanse) cycles infinitely until fracture zones unlock
+- Fracture zones: only the current cap zone cycles; all others advance forward
+- Enemy stats scale 1.6x per zone from Zone 11 base (FRACTURE_ZONE_STAT_MULTIPLIER)
 
 ---
 
@@ -627,8 +639,8 @@ All challenges use 4 difficulty levels: Novice, Apprentice, Journeyman, Master.
 | Morris | +50% XP | +100% XP | +150% XP | +1 FR, +200% XP |
 | Minesweeper | +50% XP | +75% XP | +100% XP | +1 PR, +200% XP |
 | Rune | +25% XP | +50% XP | +1 FR, +75% XP | +1 PR, +2 FR |
-| Snake | +25% XP | +75% XP | +1 PR, +100% XP | +2 PR, +100% XP |
-| Flappy Bird | +25% XP | +75% XP | +1 PR, +100% XP | +2 PR, +100% XP |
+| Snake | +25% XP | +75% XP | +100% XP | +1 PR, +100% XP |
+| Flappy Bird | +50% XP | +100% XP | +1 PR, +75% XP | +2 PR, +150% XP, +1 FR |
 | JezzBall | +25% XP | +75% XP | +1 PR, +100% XP | +2 PR, +100% XP |
 | Sigil Surge | +50% XP | +100% XP | +1 PR, +75% XP | +2 PR, +150% XP, +1 FR |
 
@@ -762,7 +774,33 @@ Progressive 10-encounter hunt at Fishing Rank 40:
 
 ### The Deep (Mercenary Expeditions)
 
-Endgame mercenary expedition system discovered on the first Expanse cycle boss kill (`BossDefeatResult::ExpanseCycle`, i.e. The Endless) at P15+. Players recruit mercenaries across 5 archetypes and 4 quality tiers, then send them on missions into a 25-layer underground structure (plus infinite Void scaling). Missions run on wall-clock time (2-24h). Two-tier persistence: guild rank, cleared layers, and infrastructure survive prestige; mercenaries, active missions, and Warband Marks reset. Five guild ranks with increasing roster and concurrent mission limits. Four infrastructure types per layer. See [Secondary Systems](secondary-systems.md#the-deep-mercenary-expedition-system) for details.
+Endgame mercenary expedition system discovered on the first Expanse cycle boss kill (`BossDefeatResult::ExpanseCycle`, i.e. The Endless) at P15+. Players recruit mercenaries across 5 archetypes and 4 quality tiers, then send them on missions into a 25-layer underground structure (plus infinite Void scaling). Missions run on wall-clock time (2-24h). Two-tier persistence: guild rank, cleared layers, and infrastructure survive prestige; mercenaries, active missions, and Warband Marks reset. Five guild ranks with increasing roster and concurrent mission limits. Four infrastructure types per layer. Deep layer breakthroughs unlock fracture zones 12-30. See [Secondary Systems](secondary-systems.md#the-deep-mercenary-expedition-system) for details.
+
+### Ascension
+
+Per-character combat power multiplier purchased with prestige ranks, gated by Deep layer milestones. Survives prestige.
+
+| Level | PR Cost | Deep Gate | Multiplier |
+|-------|---------|-----------|------------|
+| I | 35 | Layer 3 | 2x |
+| II | 65 | Layer 7 | 4x |
+| III | 120 | Layer 12 | 8x |
+| IV | 200 | Layer 18 | 16x |
+| V | 325 | Layer 25 | 32x |
+| VI | 500 | Layer 30 | 64x |
+| VII+ | 500 + 75*(level-6) | None | 64 × 1.5^(level-6) |
+
+Total PR for I-VI: 1,245. Multiplier applies to damage, defense, and HP. Ascension level stored as `ascension_level: u32` on `GameState`.
+
+### Power Rating
+
+A single numeric score for comparing character strength across prestige levels and ascension. Defined as the geometric mean of combat output and survivability:
+
+```
+power_rating = sqrt(effective_DPS × effective_HP)
+```
+
+Accounts for the full damage pipeline (crit, double strike, attack speed), defense reduction multiplier, and all bonus sources (prestige, Haven, god items, sigils, ascension). Cached as `cached_power_rating: f64` on `GameState`. Displayed in the stats header.
 
 ---
 
@@ -806,11 +844,11 @@ Headless game balance simulator that runs `game_tick()` without UI:
 
 Activated with `--debug` flag, toggle with backtick.
 
-Options organized in 5 tabs: Challenges (all 10 types), World (Dungeon, Fishing, Haven, Soulforge, Deep discovery), Resources (Stormglass), Items (God Items), Borders.
+Options organized in 8 tabs: Challenges (all 10 types), World (Dungeon, Fishing, Haven, Soulforge), Resources (Stormglass), Items (God Items), Deep (discovery, missions, marks), Zones, Character, Borders.
 
 ### Integration Tests
 
-49 integration test files in `tests/`:
+62 integration test files in `tests/`:
 - `game_loop_orchestration_test.rs` -- 36 behavior-locking tests for game tick pipeline
 - `game_tick_behavior_test.rs` / `game_tick_supplemental_test.rs` -- Tick processing behavior
 - `tick_integration_test.rs` -- Cross-system tick integration
@@ -867,6 +905,7 @@ Plain JSON with serde. No checksum -- relies on structural validation on load.
 | The Deep (persistent) | Account | Preserved (guild rank, layers, infra) |
 | The Deep (prestige) | Per-character | Reset (mercs, missions, Warband Marks) |
 | Achievements | Account | Preserved |
+| Ascension level | Per-character | Preserved |
 
 ---
 
@@ -905,6 +944,17 @@ fn soulforge_discovery_chance(prestige_rank: u32) -> f64 {
 
 // The Deep discovery trigger (no per-tick RNG)
 // Fires once on first BossDefeatResult::ExpanseCycle at P15+.
+
+// Ascension multiplier
+fn ascension_multiplier(level: u32) -> f64 {
+    if level <= 6 { 2f64.powi(level as i32) }
+    else { 64.0 * 1.5f64.powi((level - 6) as i32) }
+}
+
+// Power rating
+fn power_rating(effective_dps: f64, effective_hp: f64) -> f64 {
+    (effective_dps * effective_hp).sqrt().round()
+}
 
 // Offline XP
 fn offline_xp(elapsed_s: i64, xp_per_tick: f64, haven_bonus_pct: f64) -> f64 {
@@ -953,14 +1003,15 @@ quest/
 │   │   ├── game_logic.rs    # Thin re-export wrapper for submodules
 │   │   ├── game_state.rs    # Main GameState struct
 │   │   ├── tick.rs          # game_tick() orchestrator
-│   │   ├── tick_types.rs    # TickEvent enum (42 variants), TickResult struct
+│   │   ├── tick_types.rs    # TickEvent enum (44 variants), TickResult struct
 │   │   ├── tick_stages.rs   # Tick processing stages 4-6 + helpers
 │   │   ├── xp.rs            # XP calculation, leveling, combat kill XP
 │   │   ├── discoveries.rs   # Discovery rolls (dungeon, fishing, Haven, Soulforge)
 │   │   ├── enemy_spawning.rs # Enemy generation and spawning
 │   │   ├── offline.rs       # Offline XP progression
 │   │   ├── recent_drops.rs  # RecentDrop struct and deque management
-│   │   └── ticker.rs        # XP rate sampling and rolling window
+│   │   ├── ticker.rs        # Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
+│   │   └── power_rating.rs  # Power rating formula: sqrt(effective_DPS × effective_HP)
 │   ├── character/           # Character system
 │   │   ├── attributes.rs    # 6 RPG attributes
 │   │   ├── derived_stats.rs # Stats from attributes
@@ -990,11 +1041,13 @@ quest/
 │   │   ├── events.rs        # CombatEvent, CombatBonuses (unified struct)
 │   │   └── regen.rs         # HP regeneration after combat
 │   ├── zones/               # Zone system
-│   │   ├── data.rs          # Zone definitions
+│   │   ├── data.rs          # Zone definitions (30 zones)
 │   │   ├── progression.rs   # Zone progression
 │   │   ├── advancement.rs   # Zone/subzone advancement and travel
 │   │   ├── boss_defeat.rs   # Boss defeat handling
-│   │   └── gates.rs         # Weapon gate queries, access checks
+│   │   ├── gates.rs         # Weapon gate queries, access checks
+│   │   ├── fracture.rs      # FractureRegion enum (RedFault through OriginWound)
+│   │   └── access.rs        # sync_account_zone_unlocks()
 │   ├── dungeon/             # Dungeon system
 │   │   ├── types.rs         # Room types, dungeon sizes (5)
 │   │   ├── generation.rs    # Procedural generation
@@ -1036,6 +1089,10 @@ quest/
 │   │   ├── types.rs         # Enhancement progress, constants, success rates
 │   │   ├── logic.rs         # Enhancement rolls, discovery
 │   │   └── persistence.rs   # Save/load from ~/.quest/enhancement.json
+│   ├── ascension/           # Ascension combat power multiplier system
+│   │   ├── mod.rs           # Public re-exports
+│   │   ├── types.rs         # Cost table, gate table, multiplier formula
+│   │   └── logic.rs         # can_ascend(), ascend(), AscendResult
 │   ├── deep/                # The Deep — Mercenary Expedition System
 │   │   ├── mod.rs           # Public API re-exports
 │   │   ├── types.rs         # All data structures (DeepState, Mercenary, Mission, etc.)
@@ -1054,14 +1111,14 @@ quest/
 │   ├── god_items/           # God Items system (Asprika, Sleipnir, Megingjord)
 │   │   └── types.rs         # God item definitions, passives, bonuses, query helpers
 │   ├── achievements/        # Achievement system
-│   │   ├── types.rs         # AchievementId (168 variants), Achievements state
+│   │   ├── types.rs         # AchievementId (204 variants), Achievements state
 │   │   ├── data.rs          # Achievement database
 │   │   ├── handlers.rs      # Event handlers (on_kill, on_boss_kill, etc.)
 │   │   ├── milestones.rs    # Milestone definitions and thresholds
 │   │   ├── modal.rs         # Modal notification queue (500ms accumulation window)
 │   │   ├── notifications.rs # Notification state management
 │   │   ├── stats.rs         # Achievement statistics and progress tracking
-│   │   ├── titles.rs        # Title definitions (51 titles), selection, validation
+│   │   ├── titles.rs        # Title definitions (63 titles), selection, validation
 │   │   ├── unlock.rs        # Core unlock machinery (is_unlocked, unlock, check_milestones)
 │   │   └── persistence.rs   # Save/load
 │   ├── utils/               # Utilities
@@ -1115,7 +1172,7 @@ quest/
 │       ├── throbber.rs      # Spinner animations
 │       └── character_select.rs, character_creation.rs,
 │           character_delete.rs, character_rename.rs
-├── tests/                   # 49 integration test files
+├── tests/                   # 62 integration test files
 ├── .github/workflows/       # CI/CD pipeline
 ├── scripts/                 # Quality checks (ci-checks.sh)
 ├── docs/                    # Design documents
@@ -1146,6 +1203,7 @@ Each major module has its own `CLAUDE.md` with implementation patterns, integrat
 - `src/haven/CLAUDE.md` -- Account-level base building, bonus system
 - `src/achievements/CLAUDE.md` -- Achievement tracking, modal notifications
 - `src/enhancement/CLAUDE.md` -- Soulforge enhancement system
+- `src/ascension/CLAUDE.md` -- Ascension combat power multiplier system
 - `src/deep/CLAUDE.md` -- The Deep mercenary expedition system
 - `src/ui/CLAUDE.md` -- Shared layout components, color conventions
 

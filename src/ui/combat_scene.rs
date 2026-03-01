@@ -6,7 +6,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Gauge, Paragraph},
+    widgets::{Block, Borders, Gauge, Paragraph, Wrap},
     Frame,
 };
 
@@ -427,4 +427,117 @@ pub(super) fn draw_combat_status(frame: &mut Frame, area: Rect, game_state: &Gam
 
     let status_paragraph = Paragraph::new(status_text).alignment(Alignment::Center);
     frame.render_widget(status_paragraph, area);
+}
+
+/// Render the fracture region unlock celebration modal.
+pub fn render_fracture_region_unlock_modal(
+    frame: &mut Frame,
+    area: Rect,
+    region: crate::zones::FractureRegion,
+    ascension_level: u32,
+    _ctx: &LayoutContext,
+) {
+    use crate::ascension::types::{ascension_combat_multiplier, ascension_cost};
+    use ratatui::widgets::Clear;
+
+    const GOLD: Color = Color::Rgb(255, 215, 0);
+
+    // Determine whether to show ascension hint
+    let asc_unlocked = region.ascension_level_unlocked();
+    let show_ascension = ascension_level < asc_unlocked;
+    let extra_zones = (region.end_zone_id() - region.start_zone_id() + 1).saturating_sub(3) as u16;
+    let modal_height = if show_ascension {
+        22u16 + extra_zones
+    } else {
+        18u16 + extra_zones
+    };
+
+    let modal_width = 58u16.min(area.width.saturating_sub(4));
+    let modal_height = modal_height.min(area.height.saturating_sub(4));
+    let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
+    let modal_area = Rect::new(x, y, modal_width, modal_height);
+
+    frame.render_widget(Clear, modal_area);
+
+    let block = Block::default()
+        .title(" \u{25b6} New Region Unlocked \u{25c0} ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(super::themed_border_color(Color::Magenta)));
+    let inner = super::render_themed_block(
+        frame,
+        modal_area,
+        block,
+        Color::Magenta,
+        super::BorderFxContext,
+    );
+
+    let mut lines: Vec<Line> = vec![
+        // Headline
+        Line::from(""),
+        Line::from(Span::styled(
+            region.unlock_headline(),
+            Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
+        )),
+        // Atmospheric text
+        Line::from(""),
+        Line::from(Span::styled(
+            region.unlock_atmospheric(),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::ITALIC),
+        )),
+        // Zone list — one per line with ◆ prefix
+        Line::from(""),
+    ];
+    for zid in region.start_zone_id()..=region.end_zone_id() {
+        let name = crate::zones::get_zone(zid).map(|z| z.name).unwrap_or("???");
+        lines.push(Line::from(vec![
+            Span::styled("  \u{25c6} ", Style::default().fg(Color::Magenta)),
+            Span::styled(
+                format!("Zone {}  {}", zid, name),
+                Style::default().fg(Color::White),
+            ),
+        ]));
+    }
+
+    // Ascension narrative bridge (only if a new level just became available)
+    if show_ascension {
+        let roman = crate::ui::stats_prestige::to_roman(asc_unlocked);
+        let mult = ascension_combat_multiplier(asc_unlocked);
+        let cost = ascension_cost(asc_unlocked);
+
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            region.ascension_narrative(),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::ITALIC),
+        )));
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![Span::styled(
+            format!(
+                "\u{2726} ASCENSION {}  \u{2014}  \u{00d7}{:.1} power",
+                roman, mult
+            ),
+            Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+        )]));
+        lines.push(Line::from(vec![Span::styled(
+            format!("  Cost: {} PR  \u{2022}  [U] to Ascend", cost),
+            Style::default().fg(GOLD),
+        )]));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "[Enter] to dismiss",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let text = Paragraph::new(lines)
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: true });
+    frame.render_widget(text, inner);
 }

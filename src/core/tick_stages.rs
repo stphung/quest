@@ -570,6 +570,15 @@ pub fn process_combat_events<R: Rng>(
                             xp_gained
                         )
                     }
+                    BossDefeatResult::FractureCycle { zone_id } => {
+                        let zone_name = crate::zones::get_zone(*zone_id)
+                            .map(|z| z.name)
+                            .unwrap_or("Unknown");
+                        format!(
+                            "\u{1f451} {} conquered! +{} XP \u{2014} Zone cycles anew...",
+                            zone_name, xp_gained
+                        )
+                    }
                 };
                 result.events.push(TickEvent::SubzoneBossDefeated {
                     xp_gained,
@@ -728,6 +737,9 @@ pub(super) fn process_zone_achievements(
         BossDefeatResult::ExpanseCycle => {
             achievements.on_zone_fully_cleared(11, Some(character_name));
         }
+        BossDefeatResult::FractureCycle { zone_id } => {
+            achievements.on_zone_fully_cleared(*zone_id, Some(character_name));
+        }
         _ => {}
     }
 }
@@ -790,16 +802,41 @@ pub(super) fn tick_challenge_discovery<R: Rng>(
 }
 
 /// Stage 3: Recalculate derived stats if dirty, then sync max HP.
+///
+/// Applies ALL HP bonuses (flat prestige HP, ascension multiplier, sigil max HP%)
+/// so that `player_max_hp` is always the fully-boosted value. This prevents
+/// a snap-back where regen fills HP to boosted max, then the next tick briefly
+/// resets max HP to base before Stage 6 re-applies bonuses.
 pub(super) fn sync_derived_stats(
     state: &mut GameState,
     enhancement: &crate::enhancement::EnhancementProgress,
+    sigil_bonuses: &SigilBonuses,
 ) {
     if state.derived_stats_dirty {
         state.recalculate_derived_stats(&enhancement.levels);
         state.recalculate_prestige_bonuses();
     }
     let derived = state.cached_derived_stats;
-    state.combat_state.update_max_hp(derived.max_hp);
+    let mut max_hp = derived.max_hp;
+
+    // Apply flat HP bonus from prestige
+    let prestige_combat = state.cached_prestige_bonuses;
+    if prestige_combat.flat_hp > 0 {
+        max_hp += prestige_combat.flat_hp;
+    }
+
+    // Apply Ascension multiplier
+    let ascension_mult = crate::ascension::ascension_combat_multiplier(state.ascension_level);
+    if ascension_mult > 1.0 {
+        max_hp = (max_hp as f64 * ascension_mult) as u32;
+    }
+
+    // Apply sigil max HP% bonus
+    if sigil_bonuses.max_hp_percent > 0.0 {
+        max_hp = (max_hp as f64 * (1.0 + sigil_bonuses.max_hp_percent / 100.0)) as u32;
+    }
+
+    state.combat_state.update_max_hp(max_hp);
 }
 
 /// Compute merged Haven + Sigil bonuses for the current tick.
@@ -818,7 +855,7 @@ pub(super) fn compute_merged_bonuses(
     (haven_bonuses, sigil_bonuses)
 }
 
-/// Stage 6: Build CombatBonuses, apply HP bonuses, run combat, and process events.
+/// Stage 6: Build CombatBonuses, run combat, and process events.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn run_combat<R: Rng>(
     state: &mut GameState,
@@ -857,19 +894,20 @@ pub(super) fn run_combat<R: Rng>(
         // Prestige flat bonuses
         flat_damage: prestige_combat.flat_damage,
         flat_defense: prestige_combat.flat_defense,
-        flat_hp: prestige_combat.flat_hp,
+        // Ascension multiplier from per-character Ascension level
+        ascension_multiplier: crate::ascension::ascension_combat_multiplier(state.ascension_level),
     };
-    // Apply flat HP bonus to combat max HP (not in DerivedStats to avoid enemy scaling)
-    if combat_bonuses.flat_hp > 0 {
-        let boosted_max = derived.max_hp + combat_bonuses.flat_hp;
-        state.combat_state.update_max_hp(boosted_max);
-    }
-    // Apply sigil max HP% bonus on top of current max HP
-    if sigil_bonuses.max_hp_percent > 0.0 {
-        let current_max = state.combat_state.player_max_hp;
-        let boosted = (current_max as f64 * (1.0 + sigil_bonuses.max_hp_percent / 100.0)) as u32;
-        state.combat_state.update_max_hp(boosted);
-    }
+    // NOTE: HP bonuses (flat_hp, ascension multiplier, sigil max HP%) are now
+    // applied in sync_derived_stats (Stage 3) to prevent regen snap-back where
+    // max HP is briefly reset to base between ticks.
+
+    // Update cached power rating
+    state.cached_power_rating = crate::core::power_rating::compute_power_rating(
+        &derived,
+        &combat_bonuses,
+        state.combat_state.player_max_hp,
+    );
+
     let combat_events = update_combat(
         rng,
         state,
@@ -877,6 +915,7 @@ pub(super) fn run_combat<R: Rng>(
         &combat_bonuses,
         achievements,
         &derived,
+        deep.persistent.fracture_zone_cap,
     );
 
     process_combat_events(
@@ -990,6 +1029,15 @@ pub(super) fn tick_deep_missions(
     }
     for layer in &summary.breakthroughs {
         achievements.on_deep_breakthrough(*layer, Some(&state.character_name));
+        // Check if this breakthrough unlocks a fracture region
+        if let Some(region) = crate::zones::FractureRegion::from_layer(*layer) {
+            let new_cap = region.end_zone_id();
+            if new_cap > deep.persistent.fracture_zone_cap {
+                deep.persistent.fracture_zone_cap = new_cap;
+                deep.persistent.pending_fracture_region_unlock = Some(region);
+                result.deep_changed = true;
+            }
+        }
     }
     for _ in 0..summary.mercs_lost {
         achievements.on_deep_merc_lost(Some(&state.character_name));

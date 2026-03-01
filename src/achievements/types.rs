@@ -136,6 +136,34 @@ pub enum AchievementId {
     // The Expanse achievement
     BeyondInfinity, // Complete a cycle of The Expanse
 
+    // Fracture zone completion achievements (zones 12-20)
+    FractureZone12, // Rimbreaker
+    FractureZone13, // Cinderfall
+    FractureZone14, // Heart Piercer
+    FractureZone15, // Shard Breaker
+    FractureZone16, // Light Bender
+    FractureZone17, // Sunslayer
+    FractureZone18, // Ashen Sentinel
+    FractureZone19, // Throat Runner
+    FractureZone20, // Maw Closer
+    FractureZone21, // Amber March
+    FractureZone22, // Pale Scholar
+    FractureZone23, // Thronebreaker
+    FractureZone24, // Stillwater
+    FractureZone25, // Resonance Breaker
+    FractureZone26, // Edge Walker
+    FractureZone27, // Scar Render
+    FractureZone28, // Echo Silencer
+    FractureZone29, // Last Listener
+    FractureZone30, // Scar Mender
+    // Ascension milestone achievements (one per level, I-VI)
+    AscensionI,   // First Ascension
+    AscensionII,  // Twice Risen
+    AscensionIII, // Deepborn
+    AscensionIV,  // Fourfold
+    AscensionV,   // Quintessence
+    AscensionVI,  // Transcendent
+
     // Challenge achievements - Chess
     ChessNovice,
     ChessApprentice,
@@ -260,6 +288,13 @@ pub enum AchievementId {
     GuildRank5,           // Reach Guild Rank 5 (Vanguard)
     FirstMercLost,        // Lose a mercenary for the first time
     GatewayOpened,        // Opened the Gateway beneath the world
+    // Power Cores — unlocked at fracture zone unlock layers
+    PowerCoreI,   // Deep Layer 3 — Red Fault core
+    PowerCoreII,  // Deep Layer 7 — Mirror Scar core
+    PowerCoreIII, // Deep Layer 12 — Black Mouth core
+    PowerCoreIV,  // Deep Layer 18 — Hollow Throne core
+    PowerCoreV,   // Deep Layer 25 — Wailing Reach core
+    PowerCoreVI,  // Deep Layer 30 — Origin Wound core
 }
 
 impl AchievementId {
@@ -274,7 +309,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 182;
+    pub const VARIANT_COUNT: usize = 213;
 }
 
 /// Static definition of an achievement.

@@ -11,6 +11,7 @@ use quest::core::game_state::GameState;
 use quest::core::tick::game_tick;
 use quest::enhancement::EnhancementProgress;
 use quest::haven::Haven;
+use quest::power_cores::PowerCoreState;
 use quest::stormglass::sigils::*;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -627,7 +628,7 @@ fn force_player_attack_damage(
     state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
     state.combat_state.enemy_attack_timer = 0.0;
     let mut ach = Achievements::default();
-    let events = update_combat(rng, state, 0.0, bonuses, &mut ach, &d);
+    let events = update_combat(rng, state, 0.0, bonuses, &mut ach, &d, 11);
     events
         .iter()
         .filter_map(|e| match e {
@@ -717,6 +718,7 @@ fn test_sigil_dr_bonus_reduces_enemy_damage() {
         &CombatBonuses::default(),
         &mut ach,
         &d,
+        11,
     );
     let damage_base: u32 = events_base
         .iter()
@@ -736,7 +738,15 @@ fn test_sigil_dr_bonus_reduces_enemy_damage() {
         damage_reduction_percent: 5.0,
         ..CombatBonuses::default()
     };
-    let events_with = update_combat(&mut rng, &mut state, 0.1, &bonuses_with_dr, &mut ach, &d);
+    let events_with = update_combat(
+        &mut rng,
+        &mut state,
+        0.1,
+        &bonuses_with_dr,
+        &mut ach,
+        &d,
+        11,
+    );
     let damage_with: u32 = events_with
         .iter()
         .filter_map(|e| match e {
@@ -771,6 +781,7 @@ fn test_sigil_max_hp_applied_in_game_tick() {
         &mut enhancement,
         &mut quest::deep::DeepState::new(),
         &mut ach,
+        &mut PowerCoreState::default(),
         false,
         &mut rng,
     );
@@ -787,6 +798,7 @@ fn test_sigil_max_hp_applied_in_game_tick() {
         &mut enhancement,
         &mut quest::deep::DeepState::new(),
         &mut ach,
+        &mut PowerCoreState::default(),
         false,
         &mut rng,
     );
@@ -923,6 +935,7 @@ fn test_multiple_sigils_stack_in_game_tick() {
         &mut enhancement,
         &mut quest::deep::DeepState::new(),
         &mut ach,
+        &mut PowerCoreState::default(),
         false,
         &mut rng,
     );
@@ -946,6 +959,7 @@ fn test_multiple_sigils_stack_in_game_tick() {
         &mut enhancement,
         &mut quest::deep::DeepState::new(),
         &mut ach,
+        &mut PowerCoreState::default(),
         false,
         &mut rng,
     );

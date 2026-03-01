@@ -229,6 +229,16 @@ pub fn handle_game_input(
         return handle_deep_discovery(key, overlay);
     }
 
+    // 1e. Fracture region unlock modal (blocks all other input)
+    if matches!(overlay, GameOverlay::FractureRegionUnlock { .. }) {
+        return handle_fracture_region_unlock(key, overlay);
+    }
+
+    // 1f. Ascension confirmation modal (blocks all other input)
+    if matches!(overlay, GameOverlay::AscensionConfirm) {
+        return handle_ascension_confirm(key, state, deep_state, overlay);
+    }
+
     // 2. Haven screen (blocks other input when open)
     if haven_ui.showing {
         return handle_haven(key, state, haven, haven_ui, achievements);
@@ -251,12 +261,28 @@ pub fn handle_game_input(
 
     // 3. Vault item selection
     if matches!(overlay, GameOverlay::VaultSelection { .. }) {
-        return handle_vault_selection(key, state, haven, deep_state, deep_ui, overlay);
+        return handle_vault_selection(
+            key,
+            state,
+            haven,
+            deep_state,
+            deep_ui,
+            overlay,
+            achievements,
+        );
     }
 
     // 4. Prestige confirmation
     if matches!(overlay, GameOverlay::PrestigeConfirm) {
-        return handle_prestige_confirm(key, state, haven, deep_state, deep_ui, overlay);
+        return handle_prestige_confirm(
+            key,
+            state,
+            haven,
+            deep_state,
+            deep_ui,
+            overlay,
+            achievements,
+        );
     }
 
     // 4.5. Quit confirmation (pending challenges warning)
@@ -350,6 +376,58 @@ fn handle_deep_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResul
     InputResult::Continue
 }
 
+fn handle_fracture_region_unlock(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
+    if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
+        *overlay = GameOverlay::None;
+    }
+    InputResult::Continue
+}
+
+fn handle_ascension_confirm(
+    key: KeyEvent,
+    state: &mut GameState,
+    deep_state: &mut crate::deep::DeepState,
+    overlay: &mut GameOverlay,
+) -> InputResult {
+    match key.code {
+        KeyCode::Char('y') | KeyCode::Char('Y') => {
+            let deepest = deep_state.persistent.deepest_layer_reached;
+            match crate::ascension::ascend(state, deepest) {
+                crate::ascension::AscendResult::Success {
+                    new_level,
+                    multiplier,
+                } => {
+                    let roman = crate::ui::stats_prestige::to_roman(new_level);
+                    state.combat_state.add_log_entry(
+                        format!(
+                            "\u{2728} Ascended to Ascension {roman}! ({multiplier:.1}x multiplier)"
+                        ),
+                        false,
+                        true,
+                    );
+                    state.ticker.push(crate::core::game_state::TickerEntry {
+                        icon: "\u{2728}",
+                        text: format!("Ascension {}!", roman),
+                        color: ratatui::style::Color::Rgb(255, 215, 0),
+                        bold: true,
+                        segments: None,
+                    });
+                    *overlay = GameOverlay::None;
+                    InputResult::NeedsSaveWithEvent(crate::history::SaveEvent::AchievementUnlocked(
+                        format!("Ascension {roman}"),
+                    ))
+                }
+                _ => InputResult::Continue,
+            }
+        }
+        KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
+            *overlay = GameOverlay::None;
+            InputResult::Continue
+        }
+        _ => InputResult::Continue,
+    }
+}
+
 fn handle_achievement_unlocked(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
     // Any key dismisses the achievement modal
     if matches!(key.code, KeyCode::Enter | KeyCode::Esc | KeyCode::Char(' ')) {
@@ -413,6 +491,18 @@ fn handle_debug_menu(
                 *overlay = GameOverlay::StormglassDiscovery;
             } else if msg == "The Deep discovered!" {
                 *overlay = GameOverlay::DeepDiscovery;
+            } else if msg.contains("Red Fault unlocked") {
+                *overlay = GameOverlay::FractureRegionUnlock {
+                    region: crate::zones::FractureRegion::RedFault,
+                };
+            } else if msg.contains("Mirror Scar unlocked") {
+                *overlay = GameOverlay::FractureRegionUnlock {
+                    region: crate::zones::FractureRegion::MirrorScar,
+                };
+            } else if msg.contains("Black Mouth unlocked") {
+                *overlay = GameOverlay::FractureRegionUnlock {
+                    region: crate::zones::FractureRegion::BlackMouth,
+                };
             }
         }
         KeyCode::Esc => debug_menu.close(),
@@ -499,6 +589,19 @@ fn handle_base_game(
         KeyCode::Char('t') | KeyCode::Char('T') => {
             // Time Vault — main.rs populates state from HistoryRepo
             InputResult::OpenTimeVault
+        }
+        KeyCode::Char('u') | KeyCode::Char('U') => {
+            if deep_state.persistent.discovered
+                && (state.ascension_level > 0
+                    || crate::ascension::can_ascend(
+                        state.ascension_level,
+                        state.prestige_rank,
+                        deep_state.persistent.deepest_layer_reached,
+                    ))
+            {
+                *overlay = GameOverlay::AscensionConfirm;
+            }
+            InputResult::Continue
         }
         KeyCode::Char('w') | KeyCode::Char('W') => {
             let _ = crate::utils::bug_report::open_browser(

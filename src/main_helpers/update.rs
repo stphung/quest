@@ -699,6 +699,7 @@ pub fn show_startup_splash_screen(
     cloud_tx: &std::sync::mpsc::Sender<CloudOpResult>,
     cloud_rx: &std::sync::mpsc::Receiver<CloudOpResult>,
     cloud_op_in_flight: &mut bool,
+    power_cores: &mut crate::power_cores::PowerCoreState,
 ) -> io::Result<StartupSplashResult> {
     let mut update_status: Option<UpdateInfoStatus> = None;
     let mut time_vault_browser: Option<TimeVaultState> = None;
@@ -1149,6 +1150,7 @@ pub fn show_startup_splash_screen(
                                     enhancement,
                                     global_achievements,
                                     haven,
+                                    power_cores,
                                 ) {
                                     break StartupSplashResult::LoadCharacter {
                                         state,
@@ -1570,6 +1572,7 @@ fn load_character_for_game(
     enhancement: &mut enhancement::EnhancementProgress,
     global_achievements: &mut achievements::Achievements,
     haven: &mut haven::Haven,
+    power_cores: &mut crate::power_cores::PowerCoreState,
 ) -> Option<(
     Box<GameState>,
     Option<crate::core::game_logic::OfflineReport>,
@@ -1621,11 +1624,25 @@ fn load_character_for_game(
             let current_time = chrono::Utc::now().timestamp();
             let elapsed_seconds = current_time - state.last_save_time;
 
-            let offline_report = if elapsed_seconds > 60 {
+            let mut offline_report = if elapsed_seconds > 60 {
                 apply_offline_xp(&mut state, haven)
             } else {
                 None
             };
+
+            // Process Power Core offline catchup: grant accumulated PR for
+            // any cores that completed fill cycles while the game was closed.
+            let power_core_pr = crate::power_cores::apply_offline_power_cores(
+                &mut state,
+                power_cores,
+                global_achievements,
+            );
+            if power_core_pr > 0 {
+                if let Some(ref mut report) = offline_report {
+                    report.power_core_pr = power_core_pr;
+                }
+            }
+
             // Always sync last_save_time on load
             state.last_save_time = chrono::Utc::now().timestamp();
 

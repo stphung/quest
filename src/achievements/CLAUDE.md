@@ -23,12 +23,13 @@ src/achievements/
 
 ### `AchievementId` (`types.rs`)
 
-Enum with 182 variants covering all trackable milestones. Organized by domain:
+Enum with 207 variants covering all trackable milestones. Organized by domain:
 
 - **Combat**: `SlayerI`..`SlayerXV` (100 to 1B kills), `BossHunterI`..`BossHunterXV` (1 to 10M bosses)
 - **Level**: `Level10`..`Level100000` (18 milestones)
 - **Prestige**: `FirstPrestige`..`Prestige10000` (P1 to P10000, 19 milestones)
-- **Zones**: `Zone1Complete`..`Zone10Complete`, `TheStormbreaker`, `StormsEnd`, `BeyondInfinity`
+- **Zones**: `Zone1Complete`..`Zone10Complete`, `TheStormbreaker`, `StormsEnd`, `BeyondInfinity`, `FractureZone12`..`FractureZone30` (19 fracture zone completions)
+- **Ascension**: `AscensionI`, `AscensionIII`, `AscensionVI` (milestone achievements)
 - **Challenges**: 4 difficulties per game type (chess, morris, gomoku, minesweeper, rune, go, flappy_bird, snake, jezzball, runic_shift) + `GrandChampion` (100 wins)
 - **Enhancement**: `SoulforgeDiscovered`, `ApprenticeSmith` (+1), `FullyTempered` (+4 all), `JourneymanSmith` (+5), `SoulforgeAdept` (+6), `SoulforgeSavant` (+7), `SoulforgeMaster` (+8), `SoulforgeGrandmaster` (+9), `SoulforgeAscendant` (+10), `SoulConvergence` (+7 all), `PersistentHammering` (100 attempts)
 - **Fishing**: `GoneFishing`, `FishermanI`..`FishermanIV` (rank milestones), `FishCatcherI`..`FishCatcherX` (100 to 100M fish catches), `StormLeviathan`
@@ -42,7 +43,7 @@ Eight categories for browsing: `Combat`, `Level`, `Prestige`, `Progression`, `Ch
 
 ### `AchievementDef` (`data.rs`)
 
-Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 182 achievements total.
+Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 207 achievements total.
 
 ### `Achievements` (`types.rs`)
 
@@ -69,7 +70,7 @@ achievements.on_enemy_killed(is_boss, Some(&state.character_name));
 achievements.on_level_up(new_level, Some(&state.character_name));
 ```
 
-Event handlers: `on_enemy_killed`, `on_level_up`, `on_prestige`, `on_zone_fully_cleared`, `on_storms_end`, `on_dungeon_completed`, `on_minigame_won`, `on_fish_caught`, `on_fishing_rank_up`, `on_storm_leviathan_caught`, `on_haven_discovered`, `on_haven_all_t1`, `on_haven_all_t2`, `on_haven_architect`, `on_soulforge_discovered`, `on_enhancement_upgraded`, `on_deep_discovered`, `on_deep_breakthrough`, `on_deep_guild_rank_up`, `on_deep_mission_complete`, `on_deep_merc_lost`, `on_deep_gateway_opened`.
+Event handlers: `on_enemy_killed`, `on_level_up`, `on_prestige`, `on_zone_fully_cleared`, `on_storms_end`, `on_dungeon_completed`, `on_minigame_won`, `on_fish_caught`, `on_fishing_rank_up`, `on_storm_leviathan_caught`, `on_haven_discovered`, `on_haven_all_t1`, `on_haven_all_t2`, `on_haven_architect`, `on_soulforge_discovered`, `on_enhancement_upgraded`, `on_deep_discovered`, `on_deep_breakthrough`, `on_deep_guild_rank_up`, `on_deep_mission_complete`, `on_deep_merc_lost`, `on_deep_gateway_opened`, `on_fracture_boss_defeated`, `on_ascended`.
 
 ### Unlock Flow
 
@@ -119,7 +120,7 @@ Additionally, `newly_unlocked` is drained each tick by `collect_achievement_even
 
 Titles are display names earned by unlocking specific achievements. Players can select one title to display after their character name (e.g., "Hero, Godslayer"). Titles are account-wide and persist in `selected_title` on the `Achievements` struct.
 
-- `ALL_TITLES`: const slice of `TitleDef { achievement_id, title_text }` — 59 curated titles across level, prestige, combat, challenges, exploration, enhancement, and Deep categories
+- `ALL_TITLES`: const slice of `TitleDef { achievement_id, title_text }` — 63 curated titles across level, prestige, combat, challenges, exploration, enhancement, fracture, and Deep categories
 - `get_title_text(id)`: returns the title text for an achievement, if it grants a title
 - `get_unlocked_titles(achievements)`: returns all titles the player has earned, in display order
 - `validate_selected_title(achievements)`: clears `selected_title` if the achievement isn't unlocked or doesn't grant a title (called on load)

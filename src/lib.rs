@@ -6,6 +6,7 @@
 #![allow(dead_code)]
 
 pub mod achievements;
+pub mod ascension;
 pub mod challenges;
 pub mod character;
 pub mod combat;
@@ -18,6 +19,7 @@ pub mod god_items;
 pub mod haven;
 pub mod history;
 pub mod items;
+pub mod power_cores;
 pub mod stormglass;
 pub mod utils;
 pub mod zones;

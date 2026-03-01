@@ -3,12 +3,15 @@
 use super::responsive::{LayoutContext, SizeTier};
 use super::stats_attributes::draw_attributes_compact;
 use super::stats_equipment::draw_equipment_names_only;
-use super::stats_prestige::{draw_fishing_panel, draw_prestige_info, format_eta};
+use super::stats_prestige::{
+    draw_fishing_panel, draw_power_cores_panel, draw_prestige_info, format_eta,
+};
 use super::stats_sigils::draw_sigils_panel;
 use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::{get_adventurer_rank, get_prestige_tier};
 use crate::core::game_logic::xp_for_next_level;
 use crate::core::game_state::GameState;
+use crate::power_cores::PowerCoreState;
 use crate::utils::updater::UpdateInfo;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -66,16 +69,32 @@ pub fn draw_stats_panel(
     ctx: &LayoutContext,
     enhancement_levels: &[u8; 7],
     achievements: &crate::achievements::Achievements,
+    power_cores: &PowerCoreState,
 ) {
     match ctx.height_tier {
         SizeTier::XL | SizeTier::L => {
             let etched = game_state.storm_sigils.etched_count();
+            let prestige_height = if game_state.ascension_level > 0 {
+                7 // 5 inner rows + 2 border
+            } else {
+                6 // 4 inner rows + 2 border
+            };
+            let unlocked_cores = crate::power_cores::get_unlocked_cores(achievements).len();
+            let power_cores_height = if unlocked_cores > 0 {
+                crate::power_cores::ALL_POWER_CORES.len() as u16 + 2 // all 6 cores + 2 border rows
+            } else {
+                0
+            };
+
             let mut constraints = vec![
-                Constraint::Length(4), // Header
-                Constraint::Length(6), // Prestige (4 inner + 2 border)
+                Constraint::Length(5), // Header (name, level+power, time+rate, XP gauge)
+                Constraint::Length(prestige_height), // Prestige
                 Constraint::Length(4), // Fishing
-                Constraint::Length(5), // Attributes
             ];
+            if power_cores_height > 0 {
+                constraints.push(Constraint::Length(power_cores_height)); // Power Cores
+            }
+            constraints.push(Constraint::Length(5)); // Attributes
             if etched > 0 {
                 constraints.push(Constraint::Length(
                     crate::stormglass::sigils::MAX_SIGIL_SLOTS as u16 + 2,
@@ -95,6 +114,10 @@ pub fn draw_stats_panel(
             idx += 1;
             draw_fishing_panel(frame, chunks[idx], game_state, achievements);
             idx += 1;
+            if power_cores_height > 0 {
+                draw_power_cores_panel(frame, chunks[idx], achievements, power_cores);
+                idx += 1;
+            }
             draw_attributes_compact(frame, chunks[idx], game_state);
             idx += 1;
             if etched > 0 {
@@ -145,18 +168,32 @@ fn draw_header(
     frame.render_widget(header_block, area);
     super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
 
-    let header_text = vec![Line::from(vec![
+    // Row 1: Level + Power Level (right-aligned)
+    let power = game_state.cached_power_rating as u64;
+    let power_str = format!(
+        "\u{26a1} Power Level: {}",
+        super::game_common::format_number_short(power)
+    );
+    let level_str = format!("Level {} {}", game_state.character_level, rank);
+    // Pad power to right-align within inner width
+    let gap = (inner.width as usize).saturating_sub(level_str.len() + power_str.len());
+    let row1 = Line::from(vec![
         Span::styled(
-            format!("Level {} {}", game_state.character_level, rank),
+            level_str,
             Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::raw(" | "),
-        Span::styled("\u{23f1}\u{fe0f} ", Style::default().fg(Color::Cyan)),
-        Span::styled(play_time, Style::default().fg(Color::Cyan)),
-    ])];
+        Span::raw(" ".repeat(gap)),
+        Span::styled(
+            power_str,
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+    ]);
 
+    // Row 2: Play time + XP rate
     let rate_suffix = match game_state.xp_per_hour() {
         Some(rate) => {
             let xp_remaining = xp_needed.saturating_sub(game_state.character_xp);
@@ -174,14 +211,19 @@ fn draw_header(
         }
         None => String::new(),
     };
+    let row2 = Line::from(vec![
+        Span::styled("\u{23f1}\u{fe0f} ", Style::default().fg(Color::Cyan)),
+        Span::styled(play_time, Style::default().fg(Color::Cyan)),
+        Span::styled(rate_suffix, Style::default().fg(Color::Cyan)),
+    ]);
+
+    // Row 3: XP gauge
     let xp_label = format!(
-        "XP: {}/{} ({:.1}%){}",
+        "XP: {}/{} ({:.1}%)",
         game_state.character_xp,
         xp_needed,
         xp_ratio * 100.0,
-        rate_suffix
     );
-
     let xp_gauge = Gauge::default()
         .gauge_style(
             Style::default()
@@ -191,18 +233,21 @@ fn draw_header(
         .label(xp_label)
         .ratio(xp_ratio);
 
-    if inner.height >= 2 {
+    if inner.height >= 3 {
         let inner_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Length(1)])
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+            ])
             .split(inner);
 
-        let header_paragraph = Paragraph::new(header_text);
-        frame.render_widget(header_paragraph, inner_chunks[0]);
-        frame.render_widget(xp_gauge, inner_chunks[1]);
-    } else if inner.height == 1 {
-        let header_paragraph = Paragraph::new(header_text);
-        frame.render_widget(header_paragraph, inner);
+        frame.render_widget(Paragraph::new(vec![row1]), inner_chunks[0]);
+        frame.render_widget(Paragraph::new(vec![row2]), inner_chunks[1]);
+        frame.render_widget(xp_gauge, inner_chunks[2]);
+    } else if inner.height >= 1 {
+        frame.render_widget(Paragraph::new(vec![row1]), inner);
     }
 }
 
@@ -284,81 +329,114 @@ pub(super) fn draw_zone_info(
         )]));
     }
 
-    let mut bar_spans: Vec<Span> = Vec::new();
-    let mut label_spans: Vec<Span> = Vec::new();
+    // Dot track: ● = completed (green), ○ = current (yellow), · = unlocked (white), × = locked (gray)
+    // Chapter separators │ between base zones, zone 11, and each fracture chapter.
+    // Second row shows zone range labels aligned under each group.
+    // Uses fracture_zone_cap (from Deep breakthroughs) to determine visible range.
+    let fracture_cap = game_state.cached_fracture_zone_cap;
 
-    for zid in 1..=11u32 {
-        if zid > 1 {
-            bar_spans.push(Span::raw(" "));
+    // Define zone groups: (start, end) inclusive
+    let mut groups: Vec<(u32, u32)> = vec![(1, 11)];
+    if fracture_cap >= 12 {
+        // Fracture chapter boundaries
+        let chapter_starts: &[u32] = &[12, 15, 18, 21, 24, 27];
+        let chapter_ends: &[u32] = &[14, 17, 20, 23, 26, 30];
+        for (&start, &end) in chapter_starts.iter().zip(chapter_ends.iter()) {
+            if fracture_cap >= start {
+                groups.push((start, end.min(fracture_cap)));
+            }
         }
-
-        let zone_data = zones.iter().find(|z| z.id == zid);
-        let num_subzones = zone_data.map(|z| z.subzones.len()).unwrap_or(3);
-
-        let defeated_count = zone_data
-            .map(|z| {
-                z.subzones
-                    .iter()
-                    .filter(|s| prog.is_boss_defeated(zid, s.id))
-                    .count()
-            })
-            .unwrap_or(0);
-
-        let is_current = zid == prog.current_zone_id;
-        let is_completed = defeated_count == num_subzones;
-        let is_unlocked = if zid == 11 {
-            achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd)
-        } else {
-            prog.is_zone_unlocked(zid)
-        };
-
-        let filled = if is_completed {
-            3
-        } else if defeated_count == 0 {
-            0
-        } else {
-            ((defeated_count as f64 / num_subzones as f64) * 3.0).ceil() as usize
-        }
-        .min(3);
-
-        let (fill_char, empty_char, fg) = if is_completed {
-            ("\u{2588}", "\u{2588}", Color::Green)
-        } else if is_current {
-            ("\u{2588}", "\u{2591}", Color::Yellow)
-        } else if is_unlocked {
-            ("\u{2591}", "\u{2591}", Color::White)
-        } else {
-            ("\u{2591}", "\u{2591}", Color::DarkGray)
-        };
-
-        let segment: String = fill_char.repeat(filled) + &empty_char.repeat(3 - filled);
-        let segment_style = if is_current {
-            Style::default().fg(fg).add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(fg)
-        };
-        bar_spans.push(Span::styled(segment, segment_style));
-
-        let label_fg = if is_current {
-            Color::Yellow
-        } else if is_completed {
-            Color::Green
-        } else if is_unlocked {
-            Color::White
-        } else {
-            Color::DarkGray
-        };
-        if zid > 1 {
-            let sep = if zid == 10 { "  " } else { " " };
-            label_spans.push(Span::raw(sep));
-        }
-        let label = format!("{:^3}", zid);
-        label_spans.push(Span::styled(label, Style::default().fg(label_fg)));
     }
 
+    let mut dot_spans: Vec<Span> = Vec::new();
+    let mut label_parts: Vec<(usize, String)> = Vec::new(); // (char_offset, label)
+    let mut char_pos: usize = 0;
+
+    for (gi, &(g_start, g_end)) in groups.iter().enumerate() {
+        // Separator between groups
+        if gi > 0 {
+            dot_spans.push(Span::styled(
+                " \u{2502} ",
+                Style::default().fg(Color::DarkGray),
+            ));
+            char_pos += 3; // " │ " is 3 chars
+        }
+
+        let group_start_pos = char_pos;
+
+        for zid in g_start..=g_end {
+            if zid > g_start {
+                dot_spans.push(Span::raw(" "));
+                char_pos += 1;
+            }
+
+            let zone_data = zones.iter().find(|z| z.id == zid);
+            let num_subzones = zone_data.map(|z| z.subzones.len()).unwrap_or(3);
+            let defeated_count = zone_data
+                .map(|z| {
+                    z.subzones
+                        .iter()
+                        .filter(|s| prog.is_boss_defeated(zid, s.id))
+                        .count()
+                })
+                .unwrap_or(0);
+
+            let is_current = zid == prog.current_zone_id;
+            let is_completed = defeated_count == num_subzones;
+            let is_unlocked = if zid == 11 {
+                achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd)
+            } else {
+                prog.is_zone_unlocked(zid)
+            };
+
+            let (dot, fg, bold) = if is_current {
+                ("\u{25cb}", Color::Yellow, true) // ○
+            } else if is_completed {
+                ("\u{25cf}", Color::Green, false) // ●
+            } else if is_unlocked {
+                ("\u{00b7}", Color::White, false) // ·
+            } else {
+                ("\u{00d7}", Color::DarkGray, false) // ×
+            };
+
+            let style = if bold {
+                Style::default().fg(fg).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(fg)
+            };
+            dot_spans.push(Span::styled(dot, style));
+            char_pos += 1; // each dot is 1 char wide
+        }
+
+        // Build label for this group
+        let label = if g_start == g_end {
+            format!("{}", g_start)
+        } else {
+            format!("{}-{}", g_start, g_end)
+        };
+        let group_width = char_pos - group_start_pos;
+        label_parts.push((group_start_pos, center_label(&label, group_width)));
+    }
+
+    // Build the label line by placing each label at its offset
+    let total_width = char_pos;
+    let mut label_chars: Vec<u8> = vec![b' '; total_width];
+    for (offset, label) in &label_parts {
+        for (i, ch) in label.bytes().enumerate() {
+            let pos = offset + i;
+            if pos < total_width {
+                label_chars[pos] = ch;
+            }
+        }
+    }
+    let label_str = String::from_utf8(label_chars).unwrap_or_default();
+
     zone_lines.push(Line::from(""));
-    zone_lines.push(Line::from(bar_spans));
-    zone_lines.push(Line::from(label_spans));
+    zone_lines.push(Line::from(dot_spans));
+    zone_lines.push(Line::from(Span::styled(
+        label_str,
+        Style::default().fg(Color::DarkGray),
+    )));
 
     let location_title = match highest_zone_badge(achievements) {
         Some(icon) => format!(" Location {} ", icon),
@@ -376,6 +454,15 @@ pub(super) fn draw_zone_info(
 
     frame.render_widget(zone_widget, area);
     super::apply_themed_border_fx(frame, area, zone_color, super::BorderFxContext);
+}
+
+/// Center a label within a given width, padding with spaces.
+fn center_label(label: &str, width: usize) -> String {
+    if label.len() >= width {
+        return label[..width].to_string();
+    }
+    let pad = (width - label.len()) / 2;
+    format!("{:>width$}", label, width = pad + label.len())
 }
 
 /// Returns the icon of the highest unlocked zone completion achievement, if any.
@@ -830,6 +917,15 @@ pub fn draw_footer(
         Span::styled("[A] Achievements", Style::default().fg(Color::Magenta))
     };
 
+    let ascend_text = if !matches!(deep_indicator, DeepIndicatorStatus::Hidden) {
+        Span::styled(
+            "    [U] Ascend",
+            Style::default().fg(Color::Rgb(255, 215, 0)),
+        )
+    } else {
+        Span::raw("")
+    };
+
     let footer_text = vec![
         Line::from(vec![
             prestige_text,
@@ -842,6 +938,7 @@ pub fn draw_footer(
         Line::from(vec![
             achievements_text,
             Span::styled("    [T] Time Vault", Style::default().fg(Color::Cyan)),
+            ascend_text,
             Span::styled("    [W] Wiki", Style::default().fg(Color::DarkGray)),
             Span::styled("    [!] Bug", Style::default().fg(Color::DarkGray)),
         ]),

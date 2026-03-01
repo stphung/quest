@@ -36,6 +36,7 @@ impl CharacterManager {
             stormglass: state.stormglass,
             stormglass_discovered: state.stormglass_discovered,
             storm_sigils: state.storm_sigils.clone(),
+            ascension_level: state.ascension_level,
         };
 
         let json = serde_json::to_string_pretty(&save_data)
@@ -105,9 +106,12 @@ impl CharacterManager {
             xp_this_second: 0,
             combat_seconds_this_tick: false,
             game_over_shown_at: None,
+            cached_power_rating: 0.0,
+            cached_fracture_zone_cap: 0,
             stormglass: save_data.stormglass,
             stormglass_discovered: save_data.stormglass_discovered,
             storm_sigils: save_data.storm_sigils.clone(),
+            ascension_level: save_data.ascension_level,
             chrono_surge_active: false,
             debug_force_overcharge: false,
             player,

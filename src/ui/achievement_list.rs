@@ -1,6 +1,7 @@
 //! Achievement browser list panel rendering.
 
 use crate::achievements::{get_achievements_by_category, get_title_text, Achievements};
+use crate::power_cores::get_power_core_def;
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
@@ -78,6 +79,16 @@ pub(super) fn render_achievement_list(
                 spans.push(Span::styled(
                     format!("  \u{2726} {title}"),
                     Style::default().fg(Color::Magenta),
+                ));
+            }
+
+            if let Some(core) = get_power_core_def(def.id) {
+                spans.push(Span::styled(
+                    format!(
+                        "  \u{2742} {} \u{00b7} {} PR/day",
+                        core.name, core.pr_per_day
+                    ),
+                    Style::default().fg(Color::Rgb(255, 165, 0)),
                 ));
             }
 

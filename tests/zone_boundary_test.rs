@@ -419,13 +419,13 @@ fn test_expanse_cycle_boss_defeat_is_recorded() {
 }
 
 #[test]
-fn test_expanse_zone_has_no_prestige_requirement() {
+fn test_expanse_zone_has_prestige_requirement() {
     let zones = get_all_zones();
     let expanse = zones.iter().find(|z| z.id == EXPANSE_ZONE_ID).unwrap();
-    // The Expanse is gated by StormsEnd achievement, not prestige rank
+    // The Expanse is dual-gated: StormsEnd achievement + P25 prestige
     assert_eq!(
-        expanse.prestige_requirement, 0,
-        "Zone 11 should have 0 prestige requirement (gated by achievement)"
+        expanse.prestige_requirement, 25,
+        "Zone 11 should require P25 prestige"
     );
 }
 

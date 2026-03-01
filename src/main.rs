@@ -1,4 +1,5 @@
 mod achievements;
+mod ascension;
 mod challenges;
 mod character;
 mod combat;
@@ -15,6 +16,7 @@ mod history;
 mod input;
 mod items;
 mod main_helpers;
+mod power_cores;
 mod stormglass;
 mod tick_events;
 mod ui;
@@ -242,6 +244,9 @@ fn main() -> io::Result<()> {
 
     // Load account-level God Item progress
 
+    // Load account-level Power Cores state
+    let mut power_cores_state = power_cores::load_power_cores();
+
     // Load global achievements (shared across all characters)
     let mut global_achievements = achievements::load_achievements();
     crate::achievements::titles::validate_selected_title(&mut global_achievements);
@@ -340,6 +345,7 @@ fn main() -> io::Result<()> {
             &cloud_tx,
             &cloud_rx,
             &mut cloud_op_in_flight,
+            &mut power_cores_state,
         )?;
 
         match splash_result {
@@ -642,6 +648,7 @@ fn main() -> io::Result<()> {
                                 &deep_state,
                                 &global_achievements,
                                 &enhancement.levels,
+                                &power_cores_state,
                             );
                             draw_game_overlays(
                                 frame,
@@ -714,6 +721,7 @@ fn main() -> io::Result<()> {
                                                 enhancement: &mut enhancement,
                                                 deep: &mut deep_state,
                                                 achievements: &mut global_achievements,
+                                                power_cores: &mut power_cores_state,
                                                 debug_mode,
                                             };
                                             let tick_result = core::tick::game_tick_with_context(
@@ -1727,6 +1735,7 @@ fn main() -> io::Result<()> {
                                     enhancement: &mut enhancement,
                                     deep: &mut deep_state,
                                     achievements: &mut global_achievements,
+                                    power_cores: &mut power_cores_state,
                                     debug_mode,
                                 };
                                 let tick_result =
@@ -1742,8 +1751,12 @@ fn main() -> io::Result<()> {
                                     || tick_result.enhancement_changed
                                     || tick_result.god_items_changed
                                     || tick_result.deep_changed
+                                    || tick_result.power_cores_changed
                                 {
                                     needs_save = true;
+                                }
+                                if tick_result.power_cores_changed && !debug_mode {
+                                    power_cores::save_power_cores(&power_cores_state).ok();
                                 }
 
                                 surge.ticks_remaining -= 1;
@@ -1820,6 +1833,7 @@ fn main() -> io::Result<()> {
                                     enhancement: &mut enhancement,
                                     deep: &mut deep_state,
                                     achievements: &mut global_achievements,
+                                    power_cores: &mut power_cores_state,
                                     debug_mode,
                                 };
                                 let tick_result =
@@ -1843,12 +1857,18 @@ fn main() -> io::Result<()> {
                                 // Extract milestone save event for git history
                                 let save_event = extract_save_event(&tick_result.events, &state);
 
+                                // Persist power cores if a grant occurred
+                                if tick_result.power_cores_changed && !debug_mode {
+                                    power_cores::save_power_cores(&power_cores_state).ok();
+                                }
+
                                 // Persist all state if anything changed
                                 if (tick_result.achievements_changed
                                     || tick_result.haven_changed
                                     || tick_result.enhancement_changed
                                     || tick_result.god_items_changed
                                     || tick_result.deep_changed
+                                    || tick_result.power_cores_changed
                                     || save_event.is_some())
                                     && !debug_mode
                                 {
@@ -1927,6 +1947,9 @@ fn main() -> io::Result<()> {
                                     }
                                     if tick_flags.deep_discovered {
                                         overlay = GameOverlay::DeepDiscovery;
+                                    }
+                                    if let Some(region) = tick_flags.fracture_region_unlocked {
+                                        overlay = GameOverlay::FractureRegionUnlock { region };
                                     }
                                 }
 

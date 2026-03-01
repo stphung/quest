@@ -15,8 +15,8 @@
 use super::milestones::{
     MinigameDifficulty, MinigameType, BOSS_HUNTER_MILESTONES, DEEP_GUILD_RANK_MILESTONES,
     DEEP_LAYER_MILESTONES, DEEP_MISSION_MILESTONES, DUNGEON_MILESTONES, FISHERMAN_MILESTONES,
-    FISH_CATCHER_MILESTONES, GRAND_CHAMPION_MILESTONES, LEVEL_MILESTONES, PRESTIGE_MILESTONES,
-    SLAYER_MILESTONES,
+    FISH_CATCHER_MILESTONES, GRAND_CHAMPION_MILESTONES, LEVEL_MILESTONES, POWER_CORE_MILESTONES,
+    PRESTIGE_MILESTONES, SLAYER_MILESTONES,
 };
 use super::types::{AchievementId, Achievements};
 
@@ -111,7 +111,7 @@ impl Achievements {
             return;
         }
 
-        // Individual zone completion achievements (zones 1-10)
+        // Individual zone completion achievements (zones 1-10, 12-20)
         let achievement = match zone_id {
             1 => Some(AchievementId::Zone1Complete),
             2 => Some(AchievementId::Zone2Complete),
@@ -123,6 +123,26 @@ impl Achievements {
             8 => Some(AchievementId::Zone8Complete),
             9 => Some(AchievementId::Zone9Complete),
             10 => Some(AchievementId::Zone10Complete),
+            // Fracture zone completion achievements (zones 12-20)
+            12 => Some(AchievementId::FractureZone12),
+            13 => Some(AchievementId::FractureZone13),
+            14 => Some(AchievementId::FractureZone14),
+            15 => Some(AchievementId::FractureZone15),
+            16 => Some(AchievementId::FractureZone16),
+            17 => Some(AchievementId::FractureZone17),
+            18 => Some(AchievementId::FractureZone18),
+            19 => Some(AchievementId::FractureZone19),
+            20 => Some(AchievementId::FractureZone20),
+            21 => Some(AchievementId::FractureZone21),
+            22 => Some(AchievementId::FractureZone22),
+            23 => Some(AchievementId::FractureZone23),
+            24 => Some(AchievementId::FractureZone24),
+            25 => Some(AchievementId::FractureZone25),
+            26 => Some(AchievementId::FractureZone26),
+            27 => Some(AchievementId::FractureZone27),
+            28 => Some(AchievementId::FractureZone28),
+            29 => Some(AchievementId::FractureZone29),
+            30 => Some(AchievementId::FractureZone30),
             _ => None,
         };
 
@@ -134,6 +154,23 @@ impl Achievements {
     /// Called when the game is completed (Zone 10 boss defeated with Stormbreaker).
     pub fn on_storms_end(&mut self, character_name: Option<&str>) {
         self.unlock_with_name(AchievementId::StormsEnd, character_name);
+    }
+
+    /// Called when the character Ascends to a new level.
+    #[allow(dead_code)] // Will be called by tick pipeline once ascension input is wired
+    pub fn on_ascended(&mut self, new_level: u32, character_name: Option<&str>) {
+        let id = match new_level {
+            1 => Some(AchievementId::AscensionI),
+            2 => Some(AchievementId::AscensionII),
+            3 => Some(AchievementId::AscensionIII),
+            4 => Some(AchievementId::AscensionIV),
+            5 => Some(AchievementId::AscensionV),
+            6 => Some(AchievementId::AscensionVI),
+            _ => None,
+        };
+        if let Some(id) = id {
+            self.unlock_with_name(id, character_name);
+        }
     }
 
     // =========================================================================
@@ -331,6 +368,7 @@ impl Achievements {
         }
 
         self.check_milestones(new_layer as u64, DEEP_LAYER_MILESTONES, character_name);
+        self.check_milestones(new_layer as u64, POWER_CORE_MILESTONES, character_name);
     }
 
     /// Called when the guild rank increases in The Deep.

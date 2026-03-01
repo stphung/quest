@@ -6,7 +6,7 @@
 //! `process_discoveries`, `process_zone_achievements`, `collect_achievement_events`)
 //! indirectly through the public functions or `game_tick`.
 
-use quest::achievements::Achievements;
+use quest::achievements::{AchievementId, Achievements};
 use quest::character::attributes::AttributeType;
 use quest::character::derived_stats::DerivedStats;
 use quest::combat::CombatEvent;
@@ -17,6 +17,7 @@ use quest::enhancement::EnhancementProgress;
 use quest::fishing::{FishingPhase, FishingSession};
 use quest::haven::{Haven, HavenBonuses};
 use quest::items::types::Rarity;
+use quest::power_cores::PowerCoreState;
 use quest::zones::BossDefeatResult;
 use quest::GameState;
 use rand::SeedableRng;
@@ -66,6 +67,7 @@ fn run_game_tick(
         &mut EnhancementProgress::new(),
         &mut quest::deep::DeepState::new(),
         ach,
+        &mut PowerCoreState::default(),
         debug_mode,
         rng,
     )
@@ -1386,6 +1388,39 @@ fn test_expanse_cycle_triggers_zone_11_achievement() {
     );
 
     assert_eq!(state.session_kills, 1);
+}
+
+#[test]
+fn test_fracture_cycle_triggers_zone_achievement() {
+    let mut state = fresh_state();
+    state.combat_state.current_enemy = Some(quest::Enemy::new("Fracture Boss".into(), 10000, 1000));
+    let mut result = TickResult::default();
+    let mut ach = Achievements::default();
+    let mut rng = seeded_rng(1);
+    let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
+
+    let events = vec![CombatEvent::SubzoneBossDefeated {
+        xp_gained: 15000,
+        result: BossDefeatResult::FractureCycle { zone_id: 14 },
+    }];
+
+    tick_stages::process_combat_events(
+        &mut state,
+        events,
+        &bonuses,
+        &mut ach,
+        &mut deep,
+        false,
+        &mut result,
+        &mut rng,
+    );
+
+    assert_eq!(state.session_kills, 1);
+    assert!(
+        ach.is_unlocked(AchievementId::FractureZone14),
+        "FractureCycle should trigger zone achievement for the cap zone"
+    );
 }
 
 // =============================================================================
