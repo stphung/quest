@@ -23,9 +23,9 @@ impl JezzballDifficulty {
         34
     }
 
-    /// Grid height in cells.
+    /// Grid height in cells (fits a 40-row XL terminal with zone info overhead).
     pub fn grid_height(&self) -> i16 {
-        22
+        20
     }
 
     /// Number of hazard orbs.
@@ -279,14 +279,14 @@ mod tests {
         assert!(!game.forfeit_pending);
         assert!(game.waiting_to_start);
         assert_eq!(game.grid_width, 34);
-        assert_eq!(game.grid_height, 22);
-        assert_eq!(game.cursor, Position { x: 17, y: 11 });
+        assert_eq!(game.grid_height, 20);
+        assert_eq!(game.cursor, Position { x: 17, y: 10 });
         assert_eq!(game.orientation, WallOrientation::Vertical);
         assert_eq!(game.balls.len(), 2);
         assert_eq!(game.target_percent, 60);
         assert_eq!(game.lives, MAX_LIVES);
         assert_eq!(game.wall_step_ms, 70);
-        assert_eq!(game.total_cells(), 748);
+        assert_eq!(game.total_cells(), 680);
     }
 
     #[test]
@@ -313,7 +313,7 @@ mod tests {
         assert_eq!(game.lives, 2); // Lives preserved
         assert!(game.blocked[5][5]); // Grid preserved
         assert_eq!(game.captured_percent, 25.0); // Progress preserved
-        assert_eq!(game.cursor, Position { x: 17, y: 11 }); // Cursor reset to center
+        assert_eq!(game.cursor, Position { x: 17, y: 10 }); // Cursor reset to center
     }
 
     #[test]
