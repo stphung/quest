@@ -807,7 +807,7 @@ pub fn effective_duration_secs(
         1.0
     };
 
-    // Bridge: -10% per bridged layer below this one, capped at -50%.
+    // Bridge: -2% per bridged layer below this one, capped at -30%.
     let bridge_count = (1..layer)
         .filter(|l| {
             persistent
@@ -815,7 +815,7 @@ pub fn effective_duration_secs(
                 .is_some_and(|r| r.has_infrastructure(Infrastructure::Bridge))
         })
         .count() as u32;
-    let bridge_factor = 1.0 - (bridge_count.min(5) as f64 * 0.10);
+    let bridge_factor = 1.0 - (bridge_count.min(15) as f64 * 0.02);
 
     (base * fam_factor * outpost_factor * bridge_factor) as u64
 }
