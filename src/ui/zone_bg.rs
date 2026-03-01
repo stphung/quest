@@ -745,11 +745,100 @@ fn paint_sparkles(buffer: &mut [Vec<SceneCell>], millis: f64, intensity: f64) {
     }
 }
 
-fn paint_ash_rain(_buffer: &mut [Vec<SceneCell>], _millis: f64, _intensity: f64) {}
+fn paint_ash_rain(buffer: &mut [Vec<SceneCell>], millis: f64, intensity: f64) {
+    let height = buffer.len();
+    let width = buffer[0].len();
+    let threshold = (90.0 / intensity).max(12.0) as u32;
+    let fall_phase = (millis / 120.0) as usize;
 
-fn paint_glass_shards(_buffer: &mut [Vec<SceneCell>], _millis: f64, _intensity: f64) {}
+    for row in 0..height {
+        for col in 0..width {
+            if col >= buffer[row].len() {
+                continue;
+            }
+            let seed = hash2d(
+                row.wrapping_add(fall_phase),
+                col.wrapping_add(fall_phase / 5),
+            );
+            if !seed.is_multiple_of(threshold) {
+                continue;
+            }
+            if buffer[row][col].ch != ' ' {
+                continue;
+            }
+            let hot = seed.is_multiple_of(4);
+            let (ch, fg) = if hot {
+                ('\u{00b7}', Color::Rgb(200, 140, 80)) // middle-dot, warm orange
+            } else {
+                ('.', Color::Rgb(140, 130, 120)) // dim grey ash
+            };
+            put_cell(buffer, row as i32, col as i32, ch, fg);
+        }
+    }
+}
 
-fn paint_drifting_ash(_buffer: &mut [Vec<SceneCell>], _millis: f64, _intensity: f64) {}
+fn paint_glass_shards(buffer: &mut [Vec<SceneCell>], millis: f64, intensity: f64) {
+    let height = buffer.len();
+    let width = buffer[0].len();
+    let threshold = (100.0 / intensity).max(16.0) as u32;
+    let fall_phase = (millis / 160.0) as usize;
+
+    for row in 0..height {
+        for col in 0..width {
+            if col >= buffer[row].len() {
+                continue;
+            }
+            let seed = hash2d(
+                row.wrapping_add(fall_phase),
+                col.wrapping_add(fall_phase / 4),
+            );
+            if !seed.is_multiple_of(threshold) {
+                continue;
+            }
+            if buffer[row][col].ch != ' ' {
+                continue;
+            }
+            // Alternate between bright glint and dim shard
+            let glint = (millis * 0.005 + row as f64 * 0.3 + col as f64 * 0.2).sin() > 0.2;
+            let (ch, fg) = if glint {
+                ('\u{2726}', Color::Rgb(240, 245, 255)) // ✦ bright glint
+            } else {
+                ('/', Color::Rgb(140, 160, 180)) // dim falling shard
+            };
+            put_cell(buffer, row as i32, col as i32, ch, fg);
+        }
+    }
+}
+
+fn paint_drifting_ash(buffer: &mut [Vec<SceneCell>], millis: f64, intensity: f64) {
+    let height = buffer.len();
+    let width = buffer[0].len();
+    let threshold = (140.0 / intensity).max(22.0) as u32;
+    let drift_phase = (millis / 250.0) as usize;
+
+    for row in 0..height {
+        for col in 0..width {
+            if col >= buffer[row].len() {
+                continue;
+            }
+            // Horizontal drift: offset col by phase
+            let seed = hash2d(row + 5, col.wrapping_add(drift_phase));
+            if !seed.is_multiple_of(threshold) {
+                continue;
+            }
+            if buffer[row][col].ch != ' ' {
+                continue;
+            }
+            let dark = seed.is_multiple_of(3);
+            let (ch, fg) = if dark {
+                ('\u{00b7}', Color::Rgb(60, 55, 50)) // dark ash
+            } else {
+                ('~', Color::Rgb(90, 85, 80)) // slightly lighter ash
+            };
+            put_cell(buffer, row as i32, col as i32, ch, fg);
+        }
+    }
+}
 
 fn paint_dust_motes(_buffer: &mut [Vec<SceneCell>], _millis: f64, _intensity: f64) {}
 
