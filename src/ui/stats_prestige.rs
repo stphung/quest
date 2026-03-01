@@ -343,6 +343,9 @@ pub(super) fn draw_fishing_panel(
             let trophy_line = build_leviathan_trophy_line();
             frame.render_widget(Paragraph::new(trophy_line), inner_chunks[1]);
         } else {
+            // Row 1: rank name
+            frame.render_widget(Paragraph::new(rank_line), inner_chunks[0]);
+            // Row 2: progress bar
             let fish_label = if is_max_rank {
                 "Max Rank".to_string()
             } else {
