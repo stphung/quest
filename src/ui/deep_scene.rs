@@ -397,10 +397,7 @@ fn render_tab_bar(buffer: &mut [Vec<SceneCell>], width: usize, active: DeepView,
                     (String::new(), Color::DarkGray)
                 }
             }
-            DeepView::Infrastructure => {
-                let frontier = deep.persistent.frontier_layer();
-                (format!("L{}", frontier), Color::Cyan)
-            }
+            DeepView::Infrastructure => (String::new(), Color::DarkGray),
             DeepView::EventResponse => {
                 let events = deep
                     .prestige

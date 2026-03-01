@@ -202,12 +202,7 @@ fn handle_hub(
                 }
             }
         }
-        KeyCode::Esc => {
-            deep_ui.view = DeepView::Hub;
-            deep_ui.selected_index = 0;
-            InputResult::Continue
-        }
-        KeyCode::Char('d') | KeyCode::Char('D') => {
+        KeyCode::Esc | KeyCode::Char('d') | KeyCode::Char('D') => {
             deep_ui.close();
             InputResult::Continue
         }
@@ -305,8 +300,7 @@ fn handle_new_mission(
             InputResult::Continue
         }
         KeyCode::Esc => {
-            deep_ui.view = DeepView::Hub;
-            deep_ui.selected_index = 0;
+            deep_ui.close();
             InputResult::Continue
         }
         _ => InputResult::Continue,
@@ -472,6 +466,13 @@ fn handle_event_response(
     deep_state: &mut DeepState,
     deep_ui: &mut DeepUiState,
 ) -> InputResult {
+    // Handle Esc before early returns so it works even when no event is active.
+    if matches!(key.code, KeyCode::Esc) {
+        deep_ui.event_mission_id = None;
+        deep_ui.close();
+        return InputResult::Continue;
+    }
+
     let mission_id = match deep_ui.event_mission_id {
         Some(id) => id,
         None => {
@@ -543,12 +544,6 @@ fn handle_event_response(
             }
             InputResult::Continue
         }
-        KeyCode::Esc => {
-            // Leave the event unresolved (auto-resolve will handle it later).
-            deep_ui.view = DeepView::Hub;
-            deep_ui.event_mission_id = None;
-            InputResult::Continue
-        }
         _ => InputResult::Continue,
     }
 }
@@ -584,8 +579,7 @@ fn handle_roster(
             InputResult::Continue
         }
         KeyCode::Esc => {
-            deep_ui.view = DeepView::Hub;
-            deep_ui.selected_index = 0;
+            deep_ui.close();
             InputResult::Continue
         }
         _ => InputResult::Continue,
@@ -688,8 +682,7 @@ fn handle_recruit(
             InputResult::Continue
         }
         KeyCode::Esc => {
-            deep_ui.view = DeepView::Hub;
-            deep_ui.selected_index = 0;
+            deep_ui.close();
             InputResult::Continue
         }
         _ => InputResult::Continue,
