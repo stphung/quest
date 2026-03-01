@@ -438,6 +438,7 @@ pub fn render_fracture_region_unlock_modal(
     _ctx: &LayoutContext,
 ) {
     use crate::ascension::types::{ascension_combat_multiplier, ascension_cost};
+    use crate::power_cores::ALL_POWER_CORES;
     use ratatui::widgets::Clear;
 
     const GOLD: Color = Color::Rgb(255, 215, 0);
@@ -447,9 +448,9 @@ pub fn render_fracture_region_unlock_modal(
     let show_ascension = ascension_level < asc_unlocked;
     let extra_zones = (region.end_zone_id() - region.start_zone_id() + 1).saturating_sub(3) as u16;
     let modal_height = if show_ascension {
-        22u16 + extra_zones
+        25u16 + extra_zones
     } else {
-        18u16 + extra_zones
+        21u16 + extra_zones
     };
 
     let modal_width = 58u16.min(area.width.saturating_sub(4));
@@ -481,7 +482,7 @@ pub fn render_fracture_region_unlock_modal(
                 .fg(Color::Magenta)
                 .add_modifier(Modifier::BOLD),
         )),
-        // Atmospheric text
+        // Atmospheric text + power core narrative
         Line::from(""),
         Line::from(Span::styled(
             region.unlock_atmospheric(),
@@ -489,9 +490,33 @@ pub fn render_fracture_region_unlock_modal(
                 .fg(Color::White)
                 .add_modifier(Modifier::ITALIC),
         )),
-        // Zone list — one per line with ◆ prefix
-        Line::from(""),
+        Line::from(Span::styled(
+            region.power_core_narrative(),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::ITALIC),
+        )),
     ];
+
+    // Power Core mechanic line
+    if let Some(core) = ALL_POWER_CORES
+        .iter()
+        .find(|c| c.required_layer == region.unlock_layer())
+    {
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![Span::styled(
+            format!(
+                "\u{2b21} Power Core: {}  \u{2014}  {} PR/day",
+                core.name, core.pr_per_day
+            ),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )]));
+    }
+
+    // Zone list — one per line with ◆ prefix
+    lines.push(Line::from(""));
     for zid in region.start_zone_id()..=region.end_zone_id() {
         let name = crate::zones::get_zone(zid).map(|z| z.name).unwrap_or("???");
         lines.push(Line::from(vec![

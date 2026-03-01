@@ -90,6 +90,20 @@ impl FractureRegion {
         }
     }
 
+    /// Narrative bridge text tying the fracture to its Power Core.
+    pub fn power_core_narrative(&self) -> &'static str {
+        match self {
+            Self::RedFault => {
+                "Deep within, a core of power ignites \u{2014} the Red Fault now feeds your ascent."
+            }
+            Self::MirrorScar => "A second core awakens in the Mirror Scar.",
+            Self::BlackMouth => "A core pulses in the Black Mouth, feeding on the dark.",
+            Self::HollowThrone => "The Hollow Throne yields an ancient core.",
+            Self::WailingReach => "The Wailing Reach resonates with a core beyond hearing.",
+            Self::OriginWound => "Its final core beats at the origin.",
+        }
+    }
+
     /// Mechanical text for the unlock modal.
     pub fn unlock_mechanical(&self) -> &'static str {
         match self {
