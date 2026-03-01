@@ -961,20 +961,17 @@ pub enum DeepView {
 }
 
 impl DeepView {
-    /// The navigable tabs in order. EventResponse is 2nd (most time-critical).
+    /// The navigable tabs in order.
     pub const TABS: &[DeepView] = &[
-        DeepView::Hub,
-        DeepView::EventResponse,
-        DeepView::NewMission,
-        DeepView::Roster,
-        DeepView::Recruit,
         DeepView::Infrastructure,
+        DeepView::NewMission,
+        DeepView::Hub,
     ];
 
     /// Short label for rendering in the tab bar.
     pub fn tab_label(self) -> &'static str {
         match self {
-            DeepView::Hub => "Hub",
+            DeepView::Hub => "Team",
             DeepView::NewMission => "Missions",
             DeepView::Roster => "Roster",
             DeepView::Infrastructure => "Layers",
@@ -1024,6 +1021,12 @@ pub struct DeepUiState {
     pub layer_visit_count: u8,
     pub event_visit_count: u8,
     pub recruit_visit_count: u8,
+    /// Whether the event response modal is open over the hub.
+    pub event_modal_open: bool,
+    /// Missions tab sub-view: true = active missions, false = available pool.
+    pub missions_show_active: bool,
+    /// Status tab sub-view: false = roster (default), true = recruit.
+    pub status_show_recruit: bool,
     /// Whether [?] help reference panel is shown.
     pub show_help: bool,
     /// Mercs from last prestige shown in farewell screen: (name, level, missions_completed).
@@ -1034,7 +1037,7 @@ impl DeepUiState {
     pub fn new() -> Self {
         Self {
             open: false,
-            view: DeepView::Hub,
+            view: DeepView::Infrastructure,
             selected_index: 0,
             event_mission_id: None,
             event_choice_index: 0,
@@ -1047,6 +1050,9 @@ impl DeepUiState {
             layer_visit_count: 0,
             event_visit_count: 0,
             recruit_visit_count: 0,
+            event_modal_open: false,
+            missions_show_active: true,
+            status_show_recruit: false,
             show_help: false,
             farewell_mercs: Vec::new(),
         }
@@ -1054,10 +1060,12 @@ impl DeepUiState {
 
     pub fn open(&mut self) {
         self.open = true;
-        self.view = DeepView::Hub;
+        self.view = DeepView::Infrastructure;
         self.selected_index = 0;
         self.event_mission_id = None;
         self.event_choice_index = 0;
+        self.event_modal_open = false;
+        self.missions_show_active = true;
         self.staging_mission_index = None;
         self.staged_squad.clear();
         self.flash_message = None;
@@ -1067,10 +1075,12 @@ impl DeepUiState {
 
     pub fn close(&mut self) {
         self.open = false;
-        self.view = DeepView::Hub;
+        self.view = DeepView::Infrastructure;
         self.selected_index = 0;
         self.event_mission_id = None;
         self.event_choice_index = 0;
+        self.event_modal_open = false;
+        self.missions_show_active = true;
         self.staging_mission_index = None;
         self.staged_squad.clear();
         self.flash_message = None;
