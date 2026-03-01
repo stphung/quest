@@ -116,7 +116,7 @@ Not all challenges are equally discoverable:
 
 ## game_tick() Extraction to core/tick.rs
 
-**Decision**: Extract the per-tick orchestration function from main.rs into `src/core/tick.rs`, returning a `TickResult` struct with `Vec<TickEvent>` (now 42 variants) instead of mutating UI state directly.
+**Decision**: Extract the per-tick orchestration function from main.rs into `src/core/tick.rs`, returning a `TickResult` struct with `Vec<TickEvent>` (now 44 variants) instead of mutating UI state directly.
 
 **Rationale**: The game loop was tightly coupled to the terminal UI — game logic called `add_log_entry()` and created `VisualEffect` objects directly. Extracting `game_tick()` into a pure-logic module enables:
 - Headless simulation (the `simulator` binary reuses the exact same function)
@@ -265,3 +265,37 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 **Decision**: Add a combat retreat system (`DEATH_LOOP_THRESHOLD = 3`, `MOB_FIGHT_TIMEOUT_SECONDS = 30.0`) that automatically retreats the player to a safer zone when they die repeatedly or stall against a mob.
 
 **Rationale**: Without intervention, a player who enters a zone too early can get stuck in a death loop — dying instantly, respawning, and dying again. The retreat system detects consecutive deaths and mob fight timeouts, then moves the player back to a zone they can handle, preserving the gameplay loop.
+
+## Ascension System: Per-Character Prestige-Rank Multiplier
+
+**Decision**: Add a per-character combat power multiplier (Ascension I-VI+) purchased with prestige ranks and gated by Deep layer milestones. Ascension level survives prestige.
+
+**Rationale**: Fracture zones (12-30) scale enemy stats at 1.6x per zone, creating a steep power wall. Ascension provides a structured catch-up mechanism without trivializing early zones: players must unlock Deep layers before buying Ascension levels, ensuring progression feels earned. Surviving prestige means each purchase is permanent infrastructure, not a short-term boost.
+
+**Key choices**:
+- **Multiplier formula**: `2^level` for I-VI (doubling per level, 2x to 64x), then `64 * 1.5^(level-6)` for VII+ (diminishing 1.5x returns). Provides strong early scaling with smoother late scaling.
+- **Deep layer gates**: [3, 7, 12, 18, 25, 30] — each Ascension level aligns with a Deep breakthrough, tying two systems together.
+- **PR cost table**: [35, 65, 120, 200, 325, 500] for I-VI (total 1,245 PR). Costs are steep enough that purchasing all 6 requires dedicated prestige investment over many cycles.
+- **Multiplier scope**: Applies to damage, defense, and max HP equally, keeping the combat feel balanced rather than just inflating one stat.
+
+## Power Rating: Combat Strength Scalar
+
+**Decision**: Add a single `power_rating` metric computed as `sqrt(effective_DPS × effective_HP)` (geometric mean of offense and defense).
+
+**Rationale**: With many bonus sources (prestige, Haven, god items, sigils, ascension, enhancement), a single comparable number is valuable for both player guidance and developer balance analysis. The geometric mean rewards balanced builds: a character with 1000 DPS and 1000 effective HP rates better than one with 2000 DPS and 100 HP (geometric mean penalizes imbalance). The square root normalizes large numbers for display.
+
+**Key choices**:
+- **Formula**: `sqrt(effective_DPS × effective_HP)` — accounts for the full damage pipeline (crit, double strike, attack speed) and defense reduction multiplier.
+- **Caching**: Stored as `cached_power_rating: f64` on `GameState`, recomputed each tick alongside other stat recalculation.
+- **Display**: Shown in the stats panel header (same row as player name/level), giving it permanent visibility.
+
+## Fracture Zones 12-30: Deep-Unlocked Chapters
+
+**Decision**: Add 19 fracture zones (Z12-30) across 6 chapters, each chapter unlocked by a Deep layer breakthrough. Enemy stats scale at 1.6x per zone from Zone 11 base.
+
+**Rationale**: The Expanse (Zone 11) provides infinite content but at a fixed difficulty. Fracture zones create a long-term power progression goal that requires mastering The Deep and Ascension — two of the deepest endgame systems. Tying zone unlocks to Deep breakthroughs means advancing in one system always rewards the other.
+
+**Key choices**:
+- **1.6x stat multiplier per zone**: Steep enough to require real power investment (specifically Ascension), but not so steep that any single zone feels impossible after buying the next Ascension level.
+- **5 subzones per fracture zone**: More than standard zones (3-4 subzones), providing more content density per chapter.
+- **Cap zone cycling**: Only the highest unlocked zone cycles; all previous fracture zones advance forward. This allows players to choose their farming spot (highest zone they can sustain vs. a lower zone for speed).

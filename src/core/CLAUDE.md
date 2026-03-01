@@ -18,7 +18,15 @@ src/core/
 ├── tick_stages.rs   # Tick processing stages 4-6 and helper functions
 ├── tick_types.rs    # TickEvent enum (44 variants) and TickResult struct
 ├── ticker.rs        # Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
-└── xp.rs            # XP curves, leveling, combat kill XP, distribute_level_up_points
+├── xp.rs            # XP curves, leveling, combat kill XP, distribute_level_up_points
+├── power_rating.rs  # Character power rating (sqrt of DPS x eHP)
+├── tick_context.rs  # Tick context helpers
+├── game_state_serde.rs # GameState serialization helpers
+├── player_identity.rs # Player identity fields
+├── combat_context.rs  # Combat context helpers
+├── progression_state.rs # Progression state fields
+├── session_state.rs   # Session state fields
+└── discovery_facade.rs # Discovery facade
 ```
 
 ## Key Types
@@ -67,6 +75,8 @@ pub struct GameState {
     pub derived_stats_dirty: bool,
     pub combat_seconds_this_tick: bool,
     pub game_over_shown_at: Option<Instant>,
+    pub cached_power_rating: f64,             // Cached power rating (sqrt DPS x eHP)
+    pub cached_fracture_zone_cap: u32,        // Cached fracture zone cap from Deep
 }
 ```
 

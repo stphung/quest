@@ -132,9 +132,13 @@ final_xp = base_xp * (1.0 + haven_offline_xp_percent / 100)
 4. On enemy death: award kill XP, begin HP regen (2.5 seconds base), then spawn next enemy
 5. On player death: instant respawn at full HP, enemy resets
 
+### Combat Bonuses
+
+`CombatBonuses` is a unified struct injected into `update_combat()` carrying all bonus sources: prestige flat bonuses, Haven percentage bonuses, god item passives, Storm Sigil bonuses, and ascension multiplier. The ascension multiplier (from the Ascension system) scales damage, defense, and max HP equally (2x per level for I-VI, 1.5x per level for VII+).
+
 ### Enemy Generation
 
-- Enemy stats: Static zone-based values from `ZONE_ENEMY_STATS` table in `core/constants.rs`. Each zone defines `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)` tuples; subzone depth adds incremental stats
+- Enemy stats: Static zone-based values from `ZONE_ENEMY_STATS` table in `core/constants.rs`. Each zone defines `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)` tuples; subzone depth adds incremental stats. Zones 12-30 (Fracture) scale at 1.6x per zone from Zone 11 base (`FRACTURE_ZONE_STAT_MULTIPLIER`)
 - Procedurally generated fantasy names from syllable combinations
 
 ### Boss Enrage
@@ -213,6 +217,7 @@ final_multiplier = base_multiplier + (CHA_mod * 0.1)
 - Character name and ID
 - Fishing state (rank, total fish caught, legendary catches)
 - Chess stats
+- Ascension level (`ascension_level`)
 - Haven (account-level, persists across all characters)
 - Achievements (account-level)
 - The Deep persistent data (guild rank, cleared layers, infrastructure)
@@ -234,16 +239,22 @@ When prestiging with a Vault, the player selects which equipped items to keep. T
 
 ### Structure
 
-10 zones organized into 5 tiers, gated by prestige rank. Each zone has 3-4 subzones with a boss per subzone. An 11th post-game zone (The Expanse) is unlocked via the "StormsEnd" achievement after clearing Zone 10.
+30 total zones: 10 prestige-gated zones, Zone 11 (The Expanse, post-game cycling), and 19 fracture zones (12-30) unlocked by Deep layer breakthroughs. Zones 1-10 have 3-4 subzones; zones 12-30 have 5 subzones each.
 
-| Tier | Prestige | Zones | Subzones/Zone |
-|------|----------|-------|---------------|
+| Tier | Gate | Zones | Subzones/Zone |
+|------|------|-------|---------------|
 | 1 | P0 | Meadow, Dark Forest | 3 |
 | 2 | P5 | Mountain Pass, Ancient Ruins | 3 |
 | 3 | P10 | Volcanic Wastes, Frozen Tundra | 4 |
 | 4 | P15 | Crystal Caverns, Sunken Kingdom | 4 |
 | 5 | P20 | Floating Isles, Storm Citadel | 4 |
-| Post | Achievement | The Expanse | 4 (cycles) |
+| Post-game | StormsEnd achievement | The Expanse (Z11) | 4 (cycles) |
+| Ch.1 The Red Fault | Deep Layer 3 | Z12-14 | 5 each |
+| Ch.2 The Mirror Scar | Deep Layer 7 | Z15-17 | 5 each |
+| Ch.3 The Black Mouth | Deep Layer 12 | Z18-20 | 5 each |
+| Ch.4 The Hollow Throne | Deep Layer 18 | Z21-23 | 5 each |
+| Ch.5 The Wailing Reach | Deep Layer 25 | Z24-26 | 5 each |
+| Ch.6 The Origin Wound | Deep Layer 30 | Z27-30 | 5 each |
 
 ### Complete Zone List
 
@@ -263,7 +274,9 @@ When prestiging with a Vault, the player selects which equipped items to keep. T
 
 - 10 kills in a subzone triggers its boss
 - Defeating the boss advances to the next subzone (or next zone)
-- Zone 11 (The Expanse) cycles: after defeating the final subzone boss, returns to subzone 1 for infinite replay
+- Zone 11 (The Expanse) cycles: after defeating the final subzone boss, returns to subzone 1 for infinite replay (until fracture zones unlock)
+- Fracture zones (12-30): only the current cap zone cycles; all lower fracture zones advance forward
+- Enemy stats scale 1.6x per zone from Zone 11 base (`FRACTURE_ZONE_STAT_MULTIPLIER`)
 
 ### Stormbreaker Weapon Gate
 
@@ -278,6 +291,12 @@ Tier 3 — Elemental Forces:    Volcanic Wastes → Frozen Tundra
 Tier 4 — Hidden Depths:       Crystal Caverns → Sunken Kingdom
 Tier 5 — Ascending:           Floating Isles → Storm Citadel
 Post-game:                     The Expanse (infinite cycling)
+Ch.1 — The Red Fault:         Z12-14 (Deep Layer 3)
+Ch.2 — The Mirror Scar:       Z15-17 (Deep Layer 7)
+Ch.3 — The Black Mouth:       Z18-20 (Deep Layer 12)
+Ch.4 — The Hollow Throne:     Z21-23 (Deep Layer 18)
+Ch.5 — The Wailing Reach:     Z24-26 (Deep Layer 25)
+Ch.6 — The Origin Wound:      Z27-30 (Deep Layer 30)
 ```
 
 ## Item System
@@ -372,14 +391,14 @@ The game runs a 100ms tick loop. Each tick calls `game_tick()` in `src/core/tick
 
 The tick implementation is split across several files:
 - `tick.rs` -- Orchestrator: calls each stage in order, returns `TickResult`
-- `tick_types.rs` -- `TickEvent` enum (42 variants) and `TickResult` struct
+- `tick_types.rs` -- `TickEvent` enum (44 variants) and `TickResult` struct
 - `tick_stages.rs` -- Processing stages 4-6 and helper functions (`process_item_drop`, `process_discoveries`, etc.)
 - `xp.rs` -- XP calculation, leveling logic, combat kill XP
 - `discoveries.rs` -- Discovery rolls for dungeons, fishing spots, Haven, Soulforge
 - `enemy_spawning.rs` -- Enemy generation and spawning (spawn_enemy_if_needed, try_discover_dungeon)
 - `offline.rs` -- Offline XP progression
 - `recent_drops.rs` -- RecentDrop struct and deque management
-- `ticker.rs` -- XP rate sampling and rolling window
+- `ticker.rs` -- Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
 
 ### game_tick() Signature
 
@@ -400,7 +419,7 @@ Generic `<R: Rng>` allows seeded RNG in tests (`ChaCha8Rng`) and `thread_rng()` 
 
 ### TickEvent and TickResult
 
-`TickEvent` is an enum with 42 variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types. Defined in `tick_types.rs`.
+`TickEvent` is an enum with 44 variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types. Defined in `tick_types.rs`.
 
 ```rust
 pub struct TickResult {
@@ -426,6 +445,8 @@ pub struct TickResult {
 - Discovery: challenges, dungeons, fishing spots, Haven, Soulforge, The Deep, Stormglass
 - Stormglass: `StormglassSalvaged`, `StormglassDungeonCache`
 - Deep: `DeepMissionComplete`, `DeepEventPending`, `DeepMercInjured`, `DeepMercLost`, `DeepBreakthrough`, `DeepGuildRankUp`
+- Fracture Zones: `FractureRegionUnlocked`
+- Ascension: `Ascended`
 - Progress: `LeveledUp`, `AchievementUnlocked`
 
 ### Processing Stages
@@ -567,3 +588,8 @@ Enhancement state (`EnhancementProgress`) is saved to `~/.quest/enhancement.json
 | Mob fight timeout | `MOB_FIGHT_TIMEOUT_SECONDS = 30.0` (stalemate prevention) |
 | Prestige mult formula | `1.0 + 0.5 * rank^0.7` |
 | Base max fishing rank | 30 (40 with Fishing Dock T4) |
+| Fracture zone stat multiplier | `FRACTURE_ZONE_STAT_MULTIPLIER = 1.6` (per zone from Z11 base) |
+| Max ascension level (I-VI table) | `MAX_ASCENSION_LEVEL = 6` |
+| Ascension PR costs (I-VI) | [35, 65, 120, 200, 325, 500] (total 1,245 PR) |
+| Ascension deep gates (I-VI) | [3, 7, 12, 18, 25, 30] layers |
+| Ascension multiplier | `2^level` for I-VI (2x-64x); `64 * 1.5^(level-6)` for VII+ |

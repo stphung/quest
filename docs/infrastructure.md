@@ -212,7 +212,7 @@ When active, a `[DEBUG]` indicator shows in the UI corner.
 
 ### Menu Options
 
-The debug menu uses a tabbed category structure with 6 tabs. Left/Right arrows switch tabs, Up/Down navigate within a tab, Enter triggers.
+The debug menu uses a tabbed category structure with 8 tabs. Left/Right arrows switch tabs, Up/Down navigate within a tab, Enter triggers.
 
 **Challenges tab:**
 - Trigger Chess, Morris, Gomoku, Minesweeper, Rune, Go, Flappy Bird, JezzBall, Snake, Sigil Surge challenges
@@ -228,6 +228,12 @@ The debug menu uses a tabbed category structure with 6 tabs. Left/Right arrows s
 
 **Deep tab:**
 - Discover The Deep, Grant 10000 Warband Marks, Refresh Mission Pool, Refresh Recruit Pool, Clear Current Frontier Layer, Complete Active Missions
+
+**Zones tab:**
+- Zone/fracture zone travel options
+
+**Character tab:**
+- Character-level debug options
 
 **Borders tab:**
 - Border style options for visual customization
@@ -282,6 +288,15 @@ In-game bug report overlay (`src/utils/bug_report.rs`, `src/ui/bug_report_scene.
     └── YYYY-MM-DD_HHMMSS/   # Timestamped backup before update
         └── *.json
 ```
+
+### Key Character Save Fields
+
+Character JSON files contain the full `GameState` struct. Notable fields that persist across prestige:
+
+- `prestige_rank`, `total_prestiges` -- Prestige progression
+- `fishing_rank`, `total_fish_caught`, `legendary_fish_caught` -- Fishing state
+- `ascension_level` -- Ascension combat multiplier level (survives prestige)
+- `stormglass` -- Stormglass currency balance
 
 ## Dependencies
 

@@ -298,18 +298,21 @@ Special costs: Fishing Dock T4 = 10 prestige ranks. Storm Forge = 25 prestige ra
 ### Interaction Matrix
 
 ```
-           | Prestige | Haven  | Items  | Fishing | Challenges | Stormglass | The Deep
------------+----------+--------+--------+---------+------------+------------+---------
-Prestige   |    -     | Gates  | Reset  | Persist | Rewards PR | Gates P15+ | Gates P15+
-Haven      | Currency |   -    | Rarity | Rank Cap| Discovery  |    -       |    -
-Items      | Lost*    | Vault  |   -    | Drops   |    -       |    -       |    -
-Fishing    | Persist  | Dock   | Drops  |    -    | Ranks      |    -       |    -
-Challenges | +Ranks   | Library|   -    | +Ranks  |    -       | +Currency  |    -
-Stormglass | Gated    |   -    |   -    |    -    | Source     | Sigil bonus|    -
-The Deep   | Partial  |   -    |   -    |    -    |    -       |    -       | Marks/Mercs
+           | Prestige | Haven  | Items  | Fishing | Challenges | Stormglass | The Deep  | Ascension
+-----------+----------+--------+--------+---------+------------+------------+-----------+----------
+Prestige   |    -     | Gates  | Reset  | Persist | Rewards PR | Gates P15+ | Gates P15+| Currency
+Haven      | Currency |   -    | Rarity | Rank Cap| Discovery  |    -       |    -      |    -
+Items      | Lost*    | Vault  |   -    | Drops   |    -       |    -       |    -      |    -
+Fishing    | Persist  | Dock   | Drops  |    -    | Ranks      |    -       |    -      |    -
+Challenges | +Ranks   | Library|   -    | +Ranks  |    -       | +Currency  |    -      |    -
+Stormglass | Gated    |   -    |   -    |    -    | Source     | Sigil bonus|    -      |    -
+The Deep   | Partial  |   -    |   -    |    -    |    -       |    -       | Marks/Mercs| Gates
+Ascension  | Persist  |   -    |   -    |    -    |    -       |    -       | Deep gate | Combat×
 ```
 
 *The Deep resets partially on prestige: mercs, active missions, and Warband Marks reset; guild rank, cleared layers, and infrastructure persist.
+
+*Ascension level survives prestige. The Deep gates higher ascension levels (I-VI require Deep layers 3/7/12/18/25/30).
 
 *Items are lost on prestige unless preserved by Vault (1/3/5 items at T1/T2/T3).
 
@@ -400,7 +403,23 @@ At P20 (Eternal), all zones are unlocked. The player can progress through 35 sub
 
 ### Post-Game: Zone 11 (The Expanse)
 
-After completing Zone 10, the player unlocks The Expanse (Zone 11), an infinite 4-subzone zone that cycles endlessly. Min level 150, no level cap. This provides infinite post-game content.
+After completing Zone 10, the player unlocks The Expanse (Zone 11), an infinite 4-subzone zone that cycles endlessly. Min level 150, no level cap. This provides infinite post-game content until Deep layer breakthroughs unlock fracture zones.
+
+### Ascension System
+
+Per-character combat power multiplier purchased with prestige ranks, gated by Deep layer breakthroughs. Ascension level **survives prestige**, making it the strongest permanent investment available.
+
+| Level | Deep Gate | PR Cost | Multiplier |
+|-------|-----------|---------|------------|
+| I | Layer 3 | 35 | 2x |
+| II | Layer 7 | 65 | 4x |
+| III | Layer 12 | 120 | 8x |
+| IV | Layer 18 | 200 | 16x |
+| V | Layer 25 | 325 | 32x |
+| VI | Layer 30 | 500 | 64x |
+| VII+ | None | 500+75*(n-6) | 64 × 1.5^(n-6) |
+
+Total PR for I-VI: 1,245 PR. Multiplier applies multiplicatively to damage, defense, and max HP. Required to farm fracture zones (Z12+) where enemy stats scale 1.6x per zone from Zone 11.
 
 ---
 
@@ -419,8 +438,16 @@ After completing Zone 10, the player unlocks The Expanse (Zone 11), an infinite 
 | 9 | Floating Isles | P20 | 115-130 | 4 | Tempest Lord |
 | 10 | Storm Citadel | P20 | 130-150 | 4 | The Undying Storm* |
 | 11 | The Expanse | StormsEnd | 150+ | 4 (cycling) | Avatar of Infinity |
+| 12-14 | Ch.1 The Red Fault | Deep L3 | — | 5 each | — |
+| 15-17 | Ch.2 The Mirror Scar | Deep L7 | — | 5 each | — |
+| 18-20 | Ch.3 The Black Mouth | Deep L12 | — | 5 each | — |
+| 21-23 | Ch.4 The Hollow Throne | Deep L18 | — | 5 each | — |
+| 24-26 | Ch.5 The Wailing Reach | Deep L25 | — | 5 each | — |
+| 27-30 | Ch.6 The Origin Wound | Deep L30 | — | 5 each | — |
 
 *Requires Stormbreaker weapon to defeat final boss.
+
+Fracture zone enemy stats scale at 1.6x per zone from Zone 11 base (`FRACTURE_ZONE_STAT_MULTIPLIER`). These zones require the Ascension system for adequate combat power.
 
 ---
 
@@ -1019,6 +1046,14 @@ STORM_LURE_COST: u64 = 50000;                    // 50,000 Stormglass
 KILLS_FOR_BOSS: u32 = 10;
 BASE_MAX_FISHING_RANK: u32 = 30;
 MAX_FISHING_RANK: u32 = 40;
+
+// Fracture Zones (in src/core/constants.rs)
+FRACTURE_ZONE_STAT_MULTIPLIER: f64 = 1.6;   // Enemy stat scaling per zone from Z11 base
+
+// Ascension (in src/ascension/types.rs)
+ASCENSION_PR_COSTS: [u32; 6] = [35, 65, 120, 200, 325, 500];  // PR cost for levels I-VI
+ASCENSION_DEEP_GATES: [u32; 6] = [3, 7, 12, 18, 25, 30];       // Deep layer gate for I-VI
+// Multiplier: 2^level for I-VI (2x to 64x), 64 * 1.5^(level-6) for VII+
 ```
 
 ---

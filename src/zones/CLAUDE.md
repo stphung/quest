@@ -12,7 +12,7 @@ src/zones/
 ├── advancement.rs  # Zone/subzone advancement logic, travel_to(), advance_to_next_subzone()
 ├── boss_defeat.rs  # BossDefeatResult enum, on_boss_defeated(), on_boss_defeated_with_cap()
 ├── gates.rs        # boss_weapon_blocked(), zone unlock queries
-├── fracture.rs     # FractureRegion enum (RedFault, MirrorScar, BlackMouth) with chapter metadata
+├── fracture.rs     # FractureRegion enum (RedFault, MirrorScar, BlackMouth, HollowThrone, WailingReach, OriginWound) with chapter metadata
 └── access.rs       # sync_account_zone_unlocks() — account-level zone access synchronization
 ```
 
@@ -66,12 +66,12 @@ Enum returned by `on_boss_defeated()` / `on_boss_defeated_with_cap()`:
 
 ### `FractureRegion` (`fracture.rs`)
 Named fracture chapters, each containing 3-4 zones:
-- `RedFault` (Zones 12-14, unlocked by Deep Layer 3)
-- `MirrorScar` (Zones 15-17, unlocked by Deep Layer 7)
-- `BlackMouth` (Zones 18-20, unlocked by Deep Layer 12)
-- `HollowThrone` (Zones 21-23, unlocked by Deep Layer 18)
-- `WailingReach` (Zones 24-26, unlocked by Deep Layer 25)
-- `OriginWound` (Zones 27-30, unlocked by Deep Layer 30)
+- `RedFault` (Zones 12-14, unlocked by P50 + Deep Layer 3)
+- `MirrorScar` (Zones 15-17, unlocked by P75 + Deep Layer 7)
+- `BlackMouth` (Zones 18-20, unlocked by P100 + Deep Layer 12)
+- `HollowThrone` (Zones 21-23, unlocked by P150 + Deep Layer 18)
+- `WailingReach` (Zones 24-26, unlocked by P200 + Deep Layer 25)
+- `OriginWound` (Zones 27-30, unlocked by P300 + Deep Layer 30)
 
 Methods: `start_zone_id()`, `end_zone_id()`, `unlock_layer()`, `from_layer()`, `unlock_headline()`, `unlock_atmospheric()`, `unlock_mechanical()`, `unlock_log_line()`, `unlock_ticker_text()`
 
@@ -84,13 +84,13 @@ Methods: `start_zone_id()`, `end_zone_id()`, `unlock_layer()`, `from_layer()`, `
 | 3: Elemental Forces | P10 | Volcanic Wastes, Frozen Tundra | 4 each | 55-85 |
 | 4: Hidden Depths | P15 | Crystal Caverns, Sunken Kingdom | 4 each | 85-115 |
 | 5: Ascending | P20 | Floating Isles, Storm Citadel | 4 each | 115-150 |
-| Endgame | StormsEnd achievement | The Expanse (Zone 11) | 4 | 150+ |
-| Ch.1: The Red Fault | Deep Layer 3 | Splintered Rim, Ember Ravine, Heart of the Fault (Z12-14) | 5 each | 165-210 |
-| Ch.2: The Mirror Scar | Deep Layer 7 | Shard Fields, Refraction Steps, Hall of Second Suns (Z15-17) | 5 each | 210-255 |
-| Ch.3: The Black Mouth | Deep Layer 12 | Ashen Verge, Throat of the World, The Black Mouth (Z18-20) | 5 each | 255-300 |
-| Ch.4: The Hollow Throne | Deep Layer 18 | Sunken Processional, The Pale Archive, The Hollow Throne (Z21-23) | 5 each | 300-345 |
-| Ch.5: The Wailing Reach | Deep Layer 25 | The Stillborn Sea, Resonance Fault, The Wailing Reach (Z24-26) | 5 each | 345-390 |
-| Ch.6: The Origin Wound | Deep Layer 30 | The Scar Root, Echoing Abyss, Threshold of Silence, The Origin Wound (Z27-30) | 5 each | 390+ |
+| Endgame | P25 + StormsEnd achievement | The Expanse (Zone 11) | 4 | 150+ |
+| Ch.1: The Red Fault | P50 + Deep Layer 3 | Splintered Rim, Ember Ravine, Heart of the Fault (Z12-14) | 5 each | 165-210 |
+| Ch.2: The Mirror Scar | P75 + Deep Layer 7 | Shard Fields, Refraction Steps, Hall of Second Suns (Z15-17) | 5 each | 210-255 |
+| Ch.3: The Black Mouth | P100 + Deep Layer 12 | Ashen Verge, Throat of the World, The Black Mouth (Z18-20) | 5 each | 255-300 |
+| Ch.4: The Hollow Throne | P150 + Deep Layer 18 | Sunken Processional, The Pale Archive, The Hollow Throne (Z21-23) | 5 each | 300-345 |
+| Ch.5: The Wailing Reach | P200 + Deep Layer 25 | The Stillborn Sea, Resonance Fault, The Wailing Reach (Z24-26) | 5 each | 345-390 |
+| Ch.6: The Origin Wound | P300 + Deep Layer 30 | The Scar Root, Echoing Abyss, Threshold of Silence, The Origin Wound (Z27-30) | 5 each | 390+ |
 
 ## Kill Tracking and Boss Spawn
 
@@ -137,7 +137,7 @@ Zone 10 (Storm Citadel) final boss requires Stormbreaker:
 Infinite endgame zone unlocked by completing Zone 10:
 - `on_boss_defeated()` unlocks `AchievementId::StormsEnd` and zone 11
 - Has 4 subzones that cycle infinitely (`ExpanseCycle` result loops to subzone 1)
-- `prestige_requirement: 0` because access is achievement-gated, not prestige-gated
+- `prestige_requirement: 25` -- dual-gated by StormsEnd achievement AND P25 prestige
 - `max_level: u32::MAX` for unbounded scaling
 - When fracture zones are unlocked (`fracture_zone_cap > 11`), Expanse stops cycling and advances to Zone 12
 
@@ -157,7 +157,7 @@ Nineteen zones across six chapters, unlocked by Deep layer breakthroughs. Enemy 
 - Only the current cap zone cycles (returns `FractureCycle`)
 - All other fracture zones advance forward when their boss is defeated
 - Zone 30 becomes the permanent fracture loop cap
-- `prestige_requirement: 0` for all fracture zones (access managed by `sync_account_zone_unlocks()`)
+- Fracture zones have prestige requirements: P50 (Z12-14), P75 (Z15-17), P100 (Z18-20), P150 (Z21-23), P200 (Z24-26), P300 (Z27-30) — enforced alongside Deep layer gates by `sync_account_zone_unlocks()`
 
 **Boss defeat with cap awareness:** `on_boss_defeated_with_cap(prestige_rank, achievements, fracture_zone_cap)` extends the original `on_boss_defeated()` to handle fracture cycling logic.
 

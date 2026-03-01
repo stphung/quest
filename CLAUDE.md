@@ -93,6 +93,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 - `offline.rs` — Offline XP progression (calculate_offline_xp, process_offline_progression)
 - `recent_drops.rs` — RecentDrop struct and deque management
 - `ticker.rs` — Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
+- `power_rating.rs` — Character power rating (sqrt of DPS x eHP)
 - `constants.rs` — Game balance constants (tick rate, attack intervals, XP rates, item drop rates, zone enemy stats for 30 zones, boss multipliers, prestige combat bonuses, fracture zone scaling, update check jitter)
 
 ### Simulator (`src/bin/simulator.rs`)
@@ -168,13 +169,13 @@ CLI: `--hours N`, `--seed N`, `--strategy STR` (rush/balanced/infrastructure), `
 - P10: Volcanic Wastes, Frozen Tundra (4 subzones each)
 - P15: Crystal Caverns, Sunken Kingdom (4 subzones each)
 - P20: Floating Isles, Storm Citadel (4 subzones each, Zone 10 requires Stormbreaker)
-- Endgame: The Expanse (Zone 11, 4 subzones, cycles infinitely, endgame difficulty wall)
-- Ch.1 The Red Fault: Splintered Rim, Ember Ravine, Heart of the Fault (Z12-14, 5 subzones each, Deep Layer 3)
-- Ch.2 The Mirror Scar: Shard Fields, Refraction Steps, Hall of Second Suns (Z15-17, 5 subzones each, Deep Layer 7)
-- Ch.3 The Black Mouth: Ashen Verge, Throat of the World, The Black Mouth (Z18-20, 5 subzones each, Deep Layer 12)
-- Ch.4 The Hollow Throne: Sunken Processional, The Pale Archive, The Hollow Throne (Z21-23, 5 subzones each, Deep Layer 18)
-- Ch.5 The Wailing Reach: The Stillborn Sea, Resonance Fault, The Wailing Reach (Z24-26, 5 subzones each, Deep Layer 25)
-- Ch.6 The Origin Wound: The Scar Root, Echoing Abyss, Threshold of Silence, The Origin Wound (Z27-30, 5 subzones each, Deep Layer 30)
+- P25 Endgame: The Expanse (Zone 11, 4 subzones, cycles infinitely, endgame difficulty wall)
+- Ch.1 The Red Fault: Splintered Rim, Ember Ravine, Heart of the Fault (Z12-14, 5 subzones each, P50 + Deep Layer 3)
+- Ch.2 The Mirror Scar: Shard Fields, Refraction Steps, Hall of Second Suns (Z15-17, 5 subzones each, P75 + Deep Layer 7)
+- Ch.3 The Black Mouth: Ashen Verge, Throat of the World, The Black Mouth (Z18-20, 5 subzones each, P100 + Deep Layer 12)
+- Ch.4 The Hollow Throne: Sunken Processional, The Pale Archive, The Hollow Throne (Z21-23, 5 subzones each, P150 + Deep Layer 18)
+- Ch.5 The Wailing Reach: The Stillborn Sea, Resonance Fault, The Wailing Reach (Z24-26, 5 subzones each, P200 + Deep Layer 25)
+- Ch.6 The Origin Wound: The Scar Root, Echoing Abyss, Threshold of Silence, The Origin Wound (Z27-30, 5 subzones each, P300 + Deep Layer 30)
 
 ### Dungeon Module (`src/dungeon/`) — [detailed docs](src/dungeon/CLAUDE.md)
 
@@ -235,7 +236,7 @@ Per-character combat power multiplier purchased with prestige ranks, gated by De
 - `persistence.rs` — Save/load from `~/.quest/deep.json`
 - `discovery.rs` — Discovery logic (complete_discovery), starter roster initialisation (3 mercs: Vanguard, Scout, Medic)
 
-An endgame (P15+) system where players recruit and manage a mercenary company, sending squads on long-duration missions (2-24h wall-clock time) into a vast underground structure. Two-tier persistence: `DeepPersistent` (guild rank, cleared layers, infrastructure, `fracture_zone_cap`, `pending_fracture_region_unlock` — survives prestige) and `DeepPrestige` (mercs, missions, Warband Marks — resets on prestige). Five mercenary archetypes (Vanguard, Scout, Arcanist, Medic, Saboteur) with 4 quality tiers. Six layer tiers (Shallows through The Void). Five mission types (Supply Run, Recon, Expedition, Breakthrough, Construction). Four infrastructure types (Outpost, SupplyCache, Watchtower, Bridge). Discovered on first Endless kill (Zone 11 boss) at P15+. Deep layer breakthroughs unlock fracture zones: Layer 3 → Zones 12-14, Layer 7 → Zones 15-17, Layer 12 → Zones 18-20, Layer 18 → Zones 21-23, Layer 25 → Zones 24-26, Layer 30 → Zones 27-30.
+An endgame (P15+) system where players recruit and manage a mercenary company, sending squads on long-duration missions (2-24h wall-clock time) into a vast underground structure. Two-tier persistence: `DeepPersistent` (guild rank, cleared layers, infrastructure, `fracture_zone_cap`, `pending_fracture_region_unlock` — survives prestige) and `DeepPrestige` (mercs, missions, Warband Marks — persists across prestiges). Five mercenary archetypes (Vanguard, Scout, Arcanist, Medic, Saboteur) with 4 quality tiers. Six layer tiers (Shallows through The Void). Five mission types (Supply Run, Recon, Expedition, Breakthrough, Construction). Four infrastructure types (Outpost, SupplyCache, Watchtower, Bridge). Discovered on first Endless kill (Zone 11 boss) at P15+. Deep layer breakthroughs unlock fracture zones: Layer 3 → Zones 12-14, Layer 7 → Zones 15-17, Layer 12 → Zones 18-20, Layer 18 → Zones 21-23, Layer 25 → Zones 24-26, Layer 30 → Zones 27-30.
 
 ### Stormglass Module (`src/stormglass/`)
 
@@ -286,18 +287,18 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 
 ### Achievement Module (`src/achievements/`)
 
-- `types.rs` — AchievementId enum (204 variants), categories, unlock tracking, `selected_title` field
+- `types.rs` — AchievementId enum (207 variants), categories, unlock tracking, `selected_title` field
 - `data.rs` — Achievement database with descriptions and unlock conditions
 - `handlers.rs` — Event handlers (on_enemy_killed, on_boss_killed, on_level_up, etc.) and check_milestones
 - `milestones.rs` — MinigameType, MinigameDifficulty enums, milestone threshold arrays
 - `modal.rs` — Modal notification queue, 500ms accumulation window management
 - `notifications.rs` — Pending notification state, category-based notification counts
 - `stats.rs` — Achievement statistics, unlock percentages, progress queries, category breakdowns, score computation
-- `titles.rs` — Title definitions (50 titles), title selection/validation, maps achievements to display text
+- `titles.rs` — Title definitions (63 titles), title selection/validation, maps achievements to display text
 - `unlock.rs` — Core unlock machinery (is_unlocked, unlock, check_milestones)
 - `persistence.rs` — Save/load from `~/.quest/achievements.json`
 
-Account-level achievement system that persists across characters. 8 categories (Combat, Level, Prestige, Progression, Challenges, Exploration, Deep, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, Soulforge enhancements, Deep milestones (discovery, layers, guild ranks), fracture zone completions (Z12-Z30), and Ascension milestones (I, III, VI). Includes modal notification system with 500ms accumulation window. Includes a title system where 60 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select. Achievement score system: each of the 204 achievements has a point value (7 tiers: 5/10/25/50/100/250/500), computed at runtime. Shown in browser title bar, unlock modal, detail panel, and stats view.
+Account-level achievement system that persists across characters. 8 categories (Combat, Level, Prestige, Progression, Challenges, Exploration, Deep, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, Soulforge enhancements, Deep milestones (discovery, layers, guild ranks), fracture zone completions (Z12-Z30), and Ascension milestones (I, III, VI). Includes modal notification system with 500ms accumulation window. Includes a title system where 63 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select. Achievement score system: each of the 207 achievements has a point value (7 tiers: 5/10/25/50/100/250/500), computed at runtime. Shown in browser title bar, unlock modal, detail panel, and stats view.
 
 ### History / Time Vault (`src/history/`)
 
@@ -343,7 +344,7 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `build_info.rs` — Build metadata (commit, date) embedded at compile time
 - `updater.rs` — Self-update from GitHub releases (30min check interval ±5min jitter)
 - `bug_report.rs` — Bug report generation with game state snapshot
-- `debug_menu.rs` — Debug menu with tabbed categories (Challenges, World, Resources, Items, Deep, Borders) for testing discoveries. Activate with `--debug` flag, toggle with backtick. 29+ options: trigger dungeons, fishing, all 10 challenge types, Haven discovery, Soulforge discovery, Deep discovery, grant Warband Marks, refresh mission/recruit pools, forge god items, grant/discover Stormglass, etch sigils, border styles
+- `debug_menu.rs` — Debug menu with tabbed categories (Challenges, World, Resources, Items, Deep, Zones, Character, Borders) for testing discoveries. Activate with `--debug` flag, toggle with backtick. 87+ options: trigger dungeons, fishing, all 10 challenge types, Haven discovery, Soulforge discovery, Deep discovery, grant Warband Marks, refresh mission/recruit pools, forge god items, grant/discover Stormglass, etch sigils, travel to any zone, set prestige/level, border styles
 
 ### UI (`src/ui/`) — [detailed docs](src/ui/CLAUDE.md)
 
@@ -507,7 +508,15 @@ quest/
 │   │   ├── enemy_spawning.rs # Enemy generation
 │   │   ├── offline.rs       # Offline XP progression
 │   │   ├── recent_drops.rs  # RecentDrop deque management
-│   │   └── ticker.rs        # Scrolling loot ticker
+│   │   ├── ticker.rs        # Scrolling loot ticker
+│   │   ├── power_rating.rs    # Character power rating
+│   │   ├── tick_context.rs    # Tick context helpers
+│   │   ├── game_state_serde.rs # GameState serialization helpers
+│   │   ├── player_identity.rs # Player identity fields
+│   │   ├── combat_context.rs  # Combat context helpers
+│   │   ├── progression_state.rs # Progression state fields
+│   │   ├── session_state.rs   # Session state fields
+│   │   └── discovery_facade.rs # Discovery facade
 │   ├── character/           # Character system [CLAUDE.md]
 │   │   ├── attributes.rs    # 6 RPG attributes
 │   │   ├── derived_stats.rs # Stats from attributes
@@ -670,9 +679,12 @@ quest/
 │       ├── bug_report_scene.rs # Bug report overlay
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (49 test files, 5,642+ tests)
-│   ├── game_loop_orchestration_test.rs  # 36 behavior-locking tests for game_tick
+├── tests/                   # Integration tests (62 test files, 6,506+ tests)
+│   ├── game_loop_orchestration_test.rs  # 42 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
+│   ├── tick_stages_coverage_test.rs     # Tick stages coverage tests
+│   ├── zone_boundary_test.rs            # Zone boundary tests
+│   ├── zone_data_integrity_test.rs      # Zone data integrity tests
 │   ├── zone_progression_test.rs         # Zone advancement tests
 │   └── ...                              # Chess, fishing, dungeon, prestige, items, etc.
 ├── .github/workflows/       # CI/CD pipeline
