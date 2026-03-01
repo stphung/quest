@@ -64,7 +64,7 @@ fn test_deep_initial_frontier_is_layer_1() {
 fn test_deep_ui_state_starts_closed() {
     let ui = DeepUiState::new();
     assert!(!ui.open);
-    assert_eq!(ui.view, DeepView::Hub);
+    assert_eq!(ui.view, DeepView::Infrastructure);
     assert_eq!(ui.selected_index, 0);
     assert!(ui.event_mission_id.is_none());
     assert!(ui.staged_squad.is_empty());
@@ -80,7 +80,7 @@ fn test_deep_ui_open_resets_state() {
     ui.open();
 
     assert!(ui.open);
-    assert_eq!(ui.view, DeepView::Hub);
+    assert_eq!(ui.view, DeepView::Infrastructure);
     assert_eq!(ui.selected_index, 0);
     assert!(ui.staged_squad.is_empty());
 }
@@ -95,7 +95,7 @@ fn test_deep_ui_close_resets_state() {
     ui.close();
 
     assert!(!ui.open);
-    assert_eq!(ui.view, DeepView::Hub);
+    assert_eq!(ui.view, DeepView::Infrastructure);
     assert_eq!(ui.selected_index, 0);
 }
 

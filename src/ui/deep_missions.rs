@@ -191,69 +191,58 @@ fn format_hours(secs: u64) -> String {
     }
 }
 
-/// Format one mission row in fixed columns for the available-missions list.
-fn format_available_mission_row(
+/// Render one available-mission row using fixed column positions for alignment.
+///
+/// Columns (relative to `left`):
+///   cursor(1)  icon(1+sp)  name(variable)  eta  risk  cost
+fn render_mission_row(
+    buffer: &mut [Vec<SceneCell>],
+    row: i32,
+    left: i32,
+    row_width: usize,
     mission: &AvailableMission,
     is_selected: bool,
-    row_width: usize,
-) -> String {
-    let cursor = if is_selected { "\u{25b6} " } else { "  " };
-    let risk_tier = mission.mission_type.risk_tier();
-    let risk = risk_label(risk_tier);
-    let layer = format!("L{}", mission.layer);
+) {
+    let tc = mission_type_color(mission.mission_type);
+    let rt = mission.mission_type.risk_tier();
+
+    // Fixed column positions (computed from right edge for alignment)
+    let col_cursor = left;
+    let col_icon = left + 2;
+    let col_name = left + 4;
+    // Cost column: "Free" (4) or "NNN WM" (max ~7). Allocate 7 chars from right edge.
+    let col_cost = (left + row_width as i32 - 8).max(col_name + 12);
+    // Risk column: "Safe"/"Low"/"Med"/"High" — 4 chars, just left of cost
+    let col_risk = (col_cost - 6).max(col_name + 8);
+    // ETA column: "2h"/"10h"/"2h 5m" — up to 6 chars, just left of risk
+    let col_eta = (col_risk - 7).max(col_name + 4);
+    let max_name_chars = (col_eta - col_name - 1).max(4) as usize;
+
+    // Cursor
+    if is_selected {
+        put_text(buffer, row, col_cursor, ">", Color::Cyan);
+    }
+    // Risk icon (colored independently)
+    put_text(buffer, row, col_icon, risk_icon(rt), risk_color(rt));
+    // Type name
+    let type_name = mission_type_label(mission.mission_type);
+    let name_display = truncate_text(&type_name, max_name_chars);
+    put_text(buffer, row, col_name, &name_display, tc);
+    // ETA (right-aligned in column)
     let eta = format_hours(mission.duration_secs);
-    let cost = if mission.marks_cost > 0 {
-        format!("{} Warband Marks", mission.marks_cost)
+    let eta_col = col_eta + (6 - eta.len() as i32).max(0);
+    put_text(buffer, row, eta_col, &eta, Color::DarkGray);
+    // Risk label
+    let risk = risk_label(rt);
+    put_text(buffer, row, col_risk, risk, risk_color(rt));
+    // Cost
+    let cost_str = if mission.marks_cost > 0 {
+        format!("{} WM", mission.marks_cost)
     } else {
         "Free".to_string()
     };
-
-    let layer_w = 4usize;
-    let eta_w = 8usize;
-    let risk_w = 6usize;
-    let cost_w = cost.chars().count().max(16);
-    let prefix = format!("{}{} ", cursor, risk_icon(risk_tier));
-    let prefix_w = prefix.chars().count();
-    let fixed = prefix_w + layer_w + eta_w + risk_w + cost_w + 4;
-
-    // Fallback for narrow layouts: preserve full cost text and fit row width.
-    // Compact columns: icon + name + layer + eta + cost (risk label omitted).
-    let compact_fixed =
-        prefix_w + 1 + layer.chars().count() + 1 + eta.chars().count() + 1 + cost.chars().count();
-    if row_width <= fixed + 8 {
-        if row_width <= compact_fixed {
-            return truncate_text(&format!("{}{} {} {}", prefix, layer, eta, cost), row_width);
-        }
-        let name_w = row_width - compact_fixed;
-        let type_name = truncate_text(&mission_type_label(mission.mission_type), name_w);
-        return format!(
-            "{}{:name_w$} {} {} {}",
-            prefix,
-            type_name,
-            layer,
-            eta,
-            cost,
-            name_w = name_w
-        );
-    }
-
-    let name_w = row_width.saturating_sub(fixed).max(10);
-    let type_name = truncate_text(&mission_type_label(mission.mission_type), name_w);
-
-    format!(
-        "{}{:name_w$} {:>layer_w$} {:>eta_w$} {:<risk_w$} {:>cost_w$}",
-        prefix,
-        type_name,
-        layer,
-        eta,
-        risk,
-        cost,
-        name_w = name_w,
-        layer_w = layer_w,
-        eta_w = eta_w,
-        risk_w = risk_w,
-        cost_w = cost_w,
-    )
+    let cost_col = col_cost + (7 - cost_str.len() as i32).max(0);
+    put_text(buffer, row, cost_col, &cost_str, MARKS_COLOR);
 }
 
 /// Render a block-character progress bar.
@@ -331,159 +320,6 @@ fn draw_panel_outline(
     put_cell(buffer, bottom, right, '\u{2518}', color);
 }
 
-/// Hub timeline strip: next completion, pending events, recruit refresh.
-fn render_hub_timeline_strip(
-    buffer: &mut [Vec<SceneCell>],
-    width: usize,
-    row: i32,
-    deep: &DeepState,
-    now: chrono::DateTime<Utc>,
-) -> i32 {
-    if width < 52 || row + 3 >= buffer.len() as i32 {
-        return row;
-    }
-
-    let left = 1i32;
-    let right = width as i32 - 2;
-    let top = row;
-    let bottom = row + 3;
-    draw_deep_card(
-        buffer,
-        left,
-        top,
-        right,
-        bottom,
-        Color::Rgb(72, 136, 198),
-        Color::Rgb(6, 13, 26),
-        Some("COMMAND DECK"),
-    );
-
-    let next_completion = deep
-        .prestige
-        .active_missions
-        .iter()
-        .map(|m| (m.ends_at - now).num_seconds().max(0) as u64)
-        .min();
-    let next_str = next_completion
-        .map(|secs| {
-            if secs == 0 {
-                "resolving".to_string()
-            } else {
-                format!("~{}", format_hours(secs))
-            }
-        })
-        .unwrap_or_else(|| "idle".to_string());
-
-    let pending_events = deep
-        .prestige
-        .active_missions
-        .iter()
-        .filter(|m| m.has_pending_event())
-        .count();
-    let events_str = if pending_events > 0 {
-        format!(
-            "{} ping{}",
-            pending_events,
-            if pending_events == 1 { "" } else { "s" }
-        )
-    } else {
-        "clear".to_string()
-    };
-
-    let refresh_secs =
-        (deep.prestige.recruit_pool.refreshed_at + chrono::Duration::hours(24) - now).num_seconds();
-    let recruit_str = if refresh_secs <= 0 {
-        "ready".to_string()
-    } else {
-        format_hours(refresh_secs as u64)
-    };
-
-    let active_count = deep.prestige.active_mission_count();
-    let max_concurrent = crate::deep::effective_concurrent_missions(
-        deep.persistent.guild_rank,
-        deep.persistent.deepest_layer_reached,
-    ) as usize;
-    let ready_mercs = deep
-        .prestige
-        .roster
-        .iter()
-        .filter(|m| matches!(m.status, MercStatus::Available))
-        .count();
-    let injured_mercs = deep
-        .prestige
-        .roster
-        .iter()
-        .filter(|m| matches!(m.status, MercStatus::Injured { .. }))
-        .count();
-
-    let line1 = format!(
-        "[OPS] {}/{} live   [EVENT] {}   [NEXT] {}",
-        active_count, max_concurrent, events_str, next_str
-    );
-    let line2 = format!(
-        "[CREW] {} ready / {} injured   [RECRUIT] {}",
-        ready_mercs, injured_mercs, recruit_str
-    );
-
-    let inner_w = (right - left - 2).max(1) as usize;
-    let line1 = truncate_text(&line1, inner_w);
-    let line2 = truncate_text(&line2, inner_w);
-    put_text(buffer, top + 1, left + 1, &line1, Color::White);
-    put_text(buffer, top + 2, left + 1, &line2, Color::Rgb(140, 165, 190));
-
-    if let Some(pos) = line1.find("[OPS]") {
-        put_text(
-            buffer,
-            top + 1,
-            left + 1 + pos as i32,
-            "[OPS]",
-            Color::Rgb(95, 175, 235),
-        );
-    }
-    if let Some(pos) = line1.find("[EVENT]") {
-        put_text(
-            buffer,
-            top + 1,
-            left + 1 + pos as i32,
-            "[EVENT]",
-            if pending_events > 0 {
-                Color::Yellow
-            } else {
-                Color::Green
-            },
-        );
-    }
-    if let Some(pos) = line1.find("[NEXT]") {
-        put_text(
-            buffer,
-            top + 1,
-            left + 1 + pos as i32,
-            "[NEXT]",
-            Color::Cyan,
-        );
-    }
-    if let Some(pos) = line2.find("[CREW]") {
-        put_text(
-            buffer,
-            top + 2,
-            left + 1 + pos as i32,
-            "[CREW]",
-            Color::Rgb(100, 200, 130),
-        );
-    }
-    if let Some(pos) = line2.find("[RECRUIT]") {
-        put_text(
-            buffer,
-            top + 2,
-            left + 1 + pos as i32,
-            "[RECRUIT]",
-            Color::Rgb(180, 160, 100),
-        );
-    }
-
-    top + 4
-}
-
 // ── Compact Hub (S-tier) ─────────────────────────────────────────────────────
 
 /// Render a compact hub for S-tier (small) terminals.
@@ -544,113 +380,67 @@ fn render_compact_hub(
     put_text(buffer, row, 1, &sep, Color::DarkGray);
     row += 1;
 
-    // Completed missions first (matches full Hub ordering)
-    for mission in &deep.prestige.pending_results {
-        if row >= height as i32 - 1 {
-            break;
-        }
-        let type_label = mission_type_label(mission.mission_type);
-        let callsign = mission_callsign(mission);
-        let line = format!(
-            "\u{2713} {} {} L{}  COMPLETE",
-            callsign, type_label, mission.layer
-        );
-        put_text(buffer, row, 1, &line, Color::Green);
-        row += 1;
-    }
-
-    // Active missions (compact), sorted by urgency then ETA.
-    let now = Utc::now();
-    let mut display_order: Vec<(usize, bool, u64)> = deep
-        .prestige
-        .active_missions
-        .iter()
-        .enumerate()
-        .map(|(i, m)| {
-            let has_event = m.has_pending_event();
-            let remaining = (m.ends_at - now).num_seconds().max(0) as u64;
-            (i, has_event, remaining)
-        })
-        .collect();
-    display_order.sort_by(|a, b| b.1.cmp(&a.1).then(a.2.cmp(&b.2)));
-
-    for (priority, &(idx, _, _)) in display_order.iter().enumerate() {
-        if row >= height as i32 - 1 {
-            break;
-        }
-        let mission = &deep.prestige.active_missions[idx];
-        let type_label = match mission.mission_type {
-            MissionType::SupplyRun => "Supply",
-            MissionType::Recon => "Recon",
-            MissionType::Expedition => "Exped",
-            MissionType::Breakthrough => "Break",
-            MissionType::GatewayExpedition => "Gate",
-            MissionType::Construction(_) => "Build",
-        };
-        let callsign = mission_callsign(mission);
-        let remaining = (mission.ends_at - now).num_seconds().max(0) as u64;
-        let h = remaining / 3600;
-        let m = (remaining % 3600) / 60;
-        let (urgency, _) = mission_urgency_badge(mission, remaining);
-        let evt = if mission.has_pending_event() {
-            " [evt!]"
-        } else {
-            ""
-        };
-        let line = format!(
-            ">P{} {} {} L{}  {}h {:02}m {}{}",
-            priority + 1,
-            callsign,
-            type_label,
-            mission.layer,
-            h,
-            m,
-            urgency,
-            evt
-        );
-        let color = if mission.has_pending_event() {
-            Color::Yellow
-        } else {
-            Color::Cyan
-        };
-        put_text(buffer, row, 1, &line, color);
-        row += 1;
-    }
-
-    if deep.prestige.active_missions.is_empty() && deep.prestige.pending_results.is_empty() {
-        put_text(buffer, row, 1, "  No active missions.", Color::DarkGray);
-        row += 1;
-
-        // Show warband log if available
-        let log = &deep.prestige.warband_log;
-        if !log.is_empty() && row < height as i32 - 2 {
-            for entry in log.iter().rev().take(3) {
-                if row >= height as i32 - 1 {
-                    break;
-                }
-                let (icon, color) = match entry.outcome {
-                    crate::deep::MissionOutcome::Success => ("\u{2713}", Color::Green),
-                    crate::deep::MissionOutcome::PartialSuccess => ("\u{25cb}", Color::Yellow),
-                    crate::deep::MissionOutcome::Failure => ("\u{2717}", Color::LightRed),
-                };
-                let line = format!(
-                    "{} L{} {} {}M",
-                    icon, entry.layer, entry.mission_name, entry.marks_earned
-                );
-                put_text(buffer, row, 1, &line, color);
-                row += 1;
+    // Roster (compact)
+    let roster = &deep.prestige.roster;
+    if roster.is_empty() {
+        put_text(buffer, row, 1, "  No mercs yet.", Color::DarkGray);
+    } else {
+        for (i, merc) in roster.iter().enumerate() {
+            if row >= height as i32 - 1 {
+                break;
             }
-        }
-
-        // First-visit hint
-        if ui.hub_visit_count <= 1 && log.is_empty() && row < height as i32 - 1 {
-            put_text(
-                buffer,
-                row,
-                1,
-                "Start with a Supply Run (free).",
-                Color::Rgb(50, 80, 110),
+            if matches!(merc.status, MercStatus::Lost) {
+                continue;
+            }
+            let is_selected = ui.selected_index == i;
+            let arch_abbr = super::deep_roster::archetype_abbrev(merc.archetype);
+            let status = match &merc.status {
+                MercStatus::Available => "Rdy",
+                MercStatus::OnMission(_) => "Msn",
+                MercStatus::Injured { .. } => "Inj",
+                MercStatus::Lost => "Lost",
+            };
+            let cursor = if is_selected { ">" } else { " " };
+            let line = format!(
+                "{} {} [{}] L{}  {}",
+                cursor, merc.name, arch_abbr, merc.level, status
             );
+            let max_len = width.saturating_sub(1);
+            let display: String = if line.chars().count() > max_len {
+                line.chars().take(max_len).collect()
+            } else {
+                line
+            };
+            let color = if is_selected {
+                Color::Cyan
+            } else {
+                Color::White
+            };
+            put_text(buffer, row, 1, &display, color);
+            row += 1;
+        }
+    }
+
+    // Warband log (compact, if space)
+    let log = &deep.prestige.warband_log;
+    if !log.is_empty() && row < height as i32 - 2 {
+        put_text(buffer, row, 1, &sep, Color::DarkGray);
+        row += 1;
+        for entry in log.iter().rev().take(3) {
+            if row >= height as i32 - 1 {
+                break;
+            }
+            let (icon, color) = match entry.outcome {
+                crate::deep::MissionOutcome::Success => ("\u{2713}", Color::Green),
+                crate::deep::MissionOutcome::PartialSuccess => ("\u{25cb}", Color::Yellow),
+                crate::deep::MissionOutcome::Failure => ("\u{2717}", Color::LightRed),
+            };
+            let line = format!(
+                "{} L{} {} {}M",
+                icon, entry.layer, entry.mission_name, entry.marks_earned
+            );
+            put_text(buffer, row, 1, &line, color);
+            row += 1;
         }
     }
 
@@ -659,14 +449,14 @@ fn render_compact_hub(
         buffer,
         height as i32 - 1,
         1,
-        "[Tab] Switch View  [?] Help",
+        "[\u{2190}/\u{2192}] Switch View  [?] Help",
         SECTION_LABEL_COLOR,
     );
 }
 
 // ── Hub view ──────────────────────────────────────────────────────────────────
 
-/// Render the main Hub view.
+/// Render the main Hub view (Status tab) with Roster/Recruit sub-tabs.
 pub(super) fn render_hub(
     buffer: &mut [Vec<SceneCell>],
     width: usize,
@@ -684,242 +474,123 @@ pub(super) fn render_hub(
         return;
     }
 
-    let now = Utc::now();
-    let rank = deep.persistent.guild_rank;
-    let marks = deep.prestige.warband_marks;
-    let roster_count = deep.prestige.roster.len();
-    let max_roster = rank.max_roster() as usize;
-    let active_count = deep.prestige.active_mission_count() as u32;
-    let max_concurrent =
-        crate::deep::effective_concurrent_missions(rank, deep.persistent.deepest_layer_reached);
-    let frontier = deep.persistent.frontier_layer();
-    let deepest = deep.persistent.deepest_layer_reached;
-    let is_compact = ctx.tier <= SizeTier::S;
+    // ── Sub-tab strip: Roster / Recruit ──
+    let roster = &deep.prestige.roster;
+    let max_roster = deep.persistent.guild_rank.max_roster() as usize;
+    let live_count = roster
+        .iter()
+        .filter(|m| !matches!(m.status, MercStatus::Lost))
+        .count();
+    let pool_count = deep.prestige.recruit_pool.candidates.len();
 
-    // ── Guild Status Block ──
-    let mut header_row = 0i32;
+    let roster_label = format!("Roster ({}/{})", live_count, max_roster);
+    let recruit_label = format!("Recruit ({})", pool_count);
 
-    let generation = deep.prestige.generation_number;
-
-    if is_compact {
-        // Compact: 2-row guild block
-        let marks_str = format!("\u{25c6}{}M", marks);
-        let gen_str = if generation > 1 {
-            format!("  Gen {}", generation)
-        } else {
-            String::new()
-        };
-        let line = format!(
-            "Rank {} {}  {}/{}  {}/{}  {}{}",
-            rank.0,
-            rank.display_name(),
-            roster_count,
-            max_roster,
-            active_count,
-            max_concurrent,
-            marks_str,
-            gen_str,
-        );
-        put_text(buffer, header_row, 1, &line, Color::White);
-        // Recolor marks in amber
-        if let Some(pos) = line.find('\u{25c6}') {
-            put_text(buffer, header_row, 1 + pos as i32, &marks_str, MARKS_COLOR);
-        }
-        header_row += 1;
-
-        let frontier_tier = crate::deep::LayerTier::from_layer(frontier);
-        put_text(
-            buffer,
-            header_row,
-            1,
-            &format!("Frontier: L{} {}", frontier, frontier_tier.display_name()),
-            Color::DarkGray,
-        );
-        header_row += 1;
+    let col_start = 2i32;
+    let roster_color = if !ui.status_show_recruit {
+        Color::Rgb(120, 200, 255)
     } else {
-        // Full: 4-row guild block
-        let gen_label = if generation > 1 {
-            format!("GUILD STATUS  \u{2014}  Generation {}", generation)
-        } else {
-            "GUILD STATUS".to_string()
-        };
-        put_text(buffer, header_row, 1, &gen_label, SECTION_LABEL_COLOR);
-        header_row += 1;
+        Color::Rgb(60, 80, 110)
+    };
+    let recruit_col = col_start + roster_label.len() as i32 + 4;
+    let recruit_color = if ui.status_show_recruit {
+        Color::Rgb(120, 200, 255)
+    } else {
+        Color::Rgb(60, 80, 110)
+    };
 
-        // Row 1: Rank + key stats + marks (with goal hint)
-        let marks_str = format!("\u{25c6} {} Marks", marks);
-        let rank_line = format!(
-            "Rank {} \u{2014} {}    Mercs: {}/{}   Missions: {}/{}   {}",
-            rank.0,
-            rank.display_name(),
-            roster_count,
-            max_roster,
-            active_count,
-            max_concurrent,
-            marks_str,
-        );
-        put_text(buffer, header_row, 1, &rank_line, Color::White);
-        // Recolor marks in amber
-        if let Some(pos) = rank_line.find('\u{25c6}') {
-            put_text(buffer, header_row, 1 + pos as i32, &marks_str, MARKS_COLOR);
-        }
-        header_row += 1;
+    put_text(buffer, 0, col_start, &roster_label, roster_color);
+    put_text(buffer, 0, recruit_col, &recruit_label, recruit_color);
 
-        // Row 2: Frontier info
-        let frontier_tier = crate::deep::LayerTier::from_layer(frontier);
+    // Thick underline under selected sub-tab
+    if !ui.status_show_recruit {
+        let underline: String = "\u{2501}".repeat(roster_label.len());
+        put_text(buffer, 1, col_start, &underline, Color::Rgb(120, 200, 255));
+    } else {
+        let underline: String = "\u{2501}".repeat(recruit_label.len());
         put_text(
             buffer,
-            header_row,
             1,
-            &format!(
-                "Frontier: Layer {} ({})   Deepest: Layer {}",
-                frontier,
-                frontier_tier.display_name(),
-                deepest.max(1),
-            ),
-            Color::DarkGray,
+            recruit_col,
+            &underline,
+            Color::Rgb(120, 200, 255),
         );
-        header_row += 1;
+    }
 
-        // Row 2b: Readiness indicator
-        let avail_mercs = deep
-            .prestige
-            .roster
-            .iter()
-            .filter(|m| matches!(m.status, MercStatus::Available))
-            .count();
-        let injured_mercs = deep
-            .prestige
-            .roster
-            .iter()
-            .filter(|m| matches!(m.status, MercStatus::Injured { .. }))
-            .count();
-        let deployed_mercs = deep
-            .prestige
-            .roster
-            .iter()
-            .filter(|m| matches!(m.status, MercStatus::OnMission(_)))
-            .count();
-        let mut readiness_col = 1i32;
-        let ready_str = format!("Ready: {}", avail_mercs);
-        let ready_color = if avail_mercs > 0 {
-            Color::Green
-        } else {
-            Color::LightRed
-        };
-        put_text(buffer, header_row, readiness_col, &ready_str, ready_color);
-        readiness_col += ready_str.len() as i32 + 3;
-        if injured_mercs > 0 {
-            let inj_str = format!("Injured: {}", injured_mercs);
-            put_text(buffer, header_row, readiness_col, &inj_str, Color::Yellow);
-            readiness_col += inj_str.len() as i32 + 3;
-        }
-        if deployed_mercs > 0 {
-            let dep_str = format!("Deployed: {}", deployed_mercs);
-            put_text(buffer, header_row, readiness_col, &dep_str, Color::Cyan);
-        }
-        header_row += 1;
-
-        // Row 3: Inheritance message (only if generation > 1)
-        if generation > 1 {
-            let cleared_count = deep.persistent.layers.iter().filter(|l| l.cleared).count();
-            let infra_count: usize = deep
-                .persistent
-                .layers
-                .iter()
-                .map(|l| l.infrastructure.len())
-                .sum();
-            if cleared_count > 0 || infra_count > 0 {
-                put_text(
-                    buffer,
-                    header_row,
-                    1,
-                    &format!(
-                        "Your predecessors cleared {} layers and built {} structures. Their work endures.",
-                        cleared_count, infra_count,
-                    ),
-                    Color::Rgb(50, 80, 110),
-                );
-                header_row += 1;
-            }
-        }
-
-        // Row 4: Guild rank progress bar (visual advancement tracker)
-        if rank.can_advance() {
-            if let Some(next) = rank.next() {
-                if let Some(needed_layer) = next.required_breakthrough_layer() {
-                    // Header: "GUILD RANK  CurrentRank → NextRank"
-                    let rank_header = format!(
-                        "GUILD RANK  {} \u{2192} {}",
-                        rank.display_name(),
-                        next.display_name()
-                    );
-                    put_text(buffer, header_row, 1, &rank_header, SECTION_LABEL_COLOR);
-                    // Recolor current rank white, arrow and next rank in section color
-                    put_text(
-                        buffer,
-                        header_row,
-                        "GUILD RANK  ".len() as i32 + 1,
-                        rank.display_name(),
-                        Color::White,
-                    );
-                    header_row += 1;
-
-                    // Progress bar: "Need: Layer X Breakthrough   ████░░░░ LY/LX"
-                    let label = format!("Need: Layer {} Breakthrough   ", needed_layer);
-                    put_text(buffer, header_row, 1, &label, Color::Rgb(80, 120, 80));
-                    let bar_col = 1 + label.len() as i32;
-                    let suffix = format!(" L{}/{}", deepest.max(1), needed_layer);
-                    let bar_width =
-                        (width as i32 - bar_col - suffix.len() as i32 - 2).max(6) as usize;
-                    let progress_ratio =
-                        (deepest.max(1) as f64 / needed_layer as f64).clamp(0.0, 1.0);
-                    let bar_color = if progress_ratio >= 1.0 {
-                        Color::Green
-                    } else {
-                        Color::Cyan
-                    };
-                    render_progress_bar(
-                        buffer,
-                        header_row,
-                        bar_col,
-                        bar_width,
-                        progress_ratio,
-                        bar_color,
-                    );
-                    put_text(
-                        buffer,
-                        header_row,
-                        bar_col + bar_width as i32,
-                        &suffix,
-                        Color::DarkGray,
-                    );
-                    header_row += 1;
-                }
-            }
-        } else {
-            // Max rank reached
-            put_text(
-                buffer,
-                header_row,
-                1,
-                &format!("GUILD RANK  {} \u{2014} MAX", rank.display_name()),
-                Color::Rgb(255, 215, 0),
-            );
-            header_row += 1;
-        }
-
-        // Timeline strip for scannable operational context.
-        if header_row + 4 < height as i32 - 6 {
-            header_row = render_hub_timeline_strip(buffer, width, header_row, deep, now);
+    // Separator below sub-tabs
+    let sep_color = Color::Rgb(28, 49, 74);
+    for c in 1i32..(width as i32 - 1) {
+        if buffer.len() > 2 {
+            put_cell(buffer, 2, c, '\u{2500}', sep_color);
         }
     }
 
+    // ── Flash message ──
+    if let Some(msg) = &ui.flash_message {
+        put_text(buffer, height as i32 - 2, 1, msg, Color::LightRed);
+    }
+
+    // ── Footer ──
+    let footer = if ui.status_show_recruit {
+        match ctx.tier {
+            SizeTier::S => {
+                "[\u{2190}/\u{2192}]Switch  [\u{2191}/\u{2193}]Nav  [Enter]Recruit  [Tab]Toggle  [Esc]Close"
+            }
+            _ => {
+                "[\u{2190}/\u{2192}] Switch View  [\u{2191}/\u{2193}] Navigate  [Enter] Recruit  [Tab] Switch  [Esc] Close"
+            }
+        }
+    } else {
+        match ctx.tier {
+            SizeTier::S => "[\u{2190}/\u{2192}]Switch  [\u{2191}/\u{2193}]Nav  [G]Rank  [Tab]Toggle  [Esc]Close",
+            _ => "[\u{2190}/\u{2192}] Switch View  [\u{2191}/\u{2193}] Navigate  [G] Guild Rank  [Tab] Switch  [Esc] Close",
+        }
+    };
+    put_text(buffer, height as i32 - 1, 1, footer, Color::DarkGray);
+    let help_hint = "[?] Help";
+    let help_col = (width as i32 - help_hint.len() as i32 - 1).max(footer.len() as i32 + 2);
+    put_text(
+        buffer,
+        height as i32 - 1,
+        help_col,
+        help_hint,
+        Color::Rgb(50, 70, 100),
+    );
+
+    let content_top = 3i32; // after sub-tab labels + underline + separator
+    let content_height = height.saturating_sub(4); // minus sub-tab header (3) and footer (1)
+
+    if ui.status_show_recruit {
+        // ── Recruit sub-view ──
+        if content_height > 0 {
+            super::deep_roster::render_recruit(
+                &mut buffer[3..],
+                width,
+                content_height,
+                deep,
+                ui,
+                ctx,
+            );
+        }
+    } else {
+        // ── Roster sub-view (default) ──
+        render_hub_roster(buffer, width, height, deep, ui, ctx, content_top);
+    }
+}
+
+/// Render the roster content within the Status tab (below the sub-tab header).
+fn render_hub_roster(
+    buffer: &mut [Vec<SceneCell>],
+    width: usize,
+    height: usize,
+    deep: &DeepState,
+    ui: &DeepUiState,
+    _ctx: &LayoutContext,
+    content_top: i32,
+) {
     // ── Prestige cycle hint (first visit only) ──
+    let mut header_row = content_top;
     if ui.hub_visit_count <= 1 {
-        let sep: String = "\u{2500}".repeat(width.saturating_sub(2));
-        put_text(buffer, header_row, 1, &sep, Color::Rgb(40, 60, 80));
-        header_row += 1;
         put_text(
             buffer,
             header_row,
@@ -930,511 +601,157 @@ pub(super) fn render_hub(
         header_row += 1;
     }
 
-    // ── Separator ──
-    let sep: String = "\u{2500}".repeat(width.saturating_sub(2));
-    put_text(buffer, header_row, 1, &sep, Color::Rgb(40, 60, 80));
-    header_row += 1;
+    // ── Roster list ──
+    let roster_bottom = height as i32 - 2; // leave 2 rows for flash + footer
+    let mut row = header_row;
 
-    // ── Active missions list ──
-    let missions_top = header_row;
-    let missions_bottom = height as i32 - 1; // leave 1 row for footer
+    let roster = &deep.prestige.roster;
 
-    let active = &deep.prestige.active_missions;
-    let completed = &deep.prestige.pending_results;
+    if roster.is_empty() {
+        put_text_centered(
+            buffer,
+            row + 2,
+            width,
+            "No mercenaries yet. [Tab] to switch to Recruit view.",
+            Color::Rgb(60, 80, 110),
+        );
+    } else {
+        // Spacious column layout — full names, full class names
+        let col_cursor = 1i32;
+        let col_glyph = 4i32;
+        let col_name = 6i32;
+        let col_class = 28i32;
+        let col_lv = 39i32;
+        let col_pwr = 43i32;
+        let col_res = 48i32;
+        let col_status = 53i32;
+        let max_name_chars = (col_class - col_name - 1) as usize;
 
-    let mut missions_end_row = missions_top;
-    if active.is_empty() && completed.is_empty() {
-        // No active missions — show warband log or atmospheric text
-        let log = &deep.prestige.warband_log;
-        if !log.is_empty() {
-            // Show last 5 warband log entries
-            let sep: String = "\u{2500}".repeat(width.saturating_sub(2));
-            put_text(buffer, missions_end_row, 1, &sep, Color::Rgb(40, 60, 80));
-            missions_end_row += 1;
+        put_text(buffer, row, col_name, "Name", Color::DarkGray);
+        put_text(buffer, row, col_class, "Class", Color::DarkGray);
+        put_text(buffer, row, col_lv, "Lv", Color::DarkGray);
+        put_text(buffer, row, col_pwr, "Pwr", Color::DarkGray);
+        put_text(buffer, row, col_res, "Res", Color::DarkGray);
+        put_text(buffer, row, col_status, "Status", Color::DarkGray);
+        row += 1;
+
+        for (i, merc) in roster.iter().enumerate() {
+            if row >= roster_bottom - 6 {
+                break;
+            }
+            if matches!(merc.status, MercStatus::Lost) {
+                continue;
+            }
+            let is_selected = ui.selected_index == i;
+            let (q_glyph, q_color) = super::deep_roster::quality_glyph(merc);
+            let class_name = merc.archetype.display_name();
+            let (status_label, status_color) = match &merc.status {
+                MercStatus::Available => ("Ready", Color::Green),
+                MercStatus::OnMission(_) => ("On Mission", Color::Cyan),
+                MercStatus::Injured {
+                    missions_remaining, ..
+                } => super::deep_roster::injury_severity_display(*missions_remaining),
+                MercStatus::Lost => ("Lost", Color::Red),
+            };
+
+            if is_selected {
+                for c in 1..width.saturating_sub(1) {
+                    if (row as usize) < buffer.len() && c < buffer[row as usize].len() {
+                        buffer[row as usize][c].bg = Color::Rgb(16, 28, 46);
+                    }
+                }
+            }
+
+            if is_selected {
+                put_text(buffer, row, col_cursor, ">", Color::Cyan);
+            }
+            put_cell(buffer, row, col_glyph, q_glyph, q_color);
+            let name_display: String = merc.name.chars().take(max_name_chars).collect();
+            put_text(buffer, row, col_name, &name_display, Color::White);
             put_text(
                 buffer,
-                missions_end_row,
-                1,
-                "WARBAND LOG",
-                SECTION_LABEL_COLOR,
+                row,
+                col_class,
+                class_name,
+                archetype_color(merc.archetype),
             );
-            missions_end_row += 1;
-            for entry in log.iter().rev().take(5) {
-                if missions_end_row >= missions_bottom {
-                    break;
-                }
-                let (icon, color) = match entry.outcome {
-                    crate::deep::MissionOutcome::Success => ("\u{2713}", Color::Green),
-                    crate::deep::MissionOutcome::PartialSuccess => ("\u{25cb}", Color::Yellow),
-                    crate::deep::MissionOutcome::Failure => ("\u{2717}", Color::LightRed),
-                };
-                let line = format!(
-                    "{} Layer {} \u{2014} {} \u{2014} {} Marks",
-                    icon, entry.layer, entry.mission_name, entry.marks_earned
-                );
-                put_text(buffer, missions_end_row, 1, &line, color);
-                missions_end_row += 1;
-            }
-        }
-
-        // Atmospheric text when no missions and no log, or below log if space remains
-        let remaining_space = (missions_bottom - missions_end_row).max(0) as usize;
-        if remaining_space >= 3 {
-            let millis = super::scene_fx::current_millis();
-            let atmosphere_messages = if deep.persistent.gateway_opened {
-                // Permanent post-gateway message
-                &[
-                    "The Gateway stands open. The Wellspring waits.",
-                    "The Wellspring has seen this before. It is patient.",
-                    "What waits below the Wellspring is not a reward. It is an answer.",
-                    "Your predecessors went as far as this. You have gone further.",
-                ][..]
-            } else {
-                tier_atmosphere_messages(deep.persistent.frontier_layer())
-            };
-            let msg_idx = (millis / 8000) as usize % atmosphere_messages.len();
-            let atmo_row = if log.is_empty() {
-                missions_top + remaining_space as i32 / 2
-            } else {
-                missions_end_row + 1
-            };
-            if atmo_row < missions_bottom {
-                let atmo_color = if deep.persistent.gateway_opened {
-                    Color::Rgb(255, 215, 0) // Gold for gateway
-                } else {
-                    Color::Rgb(40, 60, 90)
-                };
-                put_text_centered(
-                    buffer,
-                    atmo_row,
-                    width,
-                    atmosphere_messages[msg_idx],
-                    atmo_color,
-                );
-            }
-        }
-
-        // ── Actionable empty state panel ──
-        let remaining_for_actions = (missions_bottom - missions_end_row).max(0) as usize;
-        if remaining_for_actions >= 3 {
-            let mut action_row = missions_end_row + 1;
-
-            // Check if all mercs are injured and no missions active
-            let all_injured = !deep.prestige.roster.is_empty()
-                && deep
-                    .prestige
-                    .roster
-                    .iter()
-                    .all(|m| matches!(m.status, MercStatus::Injured { .. }))
-                && deep.prestige.active_missions.is_empty();
-
-            if all_injured {
-                put_text(
-                    buffer,
-                    action_row,
-                    3,
-                    "Your mercs are recovering. They'll be ready after the next mission resolves.",
-                    Color::Rgb(80, 80, 120),
-                );
-                action_row += 2;
-            }
-
-            if marks == 0 && action_row < missions_bottom {
-                put_text(
-                    buffer,
-                    action_row,
-                    3,
-                    "Supply Runs are free \u{2014} start there.",
-                    Color::Rgb(40, 80, 50),
-                );
-            }
-        }
-    } else {
-        let millis = current_millis();
-        let mut row = missions_top;
-
-        // ── Completed missions section ──
-        if !completed.is_empty() {
-            render_section_rule(buffer, row, width, "COMPLETED", Some(completed.len()));
-            row += 1;
-
-            for (completed_idx, mission) in completed.iter().enumerate() {
-                if row + 1 >= missions_bottom {
-                    break;
-                }
-                let tc = mission_type_color(mission.mission_type);
-                let type_name = mission_type_label(mission.mission_type);
-                let callsign = mission_callsign(mission);
-                let tier_name = crate::deep::LayerTier::from_layer(mission.layer).display_name();
-                let is_selected = ui.selected_index == completed_idx;
-                let reward_marks = mission
-                    .result
-                    .as_ref()
-                    .map(|r| r.marks_earned)
-                    .unwrap_or_default();
-                let card_left = 1i32;
-                let card_right = (width as i32 - 2).max(card_left + 4);
-                let card_top = row;
-                let card_bottom = row + 1;
-                tint_panel_background(
-                    buffer,
-                    card_left,
-                    card_top,
-                    card_right,
-                    card_bottom,
-                    if is_selected {
-                        Color::Rgb(16, 34, 24)
-                    } else {
-                        Color::Rgb(8, 18, 14)
-                    },
-                );
-                draw_panel_outline(
-                    buffer,
-                    card_left,
-                    card_top,
-                    card_right,
-                    card_bottom,
-                    if is_selected {
-                        Color::Rgb(95, 175, 235)
-                    } else {
-                        Color::Rgb(56, 98, 74)
-                    },
-                );
-                let line_col = card_left + 2;
-
-                // [✓] Callsign + mission identity      COLLECT -> [Enter]
-                let glyph = "[\u{2713}] ";
-                put_text(buffer, row, line_col, glyph, Color::Green);
-                let info = format!(
-                    "{}  {} \u{00b7} L{} {}",
-                    callsign, type_name, mission.layer, tier_name
-                );
-                let info_w = (card_right - line_col - glyph.len() as i32 - 18).max(10) as usize;
-                let info_display = truncate_text(&info, info_w);
-                put_text(
-                    buffer,
-                    row,
-                    line_col + glyph.len() as i32,
-                    &info_display,
-                    tc,
-                );
-                let collect_hint = "COLLECT \u{2192} [Enter]";
-                let hint_col = (card_right - collect_hint.len() as i32 - 1)
-                    .max(line_col + glyph.len() as i32 + info_display.len() as i32 + 2);
-                put_text(buffer, row, hint_col, collect_hint, Color::Green);
-                put_text(
-                    buffer,
-                    row + 1,
-                    line_col,
-                    &format!(
-                        "Debrief ready \u{00b7} +{} WM confirmed \u{00b7} press [Enter]",
-                        reward_marks
-                    ),
-                    Color::Rgb(78, 108, 92),
-                );
-                row += 2;
-            }
-        }
-
-        // ── Active missions section ──
-        if !active.is_empty() {
-            render_section_rule(
+            put_text(
                 buffer,
                 row,
-                width,
-                "ACTIVE \u{00b7} URGENCY ORDER",
-                Some(active.len()),
+                col_lv,
+                &format!("{:2}", merc.level),
+                Color::White,
             );
+            put_text(
+                buffer,
+                row,
+                col_pwr,
+                &format!("{:3}", merc.effective_power()),
+                Color::White,
+            );
+            put_text(
+                buffer,
+                row,
+                col_res,
+                &format!("{:3}", merc.effective_resilience()),
+                Color::White,
+            );
+            put_text(buffer, row, col_status, status_label, status_color);
             row += 1;
-            if row < missions_bottom {
-                put_text(
-                    buffer,
-                    row,
-                    3,
-                    "Priority: pending events first, then shortest ETA.",
-                    Color::Rgb(68, 102, 140),
-                );
-                row += 1;
-            }
-
-            // Sort display order: event-pending first, then by time remaining ascending
-            let mut display_order: Vec<(usize, bool, u64)> = active
-                .iter()
-                .enumerate()
-                .map(|(i, m)| {
-                    let has_event = m.has_pending_event();
-                    let remaining = (m.ends_at - now).num_seconds().max(0) as u64;
-                    (i, has_event, remaining)
-                })
-                .collect();
-            display_order.sort_by(|a, b| {
-                b.1.cmp(&a.1) // events first
-                    .then(a.2.cmp(&b.2)) // then by remaining time ascending
-            });
-
-            for (display_idx, &(orig_idx, _has_event, _)) in display_order.iter().enumerate() {
-                // Non-compact: 4-row card (border + 2 content + border via draw_deep_card)
-                // Compact: 2-row flat (no card borders)
-                let card_rows = if is_compact { 2 } else { 4 };
-                if row + card_rows > missions_bottom {
-                    break;
-                }
-                let mission = &active[orig_idx];
-                let is_selected = ui.selected_index == completed.len() + display_idx;
-                let tc = mission_type_color(mission.mission_type);
-                let type_name = mission_type_label(mission.mission_type);
-                let callsign = mission_callsign(mission);
-                let progress = mission.progress(now);
-                let total_secs = (mission.ends_at - mission.started_at).num_seconds().max(1) as u64;
-                let elapsed_secs = (now - mission.started_at).num_seconds().max(0) as u64;
-                let remaining_secs = total_secs.saturating_sub(elapsed_secs);
-                let leader = lead_merc_name(deep, &mission.squad);
-                let risk_tier = mission.mission_type.risk_tier();
-                let squad_size = mission.squad.len();
-                let (urgency_label, urgency_color) = mission_urgency_badge(mission, remaining_secs);
-                let card_left = 1i32;
-                let card_right = (width as i32 - 2).max(card_left + 8);
-
-                if !is_compact {
-                    // ── Themed card via draw_deep_card ──
-                    let card_top = row;
-                    let card_bottom = row + card_rows - 1;
-                    let fill_bg = if is_selected {
-                        if mission.has_pending_event() {
-                            Color::Rgb(30, 22, 18)
-                        } else {
-                            Color::Rgb(16, 28, 46)
-                        }
-                    } else if mission.has_pending_event() {
-                        Color::Rgb(18, 14, 12)
-                    } else {
-                        Color::Rgb(7, 13, 24)
-                    };
-                    let border_color = if is_selected {
-                        Color::Rgb(95, 175, 235)
-                    } else if mission.has_pending_event() {
-                        Color::Rgb(130, 98, 56)
-                    } else {
-                        Color::Rgb(42, 68, 99)
-                    };
-                    draw_deep_card(
-                        buffer,
-                        card_left,
-                        card_top,
-                        card_right,
-                        card_bottom,
-                        border_color,
-                        fill_bg,
-                        Some(&callsign),
-                    );
-
-                    // Urgency badge on the title row, right-aligned
-                    let urgency_badge = format!(" {} ", urgency_label);
-                    let badge_col =
-                        (card_right - urgency_badge.len() as i32 - 2).max(card_left + 4);
-                    put_text(buffer, card_top, badge_col, &urgency_badge, urgency_color);
-
-                    let line_col = card_left + 2;
-
-                    // Content line 1: squad + mission type + layer + risk
-                    let content_row1 = card_top + 1;
-                    let (glyph, glyph_color) = if mission.has_pending_event() {
-                        ("\u{26a1} ", Color::Yellow)
-                    } else {
-                        ("\u{2694} ", Color::Cyan)
-                    };
-                    put_text(buffer, content_row1, line_col, glyph, glyph_color);
-                    let crew_str = if squad_size > 1 {
-                        format!("{} ({}) +{}", leader, type_name, squad_size - 1)
-                    } else {
-                        format!("{} ({})", leader, type_name)
-                    };
-                    let layer_risk = format!(
-                        "L{} {} {}",
-                        mission.layer,
-                        risk_icon(risk_tier),
-                        risk_label(risk_tier)
-                    );
-                    let avail_w = (card_right - line_col - 2) as usize;
-                    let crew_w = avail_w.saturating_sub(layer_risk.len() + 3);
-                    let crew_display = truncate_text(&crew_str, crew_w);
-                    put_text(
-                        buffer,
-                        content_row1,
-                        line_col + glyph.chars().count() as i32,
-                        &crew_display,
-                        Color::White,
-                    );
-                    let risk_col = (card_right - layer_risk.len() as i32 - 1).max(
-                        line_col + glyph.chars().count() as i32 + crew_display.len() as i32 + 2,
-                    );
-                    put_text(
-                        buffer,
-                        content_row1,
-                        risk_col,
-                        &layer_risk,
-                        risk_color(risk_tier),
-                    );
-
-                    // Content line 2: progress bar + ETA + event hint
-                    let content_row2 = card_top + 2;
-
-                    // Build event hint
-                    let tier = LayerTier::from_layer(mission.layer);
-                    let triggers = event_trigger_points(mission.mission_type, tier);
-                    let event_hint = if mission.has_pending_event() {
-                        "\u{26a1} Event now!".to_string()
-                    } else if triggers.is_empty() {
-                        String::new()
-                    } else if let Some(&next_trigger) = triggers.iter().find(|&&t| t > progress) {
-                        let secs_to_event =
-                            ((next_trigger - progress) * total_secs as f64).round() as u64;
-                        format!("Evt ~{}", format_hours(secs_to_event))
-                    } else {
-                        String::new()
-                    };
-
-                    let time_str = if progress >= 1.0
-                        && !matches!(mission.status, MissionStatus::EventPending)
-                    {
-                        "Resolving...".to_string()
-                    } else if remaining_secs > 0 {
-                        let pct = (progress * 100.0) as u32;
-                        format!("{}% ~{}", pct, format_hours(remaining_secs))
-                    } else {
-                        let pct = (progress * 100.0) as u32;
-                        format!("{}% done", pct)
-                    };
-                    let suffix = if event_hint.is_empty() {
-                        format!("  {}", time_str)
-                    } else {
-                        format!("  {}  \u{00b7}  {}", time_str, event_hint)
-                    };
-                    let bar_width =
-                        (card_right - line_col - suffix.len() as i32 - 2).max(8) as usize;
-                    // Pulse effect at >95% progress
-                    let bar_color = if progress > 0.95 {
-                        let pulse = (millis / 500).is_multiple_of(2);
-                        if pulse {
-                            Color::Rgb(120, 220, 160)
-                        } else {
-                            tc
-                        }
-                    } else {
-                        tc
-                    };
-                    render_progress_bar(
-                        buffer,
-                        content_row2,
-                        line_col,
-                        bar_width,
-                        progress,
-                        bar_color,
-                    );
-                    put_text(
-                        buffer,
-                        content_row2,
-                        line_col + bar_width as i32,
-                        &suffix,
-                        Color::DarkGray,
-                    );
-                    // Recolor event hint if pending
-                    if mission.has_pending_event() && !event_hint.is_empty() {
-                        if let Some(pos) = suffix.find('\u{26a1}') {
-                            put_text(
-                                buffer,
-                                content_row2,
-                                line_col + bar_width as i32 + pos as i32,
-                                &event_hint,
-                                Color::Yellow,
-                            );
-                        }
-                    }
-
-                    row += card_rows;
-                } else {
-                    // ── Compact flat layout (no card borders) ──
-                    let line_col = card_left + 1;
-                    let (glyph, glyph_color) = if mission.has_pending_event() {
-                        ("[!] ", Color::Yellow)
-                    } else {
-                        ("[\u{25b6}] ", Color::Cyan)
-                    };
-                    let info = format!(
-                        "{} {} L{} [{}]",
-                        callsign, type_name, mission.layer, urgency_label
-                    );
-                    put_text(buffer, row, line_col, glyph, glyph_color);
-                    put_text(
-                        buffer,
-                        row,
-                        line_col + glyph.len() as i32,
-                        &truncate_text(&info, (width - 6).max(10)),
-                        tc,
-                    );
-                    row += 1;
-
-                    // Compact: bar + time on same row
-                    let bar_width = 12usize;
-                    let pct = (progress * 100.0) as u32;
-                    render_progress_bar(buffer, row, line_col + 2, bar_width, progress, tc);
-                    let time_str = if remaining_secs > 0 {
-                        format!(" {}%  ~{}", pct, format_hours(remaining_secs))
-                    } else {
-                        format!(" {}%  done", pct)
-                    };
-                    put_text(
-                        buffer,
-                        row,
-                        line_col + 2 + bar_width as i32,
-                        &time_str,
-                        Color::DarkGray,
-                    );
-                    row += 1;
-                }
-            }
-        }
-
-        // ── Warband log (below missions, last 5 entries) ──
-        let log = &deep.prestige.warband_log;
-        if !log.is_empty() && row + 2 < missions_bottom {
-            render_section_rule(buffer, row, width, "WARBAND LOG", None);
-            row += 1;
-            for entry in log.iter().rev().take(5) {
-                if row >= missions_bottom {
-                    break;
-                }
-                let (icon, color) = match entry.outcome {
-                    crate::deep::MissionOutcome::Success => ("\u{2713}", Color::Green),
-                    crate::deep::MissionOutcome::PartialSuccess => ("\u{25cb}", Color::Yellow),
-                    crate::deep::MissionOutcome::Failure => ("\u{2717}", Color::LightRed),
-                };
-                let line = format!(
-                    "{} Layer {} \u{2014} {} \u{2014} {} Marks",
-                    icon, entry.layer, entry.mission_name, entry.marks_earned
-                );
-                put_text(buffer, row, 1, &line, color);
-                row += 1;
-            }
         }
     }
 
-    // ── Footer ──
-    let footer = match ctx.tier {
-        SizeTier::S => "[Tab]Switch  [Enter]Select  [Esc]Close",
-        _ => "[Tab] Switch View  [Enter] Select  [Esc] Close",
-    };
-    put_text(buffer, height as i32 - 1, 1, footer, Color::DarkGray);
-    // [?] Help hint
-    let help_hint = "[?] Help";
-    let help_col = (width as i32 - help_hint.len() as i32 - 1).max(footer.len() as i32 + 2);
-    put_text(
-        buffer,
-        height as i32 - 1,
-        help_col,
-        help_hint,
-        Color::Rgb(50, 70, 100),
-    );
+    // ── Warband log (below roster) ──
+    let log = &deep.prestige.warband_log;
+    if !log.is_empty() && row + 3 < roster_bottom {
+        render_section_rule(buffer, row, width, "WARBAND LOG", None);
+        row += 1;
+        for entry in log.iter().rev().take(5) {
+            if row >= roster_bottom {
+                break;
+            }
+            let (icon, color) = match entry.outcome {
+                crate::deep::MissionOutcome::Success => ("\u{2713}", Color::Green),
+                crate::deep::MissionOutcome::PartialSuccess => ("\u{25cb}", Color::Yellow),
+                crate::deep::MissionOutcome::Failure => ("\u{2717}", Color::LightRed),
+            };
+            let line = format!(
+                "{} Layer {} \u{2014} {} \u{2014} {} Marks",
+                icon, entry.layer, entry.mission_name, entry.marks_earned
+            );
+            put_text(buffer, row, 1, &line, color);
+            row += 1;
+        }
+    }
+
+    // Atmospheric text (if roster and log are both empty)
+    if roster.is_empty() && log.is_empty() {
+        let millis = super::scene_fx::current_millis();
+        let atmosphere_messages = if deep.persistent.gateway_opened {
+            &[
+                "The Gateway stands open. The Wellspring waits.",
+                "The Wellspring has seen this before. It is patient.",
+            ][..]
+        } else {
+            tier_atmosphere_messages(deep.persistent.frontier_layer())
+        };
+        let msg_idx = (millis / 8000) as usize % atmosphere_messages.len();
+        let atmo_row = row + 2;
+        if atmo_row < roster_bottom {
+            let atmo_color = if deep.persistent.gateway_opened {
+                Color::Rgb(255, 215, 0)
+            } else {
+                Color::Rgb(40, 60, 90)
+            };
+            put_text_centered(
+                buffer,
+                atmo_row,
+                width,
+                atmosphere_messages[msg_idx],
+                atmo_color,
+            );
+        }
+    }
 }
 
 // ── New Mission view ──────────────────────────────────────────────────────────
@@ -1454,31 +771,89 @@ pub(super) fn render_new_mission(
 
     let is_compact = ctx.tier <= SizeTier::S || width < 60;
 
-    // ── Footer (context-sensitive: mission list vs squad staging) ──
+    // ── Sub-tab strip: Active / Available ──
+    let toggle_row = 0i32;
+    let active_count = deep.prestige.active_mission_count() + deep.prestige.pending_results.len();
+    let pool_count = deep.prestige.available_missions.len();
+    {
+        let active_label = format!("Active ({})", active_count);
+        let pool_label = format!("Available ({})", pool_count);
+
+        let col_start = 2i32;
+        let active_color = if ui.missions_show_active {
+            Color::Rgb(120, 200, 255)
+        } else {
+            Color::Rgb(60, 80, 110)
+        };
+        let pool_col = col_start + active_label.len() as i32 + 4;
+        let pool_color = if !ui.missions_show_active {
+            Color::Rgb(120, 200, 255)
+        } else {
+            Color::Rgb(60, 80, 110)
+        };
+
+        put_text(buffer, toggle_row, col_start, &active_label, active_color);
+        put_text(buffer, toggle_row, pool_col, &pool_label, pool_color);
+
+        // Thick underline under selected sub-tab
+        let underline_row = toggle_row + 1;
+        if ui.missions_show_active {
+            let underline: String = "\u{2501}".repeat(active_label.len());
+            put_text(
+                buffer,
+                underline_row,
+                col_start,
+                &underline,
+                Color::Rgb(120, 200, 255),
+            );
+        } else {
+            let underline: String = "\u{2501}".repeat(pool_label.len());
+            put_text(
+                buffer,
+                underline_row,
+                pool_col,
+                &underline,
+                Color::Rgb(120, 200, 255),
+            );
+        }
+    }
+
+    // Separator below sub-tabs
+    let sep_color = Color::Rgb(28, 49, 74);
+    for c in 1i32..(width as i32 - 1) {
+        if buffer.len() > 2 {
+            put_cell(buffer, 2, c, '\u{2500}', sep_color);
+        }
+    }
+
+    // ── Footer (context-sensitive) ──
     let footer = if ui.staging_mission_index.is_some() {
         if is_compact {
             "[\u{2191}/\u{2193}] Select  [Space] Toggle  [Enter] Launch  [Esc] Cancel"
         } else {
             "[\u{2191}/\u{2193}] Navigate  [Space] Toggle Merc  [Enter] Launch Mission  [Esc] Cancel"
         }
+    } else if ui.missions_show_active {
+        if is_compact {
+            "[\u{2191}/\u{2193}]Nav  [Enter]Select  [Tab]Switch  [Esc]Close"
+        } else {
+            "[\u{2191}/\u{2193}] Navigate  [Enter] Select  [Tab] Switch  [Esc] Close"
+        }
     } else if is_compact {
-        "[\u{2191}/\u{2193}] Select  [Enter] Assign Squad  [Esc] Close"
+        "[\u{2191}/\u{2193}]Select  [Enter]Assign  [Tab]Switch  [Esc]Close"
     } else {
-        "[\u{2191}/\u{2193}] Select Mission  [Enter] Assign Squad  [Esc] Close"
+        "[\u{2191}/\u{2193}] Select Mission  [Enter] Assign Squad  [Tab] Switch  [Esc] Close"
     };
-    // Flash message (error/info) shown above the footer.
     if let Some(msg) = &ui.flash_message {
         put_text(buffer, height as i32 - 2, 1, msg, Color::LightRed);
     }
     put_text(buffer, height as i32 - 1, 1, footer, Color::DarkGray);
 
-    let content_top = 0i32;
-    let content_bottom = height as i32 - 2; // leave room for flash + footer
+    let content_top = 3i32; // after sub-tab labels + underline + separator
+    let content_bottom = height as i32 - 2;
     let content_height = (content_bottom - content_top).max(0) as usize;
 
-    let available = &deep.prestige.available_missions;
-
-    // Right-aligned: [?] Help + Marks balance in footer
+    // Right-aligned marks in footer
     let marks_display = format!("\u{25c6} {} M", deep.prestige.warband_marks);
     let marks_col = (width as i32 - marks_display.len() as i32 - 2).max(1);
     let min_marks_col = footer.chars().count() as i32 + 3;
@@ -1491,6 +866,15 @@ pub(super) fn render_new_mission(
             MARKS_COLOR,
         );
     }
+
+    // ── Active missions sub-view ──
+    if ui.missions_show_active {
+        render_active_missions_content(buffer, width, content_top, content_bottom, deep, ui);
+        return;
+    }
+
+    // ── Available sub-view (existing behavior below) ──
+    let available = &deep.prestige.available_missions;
 
     if available.is_empty() {
         let mid = content_top + content_height as i32 / 2;
@@ -1508,7 +892,7 @@ pub(super) fn render_new_mission(
                 buffer,
                 mid,
                 width,
-                "Recruit mercenaries in [Recruit] tab first.",
+                "Recruit mercs first \u{2014} go to Status, [Tab] to Recruit.",
                 Color::Rgb(50, 70, 100),
             );
         } else if active_count > 0 {
@@ -1570,6 +954,328 @@ pub(super) fn render_new_mission(
     }
 }
 
+/// Render active missions content for the Missions tab active sub-view.
+fn render_active_missions_content(
+    buffer: &mut [Vec<SceneCell>],
+    width: usize,
+    content_top: i32,
+    content_bottom: i32,
+    deep: &DeepState,
+    ui: &DeepUiState,
+) {
+    let now = Utc::now();
+    let millis = current_millis();
+    let active = &deep.prestige.active_missions;
+    let completed = &deep.prestige.pending_results;
+    let mut row = content_top;
+
+    if active.is_empty() && completed.is_empty() {
+        let mid = content_top + (content_bottom - content_top) / 2;
+        put_text_centered(
+            buffer,
+            mid,
+            width,
+            "No active missions. [Tab] to Available to start one.",
+            Color::DarkGray,
+        );
+
+        // Warband log
+        let log = &deep.prestige.warband_log;
+        if !log.is_empty() && mid + 3 < content_bottom {
+            render_section_rule(buffer, mid + 2, width, "WARBAND LOG", None);
+            let mut lr = mid + 3;
+            for entry in log.iter().rev().take(5) {
+                if lr >= content_bottom {
+                    break;
+                }
+                let (icon, color) = match entry.outcome {
+                    crate::deep::MissionOutcome::Success => ("\u{2713}", Color::Green),
+                    crate::deep::MissionOutcome::PartialSuccess => ("\u{25cb}", Color::Yellow),
+                    crate::deep::MissionOutcome::Failure => ("\u{2717}", Color::LightRed),
+                };
+                let line = format!(
+                    "{} Layer {} \u{2014} {} \u{2014} {} Marks",
+                    icon, entry.layer, entry.mission_name, entry.marks_earned
+                );
+                put_text(buffer, lr, 1, &line, color);
+                lr += 1;
+            }
+        }
+        return;
+    }
+
+    // ── Completed missions section ──
+    if !completed.is_empty() {
+        render_section_rule(buffer, row, width, "COMPLETED", Some(completed.len()));
+        row += 1;
+
+        for (completed_idx, mission) in completed.iter().enumerate() {
+            if row + 1 >= content_bottom {
+                break;
+            }
+            let tc = mission_type_color(mission.mission_type);
+            let type_name = mission_type_label(mission.mission_type);
+            let callsign = mission_callsign(mission);
+            let tier_name = crate::deep::LayerTier::from_layer(mission.layer).display_name();
+            let is_selected = ui.selected_index == completed_idx;
+            let reward_marks = mission
+                .result
+                .as_ref()
+                .map(|r| r.marks_earned)
+                .unwrap_or_default();
+            let card_left = 1i32;
+            let card_right = (width as i32 - 2).max(card_left + 4);
+            let card_top = row;
+            let card_bottom = row + 1;
+            tint_panel_background(
+                buffer,
+                card_left,
+                card_top,
+                card_right,
+                card_bottom,
+                if is_selected {
+                    Color::Rgb(16, 34, 24)
+                } else {
+                    Color::Rgb(8, 18, 14)
+                },
+            );
+            draw_panel_outline(
+                buffer,
+                card_left,
+                card_top,
+                card_right,
+                card_bottom,
+                if is_selected {
+                    Color::Rgb(95, 175, 235)
+                } else {
+                    Color::Rgb(56, 98, 74)
+                },
+            );
+            let line_col = card_left + 2;
+
+            let glyph = "[\u{2713}] ";
+            put_text(buffer, row, line_col, glyph, Color::Green);
+            let info = format!(
+                "{}  {} \u{00b7} L{} {}",
+                callsign, type_name, mission.layer, tier_name
+            );
+            let info_w = (card_right - line_col - glyph.len() as i32 - 18).max(10) as usize;
+            let info_display = truncate_text(&info, info_w);
+            put_text(
+                buffer,
+                row,
+                line_col + glyph.len() as i32,
+                &info_display,
+                tc,
+            );
+            let collect_hint = "COLLECT \u{2192} [Enter]";
+            let hint_col = (card_right - collect_hint.len() as i32 - 1)
+                .max(line_col + glyph.len() as i32 + info_display.len() as i32 + 2);
+            put_text(buffer, row, hint_col, collect_hint, Color::Green);
+            put_text(
+                buffer,
+                row + 1,
+                line_col,
+                &format!(
+                    "Debrief ready \u{00b7} +{} WM confirmed \u{00b7} press [Enter]",
+                    reward_marks
+                ),
+                Color::Rgb(78, 108, 92),
+            );
+            row += 2;
+        }
+    }
+
+    // ── Active missions section ──
+    if !active.is_empty() {
+        render_section_rule(
+            buffer,
+            row,
+            width,
+            "ACTIVE \u{00b7} URGENCY ORDER",
+            Some(active.len()),
+        );
+        row += 1;
+
+        let mut display_order: Vec<(usize, bool, u64)> = active
+            .iter()
+            .enumerate()
+            .map(|(i, m)| {
+                let has_event = m.has_pending_event();
+                let remaining = (m.ends_at - now).num_seconds().max(0) as u64;
+                (i, has_event, remaining)
+            })
+            .collect();
+        display_order.sort_by(|a, b| b.1.cmp(&a.1).then(a.2.cmp(&b.2)));
+
+        for (display_idx, &(orig_idx, _has_event, _)) in display_order.iter().enumerate() {
+            let card_rows = 4i32;
+            if row + card_rows > content_bottom {
+                break;
+            }
+            let mission = &active[orig_idx];
+            let is_selected = ui.selected_index == completed.len() + display_idx;
+            let tc = mission_type_color(mission.mission_type);
+            let type_name = mission_type_label(mission.mission_type);
+            let callsign = mission_callsign(mission);
+            let progress = mission.progress(now);
+            let total_secs = (mission.ends_at - mission.started_at).num_seconds().max(1) as u64;
+            let elapsed_secs = (now - mission.started_at).num_seconds().max(0) as u64;
+            let remaining_secs = total_secs.saturating_sub(elapsed_secs);
+            let leader = lead_merc_name(deep, &mission.squad);
+            let risk_tier = mission.mission_type.risk_tier();
+            let squad_size = mission.squad.len();
+            let (urgency_label, urgency_color) = mission_urgency_badge(mission, remaining_secs);
+            let card_left = 1i32;
+            let card_right = (width as i32 - 2).max(card_left + 8);
+
+            let card_top = row;
+            let card_bottom = row + card_rows - 1;
+            let fill_bg = if is_selected {
+                if mission.has_pending_event() {
+                    Color::Rgb(30, 22, 18)
+                } else {
+                    Color::Rgb(16, 28, 46)
+                }
+            } else if mission.has_pending_event() {
+                Color::Rgb(18, 14, 12)
+            } else {
+                Color::Rgb(7, 13, 24)
+            };
+            let border_color = if is_selected {
+                Color::Rgb(95, 175, 235)
+            } else if mission.has_pending_event() {
+                Color::Rgb(130, 98, 56)
+            } else {
+                Color::Rgb(42, 68, 99)
+            };
+            draw_deep_card(
+                buffer,
+                card_left,
+                card_top,
+                card_right,
+                card_bottom,
+                border_color,
+                fill_bg,
+                Some(&callsign),
+            );
+
+            let urgency_badge = format!(" {} ", urgency_label);
+            let badge_col = (card_right - urgency_badge.len() as i32 - 2).max(card_left + 4);
+            put_text(buffer, card_top, badge_col, &urgency_badge, urgency_color);
+
+            let line_col = card_left + 2;
+
+            let content_row1 = card_top + 1;
+            let (glyph, glyph_color) = if mission.has_pending_event() {
+                ("\u{26a1} ", Color::Yellow)
+            } else {
+                ("\u{2694} ", Color::Cyan)
+            };
+            put_text(buffer, content_row1, line_col, glyph, glyph_color);
+            let crew_str = if squad_size > 1 {
+                format!("{} ({}) +{}", leader, type_name, squad_size - 1)
+            } else {
+                format!("{} ({})", leader, type_name)
+            };
+            let layer_risk = format!(
+                "L{} {} {}",
+                mission.layer,
+                risk_icon(risk_tier),
+                risk_label(risk_tier)
+            );
+            let avail_w = (card_right - line_col - 2) as usize;
+            let crew_w = avail_w.saturating_sub(layer_risk.len() + 3);
+            let crew_display = truncate_text(&crew_str, crew_w);
+            put_text(
+                buffer,
+                content_row1,
+                line_col + glyph.chars().count() as i32,
+                &crew_display,
+                Color::White,
+            );
+            let risk_col = (card_right - layer_risk.len() as i32 - 1)
+                .max(line_col + glyph.chars().count() as i32 + crew_display.len() as i32 + 2);
+            put_text(
+                buffer,
+                content_row1,
+                risk_col,
+                &layer_risk,
+                risk_color(risk_tier),
+            );
+
+            let content_row2 = card_top + 2;
+            let tier = LayerTier::from_layer(mission.layer);
+            let triggers = event_trigger_points(mission.mission_type, tier);
+            let event_hint = if mission.has_pending_event() {
+                "\u{26a1} Event now!".to_string()
+            } else if triggers.is_empty() {
+                String::new()
+            } else if let Some(&next_trigger) = triggers.iter().find(|&&t| t > progress) {
+                let secs_to_event = ((next_trigger - progress) * total_secs as f64).round() as u64;
+                format!("Evt ~{}", format_hours(secs_to_event))
+            } else {
+                String::new()
+            };
+
+            let time_str =
+                if progress >= 1.0 && !matches!(mission.status, MissionStatus::EventPending) {
+                    "Resolving...".to_string()
+                } else if remaining_secs > 0 {
+                    let pct = (progress * 100.0) as u32;
+                    format!("{}% ~{}", pct, format_hours(remaining_secs))
+                } else {
+                    let pct = (progress * 100.0) as u32;
+                    format!("{}% done", pct)
+                };
+            let suffix = if event_hint.is_empty() {
+                format!("  {}", time_str)
+            } else {
+                format!("  {}  \u{00b7}  {}", time_str, event_hint)
+            };
+            let bar_width = (card_right - line_col - suffix.len() as i32 - 2).max(8) as usize;
+            let bar_color = if progress > 0.95 {
+                let pulse = (millis / 500).is_multiple_of(2);
+                if pulse {
+                    Color::Rgb(120, 220, 160)
+                } else {
+                    tc
+                }
+            } else {
+                tc
+            };
+            render_progress_bar(
+                buffer,
+                content_row2,
+                line_col,
+                bar_width,
+                progress,
+                bar_color,
+            );
+            put_text(
+                buffer,
+                content_row2,
+                line_col + bar_width as i32,
+                &suffix,
+                Color::DarkGray,
+            );
+            if mission.has_pending_event() && !event_hint.is_empty() {
+                if let Some(pos) = suffix.find('\u{26a1}') {
+                    put_text(
+                        buffer,
+                        content_row2,
+                        line_col + bar_width as i32 + pos as i32,
+                        &event_hint,
+                        Color::Yellow,
+                    );
+                }
+            }
+
+            row += card_rows;
+        }
+    }
+}
+
 /// Compact (S-tier) single-panel new mission view.
 #[allow(clippy::too_many_arguments)]
 fn render_new_mission_compact(
@@ -1609,20 +1315,7 @@ fn render_new_mission_compact(
                 }
             }
             let is_sel = i == ui.selected_index;
-            let tc = mission_type_color(m.mission_type);
-            let rt = m.mission_type.risk_tier();
-            let ri = risk_icon(rt);
-            let line = format_available_mission_row(m, is_sel, width.saturating_sub(2));
-            put_text(buffer, row, 1, &line, tc);
-            put_text(
-                buffer,
-                row,
-                1,
-                if is_sel { "\u{25b6} " } else { "  " },
-                if is_sel { Color::Cyan } else { Color::DarkGray },
-            );
-            // Recolor risk icon
-            put_text(buffer, row, 3, ri, risk_color(rt));
+            render_mission_row(buffer, row, 1, width.saturating_sub(2), m, is_sel);
             row += 1;
         }
         // Compact Phase 1 detail for selected mission
@@ -2054,20 +1747,7 @@ fn render_mission_list_left(
             }
         }
         let is_sel = i == selected_index;
-        let tc = mission_type_color(m.mission_type);
-        let rt = m.mission_type.risk_tier();
-        let ri = risk_icon(rt);
-        let line = format_available_mission_row(m, is_sel, list_width.saturating_sub(2));
-        put_text(buffer, row, 1, &line, tc);
-        put_text(
-            buffer,
-            row,
-            1,
-            if is_sel { "\u{25b6} " } else { "  " },
-            if is_sel { Color::Cyan } else { Color::DarkGray },
-        );
-        // Recolor risk icon
-        put_text(buffer, row, 3, ri, risk_color(rt));
+        render_mission_row(buffer, row, 1, list_width.saturating_sub(2), m, is_sel);
         row += 1;
     }
 }
@@ -2846,7 +2526,7 @@ fn render_squad_summary_panel(
                     ))
                 } else {
                     Some((
-                        "Check [Recruit] tab for required archetype".to_string(),
+                        "Check Recruit view in Status tab".to_string(),
                         Color::Yellow,
                     ))
                 }
