@@ -155,10 +155,13 @@ pub enum AchievementId {
     FractureZone27, // Scar Render
     FractureZone28, // Echo Silencer
     FractureZone29, // Last Listener
-    FractureZone30, // Wound Closer
-    // Ascension milestone achievements
+    FractureZone30, // Scar Mender
+    // Ascension milestone achievements (one per level, I-VI)
     AscensionI,   // First Ascension
+    AscensionII,  // Twice Risen
     AscensionIII, // Deepborn
+    AscensionIV,  // Fourfold
+    AscensionV,   // Quintessence
     AscensionVI,  // Transcendent
 
     // Challenge achievements - Chess
@@ -299,7 +302,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 204;
+    pub const VARIANT_COUNT: usize = 207;
 }
 
 /// Static definition of an achievement.

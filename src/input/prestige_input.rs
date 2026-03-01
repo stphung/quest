@@ -78,6 +78,7 @@ pub(super) fn handle_vault_selection(
                         &mut state.zone_progression,
                         achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
                         deep.persistent.fracture_zone_cap,
+                        state.prestige_rank,
                     );
                     *overlay = GameOverlay::None;
                     let new_rank = state.prestige_rank;
@@ -157,6 +158,7 @@ pub(super) fn handle_prestige_confirm(
                     &mut state.zone_progression,
                     achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
                     deep.persistent.fracture_zone_cap,
+                    state.prestige_rank,
                 );
                 *overlay = GameOverlay::None;
                 let new_rank = state.prestige_rank;

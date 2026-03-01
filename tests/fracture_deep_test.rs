@@ -300,6 +300,7 @@ fn run_tick_with_successful_breakthrough_power(
     for seed in 0..20 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let mut state = GameState::new("FractureTest".to_string(), 0);
+        state.prestige_rank = 300; // High enough to meet all fracture zone prestige gates
         let mut tick_counter = 0u32;
         let mut haven = Haven::default();
         let mut enhancement = EnhancementProgress::new();

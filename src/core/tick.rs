@@ -158,6 +158,7 @@ pub fn game_tick<R: Rng>(
             &mut state.zone_progression,
             achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
             deep.persistent.fracture_zone_cap,
+            state.prestige_rank,
         );
         result.events.push(TickEvent::FractureRegionUnlocked {
             region,
@@ -165,6 +166,9 @@ pub fn game_tick<R: Rng>(
         });
         result.deep_changed = true;
     }
+
+    // Sync cached fracture zone cap for UI rendering
+    state.cached_fracture_zone_cap = deep.persistent.fracture_zone_cap;
 
     // ── 12. Achievement modal accumulation ────────────────────────
     if achievements.is_modal_ready() {

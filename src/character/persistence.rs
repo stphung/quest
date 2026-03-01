@@ -107,6 +107,7 @@ impl CharacterManager {
             combat_seconds_this_tick: false,
             game_over_shown_at: None,
             cached_power_rating: 0.0,
+            cached_fracture_zone_cap: 0,
             stormglass: save_data.stormglass,
             stormglass_discovered: save_data.stormglass_discovered,
             storm_sigils: save_data.storm_sigils.clone(),

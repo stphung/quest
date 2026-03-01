@@ -87,6 +87,19 @@ pub const ALL_TITLES: &[TitleDef] = &[
         achievement_id: AchievementId::BeyondInfinity,
         title_text: "Voidwalker",
     },
+    // Ascension
+    TitleDef {
+        achievement_id: AchievementId::AscensionI,
+        title_text: "Ascended I",
+    },
+    TitleDef {
+        achievement_id: AchievementId::AscensionIII,
+        title_text: "Ascended III",
+    },
+    TitleDef {
+        achievement_id: AchievementId::AscensionVI,
+        title_text: "Ascended VI",
+    },
     // Combat
     TitleDef {
         achievement_id: AchievementId::SlayerV,
@@ -233,7 +246,7 @@ pub const ALL_TITLES: &[TitleDef] = &[
     // Fracture Zones
     TitleDef {
         achievement_id: AchievementId::FractureZone30,
-        title_text: "Wound Closer",
+        title_text: "Scar Mender",
     },
     // The Deep
     TitleDef {

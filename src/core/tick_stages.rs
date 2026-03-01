@@ -737,6 +737,9 @@ pub(super) fn process_zone_achievements(
         BossDefeatResult::ExpanseCycle => {
             achievements.on_zone_fully_cleared(11, Some(character_name));
         }
+        BossDefeatResult::FractureCycle { zone_id } => {
+            achievements.on_zone_fully_cleared(*zone_id, Some(character_name));
+        }
         _ => {}
     }
 }

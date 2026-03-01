@@ -114,6 +114,8 @@ pub struct GameState {
     pub game_over_shown_at: Option<std::time::Instant>,
     /// Cached power rating — computed each tick from DPS × eHP formula
     pub cached_power_rating: f64,
+    /// Cached fracture zone cap from Deep — used by UI for zone track rendering
+    pub cached_fracture_zone_cap: u32,
 
     // === Composed sub-structs (Phase 2 refactoring) ===
     // These group existing fields for clearer module boundaries.
@@ -193,6 +195,7 @@ impl GameState {
             combat_seconds_this_tick: false,
             game_over_shown_at: None,
             cached_power_rating: 0.0,
+            cached_fracture_zone_cap: 0,
             chrono_surge_active: false,
             debug_force_overcharge: false,
             player,

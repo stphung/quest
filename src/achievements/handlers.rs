@@ -159,17 +159,17 @@ impl Achievements {
     /// Called when the character Ascends to a new level.
     #[allow(dead_code)] // Will be called by tick pipeline once ascension input is wired
     pub fn on_ascended(&mut self, new_level: u32, character_name: Option<&str>) {
-        match new_level {
-            1 => {
-                self.unlock_with_name(AchievementId::AscensionI, character_name);
-            }
-            3 => {
-                self.unlock_with_name(AchievementId::AscensionIII, character_name);
-            }
-            6 => {
-                self.unlock_with_name(AchievementId::AscensionVI, character_name);
-            }
-            _ => {}
+        let id = match new_level {
+            1 => Some(AchievementId::AscensionI),
+            2 => Some(AchievementId::AscensionII),
+            3 => Some(AchievementId::AscensionIII),
+            4 => Some(AchievementId::AscensionIV),
+            5 => Some(AchievementId::AscensionV),
+            6 => Some(AchievementId::AscensionVI),
+            _ => None,
+        };
+        if let Some(id) = id {
+            self.unlock_with_name(id, character_name);
         }
     }
 

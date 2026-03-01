@@ -7,19 +7,29 @@ use crate::core::constants::EXPANSE_ZONE_ID;
 ///
 /// Called at: character load, prestige reset, StormsEnd, fracture region unlock.
 ///
-/// - If `storms_end_unlocked`, unlocks Zone 11
-/// - Unlocks every zone in `12..=fracture_zone_cap`
+/// - If `storms_end_unlocked` and prestige >= 25, unlocks Zone 11
+/// - Unlocks every zone in `12..=fracture_zone_cap` whose prestige requirement is met
 /// - Never unlocks above cap, never removes earlier unlocks
 pub fn sync_account_zone_unlocks(
     prog: &mut ZoneProgression,
     storms_end_unlocked: bool,
     fracture_zone_cap: u32,
+    prestige_rank: u32,
 ) {
     if storms_end_unlocked {
-        prog.unlock_zone(EXPANSE_ZONE_ID);
+        if let Some(zone) = crate::zones::data::get_zone(EXPANSE_ZONE_ID) {
+            if prestige_rank >= zone.prestige_requirement {
+                prog.unlock_zone(EXPANSE_ZONE_ID);
+            }
+        }
     }
+    let zones = crate::zones::data::get_all_zones();
     for zone_id in 12..=fracture_zone_cap {
-        prog.unlock_zone(zone_id);
+        if let Some(zone) = zones.iter().find(|z| z.id == zone_id) {
+            if prestige_rank >= zone.prestige_requirement {
+                prog.unlock_zone(zone_id);
+            }
+        }
     }
 }
 
@@ -30,21 +40,28 @@ mod tests {
     #[test]
     fn test_sync_unlocks_zone_11_when_storms_end() {
         let mut prog = ZoneProgression::new();
-        sync_account_zone_unlocks(&mut prog, true, 11);
+        sync_account_zone_unlocks(&mut prog, true, 11, 25);
         assert!(prog.is_zone_unlocked(11));
     }
 
     #[test]
     fn test_sync_does_not_unlock_zone_11_without_storms_end() {
         let mut prog = ZoneProgression::new();
-        sync_account_zone_unlocks(&mut prog, false, 11);
+        sync_account_zone_unlocks(&mut prog, false, 11, 25);
+        assert!(!prog.is_zone_unlocked(11));
+    }
+
+    #[test]
+    fn test_sync_does_not_unlock_zone_11_without_prestige() {
+        let mut prog = ZoneProgression::new();
+        sync_account_zone_unlocks(&mut prog, true, 11, 10);
         assert!(!prog.is_zone_unlocked(11));
     }
 
     #[test]
     fn test_sync_unlocks_zones_12_through_14_when_cap_14() {
         let mut prog = ZoneProgression::new();
-        sync_account_zone_unlocks(&mut prog, true, 14);
+        sync_account_zone_unlocks(&mut prog, true, 14, 50);
         assert!(prog.is_zone_unlocked(11));
         assert!(prog.is_zone_unlocked(12));
         assert!(prog.is_zone_unlocked(13));
@@ -55,7 +72,7 @@ mod tests {
     #[test]
     fn test_sync_unlocks_all_fracture_when_cap_20() {
         let mut prog = ZoneProgression::new();
-        sync_account_zone_unlocks(&mut prog, true, 20);
+        sync_account_zone_unlocks(&mut prog, true, 20, 300);
         for z in 11..=20 {
             assert!(prog.is_zone_unlocked(z), "Zone {} should be unlocked", z);
         }
@@ -63,10 +80,21 @@ mod tests {
     }
 
     #[test]
+    fn test_sync_respects_prestige_for_fracture_zones() {
+        let mut prog = ZoneProgression::new();
+        // Cap is 20, but prestige only 50 — should unlock 11-14 (P25/P50) but not 15+ (P75)
+        sync_account_zone_unlocks(&mut prog, true, 20, 50);
+        assert!(prog.is_zone_unlocked(11));
+        assert!(prog.is_zone_unlocked(12));
+        assert!(prog.is_zone_unlocked(14));
+        assert!(!prog.is_zone_unlocked(15));
+    }
+
+    #[test]
     fn test_sync_never_removes_earlier_unlocks() {
         let mut prog = ZoneProgression::new();
         prog.unlock_zone(12);
-        sync_account_zone_unlocks(&mut prog, true, 11);
+        sync_account_zone_unlocks(&mut prog, true, 11, 25);
         // Zone 12 was manually unlocked, sync should not remove it
         assert!(prog.is_zone_unlocked(12));
     }
@@ -74,8 +102,8 @@ mod tests {
     #[test]
     fn test_sync_idempotent() {
         let mut prog = ZoneProgression::new();
-        sync_account_zone_unlocks(&mut prog, true, 14);
-        sync_account_zone_unlocks(&mut prog, true, 14); // call twice
+        sync_account_zone_unlocks(&mut prog, true, 14, 50);
+        sync_account_zone_unlocks(&mut prog, true, 14, 50); // call twice
         assert!(prog.is_zone_unlocked(14));
     }
 }

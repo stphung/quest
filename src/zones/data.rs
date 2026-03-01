@@ -532,7 +532,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 11,
             name: "The Expanse",
             description: "Beyond the storm lies what was always there. Raw, unformed reality stretching past the edges of the world.",
-            prestige_requirement: 0, // Unlocked by achievement, not prestige
+            prestige_requirement: 25,
             min_level: 150,
             max_level: u32::MAX,
             requires_weapon: false,
@@ -585,7 +585,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 12,
             name: "Splintered Rim",
             description: "The continent's wound begins here — a shattered ridge where heat and ash pour upward through fractured stone.",
-            prestige_requirement: 0,
+            prestige_requirement: 50,
             min_level: 165,
             max_level: 180,
             requires_weapon: false,
@@ -647,7 +647,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 13,
             name: "Ember Ravine",
             description: "A deep canyon where the walls glow with trapped heat. Embers drift upward like inverse rain.",
-            prestige_requirement: 0,
+            prestige_requirement: 50,
             min_level: 180,
             max_level: 195,
             requires_weapon: false,
@@ -709,7 +709,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 14,
             name: "Heart of the Fault",
             description: "The deepest reach of the Red Fault, where the world's blood flows openly and the heat has a will.",
-            prestige_requirement: 0,
+            prestige_requirement: 50,
             min_level: 195,
             max_level: 210,
             requires_weapon: false,
@@ -772,7 +772,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 15,
             name: "Shard Fields",
             description: "Reality has fractured into a plain of mirror shards. Reflections move independently of their sources.",
-            prestige_requirement: 0,
+            prestige_requirement: 75,
             min_level: 210,
             max_level: 225,
             requires_weapon: false,
@@ -834,7 +834,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 16,
             name: "Refraction Steps",
             description: "Impossible geometry carved from reflected light. Staircases fold back on themselves at angles that shouldn't exist.",
-            prestige_requirement: 0,
+            prestige_requirement: 75,
             min_level: 225,
             max_level: 240,
             requires_weapon: false,
@@ -896,7 +896,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 17,
             name: "Hall of Second Suns",
             description: "A sanctuary built around a mirrored sun that was never meant to exist. Its light reveals truths and lies alike.",
-            prestige_requirement: 0,
+            prestige_requirement: 75,
             min_level: 240,
             max_level: 255,
             requires_weapon: false,
@@ -959,7 +959,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 18,
             name: "Ashen Verge",
             description: "The edge of the final wound. Ash covers everything in a silence that feels permanent.",
-            prestige_requirement: 0,
+            prestige_requirement: 100,
             min_level: 255,
             max_level: 270,
             requires_weapon: false,
@@ -1021,7 +1021,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 19,
             name: "Throat of the World",
             description: "The land slopes inward here, as if the earth is swallowing itself. The darkness ahead has weight.",
-            prestige_requirement: 0,
+            prestige_requirement: 100,
             min_level: 270,
             max_level: 285,
             requires_weapon: false,
@@ -1083,7 +1083,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 20,
             name: "The Black Mouth",
             description: "The surface has stopped merely breaking. It has opened wide enough to show hunger.",
-            prestige_requirement: 0,
+            prestige_requirement: 100,
             min_level: 285,
             max_level: 300,
             requires_weapon: false,
@@ -1146,7 +1146,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 21,
             name: "Sunken Processional",
             description: "A grand ceremonial road descending into a buried kingdom. The walls are crystallized amber. Faded grandeur preserved in perfect silence.",
-            prestige_requirement: 0,
+            prestige_requirement: 150,
             min_level: 300,
             max_level: 315,
             requires_weapon: false,
@@ -1208,7 +1208,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 22,
             name: "The Pale Archive",
             description: "Libraries of crystallized knowledge carved into burial niches. Each niche holds a crystal tablet instead of a body. The guardians here protect not from invasion but from understanding.",
-            prestige_requirement: 0,
+            prestige_requirement: 150,
             min_level: 315,
             max_level: 330,
             requires_weapon: false,
@@ -1270,7 +1270,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 23,
             name: "The Hollow Throne",
             description: "The seat of power. The palace is intact but empty. Whatever sat here left willingly \u{2014} or was removed. The room defends its throne as though something still sits there.",
-            prestige_requirement: 0,
+            prestige_requirement: 150,
             min_level: 330,
             max_level: 345,
             requires_weapon: false,
@@ -1333,7 +1333,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 24,
             name: "The Stillborn Sea",
             description: "An underground ocean that never came alive. No waves, no life, no temperature. Walking on its surface is like walking on solid grief.",
-            prestige_requirement: 0,
+            prestige_requirement: 200,
             min_level: 345,
             max_level: 360,
             requires_weapon: false,
@@ -1395,7 +1395,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 25,
             name: "Resonance Fault",
             description: "Sound has crystallized into physical structures. Footsteps create visible ripples. Voices from ages past still echo, frozen in crystal.",
-            prestige_requirement: 0,
+            prestige_requirement: 200,
             min_level: 360,
             max_level: 375,
             requires_weapon: false,
@@ -1457,7 +1457,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 26,
             name: "The Wailing Reach",
             description: "The boundary between existence and void. Things here flicker between real and not. The wailing is the sound of matter deciding whether it exists.",
-            prestige_requirement: 0,
+            prestige_requirement: 200,
             min_level: 375,
             max_level: 390,
             requires_weapon: false,
@@ -1520,7 +1520,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 27,
             name: "The Scar Root",
             description: "Petrified tendrils of primordial fracture energy radiate outward like the root system of a dead tree. This is where the cracks began spreading.",
-            prestige_requirement: 0,
+            prestige_requirement: 300,
             min_level: 390,
             max_level: 405,
             requires_weapon: false,
@@ -1582,7 +1582,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 28,
             name: "Echoing Abyss",
             description: "A vast emptiness where everything reverberates forever. Actions echo forward and backward in time. Your footsteps arrive before you do.",
-            prestige_requirement: 0,
+            prestige_requirement: 300,
             min_level: 405,
             max_level: 420,
             requires_weapon: false,
@@ -1644,7 +1644,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 29,
             name: "Threshold of Silence",
             description: "The last place where sound and light exist. Beyond this, there is only the wound.",
-            prestige_requirement: 0,
+            prestige_requirement: 300,
             min_level: 420,
             max_level: 435,
             requires_weapon: false,
@@ -1706,7 +1706,7 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
             id: 30,
             name: "The Origin Wound",
             description: "The primordial break. Not a place but an event fossilized into geography. The wound is open, patient, and eternal. It was here before the world it broke.",
-            prestige_requirement: 0,
+            prestige_requirement: 300,
             min_level: 435,
             max_level: u32::MAX,
             requires_weapon: false,
@@ -1955,7 +1955,7 @@ mod tests {
         let zone = get_zone(12).unwrap();
         assert_eq!(zone.name, "Splintered Rim");
         assert_eq!(zone.subzones.len(), 5);
-        assert_eq!(zone.prestige_requirement, 0);
+        assert_eq!(zone.prestige_requirement, 50);
         assert_eq!(zone.min_level, 165);
         assert_eq!(zone.max_level, 180);
     }
@@ -2004,14 +2004,24 @@ mod tests {
     }
 
     #[test]
-    fn test_fracture_zones_prestige_requirement_zero() {
-        for zone_id in 12..=30 {
-            let zone = get_zone(zone_id).unwrap();
-            assert_eq!(
-                zone.prestige_requirement, 0,
-                "Zone {} should have prestige_requirement 0 (managed by sync)",
-                zone_id
-            );
+    fn test_fracture_zones_prestige_requirements() {
+        let expected: &[(std::ops::RangeInclusive<u32>, u32)] = &[
+            (12..=14, 50),
+            (15..=17, 75),
+            (18..=20, 100),
+            (21..=23, 150),
+            (24..=26, 200),
+            (27..=30, 300),
+        ];
+        for (range, req) in expected {
+            for zone_id in range.clone() {
+                let zone = get_zone(zone_id).unwrap();
+                assert_eq!(
+                    zone.prestige_requirement, *req,
+                    "Zone {} should have prestige_requirement {}",
+                    zone_id, req
+                );
+            }
         }
     }
 

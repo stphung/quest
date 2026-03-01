@@ -150,10 +150,10 @@ fn draw_header(
     frame.render_widget(header_block, area);
     super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
 
-    // Row 1: Level + Power rating (right-aligned)
+    // Row 1: Level + Power Level (right-aligned)
     let power = game_state.cached_power_rating as u64;
     let power_str = format!(
-        "\u{2694} Power: {}",
+        "\u{26a1} Power Level: {}",
         super::game_common::format_number_short(power)
     );
     let level_str = format!("Level {} {}", game_state.character_level, rank);
@@ -311,23 +311,21 @@ pub(super) fn draw_zone_info(
         )]));
     }
 
-    // Dot track: ● = completed (green), ○ = current (yellow), · = unlocked (white), · = locked (gray)
+    // Dot track: ● = completed (green), ○ = current (yellow), · = unlocked (white), × = locked (gray)
     // Chapter separators │ between base zones, zone 11, and each fracture chapter.
     // Second row shows zone range labels aligned under each group.
-    let max_fracture_zone = (12..=30u32)
-        .rev()
-        .find(|&zid| prog.is_zone_unlocked(zid))
-        .unwrap_or(0);
+    // Uses fracture_zone_cap (from Deep breakthroughs) to determine visible range.
+    let fracture_cap = game_state.cached_fracture_zone_cap;
 
     // Define zone groups: (start, end) inclusive
     let mut groups: Vec<(u32, u32)> = vec![(1, 11)];
-    if max_fracture_zone >= 12 {
+    if fracture_cap >= 12 {
         // Fracture chapter boundaries
         let chapter_starts: &[u32] = &[12, 15, 18, 21, 24, 27];
         let chapter_ends: &[u32] = &[14, 17, 20, 23, 26, 30];
         for (&start, &end) in chapter_starts.iter().zip(chapter_ends.iter()) {
-            if max_fracture_zone >= start {
-                groups.push((start, end.min(max_fracture_zone)));
+            if fracture_cap >= start {
+                groups.push((start, end.min(fracture_cap)));
             }
         }
     }
@@ -380,7 +378,7 @@ pub(super) fn draw_zone_info(
             } else if is_unlocked {
                 ("\u{00b7}", Color::White, false) // ·
             } else {
-                ("\u{00b7}", Color::DarkGray, false) // ·
+                ("\u{00d7}", Color::DarkGray, false) // ×
             };
 
             let style = if bold {

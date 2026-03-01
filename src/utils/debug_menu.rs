@@ -31,6 +31,7 @@ enum DebugAction {
     TriggerRunicShiftChallenge,
     TriggerHavenDiscovery,
     TriggerSoulforgeDiscovery,
+    TriggerForgeStormbreaker,
     TriggerForgeAsprika,
     TriggerForgeSleipnir,
     TriggerForgeMegingjord,
@@ -68,6 +69,7 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerRunicShiftChallenge,
     DebugAction::TriggerHavenDiscovery,
     DebugAction::TriggerSoulforgeDiscovery,
+    DebugAction::TriggerForgeStormbreaker,
     DebugAction::TriggerForgeAsprika,
     DebugAction::TriggerForgeSleipnir,
     DebugAction::TriggerForgeMegingjord,
@@ -171,6 +173,7 @@ const RESOURCE_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerForceOvercharge,
 ];
 const ITEM_ACTIONS: &[DebugAction] = &[
+    DebugAction::TriggerForgeStormbreaker,
     DebugAction::TriggerForgeAsprika,
     DebugAction::TriggerForgeSleipnir,
     DebugAction::TriggerForgeMegingjord,
@@ -276,33 +279,34 @@ impl DebugAction {
             Self::TriggerRunicShiftChallenge => 11,
             Self::TriggerHavenDiscovery => 12,
             Self::TriggerSoulforgeDiscovery => 13,
-            Self::TriggerForgeAsprika => 14,
-            Self::TriggerForgeSleipnir => 15,
-            Self::TriggerForgeMegingjord => 16,
-            Self::TriggerGrantStormglass => 17,
-            Self::TriggerDiscoverStormglass => 18,
-            Self::TriggerGrant100kStormglass => 19,
-            Self::TriggerEtchRandomSigils => 20,
-            Self::TriggerEtchSPlusSigil => 21,
-            Self::TriggerForceOvercharge => 22,
-            Self::TriggerDeepDiscovery => 23,
-            Self::TriggerDeepGrantMarks => 24,
-            Self::TriggerDeepRefreshMissionPool => 25,
-            Self::TriggerDeepRefreshRecruits => 26,
-            Self::TriggerDeepClearFrontierLayer => 27,
-            Self::TriggerDeepCompleteActiveMissions => 28,
+            Self::TriggerForgeStormbreaker => 14,
+            Self::TriggerForgeAsprika => 15,
+            Self::TriggerForgeSleipnir => 16,
+            Self::TriggerForgeMegingjord => 17,
+            Self::TriggerGrantStormglass => 18,
+            Self::TriggerDiscoverStormglass => 19,
+            Self::TriggerGrant100kStormglass => 20,
+            Self::TriggerEtchRandomSigils => 21,
+            Self::TriggerEtchSPlusSigil => 22,
+            Self::TriggerForceOvercharge => 23,
+            Self::TriggerDeepDiscovery => 24,
+            Self::TriggerDeepGrantMarks => 25,
+            Self::TriggerDeepRefreshMissionPool => 26,
+            Self::TriggerDeepRefreshRecruits => 27,
+            Self::TriggerDeepClearFrontierLayer => 28,
+            Self::TriggerDeepCompleteActiveMissions => 29,
             Self::UnlockDeepLayer(layer) => match layer {
-                3 => 29,
-                7 => 30,
-                12 => 31,
-                18 => 32,
-                25 => 33,
-                _ => 34, // 30
+                3 => 30,
+                7 => 31,
+                12 => 32,
+                18 => 33,
+                25 => 34,
+                _ => 35, // 30
             },
-            Self::TravelToZone(zone_id) => 35 + zone_id as usize - 1, // 35-64
-            Self::SetPrestige(amount) => 65 + set_value_index(amount),
-            Self::SetLevel(amount) => 75 + set_value_index(amount),
-            Self::MaxAttributes => 85,
+            Self::TravelToZone(zone_id) => 36 + zone_id as usize - 1, // 36-65
+            Self::SetPrestige(amount) => 66 + set_value_index(amount),
+            Self::SetLevel(amount) => 76 + set_value_index(amount),
+            Self::MaxAttributes => 86,
         }
     }
 
@@ -322,6 +326,7 @@ impl DebugAction {
             Self::TriggerRunicShiftChallenge => "Trigger Sigil Surge Challenge",
             Self::TriggerHavenDiscovery => "Trigger Haven Discovery",
             Self::TriggerSoulforgeDiscovery => "Trigger Soulforge Discovery",
+            Self::TriggerForgeStormbreaker => "Forge Stormbreaker",
             Self::TriggerForgeAsprika => "Forge Asprika (God Item)",
             Self::TriggerForgeSleipnir => "Forge Sleipnir (God Item)",
             Self::TriggerForgeMegingjord => "Forge Megingjord (God Item)",
@@ -412,6 +417,7 @@ impl DebugAction {
         haven: &mut Haven,
         enhancement: &mut EnhancementProgress,
         deep: &mut DeepState,
+        achievements: &mut crate::achievements::Achievements,
     ) -> &'static str {
         match self {
             Self::TriggerDungeon => trigger_dungeon(state),
@@ -428,6 +434,7 @@ impl DebugAction {
             Self::TriggerRunicShiftChallenge => trigger_runic_shift_challenge(state),
             Self::TriggerHavenDiscovery => trigger_haven_discovery(haven),
             Self::TriggerSoulforgeDiscovery => trigger_soulforge_discovery(enhancement),
+            Self::TriggerForgeStormbreaker => trigger_forge_stormbreaker(achievements),
             Self::TriggerForgeAsprika => trigger_forge_asprika(state, enhancement),
             Self::TriggerForgeSleipnir => trigger_forge_sleipnir(state, enhancement),
             Self::TriggerForgeMegingjord => trigger_forge_megingjord(state, enhancement),
@@ -639,8 +646,19 @@ impl DebugMenu {
         }
 
         let msg = action_for_option_index(selected_option)
-            .map(|action| action.run(state, haven, enhancement, deep))
+            .map(|action| action.run(state, haven, enhancement, deep, achievements))
             .unwrap_or("Unknown option");
+
+        // Re-sync zone unlocks after every action — any action may change
+        // prestige, achievements, or Deep state that affects zone access.
+        crate::zones::access::sync_account_zone_unlocks(
+            &mut state.zone_progression,
+            achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
+            deep.persistent.fracture_zone_cap,
+            state.prestige_rank,
+        );
+        state.cached_fracture_zone_cap = deep.persistent.fracture_zone_cap;
+
         self.close();
         msg
     }
@@ -794,6 +812,26 @@ fn trigger_soulforge_discovery(enhancement: &mut EnhancementProgress) -> &'stati
     }
     enhancement.discovered = true;
     "Soulforge discovered!"
+}
+
+fn trigger_forge_stormbreaker(
+    achievements: &mut crate::achievements::Achievements,
+) -> &'static str {
+    if achievements.is_unlocked(crate::achievements::AchievementId::TheStormbreaker) {
+        return "Stormbreaker already forged!";
+    }
+    achievements.unlock(
+        crate::achievements::AchievementId::TheStormbreaker,
+        Some("Debug".to_string()),
+    );
+    // Also unlock StormsEnd so Zone 11 becomes accessible
+    if !achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd) {
+        achievements.unlock(
+            crate::achievements::AchievementId::StormsEnd,
+            Some("Debug".to_string()),
+        );
+    }
+    "Forged Stormbreaker!"
 }
 
 fn trigger_forge_asprika(state: &mut GameState, enhancement: &EnhancementProgress) -> &'static str {
@@ -989,6 +1027,7 @@ fn trigger_unlock_deep_layer(
             &mut state.zone_progression,
             true,
             deep.persistent.fracture_zone_cap,
+            state.prestige_rank,
         );
     }
 
@@ -1089,6 +1128,7 @@ fn trigger_travel_to_zone(
         &mut state.zone_progression,
         true,
         deep.persistent.fracture_zone_cap,
+        state.prestige_rank,
     );
 
     // Travel to subzone 1
@@ -1133,10 +1173,11 @@ fn trigger_set_prestige(
     state.prestige_rank = rank;
     state.recalculate_prestige_bonuses();
 
-    // Unlock zones accessible at new prestige rank
+    // Unlock zones accessible at new prestige rank (skip fracture zones 12+,
+    // those are gated by Deep layer breakthroughs via sync_account_zone_unlocks)
     let zones = get_all_zones();
     for z in zones {
-        if z.prestige_requirement <= state.prestige_rank {
+        if z.id <= 11 && z.prestige_requirement <= state.prestige_rank {
             state.zone_progression.unlock_zone(z.id);
         }
     }
@@ -1647,6 +1688,7 @@ mod tests {
     #[test]
     fn test_trigger_unlock_deep_layer_3() {
         let mut state = GameState::new("Test".to_string(), 0);
+        state.prestige_rank = 50; // Meet P50 requirement for zones 12-14
         let mut deep = DeepState::new();
 
         let msg = trigger_unlock_deep_layer(&mut deep, &mut state, 3);
@@ -1668,6 +1710,7 @@ mod tests {
     #[test]
     fn test_trigger_unlock_deep_layer_12() {
         let mut state = GameState::new("Test".to_string(), 0);
+        state.prestige_rank = 100; // Meet P100 requirement for zones 18-20
         let mut deep = DeepState::new();
 
         trigger_unlock_deep_layer(&mut deep, &mut state, 12);
