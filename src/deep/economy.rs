@@ -141,12 +141,7 @@ pub fn compute_mark_reward(params: &MarkRewardParams) -> u32 {
 pub fn mission_launch_cost(mission_type: MissionType, layer: u32) -> u32 {
     let layer = layer.max(1);
     match mission_type {
-        MissionType::SupplyRun => {
-            // 15-25 Marks when not using the free daily slot.
-            // Use the midpoint (20) for deterministic cost; variance handled
-            // at the supply-run-specific level if desired.
-            20
-        }
+        MissionType::SupplyRun => 5 + layer,
         MissionType::Recon => 30 + layer,
         MissionType::Expedition => 80 + 3 * layer,
         MissionType::Breakthrough | MissionType::GatewayExpedition => 300 + 25 * layer,
