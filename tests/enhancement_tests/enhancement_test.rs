@@ -391,13 +391,15 @@ fn test_discover_soulforge_eventually_succeeds() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut ep = EnhancementProgress::new();
     let mut found = false;
-    for _ in 0..500_000 {
-        if try_discover_soulforge(&mut ep, 15, &mut rng) {
+    // Use P100 for faster discovery (0.000609/tick vs 0.000014/tick at P15).
+    // Tests the same discovery code path with fewer iterations.
+    for _ in 0..50_000 {
+        if try_discover_soulforge(&mut ep, 100, &mut rng) {
             found = true;
             break;
         }
     }
-    assert!(found, "Should discover soulforge within 500K ticks at P15");
+    assert!(found, "Should discover soulforge within 50K ticks at P100");
     assert!(ep.discovered);
 }
 
@@ -1048,8 +1050,9 @@ fn test_try_discover_soulforge_at_exactly_min_prestige() {
     let mut ep = EnhancementProgress::new();
     let mut discovered = false;
 
-    // At exactly P15, discovery should be possible
-    for _ in 0..500_000 {
+    // At exactly P15, discovery should be possible (chance = 0.000014/tick).
+    // Expected discovery within ~71K ticks on average; 200K gives ample margin.
+    for _ in 0..200_000 {
         if try_discover_soulforge(&mut ep, SOULFORGE_MIN_PRESTIGE_RANK, &mut rng) {
             discovered = true;
             break;

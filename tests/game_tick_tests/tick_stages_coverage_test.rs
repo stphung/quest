@@ -1441,11 +1441,11 @@ fn test_collect_achievement_events_emits_unlock_events() {
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
 
-    // Run many ticks to get an enemy killed and enough XP for level 10
+    // Run ticks until enemy killed and enough XP for level 10 (early exit at level 10)
     let mut seen_level_up = false;
     let mut seen_achievement = false;
 
-    for _ in 0..10000 {
+    for _ in 0..5000 {
         let result = run_game_tick(&mut state, &mut tc, &mut haven, &mut ach, false, &mut rng);
 
         if has_event(&result, |e| matches!(e, TickEvent::LeveledUp { .. })) {

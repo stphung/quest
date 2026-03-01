@@ -237,7 +237,7 @@ fn test_item_drop_salvage_awards_stormglass() {
 
     // Run ticks until an item drop triggers salvage (early exit optimization)
     let initial_sg = state.stormglass;
-    for _ in 0..10000 {
+    for _ in 0..5000 {
         let _result = game_tick(
             &mut state,
             &mut tick_counter,
@@ -491,7 +491,7 @@ fn test_first_salvage_discovers_stormglass() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
 
     // Run many ticks — once an item drops and isn't equipped, stormglass gets discovered
-    for _ in 0..10000 {
+    for _ in 0..5000 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
@@ -620,7 +620,7 @@ fn test_salvage_continues_after_prestige_rank_drops_below_15() {
     let initial_sg = state.stormglass;
     let mut saw_salvage = false;
 
-    for _ in 0..10000 {
+    for _ in 0..5000 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,

@@ -270,7 +270,7 @@ fn test_lure_consumed_on_encounter() {
 fn test_lure_consumed_on_catch() {
     let haven = HavenFishingBonuses::default();
     let mut found = false;
-    for seed in 0..10000 {
+    for seed in 0..5000 {
         let mut rng = rng_from(seed);
         let mut state = test_state_rank40();
         state.fishing.leviathan_encounters = 10;
@@ -292,14 +292,14 @@ fn test_lure_consumed_on_catch() {
             break;
         }
     }
-    assert!(found, "Should catch Leviathan over 10000 seeds with lure");
+    assert!(found, "Should catch Leviathan over 5000 seeds with lure");
 }
 
 #[test]
 fn test_lure_consumed_on_catch_miss() {
     let haven = HavenFishingBonuses::default();
     let mut found = false;
-    for seed in 0..10000 {
+    for seed in 0..5000 {
         let mut rng = rng_from(seed);
         let mut state = test_state_rank40();
         state.fishing.leviathan_encounters = 10;
@@ -326,7 +326,7 @@ fn test_lure_consumed_on_catch_miss() {
             break;
         }
     }
-    assert!(found, "Should find catch miss over 10000 seeds");
+    assert!(found, "Should find catch miss over 5000 seeds");
 }
 
 #[test]
