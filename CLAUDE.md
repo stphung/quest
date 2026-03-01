@@ -78,6 +78,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 - [`src/deep/CLAUDE.md`](src/deep/CLAUDE.md) — The Deep mercenary expedition system
 - [`src/ascension/CLAUDE.md`](src/ascension/CLAUDE.md) — Ascension combat power multiplier system
 - [`src/stormglass/CLAUDE.md`](src/stormglass/CLAUDE.md) — Stormglass currency, Storm Sigils, daily rotation
+- [`src/power_cores/CLAUDE.md`](src/power_cores/CLAUDE.md) — Passive PR generation from Deep milestones
 - [`src/ui/CLAUDE.md`](src/ui/CLAUDE.md) — Shared game layout components, color conventions
 
 ### Core Module (`src/core/`)
@@ -85,7 +86,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 - `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
 - `game_logic.rs` — Thin re-export wrapper (XP curve, leveling, spawning, offline logic extracted to submodules)
 - `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 14 processing stages. Zero UI imports, zero file I/O — fully decoupled from rendering
-- `tick_types.rs` — TickEvent enum (44 variants) and TickResult struct
+- `tick_types.rs` — TickEvent enum (45 variants) and TickResult struct
 - `tick_stages.rs` — Tick processing stages 4-6 and helper functions (process_item_drop, process_discoveries, etc.)
 - `xp.rs` — XP calculation, leveling logic, combat kill XP
 - `discoveries.rs` — Discovery rolls for dungeons, fishing spots, Haven, Soulforge, The Deep
@@ -247,6 +248,26 @@ An endgame (P15+) system where players recruit and manage a mercenary company, s
 
 Stormglass is a currency earned from completing challenge minigames. Gated behind P15+. Players spend Stormglass to activate Storm Sigils -- a daily-rotating set of passive bonuses. Sigil slots provide combat and progression bonuses. Also offers the Storm Lure consumable (50,000 SG) that guarantees Storm Leviathan encounters during fishing at rank 40.
 
+### Power Cores Module (`src/power_cores/`)
+
+- `types.rs` — PowerCoreDef, PowerCoreState, ALL_POWER_CORES (6 core definitions), helper functions (get_power_core_def, get_unlocked_cores, fill_duration_secs)
+- `tick.rs` — Per-tick processing (tick_power_cores), offline catchup (apply_offline_power_cores), new core initialization (init_new_core)
+- `persistence.rs` — Save/load from `~/.quest/power_cores.json`
+- `mod.rs` — Public re-exports
+
+Passive prestige rank generation system tied to Deep layer milestones. Six Power Cores, each unlocked by clearing a specific Deep layer (the same layers that unlock fracture zones). Once unlocked, a core passively generates prestige ranks over time at a fixed rate. State persists in `~/.quest/power_cores.json`. Cores grant PR via wall-clock elapsed time (not game ticks), so offline catchup is automatic.
+
+| Core | Name | Deep Layer | PR/Day | Fill Time |
+|------|------|-----------|--------|-----------|
+| I | Red Fault | 3 | 1 | 24h |
+| II | Mirror Scar | 7 | 2 | 12h |
+| III | Black Mouth | 12 | 3 | 8h |
+| IV | Hollow Throne | 18 | 4 | 6h |
+| V | Wailing Reach | 25 | 5 | ~4.8h |
+| VI | Origin Wound | 30 | 6 | 4h |
+
+Total at all 6 cores: 21 PR/day (max).
+
 ### God Items Module (`src/god_items/`)
 
 - `types.rs` — 3 god items (Asprika, Sleipnir, Megingjord) with unique passives and bonuses, `GodItemId` enum, `GodItemDefinition` struct, helper functions for querying equipped god item effects
@@ -287,7 +308,7 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 
 ### Achievement Module (`src/achievements/`)
 
-- `types.rs` — AchievementId enum (207 variants), categories, unlock tracking, `selected_title` field
+- `types.rs` — AchievementId enum (213 variants), categories, unlock tracking, `selected_title` field
 - `data.rs` — Achievement database with descriptions and unlock conditions
 - `handlers.rs` — Event handlers (on_enemy_killed, on_boss_killed, on_level_up, etc.) and check_milestones
 - `milestones.rs` — MinigameType, MinigameDifficulty enums, milestone threshold arrays
@@ -298,7 +319,7 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 - `unlock.rs` — Core unlock machinery (is_unlocked, unlock, check_milestones)
 - `persistence.rs` — Save/load from `~/.quest/achievements.json`
 
-Account-level achievement system that persists across characters. 8 categories (Combat, Level, Prestige, Progression, Challenges, Exploration, Deep, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, Soulforge enhancements, Deep milestones (discovery, layers, guild ranks), fracture zone completions (Z12-Z30), and Ascension milestones (I, III, VI). Includes modal notification system with 500ms accumulation window. Includes a title system where 63 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select. Achievement score system: each of the 207 achievements has a point value (7 tiers: 5/10/25/50/100/250/500), computed at runtime. Shown in browser title bar, unlock modal, detail panel, and stats view.
+Account-level achievement system that persists across characters. 8 categories (Combat, Level, Prestige, Progression, Challenges, Exploration, Deep, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, Soulforge enhancements, Deep milestones (discovery, layers, guild ranks), fracture zone completions (Z12-Z30), and Ascension milestones (I-VI), and Power Core milestones (I-VI). Includes modal notification system with 500ms accumulation window. Includes a title system where 63 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select. Achievement score system: each of the 213 achievements has a point value (7 tiers: 5/10/25/50/100/250/500), computed at runtime. Shown in browser title bar, unlock modal, detail panel, and stats view.
 
 ### History / Time Vault (`src/history/`)
 
@@ -385,8 +406,10 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `deep_events.rs` — Deep check-in event response sub-view
 - `deep_results.rs` — Deep mission complete modal
 - `deep_shared.rs` — Shared Deep UI helpers (cards, progress bars, formatting)
+- `ascension_scene.rs` — Ascension overlay UI (level display, cost/gate info, ascend confirmation)
 - `stormglass_scene.rs` — Stormglass Exchange overlay with animations (Invoke Trial rolling, Chrono Surge speed ramp/fast-forward, Storm Sigils daily rotation, Storm Lure)
 - `time_vault_scene.rs` — Time Vault overlay UI (branch/commit browser, restore, fork, GitHub cloud sync)
+- `overlay_layout.rs` — Shared overlay layout helpers for consistent overlay rendering
 - `scene_fx.rs` — Shared utilities for layered ASCII scene rendering (scene buffer, backdrop effects, wide character support)
 - `zone_bg.rs` — Stylized zone background scenes with 6-layer compositing pipeline for all 30 zones
 - `debug_menu_scene.rs` — Debug menu overlay with tabbed categories
@@ -448,6 +471,7 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - Ascension cost: [35, 65, 120, 200, 325, 500] PR for I-VI; 500 + 75*(level-6) PR for VII+
 - Ascension deep gate: [3, 7, 12, 18, 25, 30] layers for I-VI; none for VII+
 - Ascension multiplier: 2^level for I-VI (2x to 64x); 64 * 1.5^(level-6) for VII+
+- Power Cores: 6 cores (1-6 PR/day), unlocked at Deep Layers 3/7/12/18/25/30, max 21 PR/day total
 
 ## Combat Mechanics
 
@@ -596,6 +620,11 @@ quest/
 │   │   ├── sigils.rs        # Storm Sigil definitions and bonuses
 │   │   ├── earning.rs       # Stormglass earning from challenges
 │   │   └── spending.rs      # Stormglass spending on sigils
+│   ├── power_cores/         # Power Cores — passive PR generation [CLAUDE.md]
+│   │   ├── types.rs         # Core definitions, state, helpers
+│   │   ├── tick.rs          # Per-tick processing, offline catchup
+│   │   ├── persistence.rs   # Save/load power_cores.json
+│   │   └── mod.rs           # Public re-exports
 │   ├── god_items/           # God Items system
 │   │   └── types.rs         # 3 god items, passives, bonuses, helper queries
 │   ├── history/             # Time Vault — git-based save versioning
@@ -671,15 +700,17 @@ quest/
 │       ├── snake_scene.rs   # Snake UI
 │       ├── flappy_scene.rs  # Flappy Bird UI
 │       ├── jezzball_scene.rs # JezzBall UI
+│       ├── ascension_scene.rs # Ascension overlay
 │       ├── stormglass_scene.rs # Stormglass Exchange overlay with animations
 │       ├── time_vault_scene.rs # Time Vault overlay (branch/commit browser)
+│       ├── overlay_layout.rs  # Shared overlay layout helpers
 │       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
 │       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing)
 │       ├── debug_menu_scene.rs # Debug menu with tabbed categories
 │       ├── bug_report_scene.rs # Bug report overlay
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (62 test files, 6,506+ tests)
+├── tests/                   # Integration tests (65 test files, 6,673+ tests)
 │   ├── game_loop_orchestration_test.rs  # 42 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
 │   ├── tick_stages_coverage_test.rs     # Tick stages coverage tests

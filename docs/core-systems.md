@@ -391,7 +391,7 @@ The game runs a 100ms tick loop. Each tick calls `game_tick()` in `src/core/tick
 
 The tick implementation is split across several files:
 - `tick.rs` -- Orchestrator: calls each stage in order, returns `TickResult`
-- `tick_types.rs` -- `TickEvent` enum (44 variants) and `TickResult` struct
+- `tick_types.rs` -- `TickEvent` enum (45 variants) and `TickResult` struct
 - `tick_stages.rs` -- Processing stages 4-6 and helper functions (`process_item_drop`, `process_discoveries`, etc.)
 - `xp.rs` -- XP calculation, leveling logic, combat kill XP
 - `discoveries.rs` -- Discovery rolls for dungeons, fishing spots, Haven, Soulforge
@@ -419,7 +419,7 @@ Generic `<R: Rng>` allows seeded RNG in tests (`ChaCha8Rng`) and `thread_rng()` 
 
 ### TickEvent and TickResult
 
-`TickEvent` is an enum with 44 variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types. Defined in `tick_types.rs`.
+`TickEvent` is an enum with 45 variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types. Defined in `tick_types.rs`.
 
 ```rust
 pub struct TickResult {
@@ -432,6 +432,7 @@ pub struct TickResult {
     pub enhancement_changed: bool,
     pub god_items_changed: bool,
     pub deep_changed: bool,
+    pub power_cores_changed: bool,
     pub achievement_modal_ready: Vec<AchievementId>,
 }
 ```
@@ -447,6 +448,7 @@ pub struct TickResult {
 - Deep: `DeepMissionComplete`, `DeepEventPending`, `DeepMercInjured`, `DeepMercLost`, `DeepBreakthrough`, `DeepGuildRankUp`
 - Fracture Zones: `FractureRegionUnlocked`
 - Ascension: `Ascended`
+- Power Cores: `PowerCoreGranted`
 - Progress: `LeveledUp`, `AchievementUnlocked`
 
 ### Processing Stages

@@ -23,13 +23,14 @@ src/achievements/
 
 ### `AchievementId` (`types.rs`)
 
-Enum with 207 variants covering all trackable milestones. Organized by domain:
+Enum with 213 variants covering all trackable milestones. Organized by domain:
 
 - **Combat**: `SlayerI`..`SlayerXV` (100 to 1B kills), `BossHunterI`..`BossHunterXV` (1 to 10M bosses)
 - **Level**: `Level10`..`Level100000` (18 milestones)
 - **Prestige**: `FirstPrestige`..`Prestige10000` (P1 to P10000, 19 milestones)
 - **Zones**: `Zone1Complete`..`Zone10Complete`, `TheStormbreaker`, `StormsEnd`, `BeyondInfinity`, `FractureZone12`..`FractureZone30` (19 fracture zone completions)
-- **Ascension**: `AscensionI`, `AscensionIII`, `AscensionVI` (milestone achievements)
+- **Ascension**: `AscensionI`..`AscensionVI` (6 milestone achievements, one per level)
+- **Power Cores**: `PowerCoreI`..`PowerCoreVI` (6 milestone achievements, unlocked at Deep Layers 3/7/12/18/25/30)
 - **Challenges**: 4 difficulties per game type (chess, morris, gomoku, minesweeper, rune, go, flappy_bird, snake, jezzball, runic_shift) + `GrandChampion` (100 wins)
 - **Enhancement**: `SoulforgeDiscovered`, `ApprenticeSmith` (+1), `FullyTempered` (+4 all), `JourneymanSmith` (+5), `SoulforgeAdept` (+6), `SoulforgeSavant` (+7), `SoulforgeMaster` (+8), `SoulforgeGrandmaster` (+9), `SoulforgeAscendant` (+10), `SoulConvergence` (+7 all), `PersistentHammering` (100 attempts)
 - **Fishing**: `GoneFishing`, `FishermanI`..`FishermanIV` (rank milestones), `FishCatcherI`..`FishCatcherX` (100 to 100M fish catches), `StormLeviathan`
@@ -43,7 +44,7 @@ Eight categories for browsing: `Combat`, `Level`, `Prestige`, `Progression`, `Ch
 
 ### `AchievementDef` (`data.rs`)
 
-Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 207 achievements total.
+Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 213 achievements total.
 
 ### `Achievements` (`types.rs`)
 
