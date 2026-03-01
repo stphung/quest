@@ -218,8 +218,8 @@ fn test_mission_type_max_events_gateway_expedition() {
 #[test]
 fn test_mission_type_duration_range_secs_gateway_expedition() {
     let (min, max) = MissionType::GatewayExpedition.duration_range_secs();
-    assert_eq!(min, 86400);
-    assert_eq!(max, 86400);
+    assert_eq!(min, 172800);
+    assert_eq!(max, 172800);
 }
 
 // =============================================================================

@@ -23,9 +23,9 @@ use quest::deep::{
     guild_upgrade_cost, infrastructure_build_cost, is_frontier_layer, is_safe_layer,
     layer_power_thresholds, mark_layer_cleared, marks_variance_multiplier, merc_xp_per_mission,
     merc_xp_to_next_level, mission_duration_secs, mission_launch_cost, mission_power_threshold,
-    outcome_mark_multiplier, recruit_quality_distribution, stormglass_reward,
-    try_upgrade_guild_rank, xp_reward, FamiliarityLevel, GuildUpgradeError,
-    InfrastructureBuildError, MarkRewardParams, RecruitQuality,
+    outcome_mark_multiplier, recruit_quality_distribution, try_upgrade_guild_rank, xp_reward,
+    FamiliarityLevel, GuildUpgradeError, InfrastructureBuildError, MarkRewardParams,
+    RecruitQuality,
 };
 use quest::deep::{
     DeepPersistent, DeepPrestige, DeepState, GuildRank, Infrastructure, LayerTier, MissionOutcome,
@@ -510,9 +510,9 @@ fn familiarity_level_thresholds_are_correct() {
 #[test]
 fn familiarity_gain_per_mission_type_matches_design() {
     // From balance design §5 (buffed values).
-    assert_eq!(familiarity_gain(MissionType::SupplyRun), 8);
-    assert_eq!(familiarity_gain(MissionType::Recon), 20);
-    assert_eq!(familiarity_gain(MissionType::Expedition), 10);
+    assert_eq!(familiarity_gain(MissionType::SupplyRun), 2);
+    assert_eq!(familiarity_gain(MissionType::Recon), 5);
+    assert_eq!(familiarity_gain(MissionType::Expedition), 15);
     assert_eq!(familiarity_gain(MissionType::Breakthrough), 15);
     assert_eq!(
         familiarity_gain(MissionType::Construction(Infrastructure::Bridge)),
@@ -778,7 +778,7 @@ fn layer_tier_from_layer_void() {
 
 #[test]
 fn mission_durations_match_s2_table() {
-    // Shallows: all non-Breakthrough missions are 1h, Breakthrough is 2h.
+    // Shallows: Recon 1h base, Construction 2x, Expedition 3x, Breakthrough 4x.
     assert_eq!(
         mission_duration_secs(LayerTier::Shallows, MissionType::SupplyRun),
         3600
@@ -789,18 +789,18 @@ fn mission_durations_match_s2_table() {
     );
     assert_eq!(
         mission_duration_secs(LayerTier::Shallows, MissionType::Expedition),
-        3600
+        10_800
     );
     assert_eq!(
         mission_duration_secs(LayerTier::Shallows, MissionType::Breakthrough),
-        7200
+        14_400
     );
     assert_eq!(
         mission_duration_secs(
             LayerTier::Shallows,
             MissionType::Construction(Infrastructure::Outpost)
         ),
-        3600
+        7200
     );
 
     // Warrens spot checks.
@@ -810,7 +810,7 @@ fn mission_durations_match_s2_table() {
     );
     assert_eq!(
         mission_duration_secs(LayerTier::Warrens, MissionType::Breakthrough),
-        28800
+        43_200
     );
 
     // Hollows spot checks.
@@ -820,7 +820,7 @@ fn mission_durations_match_s2_table() {
     );
     assert_eq!(
         mission_duration_secs(LayerTier::Hollows, MissionType::Breakthrough),
-        43200
+        72_000
     );
 
     // Sunken Reach spot checks.
@@ -830,7 +830,7 @@ fn mission_durations_match_s2_table() {
     );
     assert_eq!(
         mission_duration_secs(LayerTier::SunkenReach, MissionType::Breakthrough),
-        64800
+        86_400
     );
 
     // Abyss spot checks.
@@ -840,11 +840,11 @@ fn mission_durations_match_s2_table() {
     );
     assert_eq!(
         mission_duration_secs(LayerTier::Abyss, MissionType::Expedition),
-        57600
+        86_400
     );
     assert_eq!(
         mission_duration_secs(LayerTier::Abyss, MissionType::Breakthrough),
-        86400
+        115_200
     );
 
     // Void spot checks.
@@ -854,7 +854,7 @@ fn mission_durations_match_s2_table() {
     );
     assert_eq!(
         mission_duration_secs(LayerTier::Void, MissionType::Breakthrough),
-        86400
+        144_000
     );
 
     // GatewayExpedition is always 48h (172800s) regardless of tier.
@@ -1074,30 +1074,6 @@ fn xp_reward_scales_with_outcome() {
     let failure = xp_reward(MissionType::Expedition, 10, MissionOutcome::Failure);
     assert!(success > partial, "Success XP must exceed partial");
     assert!(partial > failure, "Partial XP must exceed failure");
-}
-
-#[test]
-fn stormglass_only_from_expeditions_and_breakthroughs() {
-    assert_eq!(stormglass_reward(MissionType::SupplyRun, 10), 0);
-    assert_eq!(stormglass_reward(MissionType::Recon, 10), 0);
-    assert_eq!(
-        stormglass_reward(MissionType::Construction(Infrastructure::Outpost), 10),
-        0
-    );
-    assert!(stormglass_reward(MissionType::Expedition, 1) > 0);
-    assert!(stormglass_reward(MissionType::Breakthrough, 1) > 0);
-}
-
-#[test]
-fn stormglass_increases_with_depth() {
-    assert!(
-        stormglass_reward(MissionType::Expedition, 20)
-            > stormglass_reward(MissionType::Expedition, 10)
-    );
-    assert!(
-        stormglass_reward(MissionType::Breakthrough, 20)
-            > stormglass_reward(MissionType::Breakthrough, 10)
-    );
 }
 
 // ── 20. Merc XP ──────────────────────────────────────────────────────────────

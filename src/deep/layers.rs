@@ -86,9 +86,9 @@ impl FamiliarityLevel {
 /// (handled separately in `build_infrastructure`).
 pub fn familiarity_gain(mission_type: MissionType) -> u8 {
     match mission_type {
-        MissionType::SupplyRun => 8,
-        MissionType::Recon => 20,
-        MissionType::Expedition => 10,
+        MissionType::SupplyRun => 2,
+        MissionType::Recon => 5,
+        MissionType::Expedition => 15,
         MissionType::Breakthrough | MissionType::GatewayExpedition => 15,
         MissionType::Construction(_) => 5,
     }
@@ -193,39 +193,42 @@ pub fn mission_duration_secs(tier: LayerTier, mission_type: MissionType) -> u64 
     match (tier, mission_type) {
         // Gateway Expedition — fixed 48h regardless of tier
         (_, MissionType::GatewayExpedition) => 172_800,
-        // Shallows: everything 1h except Breakthrough 2h
-        (LayerTier::Shallows, MissionType::Breakthrough) => 7_200,
-        (LayerTier::Shallows, _) => 3_600,
-        // Warrens
+        // Shallows (Recon 1h base: Construction 2h, Expedition 3h, Breakthrough 4h)
+        (LayerTier::Shallows, MissionType::SupplyRun) => 3_600,
+        (LayerTier::Shallows, MissionType::Recon) => 3_600,
+        (LayerTier::Shallows, MissionType::Construction(_)) => 7_200,
+        (LayerTier::Shallows, MissionType::Expedition) => 10_800,
+        (LayerTier::Shallows, MissionType::Breakthrough) => 14_400,
+        // Warrens (Recon 3h base)
         (LayerTier::Warrens, MissionType::SupplyRun) => 7_200,
         (LayerTier::Warrens, MissionType::Recon) => 10_800,
-        (LayerTier::Warrens, MissionType::Construction(_)) => 10_800,
-        (LayerTier::Warrens, MissionType::Expedition) => 18_000,
-        (LayerTier::Warrens, MissionType::Breakthrough) => 28_800,
-        // Hollows
+        (LayerTier::Warrens, MissionType::Construction(_)) => 21_600,
+        (LayerTier::Warrens, MissionType::Expedition) => 32_400,
+        (LayerTier::Warrens, MissionType::Breakthrough) => 43_200,
+        // Hollows (Recon 5h base)
         (LayerTier::Hollows, MissionType::SupplyRun) => 10_800,
-        (LayerTier::Hollows, MissionType::Construction(_)) => 14_400,
         (LayerTier::Hollows, MissionType::Recon) => 18_000,
-        (LayerTier::Hollows, MissionType::Expedition) => 28_800,
-        (LayerTier::Hollows, MissionType::Breakthrough) => 43_200,
-        // Sunken Reach
+        (LayerTier::Hollows, MissionType::Construction(_)) => 36_000,
+        (LayerTier::Hollows, MissionType::Expedition) => 54_000,
+        (LayerTier::Hollows, MissionType::Breakthrough) => 72_000,
+        // Sunken Reach (Recon 6h base)
         (LayerTier::SunkenReach, MissionType::SupplyRun) => 14_400,
         (LayerTier::SunkenReach, MissionType::Recon) => 21_600,
-        (LayerTier::SunkenReach, MissionType::Construction(_)) => 21_600,
-        (LayerTier::SunkenReach, MissionType::Expedition) => 43_200,
-        (LayerTier::SunkenReach, MissionType::Breakthrough) => 64_800,
-        // Abyss
+        (LayerTier::SunkenReach, MissionType::Construction(_)) => 43_200,
+        (LayerTier::SunkenReach, MissionType::Expedition) => 64_800,
+        (LayerTier::SunkenReach, MissionType::Breakthrough) => 86_400,
+        // Abyss (Recon 8h base)
         (LayerTier::Abyss, MissionType::SupplyRun) => 18_000,
         (LayerTier::Abyss, MissionType::Recon) => 28_800,
-        (LayerTier::Abyss, MissionType::Construction(_)) => 28_800,
-        (LayerTier::Abyss, MissionType::Expedition) => 57_600,
-        (LayerTier::Abyss, MissionType::Breakthrough) => 86_400,
-        // Void
+        (LayerTier::Abyss, MissionType::Construction(_)) => 57_600,
+        (LayerTier::Abyss, MissionType::Expedition) => 86_400,
+        (LayerTier::Abyss, MissionType::Breakthrough) => 115_200,
+        // Void (Recon 10h base)
         (LayerTier::Void, MissionType::SupplyRun) => 21_600,
         (LayerTier::Void, MissionType::Recon) => 36_000,
-        (LayerTier::Void, MissionType::Construction(_)) => 36_000,
-        (LayerTier::Void, MissionType::Expedition) => 72_000,
-        (LayerTier::Void, MissionType::Breakthrough) => 86_400,
+        (LayerTier::Void, MissionType::Construction(_)) => 72_000,
+        (LayerTier::Void, MissionType::Expedition) => 108_000,
+        (LayerTier::Void, MissionType::Breakthrough) => 144_000,
     }
 }
 
@@ -397,9 +400,9 @@ mod tests {
 
     #[test]
     fn test_familiarity_gain_values() {
-        assert_eq!(familiarity_gain(MissionType::SupplyRun), 8);
-        assert_eq!(familiarity_gain(MissionType::Recon), 20);
-        assert_eq!(familiarity_gain(MissionType::Expedition), 10);
+        assert_eq!(familiarity_gain(MissionType::SupplyRun), 2);
+        assert_eq!(familiarity_gain(MissionType::Recon), 5);
+        assert_eq!(familiarity_gain(MissionType::Expedition), 15);
         assert_eq!(familiarity_gain(MissionType::Breakthrough), 15);
         assert_eq!(
             familiarity_gain(MissionType::Construction(Infrastructure::Outpost)),
@@ -411,16 +414,16 @@ mod tests {
     fn test_apply_familiarity_gain_caps_at_100() {
         let mut record = LayerRecord::new(1);
         record.familiarity = 95;
-        apply_familiarity_gain(&mut record, MissionType::Recon); // +15 would overflow
+        apply_familiarity_gain(&mut record, MissionType::Expedition); // +15 would overflow
         assert_eq!(record.familiarity, 100);
     }
 
     #[test]
     fn test_apply_familiarity_gain_accumulates() {
         let mut record = LayerRecord::new(1);
-        apply_familiarity_gain(&mut record, MissionType::SupplyRun); // +8
-        apply_familiarity_gain(&mut record, MissionType::Recon); // +20
-        assert_eq!(record.familiarity, 28);
+        apply_familiarity_gain(&mut record, MissionType::SupplyRun); // +2
+        apply_familiarity_gain(&mut record, MissionType::Recon); // +5
+        assert_eq!(record.familiarity, 7);
     }
 
     // ── Power Thresholds ─────────────────────────────────────────────────────
@@ -503,18 +506,18 @@ mod tests {
         );
         assert_eq!(
             mission_duration_secs(LayerTier::Shallows, MissionType::Expedition),
-            3600
+            10_800
         );
         assert_eq!(
             mission_duration_secs(
                 LayerTier::Shallows,
                 MissionType::Construction(Infrastructure::Outpost)
             ),
-            3600
+            7200
         );
         assert_eq!(
             mission_duration_secs(LayerTier::Shallows, MissionType::Breakthrough),
-            7200
+            14_400
         );
     }
 
@@ -526,7 +529,7 @@ mod tests {
         );
         assert_eq!(
             mission_duration_secs(LayerTier::Void, MissionType::Breakthrough),
-            86_400
+            144_000
         );
     }
 

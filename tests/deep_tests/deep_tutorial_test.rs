@@ -373,7 +373,7 @@ fn test_mission_duration_ranges_ordered() {
     let expedition_min = MissionType::Expedition.duration_range_secs().0;
     let breakthrough_min = MissionType::Breakthrough.duration_range_secs().0;
 
-    assert!(supply_min < recon_min, "Supply min < Recon min");
+    assert!(supply_min <= recon_min, "Supply min <= Recon min");
     assert!(recon_min < expedition_min, "Recon min < Expedition min");
     assert!(
         expedition_min < breakthrough_min,

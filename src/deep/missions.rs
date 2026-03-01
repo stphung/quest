@@ -1458,7 +1458,6 @@ pub fn resolve_mission(
         // Player XP from missions is disabled; merc progression is handled above via
         // `apply_squad_progression` (missions_completed + level-up milestones).
         xp_earned: 0,
-        stormglass_earned: 0,
         item_ilvl: None,
         injured_mercs,
         lost_mercs,
@@ -1503,7 +1502,6 @@ fn resolve_first_orders(
         outcome: MissionOutcome::Success,
         marks_earned,
         xp_earned: 0,
-        stormglass_earned: 0,
         item_ilvl: None,
         injured_mercs: vec![],
         lost_mercs: vec![],

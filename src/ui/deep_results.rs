@@ -104,12 +104,6 @@ pub(super) fn render_mission_results(
             Style::default().fg(Color::Cyan),
         )));
     }
-    if result.stormglass_earned > 0 {
-        lines.push(Line::from(Span::styled(
-            format!("  + {} Stormglass", result.stormglass_earned),
-            Style::default().fg(Color::Rgb(100, 180, 255)),
-        )));
-    }
     if let Some(ilvl) = result.item_ilvl {
         lines.push(Line::from(Span::styled(
             format!("  + Item (ilvl {})", ilvl),
