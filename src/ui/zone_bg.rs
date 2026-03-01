@@ -402,11 +402,93 @@ fn paint_emberglow(buffer: &mut [Vec<SceneCell>], _width: usize, height: usize, 
     }
 }
 
-fn paint_cracked_sky(_buffer: &mut [Vec<SceneCell>], _width: usize, _height: usize, _millis: f64) {}
+fn paint_cracked_sky(buffer: &mut [Vec<SceneCell>], width: usize, height: usize, millis: f64) {
+    let t = millis / 1500.0;
+    let sky_limit = (height as f64 * 0.5) as usize;
 
-fn paint_void_rift(_buffer: &mut [Vec<SceneCell>], _width: usize, _height: usize, _millis: f64) {}
+    // Draw 3-4 fracture lines across the sky
+    for i in 0..4u32 {
+        let base_x = (i as f64 * width as f64 / 4.0 + width as f64 * 0.1) as i32;
+        let base_y = (i as f64 * sky_limit as f64 / 6.0 + 1.0) as i32;
 
-fn paint_flicker(_buffer: &mut [Vec<SceneCell>], _width: usize, _height: usize, _millis: f64) {}
+        let pulse = (t * 0.12 + i as f64 * 1.7).sin() * 0.5 + 0.5;
+        let brightness = (120.0 + pulse * 135.0) as u8;
+        let fg = Color::Rgb(brightness, brightness.saturating_sub(20), brightness.saturating_sub(60));
+
+        // Main fracture point
+        put_cell(buffer, base_y, base_x, '/', fg);
+        put_cell(buffer, base_y, base_x + 1, '\\', fg);
+
+        // Branch lines
+        let dim = Color::Rgb(brightness / 2, brightness / 2, brightness.saturating_sub(40) / 2);
+        put_cell(buffer, base_y - 1, base_x - 1, '/', dim);
+        put_cell(buffer, base_y + 1, base_x + 2, '\\', dim);
+
+        // Bright core glyph
+        if pulse > 0.6 {
+            put_cell(buffer, base_y, base_x, '\u{2726}', Color::Rgb(255, 240, 200)); // ✦
+        }
+    }
+}
+
+fn paint_void_rift(buffer: &mut [Vec<SceneCell>], width: usize, height: usize, millis: f64) {
+    let t = millis / 2000.0;
+    let cx = (width as f64 * 0.5 + (t * 0.02).sin() * 3.0).round() as i32;
+    let cy = (height as f64 * 0.2 + (t * 0.015).sin() * 1.5).round() as i32;
+
+    // Rift edges (purple glow)
+    let glow_pulse = (t * 0.1).sin() * 0.3 + 0.7;
+    let glow_brightness = (80.0 * glow_pulse) as u8;
+    let edge_fg = Color::Rgb(glow_brightness.saturating_add(40), glow_brightness / 4, glow_brightness);
+
+    for dx in -3..=3i32 {
+        put_cell(buffer, cy - 1, cx + dx, '\u{2500}', edge_fg); // ─
+        put_cell(buffer, cy + 1, cx + dx, '\u{2500}', edge_fg); // ─
+    }
+
+    // Rift interior (dark void)
+    for dx in -2..=2i32 {
+        let void_fg = Color::Rgb(15, 5, 20);
+        put_cell(buffer, cy, cx + dx, '\u{2591}', void_fg); // ░
+    }
+
+    // Corner accents
+    put_cell(buffer, cy - 1, cx - 3, '\u{256d}', edge_fg); // ╭
+    put_cell(buffer, cy - 1, cx + 3, '\u{256e}', edge_fg); // ╮
+    put_cell(buffer, cy + 1, cx - 3, '\u{2570}', edge_fg); // ╰
+    put_cell(buffer, cy + 1, cx + 3, '\u{256f}', edge_fg); // ╯
+}
+
+fn paint_flicker(buffer: &mut [Vec<SceneCell>], width: usize, height: usize, millis: f64) {
+    let flicker_tick = (millis / 150.0) as usize;
+    let sky_limit = (height as f64 * 0.6) as usize;
+
+    for row in 0..sky_limit.min(height) {
+        for col in 0..width {
+            if col >= buffer[row].len() {
+                continue;
+            }
+            if buffer[row][col].ch != ' ' {
+                continue;
+            }
+            if !hash2d(row + 19, col + 37).is_multiple_of(157) {
+                continue;
+            }
+            // Flicker: visible only on certain ticks
+            let visible = hash2d(row + flicker_tick, col + flicker_tick * 3).is_multiple_of(5);
+            if !visible {
+                continue;
+            }
+            let bright = hash2d(row + flicker_tick / 2, col).is_multiple_of(3);
+            let (ch, fg) = if bright {
+                ('*', Color::Rgb(200, 180, 220))
+            } else {
+                ('.', Color::Rgb(100, 80, 130))
+            };
+            put_cell(buffer, row as i32, col as i32, ch, fg);
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Layer 3 & 4: Terrain Silhouettes
@@ -840,11 +922,97 @@ fn paint_drifting_ash(buffer: &mut [Vec<SceneCell>], millis: f64, intensity: f64
     }
 }
 
-fn paint_dust_motes(_buffer: &mut [Vec<SceneCell>], _millis: f64, _intensity: f64) {}
+fn paint_dust_motes(buffer: &mut [Vec<SceneCell>], millis: f64, intensity: f64) {
+    let height = buffer.len();
+    let width = buffer[0].len();
+    let threshold = (130.0 / intensity).max(20.0) as u32;
+    let slow_phase = (millis / 800.0) as usize;
 
-fn paint_static_noise(_buffer: &mut [Vec<SceneCell>], _millis: f64, _intensity: f64) {}
+    for row in 0..height {
+        for col in 0..width {
+            if col >= buffer[row].len() {
+                continue;
+            }
+            let seed = hash2d(row + 3, col + slow_phase / 10);
+            if !seed.is_multiple_of(threshold) {
+                continue;
+            }
+            if buffer[row][col].ch != ' ' {
+                continue;
+            }
+            // Gentle pulse
+            let pulse = (millis * 0.002 + row as f64 * 0.4 + col as f64 * 0.3).sin();
+            if pulse < 0.1 {
+                continue;
+            }
+            let brightness = (60.0 + pulse * 50.0) as u8;
+            let fg = Color::Rgb(
+                brightness.saturating_add(30),
+                brightness.saturating_add(10),
+                brightness / 2,
+            );
+            put_cell(buffer, row as i32, col as i32, '\u00b7', fg);
+        }
+    }
+}
 
-fn paint_fracture_motes(_buffer: &mut [Vec<SceneCell>], _millis: f64, _intensity: f64) {}
+fn paint_static_noise(buffer: &mut [Vec<SceneCell>], millis: f64, intensity: f64) {
+    let height = buffer.len();
+    let width = buffer[0].len();
+    let threshold = (70.0 / intensity).max(10.0) as u32;
+    let phase = (millis / 60.0) as usize;
+
+    let noise_chars = ['/', '\\', '|', '-', '.', '*', ':', ';'];
+
+    for row in 0..height {
+        for col in 0..width {
+            if col >= buffer[row].len() {
+                continue;
+            }
+            let seed = hash2d(row.wrapping_add(phase), col.wrapping_add(phase * 7));
+            if !seed.is_multiple_of(threshold) {
+                continue;
+            }
+            if buffer[row][col].ch != ' ' {
+                continue;
+            }
+            let ch_idx = seed as usize % noise_chars.len();
+            let brightness = 40 + (seed % 80) as u8;
+            let fg = Color::Rgb(brightness, brightness.saturating_sub(10), brightness.saturating_add(20));
+            put_cell(buffer, row as i32, col as i32, noise_chars[ch_idx], fg);
+        }
+    }
+}
+
+fn paint_fracture_motes(buffer: &mut [Vec<SceneCell>], millis: f64, intensity: f64) {
+    let height = buffer.len();
+    let width = buffer[0].len();
+    let threshold = (160.0 / intensity).max(25.0) as u32;
+    let phase = (millis / 300.0) as usize;
+
+    for row in 0..height {
+        for col in 0..width {
+            if col >= buffer[row].len() {
+                continue;
+            }
+            let seed = hash2d(row + phase, col + 11);
+            if !seed.is_multiple_of(threshold) {
+                continue;
+            }
+            if buffer[row][col].ch != ' ' {
+                continue;
+            }
+            // Only visible during part of pulse cycle
+            let pulse = (millis * 0.003 + seed as f64 * 0.01).sin();
+            if pulse < 0.4 {
+                continue;
+            }
+            let brightness = (30.0 + pulse * 40.0) as u8;
+            let fg = Color::Rgb(brightness.saturating_add(20), brightness / 3, brightness);
+            put_cell(buffer, row as i32, col as i32, '\u00b7', fg);
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Overlay Functions
@@ -1596,16 +1764,100 @@ fn config_the_black_mouth() -> ZoneSceneConfig {
 // Chapter 4: The Hollow Throne (Zones 21-23)
 // ---------------------------------------------------------------------------
 
+/// Zone 21: Sunken Processional -- amber-grey pillared halls, dust motes, hollow echoes.
 fn config_sunken_processional() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (100, 85, 60),
+        sky_bottom: (35, 30, 22),
+        celestial: CelestialType::Wisps,
+        far_terrain: TerrainProfile {
+            glyph: '\u{2551}', // ║
+            color: (120, 100, 60),
+            base_height: 0.44,
+            amplitude: 0.06,
+            frequency: 0.22,
+            speed: 0.00003,
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '\u{2592}', // ▒
+            color: (70, 60, 40),
+            base_height: 0.66,
+            amplitude: 0.05,
+            frequency: 0.16,
+            speed: 0.00003,
+            fill: true,
+        },
+        ground_glyphs: &[':', '.'],
+        ground_color: (90, 75, 50),
+        weather: WeatherType::DustMotes,
+        weather_intensity: 0.8,
+        overlay: Some(overlay_hollow_echo),
+    }
 }
 
+/// Zone 22: The Pale Archive -- bone-white library, faded, dusty silence.
 fn config_the_pale_archive() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (160, 155, 145),
+        sky_bottom: (80, 75, 65),
+        celestial: CelestialType::None,
+        far_terrain: TerrainProfile {
+            glyph: '\u{2502}', // │
+            color: (130, 125, 115),
+            base_height: 0.46,
+            amplitude: 0.05,
+            frequency: 0.24,
+            speed: 0.00002,
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '\u{2591}', // ░
+            color: (110, 105, 95),
+            base_height: 0.65,
+            amplitude: 0.04,
+            frequency: 0.18,
+            speed: 0.00003,
+            fill: true,
+        },
+        ground_glyphs: &['\u{00b7}', ';'],
+        ground_color: (120, 115, 105),
+        weather: WeatherType::DustMotes,
+        weather_intensity: 1.2,
+        overlay: Some(overlay_hollow_echo),
+    }
 }
 
+/// Zone 23: The Hollow Throne -- cold grey to void-black, obsidian palace, void rift above.
 fn config_the_hollow_throne() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (60, 55, 65),
+        sky_bottom: (8, 5, 12),
+        celestial: CelestialType::VoidRift,
+        far_terrain: TerrainProfile {
+            glyph: '\u{256b}', // ╫
+            color: (80, 70, 90),
+            base_height: 0.44,
+            amplitude: 0.07,
+            frequency: 0.18,
+            speed: 0.00004,
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '\u{2593}', // ▓
+            color: (30, 25, 35),
+            base_height: 0.64,
+            amplitude: 0.06,
+            frequency: 0.14,
+            speed: 0.00004,
+            fill: true,
+        },
+        ground_glyphs: &[],
+        ground_color: (0, 0, 0),
+        weather: WeatherType::DustMotes,
+        weather_intensity: 0.5,
+        overlay: Some(overlay_hollow_echo),
+    }
 }
 
 // ---------------------------------------------------------------------------
