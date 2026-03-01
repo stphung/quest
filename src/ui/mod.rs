@@ -397,6 +397,13 @@ pub fn draw_ui_with_update(
     let deep_indicator =
         stats_panel::DeepIndicatorStatus::from_deep(deep_state.persistent.discovered, deep_state);
 
+    // Only show [U] Ascend once the player meets the Deep layer gate for their next level
+    // (or already has an ascension level). They don't need enough PR — just the layer unlock.
+    let show_ascend = deep_state.persistent.discovered
+        && (game_state.ascension_level > 0
+            || crate::ascension::types::ascension_deep_gate(game_state.ascension_level + 1)
+                .is_none_or(|gate| deep_state.persistent.deepest_layer_reached >= gate));
+
     match ctx.tier {
         SizeTier::XL | SizeTier::L => {
             draw_xl_l_layout(
@@ -410,6 +417,7 @@ pub fn draw_ui_with_update(
                 soulforge_discovered,
                 stormglass_discovered,
                 deep_indicator,
+                show_ascend,
                 achievements,
                 enhancement_levels,
                 power_cores,
@@ -449,6 +457,7 @@ fn draw_xl_l_layout(
     soulforge_discovered: bool,
     stormglass_discovered: bool,
     deep_indicator: stats_panel::DeepIndicatorStatus,
+    show_ascend: bool,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
     power_cores: &crate::power_cores::PowerCoreState,
@@ -530,6 +539,7 @@ fn draw_xl_l_layout(
         soulforge_discovered,
         stormglass_discovered,
         deep_indicator,
+        show_ascend,
         achievements.pending_count(),
         ctx,
     );

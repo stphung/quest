@@ -807,6 +807,7 @@ pub fn draw_footer(
     soulforge_discovered: bool,
     stormglass_discovered: bool,
     deep_indicator: DeepIndicatorStatus,
+    show_ascend: bool,
     pending_achievements: usize,
     _ctx: &LayoutContext,
 ) {
@@ -917,7 +918,7 @@ pub fn draw_footer(
         Span::styled("[A] Achievements", Style::default().fg(Color::Magenta))
     };
 
-    let ascend_text = if !matches!(deep_indicator, DeepIndicatorStatus::Hidden) {
+    let ascend_text = if show_ascend {
         Span::styled(
             "    [U] Ascend",
             Style::default().fg(Color::Rgb(255, 215, 0)),

@@ -593,11 +593,8 @@ fn handle_base_game(
         KeyCode::Char('u') | KeyCode::Char('U') => {
             if deep_state.persistent.discovered
                 && (state.ascension_level > 0
-                    || crate::ascension::can_ascend(
-                        state.ascension_level,
-                        state.prestige_rank,
-                        deep_state.persistent.deepest_layer_reached,
-                    ))
+                    || crate::ascension::types::ascension_deep_gate(state.ascension_level + 1)
+                        .is_none_or(|gate| deep_state.persistent.deepest_layer_reached >= gate))
             {
                 *overlay = GameOverlay::AscensionConfirm;
             }
