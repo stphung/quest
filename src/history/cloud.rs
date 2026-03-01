@@ -523,6 +523,11 @@ pub fn push_all_branches(quest_dir: &Path, token: &str) -> Result<(), String> {
                 squash_branch_clean(&repo, branch_name)?;
                 push_branch(&repo, branch_name, token, true)?;
             }
+            Err(e) if e.contains("non-fast-forward") => {
+                // Remote has commits local doesn't (e.g. GitHub auto-init
+                // README). Local saves are authoritative — force-push.
+                push_branch(&repo, branch_name, token, true)?;
+            }
             Err(e) => return Err(e),
         }
     }

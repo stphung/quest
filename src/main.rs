@@ -543,6 +543,17 @@ fn main() -> io::Result<()> {
                                             }
                                             _ => {
                                                 cloud_status = history::cloud::CloudStatus::Linked;
+                                                // Auto-push local saves on first link
+                                                if let Some(ref config) = cloud_config {
+                                                    main_helpers::cloud_ops::spawn_cloud_push(
+                                                        &mut cloud_op_in_flight,
+                                                        &cloud_tx,
+                                                        &quest_dir,
+                                                        &config.token,
+                                                    );
+                                                    cloud_status =
+                                                        history::cloud::CloudStatus::Syncing;
+                                                }
                                             }
                                         }
                                     }
