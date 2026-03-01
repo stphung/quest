@@ -923,7 +923,7 @@ fn render_layers_split(
                         "Boosts supply run yields".to_string()
                     }
                 }
-                Infrastructure::Watchtower => "Instant value: +25 intel on build".to_string(),
+                Infrastructure::Watchtower => "Instant value: +40 familiarity on build".to_string(),
                 Infrastructure::Bridge => {
                     let bridge_count = deep
                         .persistent

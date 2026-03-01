@@ -2,7 +2,7 @@
 //! The Deep — Mercenary Expedition System data structures.
 //!
 //! Two-tier persistence model (both persist across prestiges):
-//! - **Account-level**: Guild rank, layer breakthroughs, infrastructure, intel
+//! - **Account-level**: Guild rank, layer breakthroughs, infrastructure, familiarity
 //! - **Operational**: Mercenaries, active missions, Warband Marks
 
 use chrono::{DateTime, Utc};
@@ -141,7 +141,7 @@ pub enum MercStatus {
 pub enum MissionType {
     /// 2–4h, no risk, cleared layers only.  Resource farming and safe merc XP.
     SupplyRun,
-    /// 4–8h, low risk, frontier layer.  Gathers intel, reveals check-in events.
+    /// 4–8h, low risk, frontier layer.  Builds familiarity, reveals check-in events.
     Recon,
     /// 8–16h, medium risk, frontier layer.  Primary progression missions.
     Expedition,
@@ -231,7 +231,7 @@ pub enum Infrastructure {
     Outpost,
     /// Supply run missions on this layer yield bonus resources.
     SupplyCache,
-    /// Reveals more intel and improves auto-resolve outcomes.
+    /// Boosts familiarity and improves auto-resolve outcomes.
     Watchtower,
     /// Unlocks a shortcut — expeditions can skip this layer when pushing deeper.
     Bridge,
@@ -258,7 +258,9 @@ impl Infrastructure {
         match self {
             Infrastructure::Outpost => "Reduces mission duration on this layer by 25%.",
             Infrastructure::SupplyCache => "Supply runs yield bonus Warband Marks and resources.",
-            Infrastructure::Watchtower => "Reveals more intel; improves auto-resolve outcomes.",
+            Infrastructure::Watchtower => {
+                "Boosts familiarity (+40); improves auto-resolve outcomes."
+            }
             Infrastructure::Bridge => {
                 "Unlocks a shortcut; -10% mission duration per bridged layer (max -50%)."
             }
@@ -623,7 +625,7 @@ pub fn effective_concurrent_missions(guild_rank: GuildRank, deepest_layer_reache
 pub struct LayerRecord {
     /// 1-based layer index.
     pub index: u32,
-    /// Intel level (0–100).  Increases from completing missions on this layer.
+    /// Familiarity level (0–100).  Increases from completing missions on this layer.
     pub familiarity: u8,
     /// Infrastructure built on this layer (persists across prestiges).
     pub infrastructure: Vec<Infrastructure>,

@@ -2110,7 +2110,7 @@ fn render_squad_assembly_left(
 fn mission_type_hint(mt: MissionType) -> &'static str {
     match mt {
         MissionType::SupplyRun => "Baseline run: safest Marks income on cleared ground",
-        MissionType::Recon => "Intel run: biggest Familiarity gain, making this layer faster",
+        MissionType::Recon => "Recon run: biggest Familiarity gain, making this layer faster",
         MissionType::Expedition => "Push run: higher Marks than Supply, with more risk/events",
         MissionType::Breakthrough => "Progression run: clears the frontier to open next layer",
         MissionType::GatewayExpedition => "The final expedition \u{2014} breach the sealed gateway",
