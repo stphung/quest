@@ -366,9 +366,8 @@ pub fn replace_binary(new_binary: &Path) -> Result<(), Box<dyn Error>> {
         let old_exe = current_exe.with_extension("old");
         if let Err(e) = fs::rename(&current_exe, &old_exe) {
             // Fallback: try direct copy (works on macOS)
-            fs::copy(new_binary, &current_exe).map_err(|copy_err| {
-                format!("rename failed: {}, copy failed: {}", e, copy_err)
-            })?;
+            fs::copy(new_binary, &current_exe)
+                .map_err(|copy_err| format!("rename failed: {}, copy failed: {}", e, copy_err))?;
         } else {
             fs::copy(new_binary, &current_exe)?;
             // Clean up old binary (ignore errors - may still be in use)
