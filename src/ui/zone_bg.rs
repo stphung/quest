@@ -413,20 +413,34 @@ fn paint_cracked_sky(buffer: &mut [Vec<SceneCell>], width: usize, height: usize,
 
         let pulse = (t * 0.12 + i as f64 * 1.7).sin() * 0.5 + 0.5;
         let brightness = (120.0 + pulse * 135.0) as u8;
-        let fg = Color::Rgb(brightness, brightness.saturating_sub(20), brightness.saturating_sub(60));
+        let fg = Color::Rgb(
+            brightness,
+            brightness.saturating_sub(20),
+            brightness.saturating_sub(60),
+        );
 
         // Main fracture point
         put_cell(buffer, base_y, base_x, '/', fg);
         put_cell(buffer, base_y, base_x + 1, '\\', fg);
 
         // Branch lines
-        let dim = Color::Rgb(brightness / 2, brightness / 2, brightness.saturating_sub(40) / 2);
+        let dim = Color::Rgb(
+            brightness / 2,
+            brightness / 2,
+            brightness.saturating_sub(40) / 2,
+        );
         put_cell(buffer, base_y - 1, base_x - 1, '/', dim);
         put_cell(buffer, base_y + 1, base_x + 2, '\\', dim);
 
         // Bright core glyph
         if pulse > 0.6 {
-            put_cell(buffer, base_y, base_x, '\u{2726}', Color::Rgb(255, 240, 200)); // ✦
+            put_cell(
+                buffer,
+                base_y,
+                base_x,
+                '\u{2726}',
+                Color::Rgb(255, 240, 200),
+            ); // ✦
         }
     }
 }
@@ -439,7 +453,11 @@ fn paint_void_rift(buffer: &mut [Vec<SceneCell>], width: usize, height: usize, m
     // Rift edges (purple glow)
     let glow_pulse = (t * 0.1).sin() * 0.3 + 0.7;
     let glow_brightness = (80.0 * glow_pulse) as u8;
-    let edge_fg = Color::Rgb(glow_brightness.saturating_add(40), glow_brightness / 4, glow_brightness);
+    let edge_fg = Color::Rgb(
+        glow_brightness.saturating_add(40),
+        glow_brightness / 4,
+        glow_brightness,
+    );
 
     for dx in -3..=3i32 {
         put_cell(buffer, cy - 1, cx + dx, '\u{2500}', edge_fg); // ─
@@ -978,7 +996,11 @@ fn paint_static_noise(buffer: &mut [Vec<SceneCell>], millis: f64, intensity: f64
             }
             let ch_idx = seed as usize % noise_chars.len();
             let brightness = 40 + (seed % 80) as u8;
-            let fg = Color::Rgb(brightness, brightness.saturating_sub(10), brightness.saturating_add(20));
+            let fg = Color::Rgb(
+                brightness,
+                brightness.saturating_sub(10),
+                brightness.saturating_add(20),
+            );
             put_cell(buffer, row as i32, col as i32, noise_chars[ch_idx], fg);
         }
     }
@@ -1172,7 +1194,8 @@ fn overlay_mirror_flash(buffer: &mut [Vec<SceneCell>], millis: f64) {
         let intensity = (1.0 - phase / flash_duration) * 40.0;
         let amount = intensity as i16;
 
-        let flash_row = (hash2d(i as usize + 7, (millis / cycle) as usize) % height as u32) as usize;
+        let flash_row =
+            (hash2d(i as usize + 7, (millis / cycle) as usize) % height as u32) as usize;
         let flash_col = (hash2d((millis / cycle) as usize, i as usize + 3) % width as u32) as usize;
 
         // Horizontal streak
@@ -1214,7 +1237,11 @@ fn overlay_consuming_dark(buffer: &mut [Vec<SceneCell>], millis: f64) {
 }
 
 fn overlay_hollow_echo(buffer: &mut [Vec<SceneCell>], millis: f64) {
-    let width = if !buffer.is_empty() { buffer[0].len() } else { return };
+    let width = if !buffer.is_empty() {
+        buffer[0].len()
+    } else {
+        return;
+    };
     let wave_pos = ((millis * 0.0004).sin() * 0.5 + 0.5) * width as f64;
 
     for row_cells in buffer.iter_mut() {
