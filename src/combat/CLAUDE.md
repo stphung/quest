@@ -16,7 +16,8 @@ src/combat/
 ├── enemy_attack.rs     # Enemy attack resolution (defense, Bulwark DR, reflection, death)
 ├── damage.rs           # Shared damage helpers, handle_enemy_death()
 ├── events.rs           # CombatEvent enum, CombatBonuses (unified struct)
-└── regen.rs            # HP regeneration after combat
+├── regen.rs            # HP regeneration after combat
+└── facade.rs           # Combat update facade with explicit CombatInput struct
 ```
 
 ## Key Types

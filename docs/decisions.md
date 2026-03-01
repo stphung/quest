@@ -116,7 +116,7 @@ Not all challenges are equally discoverable:
 
 ## game_tick() Extraction to core/tick.rs
 
-**Decision**: Extract the per-tick orchestration function from main.rs into `src/core/tick.rs`, returning a `TickResult` struct with `Vec<TickEvent>` (now 44 variants) instead of mutating UI state directly.
+**Decision**: Extract the per-tick orchestration function from main.rs into `src/core/tick.rs`, returning a `TickResult` struct with `Vec<TickEvent>` (now 45 variants) instead of mutating UI state directly.
 
 **Rationale**: The game loop was tightly coupled to the terminal UI — game logic called `add_log_entry()` and created `VisualEffect` objects directly. Extracting `game_tick()` into a pure-logic module enables:
 - Headless simulation (the `simulator` binary reuses the exact same function)
@@ -299,3 +299,25 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 - **1.6x stat multiplier per zone**: Steep enough to require real power investment (specifically Ascension), but not so steep that any single zone feels impossible after buying the next Ascension level.
 - **5 subzones per fracture zone**: More than standard zones (3-4 subzones), providing more content density per chapter.
 - **Cap zone cycling**: Only the highest unlocked zone cycles; all previous fracture zones advance forward. This allows players to choose their farming spot (highest zone they can sustain vs. a lower zone for speed).
+
+## Structural Overhaul: Facades and Sub-Structs
+
+**Decision**: Decompose `GameState` into sub-structs (`PlayerIdentity`, `CombatContext`, `ProgressionState`, `SessionState`) and introduce facade modules across combat, challenges, dungeon, fishing, and deep systems.
+
+**Rationale**: `GameState` had grown to contain dozens of fields spanning identity, combat, progression, and transient session state. Facades provide explicit, testable API surfaces with documented input structs, while delegating to existing orchestration functions during migration.
+
+**Key choices**:
+- **Flat JSON serialization preserved**: `game_state_serde.rs` implements custom Serialize/Deserialize via `FlatGameState` intermediate, maintaining backward-compatible save format despite sub-struct decomposition.
+- **`TickContext` bundle**: All mutable references needed by `game_tick()` bundled into one `TickContext<'a>` struct, reducing parameter count.
+- **Gradual migration**: Facades delegate to existing functions (e.g., `update_combat_facade()` → `update_combat()`). The `CombatInput` / `FishingInput` structs document the aspirational decomposed interface for future extraction.
+
+## Power Cores: Passive Prestige Generation
+
+**Decision**: Add 6 Power Cores that passively generate prestige ranks (1-6 PR/day) tied to Deep layer breakthrough achievements at layers 3, 7, 12, 18, 25, and 30.
+
+**Rationale**: Deep layer breakthroughs are major endgame milestones with no recurring reward. Power Cores provide a long-term passive benefit that scales with Deep progression depth, giving players a permanent return on their Deep investment. The PR generation rate is modest enough to not trivialize active play but meaningful enough to accelerate fracture zone progression.
+
+**Key choices**:
+- **Wall-clock time**: Cores fill on real-time intervals (86400s / pr_per_day), not game ticks. This rewards returning players and works offline.
+- **Achievement-gated**: Uses the existing achievement system (`PowerCoreI` through `PowerCoreVI`) rather than a separate unlock mechanism.
+- **Offline catchup**: `apply_offline_power_cores()` grants accumulated PR on game load, batching multiple completed cycles.

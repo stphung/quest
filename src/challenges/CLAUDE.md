@@ -19,6 +19,9 @@ Optional additional files for complex AI:
 - `mcts.rs` - Monte Carlo Tree Search (see Go)
 - `ai.rs` - Minimax/alpha-beta AI (see Morris, Gomoku)
 
+The module also has:
+- `facade.rs` — AI tick facade dispatching to Chess, Morris, Gomoku, Go `process_ai_thinking()` functions
+
 ### 2. Required Types (`types.rs`)
 
 ```rust

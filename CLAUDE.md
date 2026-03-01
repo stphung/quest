@@ -85,7 +85,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 - `game_state.rs` — Main character state struct (level, XP, prestige, combat state, equipment)
 - `game_logic.rs` — Thin re-export wrapper (XP curve, leveling, spawning, offline logic extracted to submodules)
 - `tick.rs` — Per-tick game engine: `game_tick<R: Rng>()` with 14 processing stages. Zero UI imports, zero file I/O — fully decoupled from rendering
-- `tick_types.rs` — TickEvent enum (44 variants) and TickResult struct
+- `tick_types.rs` — TickEvent enum (45 variants) and TickResult struct
 - `tick_stages.rs` — Tick processing stages 4-6 and helper functions (process_item_drop, process_discoveries, etc.)
 - `xp.rs` — XP calculation, leveling logic, combat kill XP
 - `discoveries.rs` — Discovery rolls for dungeons, fishing spots, Haven, Soulforge, The Deep
@@ -94,6 +94,13 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 - `recent_drops.rs` — RecentDrop struct and deque management
 - `ticker.rs` — Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
 - `power_rating.rs` — Character power rating (sqrt of DPS x eHP)
+- `tick_context.rs` — TickContext struct bundling all mutable references for game_tick() (state, haven, enhancement, deep, achievements, power_cores)
+- `game_state_serde.rs` — Custom serde preserving flat JSON format during sub-struct decomposition (FlatGameState intermediate)
+- `player_identity.rs` — PlayerIdentity sub-struct (character_id, name, level, XP, attributes, prestige)
+- `combat_context.rs` — CombatContext sub-struct (combat_state, equipment, zone_progression, active_dungeon)
+- `progression_state.rs` — ProgressionState sub-struct (fishing, stormglass, challenge_menu, active_minigame)
+- `session_state.rs` — SessionState sub-struct (timers, caches, ticker, derived_stats, recent_drops)
+- `discovery_facade.rs` — Discovery roll facade with explicit DiscoveryInput/DiscoveryResult structs
 - `constants.rs` — Game balance constants (tick rate, attack intervals, XP rates, item drop rates, zone enemy stats for 30 zones, boss multipliers, prestige combat bonuses, fracture zone scaling, update check jitter)
 
 ### Simulator (`src/bin/simulator.rs`)
@@ -152,6 +159,7 @@ CLI: `--hours N`, `--seed N`, `--strategy STR` (rush/balanced/infrastructure), `
 - `damage.rs` — Shared damage calculation and enemy death handling
 - `events.rs` — CombatEvent enum, CombatBonuses (unified struct replacing HavenCombatBonuses, GodItemCombatBonuses, PrestigeCombatBonuses)
 - `regen.rs` — HP regeneration after combat
+- `facade.rs` — Combat update facade with explicit CombatInput struct, delegates to update_combat()
 
 ### Zone System (`src/zones/`) — [detailed docs](src/zones/CLAUDE.md)
 
@@ -184,6 +192,7 @@ CLI: `--hours N`, `--seed N`, `--strategy STR` (rush/balanced/infrastructure), `
 - `logic.rs` — Room clearing, key system, safe death (no prestige loss)
 - `pathfinding.rs` — BFS-based dungeon navigation, room exploration priority, auto-exploration
 - `rewards.rs` — Dungeon boss XP rewards, item generation, treasure room handling
+- `facade.rs` — Dungeon tick facade with decomposed inputs (no full GameState needed)
 
 **Dungeon Sizes:** Small 5×5, Medium 7×7, Large 9×9, Epic 11×11, Legendary 13×13 (based on level and prestige)
 
@@ -195,6 +204,7 @@ CLI: `--hours N`, `--seed N`, `--strategy STR` (rush/balanced/infrastructure), `
 - `discovery.rs` — Fishing spot discovery logic (try_discover_fishing)
 - `drops.rs` — Item drop chance and generation from fish catches
 - `rank.rs` — Rank-up checking and max rank calculation
+- `facade.rs` — Fishing tick facade with explicit FishingInput struct, delegates to tick_fishing_with_haven_result()
 
 **Fishing Ranks:** 40 ranks across 8 tiers (Novice 1-5, Apprentice 6-10, Journeyman 11-15, Expert 16-20, Master 21-25, Grandmaster 26-30 base max, Mythic 31-35, Transcendent 36-40 with Fishing Dock T4). Storm Leviathan encounter at rank 40.
 
@@ -235,6 +245,7 @@ Per-character combat power multiplier purchased with prestige ranks, gated by De
 - `layers.rs` — Layer difficulty (power thresholds L1-25 + Void scaling), familiarity system (Unknown/Mapped/Familiar/Mastered), mission durations (base + multiplicative modifiers), infrastructure building (validation, costs, Watchtower familiarity bonus)
 - `persistence.rs` — Save/load from `~/.quest/deep.json`
 - `discovery.rs` — Discovery logic (complete_discovery), starter roster initialisation (3 mercs: Vanguard, Scout, Medic)
+- `facade.rs` — Deep tick facade (mission resolution, achievement handlers), returns DeepTickResult
 
 An endgame (P15+) system where players recruit and manage a mercenary company, sending squads on long-duration missions (2-24h wall-clock time) into a vast underground structure. Two-tier persistence: `DeepPersistent` (guild rank, cleared layers, infrastructure, `fracture_zone_cap`, `pending_fracture_region_unlock` — survives prestige) and `DeepPrestige` (mercs, missions, Warband Marks — persists across prestiges). Five mercenary archetypes (Vanguard, Scout, Arcanist, Medic, Saboteur) with 4 quality tiers. Six layer tiers (Shallows through The Void). Five mission types (Supply Run, Recon, Expedition, Breakthrough, Construction). Four infrastructure types (Outpost, SupplyCache, Watchtower, Bridge). Discovered on first Endless kill (Zone 11 boss) at P15+. Deep layer breakthroughs unlock fracture zones: Layer 3 → Zones 12-14, Layer 7 → Zones 15-17, Layer 12 → Zones 18-20, Layer 18 → Zones 21-23, Layer 25 → Zones 24-26, Layer 30 → Zones 27-30.
 
@@ -246,6 +257,14 @@ An endgame (P15+) system where players recruit and manage a mercenary company, s
 - `spending.rs` — Stormglass spending on sigil slots and Storm Lure
 
 Stormglass is a currency earned from completing challenge minigames. Gated behind P15+. Players spend Stormglass to activate Storm Sigils -- a daily-rotating set of passive bonuses. Sigil slots provide combat and progression bonuses. Also offers the Storm Lure consumable (50,000 SG) that guarantees Storm Leviathan encounters during fishing at rank 40.
+
+### Power Cores Module (`src/power_cores/`)
+
+- `types.rs` — PowerCoreDef, PowerCoreState, ALL_POWER_CORES (6 core definitions), helper queries
+- `tick.rs` — Per-tick power core processing (tick_power_cores), offline catchup (apply_offline_power_cores), core initialization
+- `persistence.rs` — Save/load from `~/.quest/power_cores.json`
+
+Passive prestige rank generation tied to Deep layer milestones. Each Power Core is unlocked by a Deep layer breakthrough achievement (PowerCoreI through PowerCoreVI at layers 3, 7, 12, 18, 25, 30). Once active, cores generate prestige ranks passively at fixed rates (1-6 PR/day). Integrated into game_tick() via TickContext. Emits PowerCoreGranted tick events. Supports offline catchup on character load.
 
 ### God Items Module (`src/god_items/`)
 
@@ -265,6 +284,7 @@ God items are created via debug menu (discovery/forging system not yet designed,
 
 - `mod.rs` — `impl_apply_game_result!` macro standardizing `apply_game_result()` across all 10 challenge types. Challenge wins award Stormglass currency (in addition to PR/FR rewards)
 - `menu.rs` — Generic challenge menu system (pending challenges, extensible challenge types)
+- `facade.rs` — Challenge AI tick facade dispatching to Chess, Morris, Gomoku, Go AI processing
 - `chess/` — Chess minigame (4 difficulty levels: Novice→Master, ~500-1350 ELO), requires P1+
 - `go/` — Go (Territory Control) on 9×9 board, MCTS AI with heuristics (500-20k simulations), requires P1+
 - `morris/` — Nine Men's Morris (board layout, mill detection, phases), `ai.rs` (minimax with alpha-beta pruning), requires P1+
@@ -287,7 +307,7 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 
 ### Achievement Module (`src/achievements/`)
 
-- `types.rs` — AchievementId enum (207 variants), categories, unlock tracking, `selected_title` field
+- `types.rs` — AchievementId enum (213 variants), categories, unlock tracking, `selected_title` field
 - `data.rs` — Achievement database with descriptions and unlock conditions
 - `handlers.rs` — Event handlers (on_enemy_killed, on_boss_killed, on_level_up, etc.) and check_milestones
 - `milestones.rs` — MinigameType, MinigameDifficulty enums, milestone threshold arrays
@@ -298,7 +318,7 @@ Account-level base building that persists across prestiges. 14 rooms in a two-br
 - `unlock.rs` — Core unlock machinery (is_unlocked, unlock, check_milestones)
 - `persistence.rs` — Save/load from `~/.quest/achievements.json`
 
-Account-level achievement system that persists across characters. 8 categories (Combat, Level, Prestige, Progression, Challenges, Exploration, Deep, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, Soulforge enhancements, Deep milestones (discovery, layers, guild ranks), fracture zone completions (Z12-Z30), and Ascension milestones (I, III, VI). Includes modal notification system with 500ms accumulation window. Includes a title system where 63 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select. Achievement score system: each of the 207 achievements has a point value (7 tiers: 5/10/25/50/100/250/500), computed at runtime. Shown in browser title bar, unlock modal, detail panel, and stats view.
+Account-level achievement system that persists across characters. 8 categories (Combat, Level, Prestige, Progression, Challenges, Exploration, Deep, Stats). Tracks kills, boss kills, levels, prestige, zone completion, challenge wins, fishing ranks/catches, dungeon completions, Haven building, Soulforge enhancements, Deep milestones (discovery, layers, guild ranks), fracture zone completions (Z12-Z30), Ascension milestones (I, III, VI), and Power Core milestones (I-VI). Includes modal notification system with 500ms accumulation window. Includes a title system where 63 curated achievements grant display titles (e.g., "Godslayer", "Everlasting") shown in stats panel and character select. Achievement score system: each of the 213 achievements has a point value (7 tiers: 5/10/25/50/100/250/500), computed at runtime. Shown in browser title bar, unlock modal, detail panel, and stats view.
 
 ### History / Time Vault (`src/history/`)
 
@@ -391,6 +411,8 @@ Routes keyboard input to the appropriate handler based on current game state. Di
 - `zone_bg.rs` — Stylized zone background scenes with 6-layer compositing pipeline for all 30 zones
 - `debug_menu_scene.rs` — Debug menu overlay with tabbed categories
 - `bug_report_scene.rs` — Bug report overlay with game-state preview and clipboard status
+- `overlay_layout.rs` — Shared overlay layout helpers (centered_overlay, two_panel_split)
+- `ascension_scene.rs` — Ascension overlay UI
 - `throbber.rs` — Shared spinner animations and atmospheric messages
 - `character_select.rs`, `character_creation.rs`, `character_delete.rs`, `character_rename.rs` — Character management UI
 
@@ -415,6 +437,12 @@ All challenge minigames use 4 difficulty levels: Novice, Apprentice, Journeyman,
 
 ### Forfeit Pattern
 All interactive minigames: first Esc sets `forfeit_pending`, second Esc confirms, any other key cancels.
+
+### Facade Pattern
+Modules expose `facade.rs` files providing decomposed, testable APIs with explicit input structs. Facades delegate to existing orchestration functions while documenting the aspirational decomposed interface. Found in: challenges, combat, deep, dungeon, fishing, and core (discovery_facade).
+
+### Sub-Struct Decomposition
+`GameState` fields are grouped into sub-structs (`PlayerIdentity`, `CombatContext`, `ProgressionState`, `SessionState`) for clarity. `game_state_serde.rs` preserves flat JSON save format via `FlatGameState` intermediate. `TickContext` bundles all mutable references needed by `game_tick()`.
 
 ### Haven Bonus Injection
 Haven bonuses are passed as explicit parameters rather than accessed globally. This keeps modules decoupled.
@@ -448,6 +476,7 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - Ascension cost: [35, 65, 120, 200, 325, 500] PR for I-VI; 500 + 75*(level-6) PR for VII+
 - Ascension deep gate: [3, 7, 12, 18, 25, 30] layers for I-VI; none for VII+
 - Ascension multiplier: 2^level for I-VI (2x to 64x); 64 * 1.5^(level-6) for VII+
+- Power Cores: 6 cores unlocked at Deep layers 3/7/12/18/25/30, generating 1/2/3/4/5/6 PR/day respectively
 
 ## Combat Mechanics
 
@@ -544,7 +573,8 @@ quest/
 │   │   ├── enemy_attack.rs  # Enemy attack resolution
 │   │   ├── damage.rs        # Shared damage calculations
 │   │   ├── events.rs        # CombatEvent, CombatBonuses (unified)
-│   │   └── regen.rs         # HP regeneration
+│   │   ├── regen.rs         # HP regeneration
+│   │   └── facade.rs        # Combat update facade
 │   ├── zones/               # Zone system [CLAUDE.md]
 │   │   ├── data.rs          # Zone definitions (30 zones)
 │   │   ├── progression.rs   # Zone progression
@@ -558,14 +588,16 @@ quest/
 │   │   ├── generation.rs    # Procedural generation
 │   │   ├── logic.rs         # Room clearing, key system
 │   │   ├── pathfinding.rs   # BFS-based dungeon navigation
-│   │   └── rewards.rs       # Dungeon XP, item generation, treasure rooms
+│   │   ├── rewards.rs       # Dungeon XP, item generation, treasure rooms
+│   │   └── facade.rs        # Dungeon tick facade
 │   ├── fishing/             # Fishing system
 │   │   ├── types.rs         # Fish, phases, ranks
 │   │   ├── generation.rs    # Fish generation
 │   │   ├── logic.rs         # Session processing
 │   │   ├── discovery.rs     # Fishing spot discovery
 │   │   ├── drops.rs         # Item drops from catches
-│   │   └── rank.rs          # Rank-up logic
+│   │   ├── rank.rs          # Rank-up logic
+│   │   └── facade.rs        # Fishing tick facade
 │   ├── items/               # Item system [CLAUDE.md]
 │   │   ├── types.rs         # Items, slots, affixes
 │   │   ├── equipment.rs     # Equipment container
@@ -590,12 +622,17 @@ quest/
 │   │   ├── economy.rs       # Warband Marks economy, rewards, costs
 │   │   ├── layers.rs        # Layer difficulty, familiarity, infrastructure, durations
 │   │   ├── persistence.rs   # Save/load from ~/.quest/deep.json
-│   │   └── discovery.rs     # Discovery logic (boss-trigger), starter roster
+│   │   ├── discovery.rs     # Discovery logic (boss-trigger), starter roster
+│   │   └── facade.rs        # Deep tick facade
 │   ├── stormglass/          # Stormglass currency and Storm Sigils
 │   │   ├── types.rs         # Stormglass state, daily rotation
 │   │   ├── sigils.rs        # Storm Sigil definitions and bonuses
 │   │   ├── earning.rs       # Stormglass earning from challenges
 │   │   └── spending.rs      # Stormglass spending on sigils
+│   ├── power_cores/         # Power Cores — passive PR generation
+│   │   ├── types.rs         # Core definitions, state
+│   │   ├── tick.rs          # Per-tick processing, offline catchup
+│   │   └── persistence.rs   # Save/load
 │   ├── god_items/           # God Items system
 │   │   └── types.rs         # 3 god items, passives, bonuses, helper queries
 │   ├── history/             # Time Vault — git-based save versioning
@@ -606,6 +643,7 @@ quest/
 │   ├── challenges/          # Challenge minigames [CLAUDE.md]
 │   │   ├── mod.rs           # Challenge menu, impl_apply_game_result! macro
 │   │   ├── menu.rs          # Challenge menu UI
+│   │   ├── facade.rs        # Challenge AI tick facade
 │   │   ├── chess/           # Chess minigame
 │   │   ├── go/              # Go (Territory Control)
 │   │   ├── morris/          # Nine Men's Morris (ai.rs: minimax)
@@ -677,9 +715,11 @@ quest/
 │       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing)
 │       ├── debug_menu_scene.rs # Debug menu with tabbed categories
 │       ├── bug_report_scene.rs # Bug report overlay
+│       ├── overlay_layout.rs # Shared overlay layout helpers
+│       ├── ascension_scene.rs # Ascension overlay UI
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (62 test files, 6,506+ tests)
+├── tests/                   # Integration tests (65 test files, 3,800+ tests)
 │   ├── game_loop_orchestration_test.rs  # 42 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
 │   ├── tick_stages_coverage_test.rs     # Tick stages coverage tests

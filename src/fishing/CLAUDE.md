@@ -12,7 +12,8 @@ src/fishing/
 ├── logic.rs       # Tick processing, Haven bonus integration (discovery/drops/rank extracted)
 ├── discovery.rs   # Fishing spot discovery (try_discover_fishing)
 ├── drops.rs       # Item drop chance and generation from fish catches
-└── rank.rs        # Rank-up checking, max rank calculation
+├── rank.rs        # Rank-up checking, max rank calculation
+└── facade.rs      # Fishing tick facade with explicit FishingInput struct
 ```
 
 ## Key Types

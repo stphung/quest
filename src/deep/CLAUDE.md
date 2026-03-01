@@ -20,6 +20,7 @@ src/deep/
 ├── economy.rs      — Warband Marks economy, rewards, costs
 ├── layers.rs       — Layer difficulty, familiarity system, infrastructure, mission durations
 ├── discovery.rs    — Discovery logic (complete_discovery), starter roster init
+├── facade.rs       — Deep tick facade (mission resolution, achievement handlers)
 └── persistence.rs  — Save/load from ~/.quest/deep.json
 ```
 

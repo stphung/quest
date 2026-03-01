@@ -11,7 +11,8 @@ src/dungeon/
 ├── generation.rs  # Procedural dungeon generation with connected rooms
 ├── logic.rs       # Room clearing, key system, boss encounters
 ├── pathfinding.rs # BFS-based dungeon navigation, auto-exploration (ROOM_MOVE_INTERVAL 2.5s, ROOM_TRAVEL_INTERVAL 0.8s)
-└── rewards.rs     # Dungeon boss XP rewards, item generation, treasure room handling
+├── rewards.rs     # Dungeon boss XP rewards, item generation, treasure room handling
+└── facade.rs      # Dungeon tick facade with decomposed inputs
 ```
 
 ## Key Types
