@@ -638,6 +638,7 @@ enum StartupKeyAction {
     Achievements,
     OpenTimeVault,
     OpenWiki,
+    OpenBugReport,
     Quit,
     Ignore,
 }
@@ -657,6 +658,7 @@ fn startup_key_action(key_event: KeyEvent) -> StartupKeyAction {
         KeyCode::Char('a') | KeyCode::Char('A') => StartupKeyAction::Achievements,
         KeyCode::Char('t') | KeyCode::Char('T') => StartupKeyAction::OpenTimeVault,
         KeyCode::Char('w') | KeyCode::Char('W') => StartupKeyAction::OpenWiki,
+        KeyCode::Char('!') => StartupKeyAction::OpenBugReport,
         KeyCode::Esc => StartupKeyAction::Quit,
         _ => StartupKeyAction::Ignore,
     }
@@ -703,6 +705,7 @@ pub fn show_startup_splash_screen(
 ) -> io::Result<StartupSplashResult> {
     let mut update_status: Option<UpdateInfoStatus> = None;
     let mut time_vault_browser: Option<TimeVaultState> = None;
+    let mut browser_link_url: Option<String> = None;
 
     // Auto-pull on load if cloud is linked and no operation is in flight
     if !*cloud_op_in_flight {
@@ -943,11 +946,22 @@ pub fn show_startup_splash_screen(
             if select_screen.cloud_restore_showing {
                 select_screen.draw_cloud_restore_prompt(f, area);
             }
+            if let Some(ref url) = browser_link_url {
+                ui::bug_report_scene::draw_browser_link_modal(f, url);
+            }
         })?;
 
         if event::poll(Duration::from_millis(100))? {
             if let event::Event::Key(key_event) = event::read()? {
                 if key_event.kind != KeyEventKind::Press {
+                    continue;
+                }
+
+                // Browser link modal blocks all other input
+                if browser_link_url.is_some() {
+                    if matches!(key_event.code, KeyCode::Esc) {
+                        browser_link_url = None;
+                    }
                     continue;
                 }
 
@@ -1188,9 +1202,16 @@ pub fn show_startup_splash_screen(
                     }
                     StartupKeyAction::Quit => break StartupSplashResult::Quit,
                     StartupKeyAction::OpenWiki => {
-                        let _ = crate::utils::bug_report::open_browser(
-                            &crate::core::constants::wiki_url_for_browser(),
-                        );
+                        let url = crate::core::constants::wiki_url_for_browser();
+                        if crate::utils::bug_report::open_browser(&url).is_err() {
+                            browser_link_url = Some(url);
+                        }
+                    }
+                    StartupKeyAction::OpenBugReport => {
+                        let url = "https://github.com/stphung/quest/issues/new".to_string();
+                        if crate::utils::bug_report::open_browser(&url).is_err() {
+                            browser_link_url = Some(url);
+                        }
                     }
                     StartupKeyAction::OpenTimeVault => {
                         if let Some(repo) = history_repo {

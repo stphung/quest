@@ -99,6 +99,10 @@ pub enum GameOverlay {
     AscensionConfirm,
     /// Quit confirmation when pending challenges exist
     QuitConfirm,
+    /// Fallback modal showing a URL when browser can't open
+    BrowserLink {
+        url: String,
+    },
     /// Bug report overlay with game state summary
     BugReport {
         summary: String,

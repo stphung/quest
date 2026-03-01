@@ -182,6 +182,9 @@ pub fn draw_game_overlays(
         GameOverlay::QuitConfirm => {
             draw_quit_confirm(frame, state.challenge_menu.challenges.len());
         }
+        GameOverlay::BrowserLink { ref url } => {
+            ui::bug_report_scene::draw_browser_link_modal(frame, url);
+        }
         GameOverlay::BugReport {
             ref summary,
             clipboard_ready,

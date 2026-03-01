@@ -195,7 +195,10 @@ pub fn open_browser(url: &str) -> Result<(), String> {
     let result = std::process::Command::new("open").arg(url).spawn();
 
     #[cfg(target_os = "linux")]
-    let result = std::process::Command::new("xdg-open").arg(url).spawn();
+    let result = std::process::Command::new("xdg-open")
+        .arg(url)
+        .spawn()
+        .or_else(|_| std::process::Command::new("wslview").arg(url).spawn());
 
     #[cfg(target_os = "windows")]
     let result = std::process::Command::new("cmd")
@@ -224,6 +227,11 @@ pub fn copy_to_clipboard(text: &str) -> Result<(), String> {
         .args(["-selection", "clipboard"])
         .stdin(std::process::Stdio::piped())
         .spawn()
+        .or_else(|_| {
+            std::process::Command::new("clip.exe")
+                .stdin(std::process::Stdio::piped())
+                .spawn()
+        })
         .map_err(|e| e.to_string())?;
 
     #[cfg(target_os = "windows")]
