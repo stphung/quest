@@ -452,6 +452,8 @@ fn main() -> io::Result<()> {
                         GameOverlay::None
                     };
                     let mut debug_menu = utils::debug_menu::DebugMenu::new();
+                    let mut pending_overlays: std::collections::VecDeque<GameOverlay> =
+                        std::collections::VecDeque::new();
                     let mut chrono_surge: Option<ChronoSurgeState> = None;
                     let mut chrono_summary: Option<ChronoSurgeSummary> = None;
                     let mut last_flappy_frame = Instant::now();
@@ -1921,44 +1923,51 @@ fn main() -> io::Result<()> {
                                     }
                                 }
 
-                                // Discovery/encounter overlays should not clobber
-                                // an open Time Vault; they will fire on a later tick.
-                                let vault_open = matches!(overlay, GameOverlay::TimeVault { .. });
-                                if !vault_open {
-                                    if let Some(encounter_number) = tick_result.leviathan_encounter
-                                    {
-                                        overlay = GameOverlay::LeviathanEncounter {
-                                            encounter_number,
-                                            lure_consumed: tick_result.leviathan_lure_consumed,
-                                        };
-                                    } else if tick_result.leviathan_catch_miss {
-                                        overlay = GameOverlay::LeviathanCatchMiss {
-                                            lure_consumed: tick_result.leviathan_lure_consumed,
-                                        };
-                                    }
-                                    if tick_flags.haven_discovered {
-                                        overlay = GameOverlay::HavenDiscovery;
-                                    }
-                                    if tick_flags.soulforge_discovered {
-                                        overlay = GameOverlay::SoulforgeDiscovery;
-                                    }
-                                    if tick_flags.stormglass_discovered {
-                                        overlay = GameOverlay::StormglassDiscovery;
-                                    }
-                                    if tick_flags.deep_discovered {
-                                        overlay = GameOverlay::DeepDiscovery;
-                                    }
-                                    if let Some(region) = tick_flags.fracture_region_unlocked {
-                                        overlay = GameOverlay::FractureRegionUnlock { region };
-                                    }
+                                // Queue discovery/encounter overlays so they
+                                // never clobber each other or get lost behind
+                                // an open UI panel (Deep, Haven, etc.).
+                                if let Some(encounter_number) = tick_result.leviathan_encounter {
+                                    pending_overlays.push_back(GameOverlay::LeviathanEncounter {
+                                        encounter_number,
+                                        lure_consumed: tick_result.leviathan_lure_consumed,
+                                    });
+                                } else if tick_result.leviathan_catch_miss {
+                                    pending_overlays.push_back(GameOverlay::LeviathanCatchMiss {
+                                        lure_consumed: tick_result.leviathan_lure_consumed,
+                                    });
+                                }
+                                if tick_flags.haven_discovered {
+                                    pending_overlays.push_back(GameOverlay::HavenDiscovery);
+                                }
+                                if tick_flags.soulforge_discovered {
+                                    pending_overlays.push_back(GameOverlay::SoulforgeDiscovery);
+                                }
+                                if tick_flags.stormglass_discovered {
+                                    pending_overlays.push_back(GameOverlay::StormglassDiscovery);
+                                }
+                                if tick_flags.deep_discovered {
+                                    pending_overlays.push_back(GameOverlay::DeepDiscovery);
+                                }
+                                if let Some(region) = tick_flags.fracture_region_unlocked {
+                                    pending_overlays
+                                        .push_back(GameOverlay::FractureRegionUnlock { region });
+                                }
+                                if !tick_result.achievement_modal_ready.is_empty() {
+                                    pending_overlays.push_back(GameOverlay::AchievementUnlocked {
+                                        achievements: tick_result.achievement_modal_ready,
+                                    });
                                 }
 
+                                // Show the next pending overlay when the screen
+                                // is clear (no active overlay, no open UI panel).
                                 if matches!(overlay, GameOverlay::None)
-                                    && !tick_result.achievement_modal_ready.is_empty()
+                                    && !pending_overlays.is_empty()
+                                    && !deep_ui.open
+                                    && !haven_ui.showing
+                                    && !soulforge_ui.open
+                                    && !exchange_ui.open
                                 {
-                                    overlay = GameOverlay::AchievementUnlocked {
-                                        achievements: tick_result.achievement_modal_ready,
-                                    };
+                                    overlay = pending_overlays.pop_front().unwrap();
                                 }
                             }
                             last_tick = Instant::now();
