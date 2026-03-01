@@ -817,8 +817,14 @@ fn draw_right_panel(
     achievements: &crate::achievements::Achievements,
     ctx: &LayoutContext,
 ) {
-    // Zone info + progress bar at top
-    let zone_height = if ctx.tier >= SizeTier::XL { 9 } else { 10 };
+    // Zone info + progress bar at top (compact during minigames for more grid space)
+    let zone_height = if game_state.active_minigame.is_some() {
+        3
+    } else if ctx.tier >= SizeTier::XL {
+        9
+    } else {
+        10
+    };
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
