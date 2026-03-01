@@ -359,17 +359,12 @@ pub(super) fn render_layers(
     }
 
     // ── Footer ──
-    let esc_hint = if ui.view == crate::deep::DeepView::Hub {
-        "Close"
-    } else {
-        "Back"
-    };
     put_text(
         buffer,
         height as i32 - 1,
         1,
         &truncate_text(
-            &format!("[\u{2191}/\u{2193}] Navigate Layers  [Esc] {}", esc_hint),
+            "[\u{2191}/\u{2193}] Navigate Layers  [Esc] Close",
             width.saturating_sub(2),
         ),
         Color::DarkGray,

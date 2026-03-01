@@ -206,7 +206,7 @@ pub(super) fn render_roster(
         buffer,
         height as i32 - 1,
         1,
-        "[\u{2191}/\u{2193}] Navigate  [Esc] Back",
+        "[\u{2191}/\u{2193}] Navigate  [Esc] Close",
         Color::DarkGray,
     );
     let help_hint = "[?] Help";
@@ -802,9 +802,9 @@ pub(super) fn render_recruit(
 
     // ── Footer ──
     let footer = if ctx.tier <= SizeTier::S {
-        "[\u{2191}/\u{2193}] Select  [Enter] Recruit  [Esc] Back"
+        "[\u{2191}/\u{2193}] Select  [Enter] Recruit  [Esc] Close"
     } else {
-        "[\u{2191}/\u{2193}] Navigate  [Enter] Recruit  [Esc] Back"
+        "[\u{2191}/\u{2193}] Navigate  [Enter] Recruit  [Esc] Close"
     };
     put_text(buffer, height as i32 - 1, 1, footer, Color::DarkGray);
     let recruit_help_hint = "[?] Help";

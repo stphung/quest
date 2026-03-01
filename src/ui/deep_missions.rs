@@ -747,23 +747,7 @@ pub(super) fn render_hub(
         header_row += 1;
 
         // Row 1: Rank + key stats + marks (with goal hint)
-        let cheapest_recruit = deep
-            .prestige
-            .recruit_pool
-            .recruit_costs
-            .iter()
-            .copied()
-            .filter(|&c| c > 0)
-            .min();
-        let marks_str = if let Some(cost) = cheapest_recruit {
-            if marks < cost {
-                format!("\u{25c6} {}/{} Marks", marks, cost)
-            } else {
-                format!("\u{25c6} {} Marks", marks)
-            }
-        } else {
-            format!("\u{25c6} {} Marks", marks)
-        };
+        let marks_str = format!("\u{25c6} {} Marks", marks);
         let rank_line = format!(
             "Rank {} \u{2014} {}    Mercs: {}/{}   Missions: {}/{}   {}",
             rank.0,
@@ -1413,9 +1397,9 @@ pub(super) fn render_new_mission(
             "[\u{2191}/\u{2193}] Navigate  [Space] Toggle Merc  [Enter] Launch Mission  [Esc] Cancel"
         }
     } else if is_compact {
-        "[\u{2191}/\u{2193}] Select  [Enter] Assign Squad  [Esc] Back"
+        "[\u{2191}/\u{2193}] Select  [Enter] Assign Squad  [Esc] Close"
     } else {
-        "[\u{2191}/\u{2193}] Select Mission  [Enter] Assign Squad  [Esc] Back"
+        "[\u{2191}/\u{2193}] Select Mission  [Enter] Assign Squad  [Esc] Close"
     };
     // Flash message (error/info) shown above the footer.
     if let Some(msg) = &ui.flash_message {
@@ -1836,7 +1820,7 @@ fn render_new_mission_split(
     let staging = ui.staging_mission_index.is_some();
 
     // Panel chrome: backgrounds, outlines, divider, and headings.
-    let left_heading = render_split_panel_chrome(
+    render_split_panel_chrome(
         buffer,
         width,
         detail_left,
@@ -1857,17 +1841,7 @@ fn render_new_mission_split(
             content_bottom,
         );
     } else {
-        render_squad_assembly_left(
-            buffer,
-            deep,
-            ui,
-            available,
-            left_heading,
-            list_width,
-            content_top,
-            list_inner_top,
-            content_bottom,
-        );
+        render_squad_assembly_left(buffer, deep, ui, list_width, list_inner_top, content_bottom);
     }
 
     // Right panel
@@ -1895,13 +1869,14 @@ fn render_new_mission_split(
             ui.mission_visit_count,
         );
     } else {
+        // +2 to clear the panel outline border on the left
         render_squad_summary_panel(
             buffer,
             deep,
             ui,
             m,
-            detail_inner_left,
-            detail_inner_w,
+            detail_inner_left + 1,
+            detail_inner_w - 1,
             content_top + 1,
             content_bottom,
         );
@@ -1909,7 +1884,6 @@ fn render_new_mission_split(
 }
 
 /// Render split-panel chrome: staging backgrounds/outlines, vertical divider, and headings.
-/// Returns the left heading string (needed by squad assembly for positioning).
 fn render_split_panel_chrome(
     buffer: &mut [Vec<SceneCell>],
     width: usize,
@@ -1917,7 +1891,7 @@ fn render_split_panel_chrome(
     content_top: i32,
     content_bottom: i32,
     staging: bool,
-) -> &'static str {
+) {
     // In squad-staging mode, visibly emphasize the active left panel.
     if staging {
         let panel_top = content_top;
@@ -1979,17 +1953,8 @@ fn render_split_panel_chrome(
         SECTION_LABEL_COLOR
     };
     put_text(buffer, content_top, 1, left_heading, left_heading_color);
-    if staging {
-        put_text(
-            buffer,
-            content_top,
-            detail_left + 2,
-            "SUMMARY (read-only)",
-            Color::DarkGray,
-        );
-    }
-
-    left_heading
+    // Right panel heading intentionally blank in staging mode;
+    // mission info is rendered by render_squad_summary_panel.
 }
 
 /// Phase 1 left panel: available missions grouped by layer.
@@ -2048,36 +2013,10 @@ fn render_squad_assembly_left(
     buffer: &mut [Vec<SceneCell>],
     deep: &DeepState,
     ui: &DeepUiState,
-    available: &[AvailableMission],
-    left_heading: &str,
     list_width: usize,
-    content_top: i32,
     list_inner_top: i32,
     content_bottom: i32,
 ) {
-    if let Some(mi) = ui.staging_mission_index {
-        if let Some(m) = available.get(mi) {
-            let tc = mission_type_color(m.mission_type);
-            let cost_label = if m.marks_cost > 0 {
-                format!("{} Warband Marks", m.marks_cost)
-            } else {
-                "Free".to_string()
-            };
-            put_text(
-                buffer,
-                content_top,
-                left_heading.len() as i32 + 3,
-                &format!(
-                    "{}  L{}  Cost: {}",
-                    mission_type_label(m.mission_type),
-                    m.layer,
-                    cost_label
-                ),
-                tc,
-            );
-        }
-    }
-
     let mut row = list_inner_top;
 
     // Available mercs (selectable)
@@ -2580,6 +2519,27 @@ fn render_squad_summary_panel(
     let can_afford = marks >= mission.marks_cost;
 
     let mut row = content_top;
+
+    // Mission identity header (moved from left panel)
+    let tc = mission_type_color(mission.mission_type);
+    let cost_label = if mission.marks_cost > 0 {
+        format!("{} Marks", mission.marks_cost)
+    } else {
+        "Free".to_string()
+    };
+    put_text(
+        buffer,
+        row,
+        detail_inner_left,
+        &format!(
+            "{}  L{}  Cost: {}",
+            mission_type_label(mission.mission_type),
+            mission.layer,
+            cost_label
+        ),
+        tc,
+    );
+    row += 2;
 
     // Cost + balance header
     if mission.marks_cost > 0 {
