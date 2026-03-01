@@ -877,4 +877,766 @@ mod tests {
         let json = serde_json::to_string(&affix).expect("Affix should serialize");
         let _: Affix = serde_json::from_str(&json).expect("Affix should roundtrip");
     }
+
+    // =========================================================================
+    // NEW FIELD ROUND-TRIP TESTS (PR #428 — Fracture Expansion)
+    // =========================================================================
+    // These tests verify that every new field added in PR #428 persists correctly
+    // through a full save→load cycle via CharacterManager, and that transient
+    // (non-saved) fields are reset to their defaults on load.
+
+    // ─── ascension_level ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_ascension_level_nonzero_roundtrip() {
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("AscRtNonzero");
+        state.ascension_level = 3;
+
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager
+            .load_character("ascrtnonzero.json")
+            .expect("load failed");
+
+        assert_eq!(
+            loaded.ascension_level, 3,
+            "ascension_level=3 should persist through save→load"
+        );
+    }
+
+    #[test]
+    fn test_ascension_level_zero_roundtrip() {
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("AscRtZero");
+        state.ascension_level = 0;
+
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager
+            .load_character("ascrtzero.json")
+            .expect("load failed");
+
+        assert_eq!(
+            loaded.ascension_level, 0,
+            "ascension_level=0 (default) should persist through save→load"
+        );
+    }
+
+    #[test]
+    fn test_ascension_level_vi_roundtrip() {
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("AscRtVI");
+        state.ascension_level = 6; // Ascension VI — documented cap
+
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager.load_character("ascrtvi.json").expect("load failed");
+
+        assert_eq!(
+            loaded.ascension_level, 6,
+            "ascension_level=6 (Ascension VI, documented cap) should persist"
+        );
+    }
+
+    #[test]
+    fn test_ascension_level_all_valid_levels_roundtrip() {
+        // Test every documented Ascension level I-VI (values 1-6)
+        for level in 1..=6_u32 {
+            let (manager, _dir) = temp_manager();
+            let name = format!("AscLvl{}", level);
+            let mut state = make_test_state(&name);
+            state.ascension_level = level;
+
+            let filename = format!("{}.json", sanitize_name(&state.character_name));
+            manager.save_character(&state).expect("save failed");
+            let loaded = manager.load_character(&filename).expect("load failed");
+
+            assert_eq!(
+                loaded.ascension_level, level,
+                "ascension_level={} should round-trip correctly",
+                level
+            );
+        }
+    }
+
+    // ─── cached_fracture_zone_cap (transient, not saved) ────────────────────
+
+    #[test]
+    fn test_cached_fracture_zone_cap_is_transient() {
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("FracCapRt");
+        // Set a non-zero value before saving — should NOT appear after load
+        state.cached_fracture_zone_cap = 17;
+
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager
+            .load_character("fraccaprt.json")
+            .expect("load failed");
+
+        assert_eq!(
+            loaded.cached_fracture_zone_cap, 0,
+            "cached_fracture_zone_cap is transient and must be 0 after load (was 17 before save)"
+        );
+    }
+
+    // ─── cached_power_rating (transient, not saved) ──────────────────────────
+
+    #[test]
+    fn test_cached_power_rating_is_transient() {
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("PwrRatingRt");
+        // Set a non-zero value before saving — should NOT appear after load
+        state.cached_power_rating = 12345.678;
+
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager
+            .load_character("pwrratingrt.json")
+            .expect("load failed");
+
+        assert!(
+            loaded.cached_power_rating == 0.0,
+            "cached_power_rating is transient and must be 0.0 after load (was {} before save)",
+            state.cached_power_rating
+        );
+    }
+
+    // ─── stormglass + stormglass_discovered ──────────────────────────────────
+
+    #[test]
+    fn test_stormglass_balance_roundtrip() {
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("SGlassBalRt");
+        state.stormglass = 75_000;
+        state.stormglass_discovered = true;
+
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager
+            .load_character("sglassbalrt.json")
+            .expect("load failed");
+
+        assert_eq!(
+            loaded.stormglass, 75_000,
+            "stormglass currency should persist through save→load"
+        );
+        assert!(
+            loaded.stormglass_discovered,
+            "stormglass_discovered should persist through save→load"
+        );
+    }
+
+    #[test]
+    fn test_stormglass_zero_balance_roundtrip() {
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("SGlassZeroRt");
+        state.stormglass = 0;
+        state.stormglass_discovered = false;
+
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager
+            .load_character("sglasszerort.json")
+            .expect("load failed");
+
+        assert_eq!(
+            loaded.stormglass, 0,
+            "zero stormglass balance should persist"
+        );
+        assert!(
+            !loaded.stormglass_discovered,
+            "stormglass_discovered=false should persist"
+        );
+    }
+
+    #[test]
+    fn test_stormglass_large_balance_roundtrip() {
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("SGlassLgRt");
+        state.stormglass = 1_000_000; // large but plausible balance
+
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager
+            .load_character("sglasslgrt.json")
+            .expect("load failed");
+
+        assert_eq!(
+            loaded.stormglass, 1_000_000,
+            "large stormglass balance should persist"
+        );
+    }
+
+    // ─── storm_sigils ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_storm_sigils_empty_roundtrip() {
+        use crate::stormglass::sigils::StormSigils;
+
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("SigilsEmptyRt");
+        state.storm_sigils = StormSigils::new(); // all slots locked, no sigils
+
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager
+            .load_character("sigilsemptyrt.json")
+            .expect("load failed");
+
+        assert_eq!(
+            loaded.storm_sigils.slots_unlocked, 0,
+            "empty storm_sigils slots_unlocked should be 0 after load"
+        );
+        assert_eq!(
+            loaded.storm_sigils.etched_count(),
+            0,
+            "empty storm_sigils should have 0 etched sigils after load"
+        );
+    }
+
+    #[test]
+    fn test_storm_sigils_with_etched_sigils_roundtrip() {
+        use crate::stormglass::sigils::{Sigil, SigilEffectType, SigilGrade};
+
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("SigilsEtchRt");
+
+        // Unlock 3 slots and etch 2 sigils
+        state.storm_sigils.slots_unlocked = 3;
+        state.storm_sigils.sigils[0] = Some(Sigil {
+            effect: SigilEffectType::XpPercent,
+            value: 18.5,
+            grade: SigilGrade::A,
+        });
+        state.storm_sigils.sigils[1] = Some(Sigil {
+            effect: SigilEffectType::DamagePercent,
+            value: 7.2,
+            grade: SigilGrade::C,
+        });
+        // Slot 2 is unlocked but empty
+
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager
+            .load_character("sigilsetchrt.json")
+            .expect("load failed");
+
+        assert_eq!(
+            loaded.storm_sigils.slots_unlocked, 3,
+            "slots_unlocked should persist through save→load"
+        );
+        assert_eq!(
+            loaded.storm_sigils.etched_count(),
+            2,
+            "etched_count should be 2 after load"
+        );
+
+        let s0 = loaded.storm_sigils.sigils[0]
+            .as_ref()
+            .expect("sigil slot 0 should be Some after load");
+        assert_eq!(s0.effect, SigilEffectType::XpPercent, "slot 0 effect type");
+        assert!(
+            (s0.value - 18.5).abs() < 1e-10,
+            "slot 0 value {} should be 18.5",
+            s0.value
+        );
+        assert_eq!(s0.grade, SigilGrade::A, "slot 0 grade");
+
+        let s1 = loaded.storm_sigils.sigils[1]
+            .as_ref()
+            .expect("sigil slot 1 should be Some after load");
+        assert_eq!(
+            s1.effect,
+            SigilEffectType::DamagePercent,
+            "slot 1 effect type"
+        );
+        assert!(
+            (s1.value - 7.2).abs() < 1e-10,
+            "slot 1 value {} should be 7.2",
+            s1.value
+        );
+        assert_eq!(s1.grade, SigilGrade::C, "slot 1 grade");
+
+        assert!(
+            loaded.storm_sigils.sigils[2].is_none(),
+            "slot 2 should be None (empty unlocked slot)"
+        );
+    }
+
+    #[test]
+    fn test_storm_sigils_extreme_grades_roundtrip() {
+        use crate::stormglass::sigils::{Sigil, SigilEffectType, SigilGrade};
+
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("SigilsGradeRt");
+        state.storm_sigils.slots_unlocked = 5;
+
+        // Etch one sigil with each extreme grade
+        state.storm_sigils.sigils[0] = Some(Sigil {
+            effect: SigilEffectType::CritChancePercent,
+            value: 2.0, // min
+            grade: SigilGrade::FMinus,
+        });
+        state.storm_sigils.sigils[1] = Some(Sigil {
+            effect: SigilEffectType::CritChancePercent,
+            value: 8.0, // max
+            grade: SigilGrade::SPlus,
+        });
+
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager
+            .load_character("sigilsgradert.json")
+            .expect("load failed");
+
+        let s0 = loaded.storm_sigils.sigils[0].as_ref().unwrap();
+        assert_eq!(s0.grade, SigilGrade::FMinus, "FMinus grade should survive");
+
+        let s1 = loaded.storm_sigils.sigils[1].as_ref().unwrap();
+        assert_eq!(s1.grade, SigilGrade::SPlus, "SPlus grade should survive");
+    }
+
+    // ─── zone_progression with fracture zones ─────────────────────────────────
+
+    #[test]
+    fn test_zone_progression_with_unlocked_fracture_zones_roundtrip() {
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("FracZoneRt");
+
+        // Manually unlock fracture zones 12-14 (Red Fault chapter)
+        state.zone_progression.current_zone_id = 12;
+        state.zone_progression.current_subzone_id = 2;
+        for zone_id in 1..=14_u32 {
+            state.zone_progression.unlock_zone(zone_id);
+        }
+        state.zone_progression.defeat_boss(11, 4); // Expanse final boss
+        state.zone_progression.defeat_boss(12, 3); // Zone 12 subzone 3 boss
+
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager
+            .load_character("fraczonert.json")
+            .expect("load failed");
+
+        assert_eq!(
+            loaded.zone_progression.current_zone_id, 12,
+            "current_zone_id should persist"
+        );
+        assert_eq!(
+            loaded.zone_progression.current_subzone_id, 2,
+            "current_subzone_id should persist"
+        );
+
+        for zone_id in 1..=14_u32 {
+            assert!(
+                loaded.zone_progression.is_zone_unlocked(zone_id),
+                "Zone {} should remain unlocked after load",
+                zone_id
+            );
+        }
+        assert!(
+            !loaded.zone_progression.is_zone_unlocked(15),
+            "Zone 15 should NOT be unlocked (cap was 14)"
+        );
+        assert!(
+            loaded.zone_progression.is_boss_defeated(11, 4),
+            "Zone 11 subzone 4 boss defeat should persist"
+        );
+        assert!(
+            loaded.zone_progression.is_boss_defeated(12, 3),
+            "Zone 12 subzone 3 boss defeat should persist"
+        );
+    }
+
+    #[test]
+    fn test_zone_progression_all_fracture_zones_roundtrip() {
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("AllFracRt");
+
+        // Unlock all 30 zones and position in zone 30
+        for zone_id in 1..=30_u32 {
+            state.zone_progression.unlock_zone(zone_id);
+        }
+        state.zone_progression.current_zone_id = 30;
+        state.zone_progression.current_subzone_id = 5;
+        state.zone_progression.has_stormbreaker = true;
+
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager
+            .load_character("allfracrt.json")
+            .expect("load failed");
+
+        assert_eq!(loaded.zone_progression.current_zone_id, 30);
+        assert_eq!(loaded.zone_progression.current_subzone_id, 5);
+        assert!(loaded.zone_progression.has_stormbreaker);
+
+        for zone_id in 1..=30_u32 {
+            assert!(
+                loaded.zone_progression.is_zone_unlocked(zone_id),
+                "Zone {} should remain unlocked",
+                zone_id
+            );
+        }
+    }
+
+    #[test]
+    fn test_zone_progression_kills_in_subzone_roundtrip() {
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("FracKillsRt");
+
+        // Set up zone in middle of fracture zone kill tracking
+        state.zone_progression.current_zone_id = 14;
+        state.zone_progression.current_subzone_id = 3;
+        state.zone_progression.unlock_zone(14);
+        // Simulate 7 kills toward boss (boss spawns at 10)
+        for _ in 0..7 {
+            state.zone_progression.record_kill();
+        }
+        assert_eq!(state.zone_progression.kills_in_subzone, 7);
+        assert!(!state.zone_progression.fighting_boss);
+
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager
+            .load_character("frackillsrt.json")
+            .expect("load failed");
+
+        assert_eq!(loaded.zone_progression.current_zone_id, 14);
+        assert_eq!(loaded.zone_progression.current_subzone_id, 3);
+        // kills_in_subzone has #[serde(default)] but is NOT #[serde(skip)], so it serializes
+        assert_eq!(
+            loaded.zone_progression.kills_in_subzone, 7,
+            "kills_in_subzone should persist through save→load"
+        );
+        assert!(
+            !loaded.zone_progression.fighting_boss,
+            "fighting_boss=false should persist"
+        );
+    }
+
+    // ─── Backward compat: loading old saves without new fields ────────────────
+
+    #[test]
+    fn test_backward_compat_save_without_ascension_level() {
+        let (manager, _dir) = temp_manager();
+
+        // Write a save file that omits ascension_level (old format pre-PR-428)
+        let json_without_ascension = r#"{
+            "version": 2,
+            "character_id": "old-no-asc-id",
+            "character_name": "OldNoAsc",
+            "character_level": 15,
+            "character_xp": 50000,
+            "attributes": {"values": [12, 14, 11, 10, 10, 10]},
+            "prestige_rank": 5,
+            "total_prestige_count": 5,
+            "last_save_time": 1700000000,
+            "play_time_seconds": 3600,
+            "combat_state": {
+                "current_enemy": null,
+                "player_current_hp": 100,
+                "player_max_hp": 100,
+                "attack_timer": 0.0,
+                "regen_timer": 0.0,
+                "is_regenerating": false
+            },
+            "equipment": {
+                "weapon": null,
+                "armor": null,
+                "helmet": null,
+                "gloves": null,
+                "boots": null,
+                "amulet": null,
+                "ring": null
+            }
+        }"#;
+
+        let filepath = manager.quest_dir.join("oldnoasc.json");
+        fs::write(&filepath, json_without_ascension).expect("Failed to write old save");
+
+        let result = manager.load_character("oldnoasc.json");
+        assert!(
+            result.is_ok(),
+            "Should load old save missing ascension_level via serde default. Error: {:?}",
+            result.err()
+        );
+
+        let loaded = result.unwrap();
+        assert_eq!(loaded.character_name, "OldNoAsc");
+        assert_eq!(
+            loaded.ascension_level, 0,
+            "ascension_level should default to 0 when missing from save (serde default)"
+        );
+        assert_eq!(loaded.character_level, 15);
+        assert_eq!(loaded.prestige_rank, 5);
+    }
+
+    #[test]
+    fn test_backward_compat_save_without_stormglass_fields() {
+        let (manager, _dir) = temp_manager();
+
+        // Write a save file missing all stormglass-era fields
+        let json_without_sg = r#"{
+            "version": 2,
+            "character_id": "old-no-sg-id",
+            "character_name": "OldNoSG",
+            "character_level": 10,
+            "character_xp": 10000,
+            "attributes": {"values": [10, 10, 10, 10, 10, 10]},
+            "prestige_rank": 3,
+            "total_prestige_count": 3,
+            "last_save_time": 1699000000,
+            "play_time_seconds": 1800,
+            "combat_state": {
+                "current_enemy": null,
+                "player_current_hp": 80,
+                "player_max_hp": 80,
+                "attack_timer": 0.0,
+                "regen_timer": 0.0,
+                "is_regenerating": false
+            },
+            "equipment": {
+                "weapon": null,
+                "armor": null,
+                "helmet": null,
+                "gloves": null,
+                "boots": null,
+                "amulet": null,
+                "ring": null
+            }
+        }"#;
+
+        let filepath = manager.quest_dir.join("oldnosg.json");
+        fs::write(&filepath, json_without_sg).expect("Failed to write old save");
+
+        let result = manager.load_character("oldnosg.json");
+        assert!(
+            result.is_ok(),
+            "Should load save missing stormglass/storm_sigils/ascension_level. Error: {:?}",
+            result.err()
+        );
+
+        let loaded = result.unwrap();
+        assert_eq!(loaded.stormglass, 0, "stormglass should default to 0");
+        assert!(
+            !loaded.stormglass_discovered,
+            "stormglass_discovered should default to false"
+        );
+        assert_eq!(
+            loaded.storm_sigils.slots_unlocked, 0,
+            "storm_sigils should default to empty"
+        );
+        assert_eq!(
+            loaded.ascension_level, 0,
+            "ascension_level should default to 0"
+        );
+    }
+
+    // ─── Transient fields reset to defaults on load ───────────────────────────
+
+    #[test]
+    fn test_transient_fields_reset_on_load() {
+        use crate::items::Rarity;
+
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("TransientRt");
+
+        // Set transient fields to non-default values before saving
+        state.session_kills = 999;
+        state.consecutive_deaths = 5;
+        state.chrono_surge_active = true;
+        state.debug_force_overcharge = true;
+        state.xp_this_second = 12345;
+        state.combat_seconds_this_tick = true;
+        state.derived_stats_dirty = false; // should be true after load
+        state.cached_power_rating = 9999.0;
+        state.cached_fracture_zone_cap = 20;
+        state.add_recent_drop(
+            "Test Item".to_string(),
+            Rarity::Rare,
+            true,
+            "",
+            "Weapon".to_string(),
+            "+5 STR".to_string(),
+        );
+
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager
+            .load_character("transientrt.json")
+            .expect("load failed");
+
+        // All transient fields should be at defaults after load
+        assert_eq!(loaded.session_kills, 0, "session_kills is transient");
+        assert_eq!(
+            loaded.consecutive_deaths, 0,
+            "consecutive_deaths is transient"
+        );
+        assert!(
+            !loaded.chrono_surge_active,
+            "chrono_surge_active is transient"
+        );
+        assert!(
+            !loaded.debug_force_overcharge,
+            "debug_force_overcharge is transient"
+        );
+        assert_eq!(loaded.xp_this_second, 0, "xp_this_second is transient");
+        assert!(
+            !loaded.combat_seconds_this_tick,
+            "combat_seconds_this_tick is transient"
+        );
+        assert!(
+            loaded.derived_stats_dirty,
+            "derived_stats_dirty should be true after load (recalculation needed)"
+        );
+        assert_eq!(
+            loaded.cached_power_rating, 0.0,
+            "cached_power_rating is transient"
+        );
+        assert_eq!(
+            loaded.cached_fracture_zone_cap, 0,
+            "cached_fracture_zone_cap is transient"
+        );
+        assert!(loaded.recent_drops.is_empty(), "recent_drops is transient");
+        assert!(
+            loaded.active_fishing.is_none(),
+            "active_fishing is transient"
+        );
+        assert!(
+            loaded.active_minigame.is_none(),
+            "active_minigame is transient"
+        );
+        assert!(
+            loaded.last_minigame_win.is_none(),
+            "last_minigame_win is transient"
+        );
+        assert!(
+            loaded.xp_rate_samples.is_empty(),
+            "xp_rate_samples is transient"
+        );
+        assert!(
+            loaded.game_over_shown_at.is_none(),
+            "game_over_shown_at is transient"
+        );
+    }
+
+    // ─── Multiple save→load cycles ────────────────────────────────────────────
+
+    #[test]
+    fn test_multiple_save_load_cycles_preserve_values() {
+        use crate::stormglass::sigils::{Sigil, SigilEffectType, SigilGrade};
+
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("MultiCycleRt");
+
+        // Cycle 1: Set initial values
+        state.ascension_level = 2;
+        state.stormglass = 10_000;
+        state.stormglass_discovered = true;
+        state.storm_sigils.slots_unlocked = 1;
+        state.storm_sigils.sigils[0] = Some(Sigil {
+            effect: SigilEffectType::MaxHpPercent,
+            value: 9.0,
+            grade: SigilGrade::B,
+        });
+
+        manager.save_character(&state).expect("first save failed");
+        let loaded1 = manager
+            .load_character("multicyclert.json")
+            .expect("first load failed");
+        assert_eq!(loaded1.ascension_level, 2);
+        assert_eq!(loaded1.stormglass, 10_000);
+
+        // Cycle 2: Mutate and save again
+        let mut state2 = loaded1;
+        state2.ascension_level = 4;
+        state2.stormglass = 50_000;
+
+        manager.save_character(&state2).expect("second save failed");
+        let loaded2 = manager
+            .load_character("multicyclert.json")
+            .expect("second load failed");
+
+        assert_eq!(
+            loaded2.ascension_level, 4,
+            "ascension_level should update after second cycle"
+        );
+        assert_eq!(
+            loaded2.stormglass, 50_000,
+            "stormglass should update after second cycle"
+        );
+        // Sigil should still be intact through both cycles
+        assert_eq!(loaded2.storm_sigils.slots_unlocked, 1);
+        assert!(loaded2.storm_sigils.sigils[0].is_some());
+        let s0 = loaded2.storm_sigils.sigils[0].as_ref().unwrap();
+        assert_eq!(s0.effect, SigilEffectType::MaxHpPercent);
+        assert!((s0.value - 9.0).abs() < 1e-10);
+    }
+
+    // ─── Combined: all new fields in one character ─────────────────────────────
+
+    #[test]
+    fn test_all_new_pr428_fields_combined_roundtrip() {
+        use crate::stormglass::sigils::{Sigil, SigilEffectType, SigilGrade};
+
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("CombinedRt");
+
+        // Set all new persistent fields to non-default values
+        state.ascension_level = 5;
+        state.stormglass = 250_000;
+        state.stormglass_discovered = true;
+        state.storm_sigils.slots_unlocked = 4;
+        state.storm_sigils.sigils[0] = Some(Sigil {
+            effect: SigilEffectType::XpPercent,
+            value: 22.0,
+            grade: SigilGrade::S,
+        });
+        state.storm_sigils.sigils[1] = Some(Sigil {
+            effect: SigilEffectType::DamagePercent,
+            value: 12.5,
+            grade: SigilGrade::APlus,
+        });
+        state.storm_sigils.sigils[2] = Some(Sigil {
+            effect: SigilEffectType::CritChancePercent,
+            value: 6.0,
+            grade: SigilGrade::B,
+        });
+        // slot 3 is unlocked but empty
+
+        // Set fracture zone state
+        for zone_id in 1..=20_u32 {
+            state.zone_progression.unlock_zone(zone_id);
+        }
+        state.zone_progression.current_zone_id = 18;
+        state.zone_progression.current_subzone_id = 4;
+
+        // Transient fields — must NOT persist
+        state.cached_fracture_zone_cap = 20;
+        state.cached_power_rating = 5000.0;
+        state.session_kills = 500;
+
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager
+            .load_character("combinedrt.json")
+            .expect("load failed");
+
+        // Persistent fields must survive
+        assert_eq!(loaded.ascension_level, 5, "ascension_level");
+        assert_eq!(loaded.stormglass, 250_000, "stormglass");
+        assert!(loaded.stormglass_discovered, "stormglass_discovered");
+        assert_eq!(loaded.storm_sigils.slots_unlocked, 4, "slots_unlocked");
+        assert_eq!(loaded.storm_sigils.etched_count(), 3, "etched_count");
+
+        let s0 = loaded.storm_sigils.sigils[0].as_ref().unwrap();
+        assert_eq!(s0.effect, SigilEffectType::XpPercent);
+        assert!((s0.value - 22.0).abs() < 1e-10);
+        assert_eq!(s0.grade, SigilGrade::S);
+
+        assert_eq!(loaded.zone_progression.current_zone_id, 18);
+        assert_eq!(loaded.zone_progression.current_subzone_id, 4);
+        for zone_id in 1..=20_u32 {
+            assert!(
+                loaded.zone_progression.is_zone_unlocked(zone_id),
+                "Zone {} should be unlocked",
+                zone_id
+            );
+        }
+
+        // Transient fields must be reset
+        assert_eq!(loaded.cached_fracture_zone_cap, 0, "transient cap reset");
+        assert_eq!(
+            loaded.cached_power_rating, 0.0,
+            "transient power rating reset"
+        );
+        assert_eq!(loaded.session_kills, 0, "transient session_kills reset");
+    }
 }
