@@ -303,6 +303,7 @@ Deterministic trigger: The Deep is discovered on the first Expanse cycle boss ki
 - `events.rs` -- Check-in events and event choices
 - `economy.rs` -- Warband Marks economy, costs, rewards
 - `discovery.rs` -- Discovery completion logic (boss-triggered), starter roster
+- `narratives.rs` -- Mission narrative text for results modal
 - `persistence.rs` -- Save/load from `~/.quest/deep.json`
 
 ### Persistence

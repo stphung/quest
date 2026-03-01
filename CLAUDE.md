@@ -236,6 +236,7 @@ Per-character combat power multiplier purchased with prestige ranks, gated by De
 - `layers.rs` — Layer difficulty (power thresholds L1-25 + Void scaling), familiarity system (Unknown/Mapped/Familiar/Mastered), mission durations (base + multiplicative modifiers), infrastructure building (validation, costs, Watchtower familiarity bonus)
 - `persistence.rs` — Save/load from `~/.quest/deep.json`
 - `discovery.rs` — Discovery logic (complete_discovery), starter roster initialisation (3 mercs: Vanguard, Scout, Medic)
+- `narratives.rs` — Mission narrative text for results modal
 
 An endgame (P15+) system where players recruit and manage a mercenary company, sending squads on long-duration missions (2-24h wall-clock time) into a vast underground structure. Two-tier persistence: `DeepPersistent` (guild rank, cleared layers, infrastructure, `fracture_zone_cap`, `pending_fracture_region_unlock` — survives prestige) and `DeepPrestige` (mercs, missions, Warband Marks — persists across prestiges). Five mercenary archetypes (Vanguard, Scout, Arcanist, Medic, Saboteur) with 4 quality tiers. Six layer tiers (Shallows through The Void). Five mission types (Supply Run, Recon, Expedition, Breakthrough, Construction). Four infrastructure types (Outpost, SupplyCache, Watchtower, Bridge). Discovered on first Endless kill (Zone 11 boss) at P15+. Deep layer breakthroughs unlock fracture zones: Layer 3 → Zones 12-14, Layer 7 → Zones 15-17, Layer 12 → Zones 18-20, Layer 18 → Zones 21-23, Layer 25 → Zones 24-26, Layer 30 → Zones 27-30.
 
@@ -614,7 +615,8 @@ quest/
 │   │   ├── economy.rs       # Warband Marks economy, rewards, costs
 │   │   ├── layers.rs        # Layer difficulty, familiarity, infrastructure, durations
 │   │   ├── persistence.rs   # Save/load from ~/.quest/deep.json
-│   │   └── discovery.rs     # Discovery logic (boss-trigger), starter roster
+│   │   ├── discovery.rs     # Discovery logic (boss-trigger), starter roster
+│   │   └── narratives.rs    # Mission narrative text for results modal
 │   ├── stormglass/          # Stormglass currency and Storm Sigils
 │   │   ├── types.rs         # Stormglass state, daily rotation
 │   │   ├── sigils.rs        # Storm Sigil definitions and bonuses
@@ -705,12 +707,12 @@ quest/
 │       ├── time_vault_scene.rs # Time Vault overlay (branch/commit browser)
 │       ├── overlay_layout.rs  # Shared overlay layout helpers
 │       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
-│       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing)
+│       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing, all 30 zones)
 │       ├── debug_menu_scene.rs # Debug menu with tabbed categories
 │       ├── bug_report_scene.rs # Bug report overlay
 │       ├── *_scene.rs       # Various game scenes
 │       └── character_*.rs   # Character management UI
-├── tests/                   # Integration tests (65 test files, 6,673+ tests)
+├── tests/                   # Integration tests (79 test files, 6,631+ tests)
 │   ├── game_loop_orchestration_test.rs  # 42 behavior-locking tests for game_tick
 │   ├── tick_integration_test.rs         # Tick module integration tests
 │   ├── tick_stages_coverage_test.rs     # Tick stages coverage tests
