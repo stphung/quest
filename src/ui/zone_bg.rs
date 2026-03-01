@@ -1528,12 +1528,68 @@ fn config_ashen_verge() -> ZoneSceneConfig {
     }
 }
 
+/// Zone 19: Throat of the World -- near-black, downward stalactites, heavy drifting ash.
 fn config_throat_of_the_world() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (20, 18, 15),
+        sky_bottom: (5, 4, 3),
+        celestial: CelestialType::None,
+        far_terrain: TerrainProfile {
+            glyph: '\u{25bc}', // ▼
+            color: (40, 35, 30),
+            base_height: 0.40,
+            amplitude: 0.10,
+            frequency: 0.14,
+            speed: 0.00005,
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '\u{2588}', // █
+            color: (15, 12, 10),
+            base_height: 0.65,
+            amplitude: 0.08,
+            frequency: 0.10,
+            speed: 0.00004,
+            fill: true,
+        },
+        ground_glyphs: &[],
+        ground_color: (0, 0, 0),
+        weather: WeatherType::DriftingAsh,
+        weather_intensity: 1.8,
+        overlay: Some(overlay_consuming_dark),
+    }
 }
 
+/// Zone 20: The Black Mouth -- deep purple-black void, consuming everything.
 fn config_the_black_mouth() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (30, 10, 35),
+        sky_bottom: (5, 2, 8),
+        celestial: CelestialType::VoidRift,
+        far_terrain: TerrainProfile {
+            glyph: '\u{2572}', // ╲
+            color: (50, 20, 40),
+            base_height: 0.48,
+            amplitude: 0.08,
+            frequency: 0.18,
+            speed: 0.00008,
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '\u{2591}', // ░
+            color: (20, 8, 18),
+            base_height: 0.64,
+            amplitude: 0.06,
+            frequency: 0.15,
+            speed: 0.00006,
+            fill: true,
+        },
+        ground_glyphs: &[],
+        ground_color: (0, 0, 0),
+        weather: WeatherType::VoidParticles,
+        weather_intensity: 1.2,
+        overlay: Some(overlay_consuming_dark),
+    }
 }
 
 // ---------------------------------------------------------------------------
