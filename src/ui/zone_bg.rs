@@ -951,7 +951,7 @@ fn paint_dust_motes(buffer: &mut [Vec<SceneCell>], millis: f64, intensity: f64) 
                 brightness.saturating_add(10),
                 brightness / 2,
             );
-            put_cell(buffer, row as i32, col as i32, '\u00b7', fg);
+            put_cell(buffer, row as i32, col as i32, '\u{00b7}', fg);
         }
     }
 }
@@ -1009,7 +1009,7 @@ fn paint_fracture_motes(buffer: &mut [Vec<SceneCell>], millis: f64, intensity: f
             }
             let brightness = (30.0 + pulse * 40.0) as u8;
             let fg = Color::Rgb(brightness.saturating_add(20), brightness / 3, brightness);
-            put_cell(buffer, row as i32, col as i32, '\u00b7', fg);
+            put_cell(buffer, row as i32, col as i32, '\u{00b7}', fg);
         }
     }
 }
