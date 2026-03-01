@@ -360,8 +360,19 @@ pub fn replace_binary(new_binary: &Path) -> Result<(), Box<dyn Error>> {
 
     #[cfg(not(target_os = "windows"))]
     {
-        // On Unix, we can just overwrite the file
-        fs::copy(new_binary, &current_exe)?;
+        // On Linux, writing to a running executable fails with ETXTBSY (Text file busy).
+        // Rename the running binary out of the way first, then copy the new one in.
+        // The old inode stays alive until the process exits.
+        let old_exe = current_exe.with_extension("old");
+        if let Err(e) = fs::rename(&current_exe, &old_exe) {
+            // Fallback: try direct copy (works on macOS)
+            fs::copy(new_binary, &current_exe)
+                .map_err(|copy_err| format!("rename failed: {}, copy failed: {}", e, copy_err))?;
+        } else {
+            fs::copy(new_binary, &current_exe)?;
+            // Clean up old binary (ignore errors - may still be in use)
+            let _ = fs::remove_file(&old_exe);
+        }
 
         // Make executable
         use std::os::unix::fs::PermissionsExt;

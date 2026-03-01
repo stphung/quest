@@ -167,7 +167,10 @@ fn main() -> io::Result<()> {
         match args[1].as_str() {
             "update" => match utils::updater::run_update_command() {
                 Ok(_) => std::process::exit(0),
-                Err(_) => std::process::exit(1),
+                Err(e) => {
+                    eprintln!("Update failed: {}", e);
+                    std::process::exit(1);
+                }
             },
             "--version" | "-v" => {
                 println!(
