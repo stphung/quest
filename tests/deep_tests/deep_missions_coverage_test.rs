@@ -235,32 +235,33 @@ fn test_mission_pool_safe_mission_targets_cleared_layer() {
     let _ = persistent.layer_record_mut(3); // ensure layer 3 exists as frontier
 
     let pool = generate_mission_pool(&persistent, &mut rng);
-    let safe = pool
-        .iter()
-        .find(|m| {
-            matches!(
-                m.mission_type,
-                MissionType::SupplyRun | MissionType::Construction(_)
-            )
-        })
-        .expect("Pool must have a safe mission");
 
-    match safe.mission_type {
-        MissionType::SupplyRun => {
-            // Supply Run should target the deepest cleared layer (2), not layer 1.
-            assert_eq!(
-                safe.layer, 2,
-                "Supply Run should target the deepest cleared layer"
-            );
-        }
-        MissionType::Construction(_) => {
+    // Pool should have Supply Runs on cleared layers AND the frontier.
+    let supply_runs: Vec<u32> = pool
+        .iter()
+        .filter(|m| matches!(m.mission_type, MissionType::SupplyRun))
+        .map(|m| m.layer)
+        .collect();
+    assert!(
+        supply_runs.contains(&1) || supply_runs.contains(&2),
+        "Pool must have a Supply Run on a cleared layer, got layers {:?}",
+        supply_runs
+    );
+    assert!(
+        supply_runs.contains(&3),
+        "Pool must have a Supply Run on the frontier layer, got layers {:?}",
+        supply_runs
+    );
+
+    // Construction missions should only target cleared layers.
+    for m in &pool {
+        if matches!(m.mission_type, MissionType::Construction(_)) {
             assert!(
-                safe.layer == 1 || safe.layer == 2,
+                m.layer == 1 || m.layer == 2,
                 "Construction should target a cleared layer (got layer {})",
-                safe.layer
+                m.layer
             );
         }
-        _ => unreachable!("filtered to safe missions"),
     }
 }
 

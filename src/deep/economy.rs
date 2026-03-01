@@ -27,7 +27,7 @@ pub fn base_marks_earned(mission_type: MissionType, layer: u32) -> u32 {
             MissionType::SupplyRun => (210, 10u32),
             MissionType::Recon => (295, 15),
             MissionType::Expedition => (730, 35),
-            MissionType::Breakthrough | MissionType::GatewayExpedition => (1125, 50),
+            MissionType::Breakthrough | MissionType::GatewayExpedition => (281, 13),
             MissionType::Construction(_) => (0, 0),
         };
         return base_26 + per_layer * extra;
@@ -35,31 +35,31 @@ pub fn base_marks_earned(mission_type: MissionType, layer: u32) -> u32 {
 
     // Lookup table for layers 1–25 from the balance design document.
     let (supply, recon, expedition, breakthrough) = match layer {
-        1 => (35, 50, 130, 280),
-        2 => (40, 55, 140, 300),
-        3 => (40, 60, 155, 320),
-        4 => (45, 65, 170, 345),
-        5 => (50, 70, 185, 370),
-        6 => (55, 80, 200, 395),
-        7 => (60, 85, 215, 420),
-        8 => (65, 95, 235, 450),
-        9 => (70, 100, 255, 480),
-        10 => (75, 110, 275, 510),
-        11 => (80, 115, 295, 540),
-        12 => (90, 125, 315, 570),
-        13 => (95, 135, 340, 600),
-        14 => (100, 145, 365, 635),
-        15 => (110, 155, 390, 670),
-        16 => (115, 165, 415, 705),
-        17 => (125, 175, 440, 740),
-        18 => (130, 185, 470, 780),
-        19 => (140, 200, 500, 820),
-        20 => (150, 210, 530, 860),
-        21 => (160, 225, 560, 900),
-        22 => (170, 235, 590, 940),
-        23 => (180, 250, 625, 985),
-        24 => (190, 265, 660, 1030),
-        25 => (200, 280, 695, 1075),
+        1 => (35, 50, 130, 70),
+        2 => (40, 55, 140, 75),
+        3 => (40, 60, 155, 80),
+        4 => (45, 65, 170, 86),
+        5 => (50, 70, 185, 93),
+        6 => (55, 80, 200, 99),
+        7 => (60, 85, 215, 105),
+        8 => (65, 95, 235, 113),
+        9 => (70, 100, 255, 120),
+        10 => (75, 110, 275, 128),
+        11 => (80, 115, 295, 135),
+        12 => (90, 125, 315, 143),
+        13 => (95, 135, 340, 150),
+        14 => (100, 145, 365, 159),
+        15 => (110, 155, 390, 168),
+        16 => (115, 165, 415, 176),
+        17 => (125, 175, 440, 185),
+        18 => (130, 185, 470, 195),
+        19 => (140, 200, 500, 205),
+        20 => (150, 210, 530, 215),
+        21 => (160, 225, 560, 225),
+        22 => (170, 235, 590, 235),
+        23 => (180, 250, 625, 246),
+        24 => (190, 265, 660, 258),
+        25 => (200, 280, 695, 269),
         _ => unreachable!(), // handled above
     };
 
@@ -149,7 +149,7 @@ pub fn mission_launch_cost(mission_type: MissionType, layer: u32) -> u32 {
         }
         MissionType::Recon => 30 + layer,
         MissionType::Expedition => 80 + 3 * layer,
-        MissionType::Breakthrough | MissionType::GatewayExpedition => 70 + 8 * layer,
+        MissionType::Breakthrough | MissionType::GatewayExpedition => 300 + 25 * layer,
         MissionType::Construction(infra) => super::layers::infrastructure_build_cost(infra, layer),
     }
 }
@@ -380,7 +380,7 @@ mod tests {
         assert_eq!(base_marks_earned(MissionType::SupplyRun, 1), 35);
         assert_eq!(base_marks_earned(MissionType::Recon, 1), 50);
         assert_eq!(base_marks_earned(MissionType::Expedition, 1), 130);
-        assert_eq!(base_marks_earned(MissionType::Breakthrough, 1), 280);
+        assert_eq!(base_marks_earned(MissionType::Breakthrough, 1), 70);
     }
 
     #[test]
@@ -388,7 +388,7 @@ mod tests {
         assert_eq!(base_marks_earned(MissionType::SupplyRun, 25), 200);
         assert_eq!(base_marks_earned(MissionType::Recon, 25), 280);
         assert_eq!(base_marks_earned(MissionType::Expedition, 25), 695);
-        assert_eq!(base_marks_earned(MissionType::Breakthrough, 25), 1075);
+        assert_eq!(base_marks_earned(MissionType::Breakthrough, 25), 269);
     }
 
     #[test]
@@ -397,7 +397,7 @@ mod tests {
         assert_eq!(base_marks_earned(MissionType::SupplyRun, 26), 210 + 10);
         assert_eq!(base_marks_earned(MissionType::Recon, 26), 295 + 15);
         assert_eq!(base_marks_earned(MissionType::Expedition, 26), 730 + 35);
-        assert_eq!(base_marks_earned(MissionType::Breakthrough, 26), 1125 + 50);
+        assert_eq!(base_marks_earned(MissionType::Breakthrough, 26), 281 + 13);
     }
 
     #[test]

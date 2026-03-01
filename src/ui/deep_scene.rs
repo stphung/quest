@@ -299,8 +299,8 @@ fn render_status_summary(
     col += 5;
 
     // Marks
-    put_text(buffer, 0, col, "Marks ", status_label);
-    col += "Marks ".len() as i32;
+    put_text(buffer, 0, col, "Warband Marks ", status_label);
+    col += "Warband Marks ".len() as i32;
     let marks_str = format!("\u{25c6} {}", marks);
     put_text(buffer, 0, col, &marks_str, Color::Rgb(220, 180, 60));
     col += marks_str.len() as i32;
@@ -314,10 +314,48 @@ fn render_status_summary(
     put_text(buffer, 0, col, &mission_str, Color::Cyan);
     col += mission_str.len() as i32;
 
-    // Next completion time
+    // Crew (ready/injured)
+    put_text(buffer, 0, col, "  \u{00b7}  ", separator_color);
+    col += 5;
+    let ready_mercs = deep
+        .prestige
+        .roster
+        .iter()
+        .filter(|m| matches!(m.status, crate::deep::MercStatus::Available))
+        .count();
+    let injured_mercs = deep
+        .prestige
+        .roster
+        .iter()
+        .filter(|m| matches!(m.status, crate::deep::MercStatus::Injured { .. }))
+        .count();
+    let crew_str = if injured_mercs > 0 {
+        format!("{}r/{}i", ready_mercs, injured_mercs)
+    } else {
+        format!("{}r", ready_mercs)
+    };
+    put_text(buffer, 0, col, &crew_str, Color::Rgb(100, 200, 130));
+    col += crew_str.len() as i32;
+
+    // Events (if any pending)
+    let pending_events = deep
+        .prestige
+        .active_missions
+        .iter()
+        .filter(|m| m.has_pending_event())
+        .count();
+    if pending_events > 0 {
+        put_text(buffer, 0, col, "  ", separator_color);
+        col += 2;
+        let event_str = format!("\u{26a1}{}", pending_events);
+        put_text(buffer, 0, col, &event_str, Color::Yellow);
+        col += event_str.len() as i32;
+    }
+
+    // Next completion time (right-aligned)
     let now = Utc::now();
     let (next_str, next_color) = if active == 0 {
-        ("Next: none active".to_string(), Color::Rgb(90, 108, 130))
+        ("\u{25f7} idle".to_string(), Color::Rgb(90, 108, 130))
     } else {
         let min_remaining = deep
             .prestige
@@ -327,36 +365,94 @@ fn render_status_summary(
             .min()
             .unwrap_or(0);
         if min_remaining == 0 {
-            ("Next: resolving...".to_string(), Color::Rgb(90, 180, 120))
+            ("\u{25f7} now".to_string(), Color::Rgb(90, 180, 120))
         } else {
             let h = min_remaining / 3600;
             let m = (min_remaining % 3600) / 60;
-            if h > 0 {
-                (
-                    format!("Next: ~{}h {:02}m", h, m),
-                    if min_remaining <= 15 * 60 {
-                        Color::Yellow
-                    } else {
-                        Color::Rgb(120, 142, 166)
-                    },
-                )
+            let time_str = if h > 0 {
+                format!("\u{25f7} ~{}h {:02}m", h, m)
             } else {
-                (
-                    format!("Next: ~{}m", m),
-                    if min_remaining <= 15 * 60 {
-                        Color::Yellow
-                    } else {
-                        Color::Rgb(120, 142, 166)
-                    },
-                )
-            }
+                format!("\u{25f7} ~{}m", m)
+            };
+            let color = if min_remaining <= 15 * 60 {
+                Color::Yellow
+            } else {
+                Color::Rgb(120, 142, 166)
+            };
+            (time_str, color)
         }
     };
 
-    // Right-align the next completion hint to preserve hierarchy and avoid crowding.
     let next_col = width as i32 - next_str.len() as i32 - 1;
     if next_col > col + 2 {
         put_text(buffer, 0, next_col, &next_str, next_color);
+    }
+}
+
+/// Render the frontier layer and rank advancement bar (row 1 of the header).
+fn render_frontier_bar(buffer: &mut [Vec<SceneCell>], width: usize, deep: &DeepState) {
+    if buffer.len() < 2 || width < 30 {
+        return;
+    }
+
+    // Subtle background for row 1
+    let row_bg = Color::Rgb(5, 9, 18);
+    for c in 0..width {
+        if c < buffer[1].len() {
+            buffer[1][c].bg = row_bg;
+        }
+    }
+
+    let mut col = 1i32;
+    let right_edge = width as i32 - 2;
+
+    // Frontier: ▼ L12 Hollows
+    let frontier = deep.persistent.frontier_layer();
+    let frontier_tier = crate::deep::LayerTier::from_layer(frontier);
+    put_text(buffer, 1, col, "\u{25bc}", Color::Rgb(100, 200, 130));
+    col += 2;
+    let frontier_text = format!("L{} {}", frontier, frontier_tier.display_name());
+    put_text(buffer, 1, col, &frontier_text, Color::Rgb(140, 160, 180));
+    col += frontier_text.len() as i32 + 3;
+
+    // Rank advancement: → Legion  Need L13 ████░░░░ 12/13
+    let rank = deep.persistent.guild_rank;
+    let deepest = deep.persistent.deepest_layer_reached;
+    if rank.can_advance() {
+        if let Some(next) = rank.next() {
+            put_text(buffer, 1, col, "\u{2192}", Color::DarkGray);
+            col += 2;
+            put_text(buffer, 1, col, next.display_name(), Color::Cyan);
+            col += next.display_name().len() as i32 + 2;
+
+            if let Some(needed_layer) = next.required_breakthrough_layer() {
+                let need_label = format!("Need L{}", needed_layer);
+                put_text(buffer, 1, col, &need_label, Color::Rgb(80, 120, 80));
+                col += need_label.len() as i32 + 1;
+
+                let suffix = format!(" {}/{}", deepest.max(1), needed_layer);
+                let bar_width = (right_edge - col - suffix.len() as i32 - 1).max(4) as usize;
+                let progress_ratio = (deepest.max(1) as f64 / needed_layer as f64).clamp(0.0, 1.0);
+                let bar_color = if progress_ratio >= 1.0 {
+                    Color::Green
+                } else {
+                    Color::Cyan
+                };
+                super::deep_shared::render_progress_bar(
+                    buffer,
+                    1,
+                    col,
+                    bar_width,
+                    progress_ratio,
+                    bar_color,
+                );
+                put_text(buffer, 1, col + bar_width as i32, &suffix, Color::DarkGray);
+            }
+        }
+    } else {
+        // Max rank
+        let max_label = format!("\u{2605} {} \u{2014} MAX", rank.display_name());
+        put_text(buffer, 1, col, &max_label, Color::Rgb(255, 215, 0));
     }
 }
 
@@ -389,16 +485,9 @@ fn render_tab_bar(buffer: &mut [Vec<SceneCell>], width: usize, active: DeepView,
     let badges: Vec<(String, Color)> = DeepView::TABS
         .iter()
         .map(|&tab| match tab {
-            DeepView::Hub => {
-                let results = deep.prestige.pending_results.len();
-                if results > 0 {
-                    (format!("\u{2713}{}", results), Color::Green)
-                } else {
-                    (String::new(), Color::DarkGray)
-                }
-            }
-            DeepView::Infrastructure => (String::new(), Color::DarkGray),
-            DeepView::EventResponse => {
+            DeepView::Hub => (String::new(), Color::DarkGray),
+            DeepView::NewMission => {
+                // Missions tab: show events badge only (no count)
                 let events = deep
                     .prestige
                     .active_missions
@@ -411,40 +500,10 @@ fn render_tab_bar(buffer: &mut [Vec<SceneCell>], width: usize, active: DeepView,
                     (String::new(), Color::DarkGray)
                 }
             }
-            DeepView::NewMission => {
-                let n = deep.prestige.available_missions.len();
-                if n > 0 {
-                    (format!("\u{00b7}{}", n), Color::Cyan)
-                } else {
-                    (String::new(), Color::DarkGray)
-                }
-            }
-            DeepView::Roster => {
-                let injured = deep
-                    .prestige
-                    .roster
-                    .iter()
-                    .filter(|m| {
-                        matches!(
-                            m.status,
-                            crate::deep::MercStatus::Injured { .. } | crate::deep::MercStatus::Lost
-                        )
-                    })
-                    .count();
-                if injured > 0 {
-                    (format!("!{}", injured), Color::Yellow)
-                } else {
-                    (String::new(), Color::DarkGray)
-                }
-            }
-            DeepView::Recruit => {
-                let n = deep.prestige.recruit_pool.candidates.len();
-                if n > 0 {
-                    ("\u{00b7}".to_string(), Color::Cyan)
-                } else {
-                    (String::new(), Color::DarkGray)
-                }
-            }
+            DeepView::Recruit => (String::new(), Color::DarkGray),
+            DeepView::Infrastructure => (String::new(), Color::DarkGray),
+            // Roster and EventResponse are not in TABS, but exhaustive match requires them
+            DeepView::Roster | DeepView::EventResponse => (String::new(), Color::DarkGray),
         })
         .collect();
 
@@ -588,13 +647,16 @@ pub fn render_deep_overlay(
     // ── Status summary bar (row 0) ──
     render_status_summary(&mut buffer, width, deep, millis);
 
-    // ── Tab bar (row 1) ──
-    render_tab_bar(&mut buffer[1..], width, ui.view, deep);
+    // ── Frontier / rank advancement bar (row 1) ──
+    render_frontier_bar(&mut buffer, width, deep);
 
-    // Sub-views render below status bar (row 0), tab bar (row 1), and separator (row 2).
-    // We pass a reduced height and offset the buffer slice by 3 rows.
-    let content_height = height.saturating_sub(3);
-    let content_buffer = &mut buffer[3..];
+    // ── Tab bar (row 2) ──
+    render_tab_bar(&mut buffer[2..], width, ui.view, deep);
+
+    // Sub-views render below status bar (row 0), frontier bar (row 1), tab bar (row 2),
+    // and separator (row 3). Content starts at row 4.
+    let content_height = height.saturating_sub(4);
+    let content_buffer = &mut buffer[4..];
 
     // Dispatch to the appropriate sub-view
     match ui.view {
@@ -612,40 +674,25 @@ pub fn render_deep_overlay(
             );
         }
         DeepView::Roster => {
-            super::deep_roster::render_roster(content_buffer, width, content_height, deep, ui, ctx);
+            // Roster is no longer a separate tab; absorbed into Status tab.
         }
         DeepView::Recruit => {
-            super::deep_roster::render_recruit(
-                content_buffer,
-                width,
-                content_height,
-                deep,
-                ui,
-                ctx,
-            );
+            // Recruit is now a sub-view within the Status tab.
         }
         DeepView::Infrastructure => {
             super::deep_layers::render_layers(content_buffer, width, content_height, deep, ui, ctx);
         }
         DeepView::EventResponse => {
-            super::deep_events::render_event_response(
-                content_buffer,
-                width,
-                content_height,
-                deep,
-                ui,
-                ctx,
-            );
+            // Events are now rendered as a modal over Hub; this arm is unreachable.
         }
     }
 
-    // Event badge footer reminder when not on hub, layers, or events tab
-    if ui.view != DeepView::Hub
+    // Event badge footer reminder when not on missions tab
+    if ui.view != DeepView::NewMission
         && ui.view != DeepView::Infrastructure
-        && ui.view != DeepView::EventResponse
         && deep.prestige.has_any_pending_event()
     {
-        let reminder = "\u{26a1} Event pending \u{2014} [Tab] to Events";
+        let reminder = "\u{26a1} Event pending \u{2014} [\u{2192}] to Missions";
         let rem_col = (width as i32 - reminder.len() as i32) / 2;
         put_text(
             &mut buffer,
@@ -663,6 +710,11 @@ pub fn render_deep_overlay(
 
     // Flush buffer to frame
     render_buffer(frame, inner, &buffer);
+
+    // Event response modal over hub
+    if ui.event_modal_open && ui.event_mission_id.is_some() {
+        super::deep_events::render_event_modal(frame, area, deep, ui, ctx);
+    }
 
     // Mission results modal is layered on top if there are pending results
     if !deep.prestige.pending_results.is_empty() {
@@ -769,7 +821,7 @@ fn help_content(view: DeepView) -> &'static [&'static str] {
             "Advance by clearing breakthrough layers.",
             "",
             "Prestige Cycle",
-            "Resets: mercs, Marks, active missions",
+            "Resets: mercs, Warband Marks, active missions",
             "Survives: guild rank, cleared layers,",
             "          infrastructure, familiarity",
         ],
@@ -784,7 +836,7 @@ fn help_content(view: DeepView) -> &'static [&'static str] {
             "Cuts future mission times.",
             "",
             "Expedition   8-16h  Medium",
-            "Main rewards: items + Marks.",
+            "Main rewards: items + Warband Marks.",
             "",
             "Breakthrough 18-24h  High",
             "Clears frontier. Unlocks next.",
@@ -838,7 +890,7 @@ fn help_content(view: DeepView) -> &'static [&'static str] {
             "",
             "INFRASTRUCTURE (permanent)",
             "Outpost      -25% all mission times",
-            "Supply Cache +50% Marks on Supply Runs",
+            "Supply Cache +50% Warband Marks on Supply Runs",
             "Watchtower   +40 familiarity on build",
             "Bridge       -2h on deeper missions",
             "",
@@ -1014,7 +1066,7 @@ pub fn render_deep_discovery_modal(frame: &mut Frame, area: Rect, _ctx: &LayoutC
             Style::default().fg(Color::Cyan),
         )),
         Line::from(Span::styled(
-            "Earn Marks, items, and Prestige Rank fragments.",
+            "Earn Warband Marks, items, and Prestige Rank fragments.",
             Style::default().fg(Color::Cyan),
         )),
         Line::from(Span::styled(

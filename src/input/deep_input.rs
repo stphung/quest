@@ -42,6 +42,11 @@ pub(super) fn handle_deep(
         return InputResult::Continue;
     }
 
+    // Event modal: intercept input before tab cycling and view dispatch.
+    if deep_ui.event_modal_open {
+        return handle_event_response(key, deep_state, deep_ui);
+    }
+
     // Clear any transient error message on the next key press.
     deep_ui.flash_message = None;
 
@@ -51,15 +56,15 @@ pub(super) fn handle_deep(
         return InputResult::Continue;
     }
 
-    // Tab cycling works from any view except during squad staging.
+    // Left/Right arrow cycling works from any view except during squad staging.
     if deep_ui.staging_mission_index.is_none() {
         match key.code {
-            KeyCode::Tab | KeyCode::Right => {
+            KeyCode::Right => {
                 let new_view = deep_ui.view.next_tab();
                 switch_view(deep_ui, new_view);
                 return InputResult::Continue;
             }
-            KeyCode::BackTab | KeyCode::Left => {
+            KeyCode::Left => {
                 let new_view = deep_ui.view.prev_tab();
                 switch_view(deep_ui, new_view);
                 return InputResult::Continue;
@@ -70,11 +75,15 @@ pub(super) fn handle_deep(
 
     match deep_ui.view {
         DeepView::Hub => handle_hub(key, deep_state, deep_ui, game_state, achievements),
-        DeepView::NewMission => handle_new_mission(key, deep_state, deep_ui, debug_mode),
-        DeepView::Roster => handle_roster(key, deep_state, deep_ui),
+        DeepView::NewMission => {
+            handle_new_mission(key, deep_state, deep_ui, game_state, debug_mode)
+        }
         DeepView::Infrastructure => handle_infrastructure(key, deep_state, deep_ui),
-        DeepView::EventResponse => handle_event_response(key, deep_state, deep_ui),
-        DeepView::Recruit => handle_recruit(key, deep_state, deep_ui),
+        DeepView::Roster | DeepView::EventResponse | DeepView::Recruit => {
+            // Roster and Recruit are absorbed into Status tab; EventResponse is a modal.
+            // All arms are unreachable but kept for exhaustive matching.
+            InputResult::Continue
+        }
     }
 }
 
@@ -123,50 +132,19 @@ fn handle_hub(
     key: KeyEvent,
     deep_state: &mut DeepState,
     deep_ui: &mut DeepUiState,
-    game_state: &mut GameState,
+    _game_state: &mut GameState,
     _achievements: &mut crate::achievements::Achievements,
 ) -> InputResult {
+    // Shared keys for both sub-views.
     match key.code {
-        KeyCode::Up => {
-            deep_ui.selected_index = deep_ui.selected_index.saturating_sub(1);
-            InputResult::Continue
-        }
-        KeyCode::Down => {
-            let mission_count = deep_state.prestige.active_missions.len()
-                + deep_state.prestige.pending_results.len();
-            if mission_count > 0 && deep_ui.selected_index + 1 < mission_count {
-                deep_ui.selected_index += 1;
-            }
-            InputResult::Continue
-        }
-        KeyCode::Enter => {
-            match map_hub_selection(deep_state, deep_ui.selected_index) {
-                Some(HubSelection::Completed(pending_idx)) => {
-                    if collect_pending_result(deep_state, deep_ui, game_state, pending_idx) {
-                        return InputResult::NeedsSave;
-                    }
-                }
-                Some(HubSelection::Active(active_idx)) => {
-                    if let Some(mission) = deep_state.prestige.active_missions.get(active_idx) {
-                        if mission.has_pending_event() {
-                            deep_ui.event_mission_id = Some(mission.id);
-                            deep_ui.event_choice_index = 0;
-                            deep_ui.view = DeepView::EventResponse;
-                            deep_ui.event_visit_count = deep_ui.event_visit_count.saturating_add(1);
-                        } else {
-                            deep_ui.flash_message = Some(
-                                "No action yet. Wait for a check-in event or mission completion."
-                                    .to_string(),
-                            );
-                        }
-                    }
-                }
-                None => {}
-            }
-            InputResult::Continue
+        KeyCode::Tab | KeyCode::BackTab => {
+            // Toggle between Roster and Recruit sub-views.
+            deep_ui.status_show_recruit = !deep_ui.status_show_recruit;
+            deep_ui.selected_index = 0;
+            return InputResult::Continue;
         }
         KeyCode::Char('g') | KeyCode::Char('G') => {
-            // Attempt guild rank upgrade.
+            // Attempt guild rank upgrade (available from both sub-views).
             match crate::deep::try_upgrade_guild_rank(
                 &mut deep_state.persistent,
                 &mut deep_state.prestige,
@@ -178,7 +156,7 @@ fn handle_hub(
                         new_rank.0,
                         new_rank.display_name(),
                     ));
-                    InputResult::NeedsSave
+                    return InputResult::NeedsSave;
                 }
                 Err(e) => {
                     let msg = match e {
@@ -198,15 +176,87 @@ fn handle_hub(
                         }
                     };
                     deep_ui.flash_message = Some(msg);
-                    InputResult::Continue
+                    return InputResult::Continue;
                 }
             }
         }
         KeyCode::Esc | KeyCode::Char('d') | KeyCode::Char('D') => {
             deep_ui.close();
-            InputResult::Continue
+            return InputResult::Continue;
         }
-        _ => InputResult::Continue,
+        _ => {}
+    }
+
+    if deep_ui.status_show_recruit {
+        // ── Recruit sub-view ──
+        match key.code {
+            KeyCode::Up => {
+                deep_ui.selected_index = deep_ui.selected_index.saturating_sub(1);
+            }
+            KeyCode::Down => {
+                let count = deep_state.prestige.recruit_pool.candidates.len();
+                if count > 0 && deep_ui.selected_index + 1 < count {
+                    deep_ui.selected_index += 1;
+                }
+            }
+            KeyCode::Enter => {
+                // Recruit the selected candidate.
+                let idx = deep_ui.selected_index;
+                let pool = &deep_state.prestige.recruit_pool;
+                if idx < pool.candidates.len() {
+                    let max_roster = deep_state.persistent.guild_rank.max_roster() as usize;
+                    let occupied_slots = deep_state
+                        .prestige
+                        .roster
+                        .iter()
+                        .filter(|m| !matches!(m.status, MercStatus::Lost))
+                        .count();
+                    if occupied_slots >= max_roster {
+                        return InputResult::Continue;
+                    }
+                    let cost = pool.recruit_costs.get(idx).copied().unwrap_or(0);
+                    if cost > 0 && !deep_state.prestige.spend_marks(cost) {
+                        return InputResult::Continue;
+                    }
+                    let mut merc = deep_state.prestige.recruit_pool.candidates.remove(idx);
+                    deep_state.prestige.recruit_pool.recruit_costs.remove(idx);
+                    merc.id = deep_state.persistent.next_merc_id();
+                    deep_state.prestige.roster.push(merc);
+
+                    let now = Utc::now();
+                    let mut rng = rand::rng();
+                    let _ = crate::deep::missions::maybe_refresh_mission_pool(
+                        &mut deep_state.prestige,
+                        &deep_state.persistent,
+                        now,
+                        &mut rng,
+                    );
+
+                    let remaining = deep_state.prestige.recruit_pool.candidates.len();
+                    if deep_ui.selected_index >= remaining && remaining > 0 {
+                        deep_ui.selected_index = remaining - 1;
+                    }
+                    return InputResult::NeedsSave;
+                }
+            }
+            _ => {}
+        }
+        InputResult::Continue
+    } else {
+        // ── Roster sub-view (default) ──
+        match key.code {
+            KeyCode::Up => {
+                deep_ui.selected_index = deep_ui.selected_index.saturating_sub(1);
+            }
+            KeyCode::Down => {
+                let count = deep_state.prestige.roster.len();
+                if count > 0 && deep_ui.selected_index + 1 < count {
+                    deep_ui.selected_index += 1;
+                }
+            }
+            _ => {}
+        }
+        InputResult::Continue
     }
 }
 
@@ -238,8 +288,8 @@ fn collect_pending_result(
         let _ = crate::deep::purge_lost_mercs(&mut deep_state.prestige.roster);
     }
 
-    // Only hub selection depends on pending-results length.
-    if matches!(deep_ui.view, DeepView::Hub) {
+    // Active missions are now on the Missions tab; clamp selection there.
+    if matches!(deep_ui.view, DeepView::NewMission) && deep_ui.missions_show_active {
         let total =
             deep_state.prestige.active_missions.len() + deep_state.prestige.pending_results.len();
         if total == 0 {
@@ -258,6 +308,7 @@ fn handle_new_mission(
     key: KeyEvent,
     deep_state: &mut DeepState,
     deep_ui: &mut DeepUiState,
+    game_state: &mut GameState,
     debug_mode: bool,
 ) -> InputResult {
     // If we're in squad staging mode, delegate to squad assignment handler.
@@ -265,6 +316,81 @@ fn handle_new_mission(
         return handle_squad_assignment(key, deep_state, deep_ui, debug_mode);
     }
 
+    // Tab toggles between active missions and available pool.
+    if key.code == KeyCode::Tab || key.code == KeyCode::BackTab {
+        deep_ui.missions_show_active = !deep_ui.missions_show_active;
+        deep_ui.selected_index = 0;
+        return InputResult::Continue;
+    }
+
+    if deep_ui.missions_show_active {
+        // Active missions sub-view (adapted from former handle_hub).
+        handle_active_missions(key, deep_state, deep_ui, game_state)
+    } else {
+        // Available mission pool sub-view (original behavior).
+        handle_mission_pool(key, deep_state, deep_ui, debug_mode)
+    }
+}
+
+fn handle_active_missions(
+    key: KeyEvent,
+    deep_state: &mut DeepState,
+    deep_ui: &mut DeepUiState,
+    game_state: &mut GameState,
+) -> InputResult {
+    match key.code {
+        KeyCode::Up => {
+            deep_ui.selected_index = deep_ui.selected_index.saturating_sub(1);
+            InputResult::Continue
+        }
+        KeyCode::Down => {
+            let mission_count = deep_state.prestige.active_missions.len()
+                + deep_state.prestige.pending_results.len();
+            if mission_count > 0 && deep_ui.selected_index + 1 < mission_count {
+                deep_ui.selected_index += 1;
+            }
+            InputResult::Continue
+        }
+        KeyCode::Enter => {
+            match map_hub_selection(deep_state, deep_ui.selected_index) {
+                Some(HubSelection::Completed(pending_idx)) => {
+                    if collect_pending_result(deep_state, deep_ui, game_state, pending_idx) {
+                        return InputResult::NeedsSave;
+                    }
+                }
+                Some(HubSelection::Active(active_idx)) => {
+                    if let Some(mission) = deep_state.prestige.active_missions.get(active_idx) {
+                        if mission.has_pending_event() {
+                            deep_ui.event_mission_id = Some(mission.id);
+                            deep_ui.event_choice_index = 0;
+                            deep_ui.event_modal_open = true;
+                            deep_ui.event_visit_count = deep_ui.event_visit_count.saturating_add(1);
+                        } else {
+                            deep_ui.flash_message = Some(
+                                "No action yet. Wait for a check-in event or mission completion."
+                                    .to_string(),
+                            );
+                        }
+                    }
+                }
+                None => {}
+            }
+            InputResult::Continue
+        }
+        KeyCode::Esc => {
+            deep_ui.close();
+            InputResult::Continue
+        }
+        _ => InputResult::Continue,
+    }
+}
+
+fn handle_mission_pool(
+    key: KeyEvent,
+    deep_state: &mut DeepState,
+    deep_ui: &mut DeepUiState,
+    _debug_mode: bool,
+) -> InputResult {
     match key.code {
         KeyCode::Up => {
             deep_ui.selected_index = deep_ui.selected_index.saturating_sub(1);
@@ -377,18 +503,7 @@ fn handle_squad_assignment(
 
                     // Build mission with wall-clock timing.
                     let now = chrono::Utc::now();
-                    let duration_reduction = deep_state
-                        .persistent
-                        .layer_record(available.layer)
-                        .map(|l| l.total_duration_reduction())
-                        .unwrap_or(0.0);
-                    let mut effective_duration_secs =
-                        (available.duration_secs as f64 * (1.0 - duration_reduction)) as i64;
-                    effective_duration_secs =
-                        effective_duration_secs
-                            .max(crate::deep::minimum_mission_duration_secs_for_layer(
-                                available.layer,
-                            ) as i64);
+                    let mut effective_duration_secs = available.duration_secs as i64;
                     if available.mission_type == MissionType::SupplyRun && available.marks_cost == 0
                     {
                         // Free Supply Runs are intentionally slower fallback missions.
@@ -433,10 +548,10 @@ fn handle_squad_assignment(
                         &mut refill_rng,
                     );
 
-                    // Clean up staging state and return to hub.
+                    // Clean up staging state and switch to active missions view.
                     deep_ui.staging_mission_index = None;
                     deep_ui.staged_squad.clear();
-                    deep_ui.view = DeepView::Hub;
+                    deep_ui.missions_show_active = true;
                     deep_ui.selected_index = 0;
 
                     return InputResult::NeedsSave;
@@ -469,14 +584,14 @@ fn handle_event_response(
     // Handle Esc before early returns so it works even when no event is active.
     if matches!(key.code, KeyCode::Esc) {
         deep_ui.event_mission_id = None;
-        deep_ui.close();
+        deep_ui.event_modal_open = false;
         return InputResult::Continue;
     }
 
     let mission_id = match deep_ui.event_mission_id {
         Some(id) => id,
         None => {
-            deep_ui.view = DeepView::Hub;
+            deep_ui.event_modal_open = false;
             return InputResult::Continue;
         }
     };
@@ -485,7 +600,7 @@ fn handle_event_response(
     let mission = match deep_state.prestige.find_mission_mut(mission_id) {
         Some(m) => m,
         None => {
-            deep_ui.view = DeepView::Hub;
+            deep_ui.event_modal_open = false;
             deep_ui.event_mission_id = None;
             return InputResult::Continue;
         }
@@ -497,9 +612,9 @@ fn handle_event_response(
     let event_idx = match event_idx {
         Some(idx) => idx,
         None => {
-            // No pending events — return to hub.
+            // No pending events — close modal.
             mission.status = MissionStatus::Active;
-            deep_ui.view = DeepView::Hub;
+            deep_ui.event_modal_open = false;
             deep_ui.event_mission_id = None;
             return InputResult::Continue;
         }
@@ -548,42 +663,15 @@ fn handle_event_response(
     }
 }
 
-/// After resolving an event, transition the mission back to Active and return to hub.
+/// After resolving an event, transition the mission back to Active and close the modal.
 fn transition_after_event_resolve(mission: &mut crate::deep::Mission, deep_ui: &mut DeepUiState) {
     // If no more unresolved events, set mission back to Active.
     if mission.unresolved_event_count() == 0 {
         mission.status = MissionStatus::Active;
     }
-    deep_ui.view = DeepView::Hub;
+    deep_ui.event_modal_open = false;
     deep_ui.event_mission_id = None;
     deep_ui.event_choice_index = 0;
-}
-
-// ── Roster View ─────────────────────────────────────────────────────────────────
-
-fn handle_roster(
-    key: KeyEvent,
-    deep_state: &mut DeepState,
-    deep_ui: &mut DeepUiState,
-) -> InputResult {
-    match key.code {
-        KeyCode::Up => {
-            deep_ui.selected_index = deep_ui.selected_index.saturating_sub(1);
-            InputResult::Continue
-        }
-        KeyCode::Down => {
-            let count = deep_state.prestige.roster.len();
-            if count > 0 && deep_ui.selected_index + 1 < count {
-                deep_ui.selected_index += 1;
-            }
-            InputResult::Continue
-        }
-        KeyCode::Esc => {
-            deep_ui.close();
-            InputResult::Continue
-        }
-        _ => InputResult::Continue,
-    }
 }
 
 // ── Infrastructure (Layers) View ────────────────────────────────────────────────
@@ -613,82 +701,6 @@ fn handle_infrastructure(
     }
 }
 
-// ── Recruit View ────────────────────────────────────────────────────────────────
-
-fn handle_recruit(
-    key: KeyEvent,
-    deep_state: &mut DeepState,
-    deep_ui: &mut DeepUiState,
-) -> InputResult {
-    match key.code {
-        KeyCode::Up => {
-            deep_ui.selected_index = deep_ui.selected_index.saturating_sub(1);
-            InputResult::Continue
-        }
-        KeyCode::Down => {
-            let count = deep_state.prestige.recruit_pool.candidates.len();
-            if count > 0 && deep_ui.selected_index + 1 < count {
-                deep_ui.selected_index += 1;
-            }
-            InputResult::Continue
-        }
-        KeyCode::Enter => {
-            // Recruit the selected candidate.
-            let idx = deep_ui.selected_index;
-            let pool = &deep_state.prestige.recruit_pool;
-            if idx < pool.candidates.len() {
-                // Check roster cap.
-                let max_roster = deep_state.persistent.guild_rank.max_roster() as usize;
-                let occupied_slots = deep_state
-                    .prestige
-                    .roster
-                    .iter()
-                    .filter(|m| !matches!(m.status, MercStatus::Lost))
-                    .count();
-                if occupied_slots >= max_roster {
-                    return InputResult::Continue;
-                }
-
-                // Check cost.
-                let cost = pool.recruit_costs.get(idx).copied().unwrap_or(0);
-                if cost > 0 && !deep_state.prestige.spend_marks(cost) {
-                    return InputResult::Continue;
-                }
-
-                // Move candidate from pool to roster.
-                let mut merc = deep_state.prestige.recruit_pool.candidates.remove(idx);
-                deep_state.prestige.recruit_pool.recruit_costs.remove(idx);
-                merc.id = deep_state.persistent.next_merc_id();
-                deep_state.prestige.roster.push(merc);
-
-                // Re-evaluate mission pool affordability after spending marks on recruits.
-                let now = Utc::now();
-                let mut rng = rand::rng();
-                let _ = crate::deep::missions::maybe_refresh_mission_pool(
-                    &mut deep_state.prestige,
-                    &deep_state.persistent,
-                    now,
-                    &mut rng,
-                );
-
-                // Clamp selection after removal.
-                let remaining = deep_state.prestige.recruit_pool.candidates.len();
-                if deep_ui.selected_index >= remaining && remaining > 0 {
-                    deep_ui.selected_index = remaining - 1;
-                }
-
-                return InputResult::NeedsSave;
-            }
-            InputResult::Continue
-        }
-        KeyCode::Esc => {
-            deep_ui.close();
-            InputResult::Continue
-        }
-        _ => InputResult::Continue,
-    }
-}
-
 // ── View switching with visit counter ──────────────────────────────────────────
 
 /// Switch to a new view, resetting selection and incrementing the visit counter.
@@ -697,6 +709,8 @@ fn switch_view(ui: &mut DeepUiState, target: DeepView) {
     ui.selected_index = 0;
     ui.staged_squad.clear();
     ui.show_help = false;
+    ui.missions_show_active = true;
+    ui.status_show_recruit = false;
     match target {
         DeepView::Hub => ui.hub_visit_count = ui.hub_visit_count.saturating_add(1),
         DeepView::NewMission => ui.mission_visit_count = ui.mission_visit_count.saturating_add(1),

@@ -14,12 +14,11 @@
 //!  5. Edge cases: mid-mission prestige, injured mercs, full/empty roster.
 
 use quest::deep::{
-    apply_duration_modifiers, apply_familiarity_gain, base_mission_duration_secs,
-    build_infrastructure, generate_starter_roster, is_frontier_layer, is_safe_layer,
-    mark_layer_cleared, try_upgrade_guild_rank, DurationModifiers, FamiliarityLevel,
+    apply_familiarity_gain, build_infrastructure, generate_starter_roster, is_frontier_layer,
+    is_safe_layer, mark_layer_cleared, try_upgrade_guild_rank, FamiliarityLevel,
 };
 use quest::deep::{
-    DeepPersistent, DeepState, GuildRank, Infrastructure, LayerTier, MercArchetype, MercStatus,
+    DeepPersistent, DeepState, GuildRank, Infrastructure, MercArchetype, MercStatus,
     MissionOutcome, MissionType,
 };
 use rand::SeedableRng;
@@ -352,46 +351,6 @@ fn test_gen2_roster_size_matches_rank2() {
 
     // Rank 2 allows 7 mercs
     assert_eq!(deep.persistent.guild_rank.max_roster(), 7);
-}
-
-#[test]
-fn test_gen2_recon_benefits_from_gen1_infrastructure() {
-    let mut deep = build_generation_1_state();
-    deep.on_prestige();
-
-    // L1 has an Outpost — recon missions should be faster.
-    // Use Recon (3600s base) instead of SupplyRun (1800s base = floor) so
-    // duration modifiers can take effect above the 30-minute floor.
-    let base_duration = base_mission_duration_secs(LayerTier::Shallows, MissionType::Recon);
-    let with_outpost = apply_duration_modifiers(
-        base_duration,
-        &DurationModifiers {
-            has_outpost: true,
-            familiarity: 40, // from gen 1
-            has_saboteur: false,
-            saboteur_is_veteran: false,
-            is_overpowered: false,
-            bridge_layers: 0,
-        },
-    );
-    let without_infra = apply_duration_modifiers(
-        base_duration,
-        &DurationModifiers {
-            has_outpost: false,
-            familiarity: 0,
-            has_saboteur: false,
-            saboteur_is_veteran: false,
-            is_overpowered: false,
-            bridge_layers: 0,
-        },
-    );
-
-    assert!(
-        with_outpost < without_infra,
-        "Gen 2 recon on L1 should be faster due to gen 1 infrastructure: {} vs {}",
-        with_outpost,
-        without_infra,
-    );
 }
 
 #[test]
@@ -950,92 +909,6 @@ fn test_frontier_layer_tracks_correctly_across_prestiges() {
     // Prestige: frontier remains L6
     deep.on_prestige();
     assert_eq!(deep.persistent.frontier_layer(), 6);
-}
-
-// ── Duration Ratchet: Gen 2 Is Faster Than Gen 1 ────────────────────────────────
-
-#[test]
-fn test_gen2_recon_is_faster_than_gen1_baseline() {
-    // Use Recon (3600s base in Shallows) instead of SupplyRun (1800s = floor) so
-    // duration modifiers can take effect above the 30-minute floor.
-    let base_shallows_recon = base_mission_duration_secs(LayerTier::Shallows, MissionType::Recon);
-
-    // Gen 1 (no modifiers)
-    let gen1_duration = apply_duration_modifiers(
-        base_shallows_recon,
-        &DurationModifiers {
-            has_outpost: false,
-            familiarity: 0,
-            has_saboteur: false,
-            saboteur_is_veteran: false,
-            is_overpowered: false,
-            bridge_layers: 0,
-        },
-    );
-
-    // Gen 2 (Outpost on L1 + 40% familiarity from gen 1)
-    let gen2_duration = apply_duration_modifiers(
-        base_shallows_recon,
-        &DurationModifiers {
-            has_outpost: true,
-            familiarity: 40, // Mapped level (25-49%)
-            has_saboteur: false,
-            saboteur_is_veteran: false,
-            is_overpowered: false,
-            bridge_layers: 0,
-        },
-    );
-
-    assert!(
-        gen2_duration < gen1_duration,
-        "Gen 2 with Outpost + familiarity should be faster: {} < {}",
-        gen2_duration,
-        gen1_duration,
-    );
-
-    // Verify the exact reduction: Outpost -25% * Mapped familiarity -15% = 0.75 * 0.85 = 0.6375x
-    let expected = (base_shallows_recon as f64 * 0.75 * 0.85) as u64;
-    assert_eq!(gen2_duration, expected);
-}
-
-#[test]
-fn test_gen3_recon_is_faster_than_gen2() {
-    // Use Recon (3600s base in Shallows) instead of SupplyRun (1800s = floor) so
-    // duration modifiers can take effect above the 30-minute floor.
-    let base_shallows_recon = base_mission_duration_secs(LayerTier::Shallows, MissionType::Recon);
-
-    // Gen 2 (Outpost + Mapped familiarity 40%)
-    let gen2_duration = apply_duration_modifiers(
-        base_shallows_recon,
-        &DurationModifiers {
-            has_outpost: true,
-            familiarity: 40, // Mapped
-            has_saboteur: false,
-            saboteur_is_veteran: false,
-            is_overpowered: false,
-            bridge_layers: 0,
-        },
-    );
-
-    // Gen 3 (Outpost + Mastered familiarity 80% from accumulated missions)
-    let gen3_duration = apply_duration_modifiers(
-        base_shallows_recon,
-        &DurationModifiers {
-            has_outpost: true,
-            familiarity: 80, // Mastered
-            has_saboteur: false,
-            saboteur_is_veteran: false,
-            is_overpowered: false,
-            bridge_layers: 0,
-        },
-    );
-
-    assert!(
-        gen3_duration < gen2_duration,
-        "Gen 3 with Mastered familiarity should be faster than Gen 2: {} < {}",
-        gen3_duration,
-        gen2_duration,
-    );
 }
 
 // ── ID Monotonicity Across Generations ──────────────────────────────────────────

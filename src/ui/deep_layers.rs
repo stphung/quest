@@ -1,9 +1,8 @@
 //! The Deep — Layer infrastructure sub-view rendering.
 
 use crate::deep::{
-    base_marks_earned, base_mission_duration_secs, infrastructure_build_cost,
-    layer_power_thresholds, DeepState, DeepUiState, FamiliarityLevel, Infrastructure, LayerTier,
-    MissionType,
+    base_marks_earned, effective_duration_secs, infrastructure_build_cost, layer_power_thresholds,
+    DeepState, DeepUiState, FamiliarityLevel, Infrastructure, LayerTier, MissionType,
 };
 use ratatui::style::Color;
 
@@ -782,47 +781,6 @@ fn render_layers_split(
     );
     row += 1;
 
-    // Total duration reduction summary
-    let total_reduction = layer.total_duration_reduction();
-    if total_reduction > 0.001 && row < content_bottom {
-        let total_pct = (total_reduction * 100.0).round() as u32;
-        let has_outpost = layer.has_infrastructure(Infrastructure::Outpost);
-        let fam_reduction = match FamiliarityLevel::from_familiarity(layer.familiarity) {
-            FamiliarityLevel::Unknown => 0,
-            FamiliarityLevel::Mapped => 10,
-            FamiliarityLevel::Familiar => 20,
-            FamiliarityLevel::Mastered => 30,
-        };
-        let mut breakdown = Vec::new();
-        if has_outpost {
-            breakdown.push("Outpost -25%");
-        }
-        if fam_reduction > 0 {
-            breakdown.push(match fam_reduction {
-                10 => "Mapped -10%",
-                20 => "Familiar -20%",
-                30 => "Mastered -30%",
-                _ => "",
-            });
-        }
-        let breakdown_str = if breakdown.is_empty() {
-            String::new()
-        } else {
-            format!("  ({})", breakdown.join("  "))
-        };
-        put_text(
-            buffer,
-            row,
-            detail_inner_left,
-            &format!("  Duration reduction: -{}%{}", total_pct, breakdown_str),
-            Color::Cyan,
-        );
-        let breakdown_col =
-            detail_inner_left + format!("  Duration reduction: -{}%", total_pct).len() as i32;
-        put_text(buffer, row, breakdown_col, &breakdown_str, Color::DarkGray);
-        row += 1;
-    }
-
     // Power thresholds for frontier layers
     if layer.index == frontier && !layer.cleared && row < content_bottom - 5 {
         row += 1;
@@ -836,12 +794,16 @@ fn render_layers_split(
         row += 1;
         let thresholds = layer_power_thresholds(layer.index);
         let power_lines = [
-            ("Supply Run:", thresholds.supply_run, "safest Marks income"),
+            (
+                "Supply Run:",
+                thresholds.supply_run,
+                "safest Warband Marks income",
+            ),
             ("Recon:", thresholds.recon, "boosts familiarity/speed"),
             (
                 "Expedition:",
                 thresholds.expedition,
-                "higher Marks, medium risk",
+                "higher Warband Marks, medium risk",
             ),
             (
                 "Breakthrough:",
@@ -1043,18 +1005,62 @@ fn render_layers_split(
     // Duration section for cleared layers
     if layer.cleared && row < content_bottom - 3 {
         row += 1;
-        put_text(
-            buffer,
-            row,
-            detail_inner_left,
-            "Mission Durations:",
-            Color::Cyan,
-        );
+
+        // Build modifier summary.
+        let fam_level = FamiliarityLevel::from_familiarity(layer.familiarity);
+        let has_outpost = layer.has_infrastructure(Infrastructure::Outpost);
+        let bridge_count = (1..layer.index)
+            .filter(|l| {
+                deep.persistent
+                    .layer_record(*l)
+                    .is_some_and(|r| r.has_infrastructure(Infrastructure::Bridge))
+            })
+            .count() as u32;
+
+        let mut modifiers: Vec<String> = Vec::new();
+        if has_outpost {
+            modifiers.push("-25% Outpost".to_string());
+        }
+        let fam_reduction = ((1.0 - fam_level.duration_factor()) * 100.0).round() as u32;
+        if fam_reduction > 0 {
+            modifiers.push(format!("-{}% Familiarity", fam_reduction));
+        }
+        let bridge_pct = bridge_count.min(5) * 10;
+        if bridge_pct > 0 {
+            modifiers.push(format!("-{}% Bridge", bridge_pct));
+        }
+
+        if modifiers.is_empty() {
+            put_text(
+                buffer,
+                row,
+                detail_inner_left,
+                "Mission Durations:",
+                Color::Cyan,
+            );
+        } else {
+            let header = format!("Mission Durations:  ({})", modifiers.join(", "));
+            // Render "Mission Durations:" in cyan, modifiers in green.
+            put_text(
+                buffer,
+                row,
+                detail_inner_left,
+                "Mission Durations:",
+                Color::Cyan,
+            );
+            let mod_text = format!("  ({})", modifiers.join(", "));
+            put_text(
+                buffer,
+                row,
+                detail_inner_left + "Mission Durations:".len() as i32,
+                &mod_text,
+                Color::Green,
+            );
+            let _ = header; // suppress unused
+        }
         row += 1;
 
-        let has_outpost = layer.has_infrastructure(Infrastructure::Outpost);
-        let fam_factor = fam_level.duration_factor();
-        let outpost_factor = if has_outpost { 0.75 } else { 1.0 };
+        let has_any_modifier = has_outpost || fam_reduction > 0 || bridge_pct > 0;
 
         let mission_types = [
             ("Supply Run:", MissionType::SupplyRun),
@@ -1065,10 +1071,9 @@ fn render_layers_split(
             if row >= content_bottom {
                 break;
             }
-            let base_secs = base_mission_duration_secs(tier, mt);
-            let effective_secs =
-                ((base_secs as f64) * outpost_factor * fam_factor).max(1800.0) as u64;
-            if effective_secs != base_secs {
+            let effective = effective_duration_secs(tier, mt, layer.index, &deep.persistent);
+            if has_any_modifier {
+                let table = crate::deep::mission_duration_secs(tier, mt);
                 put_text(
                     buffer,
                     row,
@@ -1076,8 +1081,8 @@ fn render_layers_split(
                     &format!(
                         "  {:12} {} \u{2192} {}",
                         label,
-                        format_hours(base_secs),
-                        format_hours(effective_secs)
+                        format_hours(table),
+                        format_hours(effective)
                     ),
                     Color::White,
                 );
@@ -1086,7 +1091,7 @@ fn render_layers_split(
                     buffer,
                     row,
                     detail_inner_left,
-                    &format!("  {:12} {}", label, format_hours(base_secs)),
+                    &format!("  {:12} {}", label, format_hours(effective)),
                     Color::White,
                 );
             }
@@ -1098,7 +1103,7 @@ fn render_layers_split(
 fn short_infra_desc(infra: Infrastructure) -> &'static str {
     match infra {
         Infrastructure::Outpost => "-25% duration on this layer",
-        Infrastructure::SupplyCache => "+50% Marks from supply runs",
+        Infrastructure::SupplyCache => "+50% Warband Marks from supply runs",
         Infrastructure::Watchtower => "+40 familiarity instantly",
         Infrastructure::Bridge => "Skip this layer on deep push",
     }
