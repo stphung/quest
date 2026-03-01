@@ -1258,14 +1258,11 @@ fn mission_launch_costs_scale_with_depth() {
 }
 
 #[test]
-fn supply_run_launch_cost_is_fixed() {
-    // Supply Run has a flat cost regardless of layer.
-    let cost_1 = mission_launch_cost(MissionType::SupplyRun, 1);
-    let cost_10 = mission_launch_cost(MissionType::SupplyRun, 10);
-    let cost_25 = mission_launch_cost(MissionType::SupplyRun, 25);
-    assert_eq!(cost_1, cost_10);
-    assert_eq!(cost_10, cost_25);
-    assert_eq!(cost_1, 20); // Fixed at 20 per design
+fn supply_run_launch_cost_scales_with_layer() {
+    // Formula: 5 + layer.
+    assert_eq!(mission_launch_cost(MissionType::SupplyRun, 1), 6);
+    assert_eq!(mission_launch_cost(MissionType::SupplyRun, 10), 15);
+    assert_eq!(mission_launch_cost(MissionType::SupplyRun, 25), 30);
 }
 
 #[test]
