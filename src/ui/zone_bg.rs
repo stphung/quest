@@ -1238,7 +1238,6 @@ fn overlay_hollow_echo(buffer: &mut [Vec<SceneCell>], millis: f64) {
 }
 
 fn overlay_reality_tear(buffer: &mut [Vec<SceneCell>], millis: f64) {
-    let height = buffer.len();
     let phase = (millis / 200.0) as usize;
 
     for (row_idx, row_cells) in buffer.iter_mut().enumerate() {
