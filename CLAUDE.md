@@ -251,12 +251,12 @@ Stormglass is a currency earned from completing challenge minigames. Gated behin
 
 ### Power Cores Module (`src/power_cores/`)
 
-- `types.rs` — PowerCoreDef, PowerCoreState, ALL_POWER_CORES (6 core definitions), helper functions (get_power_core_def, get_unlocked_cores, fill_duration_secs)
+- `types.rs` — PassivesState, GeneratorTimer, PowerCoreDef, ALL_POWER_CORES (6 core definitions), helper functions (get_power_core_def, get_unlocked_cores, fill_duration_secs)
 - `tick.rs` — Per-tick processing (tick_power_cores), offline catchup (apply_offline_power_cores), new core initialization (init_new_core)
-- `persistence.rs` — Save/load from `~/.quest/power_cores.json`
+- `persistence.rs` — Save/load from `~/.quest/passives.json`
 - `mod.rs` — Public re-exports
 
-Passive prestige rank generation system tied to Deep layer milestones. Six Power Cores, each unlocked by clearing a specific Deep layer (the same layers that unlock fracture zones). Once unlocked, a core passively generates prestige ranks over time at a fixed rate. State persists in `~/.quest/power_cores.json`. Cores grant PR via wall-clock elapsed time (not game ticks), so offline catchup is automatic.
+Passive prestige rank generation system tied to Deep layer milestones. Six Power Cores, each unlocked by clearing a specific Deep layer (the same layers that unlock fracture zones). Once unlocked, a core passively generates prestige ranks over time at a fixed rate. State persists in `~/.quest/passives.json` as a generic `PassivesState` with string-keyed `GeneratorTimer` entries. Cores grant PR via wall-clock elapsed time (not game ticks), so offline catchup is automatic.
 
 | Core | Name | Deep Layer | PR/Day | Fill Time |
 |------|------|-----------|--------|-----------|
@@ -625,7 +625,7 @@ quest/
 │   ├── power_cores/         # Power Cores — passive PR generation [CLAUDE.md]
 │   │   ├── types.rs         # Core definitions, state, helpers
 │   │   ├── tick.rs          # Per-tick processing, offline catchup
-│   │   ├── persistence.rs   # Save/load power_cores.json
+│   │   ├── persistence.rs   # Save/load passives.json
 │   │   └── mod.rs           # Public re-exports
 │   ├── god_items/           # God Items system
 │   │   └── types.rs         # 3 god items, passives, bonuses, helper queries

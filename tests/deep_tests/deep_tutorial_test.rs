@@ -19,7 +19,7 @@ use quest::deep::{
     CheckInEvent, DeepPersistent, DeepPrestige, DeepState, DeepUiState, DeepView, EventChoice,
     GuildRank, Infrastructure, Layer, LayerTier, MercArchetype, MercStatus, Mercenary, MissionType,
 };
-use quest::power_cores::PowerCoreState;
+use quest::power_cores::PassivesState;
 
 // =============================================================================
 // 1. Initial State After Discovery — First Overlay View
@@ -931,7 +931,7 @@ fn test_deep_not_discovered_via_game_tick_without_boss_kill() {
             &mut enhancement,
             &mut deep,
             &mut achievements,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );

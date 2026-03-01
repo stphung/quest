@@ -245,7 +245,7 @@ fn main() -> io::Result<()> {
     // Load account-level God Item progress
 
     // Load account-level Power Cores state
-    let mut power_cores_state = power_cores::load_power_cores();
+    let mut power_cores_state = power_cores::load_passives();
 
     // Load global achievements (shared across all characters)
     let mut global_achievements = achievements::load_achievements();
@@ -1753,12 +1753,12 @@ fn main() -> io::Result<()> {
                                     || tick_result.enhancement_changed
                                     || tick_result.god_items_changed
                                     || tick_result.deep_changed
-                                    || tick_result.power_cores_changed
+                                    || tick_result.passives_changed
                                 {
                                     needs_save = true;
                                 }
-                                if tick_result.power_cores_changed && !debug_mode {
-                                    power_cores::save_power_cores(&power_cores_state).ok();
+                                if tick_result.passives_changed && !debug_mode {
+                                    power_cores::save_passives(&power_cores_state).ok();
                                 }
 
                                 surge.ticks_remaining -= 1;
@@ -1860,8 +1860,8 @@ fn main() -> io::Result<()> {
                                 let save_event = extract_save_event(&tick_result.events, &state);
 
                                 // Persist power cores if a grant occurred
-                                if tick_result.power_cores_changed && !debug_mode {
-                                    power_cores::save_power_cores(&power_cores_state).ok();
+                                if tick_result.passives_changed && !debug_mode {
+                                    power_cores::save_passives(&power_cores_state).ok();
                                 }
 
                                 // Persist all state if anything changed
@@ -1870,7 +1870,7 @@ fn main() -> io::Result<()> {
                                     || tick_result.enhancement_changed
                                     || tick_result.god_items_changed
                                     || tick_result.deep_changed
-                                    || tick_result.power_cores_changed
+                                    || tick_result.passives_changed
                                     || save_event.is_some())
                                     && !debug_mode
                                 {

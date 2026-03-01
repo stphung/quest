@@ -11,7 +11,7 @@ use quest::core::game_state::GameState;
 use quest::core::tick::game_tick;
 use quest::enhancement::EnhancementProgress;
 use quest::haven::Haven;
-use quest::power_cores::PowerCoreState;
+use quest::power_cores::PassivesState;
 use quest::stormglass::sigils::*;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -781,7 +781,7 @@ fn test_sigil_max_hp_applied_in_game_tick() {
         &mut enhancement,
         &mut quest::deep::DeepState::new(),
         &mut ach,
-        &mut PowerCoreState::default(),
+        &mut PassivesState::default(),
         false,
         &mut rng,
     );
@@ -798,7 +798,7 @@ fn test_sigil_max_hp_applied_in_game_tick() {
         &mut enhancement,
         &mut quest::deep::DeepState::new(),
         &mut ach,
-        &mut PowerCoreState::default(),
+        &mut PassivesState::default(),
         false,
         &mut rng,
     );
@@ -935,7 +935,7 @@ fn test_multiple_sigils_stack_in_game_tick() {
         &mut enhancement,
         &mut quest::deep::DeepState::new(),
         &mut ach,
-        &mut PowerCoreState::default(),
+        &mut PassivesState::default(),
         false,
         &mut rng,
     );
@@ -959,7 +959,7 @@ fn test_multiple_sigils_stack_in_game_tick() {
         &mut enhancement,
         &mut quest::deep::DeepState::new(),
         &mut ach,
-        &mut PowerCoreState::default(),
+        &mut PassivesState::default(),
         false,
         &mut rng,
     );

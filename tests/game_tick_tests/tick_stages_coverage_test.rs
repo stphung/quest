@@ -17,7 +17,7 @@ use quest::enhancement::EnhancementProgress;
 use quest::fishing::{FishingPhase, FishingSession};
 use quest::haven::{Haven, HavenBonuses};
 use quest::items::types::Rarity;
-use quest::power_cores::PowerCoreState;
+use quest::power_cores::PassivesState;
 use quest::zones::BossDefeatResult;
 use quest::GameState;
 use rand::SeedableRng;
@@ -67,7 +67,7 @@ fn run_game_tick(
         &mut EnhancementProgress::new(),
         &mut quest::deep::DeepState::new(),
         ach,
-        &mut PowerCoreState::default(),
+        &mut PassivesState::default(),
         debug_mode,
         rng,
     )

@@ -383,7 +383,7 @@ pub fn draw_ui_with_update(
     deep_state: &crate::deep::DeepState,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
-    power_cores: &crate::power_cores::PowerCoreState,
+    power_cores: &crate::power_cores::PassivesState,
 ) {
     set_global_ui_border_style(achievements.ui_border_style);
 
@@ -460,7 +460,7 @@ fn draw_xl_l_layout(
     show_ascend: bool,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
-    power_cores: &crate::power_cores::PowerCoreState,
+    power_cores: &crate::power_cores::PassivesState,
 ) {
     let size = frame.area();
 

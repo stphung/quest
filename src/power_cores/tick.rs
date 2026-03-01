@@ -5,7 +5,7 @@
 //! we grant +1 prestige rank and reset the timestamp.  Multiple completed
 //! cycles are each counted individually (batched offline catchup).
 
-use super::types::{fill_duration_secs, get_unlocked_cores, PowerCoreState};
+use super::types::{fill_duration_secs, get_unlocked_cores, GeneratorTimer, PassivesState};
 use crate::achievements::Achievements;
 use crate::core::game_state::GameState;
 use crate::core::tick_types::{TickEvent, TickResult};
@@ -17,11 +17,11 @@ use chrono::Utc;
 /// `state.prestige_rank`, emits a [`TickEvent::PowerCoreGranted`], and
 /// updates `last_granted_at`.
 ///
-/// Sets `result.power_cores_changed` when any grant occurs so that the
-/// caller knows to persist `PowerCoreState` to disk.
+/// Sets `result.passives_changed` when any grant occurs so that the
+/// caller knows to persist `PassivesState` to disk.
 pub fn tick_power_cores(
     state: &mut GameState,
-    power_core_state: &mut PowerCoreState,
+    passives: &mut PassivesState,
     achievements: &Achievements,
     result: &mut TickResult,
 ) {
@@ -30,20 +30,20 @@ pub fn tick_power_cores(
 
     for def in unlocked {
         let fill_secs = fill_duration_secs(def.pr_per_day);
-        let last = power_core_state
-            .last_granted_at
-            .get(&def.achievement_id)
-            .copied()
+        let last = passives
+            .generators
+            .get(def.key)
+            .map(|t| t.last_granted_at)
             .unwrap_or(0);
 
         // last == 0 means the core was just unlocked (or the save is brand-new).
         // In that case, initialise last_granted_at to now so the first cycle
         // starts from the moment of unlock.
         if last == 0 {
-            power_core_state
-                .last_granted_at
-                .insert(def.achievement_id, now);
-            result.power_cores_changed = true;
+            passives
+                .generators
+                .insert(def.key.to_string(), GeneratorTimer { last_granted_at: now });
+            result.passives_changed = true;
             continue;
         }
 
@@ -64,9 +64,9 @@ pub fn tick_power_cores(
 
         // Advance last_granted_at by exactly the cycles that completed.
         let new_last = last + fill_secs * completed_cycles as i64;
-        power_core_state
-            .last_granted_at
-            .insert(def.achievement_id, new_last);
+        passives
+            .generators
+            .insert(def.key.to_string(), GeneratorTimer { last_granted_at: new_last });
 
         // Emit one event per cycle so the log/ticker reflects each grant.
         for _ in 0..completed_cycles {
@@ -75,7 +75,7 @@ pub fn tick_power_cores(
             });
         }
 
-        result.power_cores_changed = true;
+        result.passives_changed = true;
     }
 }
 
@@ -89,7 +89,7 @@ pub fn tick_power_cores(
 /// Returns the total prestige ranks granted, or 0 if none.
 pub fn apply_offline_power_cores(
     state: &mut GameState,
-    power_core_state: &mut PowerCoreState,
+    passives: &mut PassivesState,
     achievements: &Achievements,
 ) -> u32 {
     let now = Utc::now().timestamp();
@@ -98,17 +98,17 @@ pub fn apply_offline_power_cores(
 
     for def in unlocked {
         let fill_secs = fill_duration_secs(def.pr_per_day);
-        let last = power_core_state
-            .last_granted_at
-            .get(&def.achievement_id)
-            .copied()
+        let last = passives
+            .generators
+            .get(def.key)
+            .map(|t| t.last_granted_at)
             .unwrap_or(0);
 
         if last == 0 {
             // Core was never initialised — set to now, no offline grant.
-            power_core_state
-                .last_granted_at
-                .insert(def.achievement_id, now);
+            passives
+                .generators
+                .insert(def.key.to_string(), GeneratorTimer { last_granted_at: now });
             continue;
         }
 
@@ -124,9 +124,9 @@ pub fn apply_offline_power_cores(
         total_pr_granted += pr_to_grant;
 
         let new_last = last + fill_secs * completed_cycles as i64;
-        power_core_state
-            .last_granted_at
-            .insert(def.achievement_id, new_last);
+        passives
+            .generators
+            .insert(def.key.to_string(), GeneratorTimer { last_granted_at: new_last });
     }
 
     if total_pr_granted > 0 {
@@ -142,16 +142,13 @@ pub fn apply_offline_power_cores(
 ///
 /// Call this immediately after unlocking a core's achievement.
 #[allow(dead_code)]
-pub fn init_new_core(
-    power_core_state: &mut PowerCoreState,
-    achievement_id: crate::achievements::AchievementId,
-) {
+pub fn init_new_core(passives: &mut PassivesState, key: &str) {
     let now = Utc::now().timestamp();
     // Only initialise if not already set (idempotent).
-    power_core_state
-        .last_granted_at
-        .entry(achievement_id)
-        .or_insert(now);
+    passives
+        .generators
+        .entry(key.to_string())
+        .or_insert(GeneratorTimer { last_granted_at: now });
 }
 
 #[cfg(test)]
@@ -160,11 +157,10 @@ mod tests {
     use crate::achievements::{AchievementId, Achievements};
     use crate::core::game_state::GameState;
     use crate::core::tick_types::TickResult;
-    use crate::power_cores::types::{PowerCoreState, ALL_POWER_CORES};
+    use crate::power_cores::types::{PassivesState, ALL_POWER_CORES};
 
     fn unlocked_achievements() -> Achievements {
         let mut ach = Achievements::default();
-        // Manually unlock the PowerCoreI achievement so one core is active.
         ach.unlock(AchievementId::PowerCoreI, None);
         ach
     }
@@ -172,43 +168,45 @@ mod tests {
     #[test]
     fn no_grant_when_fill_timer_not_elapsed() {
         let mut state = GameState::new("Test".to_string(), 0);
-        let mut pc_state = PowerCoreState::default();
+        let mut passives = PassivesState::default();
         let achievements = unlocked_achievements();
         let mut result = TickResult::default();
 
         let now = Utc::now().timestamp();
-        // Last granted just now — no elapsed time.
-        pc_state
-            .last_granted_at
-            .insert(AchievementId::PowerCoreI, now);
+        passives.generators.insert(
+            "power_core_1".to_string(),
+            GeneratorTimer { last_granted_at: now },
+        );
 
         let pr_before = state.prestige_rank;
-        tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+        tick_power_cores(&mut state, &mut passives, &achievements, &mut result);
 
         assert_eq!(state.prestige_rank, pr_before);
-        assert!(!result.power_cores_changed);
+        assert!(!result.passives_changed);
         assert!(result.events.is_empty());
     }
 
     #[test]
     fn grants_one_pr_after_fill_duration_elapses() {
         let mut state = GameState::new("Test".to_string(), 0);
-        let mut pc_state = PowerCoreState::default();
+        let mut passives = PassivesState::default();
         let achievements = unlocked_achievements();
         let mut result = TickResult::default();
 
         let now = Utc::now().timestamp();
         let fill = fill_duration_secs(2); // 43200s for Red Fault (2 PR/day)
-                                          // Simulate fill duration + 1 second of elapsed time.
-        pc_state
-            .last_granted_at
-            .insert(AchievementId::PowerCoreI, now - fill - 1);
+        passives.generators.insert(
+            "power_core_1".to_string(),
+            GeneratorTimer {
+                last_granted_at: now - fill - 1,
+            },
+        );
 
         let pr_before = state.prestige_rank;
-        tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+        tick_power_cores(&mut state, &mut passives, &achievements, &mut result);
 
         assert_eq!(state.prestige_rank, pr_before + 1);
-        assert!(result.power_cores_changed);
+        assert!(result.passives_changed);
         assert_eq!(result.events.len(), 1);
         assert!(matches!(
             result.events[0],
@@ -221,19 +219,21 @@ mod tests {
     #[test]
     fn grants_multiple_pr_for_multiple_elapsed_cycles() {
         let mut state = GameState::new("Test".to_string(), 0);
-        let mut pc_state = PowerCoreState::default();
+        let mut passives = PassivesState::default();
         let achievements = unlocked_achievements();
         let mut result = TickResult::default();
 
         let now = Utc::now().timestamp();
         let fill = fill_duration_secs(2);
-        // Simulate 3 complete cycles.
-        pc_state
-            .last_granted_at
-            .insert(AchievementId::PowerCoreI, now - fill * 3 - 1);
+        passives.generators.insert(
+            "power_core_1".to_string(),
+            GeneratorTimer {
+                last_granted_at: now - fill * 3 - 1,
+            },
+        );
 
         let pr_before = state.prestige_rank;
-        tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+        tick_power_cores(&mut state, &mut passives, &achievements, &mut result);
 
         assert_eq!(state.prestige_rank, pr_before + 3);
         assert_eq!(result.events.len(), 3);
@@ -242,36 +242,36 @@ mod tests {
     #[test]
     fn zero_timestamp_initialises_without_granting() {
         let mut state = GameState::new("Test".to_string(), 0);
-        let mut pc_state = PowerCoreState::default(); // all timestamps missing (0)
+        let mut passives = PassivesState::default(); // all generators empty
         let achievements = unlocked_achievements();
         let mut result = TickResult::default();
 
         let pr_before = state.prestige_rank;
-        tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+        tick_power_cores(&mut state, &mut passives, &achievements, &mut result);
 
         // No PR granted — just initialised.
         assert_eq!(state.prestige_rank, pr_before);
-        // The timestamp should now be set to approximately now.
-        assert!(pc_state
-            .last_granted_at
-            .contains_key(&AchievementId::PowerCoreI));
-        assert!(result.power_cores_changed);
+        assert!(passives.generators.contains_key("power_core_1"));
+        assert!(result.passives_changed);
     }
 
     #[test]
     fn offline_catchup_grants_pr() {
         let mut state = GameState::new("Test".to_string(), 0);
-        let mut pc_state = PowerCoreState::default();
+        let mut passives = PassivesState::default();
         let achievements = unlocked_achievements();
 
         let now = Utc::now().timestamp();
         let fill = fill_duration_secs(2);
-        pc_state
-            .last_granted_at
-            .insert(AchievementId::PowerCoreI, now - fill * 2 - 1);
+        passives.generators.insert(
+            "power_core_1".to_string(),
+            GeneratorTimer {
+                last_granted_at: now - fill * 2 - 1,
+            },
+        );
 
         let pr_before = state.prestige_rank;
-        let granted = apply_offline_power_cores(&mut state, &mut pc_state, &achievements);
+        let granted = apply_offline_power_cores(&mut state, &mut passives, &achievements);
 
         assert_eq!(granted, 2);
         assert_eq!(state.prestige_rank, pr_before + 2);
@@ -280,22 +280,24 @@ mod tests {
     #[test]
     fn no_grant_for_locked_cores() {
         let mut state = GameState::new("Test".to_string(), 0);
-        let mut pc_state = PowerCoreState::default();
+        let mut passives = PassivesState::default();
         let achievements = Achievements::default(); // nothing unlocked
         let mut result = TickResult::default();
 
         // Set timestamps far in the past for all cores.
         for def in ALL_POWER_CORES {
-            pc_state
-                .last_granted_at
-                .insert(def.achievement_id, Utc::now().timestamp() - 86400 * 10);
+            passives.generators.insert(
+                def.key.to_string(),
+                GeneratorTimer {
+                    last_granted_at: Utc::now().timestamp() - 86400 * 10,
+                },
+            );
         }
 
         let pr_before = state.prestige_rank;
-        tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+        tick_power_cores(&mut state, &mut passives, &achievements, &mut result);
 
-        // Achievements are all locked, so nothing should grant.
         assert_eq!(state.prestige_rank, pr_before);
-        assert!(!result.power_cores_changed);
+        assert!(!result.passives_changed);
     }
 }

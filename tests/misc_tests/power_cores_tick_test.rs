@@ -19,8 +19,8 @@ use quest::achievements::{AchievementId, Achievements};
 use quest::core::game_state::GameState;
 use quest::core::tick_types::{TickEvent, TickResult};
 use quest::power_cores::{
-    apply_offline_power_cores, fill_duration_secs, init_new_core, tick_power_cores, PowerCoreState,
-    ALL_POWER_CORES,
+    apply_offline_power_cores, fill_duration_secs, init_new_core, tick_power_cores, GeneratorTimer,
+    PassivesState, ALL_POWER_CORES,
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -59,6 +59,13 @@ fn count_power_core_granted_events(events: &[TickEvent]) -> usize {
         .count()
 }
 
+fn insert_timer(passives: &mut PassivesState, key: &str, last_granted_at: i64) {
+    passives.generators.insert(
+        key.to_string(),
+        GeneratorTimer { last_granted_at },
+    );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Test 1: Core does NOT grant PR before fill_duration elapsed
 // ─────────────────────────────────────────────────────────────────────────────
@@ -66,17 +73,14 @@ fn count_power_core_granted_events(events: &[TickEvent]) -> usize {
 #[test]
 fn core_does_not_grant_before_fill_duration() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
+    let mut passives = PassivesState::default();
     let achievements = ach_layer3();
     let mut result = TickResult::default();
 
-    // Set last_granted_at to just now — zero elapsed time.
-    pc_state
-        .last_granted_at
-        .insert(AchievementId::PowerCoreI, now());
+    insert_timer(&mut passives, "power_core_1", now());
 
     let pr_before = state.prestige_rank;
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut passives, &achievements, &mut result);
 
     assert_eq!(
         state.prestige_rank, pr_before,
@@ -88,8 +92,8 @@ fn core_does_not_grant_before_fill_duration() {
         "no PowerCoreGranted events should be emitted"
     );
     assert!(
-        !result.power_cores_changed,
-        "power_cores_changed must be false when nothing is granted"
+        !result.passives_changed,
+        "passives_changed must be false when nothing is granted"
     );
 }
 
@@ -100,18 +104,15 @@ fn core_does_not_grant_before_fill_duration() {
 #[test]
 fn core_grants_one_pr_when_fill_duration_elapsed() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
-    let achievements = ach_layer3(); // Red Fault: 2 PR/day = 43200s fill
+    let mut passives = PassivesState::default();
+    let achievements = ach_layer3();
     let mut result = TickResult::default();
 
     let fill = fill_duration_secs(2); // 43200s
-                                      // Simulate exactly one fill duration + 1 second of elapsed time.
-    pc_state
-        .last_granted_at
-        .insert(AchievementId::PowerCoreI, now() - fill - 1);
+    insert_timer(&mut passives, "power_core_1", now() - fill - 1);
 
     let pr_before = state.prestige_rank;
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut passives, &achievements, &mut result);
 
     assert_eq!(
         state.prestige_rank,
@@ -124,8 +125,8 @@ fn core_grants_one_pr_when_fill_duration_elapsed() {
         "exactly one PowerCoreGranted event expected"
     );
     assert!(
-        result.power_cores_changed,
-        "power_cores_changed must be set after a grant"
+        result.passives_changed,
+        "passives_changed must be set after a grant"
     );
 }
 
@@ -136,30 +137,26 @@ fn core_grants_one_pr_when_fill_duration_elapsed() {
 #[test]
 fn timer_resets_after_granting() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
+    let mut passives = PassivesState::default();
     let achievements = ach_layer3();
     let mut result = TickResult::default();
 
     let fill = fill_duration_secs(2);
     let old_timestamp = now() - fill - 1;
-    pc_state
-        .last_granted_at
-        .insert(AchievementId::PowerCoreI, old_timestamp);
+    insert_timer(&mut passives, "power_core_1", old_timestamp);
 
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut passives, &achievements, &mut result);
 
-    // The timestamp must have advanced by fill_secs from the old value.
-    let new_timestamp = pc_state
-        .last_granted_at
-        .get(&AchievementId::PowerCoreI)
-        .copied()
+    let new_timestamp = passives
+        .generators
+        .get("power_core_1")
+        .map(|t| t.last_granted_at)
         .expect("timestamp should be present after grant");
 
     assert!(
         new_timestamp > old_timestamp,
         "last_granted_at must advance after a grant"
     );
-    // new_timestamp should equal old_timestamp + fill (1 completed cycle).
     assert_eq!(
         new_timestamp,
         old_timestamp + fill,
@@ -169,7 +166,7 @@ fn timer_resets_after_granting() {
     // A second tick immediately after should NOT grant again.
     let mut result2 = TickResult::default();
     let pr_after_first = state.prestige_rank;
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result2);
+    tick_power_cores(&mut state, &mut passives, &achievements, &mut result2);
     assert_eq!(
         state.prestige_rank, pr_after_first,
         "no grant should occur immediately after reset"
@@ -188,9 +185,8 @@ fn timer_resets_after_granting() {
 #[test]
 fn multiple_cores_grant_independently() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
+    let mut passives = PassivesState::default();
 
-    // Unlock two cores: Layer3 (2 PR/day) and Layer7 (3 PR/day).
     let mut achievements = Achievements::default();
     achievements.unlock(AchievementId::PowerCoreI, None);
     achievements.unlock(AchievementId::PowerCoreII, None);
@@ -200,20 +196,12 @@ fn multiple_cores_grant_independently() {
     let fill_layer3 = fill_duration_secs(2);
     let fill_layer7 = fill_duration_secs(3);
 
-    // Layer3: 1 full cycle elapsed → should grant 1 PR.
-    pc_state
-        .last_granted_at
-        .insert(AchievementId::PowerCoreI, now() - fill_layer3 - 1);
-
-    // Layer7: 1 full cycle elapsed → should grant 1 PR.
-    pc_state
-        .last_granted_at
-        .insert(AchievementId::PowerCoreII, now() - fill_layer7 - 1);
+    insert_timer(&mut passives, "power_core_1", now() - fill_layer3 - 1);
+    insert_timer(&mut passives, "power_core_2", now() - fill_layer7 - 1);
 
     let pr_before = state.prestige_rank;
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut passives, &achievements, &mut result);
 
-    // Each core grants 1 PR independently → total +2.
     assert_eq!(
         state.prestige_rank,
         pr_before + 2,
@@ -225,10 +213,7 @@ fn multiple_cores_grant_independently() {
         "two PowerCoreGranted events expected"
     );
 
-    // Layer12 is NOT unlocked — its timestamp should not affect anything.
-    assert!(!pc_state
-        .last_granted_at
-        .contains_key(&AchievementId::PowerCoreIII));
+    assert!(!passives.generators.contains_key("power_core_3"));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -238,18 +223,16 @@ fn multiple_cores_grant_independently() {
 #[test]
 fn offline_catchup_48h_one_core_grants_four_pr() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
-    let achievements = ach_layer3(); // Red Fault: 2 PR/day
+    let mut passives = PassivesState::default();
+    let achievements = ach_layer3();
 
-    let fill = fill_duration_secs(2); // 43200s
-    let elapsed_48h: i64 = 48 * 3600; // 172800s = exactly 4 fill cycles
+    let fill = fill_duration_secs(2);
+    let elapsed_48h: i64 = 48 * 3600;
 
-    pc_state
-        .last_granted_at
-        .insert(AchievementId::PowerCoreI, now() - elapsed_48h - 1);
+    insert_timer(&mut passives, "power_core_1", now() - elapsed_48h - 1);
 
     let pr_before = state.prestige_rank;
-    let granted = apply_offline_power_cores(&mut state, &mut pc_state, &achievements);
+    let granted = apply_offline_power_cores(&mut state, &mut passives, &achievements);
 
     assert_eq!(
         granted, 4,
@@ -261,8 +244,7 @@ fn offline_catchup_48h_one_core_grants_four_pr() {
         "prestige_rank should reflect offline grant"
     );
 
-    // Timestamp should have advanced by 4 fill durations.
-    let new_ts = pc_state.last_granted_at[&AchievementId::PowerCoreI];
+    let new_ts = passives.generators["power_core_1"].last_granted_at;
     let expected_advance = fill * 4;
     let old_ts = now() - elapsed_48h - 1;
     assert_eq!(
@@ -279,35 +261,18 @@ fn offline_catchup_48h_one_core_grants_four_pr() {
 #[test]
 fn offline_catchup_24h_all_six_cores_correct_total() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
+    let mut passives = PassivesState::default();
     let achievements = ach_all_cores();
 
-    // 24h offline: each core completes floor(86400 / fill_duration) cycles.
-    // Layer3: 2 PR/day → 2 cycles in 24h
-    // Layer7: 3 PR/day → 3 cycles in 24h
-    // Layer12: 5 PR/day → 5 cycles
-    // Layer18: 8 PR/day → 8 cycles
-    // Layer25: 12 PR/day → 12 cycles
-    // Layer30: 18 PR/day → 18 cycles
-    // Total: 2+3+5+8+12+18 = 48 PR
-    let elapsed_24h: i64 = 86400 + 60; // 24h + 60s to pass all fill durations
+    let elapsed_24h: i64 = 86400 + 60;
 
     for def in ALL_POWER_CORES {
-        pc_state
-            .last_granted_at
-            .insert(def.achievement_id, now() - elapsed_24h);
+        insert_timer(&mut passives, def.key, now() - elapsed_24h);
     }
 
     let pr_before = state.prestige_rank;
-    let granted = apply_offline_power_cores(&mut state, &mut pc_state, &achievements);
+    let granted = apply_offline_power_cores(&mut state, &mut passives, &achievements);
 
-    // With 24h+60s elapsed and fill durations of 86400/N:
-    // Layer3 (43200s fill): floor(86460 / 43200) = 2 cycles
-    // Layer7 (28800s fill): floor(86460 / 28800) = 3 cycles
-    // Layer12 (17280s fill): floor(86460 / 17280) = 5 cycles
-    // Layer18 (10800s fill): floor(86460 / 10800) = 8 cycles
-    // Layer25 (7200s fill): floor(86460 / 7200) = 12 cycles
-    // Layer30 (4800s fill): floor(86460 / 4800) = 18 cycles
     let expected_pr = 2 + 3 + 5 + 8 + 12 + 18;
     assert_eq!(
         granted, expected_pr,
@@ -327,21 +292,19 @@ fn offline_catchup_24h_all_six_cores_correct_total() {
 #[test]
 fn partial_progress_preserved_no_early_grant() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
-    let achievements = ach_layer3(); // Red Fault: 2 PR/day, 43200s fill
+    let mut passives = PassivesState::default();
+    let achievements = ach_layer3();
     let mut result = TickResult::default();
 
-    let fill = fill_duration_secs(2); // 43200s
-    let elapsed_18h: i64 = 9 * 3600; // 32400s — 75% of fill, NOT yet complete
+    let fill = fill_duration_secs(2);
+    let elapsed_9h: i64 = 9 * 3600;
 
-    assert!(elapsed_18h < fill, "sanity check: 9h < 12h fill");
+    assert!(elapsed_9h < fill, "sanity check: 9h < 12h fill");
 
-    pc_state
-        .last_granted_at
-        .insert(AchievementId::PowerCoreI, now() - elapsed_18h);
+    insert_timer(&mut passives, "power_core_1", now() - elapsed_9h);
 
     let pr_before = state.prestige_rank;
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut passives, &achievements, &mut result);
 
     assert_eq!(
         state.prestige_rank, pr_before,
@@ -353,10 +316,8 @@ fn partial_progress_preserved_no_early_grant() {
         "no PowerCoreGranted event at 75% fill (9h of 12h)"
     );
 
-    // The last_granted_at timestamp must remain unchanged (progress is preserved).
-    let ts = pc_state.last_granted_at[&AchievementId::PowerCoreI];
-    let expected_ts = now() - elapsed_18h;
-    // Allow ±2 seconds of clock drift in the test.
+    let ts = passives.generators["power_core_1"].last_granted_at;
+    let expected_ts = now() - elapsed_9h;
     assert!(
         (ts - expected_ts).abs() <= 2,
         "partial progress timestamp must not change (got {ts}, expected ~{expected_ts})"
@@ -370,20 +331,17 @@ fn partial_progress_preserved_no_early_grant() {
 #[test]
 fn locked_cores_do_not_grant() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
+    let mut passives = PassivesState::default();
     let achievements = Achievements::default(); // nothing unlocked
     let mut result = TickResult::default();
 
-    // Pre-seed all cores with old timestamps.
-    let far_past = now() - 86400 * 30; // 30 days ago
+    let far_past = now() - 86400 * 30;
     for def in ALL_POWER_CORES {
-        pc_state
-            .last_granted_at
-            .insert(def.achievement_id, far_past);
+        insert_timer(&mut passives, def.key, far_past);
     }
 
     let pr_before = state.prestige_rank;
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut passives, &achievements, &mut result);
 
     assert_eq!(
         state.prestige_rank, pr_before,
@@ -395,8 +353,8 @@ fn locked_cores_do_not_grant() {
         "no PowerCoreGranted events from locked cores"
     );
     assert!(
-        !result.power_cores_changed,
-        "power_cores_changed must remain false when nothing is processed"
+        !result.passives_changed,
+        "passives_changed must remain false when nothing is processed"
     );
 }
 
@@ -407,17 +365,15 @@ fn locked_cores_do_not_grant() {
 #[test]
 fn prestige_rank_incremented_on_grant() {
     let mut state = make_state();
-    state.prestige_rank = 100; // Start at an arbitrary non-zero rank.
-    let mut pc_state = PowerCoreState::default();
+    state.prestige_rank = 100;
+    let mut passives = PassivesState::default();
     let achievements = ach_layer3();
     let mut result = TickResult::default();
 
     let fill = fill_duration_secs(2);
-    pc_state
-        .last_granted_at
-        .insert(AchievementId::PowerCoreI, now() - fill - 1);
+    insert_timer(&mut passives, "power_core_1", now() - fill - 1);
 
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut passives, &achievements, &mut result);
 
     assert_eq!(
         state.prestige_rank, 101,
@@ -432,16 +388,14 @@ fn prestige_rank_incremented_on_grant() {
 #[test]
 fn tick_event_power_core_granted_emitted_with_correct_name() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
-    let achievements = ach_layer3(); // Red Fault
+    let mut passives = PassivesState::default();
+    let achievements = ach_layer3();
     let mut result = TickResult::default();
 
     let fill = fill_duration_secs(2);
-    pc_state
-        .last_granted_at
-        .insert(AchievementId::PowerCoreI, now() - fill - 1);
+    insert_timer(&mut passives, "power_core_1", now() - fill - 1);
 
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut passives, &achievements, &mut result);
 
     assert_eq!(result.events.len(), 1);
     match &result.events[0] {
@@ -459,24 +413,19 @@ fn tick_event_power_core_granted_emitted_with_correct_name() {
 #[test]
 fn rapid_successive_ticks_do_not_double_grant() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
+    let mut passives = PassivesState::default();
     let achievements = ach_layer3();
 
     let fill = fill_duration_secs(2);
-    // Exactly one cycle has elapsed.
-    pc_state
-        .last_granted_at
-        .insert(AchievementId::PowerCoreI, now() - fill - 1);
+    insert_timer(&mut passives, "power_core_1", now() - fill - 1);
 
-    // First tick: should grant 1 PR.
     let mut result1 = TickResult::default();
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result1);
+    tick_power_cores(&mut state, &mut passives, &achievements, &mut result1);
     let pr_after_first = state.prestige_rank;
     assert_eq!(count_power_core_granted_events(&result1.events), 1);
 
-    // Immediately fire a second tick.
     let mut result2 = TickResult::default();
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result2);
+    tick_power_cores(&mut state, &mut passives, &achievements, &mut result2);
 
     assert_eq!(
         state.prestige_rank, pr_after_first,
@@ -488,10 +437,9 @@ fn rapid_successive_ticks_do_not_double_grant() {
         "no PowerCoreGranted on second rapid tick"
     );
 
-    // Fire 10 more rapid ticks for good measure.
     for _ in 0..10 {
         let mut r = TickResult::default();
-        tick_power_cores(&mut state, &mut pc_state, &achievements, &mut r);
+        tick_power_cores(&mut state, &mut passives, &achievements, &mut r);
         assert_eq!(
             state.prestige_rank, pr_after_first,
             "rapid ticks must never double-grant"
@@ -506,21 +454,17 @@ fn rapid_successive_ticks_do_not_double_grant() {
 #[test]
 fn newly_unlocked_core_starts_from_current_time() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default(); // no entries — simulates brand-new core unlock
+    let mut passives = PassivesState::default();
     let achievements = ach_layer3();
     let mut result = TickResult::default();
 
-    // last_granted_at for PowerCoreI is missing (timestamp = 0 / absent).
-    assert!(!pc_state
-        .last_granted_at
-        .contains_key(&AchievementId::PowerCoreI));
+    assert!(!passives.generators.contains_key("power_core_1"));
 
     let pr_before = state.prestige_rank;
     let time_before = now();
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut passives, &achievements, &mut result);
     let time_after = now();
 
-    // No PR should be granted on first tick — it just sets the start time.
     assert_eq!(
         state.prestige_rank, pr_before,
         "no PR should be granted on first tick (initialises timer)"
@@ -531,11 +475,10 @@ fn newly_unlocked_core_starts_from_current_time() {
         "no PowerCoreGranted on initialisation tick"
     );
 
-    // The timestamp should now be set to approximately now.
-    let ts = pc_state
-        .last_granted_at
-        .get(&AchievementId::PowerCoreI)
-        .copied()
+    let ts = passives
+        .generators
+        .get("power_core_1")
+        .map(|t| t.last_granted_at)
         .expect("timestamp must be set after first tick");
 
     assert!(
@@ -543,23 +486,21 @@ fn newly_unlocked_core_starts_from_current_time() {
         "initial timestamp must be set to current time (got {ts}, expected {time_before}..{time_after})"
     );
 
-    // power_cores_changed should be true because we initialised the timestamp.
     assert!(
-        result.power_cores_changed,
-        "power_cores_changed must be true after initialising a new core"
+        result.passives_changed,
+        "passives_changed must be true after initialising a new core"
     );
 
     // After the core is initialised with `init_new_core`, the same behaviour holds.
-    let mut pc_state2 = PowerCoreState::default();
-    init_new_core(&mut pc_state2, AchievementId::PowerCoreII);
+    let mut passives2 = PassivesState::default();
+    init_new_core(&mut passives2, "power_core_2");
 
-    let ts2 = pc_state2
-        .last_granted_at
-        .get(&AchievementId::PowerCoreII)
-        .copied()
+    let ts2 = passives2
+        .generators
+        .get("power_core_2")
+        .map(|t| t.last_granted_at)
         .expect("init_new_core must set timestamp");
 
-    // Allow ±2 seconds of clock drift.
     assert!(
         (ts2 - now()).abs() <= 2,
         "init_new_core must set timestamp to current time"

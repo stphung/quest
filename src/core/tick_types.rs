@@ -271,8 +271,8 @@ pub struct TickResult {
     /// True if Deep state was modified (discovery) and should be persisted.
     pub deep_changed: bool,
 
-    /// True if Power Core state was modified and should be persisted.
-    pub power_cores_changed: bool,
+    /// True if passive generator state was modified and should be persisted.
+    pub passives_changed: bool,
 
     /// Achievement IDs ready to be shown in a modal overlay.
     /// Populated when the 500ms accumulation window has elapsed.

@@ -11,7 +11,7 @@ use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::{get_adventurer_rank, get_prestige_tier};
 use crate::core::game_logic::xp_for_next_level;
 use crate::core::game_state::GameState;
-use crate::power_cores::PowerCoreState;
+use crate::power_cores::PassivesState;
 use crate::utils::updater::UpdateInfo;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -69,7 +69,7 @@ pub fn draw_stats_panel(
     ctx: &LayoutContext,
     enhancement_levels: &[u8; 7],
     achievements: &crate::achievements::Achievements,
-    power_cores: &PowerCoreState,
+    power_cores: &PassivesState,
 ) {
     match ctx.height_tier {
         SizeTier::XL | SizeTier::L => {

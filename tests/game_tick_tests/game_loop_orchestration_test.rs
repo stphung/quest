@@ -22,7 +22,7 @@ use quest::core::tick::{game_tick, TickEvent, TickResult};
 use quest::enhancement::EnhancementProgress;
 use quest::fishing::{FishingPhase, FishingSession};
 use quest::haven::{try_discover_haven, Haven, HavenRoomId};
-use quest::power_cores::PowerCoreState;
+use quest::power_cores::PassivesState;
 use quest::GameState;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -65,7 +65,7 @@ fn run_game_tick(
     tc: &mut u32,
     haven: &mut Haven,
     ach: &mut Achievements,
-    power_cores: &mut PowerCoreState,
+    power_cores: &mut PassivesState,
     debug_mode: bool,
     rng: &mut ChaCha8Rng,
 ) -> TickResult {
@@ -330,7 +330,7 @@ fn test_leviathan_encounter_result_from_game_tick() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -373,7 +373,7 @@ fn test_leviathan_overlay_blocks_game_ticks_contract() {
         &mut tc,
         &mut Haven::default(),
         &mut ach,
-        &mut PowerCoreState::default(),
+        &mut PassivesState::default(),
         false,
         &mut rng,
     );
@@ -432,7 +432,7 @@ fn test_achievements_changed_flag_triggers_save_in_bridge() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -468,7 +468,7 @@ fn test_debug_mode_suppresses_achievement_save_flag_for_leviathan() {
         &mut tc,
         &mut Haven::default(),
         &mut ach,
-        &mut PowerCoreState::default(),
+        &mut PassivesState::default(),
         true, // debug_mode
         &mut rng,
     );
@@ -507,7 +507,7 @@ fn test_player_attack_event_has_message_and_damage() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -552,7 +552,7 @@ fn test_enemy_attack_event_has_enemy_name() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -595,7 +595,7 @@ fn test_enemy_defeated_event_has_xp_and_message() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -644,7 +644,7 @@ fn test_player_died_event_message_format() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -682,7 +682,7 @@ fn test_item_dropped_event_has_complete_fields() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -724,7 +724,7 @@ fn test_fishing_message_event_prefixed() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -772,7 +772,7 @@ fn test_challenge_discovered_event_has_follow_up() {
             &mut tc,
             &mut haven,
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -821,7 +821,7 @@ fn test_achievement_unlocked_event_message_format() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -878,7 +878,7 @@ fn test_recent_drops_populated_on_item_drop() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -956,7 +956,7 @@ fn test_fishing_active_prevents_combat_events() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1004,7 +1004,7 @@ fn test_fishing_still_tracks_play_time() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1036,7 +1036,7 @@ fn test_subzone_boss_defeat_message_contains_xp() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1086,7 +1086,7 @@ fn test_dungeon_discovery_only_after_enemy_defeated() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1126,7 +1126,7 @@ fn test_fishing_discovery_only_after_enemy_defeated() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1169,7 +1169,7 @@ fn test_enemy_defeated_before_item_dropped() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1210,7 +1210,7 @@ fn test_enemy_defeated_before_discovery() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1260,7 +1260,7 @@ fn test_level_up_event_with_achievement_in_same_tick() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1316,7 +1316,7 @@ fn test_session_kills_accumulate_across_ticks() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1364,7 +1364,7 @@ fn test_xp_increases_with_each_kill() {
             &mut tc,
             &mut Haven::default(),
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1409,7 +1409,7 @@ fn test_haven_discovery_via_game_tick_at_p10() {
                 &mut tc,
                 &mut haven,
                 &mut ach,
-                &mut PowerCoreState::default(),
+                &mut PassivesState::default(),
                 false,
                 &mut rng,
             );
@@ -1452,7 +1452,7 @@ fn test_haven_discovery_via_game_tick_blocked_at_p9() {
             &mut tc,
             &mut haven,
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1486,7 +1486,7 @@ fn test_haven_discovery_via_game_tick_blocked_during_fishing() {
             &mut tc,
             &mut haven,
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1521,7 +1521,7 @@ fn test_haven_discovery_via_game_tick_blocked_during_dungeon() {
             &mut tc,
             &mut haven,
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1556,7 +1556,7 @@ fn test_haven_discovery_debug_mode_suppresses_save() {
                 &mut tc,
                 &mut haven,
                 &mut ach,
-                &mut PowerCoreState::default(),
+                &mut PassivesState::default(),
                 true, // debug mode
                 &mut rng,
             );
@@ -1609,7 +1609,7 @@ fn test_achievement_modal_ready_via_game_tick() {
             &mut tc,
             &mut haven,
             &mut ach,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );

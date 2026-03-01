@@ -6,14 +6,17 @@
 //! the corresponding Deep layer the matching core becomes active and begins
 //! generating prestige ranks passively at a fixed rate (1–6 PR/day).
 //!
+//! Timer state is persisted to `~/.quest/passives.json` as a generic
+//! [`PassivesState`] with string-keyed [`GeneratorTimer`] entries.
+//!
 //! # Public API
 //!
 //! ```
 //! use quest::power_cores::{
-//!     PowerCoreDef, PowerCoreState,
+//!     PowerCoreDef, PassivesState, GeneratorTimer,
 //!     ALL_POWER_CORES,
 //!     get_power_core_def, get_unlocked_cores, fill_duration_secs,
-//!     load_power_cores, save_power_cores,
+//!     load_passives, save_passives,
 //! };
 //! ```
 
@@ -22,11 +25,11 @@ pub mod tick;
 pub mod types;
 
 #[allow(unused_imports)]
-pub use persistence::{load_power_cores, save_power_cores};
+pub use persistence::{load_passives, save_passives};
 #[allow(unused_imports)]
 pub use tick::{apply_offline_power_cores, init_new_core, tick_power_cores};
 #[allow(unused_imports)]
 pub use types::{
-    fill_duration_secs, get_power_core_def, get_unlocked_cores, PowerCoreDef, PowerCoreState,
-    ALL_POWER_CORES,
+    fill_duration_secs, get_power_core_def, get_unlocked_cores, GeneratorTimer, PassivesState,
+    PowerCoreDef, ALL_POWER_CORES,
 };

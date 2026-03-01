@@ -14,7 +14,7 @@ use quest::dungeon::generation::generate_dungeon;
 use quest::enhancement::EnhancementProgress;
 use quest::fishing::FishingPhase;
 use quest::haven::Haven;
-use quest::power_cores::PowerCoreState;
+use quest::power_cores::PassivesState;
 use quest::GameState;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -53,7 +53,7 @@ fn run_ticks_collecting(
             &mut enhancement,
             &mut quest::deep::DeepState::new(),
             achievements,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             rng,
         );
@@ -80,7 +80,7 @@ fn run_ticks_collecting_results(
             &mut enhancement,
             &mut quest::deep::DeepState::new(),
             achievements,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             rng,
         );
@@ -210,7 +210,7 @@ fn test_tick_event_player_died_in_dungeon() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -410,7 +410,7 @@ fn test_tick_event_fish_caught_fields() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -471,7 +471,7 @@ fn test_tick_event_fishing_message_for_phase_transitions() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -527,7 +527,7 @@ fn test_play_time_increments_during_fishing_session() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -663,7 +663,7 @@ fn test_haven_discovery_sets_haven_changed_and_achievements_changed() {
                 &mut EnhancementProgress::new(),
                 &mut quest::deep::DeepState::new(),
                 &mut achievements,
-                &mut PowerCoreState::default(),
+                &mut PassivesState::default(),
                 false,
                 &mut rng,
             );
@@ -790,7 +790,7 @@ fn test_challenge_discovered_event_has_type_and_messages() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut a,
-            &mut quest::power_cores::PowerCoreState::default(),
+            &mut quest::power_cores::PassivesState::default(),
             false,
             &mut rng,
         );
@@ -919,7 +919,7 @@ fn test_leveled_up_event_on_enemy_defeat() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1027,7 +1027,7 @@ fn test_item_dropped_event_from_boss() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1090,7 +1090,7 @@ fn test_subzone_boss_defeated_advances_progression() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1150,7 +1150,7 @@ fn test_achievement_unlocked_event_format() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1203,7 +1203,7 @@ fn test_debug_mode_suppresses_haven_and_achievement_save_on_storm_leviathan() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut a,
-            &mut quest::power_cores::PowerCoreState::default(),
+            &mut quest::power_cores::PassivesState::default(),
             true, // debug_mode = true
             &mut rng,
         );
@@ -1238,7 +1238,7 @@ fn test_tick_result_achievement_modal_ready() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1282,7 +1282,7 @@ fn test_dungeon_boss_defeated_event_fields() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1348,7 +1348,7 @@ fn test_dungeon_elite_defeated_event() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );
@@ -1408,7 +1408,7 @@ fn test_prestige_flat_hp_applied_in_tick() {
         &mut EnhancementProgress::new(),
         &mut quest::deep::DeepState::new(),
         &mut achievements,
-        &mut PowerCoreState::default(),
+        &mut PassivesState::default(),
         false,
         &mut rng,
     );
@@ -1443,7 +1443,7 @@ fn test_enemy_defeated_increments_session_kills_via_tick() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut achievements,
-            &mut PowerCoreState::default(),
+            &mut PassivesState::default(),
             false,
             &mut rng,
         );

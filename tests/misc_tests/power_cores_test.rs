@@ -7,7 +7,7 @@
 //!  4. pr_per_day values are 2, 3, 5, 8, 12, 18
 //!  5. Core names match fracture regions: Red Fault, Mirror Scar, Black Mouth, Hollow Throne,
 //!     Wailing Reach, Origin Wound
-//!  6. PowerCoreState serialization round-trip
+//!  6. PassivesState serialization round-trip
 //!  7. get_unlocked_cores with 0, 1, 3, and 6 unlocked
 //!  8. fill_duration_secs calculation for each core
 //!  9. Persistence save/load cycle
@@ -15,8 +15,8 @@
 
 use quest::achievements::{AchievementId, Achievements};
 use quest::power_cores::{
-    fill_duration_secs, get_power_core_def, get_unlocked_cores, load_power_cores, PowerCoreState,
-    ALL_POWER_CORES,
+    fill_duration_secs, get_power_core_def, get_unlocked_cores, load_passives, GeneratorTimer,
+    PassivesState, ALL_POWER_CORES,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -57,6 +57,25 @@ fn test_core_achievement_ids_in_order() {
             def.achievement_id, expected,
             "Core index {i}: expected achievement_id {:?}, got {:?}",
             expected, def.achievement_id
+        );
+    }
+}
+
+#[test]
+fn test_core_keys_in_order() {
+    let expected_keys = [
+        "power_core_1",
+        "power_core_2",
+        "power_core_3",
+        "power_core_4",
+        "power_core_5",
+        "power_core_6",
+    ];
+    for (i, (&expected, def)) in expected_keys.iter().zip(ALL_POWER_CORES.iter()).enumerate() {
+        assert_eq!(
+            def.key, expected,
+            "Core index {i}: expected key '{expected}', got '{}'",
+            def.key
         );
     }
 }
@@ -263,63 +282,66 @@ fn test_core_names_are_nonempty() {
     }
 }
 
-// ── 6. PowerCoreState serialization round-trip ────────────────────────────────
+// ── 6. PassivesState serialization round-trip ────────────────────────────────
 
 #[test]
-fn test_power_core_state_serialization_round_trip_empty() {
-    let state = PowerCoreState::default();
+fn test_passives_state_serialization_round_trip_empty() {
+    let state = PassivesState::default();
     let json = serde_json::to_string(&state).expect("serialization should succeed");
-    let loaded: PowerCoreState =
+    let loaded: PassivesState =
         serde_json::from_str(&json).expect("deserialization should succeed");
-    assert_eq!(loaded.last_granted_at.len(), state.last_granted_at.len());
-    assert!(loaded.last_granted_at.is_empty());
+    assert_eq!(loaded.generators.len(), state.generators.len());
+    assert!(loaded.generators.is_empty());
 }
 
 #[test]
-fn test_power_core_state_serialization_round_trip_with_timestamps() {
-    let mut state = PowerCoreState::default();
-    state
-        .last_granted_at
-        .insert(AchievementId::PowerCoreI, 1_700_000_000);
-    state
-        .last_granted_at
-        .insert(AchievementId::PowerCoreII, 1_700_100_000);
-    state
-        .last_granted_at
-        .insert(AchievementId::PowerCoreIII, 1_700_200_000);
+fn test_passives_state_serialization_round_trip_with_timestamps() {
+    let mut state = PassivesState::default();
+    state.generators.insert(
+        "power_core_1".to_string(),
+        GeneratorTimer {
+            last_granted_at: 1_700_000_000,
+        },
+    );
+    state.generators.insert(
+        "power_core_2".to_string(),
+        GeneratorTimer {
+            last_granted_at: 1_700_100_000,
+        },
+    );
+    state.generators.insert(
+        "power_core_3".to_string(),
+        GeneratorTimer {
+            last_granted_at: 1_700_200_000,
+        },
+    );
 
     let json = serde_json::to_string_pretty(&state).expect("serialization should succeed");
-    let loaded: PowerCoreState =
+    let loaded: PassivesState =
         serde_json::from_str(&json).expect("deserialization should succeed");
 
-    assert_eq!(loaded.last_granted_at.len(), 3);
+    assert_eq!(loaded.generators.len(), 3);
     assert_eq!(
-        loaded.last_granted_at[&AchievementId::PowerCoreI],
+        loaded.generators["power_core_1"].last_granted_at,
         1_700_000_000
     );
     assert_eq!(
-        loaded.last_granted_at[&AchievementId::PowerCoreII],
+        loaded.generators["power_core_2"].last_granted_at,
         1_700_100_000
     );
     assert_eq!(
-        loaded.last_granted_at[&AchievementId::PowerCoreIII],
+        loaded.generators["power_core_3"].last_granted_at,
         1_700_200_000
     );
     // Unset cores should be absent
-    assert!(!loaded
-        .last_granted_at
-        .contains_key(&AchievementId::PowerCoreIV));
-    assert!(!loaded
-        .last_granted_at
-        .contains_key(&AchievementId::PowerCoreV));
-    assert!(!loaded
-        .last_granted_at
-        .contains_key(&AchievementId::PowerCoreVI));
+    assert!(!loaded.generators.contains_key("power_core_4"));
+    assert!(!loaded.generators.contains_key("power_core_5"));
+    assert!(!loaded.generators.contains_key("power_core_6"));
 }
 
 #[test]
-fn test_power_core_state_serialization_round_trip_all_six() {
-    let mut state = PowerCoreState::default();
+fn test_passives_state_serialization_round_trip_all_six() {
+    let mut state = PassivesState::default();
     let timestamps: [i64; 6] = [
         1_700_000_000,
         1_700_100_000,
@@ -328,50 +350,54 @@ fn test_power_core_state_serialization_round_trip_all_six() {
         1_700_400_000,
         1_700_500_000,
     ];
-    let ids = [
-        AchievementId::PowerCoreI,
-        AchievementId::PowerCoreII,
-        AchievementId::PowerCoreIII,
-        AchievementId::PowerCoreIV,
-        AchievementId::PowerCoreV,
-        AchievementId::PowerCoreVI,
+    let keys = [
+        "power_core_1",
+        "power_core_2",
+        "power_core_3",
+        "power_core_4",
+        "power_core_5",
+        "power_core_6",
     ];
-    for (&id, &ts) in ids.iter().zip(timestamps.iter()) {
-        state.last_granted_at.insert(id, ts);
+    for (&key, &ts) in keys.iter().zip(timestamps.iter()) {
+        state.generators.insert(
+            key.to_string(),
+            GeneratorTimer {
+                last_granted_at: ts,
+            },
+        );
     }
 
     let json = serde_json::to_string_pretty(&state).unwrap();
-    let loaded: PowerCoreState = serde_json::from_str(&json).unwrap();
+    let loaded: PassivesState = serde_json::from_str(&json).unwrap();
 
-    assert_eq!(loaded.last_granted_at.len(), 6);
-    for (&id, &ts) in ids.iter().zip(timestamps.iter()) {
+    assert_eq!(loaded.generators.len(), 6);
+    for (&key, &ts) in keys.iter().zip(timestamps.iter()) {
         assert_eq!(
-            loaded.last_granted_at[&id], ts,
-            "Timestamp mismatch for {:?}",
-            id
+            loaded.generators[key].last_granted_at, ts,
+            "Timestamp mismatch for '{key}'"
         );
     }
 }
 
 #[test]
-fn test_power_core_state_missing_keys_are_absent_after_round_trip() {
-    // State with only one entry — the other 5 should not appear after a round-trip
-    let mut state = PowerCoreState::default();
-    state
-        .last_granted_at
-        .insert(AchievementId::PowerCoreVI, 999_999_999);
+fn test_passives_state_missing_keys_are_absent_after_round_trip() {
+    let mut state = PassivesState::default();
+    state.generators.insert(
+        "power_core_6".to_string(),
+        GeneratorTimer {
+            last_granted_at: 999_999_999,
+        },
+    );
 
     let json = serde_json::to_string(&state).unwrap();
-    let loaded: PowerCoreState = serde_json::from_str(&json).unwrap();
+    let loaded: PassivesState = serde_json::from_str(&json).unwrap();
 
-    assert_eq!(loaded.last_granted_at.len(), 1);
+    assert_eq!(loaded.generators.len(), 1);
     assert_eq!(
-        loaded.last_granted_at[&AchievementId::PowerCoreVI],
+        loaded.generators["power_core_6"].last_granted_at,
         999_999_999
     );
-    assert!(!loaded
-        .last_granted_at
-        .contains_key(&AchievementId::PowerCoreI));
+    assert!(!loaded.generators.contains_key("power_core_1"));
 }
 
 // ── 7. get_unlocked_cores ────────────────────────────────────────────────────
@@ -421,7 +447,6 @@ fn test_get_unlocked_cores_with_three_unlocked() {
         names.contains(&"Black Mouth"),
         "Expected 'Black Mouth' in unlocked cores"
     );
-    // Cores 4-6 should not be unlocked
     assert!(
         !names.contains(&"Hollow Throne"),
         "Did not expect 'Hollow Throne' unlocked"
@@ -466,7 +491,6 @@ fn test_get_unlocked_cores_with_all_six_unlocked() {
 #[test]
 fn test_get_unlocked_cores_non_core_achievement_does_not_add_core() {
     let mut achievements = Achievements::default();
-    // Unlock a non-core Deep achievement — should not add any power cores
     unlock(&mut achievements, AchievementId::TheDeepDiscovered);
     unlock(&mut achievements, AchievementId::FirstBreakthrough);
     unlock(&mut achievements, AchievementId::VoidExplorer);
@@ -482,7 +506,6 @@ fn test_get_unlocked_cores_non_core_achievement_does_not_add_core() {
 #[test]
 fn test_get_unlocked_cores_returns_only_those_with_unlocked_achievement() {
     let mut achievements = Achievements::default();
-    // Unlock only the last two
     unlock(&mut achievements, AchievementId::PowerCoreV);
     unlock(&mut achievements, AchievementId::PowerCoreVI);
 
@@ -491,7 +514,6 @@ fn test_get_unlocked_cores_returns_only_those_with_unlocked_achievement() {
     let names: Vec<&str> = cores.iter().map(|c| c.name).collect();
     assert!(names.contains(&"Wailing Reach"));
     assert!(names.contains(&"Origin Wound"));
-    // Earlier cores should not be included
     assert!(!names.contains(&"Red Fault"));
     assert!(!names.contains(&"Mirror Scar"));
     assert!(!names.contains(&"Black Mouth"));
@@ -502,43 +524,36 @@ fn test_get_unlocked_cores_returns_only_those_with_unlocked_achievement() {
 
 #[test]
 fn test_fill_duration_secs_red_fault_is_43200() {
-    // 2 PR/day → 43200 seconds (12 hours)
     assert_eq!(fill_duration_secs(2), 43200);
 }
 
 #[test]
 fn test_fill_duration_secs_mirror_scar_is_28800() {
-    // 3 PR/day → 28800 seconds (8 hours)
     assert_eq!(fill_duration_secs(3), 28800);
 }
 
 #[test]
 fn test_fill_duration_secs_black_mouth_is_17280() {
-    // 5 PR/day → 17280 seconds (~4h 48m)
     assert_eq!(fill_duration_secs(5), 17280);
 }
 
 #[test]
 fn test_fill_duration_secs_hollow_throne_is_10800() {
-    // 8 PR/day → 10800 seconds (3h)
     assert_eq!(fill_duration_secs(8), 10800);
 }
 
 #[test]
 fn test_fill_duration_secs_wailing_reach_is_7200() {
-    // 12 PR/day → 7200 seconds (2h)
     assert_eq!(fill_duration_secs(12), 7200);
 }
 
 #[test]
 fn test_fill_duration_secs_origin_wound_is_4800() {
-    // 18 PR/day → 4800 seconds (~1h 20m)
     assert_eq!(fill_duration_secs(18), 4800);
 }
 
 #[test]
 fn test_fill_duration_secs_all_cores() {
-    // Verify formula: fill_duration_secs = 86400 / pr_per_day
     let expected: [(u32, i64); 6] = [
         (2, 43200),
         (3, 28800),
@@ -558,7 +573,6 @@ fn test_fill_duration_secs_all_cores() {
 
 #[test]
 fn test_fill_duration_secs_matches_86400_divided_by_pr_per_day() {
-    // Ensure each core's fill duration equals the universal constant 86400 / pr_per_day
     for def in ALL_POWER_CORES {
         let expected = 86400_i64 / def.pr_per_day as i64;
         assert_eq!(
@@ -576,34 +590,33 @@ fn test_fill_duration_secs_matches_86400_divided_by_pr_per_day() {
 
 #[test]
 fn test_persistence_save_and_load_cycle() {
-    // Build a state with all 6 cores having timestamps
-    let mut state = PowerCoreState::default();
-    let entries: [(AchievementId, i64); 6] = [
-        (AchievementId::PowerCoreI, 1_700_000_001),
-        (AchievementId::PowerCoreII, 1_700_000_002),
-        (AchievementId::PowerCoreIII, 1_700_000_003),
-        (AchievementId::PowerCoreIV, 1_700_000_004),
-        (AchievementId::PowerCoreV, 1_700_000_005),
-        (AchievementId::PowerCoreVI, 1_700_000_006),
+    let mut state = PassivesState::default();
+    let entries = [
+        ("power_core_1", 1_700_000_001_i64),
+        ("power_core_2", 1_700_000_002),
+        ("power_core_3", 1_700_000_003),
+        ("power_core_4", 1_700_000_004),
+        ("power_core_5", 1_700_000_005),
+        ("power_core_6", 1_700_000_006),
     ];
-    for (id, ts) in entries {
-        state.last_granted_at.insert(id, ts);
+    for (key, ts) in entries {
+        state.generators.insert(
+            key.to_string(),
+            GeneratorTimer {
+                last_granted_at: ts,
+            },
+        );
     }
 
-    // Serialize to JSON (simulates what save_power_cores does)
     let json = serde_json::to_string_pretty(&state).expect("serialization should succeed");
-
-    // Deserialize (simulates what load_power_cores does)
-    let loaded: PowerCoreState =
+    let loaded: PassivesState =
         serde_json::from_str(&json).expect("deserialization should succeed");
 
-    // All 6 entries should survive the round-trip unchanged
-    assert_eq!(loaded.last_granted_at.len(), 6);
-    for (id, ts) in entries {
+    assert_eq!(loaded.generators.len(), 6);
+    for (key, ts) in entries {
         assert_eq!(
-            loaded.last_granted_at[&id], ts,
-            "Timestamp mismatch for {:?} after save/load cycle",
-            id
+            loaded.generators[key].last_granted_at, ts,
+            "Timestamp mismatch for '{key}' after save/load cycle"
         );
     }
 }
@@ -613,109 +626,116 @@ fn test_persistence_save_and_load_via_tempfile() {
     use tempfile::TempDir;
 
     let tmp = TempDir::new().expect("tempdir creation should succeed");
-    let path = tmp.path().join("power_cores.json");
+    let path = tmp.path().join("passives.json");
 
-    // Build state
-    let mut state = PowerCoreState::default();
-    state
-        .last_granted_at
-        .insert(AchievementId::PowerCoreI, 1_234_567_890);
-    state
-        .last_granted_at
-        .insert(AchievementId::PowerCoreIII, 9_876_543_210);
+    let mut state = PassivesState::default();
+    state.generators.insert(
+        "power_core_1".to_string(),
+        GeneratorTimer {
+            last_granted_at: 1_234_567_890,
+        },
+    );
+    state.generators.insert(
+        "power_core_3".to_string(),
+        GeneratorTimer {
+            last_granted_at: 9_876_543_210,
+        },
+    );
 
-    // Write
     let json = serde_json::to_string_pretty(&state).unwrap();
     std::fs::write(&path, &json).expect("write should succeed");
 
-    // Read back
     let loaded_json = std::fs::read_to_string(&path).expect("read should succeed");
-    let loaded: PowerCoreState =
+    let loaded: PassivesState =
         serde_json::from_str(&loaded_json).expect("deserialization should succeed");
 
-    assert_eq!(loaded.last_granted_at.len(), 2);
+    assert_eq!(loaded.generators.len(), 2);
     assert_eq!(
-        loaded.last_granted_at[&AchievementId::PowerCoreI],
+        loaded.generators["power_core_1"].last_granted_at,
         1_234_567_890
     );
     assert_eq!(
-        loaded.last_granted_at[&AchievementId::PowerCoreIII],
+        loaded.generators["power_core_3"].last_granted_at,
         9_876_543_210
     );
-    assert!(!loaded
-        .last_granted_at
-        .contains_key(&AchievementId::PowerCoreII));
+    assert!(!loaded.generators.contains_key("power_core_2"));
 }
 
 #[test]
 fn test_persistence_load_returns_default_for_corrupted_json() {
-    // Verify that a corrupt/missing file falls back to default state rather than panicking.
-    // We test this by directly deserializing invalid JSON.
-    let result: Result<PowerCoreState, _> = serde_json::from_str("not valid json");
+    let result: Result<PassivesState, _> = serde_json::from_str("not valid json");
     assert!(result.is_err(), "Invalid JSON should fail to deserialize");
-    // The load function itself returns default on error — verified by the function signature
-    // (unwrap_or_default pattern). We verify default is what we expect.
-    let default_state = PowerCoreState::default();
-    assert!(default_state.last_granted_at.is_empty());
+    let default_state = PassivesState::default();
+    assert!(default_state.generators.is_empty());
 }
 
 #[test]
-fn test_load_power_cores_does_not_panic() {
-    // load_power_cores() should return a valid default if the file is absent.
-    // This test just ensures the function doesn't panic in the test environment.
-    let _state = load_power_cores();
+fn test_load_passives_does_not_panic() {
+    let _state = load_passives();
 }
 
 // ── 10. Default state ────────────────────────────────────────────────────────
 
 #[test]
-fn test_power_core_state_default_has_empty_map() {
-    let state = PowerCoreState::default();
+fn test_passives_state_default_has_empty_map() {
+    let state = PassivesState::default();
     assert!(
-        state.last_granted_at.is_empty(),
-        "Default PowerCoreState should have no timestamps"
+        state.generators.is_empty(),
+        "Default PassivesState should have no generators"
     );
 }
 
 #[test]
-fn test_power_core_state_new_entry_can_be_inserted() {
-    let mut state = PowerCoreState::default();
-    assert!(state.last_granted_at.is_empty());
+fn test_passives_state_new_entry_can_be_inserted() {
+    let mut state = PassivesState::default();
+    assert!(state.generators.is_empty());
 
-    state.last_granted_at.insert(AchievementId::PowerCoreI, 0);
-    assert_eq!(state.last_granted_at.len(), 1);
-    assert_eq!(state.last_granted_at[&AchievementId::PowerCoreI], 0);
+    state.generators.insert(
+        "power_core_1".to_string(),
+        GeneratorTimer {
+            last_granted_at: 0,
+        },
+    );
+    assert_eq!(state.generators.len(), 1);
+    assert_eq!(state.generators["power_core_1"].last_granted_at, 0);
 }
 
 #[test]
-fn test_power_core_state_zero_timestamp_is_valid() {
-    // Timestamp 0 represents "never granted" (epoch) — it's a valid stored value.
-    let mut state = PowerCoreState::default();
-    state.last_granted_at.insert(AchievementId::PowerCoreI, 0);
+fn test_passives_state_zero_timestamp_is_valid() {
+    let mut state = PassivesState::default();
+    state.generators.insert(
+        "power_core_1".to_string(),
+        GeneratorTimer {
+            last_granted_at: 0,
+        },
+    );
 
     let json = serde_json::to_string(&state).unwrap();
-    let loaded: PowerCoreState = serde_json::from_str(&json).unwrap();
-    assert_eq!(loaded.last_granted_at[&AchievementId::PowerCoreI], 0);
+    let loaded: PassivesState = serde_json::from_str(&json).unwrap();
+    assert_eq!(loaded.generators["power_core_1"].last_granted_at, 0);
 }
 
 #[test]
-fn test_power_core_state_clone_is_independent() {
-    let mut state = PowerCoreState::default();
-    state
-        .last_granted_at
-        .insert(AchievementId::PowerCoreI, 1000);
+fn test_passives_state_clone_is_independent() {
+    let mut state = PassivesState::default();
+    state.generators.insert(
+        "power_core_1".to_string(),
+        GeneratorTimer {
+            last_granted_at: 1000,
+        },
+    );
 
     let mut cloned = state.clone();
-    cloned
-        .last_granted_at
-        .insert(AchievementId::PowerCoreII, 2000);
+    cloned.generators.insert(
+        "power_core_2".to_string(),
+        GeneratorTimer {
+            last_granted_at: 2000,
+        },
+    );
 
-    // Original should not be affected by modifications to the clone
-    assert!(!state
-        .last_granted_at
-        .contains_key(&AchievementId::PowerCoreII));
-    assert_eq!(state.last_granted_at.len(), 1);
-    assert_eq!(cloned.last_granted_at.len(), 2);
+    assert!(!state.generators.contains_key("power_core_2"));
+    assert_eq!(state.generators.len(), 1);
+    assert_eq!(cloned.generators.len(), 2);
 }
 
 // ── Additional edge cases ────────────────────────────────────────────────────
@@ -733,8 +753,19 @@ fn test_all_power_core_achievement_ids_are_unique() {
 }
 
 #[test]
+fn test_all_power_core_keys_are_unique() {
+    let mut seen = std::collections::HashSet::new();
+    for def in ALL_POWER_CORES {
+        assert!(
+            seen.insert(def.key),
+            "Duplicate key '{}' in ALL_POWER_CORES",
+            def.key
+        );
+    }
+}
+
+#[test]
 fn test_pr_per_day_strictly_increasing_across_cores() {
-    // Each successive core should grant more PR/day than the previous
     for window in ALL_POWER_CORES.windows(2) {
         assert!(
             window[1].pr_per_day > window[0].pr_per_day,
@@ -749,7 +780,6 @@ fn test_pr_per_day_strictly_increasing_across_cores() {
 
 #[test]
 fn test_fill_duration_secs_decreases_with_higher_pr_rate() {
-    // Higher PR/day means faster fill (shorter duration)
     for window in ALL_POWER_CORES.windows(2) {
         let dur_a = fill_duration_secs(window[0].pr_per_day);
         let dur_b = fill_duration_secs(window[1].pr_per_day);
@@ -766,13 +796,11 @@ fn test_fill_duration_secs_decreases_with_higher_pr_rate() {
 
 #[test]
 fn test_get_unlocked_cores_does_not_include_duplicate_defs() {
-    // Unlocking the same achievement twice should not produce duplicate cores
     let mut achievements = Achievements::default();
     unlock(&mut achievements, AchievementId::PowerCoreI);
     unlock(&mut achievements, AchievementId::PowerCoreI); // double-unlock
 
     let cores = get_unlocked_cores(&achievements);
-    // Should still only return 1 core (Red Fault)
     let red_fault_count = cores.iter().filter(|c| c.name == "Red Fault").count();
     assert_eq!(
         red_fault_count, 1,

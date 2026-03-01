@@ -701,7 +701,7 @@ pub fn show_startup_splash_screen(
     cloud_tx: &std::sync::mpsc::Sender<CloudOpResult>,
     cloud_rx: &std::sync::mpsc::Receiver<CloudOpResult>,
     cloud_op_in_flight: &mut bool,
-    power_cores: &mut crate::power_cores::PowerCoreState,
+    power_cores: &mut crate::power_cores::PassivesState,
 ) -> io::Result<StartupSplashResult> {
     let mut update_status: Option<UpdateInfoStatus> = None;
     let mut time_vault_browser: Option<TimeVaultState> = None;
@@ -1593,7 +1593,7 @@ fn load_character_for_game(
     enhancement: &mut enhancement::EnhancementProgress,
     global_achievements: &mut achievements::Achievements,
     haven: &mut haven::Haven,
-    power_cores: &mut crate::power_cores::PowerCoreState,
+    power_cores: &mut crate::power_cores::PassivesState,
 ) -> Option<(
     Box<GameState>,
     Option<crate::core::game_logic::OfflineReport>,

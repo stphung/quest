@@ -71,7 +71,7 @@ pub fn game_tick<R: Rng>(
     enhancement: &mut crate::enhancement::EnhancementProgress,
     deep: &mut crate::deep::DeepState,
     achievements: &mut Achievements,
-    power_cores: &mut crate::power_cores::PowerCoreState,
+    power_cores: &mut crate::power_cores::PassivesState,
     debug_mode: bool,
     rng: &mut R,
 ) -> TickResult {
@@ -190,7 +190,7 @@ mod tests {
     use crate::deep::DeepState;
     use crate::enhancement::EnhancementProgress;
     use crate::haven::Haven;
-    use crate::power_cores::PowerCoreState;
+    use crate::power_cores::PassivesState;
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
 
@@ -206,7 +206,7 @@ mod tests {
         let mut enhancement = EnhancementProgress::new();
         let mut deep = DeepState::new();
         let mut achievements = Achievements::default();
-        let mut power_cores = PowerCoreState::default();
+        let mut power_cores = PassivesState::default();
         let mut rng = test_rng();
 
         let result = game_tick(
@@ -237,7 +237,7 @@ mod tests {
         let mut enhancement = EnhancementProgress::new();
         let mut deep = DeepState::new();
         let mut achievements = Achievements::default();
-        let mut power_cores = PowerCoreState::default();
+        let mut power_cores = PassivesState::default();
         let mut rng = test_rng();
 
         let initial_time = state.play_time_seconds;
@@ -268,7 +268,7 @@ mod tests {
         let mut enhancement = EnhancementProgress::new();
         let mut deep = DeepState::new();
         let mut achievements = Achievements::default();
-        let mut power_cores = PowerCoreState::default();
+        let mut power_cores = PassivesState::default();
         let mut rng = test_rng();
 
         assert!(state.combat_state.current_enemy.is_none());
@@ -304,7 +304,7 @@ mod tests {
         let mut deep2 = deep1.clone();
         let mut ach1 = Achievements::default();
         let mut ach2 = ach1.clone();
-        let mut pc1 = PowerCoreState::default();
+        let mut pc1 = PassivesState::default();
         let mut rng1 = ChaCha8Rng::seed_from_u64(42);
         let mut rng2 = ChaCha8Rng::seed_from_u64(42);
 
@@ -320,7 +320,7 @@ mod tests {
             &mut rng1,
         );
 
-        let mut pc2 = PowerCoreState::default();
+        let mut pc2 = PassivesState::default();
         let mut ctx = TickContext {
             state: &mut state2,
             tick_counter: &mut tc2,
@@ -354,7 +354,7 @@ mod tests {
         let mut enhancement = EnhancementProgress::new();
         let mut deep = DeepState::new();
         let mut achievements = Achievements::default();
-        let mut power_cores = PowerCoreState::default();
+        let mut power_cores = PassivesState::default();
         let mut rng = test_rng();
 
         let mut all_events = Vec::new();

@@ -2,15 +2,40 @@
 //!
 //! Each Power Core is unlocked by clearing a specific Deep layer milestone achievement.
 //! Once unlocked, a core passively generates prestige ranks over time at a fixed rate.
-//! State is persisted to `~/.quest/power_cores.json`.
+//! State is persisted to `~/.quest/passives.json` as part of the generic [`PassivesState`].
 
 use crate::achievements::{AchievementId, Achievements};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// A single passive generator's timer state.
+///
+/// Stored as a struct (rather than a bare `i64`) so that future fields can be
+/// added with `#[serde(default)]` without a breaking schema change.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct GeneratorTimer {
+    /// Unix timestamp (seconds) when this generator last granted its resource.
+    /// A value of `0` means "never granted" (the generator was just initialised).
+    pub last_granted_at: i64,
+}
+
+/// Top-level persistent state for all passive generators.
+///
+/// Saved to `~/.quest/passives.json`. Each entry in [`generators`](Self::generators)
+/// is keyed by a stable string identifier (e.g. `"power_core_1"`) that maps to
+/// a static definition elsewhere in code.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PassivesState {
+    /// Timer state per generator, keyed by stable string ID.
+    #[serde(default)]
+    pub generators: HashMap<String, GeneratorTimer>,
+}
+
 /// Static definition of a Power Core.
 #[derive(Debug, Clone)]
 pub struct PowerCoreDef {
+    /// Stable string key used in [`PassivesState::generators`].
+    pub key: &'static str,
     /// The achievement that unlocks this core.
     pub achievement_id: AchievementId,
     /// Display name of the core.
@@ -24,53 +49,48 @@ pub struct PowerCoreDef {
 /// All Power Core definitions, indexed by Power Core achievement milestones.
 pub const ALL_POWER_CORES: &[PowerCoreDef] = &[
     PowerCoreDef {
+        key: "power_core_1",
         achievement_id: AchievementId::PowerCoreI,
         name: "Red Fault",
         pr_per_day: 2,
         required_layer: 3,
     },
     PowerCoreDef {
+        key: "power_core_2",
         achievement_id: AchievementId::PowerCoreII,
         name: "Mirror Scar",
         pr_per_day: 3,
         required_layer: 7,
     },
     PowerCoreDef {
+        key: "power_core_3",
         achievement_id: AchievementId::PowerCoreIII,
         name: "Black Mouth",
         pr_per_day: 5,
         required_layer: 12,
     },
     PowerCoreDef {
+        key: "power_core_4",
         achievement_id: AchievementId::PowerCoreIV,
         name: "Hollow Throne",
         pr_per_day: 8,
         required_layer: 18,
     },
     PowerCoreDef {
+        key: "power_core_5",
         achievement_id: AchievementId::PowerCoreV,
         name: "Wailing Reach",
         pr_per_day: 12,
         required_layer: 25,
     },
     PowerCoreDef {
+        key: "power_core_6",
         achievement_id: AchievementId::PowerCoreVI,
         name: "Origin Wound",
         pr_per_day: 18,
         required_layer: 30,
     },
 ];
-
-/// Runtime state for all Power Cores.
-///
-/// Maps each core's `AchievementId` to the Unix timestamp (seconds) when the
-/// core last granted a prestige rank.  Missing entries are treated as "never
-/// granted" (timestamp = 0).
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct PowerCoreState {
-    /// Last-granted Unix timestamp (seconds) per core achievement.
-    pub last_granted_at: HashMap<AchievementId, i64>,
-}
 
 /// Look up the static definition for a given achievement ID.
 ///
@@ -132,11 +152,11 @@ mod tests {
         let def = def.unwrap();
         assert_eq!(def.name, "Red Fault");
         assert_eq!(def.pr_per_day, 2);
+        assert_eq!(def.key, "power_core_1");
     }
 
     #[test]
     fn get_power_core_def_returns_none_for_unrelated_id() {
-        // SlayerI is not a power core achievement
         let def = get_power_core_def(AchievementId::SlayerI);
         assert!(def.is_none());
     }
@@ -164,9 +184,27 @@ mod tests {
     }
 
     #[test]
-    fn power_core_state_default_is_empty() {
-        let state = PowerCoreState::default();
-        assert!(state.last_granted_at.is_empty());
+    fn all_cores_unique_keys() {
+        let mut seen = std::collections::HashSet::new();
+        for def in ALL_POWER_CORES {
+            assert!(
+                seen.insert(def.key),
+                "Duplicate key '{}' in ALL_POWER_CORES",
+                def.key
+            );
+        }
+    }
+
+    #[test]
+    fn passives_state_default_is_empty() {
+        let state = PassivesState::default();
+        assert!(state.generators.is_empty());
+    }
+
+    #[test]
+    fn generator_timer_default_is_zero() {
+        let timer = GeneratorTimer::default();
+        assert_eq!(timer.last_granted_at, 0);
     }
 
     #[test]
@@ -178,7 +216,6 @@ mod tests {
 
     #[test]
     fn core_definitions_ascending_pr_rate() {
-        // Each successive core should grant at least as many PR/day as the previous.
         for window in ALL_POWER_CORES.windows(2) {
             assert!(
                 window[1].pr_per_day >= window[0].pr_per_day,

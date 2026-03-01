@@ -844,7 +844,7 @@ mod soulforge_tick_integration {
         let mut haven = Haven::default();
         let mut achievements = Achievements::default();
         let mut deep = DeepState::new();
-        let mut power_cores = quest::power_cores::PowerCoreState::default();
+        let mut power_cores = quest::power_cores::PassivesState::default();
         // Use a fixed seed that hits discovery quickly at P15+
         let mut rng = make_rng(1);
 
@@ -904,7 +904,7 @@ mod soulforge_tick_integration {
         let mut enhancement = EnhancementProgress::new();
         let mut achievements = Achievements::default();
         let mut deep = DeepState::new();
-        let mut power_cores = quest::power_cores::PowerCoreState::default();
+        let mut power_cores = quest::power_cores::PassivesState::default();
         let mut rng = make_rng(1);
 
         // Run until discovery fires and capture that specific TickResult.
@@ -950,7 +950,7 @@ mod soulforge_tick_integration {
         let mut enhancement = EnhancementProgress::new();
         let mut achievements = Achievements::default();
         let mut deep = DeepState::new();
-        let mut power_cores = quest::power_cores::PowerCoreState::default();
+        let mut power_cores = quest::power_cores::PassivesState::default();
         let mut rng = make_rng(42);
 
         // Run a large number of ticks; dungeon blocks Soulforge discovery.
@@ -993,7 +993,7 @@ mod soulforge_tick_integration {
         enhancement.discovered = true; // Pre-discovered
         let mut achievements = Achievements::default();
         let mut deep = DeepState::new();
-        let mut power_cores = quest::power_cores::PowerCoreState::default();
+        let mut power_cores = quest::power_cores::PassivesState::default();
         let mut rng = make_rng(42);
 
         for _ in 0..500 {
