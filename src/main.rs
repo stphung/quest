@@ -1625,6 +1625,40 @@ fn main() -> io::Result<()> {
                                     InputAction::QuitToSelect => {
                                         break 'game_loop;
                                     }
+                                    InputAction::ContinueAndPush => {
+                                        if cloud_config.is_some() && !cloud_op_in_flight {
+                                            if let Some(ref config) = cloud_config {
+                                                cloud_op_in_flight = true;
+                                                let tx = cloud_tx.clone();
+                                                let dir = quest_dir.clone();
+                                                let tok = config.token.clone();
+                                                std::thread::spawn(move || {
+                                                    let tx2 = tx.clone();
+                                                    let result = std::panic::catch_unwind(
+                                                        std::panic::AssertUnwindSafe(|| {
+                                                            let res =
+                                                        match history::cloud::push_all_branches(&dir, &tok)
+                                                        {
+                                                            Ok(()) => history::cloud::CloudOpResult::Pushed,
+                                                            Err(e) => {
+                                                                history::cloud::CloudOpResult::Failed(e)
+                                                            }
+                                                        };
+                                                            let _ = tx.send(res);
+                                                        }),
+                                                    );
+                                                    if result.is_err() {
+                                                        let _ = tx2.send(
+                                                            history::cloud::CloudOpResult::Failed(
+                                                                "Cloud operation failed unexpectedly"
+                                                                    .to_string(),
+                                                            ),
+                                                        );
+                                                    }
+                                                });
+                                            }
+                                        }
+                                    }
                                     InputAction::Continue => {}
                                 }
                             }
