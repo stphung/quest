@@ -299,8 +299,8 @@ fn render_status_summary(
     col += 5;
 
     // Marks
-    put_text(buffer, 0, col, "Marks ", status_label);
-    col += "Marks ".len() as i32;
+    put_text(buffer, 0, col, "Warband Marks ", status_label);
+    col += "Warband Marks ".len() as i32;
     let marks_str = format!("\u{25c6} {}", marks);
     put_text(buffer, 0, col, &marks_str, Color::Rgb(220, 180, 60));
     col += marks_str.len() as i32;
@@ -821,7 +821,7 @@ fn help_content(view: DeepView) -> &'static [&'static str] {
             "Advance by clearing breakthrough layers.",
             "",
             "Prestige Cycle",
-            "Resets: mercs, Marks, active missions",
+            "Resets: mercs, Warband Marks, active missions",
             "Survives: guild rank, cleared layers,",
             "          infrastructure, familiarity",
         ],
@@ -836,7 +836,7 @@ fn help_content(view: DeepView) -> &'static [&'static str] {
             "Cuts future mission times.",
             "",
             "Expedition   8-16h  Medium",
-            "Main rewards: items + Marks.",
+            "Main rewards: items + Warband Marks.",
             "",
             "Breakthrough 18-24h  High",
             "Clears frontier. Unlocks next.",
@@ -890,7 +890,7 @@ fn help_content(view: DeepView) -> &'static [&'static str] {
             "",
             "INFRASTRUCTURE (permanent)",
             "Outpost      -25% all mission times",
-            "Supply Cache +50% Marks on Supply Runs",
+            "Supply Cache +50% Warband Marks on Supply Runs",
             "Watchtower   +40 familiarity on build",
             "Bridge       -2h on deeper missions",
             "",
@@ -1066,7 +1066,7 @@ pub fn render_deep_discovery_modal(frame: &mut Frame, area: Rect, _ctx: &LayoutC
             Style::default().fg(Color::Cyan),
         )),
         Line::from(Span::styled(
-            "Earn Marks, items, and Prestige Rank fragments.",
+            "Earn Warband Marks, items, and Prestige Rank fragments.",
             Style::default().fg(Color::Cyan),
         )),
         Line::from(Span::styled(

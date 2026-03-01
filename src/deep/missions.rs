@@ -19,9 +19,8 @@ use std::cmp::Reverse;
 use super::economy::{compute_mark_reward, mission_launch_cost, MarkRewardParams};
 use super::events::{generate_mission_events_with_names, tick_mission_events, EventTickResult};
 use super::layers::{
-    apply_duration_modifiers, apply_familiarity_gain, base_mission_duration_secs,
-    build_infrastructure, mark_layer_cleared, minimum_mission_duration_secs_for_layer,
-    mission_power_threshold, watchtower_auto_resolve_bonus, DurationModifiers,
+    apply_familiarity_gain, build_infrastructure, mark_layer_cleared, mission_duration_secs,
+    mission_power_threshold, watchtower_auto_resolve_bonus, FamiliarityLevel,
 };
 use super::mercenaries::{
     generate_recruit_pool, injure_merc, mark_merc_lost, purge_lost_mercs, tick_merc_injury,
@@ -349,6 +348,13 @@ fn prune_invalid_pool_missions(
         if !valid {
             return false;
         }
+        // Breakthrough missions are invalid on cleared layers.
+        if matches!(m.mission_type, MissionType::Breakthrough) {
+            let cleared = persistent.layer_record(m.layer).is_some_and(|r| r.cleared);
+            if cleared {
+                return false;
+            }
+        }
         let key = (m.layer, m.mission_type);
         if seen.contains(&key) {
             return false;
@@ -421,35 +427,23 @@ fn replenish_mission_pool(
 
     let (window_start, frontier) = layer_window(persistent);
 
-    // Always include mission staples on each of the previous two layers:
-    // Supply + Recon + Expedition, plus all unbuilt construction options.
-    if frontier > window_start {
-        for layer in window_start..frontier {
+    // Always include mission staples on each layer in the window (including frontier):
+    // Supply + Recon + Expedition, plus all unbuilt construction options on cleared layers.
+    for layer in window_start..=frontier {
+        changed |=
+            ensure_specific_mission_present(pool, MissionType::SupplyRun, layer, persistent, rng);
+        changed |=
+            ensure_specific_mission_present(pool, MissionType::Recon, layer, persistent, rng);
+        changed |=
+            ensure_specific_mission_present(pool, MissionType::Expedition, layer, persistent, rng);
+        for infra in unbuilt_infrastructure_for_layer(persistent, layer) {
             changed |= ensure_specific_mission_present(
                 pool,
-                MissionType::SupplyRun,
+                MissionType::Construction(infra),
                 layer,
                 persistent,
                 rng,
             );
-            changed |=
-                ensure_specific_mission_present(pool, MissionType::Recon, layer, persistent, rng);
-            changed |= ensure_specific_mission_present(
-                pool,
-                MissionType::Expedition,
-                layer,
-                persistent,
-                rng,
-            );
-            for infra in unbuilt_infrastructure_for_layer(persistent, layer) {
-                changed |= ensure_specific_mission_present(
-                    pool,
-                    MissionType::Construction(infra),
-                    layer,
-                    persistent,
-                    rng,
-                );
-            }
         }
     }
 
@@ -691,10 +685,7 @@ fn ensure_emergency_supply_run(
     {
         supply.marks_cost = 0;
         // Free recovery runs should be a slower fallback, not the optimal farm route.
-        supply.duration_secs = supply
-            .duration_secs
-            .max(minimum_mission_duration_secs_for_layer(supply.layer))
-            .max(FREE_SUPPLY_RUN_MIN_DURATION_SECS);
+        supply.duration_secs = supply.duration_secs.max(FREE_SUPPLY_RUN_MIN_DURATION_SECS);
         return true;
     }
 
@@ -709,7 +700,6 @@ fn ensure_emergency_supply_run(
     fallback.marks_cost = 0;
     fallback.duration_secs = fallback
         .duration_secs
-        .max(minimum_mission_duration_secs_for_layer(fallback.layer))
         .max(FREE_SUPPLY_RUN_MIN_DURATION_SECS);
 
     if let Some((idx, _)) = prestige
@@ -793,6 +783,43 @@ fn progress_injuries_after_completions(prestige: &mut DeepPrestige, completed_co
     }
 }
 
+/// Compute effective mission duration from the S2 table, reduced by layer
+/// infrastructure (Outpost, Bridge) and familiarity.
+pub fn effective_duration_secs(
+    tier: LayerTier,
+    mission_type: MissionType,
+    layer: u32,
+    persistent: &DeepPersistent,
+) -> u64 {
+    let base = mission_duration_secs(tier, mission_type) as f64;
+
+    // Familiarity: Unknown 1.0, Mapped 0.85, Familiar 0.70, Mastered 0.55.
+    let fam_pct = persistent.layer_record(layer).map_or(0, |r| r.familiarity);
+    let fam_factor = FamiliarityLevel::from_familiarity(fam_pct).duration_factor();
+
+    // Outpost: -25% on this layer.
+    let outpost_factor = if persistent
+        .layer_record(layer)
+        .is_some_and(|r| r.has_infrastructure(Infrastructure::Outpost))
+    {
+        0.75
+    } else {
+        1.0
+    };
+
+    // Bridge: -10% per bridged layer below this one, capped at -50%.
+    let bridge_count = (1..layer)
+        .filter(|l| {
+            persistent
+                .layer_record(*l)
+                .is_some_and(|r| r.has_infrastructure(Infrastructure::Bridge))
+        })
+        .count() as u32;
+    let bridge_factor = 1.0 - (bridge_count.min(5) as f64 * 0.10);
+
+    (base * fam_factor * outpost_factor * bridge_factor) as u64
+}
+
 /// Build an `AvailableMission` for a given type and layer.
 fn generate_available_mission(
     mission_type: MissionType,
@@ -801,32 +828,7 @@ fn generate_available_mission(
     rng: &mut impl Rng,
 ) -> AvailableMission {
     let tier = LayerTier::from_layer(layer);
-    let layer_record = persistent.layer_record(layer);
-    let familiarity = layer_record.map(|r| r.familiarity).unwrap_or(0);
-    let has_outpost = layer_record
-        .map(|r| r.has_infrastructure(Infrastructure::Outpost))
-        .unwrap_or(false);
-
-    let saboteur_present = false; // Pool generation doesn't know squad yet.
-    let bridge_layers = (1..layer)
-        .filter(|l| {
-            persistent
-                .layer_record(*l)
-                .map(|r| r.has_infrastructure(Infrastructure::Bridge))
-                .unwrap_or(false)
-        })
-        .count() as u32;
-    let mods = DurationModifiers {
-        has_outpost,
-        familiarity,
-        has_saboteur: saboteur_present,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-        bridge_layers,
-    };
-    let base = base_mission_duration_secs(tier, mission_type);
-    let duration_secs =
-        apply_duration_modifiers(base, &mods).max(minimum_mission_duration_secs_for_layer(layer));
+    let duration_secs = effective_duration_secs(tier, mission_type, layer, persistent);
 
     let min_power = mission_power_threshold(layer, mission_type);
     let marks_cost = mission_launch_cost(mission_type, layer);
@@ -1038,53 +1040,10 @@ pub fn start_mission(
         prestige.warband_marks = prestige.warband_marks.saturating_sub(available.marks_cost);
     }
 
-    // Compute actual duration (with infrastructure modifiers).
-    let layer_record = persistent.layer_record(available.layer);
-    let familiarity = layer_record.map(|r| r.familiarity).unwrap_or(0);
-    let has_outpost = layer_record
-        .map(|r| r.has_infrastructure(Infrastructure::Outpost))
-        .unwrap_or(false);
-
-    let squad_archetypes: Vec<MercArchetype> = merc_ids
-        .iter()
-        .filter_map(|&id| prestige.find_merc(id).map(|m| m.archetype))
-        .collect();
-
-    let has_saboteur = squad_archetypes.contains(&MercArchetype::Saboteur);
-    let saboteur_is_veteran = merc_ids
-        .iter()
-        .filter_map(|&id| prestige.find_merc(id))
-        .any(|m| m.archetype == MercArchetype::Saboteur && m.level >= 10);
-
-    let total_power: u32 = merc_ids
-        .iter()
-        .filter_map(|&id| prestige.find_merc(id))
-        .map(|m| m.effective_power())
-        .sum();
-    let threshold = mission_power_threshold(available.layer, available.mission_type);
-    let is_overpowered = total_power >= (threshold * 3 / 2); // ≥150% of threshold
-
-    let bridge_layers = (1..available.layer)
-        .filter(|l| {
-            persistent
-                .layer_record(*l)
-                .map(|r| r.has_infrastructure(Infrastructure::Bridge))
-                .unwrap_or(false)
-        })
-        .count() as u32;
-
+    // Table value reduced by infrastructure (Outpost, Bridge) and familiarity.
     let tier = LayerTier::from_layer(available.layer);
-    let base_duration = base_mission_duration_secs(tier, available.mission_type);
-    let mods = DurationModifiers {
-        has_outpost,
-        familiarity,
-        has_saboteur,
-        saboteur_is_veteran,
-        is_overpowered,
-        bridge_layers,
-    };
-    let mut duration_secs = apply_duration_modifiers(base_duration, &mods)
-        .max(minimum_mission_duration_secs_for_layer(available.layer));
+    let mut duration_secs =
+        effective_duration_secs(tier, available.mission_type, available.layer, persistent);
     if matches!(available.mission_type, MissionType::SupplyRun)
         && (is_free_daily_supply_run || available.marks_cost == 0)
     {
@@ -1093,6 +1052,11 @@ pub fn start_mission(
     }
 
     let ends_at = now + Duration::seconds(duration_secs as i64);
+
+    let squad_archetypes: Vec<MercArchetype> = merc_ids
+        .iter()
+        .filter_map(|&id| prestige.find_merc(id).map(|m| m.archetype))
+        .collect();
 
     // Gather squad merc names for personalised event descriptions.
     let squad_names: Vec<String> = merc_ids
@@ -1948,7 +1912,7 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_mission_pool_respects_layer_based_minimum_duration() {
+    fn test_generate_mission_pool_applies_infrastructure_and_familiarity_to_duration() {
         let mut rng = seeded_rng();
         let mut persistent = DeepPersistent::new();
         // Frontier at layer 5 to cover multiple layers in the mission window.
@@ -1956,22 +1920,23 @@ mod tests {
             let record = persistent.layer_record_mut(layer);
             record.cleared = layer < 5;
             if layer >= 3 {
-                // Apply strong duration reducers so the floor is exercised.
-                record.familiarity = 100;
-                record.infrastructure.push(Infrastructure::Outpost);
+                record.familiarity = 100; // Mastered → 0.55x duration
+                record.infrastructure.push(Infrastructure::Outpost); // -25%
+            }
+            if layer == 2 {
+                record.infrastructure.push(Infrastructure::Bridge); // -10% for deeper layers
             }
         }
 
         let pool = generate_mission_pool(&persistent, &mut rng);
         for mission in &pool {
-            let minimum = minimum_mission_duration_secs_for_layer(mission.layer);
-            assert!(
-                mission.duration_secs >= minimum,
-                "Mission {:?} on layer {} should be at least {}s, got {}s",
-                mission.mission_type,
-                mission.layer,
-                minimum,
-                mission.duration_secs
+            let tier = LayerTier::from_layer(mission.layer);
+            let expected =
+                effective_duration_secs(tier, mission.mission_type, mission.layer, &persistent);
+            assert_eq!(
+                mission.duration_secs, expected,
+                "Mission {:?} on layer {} should be {}s (effective), got {}s",
+                mission.mission_type, mission.layer, expected, mission.duration_secs
             );
         }
     }
@@ -2774,20 +2739,19 @@ mod tests {
     }
 
     #[test]
-    fn test_start_mission_respects_layer_minimum_duration_floor() {
+    fn test_start_mission_applies_infrastructure_and_familiarity_to_duration() {
         let mut rng = seeded_rng();
         let mut persistent = DeepPersistent::new();
         let record = persistent.layer_record_mut(1);
-        record.familiarity = 100;
-        record.infrastructure.push(Infrastructure::Outpost);
+        record.familiarity = 100; // Mastered → 0.55x
+        record.infrastructure.push(Infrastructure::Outpost); // -25%
 
-        let mut saboteur = make_merc(1, MercArchetype::Saboteur, 1000);
-        saboteur.level = 10; // veteran saboteur for max saboteur reduction
-        let mut prestige = make_prestige_with_mercs(vec![saboteur]);
+        let merc = make_merc(1, MercArchetype::Vanguard, 1000);
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
         prestige.warband_marks = 200;
 
         let mut available = make_available_mission(MissionType::SupplyRun, 1);
-        available.marks_cost = 1; // paid run (free-run floor is tested elsewhere)
+        available.marks_cost = 1;
         let now = Utc::now();
 
         let mission = start_mission(
@@ -2801,10 +2765,16 @@ mod tests {
         );
 
         let duration = (mission.ends_at - mission.started_at).num_seconds() as u64;
-        assert!(
-            duration >= minimum_mission_duration_secs_for_layer(1),
-            "Duration {}s should respect layer-based minimum floor",
-            duration
+        let expected = effective_duration_secs(
+            LayerTier::from_layer(1),
+            MissionType::SupplyRun,
+            1,
+            &persistent,
+        );
+        assert_eq!(
+            duration, expected,
+            "Duration should match effective_duration_secs = {}s, got {}s",
+            expected, duration
         );
     }
 

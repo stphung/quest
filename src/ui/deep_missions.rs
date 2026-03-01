@@ -1,10 +1,8 @@
 //! The Deep — Hub and New Mission sub-view rendering.
 
 use crate::deep::{
-    apply_duration_modifiers, base_marks_earned, base_mission_duration_secs, event_trigger_points,
-    familiarity_gain, AvailableMission, DeepState, DeepUiState, DurationModifiers,
-    FamiliarityLevel, Infrastructure, LayerTier, MercArchetype, MercStatus, Mission, MissionStatus,
-    MissionType,
+    base_marks_earned, event_trigger_points, familiarity_gain, AvailableMission, DeepState,
+    DeepUiState, LayerTier, MercArchetype, MercStatus, Mission, MissionStatus, MissionType,
 };
 use chrono::Utc;
 use ratatui::style::Color;
@@ -210,8 +208,8 @@ fn render_mission_row(
     let col_cursor = left;
     let col_icon = left + 2;
     let col_name = left + 4;
-    // Cost column: "Free" (4) or "NNN WM" (max ~7). Allocate 7 chars from right edge.
-    let col_cost = (left + row_width as i32 - 8).max(col_name + 12);
+    // Cost column: "Free" (4) or "NNN Warband Marks" (max ~18). Allocate 18 chars from right edge.
+    let col_cost = (left + row_width as i32 - 19).max(col_name + 12);
     // Risk column: "Safe"/"Low"/"Med"/"High" — 4 chars, just left of cost
     let col_risk = (col_cost - 6).max(col_name + 8);
     // ETA column: "2h"/"10h"/"2h 5m" — up to 6 chars, just left of risk
@@ -237,11 +235,11 @@ fn render_mission_row(
     put_text(buffer, row, col_risk, risk, risk_color(rt));
     // Cost
     let cost_str = if mission.marks_cost > 0 {
-        format!("{} WM", mission.marks_cost)
+        format!("{} Warband Marks", mission.marks_cost)
     } else {
         "Free".to_string()
     };
-    let cost_col = col_cost + (7 - cost_str.len() as i32).max(0);
+    let cost_col = col_cost + (18 - cost_str.len() as i32).max(0);
     put_text(buffer, row, cost_col, &cost_str, MARKS_COLOR);
 }
 
@@ -372,7 +370,7 @@ fn render_compact_hub(
     put_text(buffer, row, 1, &guild_line, Color::White);
     row += 1;
 
-    let marks_line = format!("MARKS  {} WM", deep.prestige.warband_marks);
+    let marks_line = format!("WARBAND MARKS  {}", deep.prestige.warband_marks);
     put_text(buffer, row, 1, &marks_line, MARKS_COLOR);
     row += 1;
 
@@ -716,7 +714,7 @@ fn render_hub_roster(
                 crate::deep::MissionOutcome::Failure => ("\u{2717}", Color::LightRed),
             };
             let line = format!(
-                "{} Layer {} \u{2014} {} \u{2014} {} Marks",
+                "{} Layer {} \u{2014} {} \u{2014} {} Warband Marks",
                 icon, entry.layer, entry.mission_name, entry.marks_earned
             );
             put_text(buffer, row, 1, &line, color);
@@ -854,7 +852,7 @@ pub(super) fn render_new_mission(
     let content_height = (content_bottom - content_top).max(0) as usize;
 
     // Right-aligned marks in footer
-    let marks_display = format!("\u{25c6} {} M", deep.prestige.warband_marks);
+    let marks_display = format!("\u{25c6} {} Warband Marks", deep.prestige.warband_marks);
     let marks_col = (width as i32 - marks_display.len() as i32 - 2).max(1);
     let min_marks_col = footer.chars().count() as i32 + 3;
     if marks_col > min_marks_col {
@@ -994,7 +992,7 @@ fn render_active_missions_content(
                     crate::deep::MissionOutcome::Failure => ("\u{2717}", Color::LightRed),
                 };
                 let line = format!(
-                    "{} Layer {} \u{2014} {} \u{2014} {} Marks",
+                    "{} Layer {} \u{2014} {} \u{2014} {} Warband Marks",
                     icon, entry.layer, entry.mission_name, entry.marks_earned
                 );
                 put_text(buffer, lr, 1, &line, color);
@@ -1077,7 +1075,7 @@ fn render_active_missions_content(
                 row + 1,
                 line_col,
                 &format!(
-                    "Debrief ready \u{00b7} +{} WM confirmed \u{00b7} press [Enter]",
+                    "Debrief ready \u{00b7} +{} Warband Marks confirmed \u{00b7} press [Enter]",
                     reward_marks
                 ),
                 Color::Rgb(78, 108, 92),
@@ -1854,25 +1852,16 @@ fn render_squad_assembly_left(
 /// One-line mission type description shown during first visits.
 fn mission_type_hint(mt: MissionType) -> &'static str {
     match mt {
-        MissionType::SupplyRun => "Baseline run: safest Marks income on cleared ground",
+        MissionType::SupplyRun => "Baseline run: safest Warband Marks income on cleared ground",
         MissionType::Recon => "Recon run: biggest Familiarity gain, making this layer faster",
-        MissionType::Expedition => "Push run: higher Marks than Supply, with more risk/events",
+        MissionType::Expedition => {
+            "Push run: higher Warband Marks than Supply, with more risk/events"
+        }
         MissionType::Breakthrough => "Progression run: clears the frontier to open next layer",
         MissionType::GatewayExpedition => "The final expedition \u{2014} breach the sealed gateway",
         MissionType::Construction(_) => {
             "Builds permanent infrastructure \u{2014} survives prestige"
         }
-    }
-}
-
-/// Risk consequence description shown during first visits.
-fn risk_consequence_hint(tier: u8) -> &'static str {
-    match tier {
-        0 => "no injuries, guaranteed return",
-        1 => "rare injuries, Marks lost on failure",
-        2 => "injuries likely on failure",
-        3 => "injuries or death possible on failure",
-        _ => "",
     }
 }
 
@@ -1886,7 +1875,7 @@ fn render_mission_detail_phase1(
     detail_inner_w: i32,
     content_top: i32,
     content_bottom: i32,
-    mission_visit_count: u8,
+    _mission_visit_count: u8,
 ) {
     let mut row = content_top;
 
@@ -1901,43 +1890,27 @@ fn render_mission_detail_phase1(
     );
     row += 1;
 
-    // Mission type name (colored) + role hint
-    let tc = mission_type_color(mission.mission_type);
-    put_text(
-        buffer,
-        row,
-        detail_inner_left,
-        &mission_type_label(mission.mission_type),
-        tc,
-    );
-    row += 1;
-
-    if row < content_bottom {
-        let hint_color = if mission_visit_count < 5 {
-            Color::Rgb(56, 92, 128)
-        } else {
-            Color::Rgb(42, 68, 96)
-        };
-        let hint = truncate_text(
-            mission_type_hint(mission.mission_type),
-            detail_inner_w as usize,
-        );
-        put_text(buffer, row, detail_inner_left, &hint, hint_color);
-        row += 1;
-    }
-
-    // Description (word-wrapped, 2 lines max)
-    if !mission.description.is_empty() {
-        let max_w = (detail_inner_w - 1).max(10) as usize;
-        let words: Vec<&str> = mission.description.split_whitespace().collect();
+    // Layer narrative (word-wrapped, quoted)
+    let narrative = crate::deep::narratives::layer_narrative(mission.layer, &mission.mission_type);
+    if !narrative.is_empty() && row + 1 < content_bottom {
+        let max_w = (detail_inner_w - 2).max(10) as usize; // -2 for quote marks
+        let quoted = format!("\u{201c}{}\u{201d}", narrative);
+        let words: Vec<&str> = quoted.split_whitespace().collect();
         let mut line_buf = String::new();
         let mut lines_rendered = 0;
         for word in &words {
-            if lines_rendered >= 2 {
+            if lines_rendered >= 3 {
                 break;
             }
             if line_buf.len() + word.len() + 1 > max_w && !line_buf.is_empty() {
-                put_text(buffer, row, detail_inner_left, &line_buf, Color::DarkGray);
+                let prefix = if lines_rendered == 0 { "" } else { " " };
+                put_text(
+                    buffer,
+                    row,
+                    detail_inner_left,
+                    &format!("{}{}", prefix, line_buf),
+                    Color::Rgb(80, 100, 130),
+                );
                 row += 1;
                 lines_rendered += 1;
                 line_buf.clear();
@@ -1947,143 +1920,65 @@ fn render_mission_detail_phase1(
             }
             line_buf.push_str(word);
         }
-        if !line_buf.is_empty() && lines_rendered < 2 {
-            put_text(buffer, row, detail_inner_left, &line_buf, Color::DarkGray);
-            row += 1;
-        }
-    }
-    row += 1;
-
-    // Duration — show effective if modifiers apply, with breakdown
-    let layer_record = deep.persistent.layer_record(mission.layer);
-    let has_outpost = layer_record
-        .map(|r| r.has_infrastructure(Infrastructure::Outpost))
-        .unwrap_or(false);
-    let familiarity = layer_record.map(|r| r.familiarity).unwrap_or(0);
-
-    let tier = LayerTier::from_layer(mission.layer);
-    let base_secs = base_mission_duration_secs(tier, mission.mission_type);
-
-    let mods = DurationModifiers {
-        has_outpost,
-        familiarity,
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-        bridge_layers: 0,
-    };
-    let baseline_secs = apply_duration_modifiers(base_secs, &mods);
-    let listed_secs = mission.duration_secs;
-
-    if row < content_bottom {
-        if listed_secs < base_secs {
-            let dur_str = format!(
-                "Duration:  {} (base {})",
-                format_hours(listed_secs),
-                format_hours(base_secs)
-            );
-            put_text(buffer, row, detail_inner_left, &dur_str, Color::DarkGray);
-            row += 1;
-
-            // Stacked modifier breakdown
-            if has_outpost && row < content_bottom {
-                put_text(
-                    buffer,
-                    row,
-                    detail_inner_left,
-                    "  Outpost:     -25%",
-                    Color::Rgb(60, 130, 90),
-                );
-                row += 1;
-            }
-            let fam_level = FamiliarityLevel::from_familiarity(familiarity);
-            let fam_mod = match fam_level {
-                FamiliarityLevel::Mapped => Some(("Mapped", "-10%")),
-                FamiliarityLevel::Familiar => Some(("Familiar", "-20%")),
-                FamiliarityLevel::Mastered => Some(("Mastered", "-30%")),
-                FamiliarityLevel::Unknown => None,
-            };
-            if let Some((label, pct)) = fam_mod {
-                if row < content_bottom {
-                    put_text(
-                        buffer,
-                        row,
-                        detail_inner_left,
-                        &format!(
-                            "  {}:{}{}",
-                            label,
-                            " ".repeat(10usize.saturating_sub(label.len())),
-                            pct
-                        ),
-                        Color::Rgb(60, 130, 90),
-                    );
-                    row += 1;
-                }
-            }
-        } else if listed_secs > base_secs {
-            let note = if mission.mission_type == MissionType::SupplyRun
-                && mission.marks_cost == 0
-                && listed_secs >= crate::deep::missions::FREE_SUPPLY_RUN_MIN_DURATION_SECS
-                && listed_secs > baseline_secs
-            {
-                "free fallback run (intentionally slower)"
-            } else {
-                "minimum duration floor applied"
-            };
-            let dur_str = format!("Duration:  {} ({})", format_hours(listed_secs), note);
-            put_text(buffer, row, detail_inner_left, &dur_str, Color::DarkGray);
-            row += 1;
-        } else {
-            let dur_str = format!("Duration:  {}", format_hours(base_secs));
-            put_text(buffer, row, detail_inner_left, &dur_str, Color::DarkGray);
-            row += 1;
-        }
-    }
-
-    // Risk with first-visit consequence hint
-    if row < content_bottom {
-        let risk_tier = mission.mission_type.risk_tier();
-        if mission_visit_count < 5 {
-            let risk_str = format!(
-                "Risk:      {} \u{2014} {}",
-                risk_label(risk_tier),
-                risk_consequence_hint(risk_tier)
-            );
+        if !line_buf.is_empty() && lines_rendered < 3 {
+            let prefix = if lines_rendered == 0 { "" } else { " " };
             put_text(
                 buffer,
                 row,
                 detail_inner_left,
-                &risk_str,
-                risk_color(risk_tier),
+                &format!("{}{}", prefix, line_buf),
+                Color::Rgb(80, 100, 130),
             );
-            let hint_part = format!("\u{2014} {}", risk_consequence_hint(risk_tier));
-            let hint_col =
-                detail_inner_left + format!("Risk:      {} ", risk_label(risk_tier)).len() as i32;
-            put_text(buffer, row, hint_col, &hint_part, Color::DarkGray);
-        } else {
-            let risk_str = format!("Risk:      {}", risk_label(risk_tier));
-            put_text(
-                buffer,
-                row,
-                detail_inner_left,
-                &risk_str,
-                risk_color(risk_tier),
-            );
+            row += 1;
         }
+        row += 1; // blank line after narrative
+    }
+
+    // ── Operations Section ──
+    if row < content_bottom {
+        put_text(buffer, row, detail_inner_left, "Operations", Color::Cyan);
         row += 1;
     }
 
-    // Cost with affordability
+    // Duration
+    if row < content_bottom {
+        put_text(
+            buffer,
+            row,
+            detail_inner_left,
+            &format!(
+                "  \u{23f1} Duration   {}",
+                format_hours(mission.duration_secs)
+            ),
+            Color::DarkGray,
+        );
+        row += 1;
+    }
+
+    // Risk
+    if row < content_bottom {
+        let risk_tier = mission.mission_type.risk_tier();
+        put_text(
+            buffer,
+            row,
+            detail_inner_left,
+            &format!("  Risk         {}", risk_label(risk_tier)),
+            risk_color(risk_tier),
+        );
+        row += 1;
+    }
+
+    // Cost
     if row < content_bottom {
         let marks = deep.prestige.warband_marks;
         if mission.marks_cost > 0 {
-            let cost_str = format!("Cost:      {} Marks", mission.marks_cost);
+            let cost_str = format!("  Cost         {} Marks", mission.marks_cost);
             put_text(buffer, row, detail_inner_left, &cost_str, MARKS_COLOR);
             let (afford_str, afford_color) = if marks >= mission.marks_cost {
-                (format!("  (have {})", marks), Color::Rgb(60, 180, 80))
+                (format!(" (have {})", marks), Color::Rgb(60, 180, 80))
             } else {
                 (
-                    format!("  (have {} \u{2014} INSUFFICIENT)", marks),
+                    format!(" (need {})", mission.marks_cost - marks),
                     Color::LightRed,
                 )
             };
@@ -2099,73 +1994,17 @@ fn render_mission_detail_phase1(
                 buffer,
                 row,
                 detail_inner_left,
-                "Cost:      Free",
+                "  Cost         Free",
                 Color::Rgb(60, 180, 80),
             );
         }
         row += 1;
     }
+    row += 1; // blank line after Operations
 
-    // Reward range (calculated from base_marks_earned with ±15% variance)
+    // ── Requires Section ──
     if row < content_bottom {
-        if matches!(mission.mission_type, MissionType::Construction(_)) {
-            put_text(
-                buffer,
-                row,
-                detail_inner_left,
-                "Reward:    Infrastructure (permanent)",
-                Color::DarkGray,
-            );
-            row += 1;
-        } else {
-            put_text(
-                buffer,
-                row,
-                detail_inner_left,
-                "Rewards (on success):",
-                Color::Cyan,
-            );
-            row += 1;
-
-            if row < content_bottom {
-                let base = base_marks_earned(mission.mission_type, mission.layer);
-                let min_marks = (base as f64 * 0.85).round() as u32;
-                let max_marks = (base as f64 * 1.15).round() as u32;
-                let marks_str = format!("  \u{25c6} {}\u{2013}{} Marks", min_marks, max_marks);
-                put_text(buffer, row, detail_inner_left, &marks_str, MARKS_COLOR);
-                row += 1;
-            }
-
-            if row < content_bottom {
-                let prog_str = "  \u{2605} Merc progression: +1 mission completed";
-                put_text(buffer, row, detail_inner_left, prog_str, Color::DarkGray);
-                row += 1;
-            }
-
-            if row < content_bottom
-                && matches!(
-                    mission.mission_type,
-                    MissionType::Recon | MissionType::Expedition
-                )
-            {
-                let fam = familiarity_gain(mission.mission_type);
-                let fam_str = format!("  \u{25c8} Familiarity: +{} on this layer", fam);
-                put_text(
-                    buffer,
-                    row,
-                    detail_inner_left,
-                    &fam_str,
-                    Color::Rgb(80, 150, 200),
-                );
-                row += 1;
-            }
-        }
-    }
-    row += 1;
-
-    // Requirements section
-    if row < content_bottom {
-        put_text(buffer, row, detail_inner_left, "Requires:", Color::Cyan);
+        put_text(buffer, row, detail_inner_left, "Requires", Color::Cyan);
         row += 1;
     }
 
@@ -2180,7 +2019,7 @@ fn render_mission_detail_phase1(
         row += 1;
     }
 
-    // Required archetype — check against full roster
+    // Required archetype
     if let Some(req_arch) = mission.required_archetype {
         if row < content_bottom {
             let in_roster = deep.prestige.roster.iter().any(|m| m.archetype == req_arch);
@@ -2218,18 +2057,131 @@ fn render_mission_detail_phase1(
                 buffer,
                 row,
                 detail_inner_left,
-                &format!("  {}{} recommended", prefix, rec_arch.display_name()),
+                &format!("  {}{} (recommended)", prefix, rec_arch.display_name()),
                 color,
+            );
+            row += 1;
+        }
+    }
+    row += 1; // blank line after Requires
+
+    // ── Rewards Section ──
+    if row < content_bottom {
+        if matches!(mission.mission_type, MissionType::Construction(_)) {
+            put_text(buffer, row, detail_inner_left, "Rewards", Color::Cyan);
+            row += 1;
+            if row < content_bottom {
+                put_text(
+                    buffer,
+                    row,
+                    detail_inner_left,
+                    "  \u{25c6} Infrastructure (permanent)",
+                    Color::DarkGray,
+                );
+                row += 1;
+            }
+        } else {
+            put_text(buffer, row, detail_inner_left, "Rewards", Color::Cyan);
+            row += 1;
+
+            if row < content_bottom {
+                let base = base_marks_earned(mission.mission_type, mission.layer);
+                let min_marks = (base as f64 * 0.85).round() as u32;
+                let max_marks = (base as f64 * 1.15).round() as u32;
+                put_text(
+                    buffer,
+                    row,
+                    detail_inner_left,
+                    &format!(
+                        "  \u{25c6} {}\u{2013}{} Warband Marks",
+                        min_marks, max_marks
+                    ),
+                    MARKS_COLOR,
+                );
+                row += 1;
+            }
+
+            if row < content_bottom {
+                put_text(
+                    buffer,
+                    row,
+                    detail_inner_left,
+                    "  \u{2605} Merc progression: +1",
+                    Color::DarkGray,
+                );
+                row += 1;
+            }
+
+            if row < content_bottom
+                && matches!(
+                    mission.mission_type,
+                    MissionType::Recon | MissionType::Expedition
+                )
+            {
+                let fam = familiarity_gain(mission.mission_type);
+                put_text(
+                    buffer,
+                    row,
+                    detail_inner_left,
+                    &format!("  \u{25c8} Familiarity: +{}", fam),
+                    Color::Rgb(80, 150, 200),
+                );
+                row += 1;
+            }
+        }
+    }
+
+    // ── Tip + Action at bottom ──
+    // Reserve 3 rows from the bottom: tip (1-2 lines) + action hint
+    let tip_text = format!(
+        "Tip: {} \u{2014} {}",
+        mission_type_label(mission.mission_type),
+        mission_type_hint(mission.mission_type)
+    );
+    let action_row = content_bottom - 1;
+    let max_tip_w = (detail_inner_w - 1).max(10) as usize;
+
+    // Word-wrap the tip into up to 2 lines
+    let tip_words: Vec<&str> = tip_text.split_whitespace().collect();
+    let mut tip_lines: Vec<String> = Vec::new();
+    let mut tip_buf = String::new();
+    for word in &tip_words {
+        if tip_buf.len() + word.len() + 1 > max_tip_w && !tip_buf.is_empty() {
+            tip_lines.push(tip_buf.clone());
+            tip_buf.clear();
+            if tip_lines.len() >= 2 {
+                break;
+            }
+        }
+        if !tip_buf.is_empty() {
+            tip_buf.push(' ');
+        }
+        tip_buf.push_str(word);
+    }
+    if !tip_buf.is_empty() && tip_lines.len() < 2 {
+        tip_lines.push(tip_buf);
+    }
+
+    let tip_start = action_row - tip_lines.len() as i32 - 1;
+    let tip_start = tip_start.max(row + 1);
+    for (i, line) in tip_lines.iter().enumerate() {
+        let r = tip_start + i as i32;
+        if r < action_row {
+            let indent = if i > 0 { "  " } else { "" };
+            put_text(
+                buffer,
+                r,
+                detail_inner_left,
+                &format!("{}{}", indent, line),
+                Color::DarkGray,
             );
         }
     }
 
-    // Action hint at bottom
-    let hint_row = (content_bottom - 2).max(row + 1);
-    if hint_row < content_bottom {
+    if action_row > tip_start {
         put_text(
             buffer,
-            hint_row,
+            action_row,
             detail_inner_left,
             "[Enter] Assign squad \u{2192}",
             Color::Rgb(50, 120, 60),
@@ -2265,55 +2217,96 @@ fn render_squad_summary_panel(
 
     let mut row = content_top;
 
-    // Mission identity header (moved from left panel)
-    let tc = mission_type_color(mission.mission_type);
-    let cost_label = if mission.marks_cost > 0 {
-        format!("{} Marks", mission.marks_cost)
-    } else {
-        "Free".to_string()
-    };
+    // ── Header: Layer + Tier ──
+    let tier_name = LayerTier::from_layer(mission.layer).display_name();
     put_text(
         buffer,
         row,
         detail_inner_left,
-        &format!(
-            "{}  L{}  Cost: {}",
-            mission_type_label(mission.mission_type),
-            mission.layer,
-            cost_label
-        ),
-        tc,
+        &format!("Layer {} \u{2014} {}", mission.layer, tier_name),
+        Color::White,
     );
-    row += 2;
+    row += 1;
 
-    // Cost + balance header
-    if mission.marks_cost > 0 {
-        let header = format!("Cost: {} Marks     Balance: {}", mission.marks_cost, marks);
-        put_text(buffer, row, detail_inner_left, &header, Color::White);
-        let cost_color = if can_afford {
-            Color::Green
-        } else {
-            Color::LightRed
-        };
-        put_text(
-            buffer,
-            row,
-            detail_inner_left + 6,
-            &format!("{}", mission.marks_cost),
-            cost_color,
-        );
-    } else {
-        put_text(
-            buffer,
-            row,
-            detail_inner_left,
-            "Cost: Free",
-            Color::Rgb(60, 180, 80),
-        );
+    // Narrative text (word-wrapped, quoted)
+    let narrative = crate::deep::narratives::layer_narrative(mission.layer, &mission.mission_type);
+    if !narrative.is_empty() && row + 1 < content_bottom {
+        let max_w = (detail_inner_w - 2).max(10) as usize;
+        let quoted = format!("\u{201c}{}\u{201d}", narrative);
+        let words: Vec<&str> = quoted.split_whitespace().collect();
+        let mut line_buf = String::new();
+        let mut lines_rendered = 0;
+        for word in &words {
+            if lines_rendered >= 3 {
+                break;
+            }
+            if line_buf.len() + word.len() + 1 > max_w && !line_buf.is_empty() {
+                let prefix = if lines_rendered == 0 { "" } else { " " };
+                put_text(
+                    buffer,
+                    row,
+                    detail_inner_left,
+                    &format!("{}{}", prefix, line_buf),
+                    Color::Rgb(80, 100, 130),
+                );
+                row += 1;
+                lines_rendered += 1;
+                line_buf.clear();
+            }
+            if !line_buf.is_empty() {
+                line_buf.push(' ');
+            }
+            line_buf.push_str(word);
+        }
+        if !line_buf.is_empty() && lines_rendered < 3 {
+            let prefix = if lines_rendered == 0 { "" } else { " " };
+            put_text(
+                buffer,
+                row,
+                detail_inner_left,
+                &format!("{}{}", prefix, line_buf),
+                Color::Rgb(80, 100, 130),
+            );
+            row += 1;
+        }
     }
-    row += 2;
 
-    // Power meter
+    // Compact operations line: ⏱ duration  Risk: X  Cost: X
+    // Render each segment separately to avoid wide-char column misalignment.
+    if row < content_bottom {
+        let risk_tier = mission.mission_type.risk_tier();
+        let mut col = detail_inner_left;
+
+        let dur_seg = format!("\u{23f1} {}  ", format_hours(mission.duration_secs));
+        put_text(buffer, row, col, &dur_seg, Color::DarkGray);
+        col += super::scene_fx::display_width(&dur_seg) as i32;
+
+        let risk_seg = format!("Risk: {}  ", risk_label(risk_tier));
+        put_text(buffer, row, col, &risk_seg, risk_color(risk_tier));
+        col += super::scene_fx::display_width(&risk_seg) as i32;
+
+        if mission.marks_cost > 0 {
+            let cost_color = if can_afford {
+                MARKS_COLOR
+            } else {
+                Color::LightRed
+            };
+            put_text(
+                buffer,
+                row,
+                col,
+                &format!("Cost: {}", mission.marks_cost),
+                cost_color,
+            );
+        } else {
+            put_text(buffer, row, col, "Cost: Free", Color::Rgb(60, 180, 80));
+        }
+        row += 1;
+    }
+    row += 1; // blank line
+
+    // ── Squad Power Section ──
+
     let ratio = if min == 0 {
         1.0
     } else {
@@ -2348,9 +2341,9 @@ fn render_squad_summary_panel(
     };
 
     let power_str = if is_safe || min == 0 {
-        format!("Squad Power:  {}", squad_power)
+        format!("Squad Power  {}", squad_power)
     } else {
-        format!("Squad Power:  {} / {}  ({}%)", squad_power, min, ratio_pct)
+        format!("Squad Power  {} / {}  ({}%)", squad_power, min, ratio_pct)
     };
     put_text(buffer, row, detail_inner_left, &power_str, Color::White);
     // Recolor percentage based on success band
@@ -2395,78 +2388,28 @@ fn render_squad_summary_panel(
         forecast_label,
         forecast_color,
     );
-    row += 2;
-
-    // Archetype summary
-    if row < content_bottom - 3 {
-        put_text(
-            buffer,
-            row,
-            detail_inner_left,
-            "Archetypes in squad:",
-            Color::Cyan,
-        );
-        row += 1;
-    }
-
-    let squad_archetypes: Vec<crate::deep::MercArchetype> = ui
-        .staged_squad
-        .iter()
-        .filter_map(|id| deep.prestige.find_merc(*id))
-        .map(|m| m.archetype)
-        .collect();
-
-    if squad_archetypes.is_empty() {
-        if row < content_bottom - 3 {
-            put_text(
-                buffer,
-                row,
-                detail_inner_left,
-                "  (none selected)",
-                Color::DarkGray,
-            );
-            row += 1;
-        }
-    } else {
-        let mut seen = std::collections::HashSet::new();
-        for &arch in &squad_archetypes {
-            if seen.insert(arch) {
-                if row >= content_bottom - 3 {
-                    break;
-                }
-                let name = deep
-                    .prestige
-                    .roster
-                    .iter()
-                    .find(|m| m.archetype == arch && ui.staged_squad.contains(&m.id))
-                    .map(|m| m.name.as_str())
-                    .unwrap_or("");
-                put_text(
-                    buffer,
-                    row,
-                    detail_inner_left,
-                    &format!("  {} ({})", arch.display_name(), name),
-                    archetype_color(arch),
-                );
-                row += 1;
-            }
-        }
-    }
+    row += 1;
 
     // Required archetype check
     if let Some(req_arch) = mission.required_archetype {
+        let squad_archetypes: Vec<crate::deep::MercArchetype> = ui
+            .staged_squad
+            .iter()
+            .filter_map(|id| deep.prestige.find_merc(*id))
+            .map(|m| m.archetype)
+            .collect();
         let req_present = squad_archetypes.contains(&req_arch);
         if row < content_bottom - 3 {
             let (prefix, color, suffix) = if req_present {
-                ("\u{2713} ", Color::Green, " required \u{2014} present")
+                ("\u{2713} ", Color::Green, " (required)")
             } else {
-                ("(!) ", Color::Yellow, " required \u{2014} missing!")
+                ("(!) ", Color::Yellow, " (required \u{2014} missing!)")
             };
             put_text(
                 buffer,
                 row,
                 detail_inner_left,
-                &format!("{}{}{}", prefix, req_arch.display_name(), suffix),
+                &format!("  {}{}{}", prefix, req_arch.display_name(), suffix),
                 color,
             );
             row += 1;
@@ -2475,79 +2418,145 @@ fn render_squad_summary_panel(
 
     // Recommended archetype check
     if let Some(rec_arch) = mission.recommended_archetype {
+        let squad_archetypes: Vec<crate::deep::MercArchetype> = ui
+            .staged_squad
+            .iter()
+            .filter_map(|id| deep.prestige.find_merc(*id))
+            .map(|m| m.archetype)
+            .collect();
         let rec_present = squad_archetypes.contains(&rec_arch);
         if row < content_bottom - 3 {
             let (prefix, color, suffix) = if rec_present {
-                ("\u{2605} ", Color::Cyan, " recommended \u{2014} present")
+                ("\u{2605} ", Color::Cyan, " (recommended)")
             } else {
-                ("  ", Color::DarkGray, " recommended")
+                ("  ", Color::DarkGray, " (recommended)")
             };
             put_text(
                 buffer,
                 row,
                 detail_inner_left,
-                &format!("{}{}{}", prefix, rec_arch.display_name(), suffix),
+                &format!("  {}{}{}", prefix, rec_arch.display_name(), suffix),
                 color,
             );
             row += 1;
         }
     }
+    row += 1; // blank line after squad section
 
-    // Smart contextual hint
-    row += 1;
-    if row < content_bottom - 1 {
-        let hint: Option<(String, Color)> = if !can_afford && mission.marks_cost > 0 {
-            Some((
-                "Earn Marks via Supply Runs (free)".to_string(),
-                Color::DarkGray,
-            ))
-        } else if ui.staged_squad.is_empty() {
-            Some(("Select mercs with [Space]".to_string(), Color::DarkGray))
-        } else if ratio >= 1.5 {
-            Some((
-                "Overpowered \u{2014} mission will complete faster!".to_string(),
-                Color::Rgb(80, 220, 120),
-            ))
-        } else if let Some(req_arch) = mission.required_archetype {
-            if !squad_archetypes.contains(&req_arch) {
-                let merc_with_arch = deep
-                    .prestige
-                    .roster
-                    .iter()
-                    .find(|m| m.archetype == req_arch && m.is_available());
-                if let Some(m) = merc_with_arch {
-                    Some((
-                        format!(
-                            "Add {} ({}) to meet requirement",
-                            m.name,
-                            req_arch.display_name()
-                        ),
-                        Color::Yellow,
-                    ))
-                } else {
-                    Some((
-                        "Check Recruit view in Status tab".to_string(),
-                        Color::Yellow,
-                    ))
-                }
-            } else {
-                None
+    // ── Rewards Section ──
+    if row < content_bottom - 4 {
+        if matches!(mission.mission_type, MissionType::Construction(_)) {
+            put_text(buffer, row, detail_inner_left, "Rewards", Color::Cyan);
+            row += 1;
+            if row < content_bottom - 3 {
+                put_text(
+                    buffer,
+                    row,
+                    detail_inner_left,
+                    "  \u{25c6} Infrastructure (permanent)",
+                    Color::DarkGray,
+                );
+                row += 1;
             }
         } else {
-            None
-        };
+            put_text(buffer, row, detail_inner_left, "Rewards", Color::Cyan);
+            row += 1;
 
-        if let Some((hint_text, hint_color)) = hint {
-            let hint_row = (content_bottom - 3).max(row);
-            if hint_row < content_bottom - 1 {
-                put_text(buffer, hint_row, detail_inner_left, &hint_text, hint_color);
+            if row < content_bottom - 3 {
+                let base = base_marks_earned(mission.mission_type, mission.layer);
+                let min_marks = (base as f64 * 0.85).round() as u32;
+                let max_marks = (base as f64 * 1.15).round() as u32;
+                put_text(
+                    buffer,
+                    row,
+                    detail_inner_left,
+                    &format!(
+                        "  \u{25c6} {}\u{2013}{} Warband Marks",
+                        min_marks, max_marks
+                    ),
+                    MARKS_COLOR,
+                );
+                row += 1;
+            }
+
+            if row < content_bottom - 3 {
+                put_text(
+                    buffer,
+                    row,
+                    detail_inner_left,
+                    "  \u{2605} Merc progression: +1",
+                    Color::DarkGray,
+                );
+                row += 1;
+            }
+
+            if row < content_bottom - 3
+                && matches!(
+                    mission.mission_type,
+                    MissionType::Recon | MissionType::Expedition
+                )
+            {
+                let fam = familiarity_gain(mission.mission_type);
+                put_text(
+                    buffer,
+                    row,
+                    detail_inner_left,
+                    &format!("  \u{25c8} Familiarity: +{}", fam),
+                    Color::Rgb(80, 150, 200),
+                );
+                row += 1;
             }
         }
     }
 
-    // Launch action at bottom
+    // ── Tip + Launch at bottom ──
+    let tip_text = format!(
+        "Tip: {} \u{2014} {}",
+        mission_type_label(mission.mission_type),
+        mission_type_hint(mission.mission_type)
+    );
     let launch_row = content_bottom - 1;
-    if launch_row > row {
+    let max_tip_w = (detail_inner_w - 1).max(10) as usize;
+
+    // Word-wrap the tip into up to 2 lines
+    let tip_words: Vec<&str> = tip_text.split_whitespace().collect();
+    let mut tip_lines: Vec<String> = Vec::new();
+    let mut tip_buf = String::new();
+    for word in &tip_words {
+        if tip_buf.len() + word.len() + 1 > max_tip_w && !tip_buf.is_empty() {
+            tip_lines.push(tip_buf.clone());
+            tip_buf.clear();
+            if tip_lines.len() >= 2 {
+                break;
+            }
+        }
+        if !tip_buf.is_empty() {
+            tip_buf.push(' ');
+        }
+        tip_buf.push_str(word);
+    }
+    if !tip_buf.is_empty() && tip_lines.len() < 2 {
+        tip_lines.push(tip_buf);
+    }
+
+    let tip_start = launch_row - tip_lines.len() as i32 - 1;
+    let tip_start = tip_start.max(row + 1);
+    for (i, line) in tip_lines.iter().enumerate() {
+        let r = tip_start + i as i32;
+        if r < launch_row {
+            let indent = if i > 0 { "  " } else { "" };
+            put_text(
+                buffer,
+                r,
+                detail_inner_left,
+                &format!("{}{}", indent, line),
+                Color::DarkGray,
+            );
+        }
+    }
+
+    // Launch action
+    if launch_row > tip_start {
         let launch_color = if ui.staged_squad.is_empty() {
             Color::DarkGray
         } else {

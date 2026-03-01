@@ -503,18 +503,7 @@ fn handle_squad_assignment(
 
                     // Build mission with wall-clock timing.
                     let now = chrono::Utc::now();
-                    let duration_reduction = deep_state
-                        .persistent
-                        .layer_record(available.layer)
-                        .map(|l| l.total_duration_reduction())
-                        .unwrap_or(0.0);
-                    let mut effective_duration_secs =
-                        (available.duration_secs as f64 * (1.0 - duration_reduction)) as i64;
-                    effective_duration_secs =
-                        effective_duration_secs
-                            .max(crate::deep::minimum_mission_duration_secs_for_layer(
-                                available.layer,
-                            ) as i64);
+                    let mut effective_duration_secs = available.duration_secs as i64;
                     if available.mission_type == MissionType::SupplyRun && available.marks_cost == 0
                     {
                         // Free Supply Runs are intentionally slower fallback missions.

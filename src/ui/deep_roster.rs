@@ -136,7 +136,7 @@ pub(super) fn render_recruit(
     };
     let pool_count = pool.candidates.len();
     let summary = format!(
-        "RECRUITS ({} available)    Roster: {}/{}    \u{25c6} {} Marks",
+        "RECRUITS ({} available)    Roster: {}/{}    \u{25c6} {} Warband Marks",
         pool_count, roster_count, max_roster, marks,
     );
     put_text(buffer, 0, 1, &summary, Color::DarkGray);
@@ -158,7 +158,7 @@ pub(super) fn render_recruit(
     let cap_str = format!("{}/{}", roster_count, max_roster);
     put_text(buffer, 0, 1 + cap_start as i32, &cap_str, capacity_color);
     // Highlight marks in amber
-    let marks_str = format!("\u{25c6} {} Marks", marks);
+    let marks_str = format!("\u{25c6} {} Warband Marks", marks);
     if let Some(marks_pos) = summary.find('\u{25c6}') {
         put_text(
             buffer,

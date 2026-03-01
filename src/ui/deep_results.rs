@@ -1,6 +1,6 @@
 //! The Deep — Mission complete results modal.
 
-use crate::deep::{DeepState, LayerTier, MercStatus, Mercenary, Mission, MissionOutcome};
+use crate::deep::{DeepState, MercStatus, Mercenary, Mission, MissionOutcome};
 use ratatui::{
     layout::Alignment,
     layout::Rect,
@@ -233,7 +233,7 @@ pub(super) fn render_mission_results(
     )));
     lines.push(Line::from(vec![
         Span::styled(
-            "  \u{25c6} Marks on hand: ",
+            "  \u{25c6} Warband Marks on hand: ",
             Style::default().fg(Color::DarkGray),
         ),
         Span::styled(
@@ -249,16 +249,17 @@ pub(super) fn render_mission_results(
         Style::default().fg(Color::DarkGray),
     )));
 
-    // Debrief flavor text
-    let tier = LayerTier::from_layer(mission.layer);
-    let flavor = debrief_flavor(tier, &result.outcome);
-    lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        flavor,
-        Style::default()
-            .fg(Color::DarkGray)
-            .add_modifier(Modifier::ITALIC),
-    )));
+    // Debrief narrative — per-layer, per-mission-type unique text
+    let narrative = crate::deep::narratives::layer_narrative(mission.layer, &mission.mission_type);
+    if !narrative.is_empty() {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            narrative,
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::ITALIC),
+        )));
+    }
 
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
@@ -273,34 +274,4 @@ pub(super) fn render_mission_results(
     };
     let text = Paragraph::new(lines).alignment(alignment);
     frame.render_widget(text, inner);
-}
-
-/// Tier-based procedural flavor text for mission debriefs.
-fn debrief_flavor(tier: LayerTier, outcome: &MissionOutcome) -> &'static str {
-    match (tier, outcome) {
-        (LayerTier::Shallows, MissionOutcome::Success) => {
-            "The squad reports stable tunnels and breathable air."
-        }
-        (LayerTier::Shallows, _) => "The upper passages proved more treacherous than expected.",
-        (LayerTier::Warrens, MissionOutcome::Success) => {
-            "The Warrens yielded their secrets reluctantly."
-        }
-        (LayerTier::Warrens, _) => "Something in the Warrens was waiting for them.",
-        (LayerTier::Hollows, MissionOutcome::Success) => {
-            "The bioluminescence guided them deeper than planned."
-        }
-        (LayerTier::Hollows, _) => "The spore clouds were thicker than the maps suggested.",
-        (LayerTier::SunkenReach, MissionOutcome::Success) => {
-            "The seals parted for them. Not everyone finds that reassuring."
-        }
-        (LayerTier::SunkenReach, _) => "The water pressure claimed equipment. And patience.",
-        (LayerTier::Abyss, MissionOutcome::Success) => {
-            "They returned with six days of rations consumed. They were gone four hours."
-        }
-        (LayerTier::Abyss, _) => "Time moved differently down there. It always does.",
-        (LayerTier::Void, MissionOutcome::Success) => {
-            "What they found cannot be mapped. Only remembered."
-        }
-        (LayerTier::Void, _) => "The Void gives nothing freely. The cost is always personal.",
-    }
 }

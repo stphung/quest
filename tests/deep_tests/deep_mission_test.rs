@@ -3,18 +3,17 @@
 //! Tests cover:
 //!   1.  Mission generation: correct pool based on frontier layer, familiarity, guild rank
 //!   2.  Squad validation: Power threshold, required archetypes
-//!   3.  Mission duration: Outpost (-25%) and familiarity (-10/20/30%) modifiers
-//!   4.  Event scheduling: events fire at correct progress percentages (25/50/75/90%)
-//!   5.  Auto-resolve: always picks safest option after 2-hour player timeout
-//!   6.  Mission resolution: Success/Partial/Failure based on squad Power vs. difficulty
-//!   7.  Reward calculation: XP, Marks, items based on mission type and outcome
-//!   8.  Free daily Supply Run: one free per day, resets correctly
-//!   9.  Supply Run safety: cleared-layer supply runs never cause injuries
-//!  10.  Breakthrough one-time gate: cannot re-breakthrough already-cleared layers
-//!  11.  Concurrent missions: cannot exceed guild-rank slot limit
-//!  12.  Merc availability: assigned mercs are locked for the mission's duration
-//!  13.  Offline resolution: missions resolve correctly from elapsed wall-clock time
-//!  14.  Event chaining: risky choice in event N affects availability in event N+2
+//!   3.  Event scheduling: events fire at correct progress percentages (25/50/75/90%)
+//!   4.  Auto-resolve: always picks safest option after 2-hour player timeout
+//!   5.  Mission resolution: Success/Partial/Failure based on squad Power vs. difficulty
+//!   6.  Reward calculation: XP, Marks, items based on mission type and outcome
+//!   7.  Free daily Supply Run: one free per day, resets correctly
+//!   8.  Supply Run safety: cleared-layer supply runs never cause injuries
+//!   9.  Breakthrough one-time gate: cannot re-breakthrough already-cleared layers
+//!  10.  Concurrent missions: cannot exceed guild-rank slot limit
+//!  11.  Merc availability: assigned mercs are locked for the mission's duration
+//!  12.  Offline resolution: missions resolve correctly from elapsed wall-clock time
+//!  13.  Event chaining: risky choice in event N affects availability in event N+2
 //!
 //! Conventions:
 //!   - Seeded `ChaCha8Rng` for all random-dependent code paths.
@@ -1481,68 +1480,6 @@ fn test_free_supply_run_skips_marks_check() {
     );
 }
 
-// ── 3. Mission duration modifiers (via apply_duration_modifiers) ───────────────
-
-#[test]
-fn test_duration_modifiers_outpost_reduces_by_25_percent() {
-    use quest::deep::{apply_duration_modifiers, DurationModifiers};
-    let base: u64 = 8 * 3600;
-    let mods = DurationModifiers {
-        has_outpost: true,
-        familiarity: 0,
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-        bridge_layers: 0,
-    };
-    let result = apply_duration_modifiers(base, &mods);
-    let expected = (base as f64 * 0.75) as u64;
-    assert!(
-        (result as i64 - expected as i64).abs() <= 1,
-        "Outpost should reduce duration by 25%, got {result} expected ~{expected}"
-    );
-}
-
-#[test]
-fn test_duration_modifiers_mastered_familiarity_reduces_by_45_percent() {
-    use quest::deep::{apply_duration_modifiers, DurationModifiers};
-    let base: u64 = 8 * 3600;
-    // Familiarity 75+ = Mastered (-45%)
-    let mods = DurationModifiers {
-        has_outpost: false,
-        familiarity: 80,
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-        bridge_layers: 0,
-    };
-    let result = apply_duration_modifiers(base, &mods);
-    let expected = (base as f64 * 0.55) as u64;
-    assert!(
-        (result as i64 - expected as i64).abs() <= 60, // allow 1min rounding
-        "Mastered familiarity should reduce by ~45%, got {result} expected ~{expected}"
-    );
-}
-
-#[test]
-fn test_duration_never_falls_below_minimum() {
-    use quest::deep::{apply_duration_modifiers, DurationModifiers, MIN_MISSION_DURATION_SECS};
-    let tiny_base: u64 = 60; // 1 minute — way below floor
-    let mods = DurationModifiers {
-        has_outpost: true,
-        familiarity: 100,
-        has_saboteur: true,
-        saboteur_is_veteran: true,
-        is_overpowered: true,
-        bridge_layers: 0,
-    };
-    let result = apply_duration_modifiers(tiny_base, &mods);
-    assert!(
-        result >= MIN_MISSION_DURATION_SECS,
-        "Duration {result}s must not fall below minimum {MIN_MISSION_DURATION_SECS}s"
-    );
-}
-
 // ── 5. Mission start ───────────────────────────────────────────────────────────
 
 #[test]
@@ -2023,92 +1960,6 @@ fn test_assigned_merc_unavailable_for_new_mission() {
     assert!(
         matches!(result, Err(SquadAssignmentError::MercNotAvailable(1))),
         "OnMission merc should not be assignable to another mission"
-    );
-}
-
-// ── 11. Bridge duration modifier ────────────────────────────────────────────
-
-#[test]
-fn test_bridge_duration_single_bridge_reduces_by_10_percent() {
-    use quest::deep::{apply_duration_modifiers, DurationModifiers};
-    let base: u64 = 8 * 3600;
-    let mods = DurationModifiers {
-        has_outpost: false,
-        familiarity: 0,
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-        bridge_layers: 1,
-    };
-    let result = apply_duration_modifiers(base, &mods);
-    let expected = (base as f64 * 0.90) as u64;
-    assert_eq!(
-        result, expected,
-        "Single bridge should reduce duration by 10%: got {result}, expected {expected}"
-    );
-}
-
-#[test]
-fn test_bridge_duration_multiple_bridges_reduces_by_27_percent() {
-    use quest::deep::{apply_duration_modifiers, DurationModifiers};
-    let base: u64 = 8 * 3600;
-    let mods = DurationModifiers {
-        has_outpost: false,
-        familiarity: 0,
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-        bridge_layers: 3,
-    };
-    let result = apply_duration_modifiers(base, &mods);
-    // 3 bridges: 1.0 - 0.10 * 3 = 0.70 → 30% reduction.
-    let expected = (base as f64 * 0.70) as u64;
-    assert_eq!(
-        result, expected,
-        "Three bridges should reduce duration by 30%: got {result}, expected {expected}"
-    );
-}
-
-#[test]
-fn test_bridge_duration_cap_at_50_percent() {
-    use quest::deep::{apply_duration_modifiers, DurationModifiers};
-    let base: u64 = 8 * 3600;
-    let mods = DurationModifiers {
-        has_outpost: false,
-        familiarity: 0,
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-        bridge_layers: 10,
-    };
-    let result = apply_duration_modifiers(base, &mods);
-    // 10 bridges: 1.0 - 0.10 * 10 = 0.0, but capped at 0.50 → 50% reduction.
-    let expected = (base as f64 * 0.50) as u64;
-    assert_eq!(
-        result, expected,
-        "Bridge reduction should be capped at 50%: got {result}, expected {expected}"
-    );
-}
-
-#[test]
-fn test_bridge_plus_outpost_stack_multiplicatively() {
-    use quest::deep::{apply_duration_modifiers, DurationModifiers};
-    let base: u64 = 8 * 3600;
-    let mods = DurationModifiers {
-        has_outpost: true,
-        familiarity: 0,
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-        bridge_layers: 2,
-    };
-    let result = apply_duration_modifiers(base, &mods);
-    // Outpost: 0.75, Bridge 2 layers: 1.0 - 0.10 * 2 = 0.80.
-    // Total: 0.75 * 0.80 = 0.60 → 40% reduction.
-    let expected = (base as f64 * 0.75 * 0.80) as u64;
-    assert_eq!(
-        result, expected,
-        "Outpost + 2 bridges should stack multiplicatively: got {result}, expected {expected}"
     );
 }
 

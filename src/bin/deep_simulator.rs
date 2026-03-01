@@ -21,15 +21,14 @@
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use quest::deep::{
-    apply_duration_modifiers, base_mission_duration_secs, build_infrastructure,
-    effective_concurrent_missions, generate_mercenary, generate_mission_pool,
-    generate_recruit_pool, generate_starter_roster, guild_upgrade_cost, infrastructure_build_cost,
-    is_daily_supply_run_available, mark_layer_cleared, mission_launch_cost,
-    mission_power_threshold, purge_lost_mercs, roster_has_capacity, start_mission,
-    tick_all_missions, tick_merc_injury, try_upgrade_guild_rank, validate_squad_assignment,
-    AvailableMission, DeepPersistent, DeepPrestige, DurationModifiers, GuildRank, Infrastructure,
-    LayerTier, MercArchetype, MercQuality, MercStatus, MissionOutcome, MissionStatus, MissionType,
-    RecruitPool,
+    build_infrastructure, effective_concurrent_missions, effective_duration_secs,
+    generate_mercenary, generate_mission_pool, generate_recruit_pool, generate_starter_roster,
+    guild_upgrade_cost, infrastructure_build_cost, is_daily_supply_run_available,
+    mark_layer_cleared, mission_launch_cost, mission_power_threshold, purge_lost_mercs,
+    roster_has_capacity, start_mission, tick_all_missions, tick_merc_injury,
+    try_upgrade_guild_rank, validate_squad_assignment, AvailableMission, DeepPersistent,
+    DeepPrestige, GuildRank, Infrastructure, LayerTier, MercArchetype, MercQuality, MercStatus,
+    MissionOutcome, MissionStatus, MissionType, RecruitPool,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -543,29 +542,8 @@ fn ensure_breakthrough_in_pool(
 
     // Create a Breakthrough mission manually.
     let tier = LayerTier::from_layer(frontier);
-    let layer_record = persistent.layer_record(frontier);
-    let familiarity = layer_record.map(|r| r.familiarity).unwrap_or(0);
-    let has_outpost = layer_record
-        .map(|r| r.has_infrastructure(Infrastructure::Outpost))
-        .unwrap_or(false);
-    let base = base_mission_duration_secs(tier, MissionType::Breakthrough);
-    let bridge_layers = (1..frontier)
-        .filter(|l| {
-            persistent
-                .layer_record(*l)
-                .map(|r| r.has_infrastructure(Infrastructure::Bridge))
-                .unwrap_or(false)
-        })
-        .count() as u32;
-    let mods = DurationModifiers {
-        has_outpost,
-        familiarity,
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-        bridge_layers,
-    };
-    let duration_secs = apply_duration_modifiers(base, &mods);
+    let duration_secs =
+        effective_duration_secs(tier, MissionType::Breakthrough, frontier, persistent);
     let min_power = mission_power_threshold(frontier, MissionType::Breakthrough);
     let cost = mission_launch_cost(MissionType::Breakthrough, frontier);
 
@@ -653,29 +631,12 @@ fn ensure_construction_in_pool(
 
     let infra = available_infra[0]; // Pick deterministically.
     let tier = LayerTier::from_layer(target_layer);
-    let layer_record = persistent.layer_record(target_layer);
-    let familiarity = layer_record.map(|r| r.familiarity).unwrap_or(0);
-    let has_outpost = layer_record
-        .map(|r| r.has_infrastructure(Infrastructure::Outpost))
-        .unwrap_or(false);
-    let base = base_mission_duration_secs(tier, MissionType::Construction(infra));
-    let bridge_layers = (1..target_layer)
-        .filter(|l| {
-            persistent
-                .layer_record(*l)
-                .map(|r| r.has_infrastructure(Infrastructure::Bridge))
-                .unwrap_or(false)
-        })
-        .count() as u32;
-    let mods = DurationModifiers {
-        has_outpost,
-        familiarity,
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-        bridge_layers,
-    };
-    let duration_secs = apply_duration_modifiers(base, &mods);
+    let duration_secs = effective_duration_secs(
+        tier,
+        MissionType::Construction(infra),
+        target_layer,
+        persistent,
+    );
     let min_power = mission_power_threshold(target_layer, MissionType::Construction(infra));
     let cost = mission_launch_cost(MissionType::Construction(infra), target_layer);
 
@@ -1031,11 +992,12 @@ fn run_simulation(config: &DeepSimConfig, seed: u64) -> DeepSimStats {
             });
             if !has_affordable {
                 let tier = LayerTier::from_layer(1);
-                let base = base_mission_duration_secs(tier, MissionType::SupplyRun);
+                let duration_secs =
+                    effective_duration_secs(tier, MissionType::SupplyRun, 1, &persistent);
                 let fallback = AvailableMission {
                     mission_type: MissionType::SupplyRun,
                     layer: 1,
-                    duration_secs: base,
+                    duration_secs,
                     min_squad_power: 0, // Always launchable
                     required_archetype: None,
                     recommended_archetype: None,
