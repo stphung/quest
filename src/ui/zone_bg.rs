@@ -2179,20 +2179,132 @@ fn config_the_wailing_reach() -> ZoneSceneConfig {
 // Chapter 6: The Origin Wound (Zones 27-30)
 // ---------------------------------------------------------------------------
 
+/// Zone 27: The Scar Root -- dark rust, petrified fracture roots, faint motes.
 fn config_the_scar_root() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (50, 25, 15),
+        sky_bottom: (12, 6, 4),
+        celestial: CelestialType::Stars,
+        far_terrain: TerrainProfile {
+            glyph: '\u{2571}', // ╱
+            color: (80, 35, 20),
+            base_height: 0.48,
+            amplitude: 0.09,
+            frequency: 0.16,
+            speed: 0.00006,
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '\u{2593}', // ▓
+            color: (35, 15, 10),
+            base_height: 0.66,
+            amplitude: 0.07,
+            frequency: 0.12,
+            speed: 0.00005,
+            fill: true,
+        },
+        ground_glyphs: &[':', '.'],
+        ground_color: (60, 30, 18),
+        weather: WeatherType::FractureMotes,
+        weather_intensity: 0.8,
+        overlay: Some(overlay_wound_pulse),
+    }
 }
 
+/// Zone 28: Echoing Abyss -- pure black void, faint distant edges, sparse motes.
 fn config_echoing_abyss() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (6, 4, 8),
+        sky_bottom: (3, 2, 5),
+        celestial: CelestialType::Flicker,
+        far_terrain: TerrainProfile {
+            glyph: ' ', // vast emptiness -- no far terrain
+            color: (0, 0, 0),
+            base_height: 0.50,
+            amplitude: 0.0,
+            frequency: 0.10,
+            speed: 0.00005,
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '\u{2591}', // ░
+            color: (18, 12, 22),
+            base_height: 0.72,
+            amplitude: 0.04,
+            frequency: 0.10,
+            speed: 0.00004,
+            fill: true,
+        },
+        ground_glyphs: &[],
+        ground_color: (0, 0, 0),
+        weather: WeatherType::FractureMotes,
+        weather_intensity: 0.4,
+        overlay: Some(overlay_wound_pulse),
+    }
 }
 
+/// Zone 29: Threshold of Silence -- light dying, a single fading horizon, emptiness.
 fn config_threshold_of_silence() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (100, 95, 90), // starts light
+        sky_bottom: (5, 4, 3),  // fades to near-black
+        celestial: CelestialType::None,
+        far_terrain: TerrainProfile {
+            glyph: '\u{2500}', // ─  single fading horizon
+            color: (60, 55, 50),
+            base_height: 0.55,
+            amplitude: 0.01, // nearly flat
+            frequency: 0.06,
+            speed: 0.00002,
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: ' ', // no near terrain
+            color: (0, 0, 0),
+            base_height: 0.90,
+            amplitude: 0.0,
+            frequency: 0.10,
+            speed: 0.00005,
+            fill: false,
+        },
+        ground_glyphs: &[],
+        ground_color: (0, 0, 0),
+        weather: WeatherType::None, // silence
+        weather_intensity: 1.0,
+        overlay: Some(overlay_wound_pulse),
+    }
 }
 
+/// Zone 30: The Origin Wound -- deep void-purple, fracture cross pattern, the wound itself.
 fn config_the_origin_wound() -> ZoneSceneConfig {
-    config_fallback()
+    ZoneSceneConfig {
+        sky_top: (20, 5, 30),
+        sky_bottom: (3, 1, 5),
+        celestial: CelestialType::Flicker,
+        far_terrain: TerrainProfile {
+            glyph: '\u{2573}', // ╳
+            color: (40, 12, 35),
+            base_height: 0.50,
+            amplitude: 0.08,
+            frequency: 0.16,
+            speed: 0.00008,
+            fill: false,
+        },
+        near_terrain: TerrainProfile {
+            glyph: '\u{2591}', // ░
+            color: (15, 5, 18),
+            base_height: 0.68,
+            amplitude: 0.05,
+            frequency: 0.12,
+            speed: 0.00006,
+            fill: true,
+        },
+        ground_glyphs: &[],
+        ground_color: (0, 0, 0),
+        weather: WeatherType::FractureMotes,
+        weather_intensity: 0.3,
+        overlay: Some(overlay_wound_pulse),
+    }
 }
 
 /// Fallback for unknown zone ids.
