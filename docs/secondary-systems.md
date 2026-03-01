@@ -393,7 +393,7 @@ Each achievement has a `points` value assigned via a 7-tier system. Scores are c
 | Elite | 250 | 18 | Stormbreaker, Chess/Go Master, Grand Champion |
 | Pinnacle | 500 | 14 | Eternal, Death Incarnate, The Absolute |
 
-**Max score** across 207 achievements. Methods: `achievement_score()` (unlocked total), `max_achievement_score()` (grand total). Displayed in: browser title bar (`X/Y pts, Z%`), unlock modal (`+N pts`), detail panel (`Worth N pts`), stats view (score line).
+**Max score** across 213 achievements. Methods: `achievement_score()` (unlocked total), `max_achievement_score()` (grand total). Displayed in: browser title bar (`X/Y pts, Z%`), unlock modal (`+N pts`), detail panel (`Worth N pts`), stats view (score line).
 
 ### Title System
 

@@ -57,10 +57,12 @@ src/ui/
 ├── soulforge_scene.rs          # Soulforge enhancement overlay (delegates to helpers below)
 ├── soulforge_effects.rs        # Soulforge hammering/success/failure animation effects
 ├── soulforge_slots.rs          # Soulforge slot selection menu
+├── ascension_scene.rs          # Ascension overlay UI (level display, cost/gate info, ascend confirmation)
 ├── stormglass_scene.rs         # Stormglass Exchange overlay with animations (Invoke Trial rolling, Chrono Surge speed ramp/fast-forward, Storm Sigils daily rotation, Storm Lure)
 ├── time_vault_scene.rs         # Time Vault overlay (branch/commit browser, restore, fork, GitHub cloud sync)
 ├── scene_fx.rs                 # Shared utilities for layered ASCII scene rendering (wide char support, SceneCell::new(), put_text_centered(), display_width())
-├── zone_bg.rs                  # Stylized zone background scenes (6-layer compositing, all 11 zones)
+├── overlay_layout.rs            # Shared overlay layout helpers for consistent overlay rendering
+├── zone_bg.rs                  # Stylized zone background scenes (6-layer compositing, zones 1-11 explicit + fallback for 12-30)
 │
 ├── character_select.rs         # Character list with preview panel
 ├── character_creation.rs       # Name input with real-time validation

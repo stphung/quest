@@ -147,7 +147,7 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
 
 ### Key Types
 
-**`TickEvent`** (44 variants):
+**`TickEvent`** (45 variants):
 - Combat: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `DamageReflected`, `RegenComplete`, `EnemyDefeated`, `BossEnrage`, `PlayerDied`, `PlayerDiedInDungeon`, `CombatRetreat`
 - Items: `ItemDropped`
 - Zones: `SubzoneBossDefeated`
@@ -158,6 +158,7 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
 - Deep: `DeepMissionComplete`, `DeepEventPending`, `DeepMercInjured`, `DeepMercLost`, `DeepBreakthrough`, `DeepGuildRankUp`
 - Fracture Zones: `FractureRegionUnlocked`
 - Ascension: `Ascended`
+- Power Cores: `PowerCoreGranted`
 - Achievements: `AchievementUnlocked`
 - Level: `LeveledUp`
 
@@ -175,6 +176,7 @@ pub struct TickResult {
     pub enhancement_changed: bool,
     pub god_items_changed: bool,
     pub deep_changed: bool,
+    pub power_cores_changed: bool,
     pub achievement_modal_ready: Vec<AchievementId>,
 }
 ```
@@ -848,7 +850,7 @@ Options organized in 8 tabs: Challenges (all 10 types), World (Dungeon, Fishing,
 
 ### Integration Tests
 
-62 integration test files in `tests/`:
+65 integration test files in `tests/`:
 - `game_loop_orchestration_test.rs` -- 36 behavior-locking tests for game tick pipeline
 - `game_tick_behavior_test.rs` / `game_tick_supplemental_test.rs` -- Tick processing behavior
 - `tick_integration_test.rs` -- Cross-system tick integration
@@ -1003,7 +1005,7 @@ quest/
 │   │   ├── game_logic.rs    # Thin re-export wrapper for submodules
 │   │   ├── game_state.rs    # Main GameState struct
 │   │   ├── tick.rs          # game_tick() orchestrator
-│   │   ├── tick_types.rs    # TickEvent enum (44 variants), TickResult struct
+│   │   ├── tick_types.rs    # TickEvent enum (45 variants), TickResult struct
 │   │   ├── tick_stages.rs   # Tick processing stages 4-6 + helpers
 │   │   ├── xp.rs            # XP calculation, leveling, combat kill XP
 │   │   ├── discoveries.rs   # Discovery rolls (dungeon, fishing, Haven, Soulforge)
@@ -1108,6 +1110,11 @@ quest/
 │   │   ├── sigils.rs        # Storm Sigil definitions and bonuses
 │   │   ├── earning.rs       # Stormglass earning from challenges
 │   │   └── spending.rs      # Stormglass spending on sigils
+│   ├── power_cores/         # Power Cores — passive PR generation from Deep milestones
+│   │   ├── types.rs         # Core definitions, state, helpers
+│   │   ├── tick.rs          # Per-tick processing, offline catchup
+│   │   ├── persistence.rs   # Save/load power_cores.json
+│   │   └── mod.rs           # Public re-exports
 │   ├── god_items/           # God Items system (Asprika, Sleipnir, Megingjord)
 │   │   └── types.rs         # God item definitions, passives, bonuses, query helpers
 │   ├── achievements/        # Achievement system
@@ -1172,7 +1179,7 @@ quest/
 │       ├── throbber.rs      # Spinner animations
 │       └── character_select.rs, character_creation.rs,
 │           character_delete.rs, character_rename.rs
-├── tests/                   # 62 integration test files
+├── tests/                   # 65 integration test files
 ├── .github/workflows/       # CI/CD pipeline
 ├── scripts/                 # Quality checks (ci-checks.sh)
 ├── docs/                    # Design documents

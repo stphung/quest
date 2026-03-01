@@ -66,5 +66,5 @@ Total PR for I-VI: 1,245 PR.
 - **Core** (`core/tick_types.rs`): `TickEvent::Ascended { level, message }` variant
 - **Core** (`core/game_state.rs`): `ascension_level` field on `GameState`
 - **Deep** (`deep/types.rs`): Deep layer milestones gate Ascension availability (account-level check)
-- **Achievements** (`achievements/handlers.rs`): `on_ascended(level)` unlocks `AscensionI` (I), `AscensionIII` (III), `AscensionVI` (VI)
+- **Achievements** (`achievements/handlers.rs`): `on_ascended(level)` unlocks `AscensionI` through `AscensionVI` (one achievement per level)
 - **UI** (`ui/stats_prestige.rs`): Shows "Asc N (Mx)" alongside prestige info when level > 0

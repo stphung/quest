@@ -116,7 +116,7 @@ Not all challenges are equally discoverable:
 
 ## game_tick() Extraction to core/tick.rs
 
-**Decision**: Extract the per-tick orchestration function from main.rs into `src/core/tick.rs`, returning a `TickResult` struct with `Vec<TickEvent>` (now 44 variants) instead of mutating UI state directly.
+**Decision**: Extract the per-tick orchestration function from main.rs into `src/core/tick.rs`, returning a `TickResult` struct with `Vec<TickEvent>` (now 45 variants) instead of mutating UI state directly.
 
 **Rationale**: The game loop was tightly coupled to the terminal UI — game logic called `add_log_entry()` and created `VisualEffect` objects directly. Extracting `game_tick()` into a pure-logic module enables:
 - Headless simulation (the `simulator` binary reuses the exact same function)
