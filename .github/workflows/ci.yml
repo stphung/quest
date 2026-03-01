@@ -14,8 +14,52 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  check:
-    name: Check & Test
+  fmt:
+    name: Format
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo fmt --check
+
+  clippy:
+    name: Clippy
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: clippy
+      - run: cargo clippy --all-targets --quiet -- -D warnings
+
+  test:
+    name: Test
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: test
+      - run: cargo test --quiet
+
+  audit:
+    name: Audit
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --quiet
+      - run: cargo audit --deny yanked --quiet
+
+  coverage:
+    name: Coverage
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -24,12 +68,30 @@ jobs:
         with:
           components: llvm-tools-preview
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: coverage
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - run: |
+          cargo llvm-cov --lib --summary-only --quiet \
+            --ignore-filename-regex "(ui/|utils/updater|utils/build_info|tick_events|history/|deep/discovery|deep/persistence|enhancement/logic|enhancement/persistence|stormglass/earning|stormglass/spending|stormglass/types)" \
+            --fail-under-lines 90
 
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-
-      - name: Run CI checks
-        run: ./scripts/ci-checks.sh
+  ci-pass:
+    name: CI
+    if: always() && github.event_name == 'pull_request'
+    needs: [fmt, clippy, test, audit, coverage]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all jobs passed
+        run: |
+          results=("${{ needs.fmt.result }}" "${{ needs.clippy.result }}" "${{ needs.test.result }}" "${{ needs.audit.result }}" "${{ needs.coverage.result }}")
+          for r in "${results[@]}"; do
+            if [[ "$r" != "success" ]]; then
+              echo "One or more CI jobs failed"
+              exit 1
+            fi
+          done
+          echo "All CI checks passed"
 
   build:
     name: Build ${{ matrix.target }}
