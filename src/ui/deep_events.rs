@@ -130,7 +130,9 @@ pub(super) fn render_event_response(
     // ── Footer ──
     let footer = match ctx.tier {
         SizeTier::S => "[\u{2191}/\u{2193}] Choose  [Enter] Confirm  [Esc] Close",
-        _ => "[\u{2191}/\u{2193}] Choose  [Enter] Confirm choice  [Esc] Close (auto-resolves later)",
+        _ => {
+            "[\u{2191}/\u{2193}] Choose  [Enter] Confirm choice  [Esc] Close (auto-resolves later)"
+        }
     };
     put_text(buffer, height as i32 - 1, 1, footer, Color::DarkGray);
     let help_hint = "[?] Help";

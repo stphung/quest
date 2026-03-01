@@ -1841,14 +1841,7 @@ fn render_new_mission_split(
             content_bottom,
         );
     } else {
-        render_squad_assembly_left(
-            buffer,
-            deep,
-            ui,
-            list_width,
-            list_inner_top,
-            content_bottom,
-        );
+        render_squad_assembly_left(buffer, deep, ui, list_width, list_inner_top, content_bottom);
     }
 
     // Right panel
