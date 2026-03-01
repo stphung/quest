@@ -276,11 +276,12 @@ pub enum AchievementId {
     DeepMissionsL,        // Complete 50 missions
     DeepMissionsC,        // Complete 100 missions
     FirstBreakthrough,    // Complete first breakthrough mission
-    Layer5Cleared,        // Reach Layer 5
-    Layer10Cleared,       // Reach Layer 10
-    Layer15Cleared,       // Reach Layer 15
-    Layer20Cleared,       // Reach Layer 20
-    Layer25Cleared,       // Reach Layer 25 (The Abyss)
+    Layer3Cleared,        // Reach Layer 3 (unlocks Red Fault)
+    Layer7Cleared,        // Reach Layer 7 (unlocks Mirror Scar)
+    Layer12Cleared,       // Reach Layer 12 (unlocks Black Mouth)
+    Layer18Cleared,       // Reach Layer 18 (unlocks Hollow Throne)
+    Layer25Cleared,       // Reach Layer 25 (unlocks Wailing Reach)
+    Layer30Cleared,       // Reach Layer 30 (unlocks Origin Wound)
     VoidExplorer,         // Reach Layer 26 (The Void)
     GuildRank2,           // Reach Guild Rank 2 (Company)
     GuildRank3,           // Reach Guild Rank 3 (Battalion)
@@ -302,7 +303,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 207;
+    pub const VARIANT_COUNT: usize = 208;
 }
 
 /// Static definition of an achievement.

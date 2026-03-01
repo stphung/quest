@@ -155,33 +155,33 @@ fn test_breakthrough_tracks_highest_layer() {
 }
 
 #[test]
-fn test_layer5_cleared_at_layer_5() {
+fn test_layer3_cleared_at_layer_3() {
     let mut ach = Achievements::default();
-    ach.on_deep_breakthrough(5, Some("Hero"));
-    assert!(ach.is_unlocked(AchievementId::Layer5Cleared));
-    assert!(!ach.is_unlocked(AchievementId::Layer10Cleared));
+    ach.on_deep_breakthrough(3, Some("Hero"));
+    assert!(ach.is_unlocked(AchievementId::Layer3Cleared));
+    assert!(!ach.is_unlocked(AchievementId::Layer7Cleared));
 }
 
 #[test]
-fn test_layer10_cleared_at_layer_10() {
+fn test_layer7_cleared_at_layer_7() {
     let mut ach = Achievements::default();
-    ach.on_deep_breakthrough(10, Some("Hero"));
-    assert!(ach.is_unlocked(AchievementId::Layer10Cleared));
-    assert!(ach.is_unlocked(AchievementId::Layer5Cleared));
+    ach.on_deep_breakthrough(7, Some("Hero"));
+    assert!(ach.is_unlocked(AchievementId::Layer7Cleared));
+    assert!(ach.is_unlocked(AchievementId::Layer3Cleared));
 }
 
 #[test]
-fn test_layer15_cleared_at_layer_15() {
+fn test_layer12_cleared_at_layer_12() {
     let mut ach = Achievements::default();
-    ach.on_deep_breakthrough(15, Some("Hero"));
-    assert!(ach.is_unlocked(AchievementId::Layer15Cleared));
+    ach.on_deep_breakthrough(12, Some("Hero"));
+    assert!(ach.is_unlocked(AchievementId::Layer12Cleared));
 }
 
 #[test]
-fn test_layer20_cleared_at_layer_20() {
+fn test_layer18_cleared_at_layer_18() {
     let mut ach = Achievements::default();
-    ach.on_deep_breakthrough(20, Some("Hero"));
-    assert!(ach.is_unlocked(AchievementId::Layer20Cleared));
+    ach.on_deep_breakthrough(18, Some("Hero"));
+    assert!(ach.is_unlocked(AchievementId::Layer18Cleared));
 }
 
 #[test]
@@ -201,11 +201,11 @@ fn test_void_explorer_at_layer_26() {
 }
 
 #[test]
-fn test_breakthrough_at_layer_below_5_unlocks_only_first_breakthrough() {
+fn test_breakthrough_at_layer_below_3_unlocks_only_first_breakthrough() {
     let mut ach = Achievements::default();
-    ach.on_deep_breakthrough(3, Some("Hero"));
+    ach.on_deep_breakthrough(2, Some("Hero"));
     assert!(ach.is_unlocked(AchievementId::FirstBreakthrough));
-    assert!(!ach.is_unlocked(AchievementId::Layer5Cleared));
+    assert!(!ach.is_unlocked(AchievementId::Layer3Cleared));
 }
 
 #[test]
@@ -213,12 +213,13 @@ fn test_breakthrough_layer_overshoot_unlocks_all_prior() {
     let mut ach = Achievements::default();
     ach.on_deep_breakthrough(30, Some("Hero"));
     assert!(ach.is_unlocked(AchievementId::FirstBreakthrough));
-    assert!(ach.is_unlocked(AchievementId::Layer5Cleared));
-    assert!(ach.is_unlocked(AchievementId::Layer10Cleared));
-    assert!(ach.is_unlocked(AchievementId::Layer15Cleared));
-    assert!(ach.is_unlocked(AchievementId::Layer20Cleared));
+    assert!(ach.is_unlocked(AchievementId::Layer3Cleared));
+    assert!(ach.is_unlocked(AchievementId::Layer7Cleared));
+    assert!(ach.is_unlocked(AchievementId::Layer12Cleared));
+    assert!(ach.is_unlocked(AchievementId::Layer18Cleared));
     assert!(ach.is_unlocked(AchievementId::Layer25Cleared));
     assert!(ach.is_unlocked(AchievementId::VoidExplorer));
+    assert!(ach.is_unlocked(AchievementId::Layer30Cleared));
 }
 
 // =========================================================================
@@ -592,7 +593,7 @@ fn test_sync_from_deep_layer_0_skips_layer_achievements() {
     let mut ach = Achievements::default();
     ach.sync_from_deep(false, 1, 0, Some("Hero"));
     assert!(!ach.is_unlocked(AchievementId::FirstBreakthrough));
-    assert!(!ach.is_unlocked(AchievementId::Layer5Cleared));
+    assert!(!ach.is_unlocked(AchievementId::Layer3Cleared));
 }
 
 #[test]
@@ -600,7 +601,7 @@ fn test_sync_from_deep_layer_1_unlocks_first_breakthrough() {
     let mut ach = Achievements::default();
     ach.sync_from_deep(false, 1, 1, Some("Hero"));
     assert!(ach.is_unlocked(AchievementId::FirstBreakthrough));
-    assert!(!ach.is_unlocked(AchievementId::Layer5Cleared));
+    assert!(!ach.is_unlocked(AchievementId::Layer3Cleared));
 }
 
 #[test]
@@ -608,9 +609,9 @@ fn test_sync_from_deep_layer_10_unlocks_layer_milestones() {
     let mut ach = Achievements::default();
     ach.sync_from_deep(false, 1, 10, Some("Hero"));
     assert!(ach.is_unlocked(AchievementId::FirstBreakthrough));
-    assert!(ach.is_unlocked(AchievementId::Layer5Cleared));
-    assert!(ach.is_unlocked(AchievementId::Layer10Cleared));
-    assert!(!ach.is_unlocked(AchievementId::Layer15Cleared));
+    assert!(ach.is_unlocked(AchievementId::Layer3Cleared));
+    assert!(ach.is_unlocked(AchievementId::Layer7Cleared));
+    assert!(!ach.is_unlocked(AchievementId::Layer12Cleared));
 }
 
 #[test]
@@ -645,10 +646,10 @@ fn test_sync_from_deep_full_progression() {
 
     // Layer milestones
     assert!(ach.is_unlocked(AchievementId::FirstBreakthrough));
-    assert!(ach.is_unlocked(AchievementId::Layer5Cleared));
-    assert!(ach.is_unlocked(AchievementId::Layer10Cleared));
-    assert!(ach.is_unlocked(AchievementId::Layer15Cleared));
-    assert!(ach.is_unlocked(AchievementId::Layer20Cleared));
+    assert!(ach.is_unlocked(AchievementId::Layer3Cleared));
+    assert!(ach.is_unlocked(AchievementId::Layer7Cleared));
+    assert!(ach.is_unlocked(AchievementId::Layer12Cleared));
+    assert!(ach.is_unlocked(AchievementId::Layer18Cleared));
     assert!(ach.is_unlocked(AchievementId::Layer25Cleared));
     assert!(ach.is_unlocked(AchievementId::VoidExplorer));
 
@@ -784,10 +785,10 @@ fn test_refresh_progress_updates_deep_layer_series() {
     ach.refresh_progress();
 
     let p = ach
-        .get_progress(AchievementId::Layer10Cleared)
-        .expect("should have progress for Layer10Cleared");
+        .get_progress(AchievementId::Layer12Cleared)
+        .expect("should have progress for Layer12Cleared");
     assert_eq!(p.current, 8);
-    assert_eq!(p.target, 10);
+    assert_eq!(p.target, 12);
 }
 
 #[test]
@@ -833,9 +834,9 @@ fn test_refresh_progress_updates_all_series_simultaneously() {
     assert_eq!(missions_p.target, 10);
 
     // Deep layer series
-    let layer_p = ach.get_progress(AchievementId::Layer5Cleared).unwrap();
+    let layer_p = ach.get_progress(AchievementId::Layer7Cleared).unwrap();
     assert_eq!(layer_p.current, 4);
-    assert_eq!(layer_p.target, 5);
+    assert_eq!(layer_p.target, 7);
 
     // Guild rank series
     let rank_p = ach.get_progress(AchievementId::GuildRank2).unwrap();
