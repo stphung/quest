@@ -1852,10 +1852,10 @@ fn render_squad_assembly_left(
 /// One-line mission type description shown during first visits.
 fn mission_type_hint(mt: MissionType) -> &'static str {
     match mt {
-        MissionType::SupplyRun => "Baseline run: safest Warband Marks income on cleared ground",
-        MissionType::Recon => "Recon run: biggest Familiarity gain, making this layer faster",
+        MissionType::SupplyRun => "Baseline run: best Warband Marks per hour on cleared ground",
+        MissionType::Recon => "Quick scout: raises Familiarity efficiently to cut future times",
         MissionType::Expedition => {
-            "Push run: higher Warband Marks than Supply, with more risk/events"
+            "Deep push: best Familiarity per mission, with more risk and events"
         }
         MissionType::Breakthrough => "Progression run: clears the frontier to open next layer",
         MissionType::GatewayExpedition => "The final expedition \u{2014} breach the sealed gateway",

@@ -189,7 +189,7 @@ Key methods:
 - `is_resolved()` — `resolved_choice.is_some()`
 
 ### `MissionResult` (`types.rs`)
-Populated when a mission completes. Carries: `outcome`, `marks_earned`, `xp_earned`, `stormglass_earned`, optional `item_ilvl`, and lists of `injured_mercs` / `lost_mercs` / `merc_level_ups`.
+Populated when a mission completes. Carries: `outcome`, `marks_earned`, `xp_earned`, optional `item_ilvl`, and lists of `injured_mercs` / `lost_mercs` / `merc_level_ups`.
 
 ### `AvailableMission` (`types.rs`)
 A mission available in the pool for the player to start.

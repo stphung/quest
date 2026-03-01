@@ -80,8 +80,8 @@ pub use discovery::complete_discovery;
 pub use economy::{
     base_marks_earned, base_xp_reward, compute_mark_reward, guild_upgrade_cost,
     marks_variance_multiplier, merc_xp_per_mission, merc_xp_to_next_level, mission_launch_cost,
-    outcome_mark_multiplier, recruit_quality_distribution, stormglass_reward,
-    try_upgrade_guild_rank, xp_reward, GuildUpgradeError, MarkRewardParams, RecruitQuality,
+    outcome_mark_multiplier, recruit_quality_distribution, try_upgrade_guild_rank, xp_reward,
+    GuildUpgradeError, MarkRewardParams, RecruitQuality,
 };
 
 // Layers re-exports

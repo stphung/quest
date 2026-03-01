@@ -129,17 +129,17 @@ fn test_risk_tier_ordering() {
 }
 
 #[test]
-fn test_supply_run_duration_range_is_half_to_3_hours() {
+fn test_supply_run_duration_range_is_1_to_6_hours() {
     let (min, max) = MissionType::SupplyRun.duration_range_secs();
-    assert_eq!(min, 1800, "Supply Run min should be 0.5h");
-    assert_eq!(max, 10800, "Supply Run max should be 3h");
+    assert_eq!(min, 3600, "Supply Run min should be 1h");
+    assert_eq!(max, 21600, "Supply Run max should be 6h");
 }
 
 #[test]
-fn test_breakthrough_duration_range_is_4_to_24_hours() {
+fn test_breakthrough_duration_range_is_4_to_40_hours() {
     let (min, max) = MissionType::Breakthrough.duration_range_secs();
     assert_eq!(min, 14400, "Breakthrough min should be 4h");
-    assert_eq!(max, 86400, "Breakthrough max should be 24h");
+    assert_eq!(max, 144000, "Breakthrough max should be 40h");
 }
 
 #[test]
@@ -148,10 +148,8 @@ fn test_mission_type_duration_ranges_are_strictly_ordered() {
     let recon_min = MissionType::Recon.duration_range_secs().0;
     let expedition_min = MissionType::Expedition.duration_range_secs().0;
     let breakthrough_min = MissionType::Breakthrough.duration_range_secs().0;
-    assert!(
-        supply_min < recon_min,
-        "Supply min should be less than Recon min"
-    );
+    // Supply Run and Recon share the same minimum at Shallows tier.
+    assert!(supply_min <= recon_min, "Supply min should be <= Recon min");
     assert!(recon_min < expedition_min);
     assert!(expedition_min < breakthrough_min);
 }
@@ -843,7 +841,6 @@ fn test_mission_result_struct_fields_are_accessible() {
         outcome: MissionOutcome::Success,
         marks_earned: 250,
         xp_earned: 1_000,
-        stormglass_earned: 50,
         item_ilvl: Some(80),
         injured_mercs: vec![],
         lost_mercs: vec![],
@@ -853,7 +850,6 @@ fn test_mission_result_struct_fields_are_accessible() {
     assert_eq!(result.outcome, MissionOutcome::Success);
     assert_eq!(result.marks_earned, 250);
     assert_eq!(result.xp_earned, 1_000);
-    assert_eq!(result.stormglass_earned, 50);
     assert_eq!(result.item_ilvl, Some(80));
     assert!(result.injured_mercs.is_empty());
     assert!(result.lost_mercs.is_empty());

@@ -324,21 +324,6 @@ pub fn xp_reward(mission_type: MissionType, layer: u32, outcome: MissionOutcome)
     scaled.round() as u32
 }
 
-// ── Stormglass Rewards ────────────────────────────────────────────────────────
-
-/// Stormglass earned from a completed mission.
-///
-/// Only Expeditions and Breakthroughs earn Stormglass.
-/// From balance design §9.
-pub fn stormglass_reward(mission_type: MissionType, layer: u32) -> u64 {
-    let layer = layer.max(1) as u64;
-    match mission_type {
-        MissionType::Expedition => 5 + layer / 3,
-        MissionType::Breakthrough => 10 + layer / 2,
-        _ => 0,
-    }
-}
-
 // ── Merc XP (per-merc leveling) ───────────────────────────────────────────────
 
 /// XP gained by each squad member from completing a mission.
@@ -724,27 +709,6 @@ mod tests {
         let failure = xp_reward(MissionType::Expedition, 5, MissionOutcome::Failure);
         assert!(success > partial);
         assert!(partial > failure);
-    }
-
-    #[test]
-    fn test_stormglass_reward_only_from_expeditions_and_breakthroughs() {
-        assert_eq!(stormglass_reward(MissionType::SupplyRun, 10), 0);
-        assert_eq!(stormglass_reward(MissionType::Recon, 10), 0);
-        assert_eq!(
-            stormglass_reward(MissionType::Construction(Infrastructure::Bridge), 10),
-            0
-        );
-        assert!(stormglass_reward(MissionType::Expedition, 1) > 0);
-        assert!(stormglass_reward(MissionType::Breakthrough, 1) > 0);
-    }
-
-    #[test]
-    fn test_stormglass_reward_scales_with_depth() {
-        let l1 = stormglass_reward(MissionType::Expedition, 1);
-        let l10 = stormglass_reward(MissionType::Expedition, 10);
-        let l20 = stormglass_reward(MissionType::Expedition, 20);
-        assert!(l10 >= l1);
-        assert!(l20 >= l10);
     }
 
     // ── Merc XP ───────────────────────────────────────────────────────────────

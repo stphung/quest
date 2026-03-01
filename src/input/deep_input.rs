@@ -276,9 +276,6 @@ fn collect_pending_result(
         if result.xp_earned > 0 {
             game_state.character_xp += result.xp_earned as u64;
         }
-        if result.stormglass_earned > 0 {
-            game_state.stormglass += result.stormglass_earned;
-        }
     }
 
     deep_state.prestige.pending_results.remove(pending_idx);
@@ -734,7 +731,7 @@ mod tests {
         KeyEvent::new(code, KeyModifiers::NONE)
     }
 
-    fn mission_with_result(xp_earned: u32, stormglass_earned: u64) -> Mission {
+    fn mission_with_result(xp_earned: u32) -> Mission {
         let now = chrono::Utc::now();
         Mission {
             id: 1,
@@ -750,7 +747,6 @@ mod tests {
                 outcome: MissionOutcome::Success,
                 marks_earned: 0,
                 xp_earned,
-                stormglass_earned,
                 item_ilvl: None,
                 injured_mercs: Vec::new(),
                 lost_mercs: Vec::new(),
@@ -781,7 +777,7 @@ mod tests {
         deep_state
             .prestige
             .pending_results
-            .push(mission_with_result(125, 9));
+            .push(mission_with_result(125));
 
         let mut deep_ui = DeepUiState::new();
         deep_ui.view = DeepView::NewMission;
@@ -801,7 +797,6 @@ mod tests {
         assert!(matches!(result, InputResult::NeedsSave));
         assert!(deep_state.prestige.pending_results.is_empty());
         assert_eq!(game_state.character_xp, 125);
-        assert_eq!(game_state.stormglass, 9);
         assert_eq!(deep_ui.view, DeepView::NewMission);
     }
 
@@ -811,7 +806,7 @@ mod tests {
         deep_state
             .prestige
             .pending_results
-            .push(mission_with_result(0, 0));
+            .push(mission_with_result(0));
 
         let mut deep_ui = DeepUiState::new();
         deep_ui.view = DeepView::NewMission;
@@ -862,7 +857,7 @@ mod tests {
         deep_state
             .prestige
             .pending_results
-            .push(mission_with_result(0, 0));
+            .push(mission_with_result(0));
         let mut deep_ui = DeepUiState::new();
         let mut game_state = GameState::new("Hero".to_string(), 0);
 
@@ -882,11 +877,11 @@ mod tests {
         deep_state
             .prestige
             .pending_results
-            .push(mission_with_result(0, 0));
+            .push(mission_with_result(0));
         deep_state
             .prestige
             .pending_results
-            .push(mission_with_result(0, 0));
+            .push(mission_with_result(0));
         let mut deep_ui = DeepUiState::new();
         let mut game_state = GameState::new("Hero".to_string(), 0);
 

@@ -178,12 +178,12 @@ impl MissionType {
     /// Nominal duration range in seconds (wall-clock).
     pub fn duration_range_secs(self) -> (u64, u64) {
         match self {
-            MissionType::SupplyRun => (1800, 10800),
-            MissionType::Recon => (3600, 21600),
-            MissionType::Expedition => (7200, 43200),
-            MissionType::Breakthrough => (14400, 86400),
-            MissionType::Construction(_) => (3600, 21600),
-            MissionType::GatewayExpedition => (86400, 86400),
+            MissionType::SupplyRun => (3600, 21600),            // 1h-6h
+            MissionType::Recon => (3600, 36000),                // 1h-10h
+            MissionType::Expedition => (10800, 108000),         // 3h-30h
+            MissionType::Breakthrough => (14400, 144000),       // 4h-40h
+            MissionType::Construction(_) => (7200, 72000),      // 2h-20h
+            MissionType::GatewayExpedition => (172800, 172800), // 48h
         }
     }
 
@@ -448,8 +448,6 @@ pub struct MissionResult {
     pub marks_earned: u32,
     /// XP to award to the character.
     pub xp_earned: u32,
-    /// Stormglass earned (Expeditions and Breakthroughs only).
-    pub stormglass_earned: u64,
     /// Item ilvl for any dropped items (None if no items).
     pub item_ilvl: Option<u32>,
     /// Merc ids that were injured as a result of this mission.
@@ -1215,11 +1213,12 @@ mod tests {
     #[test]
     fn test_mission_type_duration_ranges_are_ordered() {
         // Minimum durations should increase with risk tier (ranges may overlap).
+        // Supply Run and Recon share the same minimum at Shallows tier.
         let supply_min = MissionType::SupplyRun.duration_range_secs().0;
         let recon_min = MissionType::Recon.duration_range_secs().0;
         let expedition_min = MissionType::Expedition.duration_range_secs().0;
         let breakthrough_min = MissionType::Breakthrough.duration_range_secs().0;
-        assert!(supply_min < recon_min);
+        assert!(supply_min <= recon_min);
         assert!(recon_min < expedition_min);
         assert!(expedition_min < breakthrough_min);
     }
