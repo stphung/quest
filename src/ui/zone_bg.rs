@@ -54,6 +54,9 @@ enum CelestialType {
     BioLuminescent,
     Overcast,
     EmberGlow,
+    CrackedSky,
+    VoidRift,
+    Flicker,
     None,
 }
 
@@ -68,6 +71,12 @@ enum WeatherType {
     VoidParticles,
     WindStreaks,
     Sparkles,
+    AshRain,
+    GlassShards,
+    DriftingAsh,
+    DustMotes,
+    StaticNoise,
+    FractureMotes,
 }
 
 /// Full scene configuration for a single zone.
@@ -185,6 +194,15 @@ fn paint_celestial(buffer: &mut [Vec<SceneCell>], config: &ZoneSceneConfig, mill
         }
         CelestialType::EmberGlow => {
             paint_emberglow(buffer, width, height, millis);
+        }
+        CelestialType::CrackedSky => {
+            paint_cracked_sky(buffer, width, height, millis);
+        }
+        CelestialType::VoidRift => {
+            paint_void_rift(buffer, width, height, millis);
+        }
+        CelestialType::Flicker => {
+            paint_flicker(buffer, width, height, millis);
         }
         CelestialType::None => {}
     }
@@ -384,6 +402,12 @@ fn paint_emberglow(buffer: &mut [Vec<SceneCell>], _width: usize, height: usize, 
     }
 }
 
+fn paint_cracked_sky(_buffer: &mut [Vec<SceneCell>], _width: usize, _height: usize, _millis: f64) {}
+
+fn paint_void_rift(_buffer: &mut [Vec<SceneCell>], _width: usize, _height: usize, _millis: f64) {}
+
+fn paint_flicker(_buffer: &mut [Vec<SceneCell>], _width: usize, _height: usize, _millis: f64) {}
+
 // ---------------------------------------------------------------------------
 // Layer 3 & 4: Terrain Silhouettes
 // ---------------------------------------------------------------------------
@@ -482,6 +506,14 @@ fn paint_weather(buffer: &mut [Vec<SceneCell>], config: &ZoneSceneConfig, millis
         }
         WeatherType::WindStreaks => paint_wind_streaks(buffer, millis, config.weather_intensity),
         WeatherType::Sparkles => paint_sparkles(buffer, millis, config.weather_intensity),
+        WeatherType::AshRain => paint_ash_rain(buffer, millis, config.weather_intensity),
+        WeatherType::GlassShards => paint_glass_shards(buffer, millis, config.weather_intensity),
+        WeatherType::DriftingAsh => paint_drifting_ash(buffer, millis, config.weather_intensity),
+        WeatherType::DustMotes => paint_dust_motes(buffer, millis, config.weather_intensity),
+        WeatherType::StaticNoise => paint_static_noise(buffer, millis, config.weather_intensity),
+        WeatherType::FractureMotes => {
+            paint_fracture_motes(buffer, millis, config.weather_intensity);
+        }
     }
 }
 
@@ -713,6 +745,18 @@ fn paint_sparkles(buffer: &mut [Vec<SceneCell>], millis: f64, intensity: f64) {
     }
 }
 
+fn paint_ash_rain(_buffer: &mut [Vec<SceneCell>], _millis: f64, _intensity: f64) {}
+
+fn paint_glass_shards(_buffer: &mut [Vec<SceneCell>], _millis: f64, _intensity: f64) {}
+
+fn paint_drifting_ash(_buffer: &mut [Vec<SceneCell>], _millis: f64, _intensity: f64) {}
+
+fn paint_dust_motes(_buffer: &mut [Vec<SceneCell>], _millis: f64, _intensity: f64) {}
+
+fn paint_static_noise(_buffer: &mut [Vec<SceneCell>], _millis: f64, _intensity: f64) {}
+
+fn paint_fracture_motes(_buffer: &mut [Vec<SceneCell>], _millis: f64, _intensity: f64) {}
+
 // ---------------------------------------------------------------------------
 // Overlay Functions
 // ---------------------------------------------------------------------------
@@ -833,6 +877,18 @@ fn overlay_void_pulse(buffer: &mut [Vec<SceneCell>], millis: f64) {
     }
 }
 
+fn overlay_heat_distortion(_buffer: &mut [Vec<SceneCell>], _millis: f64) {}
+
+fn overlay_mirror_flash(_buffer: &mut [Vec<SceneCell>], _millis: f64) {}
+
+fn overlay_consuming_dark(_buffer: &mut [Vec<SceneCell>], _millis: f64) {}
+
+fn overlay_hollow_echo(_buffer: &mut [Vec<SceneCell>], _millis: f64) {}
+
+fn overlay_reality_tear(_buffer: &mut [Vec<SceneCell>], _millis: f64) {}
+
+fn overlay_wound_pulse(_buffer: &mut [Vec<SceneCell>], _millis: f64) {}
+
 // ---------------------------------------------------------------------------
 // Zone Configs
 // ---------------------------------------------------------------------------
@@ -850,6 +906,31 @@ fn zone_scene_config(zone_id: u32) -> ZoneSceneConfig {
         9 => config_floating_isles(),
         10 => config_storm_citadel(),
         11 => config_the_expanse(),
+        // Chapter 1: The Red Fault
+        12 => config_splintered_rim(),
+        13 => config_ember_ravine(),
+        14 => config_heart_of_the_fault(),
+        // Chapter 2: The Mirror Scar
+        15 => config_shard_fields(),
+        16 => config_refraction_steps(),
+        17 => config_hall_of_second_suns(),
+        // Chapter 3: The Black Mouth
+        18 => config_ashen_verge(),
+        19 => config_throat_of_the_world(),
+        20 => config_the_black_mouth(),
+        // Chapter 4: The Hollow Throne
+        21 => config_sunken_processional(),
+        22 => config_the_pale_archive(),
+        23 => config_the_hollow_throne(),
+        // Chapter 5: The Wailing Reach
+        24 => config_the_stillborn_sea(),
+        25 => config_resonance_fault(),
+        26 => config_the_wailing_reach(),
+        // Chapter 6: The Origin Wound
+        27 => config_the_scar_root(),
+        28 => config_echoing_abyss(),
+        29 => config_threshold_of_silence(),
+        30 => config_the_origin_wound(),
         _ => config_fallback(),
     }
 }
@@ -1204,6 +1285,106 @@ fn config_the_expanse() -> ZoneSceneConfig {
         weather_intensity: 1.0,
         overlay: Some(overlay_void_pulse),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Chapter 1: The Red Fault (Zones 12-14)
+// ---------------------------------------------------------------------------
+
+fn config_splintered_rim() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+fn config_ember_ravine() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+fn config_heart_of_the_fault() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+// ---------------------------------------------------------------------------
+// Chapter 2: The Mirror Scar (Zones 15-17)
+// ---------------------------------------------------------------------------
+
+fn config_shard_fields() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+fn config_refraction_steps() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+fn config_hall_of_second_suns() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+// ---------------------------------------------------------------------------
+// Chapter 3: The Black Mouth (Zones 18-20)
+// ---------------------------------------------------------------------------
+
+fn config_ashen_verge() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+fn config_throat_of_the_world() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+fn config_the_black_mouth() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+// ---------------------------------------------------------------------------
+// Chapter 4: The Hollow Throne (Zones 21-23)
+// ---------------------------------------------------------------------------
+
+fn config_sunken_processional() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+fn config_the_pale_archive() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+fn config_the_hollow_throne() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+// ---------------------------------------------------------------------------
+// Chapter 5: The Wailing Reach (Zones 24-26)
+// ---------------------------------------------------------------------------
+
+fn config_the_stillborn_sea() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+fn config_resonance_fault() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+fn config_the_wailing_reach() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+// ---------------------------------------------------------------------------
+// Chapter 6: The Origin Wound (Zones 27-30)
+// ---------------------------------------------------------------------------
+
+fn config_the_scar_root() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+fn config_echoing_abyss() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+fn config_threshold_of_silence() -> ZoneSceneConfig {
+    config_fallback()
+}
+
+fn config_the_origin_wound() -> ZoneSceneConfig {
+    config_fallback()
 }
 
 /// Fallback for unknown zone ids.
