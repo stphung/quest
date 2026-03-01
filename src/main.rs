@@ -1302,34 +1302,12 @@ fn main() -> io::Result<()> {
                                     if !cloud_op_in_flight {
                                         if let Some(ref config) = cloud_config {
                                             cloud_status = history::cloud::CloudStatus::Syncing;
-                                            cloud_op_in_flight = true;
-                                            let tx = cloud_tx.clone();
-                                            let dir = quest_dir.clone();
-                                            let tok = config.token.clone();
-                                            std::thread::spawn(move || {
-                                                let tx2 = tx.clone();
-                                                let result = std::panic::catch_unwind(
-                                                    std::panic::AssertUnwindSafe(|| {
-                                                        let res =
-                                                    match history::cloud::push_all_branches(&dir, &tok)
-                                                    {
-                                                        Ok(()) => history::cloud::CloudOpResult::Pushed,
-                                                        Err(e) => {
-                                                            history::cloud::CloudOpResult::Failed(e)
-                                                        }
-                                                    };
-                                                        let _ = tx.send(res);
-                                                    }),
-                                                );
-                                                if result.is_err() {
-                                                    let _ = tx2.send(
-                                                        history::cloud::CloudOpResult::Failed(
-                                                            "Cloud operation failed unexpectedly"
-                                                                .to_string(),
-                                                        ),
-                                                    );
-                                                }
-                                            });
+                                            main_helpers::cloud_ops::spawn_cloud_push(
+                                                &mut cloud_op_in_flight,
+                                                &cloud_tx,
+                                                &quest_dir,
+                                                &config.token,
+                                            );
                                             if let GameOverlay::TimeVault { ref mut browser } =
                                                 overlay
                                             {
@@ -1626,36 +1604,14 @@ fn main() -> io::Result<()> {
                                         break 'game_loop;
                                     }
                                     InputAction::ContinueAndPush => {
-                                        if cloud_config.is_some() && !cloud_op_in_flight {
+                                        if !cloud_op_in_flight {
                                             if let Some(ref config) = cloud_config {
-                                                cloud_op_in_flight = true;
-                                                let tx = cloud_tx.clone();
-                                                let dir = quest_dir.clone();
-                                                let tok = config.token.clone();
-                                                std::thread::spawn(move || {
-                                                    let tx2 = tx.clone();
-                                                    let result = std::panic::catch_unwind(
-                                                        std::panic::AssertUnwindSafe(|| {
-                                                            let res =
-                                                        match history::cloud::push_all_branches(&dir, &tok)
-                                                        {
-                                                            Ok(()) => history::cloud::CloudOpResult::Pushed,
-                                                            Err(e) => {
-                                                                history::cloud::CloudOpResult::Failed(e)
-                                                            }
-                                                        };
-                                                            let _ = tx.send(res);
-                                                        }),
-                                                    );
-                                                    if result.is_err() {
-                                                        let _ = tx2.send(
-                                                            history::cloud::CloudOpResult::Failed(
-                                                                "Cloud operation failed unexpectedly"
-                                                                    .to_string(),
-                                                            ),
-                                                        );
-                                                    }
-                                                });
+                                                main_helpers::cloud_ops::spawn_cloud_push(
+                                                    &mut cloud_op_in_flight,
+                                                    &cloud_tx,
+                                                    &quest_dir,
+                                                    &config.token,
+                                                );
                                             }
                                         }
                                     }
@@ -1918,39 +1874,14 @@ fn main() -> io::Result<()> {
                                     );
 
                                     // Push to cloud after milestone commits
-                                    if save_event.is_some()
-                                        && cloud_config.is_some()
-                                        && !cloud_op_in_flight
-                                    {
+                                    if save_event.is_some() && !cloud_op_in_flight {
                                         if let Some(ref config) = cloud_config {
-                                            cloud_op_in_flight = true;
-                                            let tx = cloud_tx.clone();
-                                            let dir = quest_dir.clone();
-                                            let tok = config.token.clone();
-                                            std::thread::spawn(move || {
-                                                let tx2 = tx.clone();
-                                                let result = std::panic::catch_unwind(
-                                                    std::panic::AssertUnwindSafe(|| {
-                                                        let res =
-                                                    match history::cloud::push_all_branches(&dir, &tok)
-                                                    {
-                                                        Ok(()) => history::cloud::CloudOpResult::Pushed,
-                                                        Err(e) => {
-                                                            history::cloud::CloudOpResult::Failed(e)
-                                                        }
-                                                    };
-                                                        let _ = tx.send(res);
-                                                    }),
-                                                );
-                                                if result.is_err() {
-                                                    let _ = tx2.send(
-                                                        history::cloud::CloudOpResult::Failed(
-                                                            "Cloud operation failed unexpectedly"
-                                                                .to_string(),
-                                                        ),
-                                                    );
-                                                }
-                                            });
+                                            main_helpers::cloud_ops::spawn_cloud_push(
+                                                &mut cloud_op_in_flight,
+                                                &cloud_tx,
+                                                &quest_dir,
+                                                &config.token,
+                                            );
                                         }
                                     }
                                 }
