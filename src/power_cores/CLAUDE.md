@@ -24,14 +24,14 @@ Const slice of 6 core definitions:
 
 | Core | Name | Deep Layer | PR/Day | Fill Time |
 |------|------|-----------|--------|-----------|
-| I | Red Fault | 3 | 1 | 24h |
-| II | Mirror Scar | 7 | 2 | 12h |
-| III | Black Mouth | 12 | 3 | 8h |
-| IV | Hollow Throne | 18 | 4 | 6h |
-| V | Wailing Reach | 25 | 5 | ~4.8h |
-| VI | Origin Wound | 30 | 6 | 4h |
+| I | Red Fault | 3 | 2 | 12h |
+| II | Mirror Scar | 7 | 3 | 8h |
+| III | Black Mouth | 12 | 5 | ~4.8h |
+| IV | Hollow Throne | 18 | 8 | 3h |
+| V | Wailing Reach | 25 | 12 | 2h |
+| VI | Origin Wound | 30 | 18 | ~1.3h |
 
-Total at all 6 cores active: 21 PR/day.
+Total at all 6 cores active: 48 PR/day.
 
 ### `PowerCoreState` (`types.rs`)
 
