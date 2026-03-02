@@ -458,6 +458,10 @@ fn main() -> io::Result<()> {
                     let mut last_commit_time: Option<chrono::DateTime<chrono::Local>> = None;
                     let mut last_push_instant: Option<Instant> = None;
                     let mut last_push_time: Option<chrono::DateTime<chrono::Local>> = None;
+                    // Deferred commit: save completes first, commit fires next tick
+                    // so the save indicator resolves before the commit spinner starts.
+                    // Tuple: (event, should_push_to_cloud)
+                    let mut pending_commit: Option<(history::SaveEvent, bool)> = None;
 
                     // Update check state - start initial background check immediately
                     let mut update_info: Option<UpdateInfo> = None;
@@ -516,6 +520,30 @@ fn main() -> io::Result<()> {
                             if cloud_result.pushed {
                                 last_push_instant = Some(Instant::now());
                                 last_push_time = Some(Local::now());
+                            }
+                        }
+
+                        // Process deferred commit (save was done on previous tick).
+                        // This ensures the save indicator shows before the commit
+                        // spinner starts, giving sequential visual feedback.
+                        if let Some((event, should_push)) = pending_commit.take() {
+                            if let Some(ref repo) = history_repo {
+                                // Save is done — clear its spinner, show timestamp
+                                last_save_instant = None;
+                                if commit_save(&state, &event, repo) {
+                                    last_commit_instant = Some(Instant::now());
+                                    last_commit_time = Some(Local::now());
+                                }
+                                if should_push && !cloud.op_in_flight {
+                                    if let Some(ref config) = cloud.config {
+                                        main_helpers::cloud_ops::spawn_cloud_push(
+                                            &mut cloud.op_in_flight,
+                                            &cloud.tx,
+                                            &quest_dir,
+                                            &config.token,
+                                        );
+                                    }
+                                }
                             }
                         }
 
@@ -681,12 +709,7 @@ fn main() -> io::Result<()> {
                                             );
                                             last_save_instant = Some(Instant::now());
                                             last_save_time = Some(Local::now());
-                                            if let Some(ref repo) = history_repo {
-                                                if commit_save(&state, &surge_event, repo) {
-                                                    last_commit_instant = Some(Instant::now());
-                                                    last_commit_time = Some(Local::now());
-                                                }
-                                            }
+                                            pending_commit = Some((surge_event, false));
                                         }
                                     }
                                     continue;
@@ -809,7 +832,8 @@ fn main() -> io::Result<()> {
 
                                 if let InputResult::RestoreSave { ref commit_id } = result {
                                     if let Some(ref repo) = history_repo {
-                                        // Auto-save current state before restoring
+                                        // Auto-save current state before restoring.
+                                        // Immediate commit required (state reloads next).
                                         save_files(
                                             &character_manager,
                                             &state,
@@ -818,8 +842,8 @@ fn main() -> io::Result<()> {
                                             &enhancement,
                                             &deep_state,
                                         );
-                                        last_save_instant = Some(Instant::now());
                                         last_save_time = Some(Local::now());
+                                        last_save_instant = None;
                                         if commit_save(&state, &history::SaveEvent::AutoSave, repo)
                                         {
                                             last_commit_instant = Some(Instant::now());
@@ -892,7 +916,8 @@ fn main() -> io::Result<()> {
                                 } = result
                                 {
                                     if let Some(ref repo) = history_repo {
-                                        // Auto-save current state before forking
+                                        // Auto-save current state before forking.
+                                        // Immediate commit required (state reloads next).
                                         save_files(
                                             &character_manager,
                                             &state,
@@ -901,8 +926,8 @@ fn main() -> io::Result<()> {
                                             &enhancement,
                                             &deep_state,
                                         );
-                                        last_save_instant = Some(Instant::now());
                                         last_save_time = Some(Local::now());
+                                        last_save_instant = None;
                                         if commit_save(&state, &history::SaveEvent::AutoSave, repo)
                                         {
                                             last_commit_instant = Some(Instant::now());
@@ -972,7 +997,8 @@ fn main() -> io::Result<()> {
 
                                 if let InputResult::SwitchSaveBranch { ref branch_name } = result {
                                     if let Some(ref repo) = history_repo {
-                                        // Auto-save current state before switching
+                                        // Auto-save current state before switching.
+                                        // Immediate commit required (state reloads next).
                                         save_files(
                                             &character_manager,
                                             &state,
@@ -981,8 +1007,8 @@ fn main() -> io::Result<()> {
                                             &enhancement,
                                             &deep_state,
                                         );
-                                        last_save_instant = Some(Instant::now());
                                         last_save_time = Some(Local::now());
+                                        last_save_instant = None;
                                         if commit_save(&state, &history::SaveEvent::AutoSave, repo)
                                         {
                                             last_commit_instant = Some(Instant::now());
@@ -1142,26 +1168,14 @@ fn main() -> io::Result<()> {
                                         &character_manager,
                                         &mut last_save_instant,
                                         &mut last_save_time,
-                                        &mut last_commit_instant,
-                                        &mut last_commit_time,
-                                        history_repo.as_ref(),
                                     )
                                 };
                                 match route_action {
                                     InputAction::QuitToSelect => {
                                         break 'game_loop;
                                     }
-                                    InputAction::ContinueAndPush => {
-                                        if !cloud.op_in_flight {
-                                            if let Some(ref config) = cloud.config {
-                                                main_helpers::cloud_ops::spawn_cloud_push(
-                                                    &mut cloud.op_in_flight,
-                                                    &cloud.tx,
-                                                    &quest_dir,
-                                                    &config.token,
-                                                );
-                                            }
-                                        }
+                                    InputAction::DeferCommit(event) => {
+                                        pending_commit = Some((event, true));
                                     }
                                     InputAction::Continue => {}
                                 }
@@ -1291,12 +1305,7 @@ fn main() -> io::Result<()> {
                                     );
                                     last_save_instant = Some(Instant::now());
                                     last_save_time = Some(Local::now());
-                                    if let Some(ref repo) = history_repo {
-                                        if commit_save(&state, &surge_event, repo) {
-                                            last_commit_instant = Some(Instant::now());
-                                            last_commit_time = Some(Local::now());
-                                        }
-                                    }
+                                    pending_commit = Some((surge_event, false));
                                 }
                             }
 
@@ -1362,25 +1371,8 @@ fn main() -> io::Result<()> {
                                     );
                                     last_save_instant = Some(Instant::now());
                                     last_save_time = Some(Local::now());
-                                    if let (Some(event), Some(repo)) =
-                                        (save_event.as_ref(), history_repo.as_ref())
-                                    {
-                                        if commit_save(&state, event, repo) {
-                                            last_commit_instant = Some(Instant::now());
-                                            last_commit_time = Some(Local::now());
-                                        }
-                                    }
-
-                                    // Push to cloud after milestone commits
-                                    if save_event.is_some() && !cloud.op_in_flight {
-                                        if let Some(ref config) = cloud.config {
-                                            main_helpers::cloud_ops::spawn_cloud_push(
-                                                &mut cloud.op_in_flight,
-                                                &cloud.tx,
-                                                &quest_dir,
-                                                &config.token,
-                                            );
-                                        }
+                                    if let Some(event) = save_event {
+                                        pending_commit = Some((event, true));
                                     }
                                 }
 
@@ -1536,15 +1528,8 @@ fn main() -> io::Result<()> {
                                                     );
                                                     last_save_instant = Some(Instant::now());
                                                     last_save_time = Some(Local::now());
-                                                    if let (Some(event), Some(repo)) = (
-                                                        soulforge_event.as_ref(),
-                                                        history_repo.as_ref(),
-                                                    ) {
-                                                        if commit_save(&state, event, repo) {
-                                                            last_commit_instant =
-                                                                Some(Instant::now());
-                                                            last_commit_time = Some(Local::now());
-                                                        }
+                                                    if let Some(event) = soulforge_event {
+                                                        pending_commit = Some((event, false));
                                                     }
                                                 }
                                             }

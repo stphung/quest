@@ -4,18 +4,18 @@ use chrono::Local;
 use std::time::Instant;
 
 use crate::character::manager::CharacterManager;
-use crate::history::HistoryRepo;
+use crate::history::SaveEvent;
 use crate::input::InputResult;
 use crate::main_helpers::game_context::GameContext;
 
-use super::persistence::{commit_save, save_all, save_files};
+use super::persistence::{save_all, save_files};
 
 /// What the game loop should do after processing an input result.
 pub enum InputAction {
     /// Continue the game loop normally.
     Continue,
-    /// Continue and trigger a cloud push (milestone event was committed).
-    ContinueAndPush,
+    /// Save completed; commit deferred to next tick for sequential indicator.
+    DeferCommit(SaveEvent),
     /// Player quit to character select — break the game loop.
     QuitToSelect,
 }
@@ -25,16 +25,12 @@ pub enum InputAction {
 ///
 /// Returns an [`InputAction`] telling the caller whether to continue or
 /// exit the game loop.
-#[allow(clippy::too_many_arguments)]
 pub fn route_game_input(
     result: InputResult,
     ctx: &GameContext<'_>,
     character_manager: &CharacterManager,
     last_save_instant: &mut Option<Instant>,
     last_save_time: &mut Option<chrono::DateTime<Local>>,
-    last_commit_instant: &mut Option<Instant>,
-    last_commit_time: &mut Option<chrono::DateTime<Local>>,
-    history_repo: Option<&HistoryRepo>,
 ) -> InputAction {
     let state = &*ctx.state;
     let global_achievements = &*ctx.achievements;
@@ -55,7 +51,7 @@ pub fn route_game_input(
                     enhancement,
                     deep,
                     None,
-                    history_repo,
+                    None,
                 );
             }
             InputAction::QuitToSelect
@@ -75,8 +71,7 @@ pub fn route_game_input(
             }
             InputAction::Continue
         }
-        InputResult::NeedsSaveWithEvent(ref event)
-        | InputResult::NeedsSaveAllWithEvent(ref event) => {
+        InputResult::NeedsSaveWithEvent(event) | InputResult::NeedsSaveAllWithEvent(event) => {
             if !debug_mode {
                 save_files(
                     character_manager,
@@ -88,14 +83,10 @@ pub fn route_game_input(
                 );
                 *last_save_instant = Some(Instant::now());
                 *last_save_time = Some(Local::now());
-                if let Some(repo) = history_repo {
-                    if commit_save(state, event, repo) {
-                        *last_commit_instant = Some(Instant::now());
-                        *last_commit_time = Some(Local::now());
-                    }
-                }
+                InputAction::DeferCommit(event)
+            } else {
+                InputAction::Continue
             }
-            InputAction::ContinueAndPush
         }
         // StartChronoSurge is handled directly in main.rs before reaching
         // route_game_input, but must be matched for exhaustiveness.
