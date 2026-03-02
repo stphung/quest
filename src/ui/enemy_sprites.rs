@@ -11,6 +11,8 @@ use crate::zones::get_zone;
 
 // Re-export all sprite data so existing internal consumers still compile.
 pub use super::enemy_sprite_data::*;
+use super::fracture_sprites_1::*;
+use super::fracture_sprites_2::*;
 
 #[allow(dead_code)]
 pub struct EnemySprite {
@@ -49,6 +51,18 @@ pub enum SpriteArchetype {
     Undead,
     Aquatic,
     Plant,
+    Fractured,
+    Molten,
+    Crystalline,
+    Mirrored,
+    Abyssal,
+    Devouring,
+    Regal,
+    Automaton,
+    Spectral,
+    Resonant,
+    Primordial,
+    Fossilized,
 }
 
 impl SpriteArchetype {
@@ -66,6 +80,18 @@ impl SpriteArchetype {
             SpriteArchetype::Undead => &SPRITE_HUMANOID,
             SpriteArchetype::Aquatic => &SPRITE_SERPENT,
             SpriteArchetype::Plant => &SPRITE_TITAN,
+            SpriteArchetype::Fractured => &SPRITE_FRACTURED,
+            SpriteArchetype::Molten => &SPRITE_MOLTEN,
+            SpriteArchetype::Crystalline => &SPRITE_CRYSTALLINE,
+            SpriteArchetype::Mirrored => &SPRITE_MIRRORED,
+            SpriteArchetype::Abyssal => &SPRITE_ABYSSAL,
+            SpriteArchetype::Devouring => &SPRITE_DEVOURING,
+            SpriteArchetype::Regal => &SPRITE_REGAL,
+            SpriteArchetype::Automaton => &SPRITE_AUTOMATON,
+            SpriteArchetype::Spectral => &SPRITE_SPECTRAL,
+            SpriteArchetype::Resonant => &SPRITE_RESONANT,
+            SpriteArchetype::Primordial => &SPRITE_PRIMORDIAL,
+            SpriteArchetype::Fossilized => &SPRITE_FOSSILIZED,
         }
     }
 
@@ -82,6 +108,18 @@ impl SpriteArchetype {
             SpriteArchetype::Undead => &PIXEL_UNDEAD,
             SpriteArchetype::Aquatic => &PIXEL_AQUATIC,
             SpriteArchetype::Plant => &PIXEL_PLANT,
+            SpriteArchetype::Fractured => &PIXEL_FRACTURED,
+            SpriteArchetype::Molten => &PIXEL_MOLTEN,
+            SpriteArchetype::Crystalline => &PIXEL_CRYSTALLINE,
+            SpriteArchetype::Mirrored => &PIXEL_MIRRORED,
+            SpriteArchetype::Abyssal => &PIXEL_ABYSSAL,
+            SpriteArchetype::Devouring => &PIXEL_DEVOURING,
+            SpriteArchetype::Regal => &PIXEL_REGAL,
+            SpriteArchetype::Automaton => &PIXEL_AUTOMATON,
+            SpriteArchetype::Spectral => &PIXEL_SPECTRAL,
+            SpriteArchetype::Resonant => &PIXEL_RESONANT,
+            SpriteArchetype::Primordial => &PIXEL_PRIMORDIAL,
+            SpriteArchetype::Fossilized => &PIXEL_FOSSILIZED,
         }
     }
 }
@@ -186,6 +224,88 @@ pub fn zone_palette(zone_id: u32) -> ZoneColorPalette {
             primary: Color::LightRed,
             secondary: Color::Magenta,
         },
+        // Ch.1 The Red Fault
+        12 => ZoneColorPalette {
+            primary: Color::Red,
+            secondary: Color::DarkGray,
+        }, // Splintered Rim
+        13 => ZoneColorPalette {
+            primary: Color::LightRed,
+            secondary: Color::Yellow,
+        }, // Ember Ravine
+        14 => ZoneColorPalette {
+            primary: Color::Red,
+            secondary: Color::LightRed,
+        }, // Heart of the Fault
+        // Ch.2 The Mirror Scar
+        15 => ZoneColorPalette {
+            primary: Color::LightCyan,
+            secondary: Color::White,
+        }, // Shard Fields
+        16 => ZoneColorPalette {
+            primary: Color::LightMagenta,
+            secondary: Color::LightCyan,
+        }, // Refraction Steps
+        17 => ZoneColorPalette {
+            primary: Color::LightYellow,
+            secondary: Color::White,
+        }, // Hall of Second Suns
+        // Ch.3 The Black Mouth
+        18 => ZoneColorPalette {
+            primary: Color::DarkGray,
+            secondary: Color::Gray,
+        }, // Ashen Verge
+        19 => ZoneColorPalette {
+            primary: Color::Gray,
+            secondary: Color::Red,
+        }, // Throat of the World
+        20 => ZoneColorPalette {
+            primary: Color::Magenta,
+            secondary: Color::DarkGray,
+        }, // The Black Mouth
+        // Ch.4 The Hollow Throne
+        21 => ZoneColorPalette {
+            primary: Color::Yellow,
+            secondary: Color::Gray,
+        }, // Sunken Processional
+        22 => ZoneColorPalette {
+            primary: Color::White,
+            secondary: Color::LightBlue,
+        }, // The Pale Archive
+        23 => ZoneColorPalette {
+            primary: Color::LightMagenta,
+            secondary: Color::Yellow,
+        }, // The Hollow Throne
+        // Ch.5 The Wailing Reach
+        24 => ZoneColorPalette {
+            primary: Color::Blue,
+            secondary: Color::DarkGray,
+        }, // The Stillborn Sea
+        25 => ZoneColorPalette {
+            primary: Color::LightMagenta,
+            secondary: Color::LightCyan,
+        }, // Resonance Fault
+        26 => ZoneColorPalette {
+            primary: Color::LightBlue,
+            secondary: Color::White,
+        }, // The Wailing Reach
+        // Ch.6 The Origin Wound
+        27 => ZoneColorPalette {
+            primary: Color::Green,
+            secondary: Color::DarkGray,
+        }, // The Scar Root
+        28 => ZoneColorPalette {
+            primary: Color::Magenta,
+            secondary: Color::Blue,
+        }, // Echoing Abyss
+        29 => ZoneColorPalette {
+            primary: Color::DarkGray,
+            secondary: Color::White,
+        }, // Threshold of Silence
+        30 => ZoneColorPalette {
+            primary: Color::LightRed,
+            secondary: Color::White,
+        }, // The Origin Wound
         _ => ZoneColorPalette {
             primary: Color::Red,
             secondary: Color::Yellow,
@@ -451,7 +571,7 @@ mod tests {
     #[test]
     fn test_zone_palette() {
         // Verify each zone returns a palette with ANSI-16 colors
-        for zone_id in 1..=11 {
+        for zone_id in 1..=30 {
             let palette = zone_palette(zone_id);
             // Just verify primary and secondary are assigned
             assert!(
@@ -622,6 +742,296 @@ mod tests {
                 sprite.base_art,
                 "Archetype mismatch for '{}'",
                 name
+            );
+        }
+    }
+
+    // ── Fracture Zone Sprite Tests ──────────────────────────────────────
+
+    #[test]
+    fn test_fracture_zone_palettes() {
+        // All zones 12-30 should return non-fallback palettes
+        for zone_id in 12..=30 {
+            let palette = zone_palette(zone_id);
+            // Verify not the generic Red/Yellow fallback (which was the old _ => default)
+            assert!(
+                !(matches!(palette.primary, Color::Red)
+                    && matches!(palette.secondary, Color::Yellow)),
+                "Zone {} should have a unique palette, not the generic fallback",
+                zone_id
+            );
+        }
+    }
+
+    #[test]
+    fn test_fracture_zone_palette_distinct_colors() {
+        for zone_id in 12..=30 {
+            let palette = zone_palette(zone_id);
+            assert_ne!(
+                palette.primary, palette.secondary,
+                "Zone {} should have distinct primary/secondary colors",
+                zone_id
+            );
+        }
+    }
+
+    #[test]
+    fn test_fracture_zone_defaults() {
+        // Each chapter should have its own default archetype
+        for zone_id in 12..=14 {
+            assert_eq!(
+                zone_default_archetype(zone_id),
+                SpriteArchetype::Fractured,
+                "Zone {} should default to Fractured",
+                zone_id
+            );
+        }
+        for zone_id in 15..=17 {
+            assert_eq!(
+                zone_default_archetype(zone_id),
+                SpriteArchetype::Crystalline,
+                "Zone {} should default to Crystalline",
+                zone_id
+            );
+        }
+        for zone_id in 18..=20 {
+            assert_eq!(
+                zone_default_archetype(zone_id),
+                SpriteArchetype::Abyssal,
+                "Zone {} should default to Abyssal",
+                zone_id
+            );
+        }
+        for zone_id in 21..=23 {
+            assert_eq!(
+                zone_default_archetype(zone_id),
+                SpriteArchetype::Regal,
+                "Zone {} should default to Regal",
+                zone_id
+            );
+        }
+        for zone_id in 24..=26 {
+            assert_eq!(
+                zone_default_archetype(zone_id),
+                SpriteArchetype::Spectral,
+                "Zone {} should default to Spectral",
+                zone_id
+            );
+        }
+        for zone_id in 27..=30 {
+            assert_eq!(
+                zone_default_archetype(zone_id),
+                SpriteArchetype::Primordial,
+                "Zone {} should default to Primordial",
+                zone_id
+            );
+        }
+    }
+
+    #[test]
+    fn test_fracture_suffix_known_all_zones() {
+        // Every fracture zone should recognize all 5 of its suffixes
+        let zone_suffixes: &[(u32, &[&str])] = &[
+            (12, &["Stalker", "Hound", "Ram", "Brute", "Crawler"]),
+            (13, &["Maw", "Knight", "Colossus", "Warden", "Fiend"]),
+            (14, &["Breaker", "Cantor", "Regent", "Tyrant", "Revenant"]),
+            (15, &["Hound", "Jackal", "Widow", "Watcher", "Echo"]),
+            (
+                16,
+                &["Serpent", "Marshal", "Repeater", "Sentinel", "Engine"],
+            ),
+            (17, &["Wraith", "King", "Titan", "Chorus", "Herald"]),
+            (18, &["Wing", "Revenant", "Forger", "Giant", "Shade"]),
+            (19, &["Warden", "Behemoth", "Herd", "Devourer", "Judge"]),
+            (20, &["Hunger", "Colossus", "Choir", "Crawler", "Remnant"]),
+            (
+                21,
+                &["Sentinel", "Warden", "Knight", "Colossus", "Procession"],
+            ),
+            (22, &["Wraith", "Censor", "Construct", "Eater", "Archivist"]),
+            (
+                23,
+                &["Warden", "Chancellor", "Guardian", "Absence", "Sovereign"],
+            ),
+            (
+                24,
+                &["Wanderer", "Phantom", "Leviathan", "Depthless", "Mother"],
+            ),
+            (25, &["Hound", "Dissonant", "Resonant", "Warden", "Chorus"]),
+            (26, &["Stalker", "Undefined", "Bloom", "Flickerer", "Voice"]),
+            (27, &["Creeper", "Horror", "Warden", "Rupture", "Root"]),
+            (
+                28,
+                &["Echo", "Dweller", "Noise", "Once-Slain", "Reverberation"],
+            ),
+            (29, &["Walker", "Muted", "Beast", "Frequency", "Warden"]),
+            (30, &["Guardian", "Titan", "Unbroken", "Heart", "Final"]),
+        ];
+
+        for (zone_id, suffixes) in zone_suffixes {
+            for suffix in *suffixes {
+                assert!(
+                    suffix_is_known_for_zone(*zone_id, suffix),
+                    "Zone {} should recognize suffix '{}'",
+                    zone_id,
+                    suffix
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_fracture_archetype_for_suffix_sample() {
+        // Spot-check key mappings
+        assert_eq!(
+            archetype_for_suffix(12, "Stalker"),
+            SpriteArchetype::Fractured
+        );
+        assert_eq!(archetype_for_suffix(12, "Hound"), SpriteArchetype::Molten);
+        assert_eq!(
+            archetype_for_suffix(15, "Watcher"),
+            SpriteArchetype::Crystalline
+        );
+        assert_eq!(archetype_for_suffix(17, "King"), SpriteArchetype::Regal);
+        assert_eq!(
+            archetype_for_suffix(19, "Devourer"),
+            SpriteArchetype::Devouring
+        );
+        assert_eq!(
+            archetype_for_suffix(20, "Hunger"),
+            SpriteArchetype::Devouring
+        );
+        assert_eq!(archetype_for_suffix(21, "Sentinel"), SpriteArchetype::Regal);
+        assert_eq!(
+            archetype_for_suffix(22, "Censor"),
+            SpriteArchetype::Automaton
+        );
+        assert_eq!(
+            archetype_for_suffix(24, "Phantom"),
+            SpriteArchetype::Spectral
+        );
+        assert_eq!(
+            archetype_for_suffix(25, "Dissonant"),
+            SpriteArchetype::Resonant
+        );
+        assert_eq!(
+            archetype_for_suffix(27, "Root"),
+            SpriteArchetype::Primordial
+        );
+        assert_eq!(
+            archetype_for_suffix(28, "Once-Slain"),
+            SpriteArchetype::Fossilized
+        );
+        assert_eq!(
+            archetype_for_suffix(30, "Final"),
+            SpriteArchetype::Primordial
+        );
+    }
+
+    #[test]
+    fn test_fracture_sprite_coverage() {
+        // Every fracture zone should return valid sprites for sample enemies
+        for zone_id in 12..=30 {
+            let sprite = get_sprite_for_enemy("SomeUnknown Enemy", zone_id);
+            assert_eq!(
+                sprite.height, 10,
+                "Zone {} default sprite should be 10 lines",
+                zone_id
+            );
+        }
+    }
+
+    #[test]
+    fn test_new_archetypes_have_sprites() {
+        let new_archetypes = [
+            SpriteArchetype::Fractured,
+            SpriteArchetype::Molten,
+            SpriteArchetype::Crystalline,
+            SpriteArchetype::Mirrored,
+            SpriteArchetype::Abyssal,
+            SpriteArchetype::Devouring,
+            SpriteArchetype::Regal,
+            SpriteArchetype::Automaton,
+            SpriteArchetype::Spectral,
+            SpriteArchetype::Resonant,
+            SpriteArchetype::Primordial,
+            SpriteArchetype::Fossilized,
+        ];
+
+        for archetype in &new_archetypes {
+            let sprite = archetype.sprite();
+            assert_eq!(
+                sprite.height, 10,
+                "{:?} ASCII sprite should be 10 lines",
+                archetype
+            );
+            assert!(
+                !sprite.base_art.is_empty(),
+                "{:?} should have non-empty art",
+                archetype
+            );
+
+            let pixel = archetype.pixel_sprite();
+            assert!(
+                pixel.rows.len() >= 2,
+                "{:?} pixel sprite should have rows",
+                archetype
+            );
+        }
+    }
+
+    #[test]
+    fn test_fracture_zones_never_fallback_to_quadruped() {
+        // Zone defaults should NOT be the old generic Quadruped fallback
+        for zone_id in 12..=30 {
+            assert_ne!(
+                zone_default_archetype(zone_id),
+                SpriteArchetype::Quadruped,
+                "Zone {} should not use generic Quadruped default",
+                zone_id
+            );
+        }
+    }
+
+    #[test]
+    fn test_fracture_zone_sprite_color_palettes() {
+        for zone_id in 12..=30 {
+            let pal = sprite_color_palette(zone_id, EnemyTier::Normal);
+            assert_ne!(
+                pal.dark, pal.body,
+                "Zone {} dark and body should differ",
+                zone_id
+            );
+        }
+    }
+
+    #[test]
+    fn test_fracture_visual_variety_per_zone() {
+        // Each zone should have at least 3 distinct archetypes among its suffixes
+        let zone_suffixes: &[(u32, &[&str])] = &[
+            (12, &["Stalker", "Hound", "Ram", "Brute", "Crawler"]),
+            (15, &["Hound", "Jackal", "Widow", "Watcher", "Echo"]),
+            (20, &["Hunger", "Colossus", "Choir", "Crawler", "Remnant"]),
+            (
+                23,
+                &["Warden", "Chancellor", "Guardian", "Absence", "Sovereign"],
+            ),
+            (27, &["Creeper", "Horror", "Warden", "Rupture", "Root"]),
+            (30, &["Guardian", "Titan", "Unbroken", "Heart", "Final"]),
+        ];
+
+        for (zone_id, suffixes) in zone_suffixes {
+            let mut archetypes: Vec<SpriteArchetype> = suffixes
+                .iter()
+                .map(|s| archetype_for_suffix(*zone_id, s))
+                .collect();
+            archetypes.sort_by_key(|a| format!("{:?}", a));
+            archetypes.dedup();
+            assert!(
+                archetypes.len() >= 2,
+                "Zone {} should have at least 2 distinct archetypes, got {:?}",
+                zone_id,
+                archetypes
             );
         }
     }

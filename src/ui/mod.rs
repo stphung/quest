@@ -26,6 +26,8 @@ mod enemy_sprite_data;
 mod enemy_sprites;
 pub mod fishing_scene;
 pub mod flappy_scene;
+mod fracture_sprites_1;
+mod fracture_sprites_2;
 pub mod game_common;
 pub mod go_scene;
 pub mod gomoku_scene;
