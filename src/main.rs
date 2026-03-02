@@ -32,6 +32,7 @@ use main_helpers::achievements::track_input_achievements;
 use main_helpers::character_screens::{
     handle_creation_frame, handle_delete_frame, handle_rename_frame, ScreenTransition,
 };
+use main_helpers::chrono_surge::run_chrono_surge_batch;
 use main_helpers::input_routing::{route_game_input, InputAction};
 use main_helpers::offline::apply_offline_xp;
 use main_helpers::overlay::draw_game_overlays;
@@ -1717,50 +1718,18 @@ fn main() -> io::Result<()> {
                         if chrono_surge.is_some()
                             && last_tick.elapsed() >= Duration::from_millis(TICK_INTERVAL_MS)
                         {
-                            let batch = {
-                                let surge = chrono_surge.as_ref().unwrap();
-                                surge.current_batch_size().min(surge.ticks_remaining)
-                            };
+                            let batch_result = run_chrono_surge_batch(
+                                chrono_surge.as_mut().unwrap(),
+                                &mut state,
+                                &mut tick_counter,
+                                &mut haven,
+                                &mut enhancement,
+                                &mut deep_state,
+                                &mut global_achievements,
+                                debug_mode,
+                            );
 
-                            let mut rng = rand::rng();
-                            let mut needs_save = false;
-                            let sg_before_batch = state.stormglass;
-
-                            for _ in 0..batch {
-                                let mut ctx = core::tick_context::TickContext {
-                                    state: &mut state,
-                                    tick_counter: &mut tick_counter,
-                                    haven: &mut haven,
-                                    enhancement: &mut enhancement,
-                                    deep: &mut deep_state,
-                                    achievements: &mut global_achievements,
-                                    debug_mode,
-                                };
-                                let tick_result =
-                                    core::tick::game_tick_with_context(&mut ctx, &mut rng);
-
-                                // Keep surge path headless (same semantics as [Esc] skip):
-                                // collect summary counters only and avoid per-tick UI work.
-                                let surge = chrono_surge.as_mut().unwrap();
-                                tally_chrono_surge_events(surge, &tick_result.events);
-
-                                if tick_result.achievements_changed
-                                    || tick_result.haven_changed
-                                    || tick_result.enhancement_changed
-                                    || tick_result.god_items_changed
-                                    || tick_result.deep_changed
-                                {
-                                    needs_save = true;
-                                }
-
-                                surge.ticks_remaining -= 1;
-                            }
-
-                            // No SG earned during Chrono Surge — temporal displacement
-                            // prevents salvage from materializing
-                            state.stormglass = sg_before_batch;
-
-                            if needs_save && !debug_mode {
+                            if batch_result.needs_save && !debug_mode {
                                 save_all(
                                     &character_manager,
                                     &state,
@@ -1773,25 +1742,11 @@ fn main() -> io::Result<()> {
                                 );
                             }
 
-                            // Check if surge is complete
-                            let done = chrono_surge.as_ref().unwrap().ticks_remaining == 0;
-                            if done {
+                            if let Some((summary, surge_event)) = batch_result.completed {
                                 state.chrono_surge_active = false;
-                                let surge = chrono_surge.take().unwrap();
-                                chrono_summary = Some(ChronoSurgeSummary {
-                                    kills: surge.kills,
-                                    levels_gained: surge.levels_gained,
-                                    items_equipped: surge.items_equipped,
-                                    ticks_completed: surge.ticks_total,
-                                    ticks_total: surge.ticks_total,
-                                    overcharged: surge.overcharged,
-                                });
+                                chrono_surge = None;
+                                chrono_summary = Some(summary);
                                 if !debug_mode {
-                                    let surge_event = history::SaveEvent::ChronoSurge {
-                                        levels_gained: surge.levels_gained,
-                                        kills: surge.kills,
-                                        ticks: surge.ticks_total,
-                                    };
                                     save_all(
                                         &character_manager,
                                         &state,

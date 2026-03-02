@@ -69,13 +69,7 @@ pub fn try_discover_haven<R: Rng>(haven: &mut Haven, prestige_rank: u32, rng: &m
 
 /// Get the Haven save file path
 pub fn haven_save_path() -> io::Result<PathBuf> {
-    let home_dir = dirs::home_dir().ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::NotFound,
-            "Could not determine home directory",
-        )
-    })?;
-    Ok(home_dir.join(".quest").join("haven.json"))
+    Ok(crate::core::paths::get_quest_dir()?.join("haven.json"))
 }
 
 /// Load Haven from disk, or return default if not found

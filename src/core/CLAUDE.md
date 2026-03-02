@@ -170,7 +170,7 @@ pub fn game_tick<R: Rng>(
 ) -> TickResult
 ```
 
-**Why generic `<R: Rng>`**: The `rand::Rng` trait is not dyn-compatible, so we use a generic parameter. Pass `&mut rand::thread_rng()` in production, or a seeded `ChaCha8Rng` in tests for deterministic behavior.
+**Why generic `<R: Rng>`**: The `rand::Rng` trait is not dyn-compatible, so we use a generic parameter. Pass `&mut rand::rng()` in production, or a seeded `ChaCha8Rng` in tests for deterministic behavior.
 
 ### Processing Stages
 
@@ -378,5 +378,4 @@ Zone 11 (The Expanse) is an endgame wall: `(5000, 400, 500, 80, 250, 30)` — ro
 
 ## Known Issues
 
-- `combat_kill_xp()` (`xp.rs`) and `distribute_level_up_points()` (`xp.rs`) use internal `thread_rng()` (not yet parameterized with generic `R: Rng`)
-- `try_discover_dungeon()` (`discoveries.rs`) also uses internal `thread_rng()`
+None currently. All RNG-dependent functions (`combat_kill_xp`, `distribute_level_up_points`, `try_discover_dungeon`) accept `rng: &mut R where R: Rng` and are threaded from callers in `tick_stages.rs` and `combat/damage.rs`.

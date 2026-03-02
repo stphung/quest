@@ -13,7 +13,7 @@ use std::collections::HashMap;
 // ── Discovery & Gate ─────────────────────────────────────────────────────────
 
 /// Minimum prestige rank required to discover The Deep.
-pub const DEEP_MIN_PRESTIGE_RANK: u32 = 15;
+pub use crate::core::constants::DEEP_MIN_PRESTIGE_RANK;
 /// The layer where the Gateway is located.
 pub const GATEWAY_LAYER: u32 = 30;
 

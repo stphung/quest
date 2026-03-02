@@ -4,13 +4,7 @@ use std::io;
 use std::path::PathBuf;
 
 pub fn enhancement_save_path() -> io::Result<PathBuf> {
-    let home_dir = dirs::home_dir().ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::NotFound,
-            "Could not determine home directory",
-        )
-    })?;
-    Ok(home_dir.join(".quest").join("enhancement.json"))
+    Ok(crate::core::paths::get_quest_dir()?.join("enhancement.json"))
 }
 
 pub fn load_enhancement() -> EnhancementProgress {

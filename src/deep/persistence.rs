@@ -4,13 +4,7 @@ use std::io;
 use std::path::PathBuf;
 
 pub fn deep_save_path() -> io::Result<PathBuf> {
-    let home_dir = dirs::home_dir().ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::NotFound,
-            "Could not determine home directory",
-        )
-    })?;
-    Ok(home_dir.join(".quest").join("deep.json"))
+    Ok(crate::core::paths::get_quest_dir()?.join("deep.json"))
 }
 
 pub fn load_deep() -> DeepState {

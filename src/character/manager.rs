@@ -60,16 +60,8 @@ pub struct CharacterManager {
 
 impl CharacterManager {
     pub fn new() -> io::Result<Self> {
-        let home_dir = dirs::home_dir().ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::NotFound,
-                "Could not determine home directory",
-            )
-        })?;
-
-        let quest_dir = home_dir.join(".quest");
+        let quest_dir = crate::core::paths::get_quest_dir()?;
         fs::create_dir_all(&quest_dir)?;
-
         Ok(Self { quest_dir })
     }
 

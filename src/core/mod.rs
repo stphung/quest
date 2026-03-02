@@ -9,6 +9,7 @@ pub mod enemy_spawning;
 pub mod game_logic;
 pub mod game_state;
 pub mod offline;
+pub mod paths;
 pub mod recent_drops;
 pub mod tick;
 pub mod tick_stages;

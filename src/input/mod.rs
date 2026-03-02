@@ -212,34 +212,21 @@ pub fn handle_game_input(
         return InputResult::Continue;
     }
 
-    // 1. Haven discovery modal (blocks all other input)
-    if matches!(overlay, GameOverlay::HavenDiscovery) {
-        return handle_haven_discovery(key, overlay);
-    }
-
-    // 1a. Soulforge discovery modal (blocks all other input)
-    if matches!(overlay, GameOverlay::SoulforgeDiscovery) {
-        return handle_soulforge_discovery(key, overlay);
-    }
-
-    // 1b. Stormglass discovery modal (blocks all other input)
-    if matches!(overlay, GameOverlay::StormglassDiscovery) {
-        return handle_stormglass_discovery(key, overlay);
+    // 1. Discovery/unlock modals (Enter or Esc dismisses; blocks all other input)
+    if matches!(
+        overlay,
+        GameOverlay::HavenDiscovery
+            | GameOverlay::SoulforgeDiscovery
+            | GameOverlay::StormglassDiscovery
+            | GameOverlay::DeepDiscovery
+            | GameOverlay::FractureRegionUnlock { .. }
+    ) {
+        return handle_dismiss_overlay(key, overlay);
     }
 
     // 1c. Achievement unlocked modal (blocks all other input)
     if matches!(overlay, GameOverlay::AchievementUnlocked { .. }) {
         return handle_achievement_unlocked(key, overlay);
-    }
-
-    // 1d. Deep discovery modal (blocks all other input)
-    if matches!(overlay, GameOverlay::DeepDiscovery) {
-        return handle_deep_discovery(key, overlay);
-    }
-
-    // 1e. Fracture region unlock modal (blocks all other input)
-    if matches!(overlay, GameOverlay::FractureRegionUnlock { .. }) {
-        return handle_fracture_region_unlock(key, overlay);
     }
 
     // 1f. Ascension confirmation modal (blocks all other input)
@@ -356,35 +343,7 @@ pub fn handle_game_input(
     )
 }
 
-fn handle_haven_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
-    if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
-        *overlay = GameOverlay::None;
-    }
-    InputResult::Continue
-}
-
-fn handle_soulforge_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
-    if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
-        *overlay = GameOverlay::None;
-    }
-    InputResult::Continue
-}
-
-fn handle_stormglass_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
-    if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
-        *overlay = GameOverlay::None;
-    }
-    InputResult::Continue
-}
-
-fn handle_deep_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
-    if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
-        *overlay = GameOverlay::None;
-    }
-    InputResult::Continue
-}
-
-fn handle_fracture_region_unlock(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
+fn handle_dismiss_overlay(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
     if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
         *overlay = GameOverlay::None;
     }
