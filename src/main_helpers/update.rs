@@ -939,8 +939,8 @@ pub fn show_startup_splash_screen(
             );
 
             // Draw overlays
+            let layout_ctx = ui::responsive::LayoutContext::from_frame(f);
             if achievement_browser.showing {
-                let ctx = ui::responsive::LayoutContext::from_frame(f);
                 if title_browser.showing {
                     ui::title_browser_scene::render_title_browser(
                         f,
@@ -948,6 +948,7 @@ pub fn show_startup_splash_screen(
                         global_achievements,
                         title_browser,
                         "",
+                        &layout_ctx,
                     );
                 } else {
                     ui::achievement_browser_scene::render_achievement_browser(
@@ -956,18 +957,18 @@ pub fn show_startup_splash_screen(
                         global_achievements,
                         achievement_browser,
                         enhancement,
-                        &ctx,
+                        &layout_ctx,
                     );
                 }
             }
             if let Some(ref browser) = time_vault_browser {
-                ui::time_vault_scene::draw_time_vault(f, area, browser);
+                ui::time_vault_scene::draw_time_vault(f, area, browser, &layout_ctx);
             }
             if select_screen.cloud_restore_showing {
                 select_screen.draw_cloud_restore_prompt(f, area);
             }
             if let Some(ref url) = browser_link_url {
-                ui::bug_report_scene::draw_browser_link_modal(f, url);
+                ui::bug_report_scene::draw_browser_link_modal(f, url, &layout_ctx);
             }
         })?;
 

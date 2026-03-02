@@ -88,15 +88,9 @@ pub fn process_dungeon_events<R: Rng>(
                     if let Some((item, equipped)) =
                         on_treasure_room_entered(rng, state, haven_bonuses.item_rarity_percent)
                     {
-                        let status = if equipped {
-                            "Equipped!"
-                        } else {
-                            "Kept current gear"
-                        };
                         let power = item.power();
                         let treasure_rarity = item.rarity;
                         let treasure_name = item.display_name.clone();
-                        let msg = format!("\u{1f48e} Found: {} [{}]", item.display_name, status);
                         result.events.push(TickEvent::DungeonTreasureFound {
                             item_name: item.display_name,
                             rarity: item.rarity,
@@ -104,7 +98,6 @@ pub fn process_dungeon_events<R: Rng>(
                             ilvl: item.ilvl,
                             power,
                             equipped,
-                            message: msg,
                         });
 
                         // Stormglass: salvage non-equipped treasure items
@@ -146,36 +139,22 @@ pub fn process_dungeon_events<R: Rng>(
                 }
             }
             crate::dungeon::logic::DungeonEvent::FoundKey => {
-                result.events.push(TickEvent::DungeonKeyFound {
-                    message: "\u{1f5dd}\u{fe0f} A heavy key clatters to the ground. The way forward is open.".to_string(),
-                });
+                result.events.push(TickEvent::DungeonKeyFound);
             }
             crate::dungeon::logic::DungeonEvent::BossUnlocked => {
-                result.events.push(TickEvent::DungeonBossUnlocked {
-                    message: "\u{1f479} Somewhere deep in the dungeon, a sealed door grinds open."
-                        .to_string(),
-                });
+                result.events.push(TickEvent::DungeonBossUnlocked);
             }
             crate::dungeon::logic::DungeonEvent::DungeonComplete {
                 xp_earned,
                 items_collected,
             } => {
-                let message = format!(
-                    "\u{1f3c6} Dungeon Complete! +{} XP, {} items found",
-                    xp_earned, items_collected
-                );
                 result.events.push(TickEvent::DungeonCompleted {
                     xp_earned,
                     items_collected,
-                    message,
                 });
             }
             crate::dungeon::logic::DungeonEvent::DungeonFailed => {
-                result.events.push(TickEvent::DungeonFailed {
-                    message:
-                        "\u{1f480} The dungeon spits you out, broken but alive. No prestige lost."
-                            .to_string(),
-                });
+                result.events.push(TickEvent::DungeonFailed);
             }
             _ => {}
         }
@@ -360,49 +339,32 @@ pub fn process_combat_events<R: Rng>(
     for event in combat_events {
         match event {
             CombatEvent::PlayerAttackBlocked { weapon_needed } => {
-                let message = format!("\u{1f6ab} {} required to damage this foe!", weapon_needed);
-                result.events.push(TickEvent::PlayerAttackBlocked {
-                    weapon_needed,
-                    message,
-                });
+                result
+                    .events
+                    .push(TickEvent::PlayerAttackBlocked { weapon_needed });
             }
             CombatEvent::PlayerAttack { damage, was_crit } => {
-                let message = if was_crit {
-                    format!("\u{1f4a5} CRITICAL HIT for {} damage!", damage)
-                } else {
-                    format!("\u{2694} You hit for {} damage", damage)
-                };
-                result.events.push(TickEvent::PlayerAttack {
-                    damage,
-                    was_crit,
-                    message,
-                });
+                result
+                    .events
+                    .push(TickEvent::PlayerAttack { damage, was_crit });
             }
             CombatEvent::EnemyAttack { damage } => {
                 let enemy_name = current_enemy_name.clone();
-                let message = format!("\u{1f6e1} {} hits you for {} damage", enemy_name, damage);
-                result.events.push(TickEvent::EnemyAttack {
-                    damage,
-                    enemy_name,
-                    message,
-                });
-            }
-            CombatEvent::DamageReflected { damage } => {
-                let message = format!("\u{1f4a5} {} reflected!", damage);
                 result
                     .events
-                    .push(TickEvent::DamageReflected { damage, message });
+                    .push(TickEvent::EnemyAttack { damage, enemy_name });
+            }
+            CombatEvent::DamageReflected { damage } => {
+                result.events.push(TickEvent::DamageReflected { damage });
             }
             CombatEvent::RegenComplete { healed } => {
                 result.events.push(TickEvent::RegenComplete { healed });
             }
             CombatEvent::EnemyDied { xp_gained } => {
                 let enemy_name = current_enemy_name.clone();
-                let message = format!("\u{2728} {} defeated! +{} XP", enemy_name, xp_gained);
                 result.events.push(TickEvent::EnemyDefeated {
                     xp_gained,
                     enemy_name,
-                    message,
                 });
 
                 // Apply XP and check level up
@@ -423,14 +385,9 @@ pub fn process_combat_events<R: Rng>(
             }
             CombatEvent::EliteDefeated { xp_gained } => {
                 let enemy_name = current_enemy_name.clone();
-                let message = format!(
-                    "\u{2694}\u{fe0f} {} defeated! +{} XP",
-                    enemy_name, xp_gained
-                );
                 result.events.push(TickEvent::DungeonEliteDefeated {
                     xp_gained,
                     enemy_name,
-                    message,
                 });
 
                 apply_xp_and_check_levelup(rng, state, xp_gained as f64, achievements, result);
@@ -441,9 +398,7 @@ pub fn process_combat_events<R: Rng>(
                     let events = on_elite_defeated(dungeon);
                     for de in events {
                         if matches!(de, crate::dungeon::logic::DungeonEvent::FoundKey) {
-                            result.events.push(TickEvent::DungeonKeyFound {
-                                message: "\u{1f5dd}\u{fe0f} A heavy key clatters to the ground. The way forward is open.".to_string(),
-                            });
+                            result.events.push(TickEvent::DungeonKeyFound);
                         }
                     }
                 }
@@ -471,17 +426,12 @@ pub fn process_combat_events<R: Rng>(
 
                 achievements.on_dungeon_completed(Some(&state.character_name));
 
-                let message = format!(
-                    "\u{1f3c6} Dungeon Complete! +{} bonus XP ({} total, {} items)",
-                    bonus_xp, total_xp, items
-                );
                 result.events.push(TickEvent::DungeonBossDefeated {
                     xp_gained,
                     bonus_xp,
                     total_xp,
                     items_collected: items,
                     enemy_name,
-                    message,
                 });
 
                 // Clear dungeon
@@ -505,15 +455,10 @@ pub fn process_combat_events<R: Rng>(
                 result.events.push(TickEvent::BossEnrage { message });
             }
             CombatEvent::PlayerDiedInDungeon => {
-                result.events.push(TickEvent::PlayerDiedInDungeon {
-                    message: "\u{1f480} You fell in the dungeon... (escaped without prestige loss)"
-                        .to_string(),
-                });
+                result.events.push(TickEvent::PlayerDiedInDungeon);
             }
             CombatEvent::PlayerDied => {
-                result.events.push(TickEvent::PlayerDied {
-                    message: "\u{1f480} You died! Boss encounter reset.".to_string(),
-                });
+                result.events.push(TickEvent::PlayerDied);
             }
             CombatEvent::SubzoneBossDefeated {
                 xp_gained,
@@ -525,65 +470,13 @@ pub fn process_combat_events<R: Rng>(
                 // Track zone achievements
                 process_zone_achievements(&defeat_result, achievements, &state.character_name);
 
-                // Build message
-                let message = match &defeat_result {
-                    BossDefeatResult::SubzoneComplete { .. } => {
-                        format!(
-                            "\u{1f451} Boss defeated! +{} XP \u{2014} Moving to next area.",
-                            xp_gained
-                        )
-                    }
-                    BossDefeatResult::ZoneComplete {
-                        old_zone,
-                        new_zone_id,
-                    } => {
-                        let new_zone = crate::zones::get_zone(*new_zone_id)
-                            .map(|z| z.name)
-                            .unwrap_or("???");
-                        format!(
-                            "\u{1f451} {} conquered! +{} XP \u{2014} Advancing to {}!",
-                            old_zone, xp_gained, new_zone
-                        )
-                    }
-                    BossDefeatResult::ZoneCompleteButGated {
-                        zone_name,
-                        required_prestige,
-                    } => {
-                        format!(
-                            "\u{1f451} {} conquered! +{} XP \u{2014} Next zone requires Prestige {}.",
-                            zone_name, xp_gained, required_prestige
-                        )
-                    }
-                    BossDefeatResult::StormsEnd => {
-                        format!(
-                            "\u{1f451} All zones conquered! +{} XP \u{2014} You have completed the game!",
-                            xp_gained
-                        )
-                    }
-                    BossDefeatResult::WeaponRequired { .. } => {
-                        // Already handled by PlayerAttackBlocked
-                        continue;
-                    }
-                    BossDefeatResult::ExpanseCycle => {
-                        format!(
-                            "\u{1f451} The Endless defeated! +{} XP \u{2014} The Expanse cycles anew...",
-                            xp_gained
-                        )
-                    }
-                    BossDefeatResult::FractureCycle { zone_id } => {
-                        let zone_name = crate::zones::get_zone(*zone_id)
-                            .map(|z| z.name)
-                            .unwrap_or("Unknown");
-                        format!(
-                            "\u{1f451} {} conquered! +{} XP \u{2014} Zone cycles anew...",
-                            zone_name, xp_gained
-                        )
-                    }
-                };
+                // WeaponRequired is already handled by PlayerAttackBlocked
+                if matches!(defeat_result, BossDefeatResult::WeaponRequired { .. }) {
+                    continue;
+                }
                 result.events.push(TickEvent::SubzoneBossDefeated {
                     xp_gained,
                     result: defeat_result.clone(),
-                    message,
                 });
 
                 // Deep discovery: first Endless kill at P15+
@@ -601,10 +494,7 @@ pub fn process_combat_events<R: Rng>(
                 }
             }
             CombatEvent::CombatRetreat { zone_name } => {
-                let message = format!("\u{1f3c3} Overwhelmed! You retreat to {}...", zone_name);
-                result
-                    .events
-                    .push(TickEvent::CombatRetreat { zone_name, message });
+                result.events.push(TickEvent::CombatRetreat { zone_name });
             }
         }
     }
@@ -748,10 +638,8 @@ pub(super) fn process_zone_achievements(
 pub(super) fn collect_achievement_events(achievements: &mut Achievements, result: &mut TickResult) {
     for id in achievements.take_newly_unlocked() {
         if let Some(def) = crate::achievements::get_achievement_def(id) {
-            let message = format!("\u{1f3c6} Achievement Unlocked: {}", def.name);
             result.events.push(TickEvent::AchievementUnlocked {
                 name: def.name.to_string(),
-                message,
             });
             result.achievements_changed = true;
         }
@@ -1212,11 +1100,8 @@ mod tests {
             result.events[4],
             TickEvent::RegenComplete { healed: 9 }
         ));
-        assert!(matches!(
-            result.events[5],
-            TickEvent::PlayerDiedInDungeon { .. }
-        ));
-        assert!(matches!(result.events[6], TickEvent::PlayerDied { .. }));
+        assert!(matches!(result.events[5], TickEvent::PlayerDiedInDungeon));
+        assert!(matches!(result.events[6], TickEvent::PlayerDied));
         assert!(matches!(
             result.events[7],
             TickEvent::CombatRetreat {
@@ -1241,8 +1126,8 @@ mod tests {
         assert!(result.achievements_changed);
         assert!(matches!(
             result.events.as_slice(),
-            [TickEvent::AchievementUnlocked { name, message }]
-                if name == expected_name && message.contains("Achievement Unlocked")
+            [TickEvent::AchievementUnlocked { name }]
+                if name == expected_name
         ));
         assert!(achievements.take_newly_unlocked().is_empty());
     }

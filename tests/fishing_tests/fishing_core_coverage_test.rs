@@ -608,14 +608,14 @@ fn test_zone_achievements_zone_complete_but_gated() {
     assert_eq!(state.session_kills, 1);
 
     // Check the message mentions the gated zone
-    if let Some(TickEvent::SubzoneBossDefeated { message, .. }) = result
-        .events
-        .iter()
-        .find(|e| matches!(e, TickEvent::SubzoneBossDefeated { .. }))
-    {
-        assert!(message.contains("Dark Forest"));
-        assert!(message.contains("Prestige 5"));
-    }
+    // SubzoneBossDefeated event should exist (message formatting now in presentation layer)
+    assert!(
+        result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::SubzoneBossDefeated { .. })),
+        "Should have a SubzoneBossDefeated event"
+    );
 }
 
 // =============================================================================
@@ -1049,7 +1049,7 @@ fn test_fishing_and_combat_mutually_exclusive_in_tick() {
                 TickEvent::PlayerAttack { .. }
                     | TickEvent::EnemyAttack { .. }
                     | TickEvent::EnemyDefeated { .. }
-                    | TickEvent::PlayerDied { .. }
+                    | TickEvent::PlayerDied
             )),
             "Should not see combat events while fishing"
         );

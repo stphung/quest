@@ -20,49 +20,34 @@ use crate::zones::BossDefeatResult;
 pub enum TickEvent {
     // ── Combat ──────────────────────────────────────────────────
     /// Player attacked an enemy.
-    PlayerAttack {
-        damage: u32,
-        was_crit: bool,
-        message: String,
-    },
+    PlayerAttack { damage: u32, was_crit: bool },
 
     /// Player's attack was blocked because the boss requires a specific weapon.
-    PlayerAttackBlocked {
-        weapon_needed: String,
-        message: String,
-    },
+    PlayerAttackBlocked { weapon_needed: String },
 
     /// Enemy attacked the player.
-    EnemyAttack {
-        damage: u32,
-        enemy_name: String,
-        message: String,
-    },
+    EnemyAttack { damage: u32, enemy_name: String },
 
     /// Damage reflected back to the enemy.
-    DamageReflected { damage: u32, message: String },
+    DamageReflected { damage: u32 },
 
     /// HP regen completed after a kill.
     RegenComplete { healed: u32 },
 
     /// Normal enemy or dungeon combat-room enemy was defeated.
-    EnemyDefeated {
-        xp_gained: u64,
-        enemy_name: String,
-        message: String,
-    },
+    EnemyDefeated { xp_gained: u64, enemy_name: String },
 
     /// Boss enraged after fight timer expired — instant kill.
     BossEnrage { message: String },
 
     /// Player died in overworld combat (boss encounter reset).
-    PlayerDied { message: String },
+    PlayerDied,
 
     /// Player died in a dungeon (safe exit, no prestige loss).
-    PlayerDiedInDungeon { message: String },
+    PlayerDiedInDungeon,
 
     /// Player was overwhelmed and retreated to a safer zone.
-    CombatRetreat { zone_name: String, message: String },
+    CombatRetreat { zone_name: String },
 
     // ── Item Drops ──────────────────────────────────────────────
     /// An item was dropped and auto-equip was evaluated.
@@ -83,7 +68,6 @@ pub enum TickEvent {
     SubzoneBossDefeated {
         xp_gained: u64,
         result: BossDefeatResult,
-        message: String,
     },
 
     // ── Dungeon ─────────────────────────────────────────────────
@@ -101,14 +85,13 @@ pub enum TickEvent {
         ilvl: u32,
         power: u32,
         equipped: bool,
-        message: String,
     },
 
     /// Dungeon key found (from defeating the elite guardian).
-    DungeonKeyFound { message: String },
+    DungeonKeyFound,
 
     /// Boss room is now unlocked.
-    DungeonBossUnlocked { message: String },
+    DungeonBossUnlocked,
 
     /// Dungeon boss defeated — dungeon completed with rewards.
     DungeonBossDefeated {
@@ -117,24 +100,18 @@ pub enum TickEvent {
         total_xp: u64,
         items_collected: usize,
         enemy_name: String,
-        message: String,
     },
 
     /// Dungeon elite enemy defeated.
-    DungeonEliteDefeated {
-        xp_gained: u64,
-        enemy_name: String,
-        message: String,
-    },
+    DungeonEliteDefeated { xp_gained: u64, enemy_name: String },
 
     /// Player died or was removed from dungeon.
-    DungeonFailed { message: String },
+    DungeonFailed,
 
     /// Dungeon completed event from auto-exploration (update_dungeon).
     DungeonCompleted {
         xp_earned: u64,
         items_collected: usize,
-        message: String,
     },
 
     // ── Fishing ─────────────────────────────────────────────────
@@ -214,7 +191,7 @@ pub enum TickEvent {
 
     // ── Achievements ────────────────────────────────────────────
     /// An achievement was unlocked during this tick.
-    AchievementUnlocked { name: String, message: String },
+    AchievementUnlocked { name: String },
 
     // ── Fracture Zones ───────────────────────────────────────────
     /// A fracture region was unlocked by a Deep breakthrough.
@@ -224,7 +201,7 @@ pub enum TickEvent {
     },
 
     /// Player has Ascended to a new level.
-    Ascended { level: u32, message: String },
+    Ascended { level: u32 },
 
     // ── Level Up ────────────────────────────────────────────────
     /// Player leveled up (may occur multiple times per tick from large XP gains).

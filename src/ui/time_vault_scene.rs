@@ -4,6 +4,7 @@
 //! and their snapshots. Players can restore, fork, and manage saves.
 
 use crate::history::types::{CommitInfo, TimelineInfo};
+use crate::ui::responsive::LayoutContext;
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
@@ -249,7 +250,12 @@ fn event_icon_color(message: &str) -> (&'static str, Color) {
 }
 
 /// Render the Time Vault overlay.
-pub fn draw_time_vault(frame: &mut Frame, area: Rect, state: &TimeVaultState) {
+pub fn draw_time_vault(
+    frame: &mut Frame,
+    area: Rect,
+    state: &TimeVaultState,
+    _layout_ctx: &LayoutContext,
+) {
     // Full-screen overlay with padding
     let w = area.width.saturating_sub(4).min(90);
     let h = area.height.saturating_sub(4);
@@ -1279,7 +1285,10 @@ mod tests {
         let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
 
         terminal
-            .draw(|frame| draw_time_vault(frame, frame.area(), &state))
+            .draw(|frame| {
+                let layout_ctx = LayoutContext::from_frame(frame);
+                draw_time_vault(frame, frame.area(), &state, &layout_ctx)
+            })
             .unwrap();
 
         let rendered = buffer_text(&terminal);

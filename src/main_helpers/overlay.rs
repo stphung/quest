@@ -9,11 +9,16 @@ use crate::input::{GameOverlay, HavenUiState, SoulforgeUiState};
 use crate::main_helpers::game_context::{GameContext, OverlayExtras};
 use crate::stormglass::types::{ChronoSurgeState, ChronoSurgeSummary, ExchangeUiState};
 use crate::ui;
+use crate::ui::responsive::LayoutContext;
 use crate::utils;
 use std::time::{Duration, Instant};
 
 /// Draws the quit confirmation dialog when pending challenges exist.
-fn draw_quit_confirm(frame: &mut ratatui::Frame, pending_count: usize) {
+fn draw_quit_confirm(
+    frame: &mut ratatui::Frame,
+    pending_count: usize,
+    _layout_ctx: &LayoutContext,
+) {
     use ratatui::{
         layout::{Alignment, Rect},
         style::{Color, Modifier, Style},
@@ -155,6 +160,7 @@ pub fn draw_game_overlays(
                     global_achievements,
                     title_browser,
                     &state.character_name,
+                    layout_ctx,
                 );
             } else {
                 ui::achievement_browser_scene::render_achievement_browser(
@@ -188,20 +194,26 @@ pub fn draw_game_overlays(
             );
         }
         GameOverlay::QuitConfirm => {
-            draw_quit_confirm(frame, state.challenge_menu.challenges.len());
+            draw_quit_confirm(frame, state.challenge_menu.challenges.len(), layout_ctx);
         }
         GameOverlay::BrowserLink { ref url } => {
-            ui::bug_report_scene::draw_browser_link_modal(frame, url);
+            ui::bug_report_scene::draw_browser_link_modal(frame, url, layout_ctx);
         }
         GameOverlay::BugReport {
             ref summary,
             clipboard_ready,
             ref error,
         } => {
-            ui::bug_report_scene::draw_bug_report_overlay(frame, summary, *clipboard_ready, error);
+            ui::bug_report_scene::draw_bug_report_overlay(
+                frame,
+                summary,
+                *clipboard_ready,
+                error,
+                layout_ctx,
+            );
         }
         GameOverlay::TimeVault { ref browser } => {
-            ui::time_vault_scene::draw_time_vault(frame, area, browser);
+            ui::time_vault_scene::draw_time_vault(frame, area, browser, layout_ctx);
         }
         GameOverlay::DeepDiscovery => {
             ui::deep_scene::render_deep_discovery_modal(frame, area, layout_ctx);

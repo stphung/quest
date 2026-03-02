@@ -27,13 +27,16 @@ use character::manager::CharacterManager;
 use chrono::{Local, Utc};
 use core::constants::*;
 use core::game_state::*;
-use input::{GameOverlay, HavenUiState, InputResult, SoulforgeUiState};
+use input::{GameOverlay, HavenUiState, SoulforgeUiState};
 use main_helpers::achievements::track_input_achievements;
 use main_helpers::character_screens::{
     handle_creation_frame, handle_delete_frame, handle_rename_frame, ScreenTransition,
 };
 use main_helpers::chrono_surge::run_chrono_surge_batch;
-use main_helpers::input_routing::{route_game_input, InputAction};
+use main_helpers::input_routing::{
+    dispatch_chrono_surge, dispatch_time_vault_action, route_game_input, InputAction,
+    TimeVaultAction,
+};
 use main_helpers::offline::apply_offline_xp;
 use main_helpers::overlay::draw_game_overlays;
 use main_helpers::persistence::{commit_save, save_files};
@@ -41,7 +44,6 @@ use main_helpers::scene::{current_scene_kind, is_realtime_minigame, is_wide_scen
 use main_helpers::update::{
     jittered_update_interval, show_startup_splash_screen, StartupSplashResult,
 };
-use rand::RngExt;
 use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use ratatui::crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -756,391 +758,44 @@ fn main() -> io::Result<()> {
                                 }
 
                                 // Handle StartChronoSurge before routing
-                                if let InputResult::StartChronoSurge { ticks } = result {
-                                    // Roll for overcharge proc from sigil bonus
-                                    let overcharge_chance =
-                                        stormglass::sigils::SigilBonuses::compute(
-                                            &state.storm_sigils,
-                                        )
-                                        .chrono_overcharge_percent;
-                                    let mut rng = rand::rng();
-                                    let overcharged = if state.debug_force_overcharge {
-                                        state.debug_force_overcharge = false;
-                                        true
-                                    } else {
-                                        overcharge_chance > 0.0
-                                            && rng.random::<f64>() * 100.0 < overcharge_chance
-                                    };
-                                    let actual_ticks = if overcharged {
-                                        (ticks as f64 * 1.5) as u64
-                                    } else {
-                                        ticks
-                                    };
-                                    chrono_surge =
-                                        Some(ChronoSurgeState::new(actual_ticks, overcharged));
+                                if let Some(surge) = dispatch_chrono_surge(&result, &mut state) {
+                                    chrono_surge = Some(surge);
                                     state.chrono_surge_active = true;
                                     continue;
                                 }
 
                                 // Handle Time Vault actions before routing
-                                if let InputResult::OpenTimeVault = result {
-                                    if let Some(ref repo) = history_repo {
-                                        if let Ok(branches) = repo.list_branches() {
-                                            let commits = branches
-                                                .first()
-                                                .and_then(|b| repo.list_commits(&b.name).ok())
-                                                .unwrap_or_default();
-                                            let mut vault_state =
-                                                crate::ui::time_vault_scene::TimeVaultState::new(
-                                                    branches, commits,
-                                                );
-                                            vault_state.cloud_status = cloud.status.clone();
-                                            vault_state.cloud_username = cloud.username.clone();
-                                            vault_state.cloud_current_repo =
-                                                cloud.config.as_ref().map(|c| {
-                                                    history::cloud::repo_name_from_url(&c.repo_url)
-                                                });
-                                            // If already out-of-sync, re-check divergence and show resolution dialog
-                                            if matches!(
-                                                cloud.status,
-                                                history::cloud::CloudStatus::OutOfSync
-                                            ) {
-                                                if let Ok(Some(div)) =
-                                                    history::cloud::check_divergence(&quest_dir)
-                                                {
-                                                    vault_state.cloud_divergence = Some(div);
-                                                    vault_state.mode = crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
-                                                }
-                                            }
-                                            overlay = GameOverlay::TimeVault {
-                                                browser: Box::new(vault_state),
-                                            };
-                                        }
-                                    }
-                                    continue;
-                                }
-
-                                if let InputResult::RefreshSaveHistoryCommits { ref branch_name } =
-                                    result
-                                {
-                                    if let Some(ref repo) = history_repo {
-                                        if let Ok(commits) = repo.list_commits(branch_name) {
-                                            if let GameOverlay::TimeVault { ref mut browser } =
-                                                overlay
-                                            {
-                                                browser.commits = commits;
-                                            }
-                                        }
-                                    }
-                                    continue;
-                                }
-
-                                if let InputResult::RestoreSave { ref commit_id } = result {
-                                    if let Some(ref repo) = history_repo {
-                                        // Auto-save current state before restoring.
-                                        // Immediate commit required (state reloads next).
-                                        save_files(
-                                            &character_manager,
-                                            &state,
-                                            &global_achievements,
-                                            &haven,
-                                            &enhancement,
-                                            &deep_state,
+                                match dispatch_time_vault_action(
+                                    &result,
+                                    &state,
+                                    &mut overlay,
+                                    history_repo.as_ref(),
+                                    &mut cloud,
+                                    &quest_dir,
+                                    &character_manager,
+                                    &global_achievements,
+                                    &haven,
+                                    &enhancement,
+                                    &deep_state,
+                                    debug_mode,
+                                    &mut last_save_instant,
+                                    &mut last_save_time,
+                                    &mut last_commit_instant,
+                                    &mut last_commit_time,
+                                ) {
+                                    TimeVaultAction::StateReloaded(reloaded) => {
+                                        main_helpers::cloud_ops::reload_account_state(
+                                            &mut haven,
+                                            &mut enhancement,
+                                            &mut global_achievements,
                                         );
-                                        last_save_time = Some(Local::now());
-                                        last_save_instant = None;
-                                        if commit_save(&state, &history::SaveEvent::AutoSave, repo)
-                                        {
-                                            last_commit_instant = Some(Instant::now());
-                                            last_commit_time = Some(Local::now());
-                                            if !cloud.op_in_flight {
-                                                if let Some(ref config) = cloud.config {
-                                                    main_helpers::cloud_ops::spawn_cloud_push(
-                                                        &mut cloud.op_in_flight,
-                                                        &cloud.tx,
-                                                        &quest_dir,
-                                                        &config.token,
-                                                    );
-                                                }
-                                            }
-                                        }
-                                        if repo.restore_to(commit_id).is_ok() {
-                                            // Reload all state from disk (git reset replaced files)
-                                            main_helpers::cloud_ops::reload_account_state(
-                                                &mut haven,
-                                                &mut enhancement,
-                                                &mut global_achievements,
-                                            );
-
-                                            // Reload character state
-                                            let filename = format!("{}.json", state.character_name);
-                                            if let Ok(mut reloaded) =
-                                                character_manager.load_character(&filename)
-                                            {
-                                                reloaded
-                                                    .recalculate_derived_stats(&enhancement.levels);
-                                                reloaded.recalculate_prestige_bonuses();
-                                                reloaded.combat_state.add_log_entry(
-                                                    "\u{23F3} Save restored".to_string(),
-                                                    false,
-                                                    true,
-                                                );
-                                                state = reloaded;
-                                            }
-
-                                            // Suppress offline XP on the reloaded save
-                                            state.last_save_time = Utc::now().timestamp();
-
-                                            // Refresh vault browser in-place (overlay stays open)
-                                            if let GameOverlay::TimeVault { ref mut browser } =
-                                                overlay
-                                            {
-                                                if let Ok(branches) = repo.list_branches() {
-                                                    browser.branches = branches;
-                                                    if browser.selected_branch
-                                                        >= browser.branches.len()
-                                                    {
-                                                        browser.selected_branch = browser
-                                                            .branches
-                                                            .len()
-                                                            .saturating_sub(1);
-                                                    }
-                                                    if let Some(b) = browser
-                                                        .branches
-                                                        .get(browser.selected_branch)
-                                                    {
-                                                        browser.commits = repo
-                                                            .list_commits(&b.name)
-                                                            .unwrap_or_default();
-                                                        browser.selected_commit = 0;
-                                                    }
-                                                }
-                                            }
-                                            if !debug_mode {
-                                                last_save_instant = Some(Instant::now());
-                                                last_save_time = Some(Local::now());
-                                            }
-                                        }
+                                        state = *reloaded;
+                                        continue;
                                     }
-                                    continue;
-                                }
-
-                                if let InputResult::ForkSave {
-                                    ref commit_id,
-                                    ref branch_name,
-                                } = result
-                                {
-                                    if let Some(ref repo) = history_repo {
-                                        // Auto-save current state before forking.
-                                        // Immediate commit required (state reloads next).
-                                        save_files(
-                                            &character_manager,
-                                            &state,
-                                            &global_achievements,
-                                            &haven,
-                                            &enhancement,
-                                            &deep_state,
-                                        );
-                                        last_save_time = Some(Local::now());
-                                        last_save_instant = None;
-                                        if commit_save(&state, &history::SaveEvent::AutoSave, repo)
-                                        {
-                                            last_commit_instant = Some(Instant::now());
-                                            last_commit_time = Some(Local::now());
-                                            if !cloud.op_in_flight {
-                                                if let Some(ref config) = cloud.config {
-                                                    main_helpers::cloud_ops::spawn_cloud_push(
-                                                        &mut cloud.op_in_flight,
-                                                        &cloud.tx,
-                                                        &quest_dir,
-                                                        &config.token,
-                                                    );
-                                                }
-                                            }
-                                        }
-                                        if repo.fork_timeline(branch_name, commit_id).is_ok() {
-                                            // Full state reload (fork checks out the new branch)
-                                            main_helpers::cloud_ops::reload_account_state(
-                                                &mut haven,
-                                                &mut enhancement,
-                                                &mut global_achievements,
-                                            );
-
-                                            let filename = format!("{}.json", state.character_name);
-                                            if let Ok(mut reloaded) =
-                                                character_manager.load_character(&filename)
-                                            {
-                                                reloaded
-                                                    .recalculate_derived_stats(&enhancement.levels);
-                                                reloaded.recalculate_prestige_bonuses();
-                                                reloaded.combat_state.add_log_entry(
-                                                    format!(
-                                                    "\u{1F500} Timeline branched: {branch_name}"
-                                                ),
-                                                    false,
-                                                    true,
-                                                );
-                                                state = reloaded;
-                                            }
-
-                                            // Suppress offline XP on the reloaded save
-                                            state.last_save_time = Utc::now().timestamp();
-
-                                            // Refresh vault browser in-place (overlay stays open)
-                                            if let GameOverlay::TimeVault { ref mut browser } =
-                                                overlay
-                                            {
-                                                if let Ok(branches) = repo.list_branches() {
-                                                    browser.branches = branches;
-                                                    if browser.selected_branch
-                                                        >= browser.branches.len()
-                                                    {
-                                                        browser.selected_branch = browser
-                                                            .branches
-                                                            .len()
-                                                            .saturating_sub(1);
-                                                    }
-                                                    if let Some(b) = browser
-                                                        .branches
-                                                        .get(browser.selected_branch)
-                                                    {
-                                                        browser.commits = repo
-                                                            .list_commits(&b.name)
-                                                            .unwrap_or_default();
-                                                        browser.selected_commit = 0;
-                                                    }
-                                                }
-                                            }
-                                            if !debug_mode {
-                                                last_save_instant = Some(Instant::now());
-                                                last_save_time = Some(Local::now());
-                                            }
-                                        }
+                                    TimeVaultAction::Handled => {
+                                        continue;
                                     }
-                                    continue;
-                                }
-
-                                if let InputResult::SwitchSaveBranch { ref branch_name } = result {
-                                    if let Some(ref repo) = history_repo {
-                                        // Auto-save current state before switching.
-                                        // Immediate commit required (state reloads next).
-                                        save_files(
-                                            &character_manager,
-                                            &state,
-                                            &global_achievements,
-                                            &haven,
-                                            &enhancement,
-                                            &deep_state,
-                                        );
-                                        last_save_time = Some(Local::now());
-                                        last_save_instant = None;
-                                        if commit_save(&state, &history::SaveEvent::AutoSave, repo)
-                                        {
-                                            last_commit_instant = Some(Instant::now());
-                                            last_commit_time = Some(Local::now());
-                                            if !cloud.op_in_flight {
-                                                if let Some(ref config) = cloud.config {
-                                                    main_helpers::cloud_ops::spawn_cloud_push(
-                                                        &mut cloud.op_in_flight,
-                                                        &cloud.tx,
-                                                        &quest_dir,
-                                                        &config.token,
-                                                    );
-                                                }
-                                            }
-                                        }
-                                        if repo.switch_timeline(branch_name).is_ok() {
-                                            // Full state reload (switch checks out the branch)
-                                            main_helpers::cloud_ops::reload_account_state(
-                                                &mut haven,
-                                                &mut enhancement,
-                                                &mut global_achievements,
-                                            );
-
-                                            let filename = format!("{}.json", state.character_name);
-                                            if let Ok(mut reloaded) =
-                                                character_manager.load_character(&filename)
-                                            {
-                                                reloaded
-                                                    .recalculate_derived_stats(&enhancement.levels);
-                                                reloaded.recalculate_prestige_bonuses();
-                                                reloaded.combat_state.add_log_entry(
-                                                    format!(
-                                                    "\u{1F500} Timeline switched: {branch_name}"
-                                                ),
-                                                    false,
-                                                    true,
-                                                );
-                                                state = reloaded;
-                                            }
-
-                                            // Suppress offline XP on the reloaded save
-                                            state.last_save_time = Utc::now().timestamp();
-
-                                            // Refresh vault browser in-place (overlay stays open)
-                                            if let GameOverlay::TimeVault { ref mut browser } =
-                                                overlay
-                                            {
-                                                if let Ok(branches) = repo.list_branches() {
-                                                    // Select the switched-to branch (sort order changes)
-                                                    browser.selected_branch = branches
-                                                        .iter()
-                                                        .position(|b| b.name == *branch_name)
-                                                        .unwrap_or(0);
-                                                    browser.branches = branches;
-                                                    if let Some(b) = browser
-                                                        .branches
-                                                        .get(browser.selected_branch)
-                                                    {
-                                                        browser.commits = repo
-                                                            .list_commits(&b.name)
-                                                            .unwrap_or_default();
-                                                        browser.selected_commit = 0;
-                                                    }
-                                                }
-                                            }
-                                            if !debug_mode {
-                                                last_save_instant = Some(Instant::now());
-                                                last_save_time = Some(Local::now());
-                                            }
-                                        }
-                                    }
-                                    continue;
-                                }
-
-                                if let InputResult::DeleteSaveBranch { ref branch_name } = result {
-                                    if let Some(ref repo) = history_repo {
-                                        if repo.delete_timeline(branch_name).is_ok() {
-                                            // Refresh browser in-place (overlay stays open)
-                                            if let GameOverlay::TimeVault { ref mut browser } =
-                                                overlay
-                                            {
-                                                if let Ok(branches) = repo.list_branches() {
-                                                    browser.branches = branches;
-                                                    // Clamp selection
-                                                    if browser.selected_branch
-                                                        >= browser.branches.len()
-                                                    {
-                                                        browser.selected_branch = browser
-                                                            .branches
-                                                            .len()
-                                                            .saturating_sub(1);
-                                                    }
-                                                    // Refresh commits for new selection
-                                                    if let Some(b) = browser
-                                                        .branches
-                                                        .get(browser.selected_branch)
-                                                    {
-                                                        browser.commits = repo
-                                                            .list_commits(&b.name)
-                                                            .unwrap_or_default();
-                                                        browser.selected_commit = 0;
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    continue;
+                                    TimeVaultAction::NotHandled => {}
                                 }
 
                                 // Handle async cloud sync actions before routing

@@ -116,6 +116,19 @@ pub enum GameOverlay {
 }
 
 /// Result of handling a game input event.
+///
+/// Variants are dispatched in priority order in the main game loop:
+///
+/// 1. **Chrono Surge** -- `dispatch_chrono_surge()` handles `StartChronoSurge`
+/// 2. **Time Vault** -- `dispatch_time_vault_action()` handles `OpenTimeVault`,
+///    `RefreshSaveHistoryCommits`, `RestoreSave`, `ForkSave`, `SwitchSaveBranch`,
+///    `DeleteSaveBranch`
+/// 3. **Cloud sync** -- `dispatch_cloud_action()` / `apply_cloud_resolve()` handle
+///    `ValidateToken`, `ChangeRepo`, `LinkCloud`, `PushCloud`, `PullCloud`,
+///    `UnlinkCloud`, `ResolveKeepLocal`, `ResolveUseCloud`, `ResolveKeepBoth`,
+///    `UpdateToken`
+/// 4. **Game routing** -- `route_game_input()` handles `Continue`, `QuitToSelect`,
+///    `NeedsSave`, `NeedsSaveAll`, `NeedsSaveWithEvent`, `NeedsSaveAllWithEvent`
 pub enum InputResult {
     /// Continue the game loop normally.
     Continue,

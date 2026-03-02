@@ -254,12 +254,8 @@ fn test_game_tick_produces_player_attack_events() {
         .iter()
         .find(|e| matches!(e, TickEvent::PlayerAttack { .. }))
         .unwrap();
-    if let TickEvent::PlayerAttack {
-        damage, message, ..
-    } = attack
-    {
+    if let TickEvent::PlayerAttack { damage, .. } = attack {
         assert!(*damage > 0, "Attack damage should be positive");
-        assert!(!message.is_empty(), "Attack message should not be empty");
     }
 }
 
@@ -286,15 +282,8 @@ fn test_game_tick_produces_enemy_defeated_event() {
         .iter()
         .find(|e| matches!(e, TickEvent::EnemyDefeated { .. }))
         .unwrap();
-    if let TickEvent::EnemyDefeated {
-        xp_gained, message, ..
-    } = defeated
-    {
+    if let TickEvent::EnemyDefeated { xp_gained, .. } = defeated {
         assert!(*xp_gained > 0, "XP gained should be positive");
-        assert!(
-            message.contains("defeated"),
-            "Message should mention defeat"
-        );
     }
 }
 
@@ -375,18 +364,9 @@ fn test_game_tick_produces_enemy_attack_events() {
         .iter()
         .find(|e| matches!(e, TickEvent::EnemyAttack { .. }))
         .unwrap();
-    if let TickEvent::EnemyAttack {
-        damage,
-        enemy_name,
-        message,
-    } = attack
-    {
+    if let TickEvent::EnemyAttack { damage, enemy_name } = attack {
         assert!(*damage > 0, "Enemy damage should be positive");
         assert!(!enemy_name.is_empty(), "Enemy name should not be empty");
-        assert!(
-            message.contains("hits you"),
-            "Message should describe enemy attack"
-        );
     }
 }
 
@@ -527,15 +507,8 @@ fn test_game_tick_subzone_boss_defeated_event() {
         .iter()
         .find(|e| matches!(e, TickEvent::SubzoneBossDefeated { .. }))
         .unwrap();
-    if let TickEvent::SubzoneBossDefeated {
-        xp_gained, message, ..
-    } = boss_event
-    {
+    if let TickEvent::SubzoneBossDefeated { xp_gained, .. } = boss_event {
         assert!(*xp_gained > 0, "Boss XP should be positive");
-        assert!(
-            message.contains("Boss defeated") || message.contains("conquered"),
-            "Message should describe boss defeat"
-        );
     }
 
     // Zone should have advanced
@@ -843,7 +816,7 @@ fn test_game_tick_dungeon_failed_event_on_death() {
         for event in &result.events {
             if matches!(
                 event,
-                TickEvent::DungeonFailed { .. } | TickEvent::PlayerDiedInDungeon { .. }
+                TickEvent::DungeonFailed | TickEvent::PlayerDiedInDungeon
             ) {
                 dungeon_ended = true;
             }
@@ -966,12 +939,8 @@ fn test_game_tick_achievement_event_on_level_milestone() {
             .iter()
             .find(|e| matches!(e, TickEvent::AchievementUnlocked { .. }))
             .unwrap();
-        if let TickEvent::AchievementUnlocked { name, message } = achievement {
+        if let TickEvent::AchievementUnlocked { name } = achievement {
             assert!(!name.is_empty(), "Achievement name should not be empty");
-            assert!(
-                message.contains("Achievement Unlocked"),
-                "Message should mention unlock"
-            );
         }
     }
 }

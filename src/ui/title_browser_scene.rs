@@ -1,6 +1,7 @@
 //! Title browser overlay UI — lets the player select a displayed title.
 
 use crate::achievements::{titles, Achievements};
+use crate::ui::responsive::LayoutContext;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -58,6 +59,7 @@ pub fn render_title_browser(
     achievements: &Achievements,
     ui_state: &TitleBrowserState,
     character_name: &str,
+    _layout_ctx: &LayoutContext,
 ) {
     frame.render_widget(Clear, area);
 

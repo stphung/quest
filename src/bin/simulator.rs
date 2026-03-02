@@ -333,11 +333,11 @@ impl SimStats {
                     self.total_kills += 1;
                     self.total_xp_gained += xp_gained;
                 }
-                TickEvent::PlayerDied { .. } => {
+                TickEvent::PlayerDied => {
                     self.total_deaths += 1;
                     *self.deaths_per_zone.entry(current_zone).or_insert(0) += 1;
                 }
-                TickEvent::PlayerDiedInDungeon { .. } => {
+                TickEvent::PlayerDiedInDungeon => {
                     self.total_deaths += 1;
                 }
                 TickEvent::SubzoneBossDefeated { xp_gained, .. } => {
@@ -375,7 +375,7 @@ impl SimStats {
                 TickEvent::DungeonCompleted { .. } | TickEvent::DungeonBossDefeated { .. } => {
                     self.dungeons_completed += 1;
                 }
-                TickEvent::DungeonFailed { .. } => {
+                TickEvent::DungeonFailed => {
                     self.dungeons_failed += 1;
                 }
                 TickEvent::DungeonDiscovered { .. } => {
@@ -590,8 +590,8 @@ fn print_tick_events(tick: u64, result: &TickResult) {
             } => {
                 format!("Killed {enemy_name} (+{xp_gained} XP)")
             }
-            TickEvent::PlayerDied { .. } => "DIED".to_string(),
-            TickEvent::PlayerDiedInDungeon { .. } => "DIED (dungeon)".to_string(),
+            TickEvent::PlayerDied => "DIED".to_string(),
+            TickEvent::PlayerDiedInDungeon => "DIED (dungeon)".to_string(),
             TickEvent::SubzoneBossDefeated { xp_gained, .. } => {
                 format!("Boss defeated (+{xp_gained} XP)")
             }
@@ -609,7 +609,7 @@ fn print_tick_events(tick: u64, result: &TickResult) {
             TickEvent::DungeonCompleted { xp_earned, .. } => {
                 format!("Dungeon completed (+{xp_earned} XP)")
             }
-            TickEvent::DungeonFailed { .. } => "Dungeon failed".to_string(),
+            TickEvent::DungeonFailed => "Dungeon failed".to_string(),
             TickEvent::FishCaught {
                 fish_name, rarity, ..
             } => {
