@@ -24,6 +24,7 @@ use crate::core::game_state::GameState;
 use crate::deep::types::{DeepState, DeepUiState};
 use crate::enhancement;
 use crate::haven::Haven;
+use crate::main_helpers::game_context::GameContext;
 use crate::stormglass::types::ExchangeUiState;
 use crate::utils::debug_menu::DebugMenu;
 use deep_input::handle_deep;
@@ -36,22 +37,20 @@ pub use stormglass_input::check_sigil_animation_timeout;
 use stormglass_input::handle_stormglass_exchange;
 
 /// Main dispatcher for Game screen input. Handles the priority chain.
-#[allow(clippy::too_many_arguments)]
-pub fn handle_game_input(
-    key: KeyEvent,
-    state: &mut GameState,
-    haven: &mut Haven,
-    haven_ui: &mut HavenUiState,
-    soulforge_ui: &mut SoulforgeUiState,
-    exchange_ui: &mut ExchangeUiState,
-    deep_state: &mut DeepState,
-    deep_ui: &mut DeepUiState,
-    enhancement: &mut enhancement::EnhancementProgress,
-    overlay: &mut GameOverlay,
-    debug_menu: &mut DebugMenu,
-    debug_mode: bool,
-    achievements: &mut crate::achievements::Achievements,
-) -> InputResult {
+pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResult {
+    let state = &mut *ctx.state;
+    let haven = &mut *ctx.haven;
+    let haven_ui = &mut *ctx.haven_ui;
+    let soulforge_ui = &mut *ctx.soulforge_ui;
+    let exchange_ui = &mut *ctx.exchange_ui;
+    let deep_state = &mut *ctx.deep_state;
+    let deep_ui = &mut *ctx.deep_ui;
+    let enhancement = &mut *ctx.enhancement;
+    let overlay = &mut *ctx.overlay;
+    let debug_menu = &mut *ctx.debug_menu;
+    let debug_mode = ctx.debug_mode;
+    let achievements = &mut *ctx.achievements;
+
     // 0. Offline welcome overlay (any key dismisses)
     if matches!(overlay, GameOverlay::OfflineWelcome { .. }) {
         *overlay = GameOverlay::None;

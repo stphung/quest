@@ -4,9 +4,9 @@ use chrono::Local;
 use std::time::Instant;
 
 use crate::character::manager::CharacterManager;
-use crate::core::game_state::GameState;
 use crate::history::HistoryRepo;
 use crate::input::InputResult;
+use crate::main_helpers::game_context::GameContext;
 
 use super::persistence::save_all;
 
@@ -25,20 +25,21 @@ pub enum InputAction {
 ///
 /// Returns an [`InputAction`] telling the caller whether to continue or
 /// exit the game loop.
-#[allow(clippy::too_many_arguments)]
 pub fn route_game_input(
     result: InputResult,
-    state: &GameState,
+    ctx: &GameContext<'_>,
     character_manager: &CharacterManager,
-    global_achievements: &crate::achievements::Achievements,
-    haven: &crate::haven::Haven,
-    enhancement: &crate::enhancement::EnhancementProgress,
-    deep: &crate::deep::DeepState,
-    debug_mode: bool,
     last_save_instant: &mut Option<Instant>,
     last_save_time: &mut Option<chrono::DateTime<Local>>,
     history_repo: Option<&HistoryRepo>,
 ) -> InputAction {
+    let state = &*ctx.state;
+    let global_achievements = &*ctx.achievements;
+    let haven = &*ctx.haven;
+    let enhancement = &*ctx.enhancement;
+    let deep = &*ctx.deep_state;
+    let debug_mode = ctx.debug_mode;
+
     match result {
         InputResult::Continue => InputAction::Continue,
         InputResult::QuitToSelect => {
