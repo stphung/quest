@@ -136,6 +136,8 @@ mod tests {
                 last_save_time: 1000,
                 attributes: crate::character::attributes::Attributes::new(),
                 equipment: crate::items::Equipment::new(),
+                ascension_level: 0,
+                storm_sigils: crate::stormglass::sigils::StormSigils::new(),
                 is_corrupted: false,
             },
             CharacterInfo {
@@ -148,6 +150,8 @@ mod tests {
                 last_save_time: 2000,
                 attributes: crate::character::attributes::Attributes::new(),
                 equipment: crate::items::Equipment::new(),
+                ascension_level: 0,
+                storm_sigils: crate::stormglass::sigils::StormSigils::new(),
                 is_corrupted: false,
             },
         ]
@@ -331,6 +335,8 @@ mod tests {
             last_save_time: 1000,
             attributes: crate::character::attributes::Attributes::new(),
             equipment: crate::items::Equipment::new(),
+            ascension_level: 0,
+            storm_sigils: crate::stormglass::sigils::StormSigils::new(),
             is_corrupted: false,
         }
     }
