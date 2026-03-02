@@ -11,10 +11,10 @@ use crate::core::game_state::GameState;
 use crate::core::power_rating::compute_power_rating;
 use crate::enhancement;
 use crate::haven;
-use crate::stormglass::sigils::SigilBonuses;
 use crate::history::cloud::{CloudConfig, CloudOpResult, CloudStatus};
 use crate::history::HistoryRepo;
 use crate::input::time_vault_input::{handle_time_vault_input, TimeVaultAction};
+use crate::stormglass::sigils::SigilBonuses;
 use crate::ui;
 use crate::ui::achievement_browser_scene::AchievementBrowserState;
 use crate::ui::character_select::CharacterSelectScreen;
@@ -366,10 +366,9 @@ fn build_startup_splash_text(
                 attack_speed_percent: crate::god_items::equipped_god_item_attack_speed_percent(
                     &character.equipment,
                 ) + sigil_bonuses.attack_speed_percent,
-                regen_reduction_percent:
-                    crate::god_items::equipped_god_item_regen_reduction_percent(
-                        &character.equipment,
-                    ) + sigil_bonuses.regen_delay_percent,
+                regen_reduction_percent: crate::god_items::equipped_god_item_regen_reduction_percent(
+                    &character.equipment,
+                ) + sigil_bonuses.regen_delay_percent,
                 flat_damage: prestige_combat.flat_damage,
                 flat_defense: prestige_combat.flat_defense,
                 ascension_multiplier: crate::ascension::ascension_combat_multiplier(
@@ -378,12 +377,10 @@ fn build_startup_splash_text(
             };
             // Max HP: derived base + prestige flat HP + ascension multiplier + sigil HP%
             let base_max_hp = derived.max_hp + prestige_combat.flat_hp;
-            let after_ascension =
-                (base_max_hp as f64 * combat_bonuses.ascension_multiplier) as u32;
+            let after_ascension = (base_max_hp as f64 * combat_bonuses.ascension_multiplier) as u32;
             let player_max_hp =
                 (after_ascension as f64 * (1.0 + sigil_bonuses.max_hp_percent / 100.0)) as u32;
-            let total_power =
-                compute_power_rating(&derived, &combat_bonuses, player_max_hp) as u32;
+            let total_power = compute_power_rating(&derived, &combat_bonuses, player_max_hp) as u32;
             let asc_part = if character.ascension_level > 0 {
                 format!(" \u{00b7} Asc {}", to_roman(character.ascension_level))
             } else {
