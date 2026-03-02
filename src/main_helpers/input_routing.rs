@@ -25,12 +25,15 @@ pub enum InputAction {
 ///
 /// Returns an [`InputAction`] telling the caller whether to continue or
 /// exit the game loop.
+#[allow(clippy::too_many_arguments)]
 pub fn route_game_input(
     result: InputResult,
     ctx: &GameContext<'_>,
     character_manager: &CharacterManager,
     last_save_instant: &mut Option<Instant>,
     last_save_time: &mut Option<chrono::DateTime<Local>>,
+    last_commit_instant: &mut Option<Instant>,
+    last_commit_time: &mut Option<chrono::DateTime<Local>>,
     history_repo: Option<&HistoryRepo>,
 ) -> InputAction {
     let state = &*ctx.state;
@@ -77,7 +80,7 @@ pub fn route_game_input(
         InputResult::NeedsSaveWithEvent(ref event)
         | InputResult::NeedsSaveAllWithEvent(ref event) => {
             if !debug_mode {
-                save_all(
+                let committed = save_all(
                     character_manager,
                     state,
                     global_achievements,
@@ -89,6 +92,10 @@ pub fn route_game_input(
                 );
                 *last_save_instant = Some(Instant::now());
                 *last_save_time = Some(Local::now());
+                if committed {
+                    *last_commit_instant = Some(Instant::now());
+                    *last_commit_time = Some(Local::now());
+                }
             }
             InputAction::ContinueAndPush
         }

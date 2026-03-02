@@ -50,6 +50,8 @@ pub struct CloudActionResult {
     pub account_state_reloaded: bool,
     /// True when `last_save_time` should be updated to now.
     pub needs_save_timestamp: bool,
+    /// True when a cloud push completed successfully.
+    pub pushed: bool,
 }
 
 /// Poll the cloud result channel and apply state transitions.
@@ -75,6 +77,7 @@ pub fn poll_cloud_result(
         reloaded_state: None,
         account_state_reloaded: false,
         needs_save_timestamp: false,
+        pushed: false,
     };
 
     match result {
@@ -128,6 +131,7 @@ pub fn poll_cloud_result(
         }
         CloudOpResult::Pushed => {
             cloud.status = CloudStatus::Linked;
+            action_result.pushed = true;
         }
         CloudOpResult::Pulled => {
             cloud.status = CloudStatus::Linked;
@@ -464,6 +468,7 @@ pub fn apply_cloud_resolve(
                     ),
                     account_state_reloaded: true,
                     needs_save_timestamp: true,
+                    pushed: false,
                 };
 
                 cloud.status = CloudStatus::Linked;
@@ -483,6 +488,7 @@ pub fn apply_cloud_resolve(
                 reloaded_state: reload_character(character_manager, character_name, enhancement),
                 account_state_reloaded: true,
                 needs_save_timestamp: true,
+                pushed: false,
             };
 
             cloud.status = CloudStatus::Linked;

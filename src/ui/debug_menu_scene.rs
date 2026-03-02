@@ -314,35 +314,131 @@ pub fn render_debug_indicator(
     frame.render_widget(indicator, indicator_area);
 }
 
-/// Render the save indicator (spinner while saving, timestamp after)
-/// `is_saving` should be true for ~1 second after a save completes
+/// A single segment of the save/commit/push indicator.
+#[cfg_attr(test, derive(Debug, PartialEq))]
+struct IndicatorSegment {
+    content: String,
+    color: Color,
+}
+
+/// Build the indicator segments based on current state.
+///
+/// - Save segment is always shown (when there is a last_save_time or is_saving).
+/// - Commit segment is shown only when `has_history_repo` is true.
+/// - Push segment is shown only when `has_cloud_config` is true.
+#[allow(clippy::too_many_arguments)]
+fn build_save_indicator_segments(
+    is_saving: bool,
+    last_save_time: Option<chrono::DateTime<chrono::Local>>,
+    is_committing: bool,
+    last_commit_time: Option<chrono::DateTime<chrono::Local>>,
+    is_pushing: bool,
+    last_push_time: Option<chrono::DateTime<chrono::Local>>,
+    has_history_repo: bool,
+    has_cloud_config: bool,
+) -> Vec<IndicatorSegment> {
+    use super::throbber::spinner_char;
+
+    let mut segments = Vec::new();
+
+    // Save segment (always present when there is state to show)
+    if is_saving {
+        segments.push(IndicatorSegment {
+            content: format!("{} Saving...", spinner_char()),
+            color: Color::Yellow,
+        });
+    } else if let Some(time) = last_save_time {
+        segments.push(IndicatorSegment {
+            content: format!("Saved {}", time.format("%-I:%M %p")),
+            color: Color::DarkGray,
+        });
+    }
+
+    // Commit segment (only if history repo exists)
+    if has_history_repo {
+        if is_committing {
+            segments.push(IndicatorSegment {
+                content: format!("{} Committing...", spinner_char()),
+                color: Color::Yellow,
+            });
+        } else if let Some(time) = last_commit_time {
+            segments.push(IndicatorSegment {
+                content: format!("Committed {}", time.format("%-I:%M %p")),
+                color: Color::DarkGray,
+            });
+        }
+    }
+
+    // Push segment (only if cloud config exists)
+    if has_cloud_config {
+        if is_pushing {
+            segments.push(IndicatorSegment {
+                content: format!("{} Pushing...", spinner_char()),
+                color: Color::Cyan,
+            });
+        } else if let Some(time) = last_push_time {
+            segments.push(IndicatorSegment {
+                content: format!("\u{2601} Pushed {}", time.format("%-I:%M %p")),
+                color: Color::DarkGray,
+            });
+        }
+    }
+
+    segments
+}
+
+/// Render the multi-segment save/commit/push indicator.
+///
+/// Displays up to three segments separated by `" \u{2502} "` (thin vertical bar):
+/// - Save: always shown when there is save state
+/// - Commit: shown only if `has_history_repo` is true
+/// - Push: shown only if `has_cloud_config` is true
+#[allow(clippy::too_many_arguments)]
 pub fn render_save_indicator(
     frame: &mut Frame,
     area: Rect,
     is_saving: bool,
     last_save_time: Option<chrono::DateTime<chrono::Local>>,
+    is_committing: bool,
+    last_commit_time: Option<chrono::DateTime<chrono::Local>>,
+    is_pushing: bool,
+    last_push_time: Option<chrono::DateTime<chrono::Local>>,
+    has_history_repo: bool,
+    has_cloud_config: bool,
     _ctx: &super::responsive::LayoutContext,
 ) {
-    use super::throbber::spinner_char;
+    let segments = build_save_indicator_segments(
+        is_saving,
+        last_save_time,
+        is_committing,
+        last_commit_time,
+        is_pushing,
+        last_push_time,
+        has_history_repo,
+        has_cloud_config,
+    );
 
-    let text = if is_saving {
-        format!("{} Saving...", spinner_char())
-    } else if let Some(time) = last_save_time {
-        format!("Saved {}", time.format("%-I:%M %p"))
-    } else {
-        return; // No save yet, don't show anything
-    };
+    if segments.is_empty() {
+        return;
+    }
 
-    let color = if is_saving {
-        Color::Yellow
-    } else {
-        Color::DarkGray
-    };
+    let separator = Span::styled(" \u{2502} ", Style::default().fg(Color::DarkGray));
 
-    let indicator = Paragraph::new(Line::from(text.clone())).style(Style::default().fg(color));
+    let mut spans: Vec<Span> = Vec::new();
+    for (i, seg) in segments.iter().enumerate() {
+        if i > 0 {
+            spans.push(separator.clone());
+        }
+        spans.push(Span::styled(&seg.content, Style::default().fg(seg.color)));
+    }
+
+    // Calculate total display width
+    let total_width: usize = spans.iter().map(|s| s.content.len()).sum();
+
+    let indicator = Paragraph::new(Line::from(spans));
 
     // Position in top-right corner
-    let width = text.len() as u16 + 1;
+    let width = total_width as u16 + 1;
     let x = area.x + area.width.saturating_sub(width);
     let indicator_area = Rect {
         x,
@@ -352,4 +448,120 @@ pub fn render_save_indicator(
     };
 
     frame.render_widget(indicator, indicator_area);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Local;
+
+    fn make_time() -> chrono::DateTime<chrono::Local> {
+        Local::now()
+    }
+
+    #[test]
+    fn save_only_saving() {
+        let segments =
+            build_save_indicator_segments(true, None, false, None, false, None, false, false);
+        assert_eq!(segments.len(), 1);
+        assert!(segments[0].content.contains("Saving..."));
+        assert_eq!(segments[0].color, Color::Yellow);
+    }
+
+    #[test]
+    fn save_only_saved() {
+        let time = make_time();
+        let segments = build_save_indicator_segments(
+            false,
+            Some(time),
+            false,
+            None,
+            false,
+            None,
+            false,
+            false,
+        );
+        assert_eq!(segments.len(), 1);
+        assert!(segments[0].content.starts_with("Saved "));
+        assert_eq!(segments[0].color, Color::DarkGray);
+    }
+
+    #[test]
+    fn save_and_commit() {
+        let time = make_time();
+        let segments = build_save_indicator_segments(
+            false,
+            Some(time),
+            false,
+            Some(time),
+            false,
+            None,
+            true,
+            false,
+        );
+        assert_eq!(segments.len(), 2);
+        assert!(segments[0].content.starts_with("Saved "));
+        assert!(segments[1].content.starts_with("Committed "));
+    }
+
+    #[test]
+    fn all_three() {
+        let time = make_time();
+        let segments = build_save_indicator_segments(
+            false,
+            Some(time),
+            false,
+            Some(time),
+            false,
+            Some(time),
+            true,
+            true,
+        );
+        assert_eq!(segments.len(), 3);
+        assert!(segments[0].content.starts_with("Saved "));
+        assert!(segments[1].content.starts_with("Committed "));
+        assert!(segments[2].content.contains("Pushed "));
+    }
+
+    #[test]
+    fn no_commit_without_history() {
+        let time = make_time();
+        let segments = build_save_indicator_segments(
+            false,
+            Some(time),
+            false,
+            Some(time),
+            false,
+            None,
+            false, // no history repo
+            false,
+        );
+        assert_eq!(segments.len(), 1);
+        assert!(segments[0].content.starts_with("Saved "));
+    }
+
+    #[test]
+    fn no_push_without_cloud() {
+        let time = make_time();
+        let segments = build_save_indicator_segments(
+            false,
+            Some(time),
+            false,
+            Some(time),
+            false,
+            Some(time),
+            true,
+            false, // no cloud config
+        );
+        assert_eq!(segments.len(), 2);
+        assert!(segments[0].content.starts_with("Saved "));
+        assert!(segments[1].content.starts_with("Committed "));
+    }
+
+    #[test]
+    fn empty_no_save_yet() {
+        let segments =
+            build_save_indicator_segments(false, None, false, None, false, None, true, true);
+        assert!(segments.is_empty());
+    }
 }

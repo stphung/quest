@@ -12,6 +12,8 @@ use crate::history::{CommitMetadata, HistoryRepo, SaveEvent};
 ///
 /// If a `save_event` and `history_repo` are both provided, a git commit is
 /// created after the JSON files are written.
+///
+/// Returns `true` if a git commit was successfully created, `false` otherwise.
 #[allow(clippy::too_many_arguments)]
 pub fn save_all(
     character_manager: &CharacterManager,
@@ -22,7 +24,7 @@ pub fn save_all(
     deep: &deep::DeepState,
     save_event: Option<&SaveEvent>,
     history_repo: Option<&HistoryRepo>,
-) {
+) -> bool {
     let _ = character_manager.save_character(state);
     achievements::save_achievements(global_achievements).ok();
     if haven.discovered {
@@ -44,6 +46,8 @@ pub fn save_all(
             play_time_seconds: state.play_time_seconds,
             character_name: state.character_name.clone(),
         };
-        let _ = repo.commit(event, &meta);
+        repo.commit(event, &meta).is_ok()
+    } else {
+        false
     }
 }

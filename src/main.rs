@@ -454,6 +454,10 @@ fn main() -> io::Result<()> {
                     // Save indicator state (for non-debug mode)
                     let mut last_save_instant: Option<Instant> = None;
                     let mut last_save_time: Option<chrono::DateTime<chrono::Local>> = None;
+                    let mut last_commit_instant: Option<Instant> = None;
+                    let mut last_commit_time: Option<chrono::DateTime<chrono::Local>> = None;
+                    let mut last_push_instant: Option<Instant> = None;
+                    let mut last_push_time: Option<chrono::DateTime<chrono::Local>> = None;
 
                     // Update check state - start initial background check immediately
                     let mut update_info: Option<UpdateInfo> = None;
@@ -508,6 +512,10 @@ fn main() -> io::Result<()> {
                             }
                             if cloud_result.needs_save_timestamp {
                                 state.last_save_time = Utc::now().timestamp();
+                            }
+                            if cloud_result.pushed {
+                                last_push_instant = Some(Instant::now());
+                                last_push_time = Some(Local::now());
                             }
                         }
 
@@ -573,6 +581,12 @@ fn main() -> io::Result<()> {
                                 let extras = main_helpers::game_context::OverlayExtras {
                                     last_save_instant,
                                     last_save_time,
+                                    last_commit_instant,
+                                    last_commit_time,
+                                    last_push_instant,
+                                    last_push_time,
+                                    has_history_repo: history_repo.is_some(),
+                                    has_cloud_config: cloud.config.is_some(),
                                     chrono_surge: chrono_surge.as_ref(),
                                     chrono_summary: chrono_summary.as_ref(),
                                     layout_ctx: &ctx,
@@ -657,7 +671,7 @@ fn main() -> io::Result<()> {
                                                 kills: surge.kills,
                                                 ticks: surge.ticks_total,
                                             };
-                                            save_all(
+                                            let committed = save_all(
                                                 &character_manager,
                                                 &state,
                                                 &global_achievements,
@@ -669,6 +683,10 @@ fn main() -> io::Result<()> {
                                             );
                                             last_save_instant = Some(Instant::now());
                                             last_save_time = Some(Local::now());
+                                            if committed {
+                                                last_commit_instant = Some(Instant::now());
+                                                last_commit_time = Some(Local::now());
+                                            }
                                         }
                                     }
                                     continue;
@@ -792,7 +810,7 @@ fn main() -> io::Result<()> {
                                 if let InputResult::RestoreSave { ref commit_id } = result {
                                     if let Some(ref repo) = history_repo {
                                         // Auto-save current state before restoring
-                                        save_all(
+                                        let committed = save_all(
                                             &character_manager,
                                             &state,
                                             &global_achievements,
@@ -802,6 +820,10 @@ fn main() -> io::Result<()> {
                                             Some(&history::SaveEvent::AutoSave),
                                             Some(repo),
                                         );
+                                        if committed {
+                                            last_commit_instant = Some(Instant::now());
+                                            last_commit_time = Some(Local::now());
+                                        }
                                         if repo.restore_to(commit_id).is_ok() {
                                             // Reload all state from disk (git reset replaced files)
                                             main_helpers::cloud_ops::reload_account_state(
@@ -870,7 +892,7 @@ fn main() -> io::Result<()> {
                                 {
                                     if let Some(ref repo) = history_repo {
                                         // Auto-save current state before forking
-                                        save_all(
+                                        let committed = save_all(
                                             &character_manager,
                                             &state,
                                             &global_achievements,
@@ -880,6 +902,10 @@ fn main() -> io::Result<()> {
                                             Some(&history::SaveEvent::AutoSave),
                                             Some(repo),
                                         );
+                                        if committed {
+                                            last_commit_instant = Some(Instant::now());
+                                            last_commit_time = Some(Local::now());
+                                        }
                                         if repo.fork_timeline(branch_name, commit_id).is_ok() {
                                             // Full state reload (fork checks out the new branch)
                                             main_helpers::cloud_ops::reload_account_state(
@@ -945,7 +971,7 @@ fn main() -> io::Result<()> {
                                 if let InputResult::SwitchSaveBranch { ref branch_name } = result {
                                     if let Some(ref repo) = history_repo {
                                         // Auto-save current state before switching
-                                        save_all(
+                                        let committed = save_all(
                                             &character_manager,
                                             &state,
                                             &global_achievements,
@@ -955,6 +981,10 @@ fn main() -> io::Result<()> {
                                             Some(&history::SaveEvent::AutoSave),
                                             Some(repo),
                                         );
+                                        if committed {
+                                            last_commit_instant = Some(Instant::now());
+                                            last_commit_time = Some(Local::now());
+                                        }
                                         if repo.switch_timeline(branch_name).is_ok() {
                                             // Full state reload (switch checks out the branch)
                                             main_helpers::cloud_ops::reload_account_state(
@@ -1109,6 +1139,8 @@ fn main() -> io::Result<()> {
                                         &character_manager,
                                         &mut last_save_instant,
                                         &mut last_save_time,
+                                        &mut last_commit_instant,
+                                        &mut last_commit_time,
                                         history_repo.as_ref(),
                                     )
                                 };
@@ -1250,7 +1282,7 @@ fn main() -> io::Result<()> {
                                 chrono_surge = None;
                                 chrono_summary = Some(summary);
                                 if !debug_mode {
-                                    save_all(
+                                    let committed = save_all(
                                         &character_manager,
                                         &state,
                                         &global_achievements,
@@ -1262,6 +1294,10 @@ fn main() -> io::Result<()> {
                                     );
                                     last_save_instant = Some(Instant::now());
                                     last_save_time = Some(Local::now());
+                                    if committed {
+                                        last_commit_instant = Some(Instant::now());
+                                        last_commit_time = Some(Local::now());
+                                    }
                                 }
                             }
 
@@ -1317,7 +1353,7 @@ fn main() -> io::Result<()> {
                                     || save_event.is_some())
                                     && !debug_mode
                                 {
-                                    save_all(
+                                    let committed = save_all(
                                         &character_manager,
                                         &state,
                                         &global_achievements,
@@ -1327,6 +1363,10 @@ fn main() -> io::Result<()> {
                                         save_event.as_ref(),
                                         history_repo.as_ref(),
                                     );
+                                    if committed {
+                                        last_commit_instant = Some(Instant::now());
+                                        last_commit_time = Some(Local::now());
+                                    }
 
                                     // Push to cloud after milestone commits
                                     if save_event.is_some() && !cloud.op_in_flight {
@@ -1483,7 +1523,7 @@ fn main() -> io::Result<()> {
                                                     None
                                                 };
                                                 if !debug_mode {
-                                                    save_all(
+                                                    let committed = save_all(
                                                         &character_manager,
                                                         &state,
                                                         &global_achievements,
@@ -1493,6 +1533,10 @@ fn main() -> io::Result<()> {
                                                         soulforge_event.as_ref(),
                                                         history_repo.as_ref(),
                                                     );
+                                                    if committed {
+                                                        last_commit_instant = Some(Instant::now());
+                                                        last_commit_time = Some(Local::now());
+                                                    }
                                                 }
                                             }
                                         }
