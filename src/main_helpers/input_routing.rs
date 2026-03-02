@@ -8,7 +8,7 @@ use crate::history::HistoryRepo;
 use crate::input::InputResult;
 use crate::main_helpers::game_context::GameContext;
 
-use super::persistence::save_all;
+use super::persistence::{commit_save, save_all, save_files};
 
 /// What the game loop should do after processing an input result.
 pub enum InputAction {
@@ -62,15 +62,13 @@ pub fn route_game_input(
         }
         InputResult::NeedsSave | InputResult::NeedsSaveAll => {
             if !debug_mode {
-                save_all(
+                save_files(
                     character_manager,
                     state,
                     global_achievements,
                     haven,
                     enhancement,
                     deep,
-                    None,
-                    history_repo,
                 );
                 *last_save_instant = Some(Instant::now());
                 *last_save_time = Some(Local::now());
@@ -80,21 +78,21 @@ pub fn route_game_input(
         InputResult::NeedsSaveWithEvent(ref event)
         | InputResult::NeedsSaveAllWithEvent(ref event) => {
             if !debug_mode {
-                let committed = save_all(
+                save_files(
                     character_manager,
                     state,
                     global_achievements,
                     haven,
                     enhancement,
                     deep,
-                    Some(event),
-                    history_repo,
                 );
                 *last_save_instant = Some(Instant::now());
                 *last_save_time = Some(Local::now());
-                if committed {
-                    *last_commit_instant = Some(Instant::now());
-                    *last_commit_time = Some(Local::now());
+                if let Some(repo) = history_repo {
+                    if commit_save(state, event, repo) {
+                        *last_commit_instant = Some(Instant::now());
+                        *last_commit_time = Some(Local::now());
+                    }
                 }
             }
             InputAction::ContinueAndPush

@@ -36,7 +36,7 @@ use main_helpers::chrono_surge::run_chrono_surge_batch;
 use main_helpers::input_routing::{route_game_input, InputAction};
 use main_helpers::offline::apply_offline_xp;
 use main_helpers::overlay::draw_game_overlays;
-use main_helpers::persistence::save_all;
+use main_helpers::persistence::{commit_save, save_files};
 use main_helpers::scene::{current_scene_kind, is_realtime_minigame, is_wide_scene};
 use main_helpers::update::{
     jittered_update_interval, show_startup_splash_screen, StartupSplashResult,
@@ -671,21 +671,21 @@ fn main() -> io::Result<()> {
                                                 kills: surge.kills,
                                                 ticks: surge.ticks_total,
                                             };
-                                            let committed = save_all(
+                                            save_files(
                                                 &character_manager,
                                                 &state,
                                                 &global_achievements,
                                                 &haven,
                                                 &enhancement,
                                                 &deep_state,
-                                                Some(&surge_event),
-                                                history_repo.as_ref(),
                                             );
                                             last_save_instant = Some(Instant::now());
                                             last_save_time = Some(Local::now());
-                                            if committed {
-                                                last_commit_instant = Some(Instant::now());
-                                                last_commit_time = Some(Local::now());
+                                            if let Some(ref repo) = history_repo {
+                                                if commit_save(&state, &surge_event, repo) {
+                                                    last_commit_instant = Some(Instant::now());
+                                                    last_commit_time = Some(Local::now());
+                                                }
                                             }
                                         }
                                     }
@@ -810,17 +810,18 @@ fn main() -> io::Result<()> {
                                 if let InputResult::RestoreSave { ref commit_id } = result {
                                     if let Some(ref repo) = history_repo {
                                         // Auto-save current state before restoring
-                                        let committed = save_all(
+                                        save_files(
                                             &character_manager,
                                             &state,
                                             &global_achievements,
                                             &haven,
                                             &enhancement,
                                             &deep_state,
-                                            Some(&history::SaveEvent::AutoSave),
-                                            Some(repo),
                                         );
-                                        if committed {
+                                        last_save_instant = Some(Instant::now());
+                                        last_save_time = Some(Local::now());
+                                        if commit_save(&state, &history::SaveEvent::AutoSave, repo)
+                                        {
                                             last_commit_instant = Some(Instant::now());
                                             last_commit_time = Some(Local::now());
                                         }
@@ -892,17 +893,18 @@ fn main() -> io::Result<()> {
                                 {
                                     if let Some(ref repo) = history_repo {
                                         // Auto-save current state before forking
-                                        let committed = save_all(
+                                        save_files(
                                             &character_manager,
                                             &state,
                                             &global_achievements,
                                             &haven,
                                             &enhancement,
                                             &deep_state,
-                                            Some(&history::SaveEvent::AutoSave),
-                                            Some(repo),
                                         );
-                                        if committed {
+                                        last_save_instant = Some(Instant::now());
+                                        last_save_time = Some(Local::now());
+                                        if commit_save(&state, &history::SaveEvent::AutoSave, repo)
+                                        {
                                             last_commit_instant = Some(Instant::now());
                                             last_commit_time = Some(Local::now());
                                         }
@@ -971,17 +973,18 @@ fn main() -> io::Result<()> {
                                 if let InputResult::SwitchSaveBranch { ref branch_name } = result {
                                     if let Some(ref repo) = history_repo {
                                         // Auto-save current state before switching
-                                        let committed = save_all(
+                                        save_files(
                                             &character_manager,
                                             &state,
                                             &global_achievements,
                                             &haven,
                                             &enhancement,
                                             &deep_state,
-                                            Some(&history::SaveEvent::AutoSave),
-                                            Some(repo),
                                         );
-                                        if committed {
+                                        last_save_instant = Some(Instant::now());
+                                        last_save_time = Some(Local::now());
+                                        if commit_save(&state, &history::SaveEvent::AutoSave, repo)
+                                        {
                                             last_commit_instant = Some(Instant::now());
                                             last_commit_time = Some(Local::now());
                                         }
@@ -1233,15 +1236,13 @@ fn main() -> io::Result<()> {
                                 last_autosave = Instant::now();
                                 // Immediate save with updated last_save_time
                                 if !debug_mode {
-                                    save_all(
+                                    save_files(
                                         &character_manager,
                                         &state,
                                         &global_achievements,
                                         &haven,
                                         &enhancement,
                                         &deep_state,
-                                        None,
-                                        history_repo.as_ref(),
                                     );
                                     last_save_instant = Some(Instant::now());
                                     last_save_time = Some(Local::now());
@@ -1265,15 +1266,13 @@ fn main() -> io::Result<()> {
                             );
 
                             if batch_result.needs_save && !debug_mode {
-                                save_all(
+                                save_files(
                                     &character_manager,
                                     &state,
                                     &global_achievements,
                                     &haven,
                                     &enhancement,
                                     &deep_state,
-                                    None,
-                                    history_repo.as_ref(),
                                 );
                             }
 
@@ -1282,21 +1281,21 @@ fn main() -> io::Result<()> {
                                 chrono_surge = None;
                                 chrono_summary = Some(summary);
                                 if !debug_mode {
-                                    let committed = save_all(
+                                    save_files(
                                         &character_manager,
                                         &state,
                                         &global_achievements,
                                         &haven,
                                         &enhancement,
                                         &deep_state,
-                                        Some(&surge_event),
-                                        history_repo.as_ref(),
                                     );
                                     last_save_instant = Some(Instant::now());
                                     last_save_time = Some(Local::now());
-                                    if committed {
-                                        last_commit_instant = Some(Instant::now());
-                                        last_commit_time = Some(Local::now());
+                                    if let Some(ref repo) = history_repo {
+                                        if commit_save(&state, &surge_event, repo) {
+                                            last_commit_instant = Some(Instant::now());
+                                            last_commit_time = Some(Local::now());
+                                        }
                                     }
                                 }
                             }
@@ -1353,19 +1352,23 @@ fn main() -> io::Result<()> {
                                     || save_event.is_some())
                                     && !debug_mode
                                 {
-                                    let committed = save_all(
+                                    save_files(
                                         &character_manager,
                                         &state,
                                         &global_achievements,
                                         &haven,
                                         &enhancement,
                                         &deep_state,
-                                        save_event.as_ref(),
-                                        history_repo.as_ref(),
                                     );
-                                    if committed {
-                                        last_commit_instant = Some(Instant::now());
-                                        last_commit_time = Some(Local::now());
+                                    last_save_instant = Some(Instant::now());
+                                    last_save_time = Some(Local::now());
+                                    if let (Some(event), Some(repo)) =
+                                        (save_event.as_ref(), history_repo.as_ref())
+                                    {
+                                        if commit_save(&state, event, repo) {
+                                            last_commit_instant = Some(Instant::now());
+                                            last_commit_time = Some(Local::now());
+                                        }
                                     }
 
                                     // Push to cloud after milestone commits
@@ -1523,19 +1526,25 @@ fn main() -> io::Result<()> {
                                                     None
                                                 };
                                                 if !debug_mode {
-                                                    let committed = save_all(
+                                                    save_files(
                                                         &character_manager,
                                                         &state,
                                                         &global_achievements,
                                                         &haven,
                                                         &enhancement,
                                                         &deep_state,
+                                                    );
+                                                    last_save_instant = Some(Instant::now());
+                                                    last_save_time = Some(Local::now());
+                                                    if let (Some(event), Some(repo)) = (
                                                         soulforge_event.as_ref(),
                                                         history_repo.as_ref(),
-                                                    );
-                                                    if committed {
-                                                        last_commit_instant = Some(Instant::now());
-                                                        last_commit_time = Some(Local::now());
+                                                    ) {
+                                                        if commit_save(&state, event, repo) {
+                                                            last_commit_instant =
+                                                                Some(Instant::now());
+                                                            last_commit_time = Some(Local::now());
+                                                        }
                                                     }
                                                 }
                                             }
@@ -1567,15 +1576,13 @@ fn main() -> io::Result<()> {
 
                             // Skip file I/O in debug mode
                             if !debug_mode {
-                                save_all(
+                                save_files(
                                     &character_manager,
                                     &state,
                                     &global_achievements,
                                     &haven,
                                     &enhancement,
                                     &deep_state,
-                                    None,
-                                    history_repo.as_ref(),
                                 );
                                 last_save_instant = Some(Instant::now());
                             }
