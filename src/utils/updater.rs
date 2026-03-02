@@ -250,7 +250,7 @@ pub fn check_for_updates(current_commit: &str, current_date: &str) -> UpdateChec
 
 /// Get the Quest data directory (~/.quest)
 fn get_quest_dir() -> Option<PathBuf> {
-    dirs::home_dir().map(|h| h.join(".quest"))
+    crate::core::paths::get_quest_dir().ok()
 }
 
 /// Backup all character saves to a timestamped directory.

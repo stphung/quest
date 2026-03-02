@@ -212,9 +212,7 @@ fn main() -> io::Result<()> {
     let character_manager = CharacterManager::new()?;
 
     // Quest data directory
-    let quest_dir = dirs::home_dir()
-        .map(|d| d.join(".quest"))
-        .unwrap_or_default();
+    let quest_dir = core::paths::get_quest_dir()?;
 
     // Initialize Time Vault (non-fatal — game works without it)
     let history_repo = if !debug_mode {
