@@ -381,8 +381,8 @@ fn build_startup_splash_text(
             let player_max_hp =
                 (after_ascension as f64 * (1.0 + sigil_bonuses.max_hp_percent / 100.0)) as u32;
             let total_power = compute_power_rating(&derived, &combat_bonuses, player_max_hp) as u32;
-            let asc_part = if character.ascension_level > 0 {
-                format!(" \u{00b7} Asc {}", to_roman(character.ascension_level))
+            let asc_prefix = if character.ascension_level > 0 {
+                format!("Asc {} \u{00b7} ", to_roman(character.ascension_level))
             } else {
                 String::new()
             };
@@ -391,18 +391,18 @@ fn build_startup_splash_text(
                 format!("{}{} (CORRUPTED)", marker, character.filename)
             } else if character.prestige_rank > 0 {
                 format!(
-                    "{}{} (P{} Lv{}{} \u{00b7} {} pwr)",
+                    "{}{} ({}P{} Lv{} \u{00b7} {} pwr)",
                     marker,
                     display_name,
+                    asc_prefix,
                     character.prestige_rank,
                     character.character_level,
-                    asc_part,
                     power_str
                 )
             } else {
                 format!(
-                    "{}{} (Lv{}{} \u{00b7} {} pwr)",
-                    marker, display_name, character.character_level, asc_part, power_str
+                    "{}{} ({}Lv{} \u{00b7} {} pwr)",
+                    marker, display_name, asc_prefix, character.character_level, power_str
                 )
             };
 
