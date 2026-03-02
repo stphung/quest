@@ -1,12 +1,17 @@
 //! Update check helpers.
 
 use crate::achievements;
+use crate::character::combat_bonuses::PrestigeCombatBonuses;
+use crate::character::derived_stats::DerivedStats;
 use crate::character::input::{process_select_input, SelectInput, SelectResult};
 use crate::character::manager::{CharacterInfo, CharacterManager};
+use crate::combat::events::CombatBonuses;
 use crate::core::constants::{UPDATE_CHECK_INTERVAL_SECONDS, UPDATE_CHECK_JITTER_SECONDS};
 use crate::core::game_state::GameState;
+use crate::core::power_rating::compute_power_rating;
 use crate::enhancement;
 use crate::haven;
+use crate::stormglass::sigils::SigilBonuses;
 use crate::history::cloud::{CloudConfig, CloudOpResult, CloudStatus};
 use crate::history::HistoryRepo;
 use crate::input::time_vault_input::{handle_time_vault_input, TimeVaultAction};
@@ -318,7 +323,52 @@ fn build_startup_splash_text(
                 }
             };
 
-            let total_power: u32 = character.equipment.iter_equipped().map(|i| i.power()).sum();
+            // Compute full power rating (geometric mean of DPS and eHP)
+            let derived = DerivedStats::calculate_derived_stats(
+                &character.attributes,
+                &character.equipment,
+                &enhancement.levels,
+            );
+            let prestige_combat = PrestigeCombatBonuses::from_rank(character.prestige_rank);
+            let haven_bonuses = haven.compute_bonuses();
+            let sigil_bonuses = SigilBonuses::compute(&character.storm_sigils);
+            let combat_bonuses = CombatBonuses {
+                hp_regen_percent: haven_bonuses.hp_regen_percent,
+                hp_regen_delay_reduction: haven_bonuses.hp_regen_delay_reduction,
+                damage_percent: haven_bonuses.damage_percent + sigil_bonuses.damage_percent,
+                crit_chance_percent: haven_bonuses.crit_chance_percent
+                    + sigil_bonuses.crit_chance_percent
+                    + prestige_combat.crit_chance,
+                double_strike_chance: haven_bonuses.double_strike_chance
+                    + sigil_bonuses.double_strike_percent,
+                xp_gain_percent: haven_bonuses.xp_gain_percent + sigil_bonuses.xp_percent,
+                early_damage_percent: crate::god_items::equipped_god_item_damage_percent(
+                    &character.equipment,
+                ),
+                damage_reduction_percent: crate::god_items::equipped_god_item_dr(
+                    &character.equipment,
+                ) + sigil_bonuses.damage_reduction_percent,
+                attack_speed_percent: crate::god_items::equipped_god_item_attack_speed_percent(
+                    &character.equipment,
+                ) + sigil_bonuses.attack_speed_percent,
+                regen_reduction_percent:
+                    crate::god_items::equipped_god_item_regen_reduction_percent(
+                        &character.equipment,
+                    ) + sigil_bonuses.regen_delay_percent,
+                flat_damage: prestige_combat.flat_damage,
+                flat_defense: prestige_combat.flat_defense,
+                ascension_multiplier: crate::ascension::ascension_combat_multiplier(
+                    character.ascension_level,
+                ),
+            };
+            // Max HP: derived base + prestige flat HP + ascension multiplier + sigil HP%
+            let base_max_hp = derived.max_hp + prestige_combat.flat_hp;
+            let after_ascension =
+                (base_max_hp as f64 * combat_bonuses.ascension_multiplier) as u32;
+            let player_max_hp =
+                (after_ascension as f64 * (1.0 + sigil_bonuses.max_hp_percent / 100.0)) as u32;
+            let total_power =
+                compute_power_rating(&derived, &combat_bonuses, player_max_hp) as u32;
             let asc_part = if character.ascension_level > 0 {
                 format!(" \u{00b7} Asc {}", to_roman(character.ascension_level))
             } else {
