@@ -136,6 +136,28 @@ pub fn paint_zone_scene(buffer: &mut [Vec<SceneCell>], zone_id: u32) {
     }
 }
 
+/// Paints a minimal zone background for the zone track panel:
+/// dimmed sky gradient + sparse weather particles only.
+///
+/// `dim_factor` controls brightness retention (e.g. 0.35 = 35% brightness).
+/// Weather intensity is internally scaled to 0.3× to keep particles sparse.
+pub fn paint_zone_track_bg(buffer: &mut [Vec<SceneCell>], zone_id: u32, dim_factor: f64) {
+    if buffer.is_empty() || buffer[0].is_empty() {
+        return;
+    }
+
+    let config = zone_scene_config(zone_id);
+    let millis = current_millis() as f64;
+
+    // Layer 1: dimmed sky gradient
+    paint_sky_gradient_dimmed(buffer, &config, millis, dim_factor);
+
+    // Layer 6: weather at reduced intensity
+    const WEATHER_SCALE: f64 = 0.3;
+    let scaled = config.weather_intensity * WEATHER_SCALE;
+    paint_weather_with_intensity(buffer, &config, millis, scaled);
+}
+
 // ---------------------------------------------------------------------------
 // Layer 1: Sky Gradient
 // ---------------------------------------------------------------------------
@@ -162,6 +184,64 @@ fn paint_sky_gradient(buffer: &mut [Vec<SceneCell>], config: &ZoneSceneConfig, m
             let b = clamp_u8(base.2 as i16 + jitter);
             cell.bg = Color::Rgb(r, g, b);
         }
+    }
+}
+
+/// Sky gradient with a brightness dim factor applied after noise jitter.
+fn paint_sky_gradient_dimmed(
+    buffer: &mut [Vec<SceneCell>],
+    config: &ZoneSceneConfig,
+    millis: f64,
+    dim_factor: f64,
+) {
+    let height = buffer.len();
+    let width = buffer[0].len();
+
+    for (row, row_cells) in buffer.iter_mut().enumerate() {
+        let t = if height <= 1 {
+            0.0
+        } else {
+            row as f64 / (height - 1) as f64
+        };
+        let base = lerp_rgb(config.sky_top, config.sky_bottom, t.powf(0.85));
+
+        for (col, cell) in row_cells.iter_mut().enumerate().take(width) {
+            let drift = (col as f64 * 0.13 + millis * 0.00038 + row as f64 * 0.09).sin()
+                + (row as f64 * 0.17 - millis * 0.00027 + col as f64 * 0.07).cos();
+            let jitter = (drift * 2.8).round() as i16;
+            let r = (clamp_u8(base.0 as i16 + jitter) as f64 * dim_factor) as u8;
+            let g = (clamp_u8(base.1 as i16 + jitter) as f64 * dim_factor) as u8;
+            let b = (clamp_u8(base.2 as i16 + jitter) as f64 * dim_factor) as u8;
+            cell.bg = Color::Rgb(r, g, b);
+        }
+    }
+}
+
+/// Weather dispatch with an explicit intensity override.
+fn paint_weather_with_intensity(
+    buffer: &mut [Vec<SceneCell>],
+    config: &ZoneSceneConfig,
+    millis: f64,
+    intensity: f64,
+) {
+    if intensity <= 0.0 {
+        return;
+    }
+    match config.weather {
+        WeatherType::None => {}
+        WeatherType::Snow => paint_snow(buffer, millis, intensity),
+        WeatherType::Embers => paint_embers(buffer, millis, intensity),
+        WeatherType::Sparks => paint_sparks(buffer, millis, intensity),
+        WeatherType::Bubbles => paint_bubbles(buffer, millis, intensity),
+        WeatherType::VoidParticles => paint_void_particles(buffer, millis, intensity),
+        WeatherType::WindStreaks => paint_wind_streaks(buffer, millis, intensity),
+        WeatherType::Sparkles => paint_sparkles(buffer, millis, intensity),
+        WeatherType::AshRain => paint_ash_rain(buffer, millis, intensity),
+        WeatherType::GlassShards => paint_glass_shards(buffer, millis, intensity),
+        WeatherType::DriftingAsh => paint_drifting_ash(buffer, millis, intensity),
+        WeatherType::DustMotes => paint_dust_motes(buffer, millis, intensity),
+        WeatherType::StaticNoise => paint_static_noise(buffer, millis, intensity),
+        WeatherType::FractureMotes => paint_fracture_motes(buffer, millis, intensity),
     }
 }
 
