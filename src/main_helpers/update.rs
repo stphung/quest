@@ -224,6 +224,19 @@ fn build_startup_splash_text(
             Style::default().fg(Color::Gray),
         ));
     }
+    if deep.persistent.discovered {
+        if !badges.is_empty() {
+            badges.push(Span::styled("   ", Style::default()));
+        }
+        badges.push(Span::styled(
+            "\u{26cf} ",
+            Style::default().fg(Color::Rgb(204, 153, 0)),
+        ));
+        badges.push(Span::styled(
+            format!("L{}", deep.persistent.deepest_layer_reached),
+            Style::default().fg(Color::Gray),
+        ));
+    }
     // Cloud sync badge with dot throbber
     {
         let cloud_badge_color = Color::Cyan;
