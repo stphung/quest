@@ -268,11 +268,8 @@ pub struct TickResult {
     /// True if God Item progress was modified and should be persisted.
     pub god_items_changed: bool,
 
-    /// True if Deep state was modified (discovery) and should be persisted.
+    /// True if Deep state was modified (discovery, power cores) and should be persisted.
     pub deep_changed: bool,
-
-    /// True if Power Core state was modified and should be persisted.
-    pub power_cores_changed: bool,
 
     /// Achievement IDs ready to be shown in a modal overlay.
     /// Populated when the 500ms accumulation window has elapsed.

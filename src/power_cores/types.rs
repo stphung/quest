@@ -2,11 +2,9 @@
 //!
 //! Each Power Core is unlocked by clearing a specific Deep layer milestone achievement.
 //! Once unlocked, a core passively generates prestige ranks over time at a fixed rate.
-//! State is persisted to `~/.quest/power_cores.json`.
+//! State is persisted as part of `DeepPersistent` in `~/.quest/deep.json`.
 
 use crate::achievements::{AchievementId, Achievements};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Static definition of a Power Core.
 #[derive(Debug, Clone)]
@@ -60,17 +58,6 @@ pub const ALL_POWER_CORES: &[PowerCoreDef] = &[
         required_layer: 30,
     },
 ];
-
-/// Runtime state for all Power Cores.
-///
-/// Maps each core's `AchievementId` to the Unix timestamp (seconds) when the
-/// core last granted a prestige rank.  Missing entries are treated as "never
-/// granted" (timestamp = 0).
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct PowerCoreState {
-    /// Last-granted Unix timestamp (seconds) per core achievement.
-    pub last_granted_at: HashMap<AchievementId, i64>,
-}
 
 /// Look up the static definition for a given achievement ID.
 ///
@@ -161,12 +148,6 @@ mod tests {
                 def.achievement_id
             );
         }
-    }
-
-    #[test]
-    fn power_core_state_default_is_empty() {
-        let state = PowerCoreState::default();
-        assert!(state.last_granted_at.is_empty());
     }
 
     #[test]
