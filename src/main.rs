@@ -36,7 +36,7 @@ use main_helpers::chrono_surge::run_chrono_surge_batch;
 use main_helpers::input_routing::{route_game_input, InputAction};
 use main_helpers::offline::apply_offline_xp;
 use main_helpers::overlay::draw_game_overlays;
-use main_helpers::persistence::save_all;
+use main_helpers::persistence::{commit_save, save_files};
 use main_helpers::scene::{current_scene_kind, is_realtime_minigame, is_wide_scene};
 use main_helpers::update::{
     jittered_update_interval, show_startup_splash_screen, StartupSplashResult,
@@ -454,6 +454,14 @@ fn main() -> io::Result<()> {
                     // Save indicator state (for non-debug mode)
                     let mut last_save_instant: Option<Instant> = None;
                     let mut last_save_time: Option<chrono::DateTime<chrono::Local>> = None;
+                    let mut last_commit_instant: Option<Instant> = None;
+                    let mut last_commit_time: Option<chrono::DateTime<chrono::Local>> = None;
+                    let mut last_push_instant: Option<Instant> = None;
+                    let mut last_push_time: Option<chrono::DateTime<chrono::Local>> = None;
+                    // Deferred commit: save completes first, commit fires next tick
+                    // so the save indicator resolves before the commit spinner starts.
+                    // Every commit also triggers a cloud push (if configured).
+                    let mut pending_commit: Option<history::SaveEvent> = None;
 
                     // Update check state - start initial background check immediately
                     let mut update_info: Option<UpdateInfo> = None;
@@ -508,6 +516,41 @@ fn main() -> io::Result<()> {
                             }
                             if cloud_result.needs_save_timestamp {
                                 state.last_save_time = Utc::now().timestamp();
+                            }
+                            if cloud_result.pushed {
+                                last_push_instant = Some(Instant::now());
+                                last_push_time = Some(Local::now());
+                            }
+                        }
+
+                        // Process deferred commit after save spinner has been
+                        // visible for at least 500ms. The handler runs before
+                        // render, so without this delay the save spinner would
+                        // be set and cleared between frames, never drawn.
+                        if pending_commit.is_some()
+                            && last_save_instant
+                                .map(|t| t.elapsed() >= Duration::from_millis(500))
+                                .unwrap_or(true)
+                        {
+                            if let Some(event) = pending_commit.take() {
+                                if let Some(ref repo) = history_repo {
+                                    // Save spinner done — show timestamp, start commit
+                                    last_save_instant = None;
+                                    if commit_save(&state, &event, repo) {
+                                        last_commit_instant = Some(Instant::now());
+                                        last_commit_time = Some(Local::now());
+                                    }
+                                    if !cloud.op_in_flight {
+                                        if let Some(ref config) = cloud.config {
+                                            main_helpers::cloud_ops::spawn_cloud_push(
+                                                &mut cloud.op_in_flight,
+                                                &cloud.tx,
+                                                &quest_dir,
+                                                &config.token,
+                                            );
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -573,6 +616,12 @@ fn main() -> io::Result<()> {
                                 let extras = main_helpers::game_context::OverlayExtras {
                                     last_save_instant,
                                     last_save_time,
+                                    last_commit_instant,
+                                    last_commit_time,
+                                    last_push_instant,
+                                    last_push_time,
+                                    has_history_repo: history_repo.is_some(),
+                                    has_cloud_config: cloud.config.is_some(),
                                     chrono_surge: chrono_surge.as_ref(),
                                     chrono_summary: chrono_summary.as_ref(),
                                     layout_ctx: &ctx,
@@ -657,18 +706,17 @@ fn main() -> io::Result<()> {
                                                 kills: surge.kills,
                                                 ticks: surge.ticks_total,
                                             };
-                                            save_all(
+                                            save_files(
                                                 &character_manager,
                                                 &state,
                                                 &global_achievements,
                                                 &haven,
                                                 &enhancement,
                                                 &deep_state,
-                                                Some(&surge_event),
-                                                history_repo.as_ref(),
                                             );
                                             last_save_instant = Some(Instant::now());
                                             last_save_time = Some(Local::now());
+                                            pending_commit = Some(surge_event);
                                         }
                                     }
                                     continue;
@@ -791,17 +839,33 @@ fn main() -> io::Result<()> {
 
                                 if let InputResult::RestoreSave { ref commit_id } = result {
                                     if let Some(ref repo) = history_repo {
-                                        // Auto-save current state before restoring
-                                        save_all(
+                                        // Auto-save current state before restoring.
+                                        // Immediate commit required (state reloads next).
+                                        save_files(
                                             &character_manager,
                                             &state,
                                             &global_achievements,
                                             &haven,
                                             &enhancement,
                                             &deep_state,
-                                            Some(&history::SaveEvent::AutoSave),
-                                            Some(repo),
                                         );
+                                        last_save_time = Some(Local::now());
+                                        last_save_instant = None;
+                                        if commit_save(&state, &history::SaveEvent::AutoSave, repo)
+                                        {
+                                            last_commit_instant = Some(Instant::now());
+                                            last_commit_time = Some(Local::now());
+                                            if !cloud.op_in_flight {
+                                                if let Some(ref config) = cloud.config {
+                                                    main_helpers::cloud_ops::spawn_cloud_push(
+                                                        &mut cloud.op_in_flight,
+                                                        &cloud.tx,
+                                                        &quest_dir,
+                                                        &config.token,
+                                                    );
+                                                }
+                                            }
+                                        }
                                         if repo.restore_to(commit_id).is_ok() {
                                             // Reload all state from disk (git reset replaced files)
                                             main_helpers::cloud_ops::reload_account_state(
@@ -869,17 +933,33 @@ fn main() -> io::Result<()> {
                                 } = result
                                 {
                                     if let Some(ref repo) = history_repo {
-                                        // Auto-save current state before forking
-                                        save_all(
+                                        // Auto-save current state before forking.
+                                        // Immediate commit required (state reloads next).
+                                        save_files(
                                             &character_manager,
                                             &state,
                                             &global_achievements,
                                             &haven,
                                             &enhancement,
                                             &deep_state,
-                                            Some(&history::SaveEvent::AutoSave),
-                                            Some(repo),
                                         );
+                                        last_save_time = Some(Local::now());
+                                        last_save_instant = None;
+                                        if commit_save(&state, &history::SaveEvent::AutoSave, repo)
+                                        {
+                                            last_commit_instant = Some(Instant::now());
+                                            last_commit_time = Some(Local::now());
+                                            if !cloud.op_in_flight {
+                                                if let Some(ref config) = cloud.config {
+                                                    main_helpers::cloud_ops::spawn_cloud_push(
+                                                        &mut cloud.op_in_flight,
+                                                        &cloud.tx,
+                                                        &quest_dir,
+                                                        &config.token,
+                                                    );
+                                                }
+                                            }
+                                        }
                                         if repo.fork_timeline(branch_name, commit_id).is_ok() {
                                             // Full state reload (fork checks out the new branch)
                                             main_helpers::cloud_ops::reload_account_state(
@@ -944,17 +1024,33 @@ fn main() -> io::Result<()> {
 
                                 if let InputResult::SwitchSaveBranch { ref branch_name } = result {
                                     if let Some(ref repo) = history_repo {
-                                        // Auto-save current state before switching
-                                        save_all(
+                                        // Auto-save current state before switching.
+                                        // Immediate commit required (state reloads next).
+                                        save_files(
                                             &character_manager,
                                             &state,
                                             &global_achievements,
                                             &haven,
                                             &enhancement,
                                             &deep_state,
-                                            Some(&history::SaveEvent::AutoSave),
-                                            Some(repo),
                                         );
+                                        last_save_time = Some(Local::now());
+                                        last_save_instant = None;
+                                        if commit_save(&state, &history::SaveEvent::AutoSave, repo)
+                                        {
+                                            last_commit_instant = Some(Instant::now());
+                                            last_commit_time = Some(Local::now());
+                                            if !cloud.op_in_flight {
+                                                if let Some(ref config) = cloud.config {
+                                                    main_helpers::cloud_ops::spawn_cloud_push(
+                                                        &mut cloud.op_in_flight,
+                                                        &cloud.tx,
+                                                        &quest_dir,
+                                                        &config.token,
+                                                    );
+                                                }
+                                            }
+                                        }
                                         if repo.switch_timeline(branch_name).is_ok() {
                                             // Full state reload (switch checks out the branch)
                                             main_helpers::cloud_ops::reload_account_state(
@@ -1109,24 +1205,14 @@ fn main() -> io::Result<()> {
                                         &character_manager,
                                         &mut last_save_instant,
                                         &mut last_save_time,
-                                        history_repo.as_ref(),
                                     )
                                 };
                                 match route_action {
                                     InputAction::QuitToSelect => {
                                         break 'game_loop;
                                     }
-                                    InputAction::ContinueAndPush => {
-                                        if !cloud.op_in_flight {
-                                            if let Some(ref config) = cloud.config {
-                                                main_helpers::cloud_ops::spawn_cloud_push(
-                                                    &mut cloud.op_in_flight,
-                                                    &cloud.tx,
-                                                    &quest_dir,
-                                                    &config.token,
-                                                );
-                                            }
-                                        }
+                                    InputAction::DeferCommit(event) => {
+                                        pending_commit = Some(event);
                                     }
                                     InputAction::Continue => {}
                                 }
@@ -1201,15 +1287,13 @@ fn main() -> io::Result<()> {
                                 last_autosave = Instant::now();
                                 // Immediate save with updated last_save_time
                                 if !debug_mode {
-                                    save_all(
+                                    save_files(
                                         &character_manager,
                                         &state,
                                         &global_achievements,
                                         &haven,
                                         &enhancement,
                                         &deep_state,
-                                        None,
-                                        history_repo.as_ref(),
                                     );
                                     last_save_instant = Some(Instant::now());
                                     last_save_time = Some(Local::now());
@@ -1233,15 +1317,13 @@ fn main() -> io::Result<()> {
                             );
 
                             if batch_result.needs_save && !debug_mode {
-                                save_all(
+                                save_files(
                                     &character_manager,
                                     &state,
                                     &global_achievements,
                                     &haven,
                                     &enhancement,
                                     &deep_state,
-                                    None,
-                                    history_repo.as_ref(),
                                 );
                             }
 
@@ -1250,18 +1332,17 @@ fn main() -> io::Result<()> {
                                 chrono_surge = None;
                                 chrono_summary = Some(summary);
                                 if !debug_mode {
-                                    save_all(
+                                    save_files(
                                         &character_manager,
                                         &state,
                                         &global_achievements,
                                         &haven,
                                         &enhancement,
                                         &deep_state,
-                                        Some(&surge_event),
-                                        history_repo.as_ref(),
                                     );
                                     last_save_instant = Some(Instant::now());
                                     last_save_time = Some(Local::now());
+                                    pending_commit = Some(surge_event);
                                 }
                             }
 
@@ -1317,27 +1398,18 @@ fn main() -> io::Result<()> {
                                     || save_event.is_some())
                                     && !debug_mode
                                 {
-                                    save_all(
+                                    save_files(
                                         &character_manager,
                                         &state,
                                         &global_achievements,
                                         &haven,
                                         &enhancement,
                                         &deep_state,
-                                        save_event.as_ref(),
-                                        history_repo.as_ref(),
                                     );
-
-                                    // Push to cloud after milestone commits
-                                    if save_event.is_some() && !cloud.op_in_flight {
-                                        if let Some(ref config) = cloud.config {
-                                            main_helpers::cloud_ops::spawn_cloud_push(
-                                                &mut cloud.op_in_flight,
-                                                &cloud.tx,
-                                                &quest_dir,
-                                                &config.token,
-                                            );
-                                        }
+                                    last_save_instant = Some(Instant::now());
+                                    last_save_time = Some(Local::now());
+                                    if let Some(event) = save_event {
+                                        pending_commit = Some(event);
                                     }
                                 }
 
@@ -1473,26 +1545,30 @@ fn main() -> io::Result<()> {
                                                 };
                                                 soulforge_ui.animation_tick = 0;
 
-                                                // Persist changes (only commit on success)
+                                                // Persist changes and commit
                                                 let soulforge_event = if result.success {
-                                                    Some(history::SaveEvent::SoulforgeEnhanced(
+                                                    history::SaveEvent::SoulforgeEnhanced(
                                                         slot_name.to_string(),
                                                         result.new_level,
-                                                    ))
+                                                    )
                                                 } else {
-                                                    None
+                                                    history::SaveEvent::SoulforgeFailed(
+                                                        slot_name.to_string(),
+                                                        result.new_level,
+                                                    )
                                                 };
                                                 if !debug_mode {
-                                                    save_all(
+                                                    save_files(
                                                         &character_manager,
                                                         &state,
                                                         &global_achievements,
                                                         &haven,
                                                         &enhancement,
                                                         &deep_state,
-                                                        soulforge_event.as_ref(),
-                                                        history_repo.as_ref(),
                                                     );
+                                                    last_save_instant = Some(Instant::now());
+                                                    last_save_time = Some(Local::now());
+                                                    pending_commit = Some(soulforge_event);
                                                 }
                                             }
                                         }
@@ -1523,15 +1599,13 @@ fn main() -> io::Result<()> {
 
                             // Skip file I/O in debug mode
                             if !debug_mode {
-                                save_all(
+                                save_files(
                                     &character_manager,
                                     &state,
                                     &global_achievements,
                                     &haven,
                                     &enhancement,
                                     &deep_state,
-                                    None,
-                                    history_repo.as_ref(),
                                 );
                                 last_save_instant = Some(Instant::now());
                             }

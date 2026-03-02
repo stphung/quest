@@ -315,11 +315,25 @@ pub fn draw_game_overlays(
         let is_saving = last_save_instant
             .map(|t| t.elapsed() < Duration::from_secs(1))
             .unwrap_or(false);
+        let is_committing = extras
+            .last_commit_instant
+            .map(|t| t.elapsed() < Duration::from_secs(1))
+            .unwrap_or(false);
+        let is_pushing = extras
+            .last_push_instant
+            .map(|t| t.elapsed() < Duration::from_secs(1))
+            .unwrap_or(false);
         ui::debug_menu_scene::render_save_indicator(
             frame,
             area,
             is_saving,
             last_save_time,
+            is_committing,
+            extras.last_commit_time,
+            is_pushing,
+            extras.last_push_time,
+            extras.has_history_repo,
+            extras.has_cloud_config,
             layout_ctx,
         );
     }

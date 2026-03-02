@@ -34,6 +34,12 @@ pub struct GameContext<'a> {
 pub struct OverlayExtras<'a> {
     pub last_save_instant: Option<Instant>,
     pub last_save_time: Option<chrono::DateTime<chrono::Local>>,
+    pub last_commit_instant: Option<Instant>,
+    pub last_commit_time: Option<chrono::DateTime<chrono::Local>>,
+    pub last_push_instant: Option<Instant>,
+    pub last_push_time: Option<chrono::DateTime<chrono::Local>>,
+    pub has_history_repo: bool,
+    pub has_cloud_config: bool,
     pub chrono_surge: Option<&'a ChronoSurgeState>,
     pub chrono_summary: Option<&'a ChronoSurgeSummary>,
     pub layout_ctx: &'a LayoutContext,
