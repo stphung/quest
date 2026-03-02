@@ -49,6 +49,8 @@ pub struct CharacterInfo {
     pub last_save_time: i64,
     pub attributes: super::attributes::Attributes,
     pub equipment: crate::items::Equipment,
+    pub ascension_level: u32,
+    pub storm_sigils: crate::stormglass::sigils::StormSigils,
     pub is_corrupted: bool,
 }
 

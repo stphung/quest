@@ -185,6 +185,8 @@ impl CharacterManager {
                         last_save_time: state.last_save_time,
                         attributes: state.attributes,
                         equipment: state.equipment,
+                        ascension_level: state.ascension_level,
+                        storm_sigils: state.storm_sigils,
                         is_corrupted: false,
                     });
                 }
@@ -200,6 +202,8 @@ impl CharacterManager {
                         last_save_time: 0,
                         attributes: super::attributes::Attributes::new(),
                         equipment: crate::items::Equipment::new(),
+                        ascension_level: 0,
+                        storm_sigils: crate::stormglass::sigils::StormSigils::new(),
                         is_corrupted: true,
                     });
                 }
