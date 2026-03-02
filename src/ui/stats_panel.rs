@@ -259,7 +259,9 @@ pub(super) fn draw_zone_info(
     achievements: &crate::achievements::Achievements,
     _ctx: &LayoutContext,
 ) {
-    use super::scene_fx::{display_width, put_cell, put_text, put_text_centered, render_buffer, SceneCell};
+    use super::scene_fx::{
+        display_width, put_cell, put_text, put_text_centered, render_buffer, SceneCell,
+    };
     use crate::zones::get_all_zones;
 
     let zones = get_all_zones();
@@ -309,7 +311,10 @@ pub(super) fn draw_zone_info(
     let prefix = format!("Zone {}: ", prog.current_zone_id);
     let separator = " | ";
     let suffix = format!(" ({}/{})", prog.current_subzone_id, total_subzones);
-    let full_row0 = format!("{}{}{}{}{}", prefix, zone_name, separator, subzone_name, suffix);
+    let full_row0 = format!(
+        "{}{}{}{}{}",
+        prefix, zone_name, separator, subzone_name, suffix
+    );
     let start_col = ((width as i32 - display_width(&full_row0) as i32) / 2).max(0);
     let mut col = start_col;
     put_text(&mut buffer, 0, col, &prefix, Color::White);
@@ -499,17 +504,17 @@ fn current_zone_dot_color() -> Color {
 /// Derived from each zone's sky palette, kept very subtle (low saturation).
 fn zone_description_tint(zone_id: u32) -> Color {
     let (r, g, b) = match zone_id {
-        1 => (90, 120, 90),    // Meadow: soft green
-        2 => (80, 70, 100),    // Dark Forest: dusky purple
-        3 => (100, 105, 120),  // Mountain Pass: cool grey-blue
-        4 => (95, 75, 110),    // Ancient Ruins: mystic purple
-        5 => (130, 80, 60),    // Volcanic Wastes: warm ember
-        6 => (90, 105, 120),   // Frozen Tundra: icy blue-grey
-        7 => (80, 100, 120),   // Crystal Caverns: crystal blue
-        8 => (70, 95, 115),    // Sunken Kingdom: deep aqua
-        9 => (95, 115, 130),   // Floating Isles: sky blue
-        10 => (100, 100, 115), // Storm Citadel: storm grey
-        11 => (85, 80, 110),   // The Expanse: void purple
+        1 => (90, 120, 90),        // Meadow: soft green
+        2 => (80, 70, 100),        // Dark Forest: dusky purple
+        3 => (100, 105, 120),      // Mountain Pass: cool grey-blue
+        4 => (95, 75, 110),        // Ancient Ruins: mystic purple
+        5 => (130, 80, 60),        // Volcanic Wastes: warm ember
+        6 => (90, 105, 120),       // Frozen Tundra: icy blue-grey
+        7 => (80, 100, 120),       // Crystal Caverns: crystal blue
+        8 => (70, 95, 115),        // Sunken Kingdom: deep aqua
+        9 => (95, 115, 130),       // Floating Isles: sky blue
+        10 => (100, 100, 115),     // Storm Citadel: storm grey
+        11 => (85, 80, 110),       // The Expanse: void purple
         12..=14 => (120, 80, 70),  // Red Fault: warm red-brown
         15..=17 => (100, 95, 115), // Mirror Scar: cool crystal
         18..=20 => (95, 85, 80),   // Black Mouth: ashen grey
