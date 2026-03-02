@@ -344,12 +344,12 @@ fn build_save_indicator_segments(
     // Save segment (always present when there is state to show)
     if is_saving {
         segments.push(IndicatorSegment {
-            content: format!("{} Saving...", spinner_char()),
+            content: format!("\u{1F4BE} {}", spinner_char()),
             color: Color::Yellow,
         });
     } else if let Some(time) = last_save_time {
         segments.push(IndicatorSegment {
-            content: format!("Saved {}", time.format("%-I:%M %p")),
+            content: format!("\u{1F4BE} {}", time.format("%-I:%M %p")),
             color: Color::DarkGray,
         });
     }
@@ -358,12 +358,12 @@ fn build_save_indicator_segments(
     if has_history_repo {
         if is_committing {
             segments.push(IndicatorSegment {
-                content: format!("{} Committing...", spinner_char()),
+                content: format!("\u{1F4DD} {}", spinner_char()),
                 color: Color::Yellow,
             });
         } else if let Some(time) = last_commit_time {
             segments.push(IndicatorSegment {
-                content: format!("Committed {}", time.format("%-I:%M %p")),
+                content: format!("\u{1F4DD} {}", time.format("%-I:%M %p")),
                 color: Color::DarkGray,
             });
         }
@@ -373,12 +373,12 @@ fn build_save_indicator_segments(
     if has_cloud_config {
         if is_pushing {
             segments.push(IndicatorSegment {
-                content: format!("{} Pushing...", spinner_char()),
+                content: format!("\u{2601} {}", spinner_char()),
                 color: Color::Cyan,
             });
         } else if let Some(time) = last_push_time {
             segments.push(IndicatorSegment {
-                content: format!("\u{2601} Pushed {}", time.format("%-I:%M %p")),
+                content: format!("\u{2601} {}", time.format("%-I:%M %p")),
                 color: Color::DarkGray,
             });
         }
@@ -389,10 +389,10 @@ fn build_save_indicator_segments(
 
 /// Render the multi-segment save/commit/push indicator.
 ///
-/// Displays up to three segments separated by `" \u{2502} "` (thin vertical bar):
-/// - Save: always shown when there is save state
-/// - Commit: shown only if `has_history_repo` is true
-/// - Push: shown only if `has_cloud_config` is true
+/// Displays up to three icon segments separated by double spaces:
+/// - 💾 Save: always shown when there is save state
+/// - 📝 Commit: shown only if `has_history_repo` is true
+/// - ☁ Push: shown only if `has_cloud_config` is true
 #[allow(clippy::too_many_arguments)]
 pub fn render_save_indicator(
     frame: &mut Frame,
@@ -422,32 +422,27 @@ pub fn render_save_indicator(
         return;
     }
 
-    let separator = Span::styled(" \u{2502} ", Style::default().fg(Color::DarkGray));
-
     let mut spans: Vec<Span> = Vec::new();
     for (i, seg) in segments.iter().enumerate() {
         if i > 0 {
-            spans.push(separator.clone());
+            spans.push(Span::raw("  "));
         }
         spans.push(Span::styled(&seg.content, Style::default().fg(seg.color)));
     }
 
-    // Calculate total display width
-    let total_width: usize = spans.iter().map(|s| s.content.len()).sum();
-
-    let indicator = Paragraph::new(Line::from(spans));
+    let line = Line::from(spans);
+    let display_width = line.width() as u16 + 1;
 
     // Position in top-right corner
-    let width = total_width as u16 + 1;
-    let x = area.x + area.width.saturating_sub(width);
+    let x = area.x + area.width.saturating_sub(display_width);
     let indicator_area = Rect {
         x,
         y: area.y,
-        width,
+        width: display_width,
         height: 1,
     };
 
-    frame.render_widget(indicator, indicator_area);
+    frame.render_widget(Paragraph::new(line), indicator_area);
 }
 
 #[cfg(test)]
@@ -464,7 +459,7 @@ mod tests {
         let segments =
             build_save_indicator_segments(true, None, false, None, false, None, false, false);
         assert_eq!(segments.len(), 1);
-        assert!(segments[0].content.contains("Saving..."));
+        assert!(segments[0].content.starts_with("\u{1F4BE}"));
         assert_eq!(segments[0].color, Color::Yellow);
     }
 
@@ -482,7 +477,7 @@ mod tests {
             false,
         );
         assert_eq!(segments.len(), 1);
-        assert!(segments[0].content.starts_with("Saved "));
+        assert!(segments[0].content.starts_with("\u{1F4BE} "));
         assert_eq!(segments[0].color, Color::DarkGray);
     }
 
@@ -500,8 +495,8 @@ mod tests {
             false,
         );
         assert_eq!(segments.len(), 2);
-        assert!(segments[0].content.starts_with("Saved "));
-        assert!(segments[1].content.starts_with("Committed "));
+        assert!(segments[0].content.starts_with("\u{1F4BE} "));
+        assert!(segments[1].content.starts_with("\u{1F4DD} "));
     }
 
     #[test]
@@ -518,9 +513,9 @@ mod tests {
             true,
         );
         assert_eq!(segments.len(), 3);
-        assert!(segments[0].content.starts_with("Saved "));
-        assert!(segments[1].content.starts_with("Committed "));
-        assert!(segments[2].content.contains("Pushed "));
+        assert!(segments[0].content.starts_with("\u{1F4BE} "));
+        assert!(segments[1].content.starts_with("\u{1F4DD} "));
+        assert!(segments[2].content.starts_with("\u{2601} "));
     }
 
     #[test]
@@ -537,7 +532,7 @@ mod tests {
             false,
         );
         assert_eq!(segments.len(), 1);
-        assert!(segments[0].content.starts_with("Saved "));
+        assert!(segments[0].content.starts_with("\u{1F4BE} "));
     }
 
     #[test]
@@ -554,8 +549,8 @@ mod tests {
             false, // no cloud config
         );
         assert_eq!(segments.len(), 2);
-        assert!(segments[0].content.starts_with("Saved "));
-        assert!(segments[1].content.starts_with("Committed "));
+        assert!(segments[0].content.starts_with("\u{1F4BE} "));
+        assert!(segments[1].content.starts_with("\u{1F4DD} "));
     }
 
     #[test]
