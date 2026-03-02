@@ -13,7 +13,6 @@ use quest::dungeon::generation::generate_dungeon;
 use quest::enhancement::EnhancementProgress;
 use quest::fishing::{FishingPhase, FishingSession};
 use quest::haven::Haven;
-use quest::power_cores::PowerCoreState;
 use quest::{ActiveMinigame, ChessDifficulty, ChessGame};
 use quest::{GameState, TickEvent};
 use rand::SeedableRng;
@@ -65,7 +64,6 @@ fn tick(
         &mut EnhancementProgress::new(),
         &mut quest::deep::DeepState::new(),
         ach,
-        &mut PowerCoreState::default(),
         false,
         r,
     )
@@ -130,7 +128,6 @@ fn test_storm_leviathan_achievement_via_game_tick() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut ach,
-            &mut PowerCoreState::default(),
             false,
             &mut r,
         );
@@ -252,7 +249,6 @@ fn test_dungeon_boss_completion_triggers_achievement() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut ach,
-            &mut PowerCoreState::default(),
             false,
             &mut r,
         );
@@ -645,7 +641,6 @@ fn test_multi_level_up_unlocks_intermediate_achievements() {
             &mut EnhancementProgress::new(),
             &mut quest::deep::DeepState::new(),
             &mut ach,
-            &mut PowerCoreState::default(),
             false,
             &mut r,
         );

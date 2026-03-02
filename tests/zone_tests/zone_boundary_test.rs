@@ -6,15 +6,13 @@
 //! Focus areas:
 //! - travel_to() boundary cases (subzone 0, out-of-range zones)
 //! - advance_to_next_subzone() at zone boundaries
-//! - Kill retry count (KILLS_FOR_BOSS_RETRY) after boss defeat resets kill state
+//! - Kill count reset after boss defeat
 //! - Exact prestige gate boundaries (P4 vs P5, P9 vs P10, etc.)
 //! - Zone 11 subzone cycling with correct killed-boss tracking
 //! - BossDefeatResult variants for each zone transition type
 
 use quest::achievements::{AchievementId, Achievements};
-use quest::core::constants::{
-    EXPANSE_ZONE_ID, FINAL_ZONE_ID, KILLS_FOR_BOSS, KILLS_FOR_BOSS_RETRY,
-};
+use quest::core::constants::{EXPANSE_ZONE_ID, FINAL_ZONE_ID, KILLS_FOR_BOSS};
 use quest::zones::get_all_zones;
 use quest::zones::{BossDefeatResult, ZoneProgression};
 
@@ -148,14 +146,8 @@ fn test_advance_subzone_sequential_for_4_subzone_zone() {
 }
 
 // ============================================================================
-// Kill retry count (KILLS_FOR_BOSS_RETRY) after boss death
+// Kill count reset after boss defeat
 // ============================================================================
-
-#[test]
-fn test_kills_for_boss_retry_constant_is_less_than_kills_for_boss() {
-    // The retry count must be less than the full kill count — verified at compile time
-    const { assert!(KILLS_FOR_BOSS_RETRY < KILLS_FOR_BOSS) }
-}
 
 #[test]
 fn test_kills_until_boss_after_boss_defeat_resets_to_zero() {

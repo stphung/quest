@@ -7,8 +7,9 @@ use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::{get_next_prestige_tier, get_prestige_tier};
 use crate::core::game_logic::xp_for_next_level;
 use crate::core::game_state::GameState;
+use crate::deep::DeepState;
 use crate::fishing::types::{FishingState, RANK_NAMES};
-use crate::power_cores::{fill_duration_secs, PowerCoreState, ALL_POWER_CORES};
+use crate::power_cores::{fill_duration_secs, ALL_POWER_CORES};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -546,7 +547,7 @@ pub(super) fn draw_power_cores_panel(
     frame: &mut Frame,
     area: Rect,
     achievements: &crate::achievements::Achievements,
-    power_cores: &PowerCoreState,
+    deep: &DeepState,
 ) {
     const AMBER: Color = Color::Rgb(255, 165, 0);
     const BAR_WIDTH: usize = 16;
@@ -588,8 +589,9 @@ pub(super) fn draw_power_cores_panel(
             spans.push(Span::styled(name_padded, Style::default().fg(AMBER)));
 
             let fill_secs = fill_duration_secs(core.pr_per_day);
-            let last_granted = power_cores
-                .last_granted_at
+            let last_granted = deep
+                .persistent
+                .power_core_last_granted
                 .get(&core.achievement_id)
                 .copied()
                 .unwrap_or(0);

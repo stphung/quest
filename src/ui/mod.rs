@@ -26,6 +26,8 @@ mod enemy_sprite_data;
 mod enemy_sprites;
 pub mod fishing_scene;
 pub mod flappy_scene;
+mod fracture_sprites_1;
+mod fracture_sprites_2;
 pub mod game_common;
 pub mod go_scene;
 pub mod gomoku_scene;
@@ -383,7 +385,7 @@ pub fn draw_ui_with_update(
     deep_state: &crate::deep::DeepState,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
-    power_cores: &crate::power_cores::PowerCoreState,
+    deep_for_cores: &crate::deep::DeepState,
 ) {
     set_global_ui_border_style(achievements.ui_border_style);
 
@@ -420,7 +422,7 @@ pub fn draw_ui_with_update(
                 show_ascend,
                 achievements,
                 enhancement_levels,
-                power_cores,
+                deep_for_cores,
             );
         }
         SizeTier::M => {
@@ -460,7 +462,7 @@ fn draw_xl_l_layout(
     show_ascend: bool,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
-    power_cores: &crate::power_cores::PowerCoreState,
+    deep_for_cores: &crate::deep::DeepState,
 ) {
     let size = frame.area();
 
@@ -516,7 +518,7 @@ fn draw_xl_l_layout(
         ctx,
         enhancement_levels,
         achievements,
-        power_cores,
+        deep_for_cores,
     );
 
     // Draw ticker

@@ -135,6 +135,200 @@ pub const SPRITE_HORROR: EnemySprite = EnemySprite::new(
     10,
 );
 
+// ── 12 Fracture-Zone Sprite Archetypes ────────────────────────────────
+
+#[allow(dead_code)]
+pub const SPRITE_FRACTURED: EnemySprite = EnemySprite::new(
+    r"    ╱══╲  ╱╲
+   ╱ ▓░▓ ╲╱ ╲
+   │ ●  ░● │
+   │ ▓░▓▓░▓│
+   │╱▓█░█▓╲│
+   ╲ ▓░▓▓░ ╱
+    ╲░████░╱
+    ╱│░██░│╲
+   ╱ │░░░░│ ╲
+   ╰─╯╱╲ ╰─╯",
+    15,
+    10,
+);
+
+#[allow(dead_code)]
+pub const SPRITE_MOLTEN: EnemySprite = EnemySprite::new(
+    r"    ░▒▓▓▒░
+   ▒▓▓████▓▓▒
+  ▓██ ◆◆ ██▓
+  ▓████████▓▒
+  ▒▓██▓▓██▓░
+   ▒▓▓████▓▒
+  ▒▓████████▒
+  ░▒▓██████▒░
+   ░▒▓▓▓▓▒▒░
+    ░░▒▒▒░░",
+    15,
+    10,
+);
+
+#[allow(dead_code)]
+pub const SPRITE_CRYSTALLINE: EnemySprite = EnemySprite::new(
+    r"       ╱╲
+      ╱◆◆╲
+     ╱◆  ◆╲
+    ╱ ◆●●◆ ╲
+   ╱◆◆◆◆◆◆◆╲
+   ╲◆◆◆◆◆◆◆╱
+    ╲ ◆◆◆◆ ╱
+     ╲◆◆◆◆╱
+      ╲◆◆╱
+       ╲╱",
+    15,
+    10,
+);
+
+#[allow(dead_code)]
+pub const SPRITE_MIRRORED: EnemySprite = EnemySprite::new(
+    r"     ═══════
+    ║ ░░░░░ ║
+    ║ ●   ● ║
+    ║  ═══  ║
+    ║ ░███░ ║
+    ║ ░███░ ║
+    ║ ░░░░░ ║
+    ║ ░░ ░░ ║
+    ║ ░░ ░░ ║
+     ═══════",
+    15,
+    10,
+);
+
+#[allow(dead_code)]
+pub const SPRITE_ABYSSAL: EnemySprite = EnemySprite::new(
+    r"  ░       ░
+   ░▒     ▒░
+  ░▒▓ ◆ ◆ ▓░
+  ░▒▓▓▓▓▓▓▓░
+  ░▓███▼███▓░
+  ░▒▓█████▓▒░
+   ░▒▓▓▓▓▓▒░
+    ░▒▒▒▒▒░
+   ░  ░ ░  ░
+  ░    ░    ░",
+    15,
+    10,
+);
+
+#[allow(dead_code)]
+pub const SPRITE_DEVOURING: EnemySprite = EnemySprite::new(
+    r"   ╱▼═══▼╲
+  ╱ ▼▓▓▓▓▼ ╲
+ │▼ ●▓▓▓● ▼│
+ │ ▓▼▓▓▼▓▓ │
+ │▓▓▓▼▼▓▓▓▓│
+ │▼▓▓▓▓▓▓▼▓│
+  ╲▓▼▓▓▼▓▓╱
+   ╲▓▓▼▓▓╱
+   ╱▼╲  ╱▼╲
+  ╱▼╲╱  ╲╱▼╲",
+    15,
+    10,
+);
+
+#[allow(dead_code)]
+pub const SPRITE_REGAL: EnemySprite = EnemySprite::new(
+    r"   ▲ ═▲═ ▲
+    ╱═════╲
+    │ ●  ● │
+    │  ▼   │
+    ╰┬════┬╯
+  ║─┤░░░░├─║
+  ║ │░░░░│ ║
+  ║ └════┘ ║
+    │░  ░│
+    ╰════╯",
+    15,
+    10,
+);
+
+#[allow(dead_code)]
+pub const SPRITE_AUTOMATON: EnemySprite = EnemySprite::new(
+    r"   ╔══════╗
+   ║ ●  ● ║
+   ║ ╔══╗ ║
+   ╠══════╣
+  ╔╩══════╩╗
+  ║ ◆████◆ ║
+  ║ ██████ ║
+  ╚╦══════╦╝
+   ║║    ║║
+   ╩╩    ╩╩",
+    15,
+    10,
+);
+
+#[allow(dead_code)]
+pub const SPRITE_SPECTRAL: EnemySprite = EnemySprite::new(
+    r"    ╱░░░░╲
+   ╱░    ░╲
+   │ ●  ● │
+   │  ░░   │
+    ╲░░░░░╱
+   ░ ░░░░ ░
+  ░  ░░░░  ░
+   ░░░░░░░░
+    ░ ░░ ░
+   ░   ░   ░",
+    15,
+    10,
+);
+
+#[allow(dead_code)]
+pub const SPRITE_RESONANT: EnemySprite = EnemySprite::new(
+    r"       ║
+   ═══╦═══
+  ░  ╱║╲  ░
+ ░  ╱ ║ ╲  ░
+ ═ ╱  ●  ╲ ═
+ ═ ╲  ●  ╱ ═
+ ░  ╲ ║ ╱  ░
+  ░  ╲║╱  ░
+   ═══╩═══
+       ║",
+    15,
+    10,
+);
+
+#[allow(dead_code)]
+pub const SPRITE_PRIMORDIAL: EnemySprite = EnemySprite::new(
+    r" ╲╱╲  ╱╲  ╱╲╱
+  ╲ ╲╱╲╱╲╱ ╱
+   │▓▓●●▓▓│
+   │▓▓▓▓▓▓│
+  ╱│▓████▓│╲
+ ╱ │▓▓▓▓▓▓│ ╲
+ ╲╱╱▓▓▓▓▓▓╲╲╱
+  ╱╲▓▓▓▓▓▓╱╲
+ ╱╱╲╲╱╲╱╲╱╱╲╲
+╱╱  ╲╲  ╱╱  ╲╲",
+    16,
+    10,
+);
+
+#[allow(dead_code)]
+pub const SPRITE_FOSSILIZED: EnemySprite = EnemySprite::new(
+    r"    ╱▓▓══╲
+   ╱▓▓ ●═ ╲
+   │▓▓ ●══ │
+   │▓▓▓═══ │
+   ╲▓▓████═╱
+    ▓█████═
+    │▓██═══│
+    │▓▓══ │
+    ╱▓╲  ╱═╲
+   ╱▓▓╲╱═══╲",
+    15,
+    10,
+);
+
 // ── Boss Crown Patterns ─────────────────────────────────────────────
 
 pub const BOSS_CROWN: &str = "--- \u{2605} ---";
@@ -519,6 +713,158 @@ pub fn archetype_for_suffix(zone_id: u32, suffix: &str) -> SpriteArchetype {
             "remnant" => Some(SpriteArchetype::Undead),
             _ => None,
         },
+        12 => match s.as_str() {
+            "stalker" => Some(SpriteArchetype::Fractured),
+            "hound" => Some(SpriteArchetype::Molten),
+            "ram" => Some(SpriteArchetype::Quadruped),
+            "brute" => Some(SpriteArchetype::Titan),
+            "crawler" => Some(SpriteArchetype::Insect),
+            _ => None,
+        },
+        13 => match s.as_str() {
+            "maw" => Some(SpriteArchetype::Molten),
+            "knight" => Some(SpriteArchetype::Humanoid),
+            "colossus" => Some(SpriteArchetype::Titan),
+            "warden" => Some(SpriteArchetype::Humanoid),
+            "fiend" => Some(SpriteArchetype::Fractured),
+            _ => None,
+        },
+        14 => match s.as_str() {
+            "breaker" => Some(SpriteArchetype::Fractured),
+            "cantor" => Some(SpriteArchetype::Humanoid),
+            "regent" => Some(SpriteArchetype::Regal),
+            "tyrant" => Some(SpriteArchetype::Titan),
+            "revenant" => Some(SpriteArchetype::Molten),
+            _ => None,
+        },
+        15 => match s.as_str() {
+            "hound" => Some(SpriteArchetype::Quadruped),
+            "jackal" => Some(SpriteArchetype::Mirrored),
+            "widow" => Some(SpriteArchetype::Insect),
+            "watcher" => Some(SpriteArchetype::Crystalline),
+            "echo" => Some(SpriteArchetype::Crystalline),
+            _ => None,
+        },
+        16 => match s.as_str() {
+            "serpent" => Some(SpriteArchetype::Serpent),
+            "marshal" => Some(SpriteArchetype::Mirrored),
+            "repeater" => Some(SpriteArchetype::Crystalline),
+            "sentinel" => Some(SpriteArchetype::Crystalline),
+            "engine" => Some(SpriteArchetype::Titan),
+            _ => None,
+        },
+        17 => match s.as_str() {
+            "wraith" => Some(SpriteArchetype::Mirrored),
+            "king" => Some(SpriteArchetype::Regal),
+            "titan" => Some(SpriteArchetype::Titan),
+            "chorus" => Some(SpriteArchetype::Crystalline),
+            "herald" => Some(SpriteArchetype::Humanoid),
+            _ => None,
+        },
+        18 => match s.as_str() {
+            "wing" => Some(SpriteArchetype::Avian),
+            "revenant" => Some(SpriteArchetype::Undead),
+            "forger" => Some(SpriteArchetype::Humanoid),
+            "giant" => Some(SpriteArchetype::Titan),
+            "shade" => Some(SpriteArchetype::Abyssal),
+            _ => None,
+        },
+        19 => match s.as_str() {
+            "warden" => Some(SpriteArchetype::Humanoid),
+            "behemoth" => Some(SpriteArchetype::Titan),
+            "herd" => Some(SpriteArchetype::Quadruped),
+            "devourer" => Some(SpriteArchetype::Devouring),
+            "judge" => Some(SpriteArchetype::Abyssal),
+            _ => None,
+        },
+        20 => match s.as_str() {
+            "hunger" => Some(SpriteArchetype::Devouring),
+            "colossus" => Some(SpriteArchetype::Titan),
+            "choir" => Some(SpriteArchetype::Abyssal),
+            "crawler" => Some(SpriteArchetype::Devouring),
+            "remnant" => Some(SpriteArchetype::Undead),
+            _ => None,
+        },
+        21 => match s.as_str() {
+            "sentinel" => Some(SpriteArchetype::Regal),
+            "warden" => Some(SpriteArchetype::Regal),
+            "knight" => Some(SpriteArchetype::Automaton),
+            "colossus" => Some(SpriteArchetype::Titan),
+            "procession" => Some(SpriteArchetype::Regal),
+            _ => None,
+        },
+        22 => match s.as_str() {
+            "wraith" => Some(SpriteArchetype::Spectral),
+            "censor" => Some(SpriteArchetype::Automaton),
+            "construct" => Some(SpriteArchetype::Automaton),
+            "eater" => Some(SpriteArchetype::Horror),
+            "archivist" => Some(SpriteArchetype::Regal),
+            _ => None,
+        },
+        23 => match s.as_str() {
+            "warden" => Some(SpriteArchetype::Regal),
+            "chancellor" => Some(SpriteArchetype::Regal),
+            "guardian" => Some(SpriteArchetype::Automaton),
+            "absence" => Some(SpriteArchetype::Horror),
+            "sovereign" => Some(SpriteArchetype::Regal),
+            _ => None,
+        },
+        24 => match s.as_str() {
+            "wanderer" => Some(SpriteArchetype::Spectral),
+            "phantom" => Some(SpriteArchetype::Spectral),
+            "leviathan" => Some(SpriteArchetype::Titan),
+            "depthless" => Some(SpriteArchetype::Resonant),
+            "mother" => Some(SpriteArchetype::Horror),
+            _ => None,
+        },
+        25 => match s.as_str() {
+            "hound" => Some(SpriteArchetype::Quadruped),
+            "dissonant" => Some(SpriteArchetype::Resonant),
+            "resonant" => Some(SpriteArchetype::Resonant),
+            "warden" => Some(SpriteArchetype::Humanoid),
+            "chorus" => Some(SpriteArchetype::Spectral),
+            _ => None,
+        },
+        26 => match s.as_str() {
+            "stalker" => Some(SpriteArchetype::Spectral),
+            "undefined" => Some(SpriteArchetype::Resonant),
+            "bloom" => Some(SpriteArchetype::Elemental),
+            "flickerer" => Some(SpriteArchetype::Spectral),
+            "voice" => Some(SpriteArchetype::Resonant),
+            _ => None,
+        },
+        27 => match s.as_str() {
+            "creeper" => Some(SpriteArchetype::Primordial),
+            "horror" => Some(SpriteArchetype::Horror),
+            "warden" => Some(SpriteArchetype::Humanoid),
+            "rupture" => Some(SpriteArchetype::Primordial),
+            "root" => Some(SpriteArchetype::Primordial),
+            _ => None,
+        },
+        28 => match s.as_str() {
+            "echo" => Some(SpriteArchetype::Fossilized),
+            "dweller" => Some(SpriteArchetype::Primordial),
+            "noise" => Some(SpriteArchetype::Spectral),
+            "once-slain" => Some(SpriteArchetype::Fossilized),
+            "reverberation" => Some(SpriteArchetype::Primordial),
+            _ => None,
+        },
+        29 => match s.as_str() {
+            "walker" => Some(SpriteArchetype::Fossilized),
+            "muted" => Some(SpriteArchetype::Primordial),
+            "beast" => Some(SpriteArchetype::Quadruped),
+            "frequency" => Some(SpriteArchetype::Spectral),
+            "warden" => Some(SpriteArchetype::Humanoid),
+            _ => None,
+        },
+        30 => match s.as_str() {
+            "guardian" => Some(SpriteArchetype::Primordial),
+            "titan" => Some(SpriteArchetype::Titan),
+            "unbroken" => Some(SpriteArchetype::Fossilized),
+            "heart" => Some(SpriteArchetype::Primordial),
+            "final" => Some(SpriteArchetype::Primordial),
+            _ => None,
+        },
         _ => None,
     };
 
@@ -535,6 +881,12 @@ pub fn zone_default_archetype(zone_id: u32) -> SpriteArchetype {
         8 => SpriteArchetype::Serpent,
         9 => SpriteArchetype::Avian,
         11 => SpriteArchetype::Horror,
+        12..=14 => SpriteArchetype::Fractured, // Ch.1 Red Fault
+        15..=17 => SpriteArchetype::Crystalline, // Ch.2 Mirror Scar
+        18..=20 => SpriteArchetype::Abyssal,   // Ch.3 Black Mouth
+        21..=23 => SpriteArchetype::Regal,     // Ch.4 Hollow Throne
+        24..=26 => SpriteArchetype::Spectral,  // Ch.5 Wailing Reach
+        27..=30 => SpriteArchetype::Primordial, // Ch.6 Origin Wound
         _ => SpriteArchetype::Quadruped,
     }
 }
@@ -773,6 +1125,82 @@ pub fn suffix_is_known_for_zone(zone_id: u32, suffix: &str) -> bool {
                 | "rift"
                 | "amalgam"
                 | "remnant"
+        ),
+        12 => matches!(
+            s.as_str(),
+            "stalker" | "hound" | "ram" | "brute" | "crawler"
+        ),
+        13 => matches!(
+            s.as_str(),
+            "maw" | "knight" | "colossus" | "warden" | "fiend"
+        ),
+        14 => matches!(
+            s.as_str(),
+            "breaker" | "cantor" | "regent" | "tyrant" | "revenant"
+        ),
+        15 => matches!(
+            s.as_str(),
+            "hound" | "jackal" | "widow" | "watcher" | "echo"
+        ),
+        16 => matches!(
+            s.as_str(),
+            "serpent" | "marshal" | "repeater" | "sentinel" | "engine"
+        ),
+        17 => matches!(
+            s.as_str(),
+            "wraith" | "king" | "titan" | "chorus" | "herald"
+        ),
+        18 => matches!(
+            s.as_str(),
+            "wing" | "revenant" | "forger" | "giant" | "shade"
+        ),
+        19 => matches!(
+            s.as_str(),
+            "warden" | "behemoth" | "herd" | "devourer" | "judge"
+        ),
+        20 => matches!(
+            s.as_str(),
+            "hunger" | "colossus" | "choir" | "crawler" | "remnant"
+        ),
+        21 => matches!(
+            s.as_str(),
+            "sentinel" | "warden" | "knight" | "colossus" | "procession"
+        ),
+        22 => matches!(
+            s.as_str(),
+            "wraith" | "censor" | "construct" | "eater" | "archivist"
+        ),
+        23 => matches!(
+            s.as_str(),
+            "warden" | "chancellor" | "guardian" | "absence" | "sovereign"
+        ),
+        24 => matches!(
+            s.as_str(),
+            "wanderer" | "phantom" | "leviathan" | "depthless" | "mother"
+        ),
+        25 => matches!(
+            s.as_str(),
+            "hound" | "dissonant" | "resonant" | "warden" | "chorus"
+        ),
+        26 => matches!(
+            s.as_str(),
+            "stalker" | "undefined" | "bloom" | "flickerer" | "voice"
+        ),
+        27 => matches!(
+            s.as_str(),
+            "creeper" | "horror" | "warden" | "rupture" | "root"
+        ),
+        28 => matches!(
+            s.as_str(),
+            "echo" | "dweller" | "noise" | "once-slain" | "reverberation"
+        ),
+        29 => matches!(
+            s.as_str(),
+            "walker" | "muted" | "beast" | "frequency" | "warden"
+        ),
+        30 => matches!(
+            s.as_str(),
+            "guardian" | "titan" | "unbroken" | "heart" | "final"
         ),
         _ => false,
     }
