@@ -341,22 +341,32 @@ fn build_save_indicator_segments(
 ) -> Vec<IndicatorSegment> {
     use super::throbber::spinner_char;
 
+    // Fixed text width so the indicator doesn't bounce when segments
+    // transition between spinner / timestamp / placeholder states.
+    // Max timestamp: "12:45 PM" = 8 chars.
+    const TEXT_WIDTH: usize = 8;
+
+    /// Format the text portion of a segment, right-padded to `TEXT_WIDTH`.
+    fn pad(text: &str) -> String {
+        format!("{:<width$}", text, width = TEXT_WIDTH)
+    }
+
     let mut segments = Vec::new();
 
     // Save segment (always present)
     if is_saving {
         segments.push(IndicatorSegment {
-            content: format!("\u{1F4BE} {}", spinner_char()),
+            content: format!("\u{1F4BE} {}", pad(&spinner_char().to_string())),
             color: Color::Yellow,
         });
     } else if let Some(time) = last_save_time {
         segments.push(IndicatorSegment {
-            content: format!("\u{1F4BE} {}", time.format("%-I:%M %p")),
+            content: format!("\u{1F4BE} {}", pad(&time.format("%-I:%M %p").to_string())),
             color: Color::DarkGray,
         });
     } else {
         segments.push(IndicatorSegment {
-            content: "\u{1F4BE} ---".to_string(),
+            content: format!("\u{1F4BE} {}", pad("---")),
             color: Color::DarkGray,
         });
     }
@@ -365,17 +375,17 @@ fn build_save_indicator_segments(
     if has_history_repo {
         if is_committing {
             segments.push(IndicatorSegment {
-                content: format!("\u{1F4DD} {}", spinner_char()),
+                content: format!("\u{1F4DD} {}", pad(&spinner_char().to_string())),
                 color: Color::Yellow,
             });
         } else if let Some(time) = last_commit_time {
             segments.push(IndicatorSegment {
-                content: format!("\u{1F4DD} {}", time.format("%-I:%M %p")),
+                content: format!("\u{1F4DD} {}", pad(&time.format("%-I:%M %p").to_string())),
                 color: Color::DarkGray,
             });
         } else {
             segments.push(IndicatorSegment {
-                content: "\u{1F4DD} ---".to_string(),
+                content: format!("\u{1F4DD} {}", pad("---")),
                 color: Color::DarkGray,
             });
         }
@@ -385,17 +395,17 @@ fn build_save_indicator_segments(
     if has_cloud_config {
         if is_pushing {
             segments.push(IndicatorSegment {
-                content: format!("\u{2601} {}", spinner_char()),
+                content: format!("\u{2601} {}", pad(&spinner_char().to_string())),
                 color: Color::Cyan,
             });
         } else if let Some(time) = last_push_time {
             segments.push(IndicatorSegment {
-                content: format!("\u{2601} {}", time.format("%-I:%M %p")),
+                content: format!("\u{2601} {}", pad(&time.format("%-I:%M %p").to_string())),
                 color: Color::DarkGray,
             });
         } else {
             segments.push(IndicatorSegment {
-                content: "\u{2601} ---".to_string(),
+                content: format!("\u{2601} {}", pad("---")),
                 color: Color::DarkGray,
             });
         }
@@ -576,9 +586,10 @@ mod tests {
         let segments =
             build_save_indicator_segments(false, None, false, None, false, None, true, true);
         assert_eq!(segments.len(), 3);
-        assert_eq!(segments[0].content, "\u{1F4BE} ---");
-        assert_eq!(segments[1].content, "\u{1F4DD} ---");
-        assert_eq!(segments[2].content, "\u{2601} ---");
+        // "---" padded to 8 chars
+        assert_eq!(segments[0].content, "\u{1F4BE} ---     ");
+        assert_eq!(segments[1].content, "\u{1F4DD} ---     ");
+        assert_eq!(segments[2].content, "\u{2601} ---     ");
         assert!(segments.iter().all(|s| s.color == Color::DarkGray));
     }
 
@@ -587,7 +598,7 @@ mod tests {
         let segments =
             build_save_indicator_segments(false, None, false, None, false, None, false, false);
         assert_eq!(segments.len(), 1);
-        assert_eq!(segments[0].content, "\u{1F4BE} ---");
+        assert_eq!(segments[0].content, "\u{1F4BE} ---     ");
         assert_eq!(segments[0].color, Color::DarkGray);
     }
 
@@ -596,7 +607,32 @@ mod tests {
         let segments =
             build_save_indicator_segments(false, None, false, None, false, None, true, false);
         assert_eq!(segments.len(), 2);
-        assert_eq!(segments[0].content, "\u{1F4BE} ---");
-        assert_eq!(segments[1].content, "\u{1F4DD} ---");
+        assert_eq!(segments[0].content, "\u{1F4BE} ---     ");
+        assert_eq!(segments[1].content, "\u{1F4DD} ---     ");
+    }
+
+    #[test]
+    fn fixed_width_segments() {
+        use unicode_width::UnicodeWidthStr;
+        // All segment states should produce the same display width
+        let saving =
+            build_save_indicator_segments(true, None, false, None, false, None, false, false);
+        let default =
+            build_save_indicator_segments(false, None, false, None, false, None, false, false);
+        let saved = build_save_indicator_segments(
+            false,
+            Some(make_time()),
+            false,
+            None,
+            false,
+            None,
+            false,
+            false,
+        );
+        let saving_w = UnicodeWidthStr::width(saving[0].content.as_str());
+        let default_w = UnicodeWidthStr::width(default[0].content.as_str());
+        let saved_w = UnicodeWidthStr::width(saved[0].content.as_str());
+        assert_eq!(saving_w, default_w);
+        assert_eq!(saving_w, saved_w);
     }
 }
