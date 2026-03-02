@@ -710,10 +710,21 @@ pub fn render_vault_selection(
                     format!("  Z{}", item.ilvl / 10),
                     Style::default().fg(Color::DarkGray),
                 ));
+                let base_power = item.power();
                 spans.push(Span::styled(
-                    format!(" \u{26a1}{}", item.power()),
+                    format!(" \u{26a1}{}", base_power),
                     Style::default().fg(Color::Cyan),
                 ));
+                let enh_bonus = {
+                    let mult = crate::enhancement::enhancement_multiplier(enhancement_levels[i]);
+                    (base_power as f64 * mult).round() as u32 - base_power
+                };
+                if enh_bonus > 0 {
+                    spans.push(Span::styled(
+                        format!("+{}", enh_bonus),
+                        super::stats_equipment::enhancement_style(enhancement_levels[i]),
+                    ));
+                }
 
                 ListItem::new(Line::from(spans))
             } else {
