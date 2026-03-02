@@ -61,8 +61,16 @@ pub(super) fn draw_attributes_compact(
         let r_val = game_state.attributes.get(*right);
         let r_mod = game_state.attributes.modifier(*right);
 
-        let l_fg = if l_val >= cap { gold } else { attr_color(*left) };
-        let r_fg = if r_val >= cap { gold } else { attr_color(*right) };
+        let l_fg = if l_val >= cap {
+            gold
+        } else {
+            attr_color(*left)
+        };
+        let r_fg = if r_val >= cap {
+            gold
+        } else {
+            attr_color(*right)
+        };
 
         let l_filled = if cap > 0 {
             ((l_val as f64 / cap as f64) * BAR_WIDTH as f64).round() as usize
@@ -86,38 +94,26 @@ pub(super) fn draw_attributes_compact(
                 Style::default().add_modifier(Modifier::BOLD),
             ),
             Span::raw("["),
-            Span::styled(
-                "\u{2588}".repeat(l_filled),
-                Style::default().fg(l_fg),
-            ),
+            Span::styled("\u{2588}".repeat(l_filled), Style::default().fg(l_fg)),
             Span::styled(
                 "\u{2591}".repeat(BAR_WIDTH - l_filled),
                 Style::default().fg(Color::DarkGray),
             ),
             Span::raw("] "),
-            Span::styled(
-                format!("{}/{}", l_val, cap),
-                Style::default().fg(l_fg),
-            ),
+            Span::styled(format!("{}/{}", l_val, cap), Style::default().fg(l_fg)),
             Span::raw(format!(" {:>3}   ", l_mod_str)),
             Span::styled(
                 format!("{} ", right.abbrev()),
                 Style::default().add_modifier(Modifier::BOLD),
             ),
             Span::raw("["),
-            Span::styled(
-                "\u{2588}".repeat(r_filled),
-                Style::default().fg(r_fg),
-            ),
+            Span::styled("\u{2588}".repeat(r_filled), Style::default().fg(r_fg)),
             Span::styled(
                 "\u{2591}".repeat(BAR_WIDTH - r_filled),
                 Style::default().fg(Color::DarkGray),
             ),
             Span::raw("] "),
-            Span::styled(
-                format!("{}/{}", r_val, cap),
-                Style::default().fg(r_fg),
-            ),
+            Span::styled(format!("{}/{}", r_val, cap), Style::default().fg(r_fg)),
             Span::raw(format!(" {:>3}", r_mod_str)),
         ]));
     }
