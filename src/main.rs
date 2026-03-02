@@ -523,25 +523,32 @@ fn main() -> io::Result<()> {
                             }
                         }
 
-                        // Process deferred commit (save was done on previous tick).
-                        // This ensures the save indicator shows before the commit
-                        // spinner starts, giving sequential visual feedback.
-                        if let Some((event, should_push)) = pending_commit.take() {
-                            if let Some(ref repo) = history_repo {
-                                // Save is done — clear its spinner, show timestamp
-                                last_save_instant = None;
-                                if commit_save(&state, &event, repo) {
-                                    last_commit_instant = Some(Instant::now());
-                                    last_commit_time = Some(Local::now());
-                                }
-                                if should_push && !cloud.op_in_flight {
-                                    if let Some(ref config) = cloud.config {
-                                        main_helpers::cloud_ops::spawn_cloud_push(
-                                            &mut cloud.op_in_flight,
-                                            &cloud.tx,
-                                            &quest_dir,
-                                            &config.token,
-                                        );
+                        // Process deferred commit after save spinner has been
+                        // visible for at least 500ms. The handler runs before
+                        // render, so without this delay the save spinner would
+                        // be set and cleared between frames, never drawn.
+                        if pending_commit.is_some()
+                            && last_save_instant
+                                .map(|t| t.elapsed() >= Duration::from_millis(500))
+                                .unwrap_or(true)
+                        {
+                            if let Some((event, should_push)) = pending_commit.take() {
+                                if let Some(ref repo) = history_repo {
+                                    // Save spinner done — show timestamp, start commit
+                                    last_save_instant = None;
+                                    if commit_save(&state, &event, repo) {
+                                        last_commit_instant = Some(Instant::now());
+                                        last_commit_time = Some(Local::now());
+                                    }
+                                    if should_push && !cloud.op_in_flight {
+                                        if let Some(ref config) = cloud.config {
+                                            main_helpers::cloud_ops::spawn_cloud_push(
+                                                &mut cloud.op_in_flight,
+                                                &cloud.tx,
+                                                &quest_dir,
+                                                &config.token,
+                                            );
+                                        }
                                     }
                                 }
                             }
