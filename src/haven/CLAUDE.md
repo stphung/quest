@@ -25,7 +25,7 @@ Haven is **not** tied to a single character. It persists across:
 Haven is discovered randomly at P10+. Base discovery chance: `0.000014 + (prestige_rank - 10) × 0.000007` per tick.
 
 ### Room Skill Tree
-The Haven consists of 14 rooms organized in a two-branch skill tree. Each room has upgrade tiers (most have 3 tiers, exceptions noted). Rooms require parent rooms at T1+ to unlock. Capstones require both parents.
+The Haven consists of 14 rooms organized in a two-branch skill tree: a **combat branch** (Armory side: damage, XP, drops, crit, double strike) and a **QoL branch** (Bedroom side: regen, fishing, discovery, rarity, item preservation). The branches converge at 3 capstones: **War Room** (combat cap), **Vault** (QoL cap), and **Storm Forge** (ultimate, requires both). Each room has upgrade tiers (most have 3 tiers, exceptions noted). Rooms require parent rooms at T1+ to unlock. Capstones require both parents.
 
 ```
                     Hearthstone (root)

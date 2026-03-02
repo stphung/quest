@@ -105,6 +105,15 @@ Zone 11 has dramatically higher stats than Zone 10 (~6.2x HP, ~4.6x DMG, ~4.8x D
 - **attack_speed_percent**: Windborne + sigils
 - **hp_regen_percent**, **hp_regen_delay_reduction**, **regen_reduction_percent**: Regen modifiers from Haven, sigils, Sleipnir
 
+## Combat Pipelines (Quick Reference)
+
+- **Damage pipeline**: base damage --> Giant's Might % --> Haven Armory % --> prestige flat damage --> ascension multiplier --> enemy defense --> min 1 --> Divine Bulwark DR --> crit (2x)
+- **Defense pipeline**: base defense --> prestige flat defense --> ascension multiplier --> damage reduction %
+- **Ascension multiplier**: Also applied to player max HP in `core/tick.rs` (default 1.0x, up to 64x+ at Ascension VI)
+- **Boss enrage timer**: Bosses enrage after 60 seconds of combat, increasing damage output (instant kill)
+
+See "Unified Combat Bonuses" below for the full field-level breakdown of `CombatBonuses`.
+
 ## Boss Encounters
 
 - After 10 kills in a subzone, the next enemy is the subzone boss
