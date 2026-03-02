@@ -11,7 +11,7 @@ use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::{get_adventurer_rank, get_prestige_tier};
 use crate::core::game_logic::xp_for_next_level;
 use crate::core::game_state::GameState;
-use crate::power_cores::PowerCoreState;
+use crate::deep::DeepState;
 use crate::utils::updater::UpdateInfo;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -69,7 +69,7 @@ pub fn draw_stats_panel(
     ctx: &LayoutContext,
     enhancement_levels: &[u8; 7],
     achievements: &crate::achievements::Achievements,
-    power_cores: &PowerCoreState,
+    deep: &DeepState,
 ) {
     match ctx.height_tier {
         SizeTier::XL | SizeTier::L => {
@@ -115,7 +115,7 @@ pub fn draw_stats_panel(
             draw_fishing_panel(frame, chunks[idx], game_state, achievements);
             idx += 1;
             if power_cores_height > 0 {
-                draw_power_cores_panel(frame, chunks[idx], achievements, power_cores);
+                draw_power_cores_panel(frame, chunks[idx], achievements, deep);
                 idx += 1;
             }
             draw_attributes_compact(frame, chunks[idx], game_state);

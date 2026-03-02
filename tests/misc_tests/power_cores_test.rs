@@ -7,16 +7,16 @@
 //!  4. pr_per_day values are 2, 3, 5, 8, 12, 18
 //!  5. Core names match fracture regions: Red Fault, Mirror Scar, Black Mouth, Hollow Throne,
 //!     Wailing Reach, Origin Wound
-//!  6. PowerCoreState serialization round-trip
+//!  6. DeepPersistent power_core_last_granted serialization round-trip
 //!  7. get_unlocked_cores with 0, 1, 3, and 6 unlocked
 //!  8. fill_duration_secs calculation for each core
 //!  9. Persistence save/load cycle
-//! 10. Default state
+//! 10. Default state (DeepPersistent)
 
 use quest::achievements::{AchievementId, Achievements};
+use quest::deep::types::DeepPersistent;
 use quest::power_cores::{
-    fill_duration_secs, get_power_core_def, get_unlocked_cores, load_power_cores, PowerCoreState,
-    ALL_POWER_CORES,
+    fill_duration_secs, get_power_core_def, get_unlocked_cores, ALL_POWER_CORES,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -263,63 +263,66 @@ fn test_core_names_are_nonempty() {
     }
 }
 
-// ── 6. PowerCoreState serialization round-trip ────────────────────────────────
+// ── 6. DeepPersistent power_core_last_granted serialization round-trip ────────
 
 #[test]
-fn test_power_core_state_serialization_round_trip_empty() {
-    let state = PowerCoreState::default();
+fn test_power_core_last_granted_serialization_round_trip_empty() {
+    let state = DeepPersistent::new();
     let json = serde_json::to_string(&state).expect("serialization should succeed");
-    let loaded: PowerCoreState =
+    let loaded: DeepPersistent =
         serde_json::from_str(&json).expect("deserialization should succeed");
-    assert_eq!(loaded.last_granted_at.len(), state.last_granted_at.len());
-    assert!(loaded.last_granted_at.is_empty());
+    assert_eq!(
+        loaded.power_core_last_granted.len(),
+        state.power_core_last_granted.len()
+    );
+    assert!(loaded.power_core_last_granted.is_empty());
 }
 
 #[test]
-fn test_power_core_state_serialization_round_trip_with_timestamps() {
-    let mut state = PowerCoreState::default();
+fn test_power_core_last_granted_serialization_round_trip_with_timestamps() {
+    let mut state = DeepPersistent::new();
     state
-        .last_granted_at
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreI, 1_700_000_000);
     state
-        .last_granted_at
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreII, 1_700_100_000);
     state
-        .last_granted_at
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreIII, 1_700_200_000);
 
     let json = serde_json::to_string_pretty(&state).expect("serialization should succeed");
-    let loaded: PowerCoreState =
+    let loaded: DeepPersistent =
         serde_json::from_str(&json).expect("deserialization should succeed");
 
-    assert_eq!(loaded.last_granted_at.len(), 3);
+    assert_eq!(loaded.power_core_last_granted.len(), 3);
     assert_eq!(
-        loaded.last_granted_at[&AchievementId::PowerCoreI],
+        loaded.power_core_last_granted[&AchievementId::PowerCoreI],
         1_700_000_000
     );
     assert_eq!(
-        loaded.last_granted_at[&AchievementId::PowerCoreII],
+        loaded.power_core_last_granted[&AchievementId::PowerCoreII],
         1_700_100_000
     );
     assert_eq!(
-        loaded.last_granted_at[&AchievementId::PowerCoreIII],
+        loaded.power_core_last_granted[&AchievementId::PowerCoreIII],
         1_700_200_000
     );
     // Unset cores should be absent
     assert!(!loaded
-        .last_granted_at
+        .power_core_last_granted
         .contains_key(&AchievementId::PowerCoreIV));
     assert!(!loaded
-        .last_granted_at
+        .power_core_last_granted
         .contains_key(&AchievementId::PowerCoreV));
     assert!(!loaded
-        .last_granted_at
+        .power_core_last_granted
         .contains_key(&AchievementId::PowerCoreVI));
 }
 
 #[test]
-fn test_power_core_state_serialization_round_trip_all_six() {
-    let mut state = PowerCoreState::default();
+fn test_power_core_last_granted_serialization_round_trip_all_six() {
+    let mut state = DeepPersistent::new();
     let timestamps: [i64; 6] = [
         1_700_000_000,
         1_700_100_000,
@@ -337,16 +340,16 @@ fn test_power_core_state_serialization_round_trip_all_six() {
         AchievementId::PowerCoreVI,
     ];
     for (&id, &ts) in ids.iter().zip(timestamps.iter()) {
-        state.last_granted_at.insert(id, ts);
+        state.power_core_last_granted.insert(id, ts);
     }
 
     let json = serde_json::to_string_pretty(&state).unwrap();
-    let loaded: PowerCoreState = serde_json::from_str(&json).unwrap();
+    let loaded: DeepPersistent = serde_json::from_str(&json).unwrap();
 
-    assert_eq!(loaded.last_granted_at.len(), 6);
+    assert_eq!(loaded.power_core_last_granted.len(), 6);
     for (&id, &ts) in ids.iter().zip(timestamps.iter()) {
         assert_eq!(
-            loaded.last_granted_at[&id], ts,
+            loaded.power_core_last_granted[&id], ts,
             "Timestamp mismatch for {:?}",
             id
         );
@@ -354,23 +357,23 @@ fn test_power_core_state_serialization_round_trip_all_six() {
 }
 
 #[test]
-fn test_power_core_state_missing_keys_are_absent_after_round_trip() {
+fn test_power_core_last_granted_missing_keys_are_absent_after_round_trip() {
     // State with only one entry — the other 5 should not appear after a round-trip
-    let mut state = PowerCoreState::default();
+    let mut state = DeepPersistent::new();
     state
-        .last_granted_at
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreVI, 999_999_999);
 
     let json = serde_json::to_string(&state).unwrap();
-    let loaded: PowerCoreState = serde_json::from_str(&json).unwrap();
+    let loaded: DeepPersistent = serde_json::from_str(&json).unwrap();
 
-    assert_eq!(loaded.last_granted_at.len(), 1);
+    assert_eq!(loaded.power_core_last_granted.len(), 1);
     assert_eq!(
-        loaded.last_granted_at[&AchievementId::PowerCoreVI],
+        loaded.power_core_last_granted[&AchievementId::PowerCoreVI],
         999_999_999
     );
     assert!(!loaded
-        .last_granted_at
+        .power_core_last_granted
         .contains_key(&AchievementId::PowerCoreI));
 }
 
@@ -577,7 +580,7 @@ fn test_fill_duration_secs_matches_86400_divided_by_pr_per_day() {
 #[test]
 fn test_persistence_save_and_load_cycle() {
     // Build a state with all 6 cores having timestamps
-    let mut state = PowerCoreState::default();
+    let mut state = DeepPersistent::new();
     let entries: [(AchievementId, i64); 6] = [
         (AchievementId::PowerCoreI, 1_700_000_001),
         (AchievementId::PowerCoreII, 1_700_000_002),
@@ -587,21 +590,21 @@ fn test_persistence_save_and_load_cycle() {
         (AchievementId::PowerCoreVI, 1_700_000_006),
     ];
     for (id, ts) in entries {
-        state.last_granted_at.insert(id, ts);
+        state.power_core_last_granted.insert(id, ts);
     }
 
-    // Serialize to JSON (simulates what save_power_cores does)
+    // Serialize to JSON (simulates what save_deep does)
     let json = serde_json::to_string_pretty(&state).expect("serialization should succeed");
 
-    // Deserialize (simulates what load_power_cores does)
-    let loaded: PowerCoreState =
+    // Deserialize (simulates what load_deep does)
+    let loaded: DeepPersistent =
         serde_json::from_str(&json).expect("deserialization should succeed");
 
     // All 6 entries should survive the round-trip unchanged
-    assert_eq!(loaded.last_granted_at.len(), 6);
+    assert_eq!(loaded.power_core_last_granted.len(), 6);
     for (id, ts) in entries {
         assert_eq!(
-            loaded.last_granted_at[&id], ts,
+            loaded.power_core_last_granted[&id], ts,
             "Timestamp mismatch for {:?} after save/load cycle",
             id
         );
@@ -613,15 +616,15 @@ fn test_persistence_save_and_load_via_tempfile() {
     use tempfile::TempDir;
 
     let tmp = TempDir::new().expect("tempdir creation should succeed");
-    let path = tmp.path().join("power_cores.json");
+    let path = tmp.path().join("deep.json");
 
     // Build state
-    let mut state = PowerCoreState::default();
+    let mut state = DeepPersistent::new();
     state
-        .last_granted_at
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreI, 1_234_567_890);
     state
-        .last_granted_at
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreIII, 9_876_543_210);
 
     // Write
@@ -630,20 +633,20 @@ fn test_persistence_save_and_load_via_tempfile() {
 
     // Read back
     let loaded_json = std::fs::read_to_string(&path).expect("read should succeed");
-    let loaded: PowerCoreState =
+    let loaded: DeepPersistent =
         serde_json::from_str(&loaded_json).expect("deserialization should succeed");
 
-    assert_eq!(loaded.last_granted_at.len(), 2);
+    assert_eq!(loaded.power_core_last_granted.len(), 2);
     assert_eq!(
-        loaded.last_granted_at[&AchievementId::PowerCoreI],
+        loaded.power_core_last_granted[&AchievementId::PowerCoreI],
         1_234_567_890
     );
     assert_eq!(
-        loaded.last_granted_at[&AchievementId::PowerCoreIII],
+        loaded.power_core_last_granted[&AchievementId::PowerCoreIII],
         9_876_543_210
     );
     assert!(!loaded
-        .last_granted_at
+        .power_core_last_granted
         .contains_key(&AchievementId::PowerCoreII));
 }
 
@@ -651,71 +654,78 @@ fn test_persistence_save_and_load_via_tempfile() {
 fn test_persistence_load_returns_default_for_corrupted_json() {
     // Verify that a corrupt/missing file falls back to default state rather than panicking.
     // We test this by directly deserializing invalid JSON.
-    let result: Result<PowerCoreState, _> = serde_json::from_str("not valid json");
+    let result: Result<DeepPersistent, _> = serde_json::from_str("not valid json");
     assert!(result.is_err(), "Invalid JSON should fail to deserialize");
     // The load function itself returns default on error — verified by the function signature
     // (unwrap_or_default pattern). We verify default is what we expect.
-    let default_state = PowerCoreState::default();
-    assert!(default_state.last_granted_at.is_empty());
+    let default_state = DeepPersistent::new();
+    assert!(default_state.power_core_last_granted.is_empty());
 }
 
 #[test]
-fn test_load_power_cores_does_not_panic() {
-    // load_power_cores() should return a valid default if the file is absent.
+fn test_load_deep_does_not_panic() {
+    // load_deep() should return a valid default if the file is absent.
     // This test just ensures the function doesn't panic in the test environment.
-    let _state = load_power_cores();
+    let _state = quest::deep::load_deep();
 }
 
 // ── 10. Default state ────────────────────────────────────────────────────────
 
 #[test]
-fn test_power_core_state_default_has_empty_map() {
-    let state = PowerCoreState::default();
+fn test_deep_persistent_default_has_empty_power_core_map() {
+    let state = DeepPersistent::new();
     assert!(
-        state.last_granted_at.is_empty(),
-        "Default PowerCoreState should have no timestamps"
+        state.power_core_last_granted.is_empty(),
+        "Default DeepPersistent should have no power core timestamps"
     );
 }
 
 #[test]
-fn test_power_core_state_new_entry_can_be_inserted() {
-    let mut state = PowerCoreState::default();
-    assert!(state.last_granted_at.is_empty());
+fn test_deep_persistent_power_core_entry_can_be_inserted() {
+    let mut state = DeepPersistent::new();
+    assert!(state.power_core_last_granted.is_empty());
 
-    state.last_granted_at.insert(AchievementId::PowerCoreI, 0);
-    assert_eq!(state.last_granted_at.len(), 1);
-    assert_eq!(state.last_granted_at[&AchievementId::PowerCoreI], 0);
+    state
+        .power_core_last_granted
+        .insert(AchievementId::PowerCoreI, 0);
+    assert_eq!(state.power_core_last_granted.len(), 1);
+    assert_eq!(state.power_core_last_granted[&AchievementId::PowerCoreI], 0);
 }
 
 #[test]
-fn test_power_core_state_zero_timestamp_is_valid() {
+fn test_deep_persistent_zero_timestamp_is_valid() {
     // Timestamp 0 represents "never granted" (epoch) — it's a valid stored value.
-    let mut state = PowerCoreState::default();
-    state.last_granted_at.insert(AchievementId::PowerCoreI, 0);
+    let mut state = DeepPersistent::new();
+    state
+        .power_core_last_granted
+        .insert(AchievementId::PowerCoreI, 0);
 
     let json = serde_json::to_string(&state).unwrap();
-    let loaded: PowerCoreState = serde_json::from_str(&json).unwrap();
-    assert_eq!(loaded.last_granted_at[&AchievementId::PowerCoreI], 0);
+    let loaded: DeepPersistent = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        loaded.power_core_last_granted[&AchievementId::PowerCoreI],
+        0
+    );
 }
 
 #[test]
-fn test_power_core_state_clone_is_independent() {
-    let mut state = PowerCoreState::default();
+fn test_deep_persistent_clone_is_independent() {
+    let mut state = DeepPersistent::new();
     state
-        .last_granted_at
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreI, 1000);
 
     let mut cloned = state.clone();
     cloned
-        .last_granted_at
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreII, 2000);
 
     // Original should not be affected by modifications to the clone
     assert!(!state
-        .last_granted_at
+        .power_core_last_granted
         .contains_key(&AchievementId::PowerCoreII));
-    assert_eq!(state.last_granted_at.len(), 1);
-    assert_eq!(cloned.last_granted_at.len(), 2);
+    assert_eq!(state.power_core_last_granted.len(), 1);
+    assert_eq!(cloned.power_core_last_granted.len(), 2);
 }
 
 // ── Additional edge cases ────────────────────────────────────────────────────

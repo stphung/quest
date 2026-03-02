@@ -123,7 +123,7 @@ fn build_startup_splash_text(
     cloud_config: Option<&CloudConfig>,
     haven: &haven::Haven,
     enhancement: &enhancement::EnhancementProgress,
-    deep: &crate::deep::DeepState,
+    deep_state: &crate::deep::DeepState,
 ) -> Vec<Line<'static>> {
     use crate::utils::build_info::{BUILD_COMMIT, BUILD_DATE};
     let now = Utc::now();
@@ -245,7 +245,7 @@ fn build_startup_splash_text(
             Style::default().fg(Color::Gray),
         ));
     }
-    if deep.persistent.discovered {
+    if deep_state.persistent.discovered {
         if !badges.is_empty() {
             badges.push(Span::styled("   ", Style::default()));
         }
@@ -254,7 +254,7 @@ fn build_startup_splash_text(
             Style::default().fg(Color::Rgb(204, 153, 0)),
         ));
         badges.push(Span::styled(
-            format!("L{}", deep.persistent.deepest_layer_reached),
+            format!("L{}", deep_state.persistent.deepest_layer_reached),
             Style::default().fg(Color::Gray),
         ));
     }
@@ -785,8 +785,7 @@ pub fn show_startup_splash_screen(
     cloud_tx: &std::sync::mpsc::Sender<CloudOpResult>,
     cloud_rx: &std::sync::mpsc::Receiver<CloudOpResult>,
     cloud_op_in_flight: &mut bool,
-    power_cores: &mut crate::power_cores::PowerCoreState,
-    deep: &crate::deep::DeepState,
+    deep_state: &mut crate::deep::DeepState,
 ) -> io::Result<StartupSplashResult> {
     let mut update_status: Option<UpdateInfoStatus> = None;
     let mut time_vault_browser: Option<TimeVaultState> = None;
@@ -968,7 +967,7 @@ pub fn show_startup_splash_screen(
             cloud_config.as_ref(),
             haven,
             enhancement,
-            deep,
+            deep_state,
         );
         terminal.draw(|f| {
             let area = f.area();
@@ -1250,7 +1249,7 @@ pub fn show_startup_splash_screen(
                                     enhancement,
                                     global_achievements,
                                     haven,
-                                    power_cores,
+                                    deep_state,
                                 ) {
                                     break StartupSplashResult::LoadCharacter {
                                         state,
@@ -1679,7 +1678,7 @@ fn load_character_for_game(
     enhancement: &mut enhancement::EnhancementProgress,
     global_achievements: &mut achievements::Achievements,
     haven: &mut haven::Haven,
-    power_cores: &mut crate::power_cores::PowerCoreState,
+    deep_state: &mut crate::deep::DeepState,
 ) -> Option<(
     Box<GameState>,
     Option<crate::core::game_logic::OfflineReport>,
@@ -1741,7 +1740,7 @@ fn load_character_for_game(
             // any cores that completed fill cycles while the game was closed.
             let power_core_pr = crate::power_cores::apply_offline_power_cores(
                 &mut state,
-                power_cores,
+                deep_state,
                 global_achievements,
             );
             if power_core_pr > 0 {
