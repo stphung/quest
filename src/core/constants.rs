@@ -91,7 +91,6 @@ pub const REALTIME_FRAME_MS: u64 = 16; // ~60 FPS for action games
 
 // Zone progression
 pub const KILLS_FOR_BOSS: u32 = 10;
-pub const KILLS_FOR_BOSS_RETRY: u32 = 5;
 
 // Combat fitness: death loop and stalemate prevention
 pub const DEATH_LOOP_THRESHOLD: u32 = 3;
