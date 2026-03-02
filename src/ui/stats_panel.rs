@@ -17,7 +17,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Gauge, Paragraph, Wrap},
+    widgets::{Block, Borders, Gauge, Paragraph},
     Frame,
 };
 
@@ -258,6 +258,7 @@ pub(super) fn draw_zone_info(
     achievements: &crate::achievements::Achievements,
     _ctx: &LayoutContext,
 ) {
+    use super::scene_fx::{display_width, put_cell, put_text, put_text_centered, render_buffer, SceneCell};
     use crate::zones::get_all_zones;
 
     let zones = get_all_zones();
@@ -280,180 +281,170 @@ pub(super) fn draw_zone_info(
         _ => Color::White,
     };
 
-    let boss_progress = if let Some(weapon) = prog.boss_weapon_blocked(achievements) {
-        Span::styled(
-            format!(" \u{2694}\u{fe0f} BOSS: {} [Need {}!] ", boss_name, weapon),
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD | Modifier::SLOW_BLINK),
-        )
-    } else if prog.fighting_boss {
-        Span::styled(
-            format!(" \u{2694}\u{fe0f} BOSS: {} ", boss_name),
-            Style::default()
-                .fg(Color::Red)
-                .add_modifier(Modifier::BOLD | Modifier::SLOW_BLINK),
-        )
-    } else {
-        let kills_left = prog.kills_until_boss();
-        Span::styled(
-            format!(" [Boss in {} kills]", kills_left),
-            Style::default().fg(Color::DarkGray),
-        )
-    };
+    let description_color = zone_description_tint(prog.current_zone_id);
 
-    let mut zone_lines = vec![Line::from(vec![
-        Span::styled(
-            format!("Zone {}: ", prog.current_zone_id),
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            zone_name,
-            Style::default().fg(zone_color).add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" | "),
-        Span::styled(subzone_name, Style::default().fg(Color::White)),
-        Span::styled(
-            format!(" ({}/{})", prog.current_subzone_id, total_subzones),
-            Style::default().fg(Color::DarkGray),
-        ),
-    ])];
-    zone_lines.push(Line::from(boss_progress));
-
-    if let Some(sz) = subzone {
-        zone_lines.push(Line::from(vec![Span::styled(
-            sz.description,
-            Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::ITALIC),
-        )]));
-    }
-
-    // Dot track: ● = completed (green), ○ = current (yellow), · = unlocked (white), × = locked (gray)
-    // Chapter separators │ between base zones, zone 11, and each fracture chapter.
-    // Second row shows zone range labels aligned under each group.
-    // Uses fracture_zone_cap (from Deep breakthroughs) to determine visible range.
-    let fracture_cap = game_state.cached_fracture_zone_cap;
-
-    // Define zone groups: (start, end) inclusive
-    let mut groups: Vec<(u32, u32)> = vec![(1, 11)];
-    if fracture_cap >= 12 {
-        // Fracture chapter boundaries
-        let chapter_starts: &[u32] = &[12, 15, 18, 21, 24, 27];
-        let chapter_ends: &[u32] = &[14, 17, 20, 23, 26, 30];
-        for (&start, &end) in chapter_starts.iter().zip(chapter_ends.iter()) {
-            if fracture_cap >= start {
-                groups.push((start, end.min(fracture_cap)));
-            }
-        }
-    }
-
-    let mut dot_spans: Vec<Span> = Vec::new();
-    let mut label_parts: Vec<(usize, String)> = Vec::new(); // (char_offset, label)
-    let mut char_pos: usize = 0;
-
-    for (gi, &(g_start, g_end)) in groups.iter().enumerate() {
-        // Separator between groups
-        if gi > 0 {
-            dot_spans.push(Span::styled(
-                " \u{2502} ",
-                Style::default().fg(Color::DarkGray),
-            ));
-            char_pos += 3; // " │ " is 3 chars
-        }
-
-        let group_start_pos = char_pos;
-
-        for zid in g_start..=g_end {
-            if zid > g_start {
-                dot_spans.push(Span::raw(" "));
-                char_pos += 1;
-            }
-
-            let zone_data = zones.iter().find(|z| z.id == zid);
-            let num_subzones = zone_data.map(|z| z.subzones.len()).unwrap_or(3);
-            let defeated_count = zone_data
-                .map(|z| {
-                    z.subzones
-                        .iter()
-                        .filter(|s| prog.is_boss_defeated(zid, s.id))
-                        .count()
-                })
-                .unwrap_or(0);
-
-            let is_current = zid == prog.current_zone_id;
-            let is_completed = defeated_count == num_subzones;
-            let is_unlocked = if zid == 11 {
-                achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd)
-            } else {
-                prog.is_zone_unlocked(zid)
-            };
-
-            let (dot, fg, bold) = if is_current {
-                ("\u{25cb}", Color::Yellow, true) // ○
-            } else if is_completed {
-                ("\u{25cf}", Color::Green, false) // ●
-            } else if is_unlocked {
-                ("\u{00b7}", Color::White, false) // ·
-            } else {
-                ("\u{00d7}", Color::DarkGray, false) // ×
-            };
-
-            let style = if bold {
-                Style::default().fg(fg).add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(fg)
-            };
-            dot_spans.push(Span::styled(dot, style));
-            char_pos += 1; // each dot is 1 char wide
-        }
-
-        // Build label for this group
-        let label = if g_start == g_end {
-            format!("{}", g_start)
-        } else {
-            format!("{}-{}", g_start, g_end)
-        };
-        let group_width = char_pos - group_start_pos;
-        label_parts.push((group_start_pos, center_label(&label, group_width)));
-    }
-
-    // Build the label line by placing each label at its offset
-    let total_width = char_pos;
-    let mut label_chars: Vec<u8> = vec![b' '; total_width];
-    for (offset, label) in &label_parts {
-        for (i, ch) in label.bytes().enumerate() {
-            let pos = offset + i;
-            if pos < total_width {
-                label_chars[pos] = ch;
-            }
-        }
-    }
-    let label_str = String::from_utf8(label_chars).unwrap_or_default();
-
-    zone_lines.push(Line::from(""));
-    zone_lines.push(Line::from(dot_spans));
-    zone_lines.push(Line::from(Span::styled(
-        label_str,
-        Style::default().fg(Color::DarkGray),
-    )));
-
+    // --- Render the outer border block ---
     let location_title = match highest_zone_badge(achievements) {
         Some(icon) => format!(" Location {} ", icon),
         None => " Location ".to_string(),
     };
-    let zone_widget = Paragraph::new(zone_lines)
-        .block(super::themed_block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(super::themed_border_color(zone_color)))
-                .title(location_title),
-        ))
-        .wrap(Wrap { trim: true })
-        .alignment(Alignment::Center);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(super::themed_border_color(zone_color)))
+        .title(location_title);
+    let inner = super::render_themed_block(frame, area, block, zone_color, super::BorderFxContext);
 
-    frame.render_widget(zone_widget, area);
-    super::apply_themed_border_fx(frame, area, zone_color, super::BorderFxContext);
+    let width = inner.width as usize;
+    let height = inner.height as usize;
+    if width == 0 || height == 0 {
+        return;
+    }
+
+    // --- Allocate buffer and paint dimmed zone background ---
+    let mut buffer = vec![vec![SceneCell::default(); width]; height];
+    super::zone_bg::paint_zone_track_bg(&mut buffer, prog.current_zone_id, 0.35);
+
+    // --- Row 0: Zone name line (multi-color, centered) ---
+    let prefix = format!("Zone {}: ", prog.current_zone_id);
+    let separator = " | ";
+    let suffix = format!(" ({}/{})", prog.current_subzone_id, total_subzones);
+    let full_row0 = format!("{}{}{}{}{}", prefix, zone_name, separator, subzone_name, suffix);
+    let start_col = ((width as i32 - display_width(&full_row0) as i32) / 2).max(0);
+    let mut col = start_col;
+    put_text(&mut buffer, 0, col, &prefix, Color::White);
+    col += display_width(&prefix) as i32;
+    put_text(&mut buffer, 0, col, zone_name, zone_color);
+    col += display_width(zone_name) as i32;
+    put_text(&mut buffer, 0, col, separator, Color::White);
+    col += display_width(separator) as i32;
+    put_text(&mut buffer, 0, col, subzone_name, Color::White);
+    col += display_width(subzone_name) as i32;
+    put_text(&mut buffer, 0, col, &suffix, Color::DarkGray);
+
+    // --- Row 1: Boss progress ---
+    if height > 1 {
+        if let Some(weapon) = prog.boss_weapon_blocked(achievements) {
+            let text = format!("\u{2694}\u{fe0f} BOSS: {} [Need {}!]", boss_name, weapon);
+            put_text_centered(&mut buffer, 1, width, &text, Color::Yellow);
+        } else if prog.fighting_boss {
+            let text = format!("\u{2694}\u{fe0f} BOSS: {}", boss_name);
+            put_text_centered(&mut buffer, 1, width, &text, Color::Red);
+        } else {
+            let kills_left = prog.kills_until_boss();
+            let text = format!("[Boss in {} kills]", kills_left);
+            put_text_centered(&mut buffer, 1, width, &text, Color::DarkGray);
+        }
+    }
+
+    // --- Row 2: Subzone description ---
+    if height > 2 {
+        if let Some(sz) = subzone {
+            put_text_centered(&mut buffer, 2, width, sz.description, description_color);
+        }
+    }
+
+    // --- Row 3: Empty (weather particles visible) ---
+
+    // --- Row 4: Dot track ---
+    if height > 4 {
+        let fracture_cap = game_state.cached_fracture_zone_cap;
+        let mut groups: Vec<(u32, u32)> = vec![(1, 11)];
+        if fracture_cap >= 12 {
+            let chapter_starts: &[u32] = &[12, 15, 18, 21, 24, 27];
+            let chapter_ends: &[u32] = &[14, 17, 20, 23, 26, 30];
+            for (&start, &end) in chapter_starts.iter().zip(chapter_ends.iter()) {
+                if fracture_cap >= start {
+                    groups.push((start, end.min(fracture_cap)));
+                }
+            }
+        }
+
+        let mut dot_chars: Vec<(char, Color)> = Vec::new();
+        let mut label_parts: Vec<(usize, String)> = Vec::new();
+        let mut char_pos: usize = 0;
+
+        for (gi, &(g_start, g_end)) in groups.iter().enumerate() {
+            if gi > 0 {
+                dot_chars.push((' ', Color::DarkGray));
+                dot_chars.push(('\u{2502}', Color::DarkGray));
+                dot_chars.push((' ', Color::DarkGray));
+                char_pos += 3;
+            }
+
+            let group_start_pos = char_pos;
+
+            for zid in g_start..=g_end {
+                if zid > g_start {
+                    dot_chars.push((' ', Color::Reset));
+                    char_pos += 1;
+                }
+
+                let zone_data = zones.iter().find(|z| z.id == zid);
+                let num_subzones = zone_data.map(|z| z.subzones.len()).unwrap_or(3);
+                let defeated_count = zone_data
+                    .map(|z| {
+                        z.subzones
+                            .iter()
+                            .filter(|s| prog.is_boss_defeated(zid, s.id))
+                            .count()
+                    })
+                    .unwrap_or(0);
+
+                let is_current = zid == prog.current_zone_id;
+                let is_completed = defeated_count == num_subzones;
+                let is_unlocked = if zid == 11 {
+                    achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd)
+                } else {
+                    prog.is_zone_unlocked(zid)
+                };
+
+                let (dot_ch, fg) = if is_current {
+                    ('\u{25cb}', current_zone_dot_color()) // ○
+                } else if is_completed {
+                    ('\u{25cf}', Color::Green) // ●
+                } else if is_unlocked {
+                    ('\u{00b7}', Color::White) // ·
+                } else {
+                    ('\u{00d7}', Color::DarkGray) // ×
+                };
+
+                dot_chars.push((dot_ch, fg));
+                char_pos += 1;
+            }
+
+            let label = if g_start == g_end {
+                format!("{}", g_start)
+            } else {
+                format!("{}-{}", g_start, g_end)
+            };
+            let group_width = char_pos - group_start_pos;
+            label_parts.push((group_start_pos, center_label(&label, group_width)));
+        }
+
+        let total_track_width = char_pos;
+        let track_start = ((width as i32 - total_track_width as i32) / 2).max(0);
+
+        for (i, &(ch, fg)) in dot_chars.iter().enumerate() {
+            put_cell(&mut buffer, 4, track_start + i as i32, ch, fg);
+        }
+
+        // --- Row 5: Label line ---
+        if height > 5 {
+            let mut label_bytes: Vec<u8> = vec![b' '; total_track_width];
+            for (offset, label) in &label_parts {
+                for (i, ch) in label.bytes().enumerate() {
+                    let pos = offset + i;
+                    if pos < total_track_width {
+                        label_bytes[pos] = ch;
+                    }
+                }
+            }
+            let label_str = String::from_utf8(label_bytes).unwrap_or_default();
+            put_text(&mut buffer, 5, track_start, &label_str, Color::DarkGray);
+        }
+    }
+
+    render_buffer(frame, inner, &buffer);
 }
 
 /// Center a label within a given width, padding with spaces.
@@ -489,6 +480,44 @@ fn highest_zone_badge(achievements: &crate::achievements::Achievements) -> Optio
         }
     }
     None
+}
+
+/// Slow-breathing color for the current zone dot (○).
+/// Cycles between warm yellow and bright gold over ~3 seconds.
+fn current_zone_dot_color() -> Color {
+    let t = super::scene_fx::current_millis() as f64;
+    // Slow sine wave: ~3s period
+    let phase = ((t / 3000.0) * std::f64::consts::TAU).sin();
+    // Map -1..1 to 0..1
+    let blend = (phase + 1.0) * 0.5;
+    let (r, g, b) = super::scene_fx::lerp_rgb((200, 180, 60), (255, 220, 100), blend);
+    Color::Rgb(r, g, b)
+}
+
+/// Returns a dim zone-themed tint for the subzone description text.
+/// Derived from each zone's sky palette, kept very subtle (low saturation).
+fn zone_description_tint(zone_id: u32) -> Color {
+    let (r, g, b) = match zone_id {
+        1 => (90, 120, 90),    // Meadow: soft green
+        2 => (80, 70, 100),    // Dark Forest: dusky purple
+        3 => (100, 105, 120),  // Mountain Pass: cool grey-blue
+        4 => (95, 75, 110),    // Ancient Ruins: mystic purple
+        5 => (130, 80, 60),    // Volcanic Wastes: warm ember
+        6 => (90, 105, 120),   // Frozen Tundra: icy blue-grey
+        7 => (80, 100, 120),   // Crystal Caverns: crystal blue
+        8 => (70, 95, 115),    // Sunken Kingdom: deep aqua
+        9 => (95, 115, 130),   // Floating Isles: sky blue
+        10 => (100, 100, 115), // Storm Citadel: storm grey
+        11 => (85, 80, 110),   // The Expanse: void purple
+        12..=14 => (120, 80, 70),  // Red Fault: warm red-brown
+        15..=17 => (100, 95, 115), // Mirror Scar: cool crystal
+        18..=20 => (95, 85, 80),   // Black Mouth: ashen grey
+        21..=23 => (85, 90, 100),  // Hollow Throne: faded blue
+        24..=26 => (100, 90, 100), // Wailing Reach: static haze
+        27..=30 => (90, 75, 95),   // Origin Wound: deep wound purple
+        _ => (100, 100, 100),      // fallback: neutral grey
+    };
+    Color::Rgb(r, g, b)
 }
 
 /// Returns the icon of the highest unlocked level achievement, if any.
