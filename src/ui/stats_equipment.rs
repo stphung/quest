@@ -39,13 +39,27 @@ pub(super) fn draw_equipment_names_only(
         EquipmentSlot::Ring,
     ];
 
-    let total_power: u32 = slot_order
-        .iter()
-        .filter_map(|slot| game_state.equipment.get(*slot).as_ref())
-        .map(|item| item.power())
-        .sum();
-    let title = if total_power > 0 {
-        format!(" Equipment \u{26A1}{} ", total_power)
+    let (base_total, enhanced_total) =
+        slot_order
+            .iter()
+            .enumerate()
+            .fold((0u32, 0u32), |(base, enh), (idx, slot)| {
+                if let Some(item) = game_state.equipment.get(*slot).as_ref() {
+                    let bp = item.power();
+                    let mult = crate::enhancement::enhancement_multiplier(enhancement_levels[idx]);
+                    let ep = (bp as f64 * mult).round() as u32;
+                    (base + bp, enh + ep)
+                } else {
+                    (base, enh)
+                }
+            });
+    let enh_total_bonus = enhanced_total.saturating_sub(base_total);
+    let title = if enhanced_total > 0 {
+        if enh_total_bonus > 0 {
+            format!(" Equipment \u{26A1}{}+{} ", base_total, enh_total_bonus)
+        } else {
+            format!(" Equipment \u{26A1}{} ", base_total)
+        }
     } else {
         " Equipment ".to_string()
     };
@@ -106,10 +120,21 @@ pub(super) fn draw_equipment_names_only(
                 format!("  Z{}", item.ilvl / 10),
                 Style::default().fg(Color::DarkGray),
             ));
+            let base_power = item.power();
             spans.push(Span::styled(
-                format!(" \u{26A1}{}", item.power()),
+                format!(" \u{26A1}{}", base_power),
                 Style::default().fg(Color::Cyan),
             ));
+            let enh_bonus = {
+                let mult = crate::enhancement::enhancement_multiplier(enhancement_levels[idx]);
+                (base_power as f64 * mult).round() as u32 - base_power
+            };
+            if enh_bonus > 0 {
+                spans.push(Span::styled(
+                    format!("+{}", enh_bonus),
+                    enhancement_style(enhancement_levels[idx]),
+                ));
+            }
 
             lines.push(Line::from(spans));
         } else {
