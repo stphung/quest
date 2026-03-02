@@ -46,6 +46,8 @@ Eight categories for browsing: `Combat`, `Level`, `Prestige`, `Progression`, `Ch
 
 Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 213 achievements total.
 
+Achievement score is computed at runtime by summing the point values of all unlocked achievements. Score is displayed in four locations: browser title bar, achievement unlock modal, achievement detail panel, and stats view.
+
 ### `Achievements` (`types.rs`)
 
 Main state struct (serialized to disk). Contains:

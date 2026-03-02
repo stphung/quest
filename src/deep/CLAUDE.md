@@ -21,6 +21,7 @@ src/deep/
 ├── layers.rs       — Layer difficulty, familiarity system, infrastructure, mission durations
 ├── discovery.rs    — Discovery logic (complete_discovery), starter roster init
 ├── narratives.rs   — Mission narrative text for results modal
+├── facade.rs       — Deep state facade helpers
 └── persistence.rs  — Save/load from ~/.quest/deep.json
 ```
 
@@ -382,6 +383,21 @@ XP curve: `200 * level^1.3` per level. Max level: 20. Stat variance: +/-10%.
 | Expedition | +10 |
 | Breakthrough | +15 |
 | Construction | +5 |
+
+## Fracture Zone Unlocks
+
+Deep layer breakthroughs unlock fracture zones for the main game's zone progression:
+
+| Deep Layer | Fracture Zones | Region Name |
+|-----------|---------------|-------------|
+| 3 | Zones 12-14 | The Red Fault |
+| 7 | Zones 15-17 | The Mirror Scar |
+| 12 | Zones 18-20 | The Black Mouth |
+| 18 | Zones 21-23 | The Hollow Throne |
+| 25 | Zones 24-26 | The Wailing Reach |
+| 30 | Zones 27-30 | The Origin Wound |
+
+When a breakthrough clears one of these layers, `DeepPersistent.fracture_zone_cap` is raised to the new maximum zone, and `pending_fracture_region_unlock` is set to the corresponding `FractureRegion` variant. The game tick consumes this pending unlock to show a world-event modal to the player.
 
 ## Extension Guide
 
