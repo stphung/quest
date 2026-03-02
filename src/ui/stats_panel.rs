@@ -228,6 +228,7 @@ fn draw_header(
         .gauge_style(
             Style::default()
                 .fg(Color::Yellow)
+                .bg(Color::Rgb(30, 28, 8))
                 .add_modifier(Modifier::BOLD),
         )
         .label(xp_label)
@@ -644,6 +645,7 @@ pub(super) fn draw_xp_bar_compact(frame: &mut Frame, area: Rect, game_state: &Ga
         .gauge_style(
             Style::default()
                 .fg(Color::Yellow)
+                .bg(Color::Rgb(30, 28, 8))
                 .add_modifier(Modifier::BOLD),
         )
         .label(xp_label)

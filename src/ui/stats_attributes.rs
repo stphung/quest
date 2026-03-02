@@ -46,8 +46,8 @@ pub(super) fn draw_attributes_compact(
     super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
 
     let gold = Color::Rgb(255, 215, 0);
+    const BAR_WIDTH: usize = 8;
 
-    // Pair attributes: STR/INT, DEX/WIS, CON/CHA
     let pairs = [
         (AttributeType::Strength, AttributeType::Intelligence),
         (AttributeType::Dexterity, AttributeType::Wisdom),
@@ -61,33 +61,64 @@ pub(super) fn draw_attributes_compact(
         let r_val = game_state.attributes.get(*right);
         let r_mod = game_state.attributes.modifier(*right);
 
-        let l_color = if l_val >= cap {
-            gold
+        let l_fg = if l_val >= cap { gold } else { attr_color(*left) };
+        let r_fg = if r_val >= cap { gold } else { attr_color(*right) };
+
+        let l_filled = if cap > 0 {
+            ((l_val as f64 / cap as f64) * BAR_WIDTH as f64).round() as usize
         } else {
-            attr_color(*left)
-        };
-        let r_color = if r_val >= cap {
-            gold
+            0
+        }
+        .min(BAR_WIDTH);
+        let r_filled = if cap > 0 {
+            ((r_val as f64 / cap as f64) * BAR_WIDTH as f64).round() as usize
         } else {
-            attr_color(*right)
-        };
+            0
+        }
+        .min(BAR_WIDTH);
 
         let l_mod_str = format_modifier(l_mod);
         let r_mod_str = format_modifier(r_mod);
 
         lines.push(Line::from(vec![
             Span::styled(
-                format!("{}: ", left.abbrev()),
+                format!("{} ", left.abbrev()),
                 Style::default().add_modifier(Modifier::BOLD),
             ),
-            Span::styled(format!("{}/{}", l_val, cap), Style::default().fg(l_color)),
-            Span::raw(format!(" ({:>3})  ", l_mod_str)),
+            Span::raw("["),
             Span::styled(
-                format!("{}: ", right.abbrev()),
+                "\u{2588}".repeat(l_filled),
+                Style::default().fg(l_fg),
+            ),
+            Span::styled(
+                "\u{2591}".repeat(BAR_WIDTH - l_filled),
+                Style::default().fg(Color::DarkGray),
+            ),
+            Span::raw("] "),
+            Span::styled(
+                format!("{}/{}", l_val, cap),
+                Style::default().fg(l_fg),
+            ),
+            Span::raw(format!(" {:>3}   ", l_mod_str)),
+            Span::styled(
+                format!("{} ", right.abbrev()),
                 Style::default().add_modifier(Modifier::BOLD),
             ),
-            Span::styled(format!("{}/{}", r_val, cap), Style::default().fg(r_color)),
-            Span::raw(format!(" ({:>3})", r_mod_str)),
+            Span::raw("["),
+            Span::styled(
+                "\u{2588}".repeat(r_filled),
+                Style::default().fg(r_fg),
+            ),
+            Span::styled(
+                "\u{2591}".repeat(BAR_WIDTH - r_filled),
+                Style::default().fg(Color::DarkGray),
+            ),
+            Span::raw("] "),
+            Span::styled(
+                format!("{}/{}", r_val, cap),
+                Style::default().fg(r_fg),
+            ),
+            Span::raw(format!(" {:>3}", r_mod_str)),
         ]));
     }
 

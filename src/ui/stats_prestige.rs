@@ -101,6 +101,7 @@ fn prestige_ready_gauge_style() -> Style {
     let idx = ((current_millis() / 220) % PULSE_COLORS.len() as u128) as usize;
     Style::default()
         .fg(PULSE_COLORS[idx])
+        .bg(Color::Rgb(25, 15, 35))
         .add_modifier(Modifier::BOLD)
 }
 
@@ -254,6 +255,7 @@ pub(super) fn draw_prestige_info(
         } else {
             Style::default()
                 .fg(Color::Rgb(180, 100, 255))
+                .bg(Color::Rgb(20, 10, 30))
                 .add_modifier(Modifier::BOLD)
         })
         .label(prestige_label)
@@ -387,6 +389,7 @@ pub(super) fn draw_fishing_panel(
                 .gauge_style(
                     Style::default()
                         .fg(Color::Blue)
+                        .bg(Color::Rgb(8, 8, 28))
                         .add_modifier(Modifier::BOLD),
                 )
                 .label(fish_label)
