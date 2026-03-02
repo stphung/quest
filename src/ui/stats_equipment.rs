@@ -2,7 +2,7 @@
 
 use crate::core::game_state::GameState;
 use ratatui::{
-    layout::Rect,
+    layout::{Position, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
@@ -150,4 +150,196 @@ pub(super) fn draw_equipment_names_only(
 
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, inner);
+
+    // Soulforge visual effects scale with total enhancement level.
+    let total_enh: u16 = enhancement_levels.iter().map(|&l| l as u16).sum();
+    if total_enh > 0 {
+        paint_soulforge_bg(frame, inner, enhancement_levels);
+        paint_soulforge_heat_line(frame, inner, enhancement_levels);
+        paint_soulforge_motes(frame, inner, total_enh, enhancement_levels);
+    }
+}
+
+/// Returns a dimmed version of the soulforge color for the given enhancement levels.
+/// Uses the highest level's color tier, scaled by average intensity.
+fn soulforge_dim_color(enhancement_levels: &[u8; 7], dim: f64) -> (u8, u8, u8) {
+    let max_level = enhancement_levels.iter().copied().max().unwrap_or(0);
+    let (cr, cg, cb) = crate::enhancement::enhancement_color_rgb(max_level);
+    (
+        (cr as f64 * dim) as u8,
+        (cg as f64 * dim) as u8,
+        (cb as f64 * dim) as u8,
+    )
+}
+
+/// Paints a faint soulforge-colored background tint on the equipment panel.
+fn paint_soulforge_bg(frame: &mut Frame, inner: Rect, enhancement_levels: &[u8; 7]) {
+    let avg = enhancement_levels.iter().map(|&l| l as f64).sum::<f64>() / 7.0;
+    let intensity = (avg / 10.0).min(1.0);
+    let dim = 0.03 + intensity * 0.04;
+    let (r, g, b) = soulforge_dim_color(enhancement_levels, dim);
+    let bg = Color::Rgb(r, g, b);
+
+    let buf = frame.buffer_mut();
+    for y in inner.y..inner.y + inner.height {
+        for x in inner.x..inner.x + inner.width {
+            if let Some(cell) = buf.cell_mut(Position::new(x, y)) {
+                cell.set_bg(bg);
+            }
+        }
+    }
+}
+
+/// Paints a glowing heat line along the bottom row — the forge source.
+/// Faint ember at low levels, bright at max. Motes appear to rise from here.
+fn paint_soulforge_heat_line(frame: &mut Frame, inner: Rect, enhancement_levels: &[u8; 7]) {
+    if inner.height == 0 {
+        return;
+    }
+    let avg = enhancement_levels.iter().map(|&l| l as f64).sum::<f64>() / 7.0;
+    let intensity = (avg / 10.0).min(1.0);
+    // Bottom row bg: dim 8% at low, 18% at max
+    let dim = 0.08 + intensity * 0.10;
+    let (r, g, b) = soulforge_dim_color(enhancement_levels, dim);
+    let bg = Color::Rgb(r, g, b);
+
+    let bottom_y = inner.y + inner.height - 1;
+    let buf = frame.buffer_mut();
+    for x in inner.x..inner.x + inner.width {
+        if let Some(cell) = buf.cell_mut(Position::new(x, bottom_y)) {
+            cell.set_bg(bg);
+        }
+    }
+    // Second-to-bottom row gets a lighter glow if panel is tall enough
+    if inner.height >= 3 {
+        let dim2 = 0.05 + intensity * 0.06;
+        let (r2, g2, b2) = soulforge_dim_color(enhancement_levels, dim2);
+        let bg2 = Color::Rgb(r2, g2, b2);
+        let row2_y = inner.y + inner.height - 2;
+        for x in inner.x..inner.x + inner.width {
+            if let Some(cell) = buf.cell_mut(Position::new(x, row2_y)) {
+                cell.set_bg(bg2);
+            }
+        }
+    }
+}
+
+/// Selects mote character based on enhancement tier (A: size progression).
+fn mote_char_for_tier(seed: u32, avg_level: f64) -> char {
+    if avg_level >= 9.0 {
+        // +10 tier: ·, •, ✦, *
+        match seed % 8 {
+            0 => '*',
+            1..=2 => '\u{2726}', // ✦
+            3..=4 => '\u{2022}', // •
+            _ => '\u{00b7}',     // ·
+        }
+    } else if avg_level >= 7.0 {
+        // +8-9 tier: ·, •, ✦
+        match seed % 6 {
+            0..=1 => '\u{2726}', // ✦
+            2..=3 => '\u{2022}', // •
+            _ => '\u{00b7}',     // ·
+        }
+    } else if avg_level >= 4.0 {
+        // +5-7 tier: · and •
+        if seed.is_multiple_of(3) {
+            '\u{2022}' // •
+        } else {
+            '\u{00b7}' // ·
+        }
+    } else {
+        '\u{00b7}' // · only at low levels
+    }
+}
+
+/// Computes mote foreground color based on soulforge tier (B: color evolution).
+fn mote_color(enhancement_levels: &[u8; 7], brightness: f64) -> Color {
+    let max_level = enhancement_levels.iter().copied().max().unwrap_or(0);
+    let (cr, cg, cb) = crate::enhancement::enhancement_color_rgb(max_level);
+    // Scale the tier color by brightness (0.0-1.0 range)
+    let scale = (brightness / 255.0).min(1.0);
+    Color::Rgb(
+        (cr as f64 * scale * 0.35) as u8,
+        (cg as f64 * scale * 0.35) as u8,
+        (cb as f64 * scale * 0.35) as u8,
+    )
+}
+
+/// Paints rising soulforge motes with size progression, color evolution, and trails.
+fn paint_soulforge_motes(
+    frame: &mut Frame,
+    inner: Rect,
+    total_enh: u16,
+    enhancement_levels: &[u8; 7],
+) {
+    use super::scene_fx::{current_millis, hash2d};
+
+    let height = inner.height as usize;
+    let width = inner.width as usize;
+    if height == 0 || width == 0 {
+        return;
+    }
+
+    let t = (total_enh as f64 / 70.0).min(1.0);
+    let avg_level = enhancement_levels.iter().map(|&l| l as f64).sum::<f64>() / 7.0;
+
+    // Density: threshold 90 (sparse) → 12 (dense)
+    let threshold = (90.0 - t * 78.0) as u32;
+    // Rise speed: 600ms (slow) → 90ms (fast) per row
+    let rise_rate = 600.0 - t * 510.0;
+    let millis = current_millis() as f64;
+    let rise_phase = (millis / rise_rate) as usize;
+
+    // C: trails at high levels (+8+)
+    let has_trails = avg_level >= 7.0;
+
+    let buf = frame.buffer_mut();
+    for y in inner.y..inner.y + inner.height {
+        for x in inner.x..inner.x + inner.width {
+            let row = (y - inner.y) as usize;
+            let col = (x - inner.x) as usize;
+
+            let seed = hash2d(
+                row.wrapping_add(rise_phase),
+                col.wrapping_add(rise_phase / 4),
+            );
+            if !seed.is_multiple_of(threshold) {
+                continue;
+            }
+
+            let Some(cell) = buf.cell_mut(Position::new(x, y)) else {
+                continue;
+            };
+            if cell.symbol() != " " {
+                continue;
+            }
+
+            let pulse = (millis * 0.003 + row as f64 * 0.8 + col as f64 * 0.6).sin();
+            if pulse < 0.0 {
+                continue;
+            }
+
+            let base_brightness = 80.0 + t * 100.0;
+            let brightness = base_brightness + pulse * 75.0;
+
+            // A: size progression
+            let ch = mote_char_for_tier(seed, avg_level);
+            // B: color evolution
+            let fg = mote_color(enhancement_levels, brightness);
+
+            cell.set_char(ch);
+            cell.set_fg(fg);
+
+            // C: trail — place a dimmer dot one row below the mote
+            if has_trails && y + 1 < inner.y + inner.height {
+                if let Some(trail_cell) = buf.cell_mut(Position::new(x, y + 1)) {
+                    if trail_cell.symbol() == " " {
+                        trail_cell.set_char('\u{00b7}');
+                        trail_cell.set_fg(mote_color(enhancement_levels, brightness * 0.4));
+                    }
+                }
+            }
+        }
+    }
 }

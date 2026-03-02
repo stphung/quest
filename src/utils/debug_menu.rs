@@ -52,6 +52,7 @@ enum DebugAction {
     SetPrestige(u32),
     SetLevel(u32),
     MaxAttributes,
+    SetEnhancement(u8),
 }
 
 const DEBUG_ACTIONS: &[DebugAction] = &[
@@ -144,6 +145,18 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::SetLevel(2500),
     DebugAction::SetLevel(5000),
     DebugAction::MaxAttributes,
+    // Soulforge enhancement actions
+    DebugAction::SetEnhancement(0),
+    DebugAction::SetEnhancement(1),
+    DebugAction::SetEnhancement(2),
+    DebugAction::SetEnhancement(3),
+    DebugAction::SetEnhancement(4),
+    DebugAction::SetEnhancement(5),
+    DebugAction::SetEnhancement(6),
+    DebugAction::SetEnhancement(7),
+    DebugAction::SetEnhancement(8),
+    DebugAction::SetEnhancement(9),
+    DebugAction::SetEnhancement(10),
 ];
 
 const CHALLENGE_ACTIONS: &[DebugAction] = &[
@@ -247,6 +260,19 @@ const CHARACTER_ACTIONS: &[DebugAction] = &[
     DebugAction::SetLevel(5000),
     DebugAction::MaxAttributes,
 ];
+const SOULFORGE_ACTIONS: &[DebugAction] = &[
+    DebugAction::SetEnhancement(0),
+    DebugAction::SetEnhancement(1),
+    DebugAction::SetEnhancement(2),
+    DebugAction::SetEnhancement(3),
+    DebugAction::SetEnhancement(4),
+    DebugAction::SetEnhancement(5),
+    DebugAction::SetEnhancement(6),
+    DebugAction::SetEnhancement(7),
+    DebugAction::SetEnhancement(8),
+    DebugAction::SetEnhancement(9),
+    DebugAction::SetEnhancement(10),
+];
 const BORDER_OPTION_START_INDEX: usize = DEBUG_ACTIONS.len();
 
 const SET_VALUES: &[u32] = &[1, 5, 25, 50, 100, 250, 500, 1000, 2500, 5000];
@@ -307,6 +333,7 @@ impl DebugAction {
             Self::SetPrestige(amount) => 66 + set_value_index(amount),
             Self::SetLevel(amount) => 76 + set_value_index(amount),
             Self::MaxAttributes => 86,
+            Self::SetEnhancement(level) => 87 + level as usize,
         }
     }
 
@@ -408,6 +435,19 @@ impl DebugAction {
                 _ => "Set Level to 5000",
             },
             Self::MaxAttributes => "Max All Attributes",
+            Self::SetEnhancement(level) => match level {
+                0 => "Set All Enhancement +0",
+                1 => "Set All Enhancement +1",
+                2 => "Set All Enhancement +2",
+                3 => "Set All Enhancement +3",
+                4 => "Set All Enhancement +4",
+                5 => "Set All Enhancement +5",
+                6 => "Set All Enhancement +6",
+                7 => "Set All Enhancement +7",
+                8 => "Set All Enhancement +8",
+                9 => "Set All Enhancement +9",
+                _ => "Set All Enhancement +10",
+            },
         }
     }
 
@@ -459,6 +499,7 @@ impl DebugAction {
             Self::SetPrestige(amount) => trigger_set_prestige(state, enhancement, amount),
             Self::SetLevel(amount) => trigger_set_level(state, enhancement, amount),
             Self::MaxAttributes => trigger_max_attributes(state, enhancement),
+            Self::SetEnhancement(level) => trigger_set_enhancement(state, enhancement, level),
         }
     }
 }
@@ -498,6 +539,7 @@ pub fn option_count_for_category(category: DebugCategory) -> usize {
         DebugCategory::Deep => DEEP_ACTIONS.len(),
         DebugCategory::Zones => ZONE_ACTIONS.len(),
         DebugCategory::Character => CHARACTER_ACTIONS.len(),
+        DebugCategory::Soulforge => SOULFORGE_ACTIONS.len(),
         DebugCategory::Borders => SELECTABLE_UI_BORDER_STYLES.len(),
     }
 }
@@ -511,6 +553,7 @@ pub enum DebugCategory {
     Deep,
     Zones,
     Character,
+    Soulforge,
     Borders,
 }
 
@@ -524,6 +567,7 @@ impl DebugCategory {
             Self::Deep => "The Deep",
             Self::Zones => "Zones",
             Self::Character => "Character",
+            Self::Soulforge => "Soulforge",
             Self::Borders => "Borders",
         }
     }
@@ -537,6 +581,7 @@ pub const DEBUG_CATEGORIES: &[DebugCategory] = &[
     DebugCategory::Deep,
     DebugCategory::Zones,
     DebugCategory::Character,
+    DebugCategory::Soulforge,
     DebugCategory::Borders,
 ];
 
@@ -621,6 +666,7 @@ impl DebugMenu {
             DebugCategory::Deep => DEEP_ACTIONS[visible_index].option_index(),
             DebugCategory::Zones => ZONE_ACTIONS[visible_index].option_index(),
             DebugCategory::Character => CHARACTER_ACTIONS[visible_index].option_index(),
+            DebugCategory::Soulforge => SOULFORGE_ACTIONS[visible_index].option_index(),
             DebugCategory::Borders => BORDER_OPTION_START_INDEX + visible_index,
         }
     }
@@ -1243,6 +1289,32 @@ fn trigger_set_level(
     }
 }
 
+fn trigger_set_enhancement(
+    state: &mut GameState,
+    enhancement: &mut EnhancementProgress,
+    level: u8,
+) -> &'static str {
+    let clamped = level.min(10);
+    for i in 0..7 {
+        enhancement.levels[i] = clamped;
+    }
+    enhancement.discovered = true;
+    state.recalculate_derived_stats(&enhancement.levels);
+    match clamped {
+        0 => "Set all enhancement to +0!",
+        1 => "Set all enhancement to +1!",
+        2 => "Set all enhancement to +2!",
+        3 => "Set all enhancement to +3!",
+        4 => "Set all enhancement to +4!",
+        5 => "Set all enhancement to +5!",
+        6 => "Set all enhancement to +6!",
+        7 => "Set all enhancement to +7!",
+        8 => "Set all enhancement to +8!",
+        9 => "Set all enhancement to +9!",
+        _ => "Set all enhancement to +10!",
+    }
+}
+
 fn trigger_max_attributes(
     state: &mut GameState,
     enhancement: &EnhancementProgress,
@@ -1312,6 +1384,9 @@ mod tests {
         assert_eq!(menu.current_category(), DebugCategory::Borders);
 
         menu.navigate_prev_category();
+        assert_eq!(menu.current_category(), DebugCategory::Soulforge);
+
+        menu.navigate_prev_category();
         assert_eq!(menu.current_category(), DebugCategory::Character);
 
         menu.navigate_prev_category();
@@ -1325,7 +1400,7 @@ mod tests {
     fn test_border_preview_does_not_close_menu() {
         let mut menu = DebugMenu::new();
         menu.open();
-        for _ in 0..7 {
+        for _ in 0..8 {
             menu.navigate_next_category();
         }
         assert_eq!(menu.current_category(), DebugCategory::Borders);
