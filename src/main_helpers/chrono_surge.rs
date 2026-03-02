@@ -105,7 +105,10 @@ pub fn run_chrono_surge_batch(
     }
 }
 
-fn tally_chrono_surge_events(surge: &mut ChronoSurgeState, events: &[crate::core::tick::TickEvent]) {
+fn tally_chrono_surge_events(
+    surge: &mut ChronoSurgeState,
+    events: &[crate::core::tick::TickEvent],
+) {
     for event in events {
         match event {
             crate::core::tick::TickEvent::EnemyDefeated { .. }

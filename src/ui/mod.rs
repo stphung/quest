@@ -715,7 +715,11 @@ fn render_hp_bar_with_flash(
     flash: Option<&crate::combat::types::DamageFlash>,
 ) {
     let gauge = Gauge::default()
-        .gauge_style(Style::default().fg(gauge_color).add_modifier(Modifier::BOLD))
+        .gauge_style(
+            Style::default()
+                .fg(gauge_color)
+                .add_modifier(Modifier::BOLD),
+        )
         .label(label)
         .ratio(ratio);
 

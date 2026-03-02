@@ -217,11 +217,7 @@ pub fn draw_game_overlays(
         }
         GameOverlay::AscensionConfirm => {
             ui::ascension_scene::render_ascension_confirm(
-                frame,
-                area,
-                state,
-                deep_state,
-                layout_ctx,
+                frame, area, state, deep_state, layout_ctx,
             );
         }
         GameOverlay::None => {}

@@ -235,8 +235,8 @@ pub fn dispatch_cloud_action(
                         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                             match history::cloud::github_get_username(&tok) {
                                 Ok(username) => {
-                                    let repos = history::cloud::github_list_repos(&tok)
-                                        .unwrap_or_default();
+                                    let repos =
+                                        history::cloud::github_list_repos(&tok).unwrap_or_default();
                                     let _ = tx.send(CloudOpResult::TokenValidated {
                                         username,
                                         token: tok,
@@ -411,11 +411,10 @@ pub fn dispatch_cloud_action(
                     std::thread::spawn(move || {
                         let tx2 = tx.clone();
                         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                            let res =
-                                match history::cloud::force_push_branch(&dir, "main", &tok) {
-                                    Ok(()) => CloudOpResult::Pushed,
-                                    Err(e) => CloudOpResult::Failed(e),
-                                };
+                            let res = match history::cloud::force_push_branch(&dir, "main", &tok) {
+                                Ok(()) => CloudOpResult::Pushed,
+                                Err(e) => CloudOpResult::Failed(e),
+                            };
                             let _ = tx.send(res);
                         }));
                         if result.is_err() {
@@ -458,7 +457,11 @@ pub fn apply_cloud_resolve(
                 let _ = history::cloud::reset_to_remote(quest_dir, "main");
 
                 let action_result = CloudActionResult {
-                    reloaded_state: reload_character(character_manager, character_name, enhancement),
+                    reloaded_state: reload_character(
+                        character_manager,
+                        character_name,
+                        enhancement,
+                    ),
                     account_state_reloaded: true,
                     needs_save_timestamp: true,
                 };

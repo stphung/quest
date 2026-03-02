@@ -556,29 +556,27 @@ fn main() -> io::Result<()> {
                                 &deep_state,
                             );
                             {
-                                let game_ctx =
-                                    main_helpers::game_context::GameContext {
-                                        state: &mut state,
-                                        haven: &mut haven,
-                                        haven_ui: &mut haven_ui,
-                                        soulforge_ui: &mut soulforge_ui,
-                                        exchange_ui: &mut exchange_ui,
-                                        deep_state: &mut deep_state,
-                                        deep_ui: &mut deep_ui,
-                                        enhancement: &mut enhancement,
-                                        overlay: &mut overlay,
-                                        debug_menu: &mut debug_menu,
-                                        debug_mode,
-                                        achievements: &mut global_achievements,
-                                    };
-                                let extras =
-                                    main_helpers::game_context::OverlayExtras {
-                                        last_save_instant,
-                                        last_save_time,
-                                        chrono_surge: chrono_surge.as_ref(),
-                                        chrono_summary: chrono_summary.as_ref(),
-                                        layout_ctx: &ctx,
-                                    };
+                                let game_ctx = main_helpers::game_context::GameContext {
+                                    state: &mut state,
+                                    haven: &mut haven,
+                                    haven_ui: &mut haven_ui,
+                                    soulforge_ui: &mut soulforge_ui,
+                                    exchange_ui: &mut exchange_ui,
+                                    deep_state: &mut deep_state,
+                                    deep_ui: &mut deep_ui,
+                                    enhancement: &mut enhancement,
+                                    overlay: &mut overlay,
+                                    debug_menu: &mut debug_menu,
+                                    debug_mode,
+                                    achievements: &mut global_achievements,
+                                };
+                                let extras = main_helpers::game_context::OverlayExtras {
+                                    last_save_instant,
+                                    last_save_time,
+                                    chrono_surge: chrono_surge.as_ref(),
+                                    chrono_summary: chrono_summary.as_ref(),
+                                    layout_ctx: &ctx,
+                                };
                                 draw_game_overlays(frame, &game_ctx, &extras);
                             }
                         })?;
@@ -681,21 +679,20 @@ fn main() -> io::Result<()> {
                                 let fishing_rank_before = state.fishing.rank;
 
                                 let result = {
-                                    let mut ctx =
-                                        main_helpers::game_context::GameContext {
-                                            state: &mut state,
-                                            haven: &mut haven,
-                                            haven_ui: &mut haven_ui,
-                                            soulforge_ui: &mut soulforge_ui,
-                                            exchange_ui: &mut exchange_ui,
-                                            deep_state: &mut deep_state,
-                                            deep_ui: &mut deep_ui,
-                                            enhancement: &mut enhancement,
-                                            overlay: &mut overlay,
-                                            debug_menu: &mut debug_menu,
-                                            debug_mode,
-                                            achievements: &mut global_achievements,
-                                        };
+                                    let mut ctx = main_helpers::game_context::GameContext {
+                                        state: &mut state,
+                                        haven: &mut haven,
+                                        haven_ui: &mut haven_ui,
+                                        soulforge_ui: &mut soulforge_ui,
+                                        exchange_ui: &mut exchange_ui,
+                                        deep_state: &mut deep_state,
+                                        deep_ui: &mut deep_ui,
+                                        enhancement: &mut enhancement,
+                                        overlay: &mut overlay,
+                                        debug_menu: &mut debug_menu,
+                                        debug_mode,
+                                        achievements: &mut global_achievements,
+                                    };
                                     input::handle_game_input(key_event, &mut ctx)
                                 };
 
@@ -1092,21 +1089,20 @@ fn main() -> io::Result<()> {
                                 }
 
                                 let route_action = {
-                                    let route_ctx =
-                                        main_helpers::game_context::GameContext {
-                                            state: &mut state,
-                                            haven: &mut haven,
-                                            haven_ui: &mut haven_ui,
-                                            soulforge_ui: &mut soulforge_ui,
-                                            exchange_ui: &mut exchange_ui,
-                                            deep_state: &mut deep_state,
-                                            deep_ui: &mut deep_ui,
-                                            enhancement: &mut enhancement,
-                                            overlay: &mut overlay,
-                                            debug_menu: &mut debug_menu,
-                                            debug_mode,
-                                            achievements: &mut global_achievements,
-                                        };
+                                    let route_ctx = main_helpers::game_context::GameContext {
+                                        state: &mut state,
+                                        haven: &mut haven,
+                                        haven_ui: &mut haven_ui,
+                                        soulforge_ui: &mut soulforge_ui,
+                                        exchange_ui: &mut exchange_ui,
+                                        deep_state: &mut deep_state,
+                                        deep_ui: &mut deep_ui,
+                                        enhancement: &mut enhancement,
+                                        overlay: &mut overlay,
+                                        debug_menu: &mut debug_menu,
+                                        debug_mode,
+                                        achievements: &mut global_achievements,
+                                    };
                                     route_game_input(
                                         result,
                                         &route_ctx,
