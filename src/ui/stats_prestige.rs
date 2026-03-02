@@ -9,7 +9,9 @@ use crate::core::game_logic::xp_for_next_level;
 use crate::core::game_state::GameState;
 use crate::deep::DeepState;
 use crate::fishing::types::{FishingState, RANK_NAMES};
-use crate::power_cores::{fill_duration_secs, ALL_POWER_CORES};
+use crate::power_cores::{
+    fill_duration_secs, fill_ratio, format_core_time_remaining, ALL_POWER_CORES,
+};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -597,25 +599,13 @@ pub(super) fn draw_power_cores_panel(
                 .unwrap_or(0);
 
             let elapsed = (now - last_granted).max(0);
-            let ratio = if fill_secs > 0 {
-                (elapsed as f64 / fill_secs as f64).min(1.0)
-            } else {
-                1.0
-            };
+            let ratio = fill_ratio(elapsed, fill_secs);
 
             let filled = (ratio * BAR_WIDTH as f64).round() as usize;
             let empty = BAR_WIDTH.saturating_sub(filled);
 
             let remaining_secs = (fill_secs - elapsed).max(0);
-            let hours = remaining_secs / 3600;
-            let mins = (remaining_secs % 3600) / 60;
-            let time_str = if ratio >= 1.0 {
-                "Ready!".to_string()
-            } else if hours > 0 {
-                format!("{}h {}m", hours, mins)
-            } else {
-                format!("{}m", mins)
-            };
+            let time_str = format_core_time_remaining(remaining_secs, ratio);
 
             spans.push(Span::styled("[", Style::default().fg(Color::DarkGray)));
             spans.push(Span::styled(

@@ -2,6 +2,7 @@
 
 use std::fs;
 
+use quest::history::types::CommitMetadata;
 use quest::history::{HistoryError, HistoryRepo, SaveEvent};
 use tempfile::TempDir;
 
@@ -11,6 +12,25 @@ fn setup_quest_dir() -> TempDir {
     fs::write(dir.path().join("save.json"), r#"{"level":1,"prestige":0}"#)
         .expect("write save file");
     dir
+}
+
+/// Build a CommitMetadata for tests with sensible defaults.
+fn meta(
+    level: u32,
+    prestige: u32,
+    zone_id: u32,
+    subzone_id: u32,
+    play_time_seconds: u64,
+    character_name: &str,
+) -> CommitMetadata {
+    CommitMetadata {
+        level,
+        prestige,
+        zone_id,
+        subzone_id,
+        play_time_seconds,
+        character_name: character_name.to_string(),
+    }
 }
 
 // ── init ────────────────────────────────────────────────────────────────
@@ -55,7 +75,7 @@ fn commit_adds_entry() {
     // Modify a file so there is something to commit.
     fs::write(dir.path().join("save.json"), r#"{"level":5,"prestige":0}"#).expect("write");
 
-    repo.commit(&SaveEvent::LevelUp(5), 5, 0, 1, 1, 600, "Hero")
+    repo.commit(&SaveEvent::LevelUp(5), &meta(5, 0, 1, 1, 600, "Hero"))
         .expect("commit");
 
     let commits = repo.list_commits("main").expect("list_commits");
@@ -69,7 +89,7 @@ fn commit_skipped_when_no_changes() {
     let repo = HistoryRepo::init(dir.path()).expect("init");
 
     // No file changes => should return NothingToCommit.
-    let result = repo.commit(&SaveEvent::ManualSave, 1, 0, 1, 1, 0, "Hero");
+    let result = repo.commit(&SaveEvent::ManualSave, &meta(1, 0, 1, 1, 0, "Hero"));
     assert!(matches!(result, Err(HistoryError::NothingToCommit)));
 
     // Still just the initial commit.
@@ -86,12 +106,12 @@ fn list_commits_newest_first() {
 
     // First change.
     fs::write(dir.path().join("save.json"), r#"{"level":2}"#).expect("write");
-    repo.commit(&SaveEvent::LevelUp(2), 2, 0, 1, 1, 300, "Hero")
+    repo.commit(&SaveEvent::LevelUp(2), &meta(2, 0, 1, 1, 300, "Hero"))
         .expect("commit 1");
 
     // Second change.
     fs::write(dir.path().join("save.json"), r#"{"level":3}"#).expect("write");
-    repo.commit(&SaveEvent::LevelUp(3), 3, 0, 1, 1, 600, "Hero")
+    repo.commit(&SaveEvent::LevelUp(3), &meta(3, 0, 1, 1, 600, "Hero"))
         .expect("commit 2");
 
     let commits = repo.list_commits("main").expect("list_commits");
@@ -112,7 +132,7 @@ fn restore_resets_branch_to_commit() {
 
     // Create a second commit with different file content.
     fs::write(dir.path().join("save.json"), r#"{"level":10}"#).expect("write");
-    repo.commit(&SaveEvent::LevelUp(10), 10, 0, 2, 1, 3600, "Hero")
+    repo.commit(&SaveEvent::LevelUp(10), &meta(10, 0, 2, 1, 3600, "Hero"))
         .expect("commit");
 
     // Get the initial commit id.
@@ -146,11 +166,11 @@ fn fork_creates_branch_at_commit() {
     let repo = HistoryRepo::init(dir.path()).expect("init");
 
     fs::write(dir.path().join("save.json"), r#"{"level":5}"#).expect("write");
-    repo.commit(&SaveEvent::LevelUp(5), 5, 0, 1, 1, 600, "Hero")
+    repo.commit(&SaveEvent::LevelUp(5), &meta(5, 0, 1, 1, 600, "Hero"))
         .expect("commit");
 
     fs::write(dir.path().join("save.json"), r#"{"level":10}"#).expect("write");
-    repo.commit(&SaveEvent::LevelUp(10), 10, 0, 2, 1, 1200, "Hero")
+    repo.commit(&SaveEvent::LevelUp(10), &meta(10, 0, 2, 1, 1200, "Hero"))
         .expect("commit");
 
     // Fork at the first commit (oldest).
@@ -175,7 +195,7 @@ fn fork_rejects_duplicate_name() {
     let repo = HistoryRepo::init(dir.path()).expect("init");
 
     fs::write(dir.path().join("save.json"), r#"{"level":5}"#).expect("write");
-    repo.commit(&SaveEvent::LevelUp(5), 5, 0, 1, 1, 600, "Hero")
+    repo.commit(&SaveEvent::LevelUp(5), &meta(5, 0, 1, 1, 600, "Hero"))
         .expect("commit");
 
     let commits = repo.list_commits("main").expect("list_commits");
@@ -194,7 +214,7 @@ fn fork_rejects_invalid_names() {
     let repo = HistoryRepo::init(dir.path()).expect("init");
 
     fs::write(dir.path().join("save.json"), r#"{"level":5}"#).expect("write");
-    repo.commit(&SaveEvent::LevelUp(5), 5, 0, 1, 1, 600, "Hero")
+    repo.commit(&SaveEvent::LevelUp(5), &meta(5, 0, 1, 1, 600, "Hero"))
         .expect("commit");
 
     let commits = repo.list_commits("main").expect("list_commits");
@@ -215,7 +235,7 @@ fn switch_changes_active_branch() {
     let repo = HistoryRepo::init(dir.path()).expect("init");
 
     fs::write(dir.path().join("save.json"), r#"{"level":5}"#).expect("write");
-    repo.commit(&SaveEvent::LevelUp(5), 5, 0, 1, 1, 600, "Hero")
+    repo.commit(&SaveEvent::LevelUp(5), &meta(5, 0, 1, 1, 600, "Hero"))
         .expect("commit");
 
     let commits = repo.list_commits("main").expect("list_commits");
@@ -247,7 +267,7 @@ fn delete_removes_branch() {
     let repo = HistoryRepo::init(dir.path()).expect("init");
 
     fs::write(dir.path().join("save.json"), r#"{"level":5}"#).expect("write");
-    repo.commit(&SaveEvent::LevelUp(5), 5, 0, 1, 1, 600, "Hero")
+    repo.commit(&SaveEvent::LevelUp(5), &meta(5, 0, 1, 1, 600, "Hero"))
         .expect("commit");
 
     let commits = repo.list_commits("main").expect("list_commits");
@@ -277,7 +297,7 @@ fn delete_fails_on_active_branch() {
     let repo = HistoryRepo::init(dir.path()).expect("init");
 
     fs::write(dir.path().join("save.json"), r#"{"level":5}"#).expect("write");
-    repo.commit(&SaveEvent::LevelUp(5), 5, 0, 1, 1, 600, "Hero")
+    repo.commit(&SaveEvent::LevelUp(5), &meta(5, 0, 1, 1, 600, "Hero"))
         .expect("commit");
 
     let commits = repo.list_commits("main").expect("list_commits");
@@ -307,11 +327,11 @@ fn fork_switch_delete_lifecycle() {
 
     // Add some history on main.
     fs::write(dir.path().join("save.json"), r#"{"level":5}"#).expect("write");
-    repo.commit(&SaveEvent::LevelUp(5), 5, 0, 1, 1, 600, "Hero")
+    repo.commit(&SaveEvent::LevelUp(5), &meta(5, 0, 1, 1, 600, "Hero"))
         .expect("commit");
 
     fs::write(dir.path().join("save.json"), r#"{"level":10}"#).expect("write");
-    repo.commit(&SaveEvent::LevelUp(10), 10, 0, 2, 1, 1200, "Hero")
+    repo.commit(&SaveEvent::LevelUp(10), &meta(10, 0, 2, 1, 1200, "Hero"))
         .expect("commit");
 
     // Fork at level 5 commit.
@@ -322,7 +342,7 @@ fn fork_switch_delete_lifecycle() {
 
     // We're now on speedrun. Add a commit there.
     fs::write(dir.path().join("save.json"), r#"{"level":6}"#).expect("write");
-    repo.commit(&SaveEvent::LevelUp(6), 6, 0, 1, 2, 700, "Hero")
+    repo.commit(&SaveEvent::LevelUp(6), &meta(6, 0, 1, 2, 700, "Hero"))
         .expect("commit on fork");
 
     // Switch back to main.

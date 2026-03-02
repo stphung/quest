@@ -81,6 +81,39 @@ pub fn fill_duration_secs(pr_per_day: u32) -> i64 {
     86400 / pr_per_day as i64
 }
 
+/// Fill ratio of a power core progress bar in the range [0.0, 1.0].
+///
+/// `elapsed` is the number of seconds since the last grant.
+/// `fill_secs` is the number of seconds per cycle (from `fill_duration_secs`).
+/// Returns 1.0 when fully filled (ready to grant).
+pub fn fill_ratio(elapsed: i64, fill_secs: i64) -> f64 {
+    if fill_secs > 0 {
+        (elapsed.max(0) as f64 / fill_secs as f64).min(1.0)
+    } else {
+        1.0
+    }
+}
+
+/// Format the time remaining until a power core grants its next PR.
+///
+/// When `ratio >= 1.0` (core ready), returns `"Ready!"`.
+/// When `hours > 0`, returns `"Xh Ym"`.
+/// Otherwise returns `"Ym"`.
+pub fn format_core_time_remaining(remaining_secs: i64, ratio: f64) -> String {
+    if ratio >= 1.0 {
+        "Ready!".to_string()
+    } else {
+        let remaining = remaining_secs.max(0) as u64;
+        let hours = remaining / 3600;
+        let mins = (remaining % 3600) / 60;
+        if hours > 0 {
+            format!("{}h {}m", hours, mins)
+        } else {
+            format!("{}m", mins)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

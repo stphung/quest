@@ -132,6 +132,29 @@ pub fn format_suffix(
     format!("Lv{level} P{prestige} Z{zone_id}-{subzone_id} {hours}h{minutes:02}m @{character_name}")
 }
 
+// ── CommitMetadata ───────────────────────────────────────────────────────
+
+/// Snapshot metadata passed to `HistoryRepo::commit()`.
+///
+/// Bundles all per-commit fields so the caller doesn't need to pass
+/// individual positional arguments and the signature stays stable as
+/// new fields are added.
+#[derive(Debug, Clone)]
+pub struct CommitMetadata {
+    /// Character level at the time of the save.
+    pub level: u32,
+    /// Prestige rank at the time of the save.
+    pub prestige: u32,
+    /// Current zone id at the time of the save.
+    pub zone_id: u32,
+    /// Current subzone id at the time of the save.
+    pub subzone_id: u32,
+    /// Total play time in seconds at the time of the save.
+    pub play_time_seconds: u64,
+    /// Character name at the time of the save.
+    pub character_name: String,
+}
+
 // ── CommitInfo ───────────────────────────────────────────────────────────
 
 /// Metadata extracted from a single history commit.
