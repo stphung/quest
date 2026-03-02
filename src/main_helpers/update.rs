@@ -13,6 +13,7 @@ use crate::input::time_vault_input::{handle_time_vault_input, TimeVaultAction};
 use crate::ui;
 use crate::ui::achievement_browser_scene::AchievementBrowserState;
 use crate::ui::character_select::CharacterSelectScreen;
+use crate::ui::stats_prestige::to_roman;
 use crate::ui::throbber::block_spinner_char;
 use crate::ui::time_vault_scene::TimeVaultState;
 use crate::ui::title_browser_scene::TitleBrowserState;
@@ -318,21 +319,27 @@ fn build_startup_splash_text(
             };
 
             let total_power: u32 = character.equipment.iter_equipped().map(|i| i.power()).sum();
+            let asc_part = if character.ascension_level > 0 {
+                format!(" \u{00b7} Asc {}", to_roman(character.ascension_level))
+            } else {
+                String::new()
+            };
             let entry = if character.is_corrupted {
                 format!("{}{} (CORRUPTED)", marker, character.filename)
             } else if character.prestige_rank > 0 {
                 format!(
-                    "{}{} (P{} Lv{} \u{00b7} {} pwr)",
+                    "{}{} (P{} Lv{}{} \u{00b7} {} pwr)",
                     marker,
                     display_name,
                     character.prestige_rank,
                     character.character_level,
+                    asc_part,
                     total_power
                 )
             } else {
                 format!(
-                    "{}{} (Lv{} \u{00b7} {} pwr)",
-                    marker, display_name, character.character_level, total_power
+                    "{}{} (Lv{}{} \u{00b7} {} pwr)",
+                    marker, display_name, character.character_level, asc_part, total_power
                 )
             };
 
