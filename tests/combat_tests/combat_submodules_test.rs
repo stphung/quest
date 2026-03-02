@@ -1088,7 +1088,7 @@ fn player_death_in_dungeon_exits_dungeon() {
 }
 
 #[test]
-fn player_death_to_subzone_boss_sets_retry_kills() {
+fn player_death_to_subzone_boss_triggers_retreat() {
     let mut rng = seeded_rng();
     let mut state = state_player_about_to_die();
     // Zone 1, subzone 1 — NOT a zone boss (zone boss is subzone 3)
@@ -1097,26 +1097,19 @@ fn player_death_to_subzone_boss_sets_retry_kills() {
     state.zone_progression.fighting_boss = true;
     state.zone_progression.kills_in_subzone = KILLS_FOR_BOSS;
 
-    force_enemy_attack(&mut rng, &mut state, &default_bonuses());
+    let events = force_enemy_attack(&mut rng, &mut state, &default_bonuses());
 
-    // Boss flag should be cleared
-    assert!(
-        !state.zone_progression.fighting_boss,
-        "Boss flag should be cleared on death"
-    );
-    // Stays in same subzone
-    assert_eq!(state.zone_progression.current_subzone_id, 1);
-    // Kills should be set so only KILLS_FOR_BOSS_RETRY more kills needed
-    assert_eq!(
-        state.zone_progression.kills_in_subzone,
-        KILLS_FOR_BOSS.saturating_sub(KILLS_FOR_BOSS_RETRY),
-        "Kills should be set for retry (need {} more kills)",
-        KILLS_FOR_BOSS_RETRY
-    );
+    // Boss death triggers immediate retreat
+    let retreated = events
+        .iter()
+        .any(|e| matches!(e, CombatEvent::CombatRetreat { .. }));
+    assert!(retreated, "Boss death should trigger retreat");
+    assert!(!state.zone_progression.fighting_boss);
+    assert!(state.combat_state.current_enemy.is_none());
 }
 
 #[test]
-fn player_death_to_zone_boss_resets_to_subzone_1() {
+fn player_death_to_zone_boss_triggers_retreat() {
     let mut rng = seeded_rng();
     let mut state = state_player_about_to_die();
     // Zone 1, subzone 3 — the zone boss (Sporeling Queen)
@@ -1125,23 +1118,20 @@ fn player_death_to_zone_boss_resets_to_subzone_1() {
     state.zone_progression.fighting_boss = true;
     state.zone_progression.kills_in_subzone = KILLS_FOR_BOSS;
 
-    force_enemy_attack(&mut rng, &mut state, &default_bonuses());
+    let events = force_enemy_attack(&mut rng, &mut state, &default_bonuses());
 
+    // Boss death triggers immediate retreat
+    let retreated = events
+        .iter()
+        .any(|e| matches!(e, CombatEvent::CombatRetreat { .. }));
+    assert!(retreated, "Boss death should trigger retreat");
     assert!(!state.zone_progression.fighting_boss);
-    // Sent back to subzone 1
-    assert_eq!(
-        state.zone_progression.current_subzone_id, 1,
-        "Death to zone boss should reset to subzone 1"
-    );
-    // Kills reset to 0 (fresh start)
-    assert_eq!(
-        state.zone_progression.kills_in_subzone, 0,
-        "Kills should be fully reset after zone boss death"
-    );
+    assert_eq!(state.zone_progression.current_subzone_id, 1);
+    assert_eq!(state.zone_progression.kills_in_subzone, 0);
 }
 
 #[test]
-fn player_death_to_undying_storm_resets_to_lightning_fields() {
+fn player_death_to_undying_storm_triggers_retreat() {
     let mut rng = seeded_rng();
     let mut state = state_player_about_to_die();
     // Zone 10 (Storm Citadel), subzone 4 (Apex Spire) — The Undying Storm
@@ -1150,19 +1140,18 @@ fn player_death_to_undying_storm_resets_to_lightning_fields() {
     state.zone_progression.fighting_boss = true;
     state.zone_progression.kills_in_subzone = KILLS_FOR_BOSS;
 
-    force_enemy_attack(&mut rng, &mut state, &default_bonuses());
+    let events = force_enemy_attack(&mut rng, &mut state, &default_bonuses());
 
+    let retreated = events
+        .iter()
+        .any(|e| matches!(e, CombatEvent::CombatRetreat { .. }));
+    assert!(retreated, "Boss death should trigger retreat");
     assert!(!state.zone_progression.fighting_boss);
-    // Sent back to subzone 1 (Lightning Fields)
-    assert_eq!(
-        state.zone_progression.current_subzone_id, 1,
-        "Death to The Undying Storm should reset to Lightning Fields (subzone 1)"
-    );
-    assert_eq!(state.zone_progression.kills_in_subzone, 0);
+    assert!(state.combat_state.current_enemy.is_none());
 }
 
 #[test]
-fn player_death_to_zone_boss_preserves_zone_id() {
+fn player_death_to_zone_boss_retreats_to_safe_zone() {
     let mut rng = seeded_rng();
     let mut state = state_player_about_to_die();
     // Zone 5 (Volcanic Wastes), subzone 4 (Magma Core) — Infernal Titan (zone boss)
@@ -1170,23 +1159,26 @@ fn player_death_to_zone_boss_preserves_zone_id() {
     state.zone_progression.current_subzone_id = 4;
     state.zone_progression.fighting_boss = true;
     state.zone_progression.kills_in_subzone = KILLS_FOR_BOSS;
+    // Mark zone 4 boss as defeated so retreat goes there
+    state.zone_progression.defeated_bosses.push((4, 3));
 
-    force_enemy_attack(&mut rng, &mut state, &default_bonuses());
+    let events = force_enemy_attack(&mut rng, &mut state, &default_bonuses());
 
-    // Stays in same zone, just reset to subzone 1
+    // Boss death triggers retreat to highest safe zone
+    let retreated = events
+        .iter()
+        .any(|e| matches!(e, CombatEvent::CombatRetreat { .. }));
+    assert!(retreated, "Boss death should trigger retreat");
     assert_eq!(
-        state.zone_progression.current_zone_id, 5,
-        "Zone should not change on zone boss death"
+        state.zone_progression.current_zone_id, 4,
+        "Should retreat to highest zone with defeated boss"
     );
-    assert_eq!(
-        state.zone_progression.current_subzone_id, 1,
-        "Should reset to subzone 1 of same zone"
-    );
+    assert_eq!(state.zone_progression.current_subzone_id, 1);
     assert_eq!(state.zone_progression.kills_in_subzone, 0);
 }
 
 #[test]
-fn player_death_to_expanse_zone_boss_resets_to_subzone_1() {
+fn player_death_to_expanse_zone_boss_triggers_retreat() {
     let mut rng = seeded_rng();
     let mut state = state_player_about_to_die();
     // Zone 11 (The Expanse), subzone 4 (The Endless) — Avatar of Infinity (zone boss)
@@ -1195,21 +1187,18 @@ fn player_death_to_expanse_zone_boss_resets_to_subzone_1() {
     state.zone_progression.fighting_boss = true;
     state.zone_progression.kills_in_subzone = KILLS_FOR_BOSS;
 
-    force_enemy_attack(&mut rng, &mut state, &default_bonuses());
+    let events = force_enemy_attack(&mut rng, &mut state, &default_bonuses());
 
-    assert_eq!(
-        state.zone_progression.current_zone_id, 11,
-        "Should stay in The Expanse"
-    );
-    assert_eq!(
-        state.zone_progression.current_subzone_id, 1,
-        "Death to Avatar of Infinity should reset to Void's Edge (subzone 1)"
-    );
-    assert_eq!(state.zone_progression.kills_in_subzone, 0);
+    let retreated = events
+        .iter()
+        .any(|e| matches!(e, CombatEvent::CombatRetreat { .. }));
+    assert!(retreated, "Boss death should trigger retreat");
+    assert!(!state.zone_progression.fighting_boss);
+    assert!(state.combat_state.current_enemy.is_none());
 }
 
 #[test]
-fn player_death_to_mid_subzone_boss_in_4_subzone_zone_uses_retry() {
+fn player_death_to_mid_subzone_boss_triggers_retreat() {
     let mut rng = seeded_rng();
     let mut state = state_player_about_to_die();
     // Zone 5 (Volcanic Wastes), subzone 2 (Lava Rivers) — Magma Serpent (NOT zone boss)
@@ -1218,23 +1207,19 @@ fn player_death_to_mid_subzone_boss_in_4_subzone_zone_uses_retry() {
     state.zone_progression.fighting_boss = true;
     state.zone_progression.kills_in_subzone = KILLS_FOR_BOSS;
 
-    force_enemy_attack(&mut rng, &mut state, &default_bonuses());
+    let events = force_enemy_attack(&mut rng, &mut state, &default_bonuses());
 
-    // Stays in same subzone with retry mechanic
-    assert_eq!(state.zone_progression.current_zone_id, 5);
-    assert_eq!(
-        state.zone_progression.current_subzone_id, 2,
-        "Should stay in same subzone for non-zone boss"
-    );
-    assert_eq!(
-        state.zone_progression.kills_in_subzone,
-        KILLS_FOR_BOSS.saturating_sub(KILLS_FOR_BOSS_RETRY),
-        "Should use 5-kill retry for subzone boss"
-    );
+    // All boss deaths trigger immediate retreat
+    let retreated = events
+        .iter()
+        .any(|e| matches!(e, CombatEvent::CombatRetreat { .. }));
+    assert!(retreated, "Boss death should trigger retreat");
+    assert!(!state.zone_progression.fighting_boss);
+    assert!(state.combat_state.current_enemy.is_none());
 }
 
 #[test]
-fn player_death_to_zone_boss_emits_player_died_event() {
+fn player_death_to_zone_boss_emits_retreat_event() {
     let mut rng = seeded_rng();
     let mut state = state_player_about_to_die();
     // Zone 1, subzone 3 — Sporeling Queen (zone boss)
@@ -1246,8 +1231,10 @@ fn player_death_to_zone_boss_emits_player_died_event() {
     let events = force_enemy_attack(&mut rng, &mut state, &default_bonuses());
 
     assert!(
-        events.iter().any(|e| matches!(e, CombatEvent::PlayerDied)),
-        "Should emit PlayerDied event on zone boss death"
+        events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::CombatRetreat { .. })),
+        "Should emit CombatRetreat event on boss death"
     );
 }
 

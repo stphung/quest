@@ -334,7 +334,7 @@ mod tests {
     }
 
     #[test]
-    fn test_death_to_weapon_blocked_boss_resets_encounter() {
+    fn test_death_to_weapon_blocked_boss_retreats() {
         let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default(); // No TheStormbreaker achievement
@@ -357,23 +357,17 @@ mod tests {
             &mut achievements,
         );
 
-        // Should have PlayerDied event
-        let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
-        assert!(died);
+        // Boss death triggers immediate retreat
+        let retreated = events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::CombatRetreat { .. }));
+        assert!(retreated, "Boss death should trigger retreat");
 
-        // Zone boss death resets to subzone 1 (fresh start)
+        // Retreat clears boss state and enemy
         assert!(!state.zone_progression.fighting_boss);
-        assert_eq!(
-            state.zone_progression.current_subzone_id, 1,
-            "Death to zone boss should reset to subzone 1"
-        );
-        assert_eq!(
-            state.zone_progression.kills_in_subzone, 0,
-            "Kills should be fully reset after zone boss death"
-        );
-
-        // Enemy should be cleared (not reset)
         assert!(state.combat_state.current_enemy.is_none());
+        assert_eq!(state.zone_progression.kills_in_subzone, 0);
+        assert_eq!(state.zone_progression.current_subzone_id, 1);
     }
 
     #[test]
@@ -558,7 +552,7 @@ mod tests {
     }
 
     #[test]
-    fn test_death_to_any_boss_resets_encounter() {
+    fn test_death_to_any_boss_retreats() {
         let mut rng = seeded_rng();
         let mut state = GameState::new("Test Hero".to_string(), 0);
         let mut achievements = Achievements::default();
@@ -581,19 +575,17 @@ mod tests {
             &mut achievements,
         );
 
-        // Should have PlayerDied event
-        let died = events.iter().any(|e| matches!(e, CombatEvent::PlayerDied));
-        assert!(died);
+        // Boss death triggers immediate retreat
+        let retreated = events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::CombatRetreat { .. }));
+        assert!(retreated, "Boss death should trigger retreat");
 
-        // Boss encounter should be reset with retry mechanic
+        // Retreat clears boss state and enemy
         assert!(!state.zone_progression.fighting_boss);
-        assert_eq!(
-            state.zone_progression.kills_in_subzone,
-            KILLS_FOR_BOSS.saturating_sub(KILLS_FOR_BOSS_RETRY)
-        );
-
-        // Enemy should be cleared
         assert!(state.combat_state.current_enemy.is_none());
+        assert_eq!(state.zone_progression.kills_in_subzone, 0);
+        assert_eq!(state.zone_progression.current_subzone_id, 1);
     }
 
     #[test]
@@ -1089,12 +1081,12 @@ mod tests {
         state.prestige_rank = 3;
         let original_rank = state.prestige_rank;
 
-        // Set up boss fight
-        state.zone_progression.fighting_boss = true;
+        // Set up mob fight (not boss — boss triggers immediate retreat)
+        state.zone_progression.fighting_boss = false;
 
         // Low HP so player dies
         state.combat_state.player_current_hp = 1;
-        state.combat_state.current_enemy = Some(Enemy::new("Boss".to_string(), 100, 50));
+        state.combat_state.current_enemy = Some(Enemy::new("Mob".to_string(), 100, 50));
 
         // Force both attacks (enemy kills player)
         let events = force_both_attacks(
