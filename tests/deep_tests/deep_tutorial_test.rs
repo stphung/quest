@@ -64,7 +64,7 @@ fn test_deep_initial_frontier_is_layer_1() {
 fn test_deep_ui_state_starts_closed() {
     let ui = DeepUiState::new();
     assert!(!ui.open);
-    assert_eq!(ui.view, DeepView::Hub);
+    assert_eq!(ui.view, DeepView::Infrastructure);
     assert_eq!(ui.selected_index, 0);
     assert!(ui.event_mission_id.is_none());
     assert!(ui.staged_squad.is_empty());
@@ -80,7 +80,7 @@ fn test_deep_ui_open_resets_state() {
     ui.open();
 
     assert!(ui.open);
-    assert_eq!(ui.view, DeepView::Hub);
+    assert_eq!(ui.view, DeepView::Infrastructure);
     assert_eq!(ui.selected_index, 0);
     assert!(ui.staged_squad.is_empty());
 }
@@ -95,7 +95,7 @@ fn test_deep_ui_close_resets_state() {
     ui.close();
 
     assert!(!ui.open);
-    assert_eq!(ui.view, DeepView::Hub);
+    assert_eq!(ui.view, DeepView::Infrastructure);
     assert_eq!(ui.selected_index, 0);
 }
 
@@ -373,7 +373,7 @@ fn test_mission_duration_ranges_ordered() {
     let expedition_min = MissionType::Expedition.duration_range_secs().0;
     let breakthrough_min = MissionType::Breakthrough.duration_range_secs().0;
 
-    assert!(supply_min < recon_min, "Supply min < Recon min");
+    assert!(supply_min <= recon_min, "Supply min <= Recon min");
     assert!(recon_min < expedition_min, "Recon min < Expedition min");
     assert!(
         expedition_min < breakthrough_min,

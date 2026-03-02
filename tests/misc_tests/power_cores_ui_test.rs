@@ -186,45 +186,45 @@ fn test_power_core_layer30_name_is_origin_wound() {
 // =========================================================================
 
 #[test]
-fn test_rate_layer3_is_1_pr_per_day() {
+fn test_rate_layer3_is_2_pr_per_day() {
     let def = get_power_core_def(AchievementId::PowerCoreI).unwrap();
     assert_eq!(
-        def.pr_per_day, 1,
-        "PowerCoreI (Red Fault) must grant 1 PR/day"
+        def.pr_per_day, 2,
+        "PowerCoreI (Red Fault) must grant 2 PR/day"
     );
 }
 
 #[test]
-fn test_rate_layer7_is_2_pr_per_day() {
+fn test_rate_layer7_is_3_pr_per_day() {
     let def = get_power_core_def(AchievementId::PowerCoreII).unwrap();
     assert_eq!(
-        def.pr_per_day, 2,
-        "PowerCoreII (Mirror Scar) must grant 2 PR/day"
+        def.pr_per_day, 3,
+        "PowerCoreII (Mirror Scar) must grant 3 PR/day"
     );
 }
 
 #[test]
-fn test_rate_layer12_is_3_pr_per_day() {
+fn test_rate_layer12_is_5_pr_per_day() {
     let def = get_power_core_def(AchievementId::PowerCoreIII).unwrap();
-    assert_eq!(def.pr_per_day, 3);
-}
-
-#[test]
-fn test_rate_layer18_is_4_pr_per_day() {
-    let def = get_power_core_def(AchievementId::PowerCoreIV).unwrap();
-    assert_eq!(def.pr_per_day, 4);
-}
-
-#[test]
-fn test_rate_layer25_is_5_pr_per_day() {
-    let def = get_power_core_def(AchievementId::PowerCoreV).unwrap();
     assert_eq!(def.pr_per_day, 5);
 }
 
 #[test]
-fn test_rate_layer30_is_6_pr_per_day() {
+fn test_rate_layer18_is_8_pr_per_day() {
+    let def = get_power_core_def(AchievementId::PowerCoreIV).unwrap();
+    assert_eq!(def.pr_per_day, 8);
+}
+
+#[test]
+fn test_rate_layer25_is_12_pr_per_day() {
+    let def = get_power_core_def(AchievementId::PowerCoreV).unwrap();
+    assert_eq!(def.pr_per_day, 12);
+}
+
+#[test]
+fn test_rate_layer30_is_18_pr_per_day() {
     let def = get_power_core_def(AchievementId::PowerCoreVI).unwrap();
-    assert_eq!(def.pr_per_day, 6);
+    assert_eq!(def.pr_per_day, 18);
 }
 
 // Rate string rendering: the UI displays "N PR/day". Verify the integer backing
@@ -232,24 +232,24 @@ fn test_rate_layer30_is_6_pr_per_day() {
 // `format!("{} PR/day", def.pr_per_day)`.
 
 #[test]
-fn test_rate_string_format_1_pr_per_day() {
-    let def = get_power_core_def(AchievementId::PowerCoreI).unwrap();
-    let rate_str = format!("{} PR/day", def.pr_per_day);
-    assert_eq!(rate_str, "1 PR/day");
-}
-
-#[test]
 fn test_rate_string_format_2_pr_per_day() {
-    let def = get_power_core_def(AchievementId::PowerCoreII).unwrap();
+    let def = get_power_core_def(AchievementId::PowerCoreI).unwrap();
     let rate_str = format!("{} PR/day", def.pr_per_day);
     assert_eq!(rate_str, "2 PR/day");
 }
 
 #[test]
-fn test_rate_string_format_6_pr_per_day() {
+fn test_rate_string_format_3_pr_per_day() {
+    let def = get_power_core_def(AchievementId::PowerCoreII).unwrap();
+    let rate_str = format!("{} PR/day", def.pr_per_day);
+    assert_eq!(rate_str, "3 PR/day");
+}
+
+#[test]
+fn test_rate_string_format_18_pr_per_day() {
     let def = get_power_core_def(AchievementId::PowerCoreVI).unwrap();
     let rate_str = format!("{} PR/day", def.pr_per_day);
-    assert_eq!(rate_str, "6 PR/day");
+    assert_eq!(rate_str, "18 PR/day");
 }
 
 // =========================================================================
@@ -260,39 +260,39 @@ fn test_rate_string_format_6_pr_per_day() {
 // =========================================================================
 
 #[test]
-fn test_fill_duration_1_pr_per_day_is_24h() {
-    // 1 PR/day → one grant every 24h = 86400 seconds
-    assert_eq!(fill_duration_secs(1), 86_400);
-}
-
-#[test]
 fn test_fill_duration_2_pr_per_day_is_12h() {
-    // 2 PR/day → one grant every 12h = 43200 seconds
+    // 2 PR/day → one grant every 12h = 43200 seconds (Red Fault)
     assert_eq!(fill_duration_secs(2), 43_200);
 }
 
 #[test]
 fn test_fill_duration_3_pr_per_day_is_8h() {
-    // 3 PR/day → one grant every 8h = 28800 seconds
+    // 3 PR/day → one grant every 8h = 28800 seconds (Mirror Scar)
     assert_eq!(fill_duration_secs(3), 28_800);
 }
 
 #[test]
-fn test_fill_duration_4_pr_per_day_is_6h() {
-    // 4 PR/day → one grant every 6h = 21600 seconds
-    assert_eq!(fill_duration_secs(4), 21_600);
-}
-
-#[test]
 fn test_fill_duration_5_pr_per_day_is_4h48m() {
-    // 5 PR/day → one grant every 4h 48m = 17280 seconds
+    // 5 PR/day → one grant every ~4h 48m = 17280 seconds (Black Mouth)
     assert_eq!(fill_duration_secs(5), 17_280);
 }
 
 #[test]
-fn test_fill_duration_6_pr_per_day_is_4h() {
-    // 6 PR/day → one grant every 4h = 14400 seconds
-    assert_eq!(fill_duration_secs(6), 14_400);
+fn test_fill_duration_8_pr_per_day_is_3h() {
+    // 8 PR/day → one grant every 3h = 10800 seconds (Hollow Throne)
+    assert_eq!(fill_duration_secs(8), 10_800);
+}
+
+#[test]
+fn test_fill_duration_12_pr_per_day_is_2h() {
+    // 12 PR/day → one grant every 2h = 7200 seconds (Wailing Reach)
+    assert_eq!(fill_duration_secs(12), 7_200);
+}
+
+#[test]
+fn test_fill_duration_18_pr_per_day_is_1h20m() {
+    // 18 PR/day → one grant every ~1h 20m = 4800 seconds (Origin Wound)
+    assert_eq!(fill_duration_secs(18), 4_800);
 }
 
 /// Helper: given elapsed seconds and fill_duration, compute fill fraction [0.0, 1.0].
@@ -573,16 +573,16 @@ fn test_get_unlocked_cores_returns_cores_in_definition_order() {
     assert_eq!(unlocked.len(), 3);
     // Definitions are in ascending PR/day order: 1, 2, 6
     assert_eq!(
-        unlocked[0].pr_per_day, 1,
-        "First returned core must have lowest rate (Red Fault, 1 PR/day)"
+        unlocked[0].pr_per_day, 2,
+        "First returned core must have lowest rate (Red Fault, 2 PR/day)"
     );
     assert_eq!(
-        unlocked[1].pr_per_day, 2,
-        "Second returned core must have next rate (Mirror Scar, 2 PR/day)"
+        unlocked[1].pr_per_day, 3,
+        "Second returned core must have next rate (Mirror Scar, 3 PR/day)"
     );
     assert_eq!(
-        unlocked[2].pr_per_day, 6,
-        "Third returned core must be highest unlocked (Origin Wound, 6 PR/day)"
+        unlocked[2].pr_per_day, 18,
+        "Third returned core must be highest unlocked (Origin Wound, 18 PR/day)"
     );
 }
 

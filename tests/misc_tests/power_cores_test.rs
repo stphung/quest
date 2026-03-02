@@ -4,7 +4,7 @@
 //!  1. ALL_POWER_CORES has exactly 6 entries
 //!  2. Each core maps to the correct achievement ID (PowerCoreI through PowerCoreVI)
 //!  3. get_power_core_def returns correct def for each core, None for non-core achievements
-//!  4. pr_per_day values are 1, 2, 3, 4, 5, 6
+//!  4. pr_per_day values are 2, 3, 5, 8, 12, 18
 //!  5. Core names match fracture regions: Red Fault, Mirror Scar, Black Mouth, Hollow Throne,
 //!     Wailing Reach, Origin Wound
 //!  6. PowerCoreState serialization round-trip
@@ -165,8 +165,8 @@ fn test_get_power_core_def_returns_correct_name_for_each() {
 // ── 4. pr_per_day values ──────────────────────────────────────────────────────
 
 #[test]
-fn test_pr_per_day_values_are_1_through_6_in_order() {
-    let expected_rates: [u32; 6] = [1, 2, 3, 4, 5, 6];
+fn test_pr_per_day_values_match_accelerating_curve() {
+    let expected_rates: [u32; 6] = [2, 3, 5, 8, 12, 18];
     for (i, (def, &expected)) in ALL_POWER_CORES
         .iter()
         .zip(expected_rates.iter())
@@ -181,39 +181,39 @@ fn test_pr_per_day_values_are_1_through_6_in_order() {
 }
 
 #[test]
-fn test_red_fault_has_1_pr_per_day() {
+fn test_red_fault_has_2_pr_per_day() {
     let def = get_power_core_def(AchievementId::PowerCoreI).unwrap();
-    assert_eq!(def.pr_per_day, 1);
-}
-
-#[test]
-fn test_mirror_scar_has_2_pr_per_day() {
-    let def = get_power_core_def(AchievementId::PowerCoreII).unwrap();
     assert_eq!(def.pr_per_day, 2);
 }
 
 #[test]
-fn test_black_mouth_has_3_pr_per_day() {
-    let def = get_power_core_def(AchievementId::PowerCoreIII).unwrap();
+fn test_mirror_scar_has_3_pr_per_day() {
+    let def = get_power_core_def(AchievementId::PowerCoreII).unwrap();
     assert_eq!(def.pr_per_day, 3);
 }
 
 #[test]
-fn test_hollow_throne_has_4_pr_per_day() {
-    let def = get_power_core_def(AchievementId::PowerCoreIV).unwrap();
-    assert_eq!(def.pr_per_day, 4);
-}
-
-#[test]
-fn test_wailing_reach_has_5_pr_per_day() {
-    let def = get_power_core_def(AchievementId::PowerCoreV).unwrap();
+fn test_black_mouth_has_5_pr_per_day() {
+    let def = get_power_core_def(AchievementId::PowerCoreIII).unwrap();
     assert_eq!(def.pr_per_day, 5);
 }
 
 #[test]
-fn test_origin_wound_has_6_pr_per_day() {
+fn test_hollow_throne_has_8_pr_per_day() {
+    let def = get_power_core_def(AchievementId::PowerCoreIV).unwrap();
+    assert_eq!(def.pr_per_day, 8);
+}
+
+#[test]
+fn test_wailing_reach_has_12_pr_per_day() {
+    let def = get_power_core_def(AchievementId::PowerCoreV).unwrap();
+    assert_eq!(def.pr_per_day, 12);
+}
+
+#[test]
+fn test_origin_wound_has_18_pr_per_day() {
     let def = get_power_core_def(AchievementId::PowerCoreVI).unwrap();
-    assert_eq!(def.pr_per_day, 6);
+    assert_eq!(def.pr_per_day, 18);
 }
 
 #[test]
@@ -501,51 +501,51 @@ fn test_get_unlocked_cores_returns_only_those_with_unlocked_achievement() {
 // ── 8. fill_duration_secs ────────────────────────────────────────────────────
 
 #[test]
-fn test_fill_duration_secs_red_fault_is_86400() {
-    // 1 PR/day → 86400 seconds (24 hours)
-    assert_eq!(fill_duration_secs(1), 86400);
-}
-
-#[test]
-fn test_fill_duration_secs_mirror_scar_is_43200() {
+fn test_fill_duration_secs_red_fault_is_43200() {
     // 2 PR/day → 43200 seconds (12 hours)
     assert_eq!(fill_duration_secs(2), 43200);
 }
 
 #[test]
-fn test_fill_duration_secs_black_mouth_is_28800() {
+fn test_fill_duration_secs_mirror_scar_is_28800() {
     // 3 PR/day → 28800 seconds (8 hours)
     assert_eq!(fill_duration_secs(3), 28800);
 }
 
 #[test]
-fn test_fill_duration_secs_hollow_throne_is_21600() {
-    // 4 PR/day → 21600 seconds (6 hours)
-    assert_eq!(fill_duration_secs(4), 21600);
-}
-
-#[test]
-fn test_fill_duration_secs_wailing_reach_is_17280() {
-    // 5 PR/day → 17280 seconds (4h 48m)
+fn test_fill_duration_secs_black_mouth_is_17280() {
+    // 5 PR/day → 17280 seconds (~4h 48m)
     assert_eq!(fill_duration_secs(5), 17280);
 }
 
 #[test]
-fn test_fill_duration_secs_origin_wound_is_14400() {
-    // 6 PR/day → 14400 seconds (4 hours)
-    assert_eq!(fill_duration_secs(6), 14400);
+fn test_fill_duration_secs_hollow_throne_is_10800() {
+    // 8 PR/day → 10800 seconds (3h)
+    assert_eq!(fill_duration_secs(8), 10800);
+}
+
+#[test]
+fn test_fill_duration_secs_wailing_reach_is_7200() {
+    // 12 PR/day → 7200 seconds (2h)
+    assert_eq!(fill_duration_secs(12), 7200);
+}
+
+#[test]
+fn test_fill_duration_secs_origin_wound_is_4800() {
+    // 18 PR/day → 4800 seconds (~1h 20m)
+    assert_eq!(fill_duration_secs(18), 4800);
 }
 
 #[test]
 fn test_fill_duration_secs_all_cores() {
     // Verify formula: fill_duration_secs = 86400 / pr_per_day
     let expected: [(u32, i64); 6] = [
-        (1, 86400),
         (2, 43200),
         (3, 28800),
-        (4, 21600),
         (5, 17280),
-        (6, 14400),
+        (8, 10800),
+        (12, 7200),
+        (18, 4800),
     ];
     for (pr_per_day, expected_secs) in expected {
         assert_eq!(

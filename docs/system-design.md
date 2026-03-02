@@ -71,7 +71,7 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 
 ### Key Architectural Patterns
 
-- **Event-driven tick processing**: `game_tick()` returns a `TickResult` containing `Vec<TickEvent>` (44 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
+- **Event-driven tick processing**: `game_tick()` returns a `TickResult` containing `Vec<TickEvent>` (45 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
 - **Generic RNG**: `game_tick<R: Rng>()` uses a generic type parameter because `rand::Rng` is not dyn-compatible. Production uses `thread_rng()`, tests use seeded `ChaCha8Rng` for determinism.
 - **Haven bonus injection**: Haven bonuses are passed as explicit parameters to game systems rather than accessed globally, keeping modules decoupled.
 
@@ -850,7 +850,7 @@ Options organized in 8 tabs: Challenges (all 10 types), World (Dungeon, Fishing,
 
 ### Integration Tests
 
-65 integration test files in `tests/`:
+79 integration test files in `tests/`:
 - `game_loop_orchestration_test.rs` -- 36 behavior-locking tests for game tick pipeline
 - `game_tick_behavior_test.rs` / `game_tick_supplemental_test.rs` -- Tick processing behavior
 - `tick_integration_test.rs` -- Cross-system tick integration
@@ -1104,6 +1104,7 @@ quest/
 │   │   ├── events.rs        # Check-in events and event choices
 │   │   ├── economy.rs       # Warband Marks economy, costs, rewards
 │   │   ├── discovery.rs     # Discovery roll logic, starter roster
+│   │   ├── narratives.rs    # Mission narrative text for results modal
 │   │   └── persistence.rs   # Save/load from ~/.quest/deep.json
 │   ├── stormglass/          # Stormglass currency and Storm Sigils
 │   │   ├── types.rs         # Stormglass state, daily rotation
@@ -1118,7 +1119,7 @@ quest/
 │   ├── god_items/           # God Items system (Asprika, Sleipnir, Megingjord)
 │   │   └── types.rs         # God item definitions, passives, bonuses, query helpers
 │   ├── achievements/        # Achievement system
-│   │   ├── types.rs         # AchievementId (204 variants), Achievements state
+│   │   ├── types.rs         # AchievementId (213 variants), Achievements state
 │   │   ├── data.rs          # Achievement database
 │   │   ├── handlers.rs      # Event handlers (on_kill, on_boss_kill, etc.)
 │   │   ├── milestones.rs    # Milestone definitions and thresholds
@@ -1174,12 +1175,12 @@ quest/
 │       ├── bug_report_scene.rs # Bug report overlay
 │       ├── stormglass_scene.rs # Stormglass Exchange overlay with animations
 │       ├── scene_fx.rs       # Shared utilities for layered ASCII scene rendering
-│       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing)
+│       ├── zone_bg.rs        # Stylized zone background scenes (6-layer compositing, all 30 zones)
 │       ├── debug_menu_scene.rs # Debug menu with tabbed categories
 │       ├── throbber.rs      # Spinner animations
 │       └── character_select.rs, character_creation.rs,
 │           character_delete.rs, character_rename.rs
-├── tests/                   # 65 integration test files
+├── tests/                   # 79 integration test files
 ├── .github/workflows/       # CI/CD pipeline
 ├── scripts/                 # Quality checks (ci-checks.sh)
 ├── docs/                    # Design documents

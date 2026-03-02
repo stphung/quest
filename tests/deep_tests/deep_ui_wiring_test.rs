@@ -1,17 +1,12 @@
-//! QA-3: Integration tests for UI-related type changes, concurrent slot wiring,
-//! and duration modifier computation.
+//! QA-3: Integration tests for UI-related type changes and concurrent slot wiring.
 //!
 //! Tests cover:
 //! - GuildRank::concurrent_missions() raw table values unchanged
 //! - effective_concurrent_missions() bonus at Rank 1 with L3 breakthrough
-//! - DurationModifiers computation for T1-1 effective duration display
 //! - DeepUiState lifecycle (open, close, defaults, visit counters)
 //! - DeepView tab navigation (next, prev, wrapping, EventResponse exclusion)
 
-use quest::deep::{
-    apply_duration_modifiers, effective_concurrent_missions, DurationModifiers, GuildRank,
-    MIN_MISSION_DURATION_SECS,
-};
+use quest::deep::{effective_concurrent_missions, GuildRank};
 
 // =========================================================================
 // Concurrent Mission Wiring — raw GuildRank method unchanged
@@ -64,191 +59,6 @@ fn test_effective_concurrent_rank1_boundary_layer2_vs_3() {
 }
 
 // =========================================================================
-// Duration Modifier Computation (T1-1 display support)
-// =========================================================================
-
-#[test]
-fn test_duration_mods_outpost_only() {
-    let base = 7200u64; // 2 hours
-    let mods = DurationModifiers {
-        has_outpost: true,
-        familiarity: 0,
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-        bridge_layers: 0,
-    };
-    let effective = apply_duration_modifiers(base, &mods);
-    // Outpost: *0.75 => 7200 * 0.75 = 5400
-    assert_eq!(effective, 5400);
-}
-
-#[test]
-fn test_duration_mods_outpost_and_mastered_familiarity() {
-    let base = 7200u64; // 2 hours
-    let mods = DurationModifiers {
-        has_outpost: true,
-        familiarity: 75, // Mastered => *0.55
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-        bridge_layers: 0,
-    };
-    let effective = apply_duration_modifiers(base, &mods);
-    // Outpost: *0.75, Mastered: *0.55 => 7200 * 0.75 * 0.55 = 2970
-    let expected = (7200.0_f64 * 0.75 * 0.55) as u64;
-    assert_eq!(effective, expected);
-}
-
-#[test]
-fn test_duration_mods_saboteur_base() {
-    let base = 10000u64;
-    let mods = DurationModifiers {
-        has_outpost: false,
-        familiarity: 0,
-        has_saboteur: true,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-        bridge_layers: 0,
-    };
-    let effective = apply_duration_modifiers(base, &mods);
-    // Saboteur base: *0.90 => 10000 * 0.90 = 9000
-    assert_eq!(effective, 9000);
-}
-
-#[test]
-fn test_duration_mods_saboteur_veteran() {
-    let base = 10000u64;
-    let mods = DurationModifiers {
-        has_outpost: false,
-        familiarity: 0,
-        has_saboteur: true,
-        saboteur_is_veteran: true,
-        is_overpowered: false,
-        bridge_layers: 0,
-    };
-    let effective = apply_duration_modifiers(base, &mods);
-    // Saboteur veteran: *0.85 => 10000 * 0.85 = 8500
-    assert_eq!(effective, 8500);
-}
-
-#[test]
-fn test_duration_mods_all_active_stacks_multiplicatively() {
-    let base = 14400u64; // 4 hours
-    let mods = DurationModifiers {
-        has_outpost: true,  // *0.75
-        familiarity: 100,   // Mastered *0.55
-        has_saboteur: true, // *0.85 (veteran)
-        saboteur_is_veteran: true,
-        is_overpowered: true, // *0.90
-        bridge_layers: 2,     // *0.80 (2 bridges at 10% each)
-    };
-    let effective = apply_duration_modifiers(base, &mods);
-    let expected = (14400.0_f64 * 0.75 * 0.55 * 0.85 * 0.90 * 0.80) as u64;
-    assert_eq!(effective, expected);
-    assert!(effective < base);
-    assert!(
-        effective >= MIN_MISSION_DURATION_SECS,
-        "Should respect MIN_MISSION_DURATION_SECS floor"
-    );
-}
-
-#[test]
-fn test_duration_mods_respects_minimum_floor() {
-    let base = MIN_MISSION_DURATION_SECS;
-    let mods = DurationModifiers {
-        has_outpost: true,
-        familiarity: 100,
-        has_saboteur: true,
-        saboteur_is_veteran: true,
-        is_overpowered: true,
-        bridge_layers: 5,
-    };
-    let effective = apply_duration_modifiers(base, &mods);
-    assert_eq!(
-        effective, MIN_MISSION_DURATION_SECS,
-        "Duration must never go below MIN_MISSION_DURATION_SECS"
-    );
-}
-
-#[test]
-fn test_duration_mods_no_modifiers_returns_base() {
-    let base = 21600u64; // 6 hours
-    let mods = DurationModifiers {
-        has_outpost: false,
-        familiarity: 0,
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-        bridge_layers: 0,
-    };
-    let effective = apply_duration_modifiers(base, &mods);
-    assert_eq!(effective, base, "No modifiers should return base duration");
-}
-
-#[test]
-fn test_duration_mods_bridge_cap_at_50_percent() {
-    let base = 28800u64; // 8 hours
-                         // 6 bridge layers would reduce by 60% without cap, but cap is 50%.
-    let mods = DurationModifiers {
-        has_outpost: false,
-        familiarity: 0,
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-        bridge_layers: 6,
-    };
-    let effective = apply_duration_modifiers(base, &mods);
-    // Bridge capped at 50% => *0.50 => 28800 * 0.50 = 14400
-    assert_eq!(effective, 14400);
-}
-
-#[test]
-fn test_duration_mods_familiarity_mapped() {
-    let base = 10000u64;
-    let mods = DurationModifiers {
-        has_outpost: false,
-        familiarity: 30, // Mapped => *0.85
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-        bridge_layers: 0,
-    };
-    let effective = apply_duration_modifiers(base, &mods);
-    assert_eq!(effective, 8500); // 10000 * 0.85
-}
-
-#[test]
-fn test_duration_mods_familiarity_familiar() {
-    let base = 10000u64;
-    let mods = DurationModifiers {
-        has_outpost: false,
-        familiarity: 55, // Familiar => *0.70
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: false,
-        bridge_layers: 0,
-    };
-    let effective = apply_duration_modifiers(base, &mods);
-    assert_eq!(effective, 7000); // 10000 * 0.70
-}
-
-#[test]
-fn test_duration_mods_overpowered_alone() {
-    let base = 10000u64;
-    let mods = DurationModifiers {
-        has_outpost: false,
-        familiarity: 0,
-        has_saboteur: false,
-        saboteur_is_veteran: false,
-        is_overpowered: true,
-        bridge_layers: 0,
-    };
-    let effective = apply_duration_modifiers(base, &mods);
-    assert_eq!(effective, 9000); // 10000 * 0.90
-}
-
-// =========================================================================
 // DeepUiState lifecycle tests
 // =========================================================================
 
@@ -256,7 +66,7 @@ fn test_duration_mods_overpowered_alone() {
 fn test_ui_state_defaults() {
     let ui = quest::deep::DeepUiState::new();
     assert!(!ui.open);
-    assert_eq!(ui.view, quest::deep::DeepView::Hub);
+    assert_eq!(ui.view, quest::deep::DeepView::Infrastructure);
     assert_eq!(ui.selected_index, 0);
     assert!(ui.event_mission_id.is_none());
     assert_eq!(ui.event_choice_index, 0);
@@ -283,7 +93,7 @@ fn test_ui_state_open_sets_hub_and_increments_visit() {
     ui.open();
 
     assert!(ui.open);
-    assert_eq!(ui.view, quest::deep::DeepView::Hub);
+    assert_eq!(ui.view, quest::deep::DeepView::Infrastructure);
     assert_eq!(ui.selected_index, 0);
     assert!(ui.flash_message.is_none());
     assert_eq!(ui.hub_visit_count, 1);
@@ -311,7 +121,7 @@ fn test_ui_state_close_resets_state() {
     ui.close();
 
     assert!(!ui.open);
-    assert_eq!(ui.view, quest::deep::DeepView::Hub);
+    assert_eq!(ui.view, quest::deep::DeepView::Infrastructure);
     assert_eq!(ui.selected_index, 0);
     assert!(ui.staged_squad.is_empty());
     assert!(ui.flash_message.is_none());
@@ -342,54 +152,49 @@ fn test_ui_state_open_clears_staging() {
 #[test]
 fn test_view_tab_cycle_next() {
     use quest::deep::DeepView;
-    // Hub → EventResponse → NewMission → Roster → Recruit → Infrastructure → Hub
-    let mut view = DeepView::Hub;
-    view = view.next_tab();
-    assert_eq!(view, DeepView::EventResponse);
+    // Infrastructure → NewMission → Hub → Infrastructure (3 tabs)
+    let mut view = DeepView::Infrastructure;
     view = view.next_tab();
     assert_eq!(view, DeepView::NewMission);
     view = view.next_tab();
-    assert_eq!(view, DeepView::Roster);
-    view = view.next_tab();
-    assert_eq!(view, DeepView::Recruit);
-    view = view.next_tab();
-    assert_eq!(view, DeepView::Infrastructure);
+    assert_eq!(view, DeepView::Hub);
     // Wraps around
     view = view.next_tab();
-    assert_eq!(view, DeepView::Hub);
+    assert_eq!(view, DeepView::Infrastructure);
 }
 
 #[test]
 fn test_view_tab_cycle_prev() {
     use quest::deep::DeepView;
-    let mut view = DeepView::Hub;
+    // Infrastructure → Hub → NewMission → Infrastructure (3 tabs)
+    let mut view = DeepView::Infrastructure;
     view = view.prev_tab();
-    assert_eq!(view, DeepView::Infrastructure);
-    view = view.prev_tab();
-    assert_eq!(view, DeepView::Recruit);
-    view = view.prev_tab();
-    assert_eq!(view, DeepView::Roster);
+    assert_eq!(view, DeepView::Hub);
     view = view.prev_tab();
     assert_eq!(view, DeepView::NewMission);
     view = view.prev_tab();
-    assert_eq!(view, DeepView::EventResponse);
-    view = view.prev_tab();
-    assert_eq!(view, DeepView::Hub);
+    assert_eq!(view, DeepView::Infrastructure);
 }
 
 #[test]
-fn test_view_event_response_in_tab_cycle() {
+fn test_view_non_tabbed_views_not_in_tab_cycle() {
     use quest::deep::DeepView;
-    // EventResponse is now in TABS (2nd position, most time-critical).
+    // EventResponse is a modal, Roster and Recruit are sub-views of Status tab.
     let view = DeepView::EventResponse;
-    assert_eq!(view.next_tab(), DeepView::NewMission);
-    assert_eq!(view.prev_tab(), DeepView::Hub);
+    assert_eq!(view.next_tab(), DeepView::EventResponse);
+    assert_eq!(view.prev_tab(), DeepView::EventResponse);
+    let view = DeepView::Roster;
+    assert_eq!(view.next_tab(), DeepView::Roster);
+    assert_eq!(view.prev_tab(), DeepView::Roster);
+    let view = DeepView::Recruit;
+    assert_eq!(view.next_tab(), DeepView::Recruit);
+    assert_eq!(view.prev_tab(), DeepView::Recruit);
 }
 
 #[test]
 fn test_view_tab_labels() {
     use quest::deep::DeepView;
-    assert_eq!(DeepView::Hub.tab_label(), "Hub");
+    assert_eq!(DeepView::Hub.tab_label(), "Team");
     assert_eq!(DeepView::NewMission.tab_label(), "Missions");
     assert_eq!(DeepView::Roster.tab_label(), "Roster");
     assert_eq!(DeepView::Infrastructure.tab_label(), "Layers");
@@ -398,12 +203,13 @@ fn test_view_tab_labels() {
 }
 
 #[test]
-fn test_view_tabs_constant_includes_event_response() {
+fn test_view_tabs_constant_excludes_event_response() {
     use quest::deep::DeepView;
-    assert!(DeepView::TABS.contains(&DeepView::EventResponse));
+    assert!(!DeepView::TABS.contains(&DeepView::EventResponse));
+    assert!(!DeepView::TABS.contains(&DeepView::Roster));
+    assert!(!DeepView::TABS.contains(&DeepView::Recruit));
     assert!(DeepView::TABS.contains(&DeepView::Hub));
-    assert!(DeepView::TABS.contains(&DeepView::Recruit));
-    assert_eq!(DeepView::TABS.len(), 6);
+    assert_eq!(DeepView::TABS.len(), 3);
 }
 
 #[test]

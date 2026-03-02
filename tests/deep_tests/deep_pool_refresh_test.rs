@@ -432,10 +432,23 @@ fn test_safe_mission_targets_cleared_layer_after_refresh() {
     );
 
     for mission in &safe_missions {
-        assert_eq!(
-            mission.layer, 1,
-            "After clearing layer 1, safe missions should target the cleared layer 1"
-        );
+        match mission.mission_type {
+            MissionType::SupplyRun => {
+                // Supply Runs can target cleared layers or the frontier.
+                assert!(
+                    mission.layer == 1 || mission.layer == 2,
+                    "Supply Run should target a cleared layer or frontier (got layer {})",
+                    mission.layer
+                );
+            }
+            MissionType::Construction(_) => {
+                assert_eq!(
+                    mission.layer, 1,
+                    "Construction should target the cleared layer 1"
+                );
+            }
+            _ => unreachable!("filtered to safe missions"),
+        }
     }
 }
 

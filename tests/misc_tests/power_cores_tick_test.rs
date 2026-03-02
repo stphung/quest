@@ -5,7 +5,7 @@
 //! 2. Core grants +1 PR when fill_duration elapsed
 //! 3. Timer resets after granting
 //! 4. Multiple cores grant independently
-//! 5. Offline catchup: 48h offline + 1 PR/day → +2 PR
+//! 5. Offline catchup: 48h offline + 2 PR/day → +4 PR
 //! 6. Offline catchup: 24h offline with all 6 cores → correct total PR
 //! 7. Partial progress preserved (18h into 24h cycle = 75%)
 //! 8. Only unlocked cores process (locked = no effect)
@@ -29,7 +29,7 @@ fn make_state() -> GameState {
     GameState::new("PowerCoreTest".to_string(), 0)
 }
 
-/// Unlock a single PowerCoreI achievement (Red Fault, 1 PR/day).
+/// Unlock a single PowerCoreI achievement (Red Fault, 2 PR/day).
 fn ach_layer3() -> Achievements {
     let mut ach = Achievements::default();
     ach.unlock(AchievementId::PowerCoreI, None);
@@ -101,10 +101,10 @@ fn core_does_not_grant_before_fill_duration() {
 fn core_grants_one_pr_when_fill_duration_elapsed() {
     let mut state = make_state();
     let mut pc_state = PowerCoreState::default();
-    let achievements = ach_layer3(); // Red Fault: 1 PR/day = 86400s fill
+    let achievements = ach_layer3(); // Red Fault: 2 PR/day = 43200s fill
     let mut result = TickResult::default();
 
-    let fill = fill_duration_secs(1); // 86400s
+    let fill = fill_duration_secs(2); // 43200s
                                       // Simulate exactly one fill duration + 1 second of elapsed time.
     pc_state
         .last_granted_at
@@ -140,7 +140,7 @@ fn timer_resets_after_granting() {
     let achievements = ach_layer3();
     let mut result = TickResult::default();
 
-    let fill = fill_duration_secs(1);
+    let fill = fill_duration_secs(2);
     let old_timestamp = now() - fill - 1;
     pc_state
         .last_granted_at
@@ -190,15 +190,15 @@ fn multiple_cores_grant_independently() {
     let mut state = make_state();
     let mut pc_state = PowerCoreState::default();
 
-    // Unlock two cores: Layer3 (1 PR/day) and Layer7 (2 PR/day).
+    // Unlock two cores: Layer3 (2 PR/day) and Layer7 (3 PR/day).
     let mut achievements = Achievements::default();
     achievements.unlock(AchievementId::PowerCoreI, None);
     achievements.unlock(AchievementId::PowerCoreII, None);
 
     let mut result = TickResult::default();
 
-    let fill_layer3 = fill_duration_secs(1);
-    let fill_layer7 = fill_duration_secs(2);
+    let fill_layer3 = fill_duration_secs(2);
+    let fill_layer7 = fill_duration_secs(3);
 
     // Layer3: 1 full cycle elapsed → should grant 1 PR.
     pc_state
@@ -236,13 +236,13 @@ fn multiple_cores_grant_independently() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[test]
-fn offline_catchup_48h_one_core_grants_two_pr() {
+fn offline_catchup_48h_one_core_grants_four_pr() {
     let mut state = make_state();
     let mut pc_state = PowerCoreState::default();
-    let achievements = ach_layer3(); // Red Fault: 1 PR/day
+    let achievements = ach_layer3(); // Red Fault: 2 PR/day
 
-    let fill = fill_duration_secs(1); // 86400s
-    let elapsed_48h: i64 = 48 * 3600; // 172800s = exactly 2 fill cycles
+    let fill = fill_duration_secs(2); // 43200s
+    let elapsed_48h: i64 = 48 * 3600; // 172800s = exactly 4 fill cycles
 
     pc_state
         .last_granted_at
@@ -252,18 +252,18 @@ fn offline_catchup_48h_one_core_grants_two_pr() {
     let granted = apply_offline_power_cores(&mut state, &mut pc_state, &achievements);
 
     assert_eq!(
-        granted, 2,
-        "48h offline with 1 PR/day should grant exactly 2 PR"
+        granted, 4,
+        "48h offline with 2 PR/day should grant exactly 4 PR"
     );
     assert_eq!(
         state.prestige_rank,
-        pr_before + 2,
+        pr_before + 4,
         "prestige_rank should reflect offline grant"
     );
 
-    // Timestamp should have advanced by 2 fill durations.
+    // Timestamp should have advanced by 4 fill durations.
     let new_ts = pc_state.last_granted_at[&AchievementId::PowerCoreI];
-    let expected_advance = fill * 2;
+    let expected_advance = fill * 4;
     let old_ts = now() - elapsed_48h - 1;
     assert_eq!(
         new_ts,
@@ -283,13 +283,13 @@ fn offline_catchup_24h_all_six_cores_correct_total() {
     let achievements = ach_all_cores();
 
     // 24h offline: each core completes floor(86400 / fill_duration) cycles.
-    // Layer3: 1 PR/day → 1 cycle in 24h
-    // Layer7: 2 PR/day → 2 cycles in 24h
-    // Layer12: 3 PR/day → 3 cycles
-    // Layer18: 4 PR/day → 4 cycles
-    // Layer25: 5 PR/day → 5 cycles
-    // Layer30: 6 PR/day → 6 cycles
-    // Total: 1+2+3+4+5+6 = 21 PR
+    // Layer3: 2 PR/day → 2 cycles in 24h
+    // Layer7: 3 PR/day → 3 cycles in 24h
+    // Layer12: 5 PR/day → 5 cycles
+    // Layer18: 8 PR/day → 8 cycles
+    // Layer25: 12 PR/day → 12 cycles
+    // Layer30: 18 PR/day → 18 cycles
+    // Total: 2+3+5+8+12+18 = 48 PR
     let elapsed_24h: i64 = 86400 + 60; // 24h + 60s to pass all fill durations
 
     for def in ALL_POWER_CORES {
@@ -302,13 +302,13 @@ fn offline_catchup_24h_all_six_cores_correct_total() {
     let granted = apply_offline_power_cores(&mut state, &mut pc_state, &achievements);
 
     // With 24h+60s elapsed and fill durations of 86400/N:
-    // Layer3 (86400s fill): floor(86460 / 86400) = 1 cycle
-    // Layer7 (43200s fill): floor(86460 / 43200) = 2 cycles
-    // Layer12 (28800s fill): floor(86460 / 28800) = 3 cycles
-    // Layer18 (21600s fill): floor(86460 / 21600) = 4 cycles
-    // Layer25 (17280s fill): floor(86460 / 17280) = 5 cycles
-    // Layer30 (14400s fill): floor(86460 / 14400) = 6 cycles
-    let expected_pr = 1 + 2 + 3 + 4 + 5 + 6;
+    // Layer3 (43200s fill): floor(86460 / 43200) = 2 cycles
+    // Layer7 (28800s fill): floor(86460 / 28800) = 3 cycles
+    // Layer12 (17280s fill): floor(86460 / 17280) = 5 cycles
+    // Layer18 (10800s fill): floor(86460 / 10800) = 8 cycles
+    // Layer25 (7200s fill): floor(86460 / 7200) = 12 cycles
+    // Layer30 (4800s fill): floor(86460 / 4800) = 18 cycles
+    let expected_pr = 2 + 3 + 5 + 8 + 12 + 18;
     assert_eq!(
         granted, expected_pr,
         "24h offline with all 6 cores should grant {expected_pr} PR total"
@@ -328,13 +328,13 @@ fn offline_catchup_24h_all_six_cores_correct_total() {
 fn partial_progress_preserved_no_early_grant() {
     let mut state = make_state();
     let mut pc_state = PowerCoreState::default();
-    let achievements = ach_layer3(); // Red Fault: 1 PR/day, 86400s fill
+    let achievements = ach_layer3(); // Red Fault: 2 PR/day, 43200s fill
     let mut result = TickResult::default();
 
-    let fill = fill_duration_secs(1); // 86400s
-    let elapsed_18h: i64 = 18 * 3600; // 64800s — 75% of fill, NOT yet complete
+    let fill = fill_duration_secs(2); // 43200s
+    let elapsed_18h: i64 = 9 * 3600; // 32400s — 75% of fill, NOT yet complete
 
-    assert!(elapsed_18h < fill, "sanity check: 18h < 24h fill");
+    assert!(elapsed_18h < fill, "sanity check: 9h < 12h fill");
 
     pc_state
         .last_granted_at
@@ -345,12 +345,12 @@ fn partial_progress_preserved_no_early_grant() {
 
     assert_eq!(
         state.prestige_rank, pr_before,
-        "no PR should be granted at 75% fill progress"
+        "no PR should be granted at 75% fill progress (9h of 12h)"
     );
     assert_eq!(
         count_power_core_granted_events(&result.events),
         0,
-        "no PowerCoreGranted event at 75% fill"
+        "no PowerCoreGranted event at 75% fill (9h of 12h)"
     );
 
     // The last_granted_at timestamp must remain unchanged (progress is preserved).
@@ -412,7 +412,7 @@ fn prestige_rank_incremented_on_grant() {
     let achievements = ach_layer3();
     let mut result = TickResult::default();
 
-    let fill = fill_duration_secs(1);
+    let fill = fill_duration_secs(2);
     pc_state
         .last_granted_at
         .insert(AchievementId::PowerCoreI, now() - fill - 1);
@@ -436,7 +436,7 @@ fn tick_event_power_core_granted_emitted_with_correct_name() {
     let achievements = ach_layer3(); // Red Fault
     let mut result = TickResult::default();
 
-    let fill = fill_duration_secs(1);
+    let fill = fill_duration_secs(2);
     pc_state
         .last_granted_at
         .insert(AchievementId::PowerCoreI, now() - fill - 1);
@@ -462,7 +462,7 @@ fn rapid_successive_ticks_do_not_double_grant() {
     let mut pc_state = PowerCoreState::default();
     let achievements = ach_layer3();
 
-    let fill = fill_duration_secs(1);
+    let fill = fill_duration_secs(2);
     // Exactly one cycle has elapsed.
     pc_state
         .last_granted_at

@@ -235,32 +235,33 @@ fn test_mission_pool_safe_mission_targets_cleared_layer() {
     let _ = persistent.layer_record_mut(3); // ensure layer 3 exists as frontier
 
     let pool = generate_mission_pool(&persistent, &mut rng);
-    let safe = pool
-        .iter()
-        .find(|m| {
-            matches!(
-                m.mission_type,
-                MissionType::SupplyRun | MissionType::Construction(_)
-            )
-        })
-        .expect("Pool must have a safe mission");
 
-    match safe.mission_type {
-        MissionType::SupplyRun => {
-            // Supply Run should target the deepest cleared layer (2), not layer 1.
-            assert_eq!(
-                safe.layer, 2,
-                "Supply Run should target the deepest cleared layer"
-            );
-        }
-        MissionType::Construction(_) => {
+    // Pool should have Supply Runs on cleared layers AND the frontier.
+    let supply_runs: Vec<u32> = pool
+        .iter()
+        .filter(|m| matches!(m.mission_type, MissionType::SupplyRun))
+        .map(|m| m.layer)
+        .collect();
+    assert!(
+        supply_runs.contains(&1) || supply_runs.contains(&2),
+        "Pool must have a Supply Run on a cleared layer, got layers {:?}",
+        supply_runs
+    );
+    assert!(
+        supply_runs.contains(&3),
+        "Pool must have a Supply Run on the frontier layer, got layers {:?}",
+        supply_runs
+    );
+
+    // Construction missions should only target cleared layers.
+    for m in &pool {
+        if matches!(m.mission_type, MissionType::Construction(_)) {
             assert!(
-                safe.layer == 1 || safe.layer == 2,
+                m.layer == 1 || m.layer == 2,
                 "Construction should target a cleared layer (got layer {})",
-                safe.layer
+                m.layer
             );
         }
-        _ => unreachable!("filtered to safe missions"),
     }
 }
 
@@ -1515,104 +1516,13 @@ fn test_resolve_recon_gains_more_familiarity_than_supply_run() {
     let supply_fam = run_and_get_familiarity(MissionType::SupplyRun, &mut rng_supply);
     let recon_fam = run_and_get_familiarity(MissionType::Recon, &mut rng_recon);
 
-    // Recon grants +15 familiarity, SupplyRun grants +5.
+    // Recon grants +5 familiarity, SupplyRun grants +2.
     assert!(
         recon_fam > supply_fam,
         "Recon should gain more familiarity ({}) than SupplyRun ({})",
         recon_fam,
         supply_fam
     );
-}
-
-// =============================================================================
-// stormglass reward scaling by outcome
-// =============================================================================
-
-#[test]
-fn test_stormglass_reward_zero_on_failure() {
-    let now = Utc::now();
-    let mut found_failure = false;
-
-    for seed in 0u64..50 {
-        let mut rng = seeded_rng(seed + 16000);
-        let mut persistent = DeepPersistent::new();
-        let _ = persistent.layer_record_mut(1);
-        let merc = make_merc(1, MercArchetype::Scout, 1); // Very weak → likely failure
-        let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
-
-        let mut mission = Mission {
-            id: 1,
-            mission_type: MissionType::Expedition,
-            layer: 1,
-            squad: vec![1],
-            started_at: now - Duration::hours(10),
-            ends_at: now - Duration::minutes(1),
-            events: vec![],
-            pending_event_index: 0,
-            status: MissionStatus::Active,
-            result: None,
-            is_first_orders: false,
-        };
-
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
-        let result = mission.result.as_ref().unwrap();
-
-        if matches!(result.outcome, MissionOutcome::Failure) {
-            assert_eq!(
-                result.stormglass_earned, 0,
-                "Failure should earn 0 Stormglass (seed {})",
-                seed
-            );
-            found_failure = true;
-            break;
-        }
-    }
-    let _ = found_failure;
-}
-
-#[test]
-fn test_stormglass_reward_halved_on_partial_success() {
-    let now = Utc::now();
-    let mut found_partial = false;
-
-    for seed in 0u64..80 {
-        let mut rng = seeded_rng(seed + 16100);
-        let mut persistent = DeepPersistent::new();
-        let _ = persistent.layer_record_mut(1);
-        // Power near threshold → partial success likely.
-        let merc = make_merc(1, MercArchetype::Vanguard, 17);
-        let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
-
-        // Build a reference full Expedition result with the same seed to get the base stormglass.
-        let mut mission = Mission {
-            id: 1,
-            mission_type: MissionType::Expedition,
-            layer: 1,
-            squad: vec![1],
-            started_at: now - Duration::hours(10),
-            ends_at: now - Duration::minutes(1),
-            events: vec![],
-            pending_event_index: 0,
-            status: MissionStatus::Active,
-            result: None,
-            is_first_orders: false,
-        };
-
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
-        let result = mission.result.as_ref().unwrap();
-
-        if matches!(result.outcome, MissionOutcome::PartialSuccess) {
-            // stormglass should be base / 2 — verify it is not the full amount.
-            // We can't know the exact base without re-running, but we can confirm it's > 0.
-            // The actual check that it's halved is in the code path; we verify the code path.
-            let _ = result.stormglass_earned; // accessed to exercise the branch
-            found_partial = true;
-            break;
-        }
-    }
-    let _ = found_partial;
 }
 
 // =============================================================================

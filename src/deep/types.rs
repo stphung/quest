@@ -178,12 +178,12 @@ impl MissionType {
     /// Nominal duration range in seconds (wall-clock).
     pub fn duration_range_secs(self) -> (u64, u64) {
         match self {
-            MissionType::SupplyRun => (1800, 10800),
-            MissionType::Recon => (3600, 21600),
-            MissionType::Expedition => (7200, 43200),
-            MissionType::Breakthrough => (14400, 86400),
-            MissionType::Construction(_) => (3600, 21600),
-            MissionType::GatewayExpedition => (86400, 86400),
+            MissionType::SupplyRun => (3600, 21600),            // 1h-6h
+            MissionType::Recon => (3600, 36000),                // 1h-10h
+            MissionType::Expedition => (10800, 108000),         // 3h-30h
+            MissionType::Breakthrough => (14400, 144000),       // 4h-40h
+            MissionType::Construction(_) => (7200, 72000),      // 2h-20h
+            MissionType::GatewayExpedition => (172800, 172800), // 48h
         }
     }
 
@@ -262,7 +262,7 @@ impl Infrastructure {
                 "Boosts familiarity (+40); improves auto-resolve outcomes."
             }
             Infrastructure::Bridge => {
-                "Unlocks a shortcut; -10% mission duration per bridged layer (max -50%)."
+                "Unlocks a shortcut; -2% mission duration per bridged layer (max -30%)."
             }
         }
     }
@@ -448,8 +448,6 @@ pub struct MissionResult {
     pub marks_earned: u32,
     /// XP to award to the character.
     pub xp_earned: u32,
-    /// Stormglass earned (Expeditions and Breakthroughs only).
-    pub stormglass_earned: u64,
     /// Item ilvl for any dropped items (None if no items).
     pub item_ilvl: Option<u32>,
     /// Merc ids that were injured as a result of this mission.
@@ -961,20 +959,17 @@ pub enum DeepView {
 }
 
 impl DeepView {
-    /// The navigable tabs in order. EventResponse is 2nd (most time-critical).
+    /// The navigable tabs in order.
     pub const TABS: &[DeepView] = &[
-        DeepView::Hub,
-        DeepView::EventResponse,
-        DeepView::NewMission,
-        DeepView::Roster,
-        DeepView::Recruit,
         DeepView::Infrastructure,
+        DeepView::NewMission,
+        DeepView::Hub,
     ];
 
     /// Short label for rendering in the tab bar.
     pub fn tab_label(self) -> &'static str {
         match self {
-            DeepView::Hub => "Hub",
+            DeepView::Hub => "Team",
             DeepView::NewMission => "Missions",
             DeepView::Roster => "Roster",
             DeepView::Infrastructure => "Layers",
@@ -1024,6 +1019,12 @@ pub struct DeepUiState {
     pub layer_visit_count: u8,
     pub event_visit_count: u8,
     pub recruit_visit_count: u8,
+    /// Whether the event response modal is open over the hub.
+    pub event_modal_open: bool,
+    /// Missions tab sub-view: true = active missions, false = available pool.
+    pub missions_show_active: bool,
+    /// Status tab sub-view: false = roster (default), true = recruit.
+    pub status_show_recruit: bool,
     /// Whether [?] help reference panel is shown.
     pub show_help: bool,
     /// Mercs from last prestige shown in farewell screen: (name, level, missions_completed).
@@ -1034,7 +1035,7 @@ impl DeepUiState {
     pub fn new() -> Self {
         Self {
             open: false,
-            view: DeepView::Hub,
+            view: DeepView::Infrastructure,
             selected_index: 0,
             event_mission_id: None,
             event_choice_index: 0,
@@ -1047,6 +1048,9 @@ impl DeepUiState {
             layer_visit_count: 0,
             event_visit_count: 0,
             recruit_visit_count: 0,
+            event_modal_open: false,
+            missions_show_active: true,
+            status_show_recruit: false,
             show_help: false,
             farewell_mercs: Vec::new(),
         }
@@ -1054,10 +1058,12 @@ impl DeepUiState {
 
     pub fn open(&mut self) {
         self.open = true;
-        self.view = DeepView::Hub;
+        self.view = DeepView::Infrastructure;
         self.selected_index = 0;
         self.event_mission_id = None;
         self.event_choice_index = 0;
+        self.event_modal_open = false;
+        self.missions_show_active = true;
         self.staging_mission_index = None;
         self.staged_squad.clear();
         self.flash_message = None;
@@ -1067,10 +1073,12 @@ impl DeepUiState {
 
     pub fn close(&mut self) {
         self.open = false;
-        self.view = DeepView::Hub;
+        self.view = DeepView::Infrastructure;
         self.selected_index = 0;
         self.event_mission_id = None;
         self.event_choice_index = 0;
+        self.event_modal_open = false;
+        self.missions_show_active = true;
         self.staging_mission_index = None;
         self.staged_squad.clear();
         self.flash_message = None;
@@ -1205,11 +1213,12 @@ mod tests {
     #[test]
     fn test_mission_type_duration_ranges_are_ordered() {
         // Minimum durations should increase with risk tier (ranges may overlap).
+        // Supply Run and Recon share the same minimum at Shallows tier.
         let supply_min = MissionType::SupplyRun.duration_range_secs().0;
         let recon_min = MissionType::Recon.duration_range_secs().0;
         let expedition_min = MissionType::Expedition.duration_range_secs().0;
         let breakthrough_min = MissionType::Breakthrough.duration_range_secs().0;
-        assert!(supply_min < recon_min);
+        assert!(supply_min <= recon_min);
         assert!(recon_min < expedition_min);
         assert!(expedition_min < breakthrough_min);
     }

@@ -26,37 +26,37 @@ pub const ALL_POWER_CORES: &[PowerCoreDef] = &[
     PowerCoreDef {
         achievement_id: AchievementId::PowerCoreI,
         name: "Red Fault",
-        pr_per_day: 1,
+        pr_per_day: 2,
         required_layer: 3,
     },
     PowerCoreDef {
         achievement_id: AchievementId::PowerCoreII,
         name: "Mirror Scar",
-        pr_per_day: 2,
+        pr_per_day: 3,
         required_layer: 7,
     },
     PowerCoreDef {
         achievement_id: AchievementId::PowerCoreIII,
         name: "Black Mouth",
-        pr_per_day: 3,
+        pr_per_day: 5,
         required_layer: 12,
     },
     PowerCoreDef {
         achievement_id: AchievementId::PowerCoreIV,
         name: "Hollow Throne",
-        pr_per_day: 4,
+        pr_per_day: 8,
         required_layer: 18,
     },
     PowerCoreDef {
         achievement_id: AchievementId::PowerCoreV,
         name: "Wailing Reach",
-        pr_per_day: 5,
+        pr_per_day: 12,
         required_layer: 25,
     },
     PowerCoreDef {
         achievement_id: AchievementId::PowerCoreVI,
         name: "Origin Wound",
-        pr_per_day: 6,
+        pr_per_day: 18,
         required_layer: 30,
     },
 ];
@@ -131,7 +131,7 @@ mod tests {
         assert!(def.is_some());
         let def = def.unwrap();
         assert_eq!(def.name, "Red Fault");
-        assert_eq!(def.pr_per_day, 1);
+        assert_eq!(def.pr_per_day, 2);
     }
 
     #[test]

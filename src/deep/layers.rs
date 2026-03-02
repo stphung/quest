@@ -86,9 +86,9 @@ impl FamiliarityLevel {
 /// (handled separately in `build_infrastructure`).
 pub fn familiarity_gain(mission_type: MissionType) -> u8 {
     match mission_type {
-        MissionType::SupplyRun => 8,
-        MissionType::Recon => 20,
-        MissionType::Expedition => 10,
+        MissionType::SupplyRun => 2,
+        MissionType::Recon => 5,
+        MissionType::Expedition => 15,
         MissionType::Breakthrough | MissionType::GatewayExpedition => 15,
         MissionType::Construction(_) => 5,
     }
@@ -186,114 +186,50 @@ pub fn mission_power_threshold(layer: u32, mission_type: MissionType) -> u32 {
 
 // ── Mission Durations ─────────────────────────────────────────────────────────
 
-/// Absolute minimum wall-clock mission duration in seconds (15 minutes).
-pub const MIN_MISSION_DURATION_SECS: u64 = 15 * 60;
-/// Layer-based minimum mission duration at layer 1 (1 hour).
-pub const LAYER_ONE_MIN_MISSION_DURATION_SECS: u64 = 60 * 60;
-/// Additional minimum duration per layer above 1 (10 minutes).
-pub const PER_LAYER_MIN_DURATION_STEP_SECS: u64 = 10 * 60;
-
-/// Layer-based minimum mission duration floor.
+/// Mission duration in seconds, keyed on layer tier and mission type.
 ///
-/// Layer 1 starts at 1 hour, and each deeper layer increases the floor by
-/// `PER_LAYER_MIN_DURATION_STEP_SECS`.
-pub fn minimum_mission_duration_secs_for_layer(layer: u32) -> u64 {
-    let depth_offset = layer.saturating_sub(1) as u64;
-    LAYER_ONE_MIN_MISSION_DURATION_SECS + depth_offset * PER_LAYER_MIN_DURATION_STEP_SECS
-}
-
-/// Base mission duration in seconds before any modifiers, keyed on layer tier.
-///
-/// Matches the balance design table (§2, Base Durations by Mission Type and Tier).
-pub fn base_mission_duration_secs(tier: LayerTier, mission_type: MissionType) -> u64 {
+/// This is the final duration — no modifiers, no minimums, no base/effective split.
+pub fn mission_duration_secs(tier: LayerTier, mission_type: MissionType) -> u64 {
     match (tier, mission_type) {
-        // Supply Run
-        (LayerTier::Shallows, MissionType::SupplyRun) => 600,
-        (LayerTier::Warrens, MissionType::SupplyRun) => 1800,
-        (LayerTier::Hollows, MissionType::SupplyRun) => 2700,
-        (LayerTier::SunkenReach, MissionType::SupplyRun) => 3600,
-        (LayerTier::Abyss, MissionType::SupplyRun) => 4500,
-        (LayerTier::Void, MissionType::SupplyRun) => 5400,
-        // Recon
-        (LayerTier::Shallows, MissionType::Recon) => 1800,
-        (LayerTier::Warrens, MissionType::Recon) => 3600,
-        (LayerTier::Hollows, MissionType::Recon) => 5400,
-        (LayerTier::SunkenReach, MissionType::Recon) => 7200,
-        (LayerTier::Abyss, MissionType::Recon) => 9000,
-        (LayerTier::Void, MissionType::Recon) => 10800,
-        // Expedition
-        (LayerTier::Shallows, MissionType::Expedition) => 3600,
-        (LayerTier::Warrens, MissionType::Expedition) => 7200,
-        (LayerTier::Hollows, MissionType::Expedition) => 10800,
-        (LayerTier::SunkenReach, MissionType::Expedition) => 14400,
-        (LayerTier::Abyss, MissionType::Expedition) => 18000,
-        (LayerTier::Void, MissionType::Expedition) => 21600,
-        // Breakthrough
-        (LayerTier::Shallows, MissionType::Breakthrough) => 7200,
-        (LayerTier::Warrens, MissionType::Breakthrough) => 14400,
-        (LayerTier::Hollows, MissionType::Breakthrough) => 21600,
-        (LayerTier::SunkenReach, MissionType::Breakthrough) => 28800,
-        (LayerTier::Abyss, MissionType::Breakthrough) => 36000,
-        (LayerTier::Void, MissionType::Breakthrough) => 43200,
-        // Construction
-        (LayerTier::Shallows, MissionType::Construction(_)) => 1800,
-        (LayerTier::Warrens, MissionType::Construction(_)) => 3600,
-        (LayerTier::Hollows, MissionType::Construction(_)) => 5400,
-        (LayerTier::SunkenReach, MissionType::Construction(_)) => 7200,
-        (LayerTier::Abyss, MissionType::Construction(_)) => 9000,
-        (LayerTier::Void, MissionType::Construction(_)) => 10800,
-        // Gateway Expedition — fixed 12h regardless of tier
-        (_, MissionType::GatewayExpedition) => 43200,
+        // Gateway Expedition — fixed 48h regardless of tier
+        (_, MissionType::GatewayExpedition) => 172_800,
+        // Shallows (Recon 1h base: Construction 2h, Expedition 3h, Breakthrough 4h)
+        (LayerTier::Shallows, MissionType::SupplyRun) => 3_600,
+        (LayerTier::Shallows, MissionType::Recon) => 3_600,
+        (LayerTier::Shallows, MissionType::Construction(_)) => 7_200,
+        (LayerTier::Shallows, MissionType::Expedition) => 10_800,
+        (LayerTier::Shallows, MissionType::Breakthrough) => 14_400,
+        // Warrens (Recon 3h base)
+        (LayerTier::Warrens, MissionType::SupplyRun) => 7_200,
+        (LayerTier::Warrens, MissionType::Recon) => 10_800,
+        (LayerTier::Warrens, MissionType::Construction(_)) => 21_600,
+        (LayerTier::Warrens, MissionType::Expedition) => 32_400,
+        (LayerTier::Warrens, MissionType::Breakthrough) => 43_200,
+        // Hollows (Recon 5h base)
+        (LayerTier::Hollows, MissionType::SupplyRun) => 10_800,
+        (LayerTier::Hollows, MissionType::Recon) => 18_000,
+        (LayerTier::Hollows, MissionType::Construction(_)) => 36_000,
+        (LayerTier::Hollows, MissionType::Expedition) => 54_000,
+        (LayerTier::Hollows, MissionType::Breakthrough) => 72_000,
+        // Sunken Reach (Recon 6h base)
+        (LayerTier::SunkenReach, MissionType::SupplyRun) => 14_400,
+        (LayerTier::SunkenReach, MissionType::Recon) => 21_600,
+        (LayerTier::SunkenReach, MissionType::Construction(_)) => 43_200,
+        (LayerTier::SunkenReach, MissionType::Expedition) => 64_800,
+        (LayerTier::SunkenReach, MissionType::Breakthrough) => 86_400,
+        // Abyss (Recon 8h base)
+        (LayerTier::Abyss, MissionType::SupplyRun) => 18_000,
+        (LayerTier::Abyss, MissionType::Recon) => 28_800,
+        (LayerTier::Abyss, MissionType::Construction(_)) => 57_600,
+        (LayerTier::Abyss, MissionType::Expedition) => 86_400,
+        (LayerTier::Abyss, MissionType::Breakthrough) => 115_200,
+        // Void (Recon 10h base)
+        (LayerTier::Void, MissionType::SupplyRun) => 21_600,
+        (LayerTier::Void, MissionType::Recon) => 36_000,
+        (LayerTier::Void, MissionType::Construction(_)) => 72_000,
+        (LayerTier::Void, MissionType::Expedition) => 108_000,
+        (LayerTier::Void, MissionType::Breakthrough) => 144_000,
     }
-}
-
-/// Parameters that can reduce mission duration beyond the base value.
-pub struct DurationModifiers {
-    /// Whether an Outpost has been built on this layer.
-    pub has_outpost: bool,
-    /// Raw familiarity percentage (0–100) for this layer.
-    pub familiarity: u8,
-    /// Whether a Saboteur is in the squad.
-    pub has_saboteur: bool,
-    /// Whether the Saboteur (if present) is Level 10+.
-    pub saboteur_is_veteran: bool,
-    /// Whether the squad Power exceeds 150% of the mission's threshold.
-    pub is_overpowered: bool,
-    /// Number of Bridge infrastructure layers between start and target layer.
-    /// Each bridged layer reduces duration by 10% (multiplicative, capped at 50%).
-    pub bridge_layers: u32,
-}
-
-/// Apply all duration modifiers multiplicatively and enforce the minimum floor.
-///
-/// Modifiers are applied in order: Outpost → Familiarity → Saboteur → Overpower → Bridge.
-/// The result is clamped to `MIN_MISSION_DURATION_SECS`.
-pub fn apply_duration_modifiers(base_secs: u64, mods: &DurationModifiers) -> u64 {
-    let mut duration = base_secs as f64;
-
-    if mods.has_outpost {
-        duration *= 1.0 - Infrastructure::Outpost.duration_reduction(); // -25%
-    }
-
-    let fam = FamiliarityLevel::from_familiarity(mods.familiarity);
-    duration *= fam.duration_factor();
-
-    if mods.has_saboteur {
-        let saboteur_factor = if mods.saboteur_is_veteran { 0.85 } else { 0.90 };
-        duration *= saboteur_factor;
-    }
-
-    if mods.is_overpowered {
-        duration *= 0.90; // -10%
-    }
-
-    // Bridge layers reduce duration by 10% each (multiplicative, cap at 50%)
-    if mods.bridge_layers > 0 {
-        let bridge_reduction = (1.0 - 0.10 * mods.bridge_layers as f64).max(0.50);
-        duration *= bridge_reduction;
-    }
-
-    (duration as u64).max(MIN_MISSION_DURATION_SECS)
 }
 
 /// Returns the auto-resolve success bonus from a Watchtower (+5%).
@@ -464,9 +400,9 @@ mod tests {
 
     #[test]
     fn test_familiarity_gain_values() {
-        assert_eq!(familiarity_gain(MissionType::SupplyRun), 8);
-        assert_eq!(familiarity_gain(MissionType::Recon), 20);
-        assert_eq!(familiarity_gain(MissionType::Expedition), 10);
+        assert_eq!(familiarity_gain(MissionType::SupplyRun), 2);
+        assert_eq!(familiarity_gain(MissionType::Recon), 5);
+        assert_eq!(familiarity_gain(MissionType::Expedition), 15);
         assert_eq!(familiarity_gain(MissionType::Breakthrough), 15);
         assert_eq!(
             familiarity_gain(MissionType::Construction(Infrastructure::Outpost)),
@@ -478,16 +414,16 @@ mod tests {
     fn test_apply_familiarity_gain_caps_at_100() {
         let mut record = LayerRecord::new(1);
         record.familiarity = 95;
-        apply_familiarity_gain(&mut record, MissionType::Recon); // +15 would overflow
+        apply_familiarity_gain(&mut record, MissionType::Expedition); // +15 would overflow
         assert_eq!(record.familiarity, 100);
     }
 
     #[test]
     fn test_apply_familiarity_gain_accumulates() {
         let mut record = LayerRecord::new(1);
-        apply_familiarity_gain(&mut record, MissionType::SupplyRun); // +8
-        apply_familiarity_gain(&mut record, MissionType::Recon); // +20
-        assert_eq!(record.familiarity, 28);
+        apply_familiarity_gain(&mut record, MissionType::SupplyRun); // +2
+        apply_familiarity_gain(&mut record, MissionType::Recon); // +5
+        assert_eq!(record.familiarity, 7);
     }
 
     // ── Power Thresholds ─────────────────────────────────────────────────────
@@ -556,142 +492,90 @@ mod tests {
         );
     }
 
-    // ── Base Durations ───────────────────────────────────────────────────────
+    // ── Mission Durations ─────────────────────────────────────────────────────
 
     #[test]
-    fn test_base_durations_shallows() {
+    fn test_shallows_durations() {
         assert_eq!(
-            base_mission_duration_secs(LayerTier::Shallows, MissionType::SupplyRun),
-            600
+            mission_duration_secs(LayerTier::Shallows, MissionType::SupplyRun),
+            3600
         );
         assert_eq!(
-            base_mission_duration_secs(LayerTier::Shallows, MissionType::Breakthrough),
+            mission_duration_secs(LayerTier::Shallows, MissionType::Recon),
+            3600
+        );
+        assert_eq!(
+            mission_duration_secs(LayerTier::Shallows, MissionType::Expedition),
+            10_800
+        );
+        assert_eq!(
+            mission_duration_secs(
+                LayerTier::Shallows,
+                MissionType::Construction(Infrastructure::Outpost)
+            ),
             7200
+        );
+        assert_eq!(
+            mission_duration_secs(LayerTier::Shallows, MissionType::Breakthrough),
+            14_400
         );
     }
 
     #[test]
-    fn test_base_durations_increase_with_tier() {
+    fn test_void_durations() {
+        assert_eq!(
+            mission_duration_secs(LayerTier::Void, MissionType::SupplyRun),
+            21_600
+        );
+        assert_eq!(
+            mission_duration_secs(LayerTier::Void, MissionType::Breakthrough),
+            144_000
+        );
+    }
+
+    #[test]
+    fn test_gateway_duration() {
+        assert_eq!(
+            mission_duration_secs(LayerTier::Void, MissionType::GatewayExpedition),
+            172_800
+        );
+        // Gateway is the same regardless of tier
+        assert_eq!(
+            mission_duration_secs(LayerTier::Shallows, MissionType::GatewayExpedition),
+            172_800
+        );
+    }
+
+    #[test]
+    fn test_durations_increase_with_tier() {
         let tiers = [
             LayerTier::Shallows,
             LayerTier::Warrens,
             LayerTier::Hollows,
             LayerTier::SunkenReach,
             LayerTier::Abyss,
+            LayerTier::Void,
         ];
         for mission in [
             MissionType::SupplyRun,
             MissionType::Recon,
             MissionType::Expedition,
+            MissionType::Breakthrough,
         ] {
             let mut prev = 0u64;
             for &tier in &tiers {
-                let d = base_mission_duration_secs(tier, mission);
+                let d = mission_duration_secs(tier, mission);
                 assert!(
                     d >= prev,
-                    "{:?} {:?} duration should not decrease",
+                    "{:?} {:?} duration should not decrease: {} < {}",
                     tier,
-                    mission
+                    mission,
+                    d,
+                    prev,
                 );
                 prev = d;
             }
         }
-    }
-
-    #[test]
-    fn test_layer_minimum_duration_starts_at_one_hour() {
-        assert_eq!(minimum_mission_duration_secs_for_layer(1), 60 * 60);
-    }
-
-    #[test]
-    fn test_layer_minimum_duration_increases_with_layer() {
-        let l1 = minimum_mission_duration_secs_for_layer(1);
-        let l2 = minimum_mission_duration_secs_for_layer(2);
-        let l10 = minimum_mission_duration_secs_for_layer(10);
-        assert_eq!(l2 - l1, PER_LAYER_MIN_DURATION_STEP_SECS);
-        assert!(l10 > l2);
-    }
-
-    // ── Duration Modifiers ───────────────────────────────────────────────────
-
-    #[test]
-    fn test_duration_no_modifiers_returns_base() {
-        let base: u64 = 8 * 3600;
-        let mods = DurationModifiers {
-            has_outpost: false,
-            familiarity: 0,
-            has_saboteur: false,
-            saboteur_is_veteran: false,
-            is_overpowered: false,
-            bridge_layers: 0,
-        };
-        assert_eq!(apply_duration_modifiers(base, &mods), base);
-    }
-
-    #[test]
-    fn test_duration_outpost_reduces_by_25_percent() {
-        let base = 8 * 3600u64;
-        let mods = DurationModifiers {
-            has_outpost: true,
-            familiarity: 0,
-            has_saboteur: false,
-            saboteur_is_veteran: false,
-            is_overpowered: false,
-            bridge_layers: 0,
-        };
-        let result = apply_duration_modifiers(base, &mods);
-        let expected = (base as f64 * 0.75) as u64;
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_duration_mastered_familiarity_reduces_by_45_percent() {
-        let base = 8 * 3600u64;
-        let mods = DurationModifiers {
-            has_outpost: false,
-            familiarity: 80, // Mastered
-            has_saboteur: false,
-            saboteur_is_veteran: false,
-            is_overpowered: false,
-            bridge_layers: 0,
-        };
-        let result = apply_duration_modifiers(base, &mods);
-        let expected = (base as f64 * 0.55) as u64;
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_duration_stacks_multiplicatively() {
-        // Outpost -25%, Mastered -45%, Saboteur veteran -15%, Overpowered -10%
-        // Net: 0.75 * 0.55 * 0.85 * 0.90 ≈ 0.3156
-        let base = 8 * 3600u64;
-        let mods = DurationModifiers {
-            has_outpost: true,
-            familiarity: 80,
-            has_saboteur: true,
-            saboteur_is_veteran: true,
-            is_overpowered: true,
-            bridge_layers: 0,
-        };
-        let result = apply_duration_modifiers(base, &mods);
-        let expected = (base as f64 * 0.75 * 0.55 * 0.85 * 0.90) as u64;
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_duration_clamped_to_minimum() {
-        // Very short base with all reductions would go below 30 minutes.
-        let base = 30 * 60u64; // already at minimum
-        let mods = DurationModifiers {
-            has_outpost: true,
-            familiarity: 80,
-            has_saboteur: true,
-            saboteur_is_veteran: true,
-            is_overpowered: true,
-            bridge_layers: 0,
-        };
-        let result = apply_duration_modifiers(base, &mods);
-        assert_eq!(result, MIN_MISSION_DURATION_SECS);
     }
 
     // ── Infrastructure Build Cost ─────────────────────────────────────────────

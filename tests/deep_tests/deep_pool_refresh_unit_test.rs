@@ -656,8 +656,7 @@ fn pool_size_matches_guild_rank_five() {
 
 #[test]
 fn pool_missions_reflect_outpost_infrastructure_shorter_duration() {
-    // Compare a frontier Breakthrough mission at layer 5 with and without an Outpost on layer 5.
-    // Outpost applies a -25% mission duration multiplier.
+    // Outpost applies -25% to the table duration on that layer.
     let mut persistent_no_outpost = make_persistent_with_frontier(5);
     persistent_no_outpost.guild_rank = GuildRank(4);
 

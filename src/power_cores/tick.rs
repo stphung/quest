@@ -198,7 +198,7 @@ mod tests {
         let mut result = TickResult::default();
 
         let now = Utc::now().timestamp();
-        let fill = fill_duration_secs(1); // 86400s for Red Fault (1 PR/day)
+        let fill = fill_duration_secs(2); // 43200s for Red Fault (2 PR/day)
                                           // Simulate fill duration + 1 second of elapsed time.
         pc_state
             .last_granted_at
@@ -226,7 +226,7 @@ mod tests {
         let mut result = TickResult::default();
 
         let now = Utc::now().timestamp();
-        let fill = fill_duration_secs(1);
+        let fill = fill_duration_secs(2);
         // Simulate 3 complete cycles.
         pc_state
             .last_granted_at
@@ -265,7 +265,7 @@ mod tests {
         let achievements = unlocked_achievements();
 
         let now = Utc::now().timestamp();
-        let fill = fill_duration_secs(1);
+        let fill = fill_duration_secs(2);
         pc_state
             .last_granted_at
             .insert(AchievementId::PowerCoreI, now - fill * 2 - 1);
