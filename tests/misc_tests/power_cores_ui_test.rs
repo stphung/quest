@@ -4,14 +4,17 @@
 //! - get_power_core_def returns Some for all 6 layer achievements
 //! - get_power_core_def returns None for non-power-core achievements
 //! - Correct rate strings ("1 PR/day" through "6 PR/day")
-//! - Progress bar fill calculation at various elapsed times (via fill_duration_secs)
-//! - Time remaining formatting (via seconds_until_next_grant or format_time_remaining)
+//! - Progress bar fill calculation at various elapsed times (via fill_ratio)
+//! - Time remaining formatting (via format_core_time_remaining)
 //! - Power Cores section hidden when 0 cores unlocked (get_unlocked_cores is empty)
 //! - Power Cores section shows N bars for N unlocked cores
 //! - PowerCoreGrant TickEvent field correctness
 
 use quest::achievements::{AchievementId, Achievements};
-use quest::power_cores::{fill_duration_secs, get_power_core_def, get_unlocked_cores};
+use quest::power_cores::{
+    fill_duration_secs, fill_ratio, format_core_time_remaining, get_power_core_def,
+    get_unlocked_cores,
+};
 
 // =========================================================================
 // Helper
@@ -253,10 +256,11 @@ fn test_rate_string_format_18_pr_per_day() {
 }
 
 // =========================================================================
-// Section 5: Progress bar fill calculation via fill_duration_secs
+// Section 5: Progress bar fill calculation via fill_ratio
 //
 // The UI progress bar fills based on elapsed / fill_duration.
-// fill_duration_secs(pr_per_day) is the public utility that drives this.
+// fill_ratio(elapsed, fill_secs) is the public utility that drives this.
+// It clamps to [0.0, 1.0] — the bar is full when >= 1.0 (ready to grant).
 // =========================================================================
 
 #[test]
@@ -295,140 +299,139 @@ fn test_fill_duration_18_pr_per_day_is_1h20m() {
     assert_eq!(fill_duration_secs(18), 4_800);
 }
 
-/// Helper: given elapsed seconds and fill_duration, compute fill fraction [0.0, 1.0].
-/// This mirrors the progress bar calculation in the UI:
-/// `(elapsed % fill_duration) as f64 / fill_duration as f64`
-fn fill_fraction(elapsed: i64, fill_duration: i64) -> f64 {
-    let position_in_cycle = elapsed.max(0) % fill_duration;
-    (position_in_cycle as f64 / fill_duration as f64).min(1.0)
-}
-
 #[test]
-fn test_fill_fraction_zero_elapsed() {
+fn test_fill_ratio_zero_elapsed() {
     let fill_dur = fill_duration_secs(1); // 86400
     assert!(
-        fill_fraction(0, fill_dur).abs() < 1e-9,
-        "0 elapsed must yield 0.0 fill fraction"
+        fill_ratio(0, fill_dur).abs() < 1e-9,
+        "0 elapsed must yield 0.0 fill ratio"
     );
 }
 
 #[test]
-fn test_fill_fraction_half_elapsed() {
+fn test_fill_ratio_half_elapsed() {
     let fill_dur = fill_duration_secs(1);
     let elapsed = fill_dur / 2;
-    let frac = fill_fraction(elapsed, fill_dur);
+    let ratio = fill_ratio(elapsed, fill_dur);
     assert!(
-        (frac - 0.5).abs() < 1e-6,
-        "Half elapsed must yield 0.5 fill fraction, got {}",
-        frac
+        (ratio - 0.5).abs() < 1e-6,
+        "Half elapsed must yield 0.5 fill ratio, got {}",
+        ratio
     );
 }
 
 #[test]
-fn test_fill_fraction_full_cycle_wraps_to_zero() {
-    // When exactly one full cycle has elapsed, position_in_cycle == 0 (modulo),
-    // so the bar resets. This is correct because the PR was just granted.
+fn test_fill_ratio_full_cycle_is_ready() {
+    // When exactly one full cycle has elapsed, the bar is full (1.0) — ready to grant.
     let fill_dur = fill_duration_secs(1);
-    let frac = fill_fraction(fill_dur, fill_dur);
+    let ratio = fill_ratio(fill_dur, fill_dur);
     assert!(
-        frac.abs() < 1e-9,
-        "Exactly one full cycle elapsed should yield 0.0 (bar reset), got {}",
-        frac
+        (ratio - 1.0).abs() < 1e-9,
+        "Exactly one full cycle elapsed should yield 1.0 (ready), got {}",
+        ratio
     );
 }
 
 #[test]
-fn test_fill_fraction_one_hour_into_twelve_hour_fill() {
+fn test_fill_ratio_one_hour_into_twelve_hour_fill() {
     let fill_dur = fill_duration_secs(2); // 43200 (12h)
     let elapsed = 3_600_i64; // 1 hour
-    let frac = fill_fraction(elapsed, fill_dur);
+    let ratio = fill_ratio(elapsed, fill_dur);
     let expected = 1.0 / 12.0;
     assert!(
-        (frac - expected).abs() < 1e-6,
+        (ratio - expected).abs() < 1e-6,
         "1h / 12h fill must be ~{:.4}, got {:.4}",
         expected,
-        frac
+        ratio
     );
 }
 
 #[test]
-fn test_fill_fraction_quarter_elapsed() {
+fn test_fill_ratio_quarter_elapsed() {
     let fill_dur = fill_duration_secs(1); // 86400
     let elapsed = fill_dur / 4;
-    let frac = fill_fraction(elapsed, fill_dur);
+    let ratio = fill_ratio(elapsed, fill_dur);
     assert!(
-        (frac - 0.25).abs() < 1e-6,
+        (ratio - 0.25).abs() < 1e-6,
         "Quarter elapsed must yield 0.25, got {}",
-        frac
+        ratio
+    );
+}
+
+#[test]
+fn test_fill_ratio_clamped_at_one_for_overdue() {
+    // If more than one cycle has elapsed (e.g. offline time), ratio clamps to 1.0.
+    let fill_dur = fill_duration_secs(2); // 43200
+    let elapsed = fill_dur * 3; // 3 full cycles overdue
+    let ratio = fill_ratio(elapsed, fill_dur);
+    assert!(
+        (ratio - 1.0).abs() < 1e-9,
+        "Overdue core must clamp ratio to 1.0, got {}",
+        ratio
     );
 }
 
 // =========================================================================
-// Section 6: Time remaining formatting
+// Section 6: Time remaining formatting via format_core_time_remaining
 //
-// The UI shows time remaining as "Xh Ym" when >= 1h, or "Ym" when < 1h.
-// The format helper works with seconds remaining until the next grant.
+// The UI shows "Ready!" when ratio >= 1.0, "Xh Ym" when hours >= 1, "Ym" otherwise.
+// format_core_time_remaining(remaining_secs, ratio) is the real production function.
 // =========================================================================
-
-/// Mirror of the time-remaining formatting that the UI should produce.
-/// Format: "Xh Ym" when hours >= 1, "Ym" when hours == 0, "0h 0m" when 0.
-fn format_time_remaining(remaining_secs: i64) -> String {
-    let remaining = remaining_secs.max(0) as u64;
-    let hours = remaining / 3600;
-    let minutes = (remaining % 3600) / 60;
-    if hours > 0 {
-        format!("{}h {}m", hours, minutes)
-    } else if remaining == 0 {
-        "0h 0m".to_string()
-    } else {
-        format!("{}m", minutes)
-    }
-}
 
 #[test]
 fn test_time_remaining_14h_2m() {
     let remaining_secs = 14 * 3600 + 2 * 60;
-    assert_eq!(format_time_remaining(remaining_secs), "14h 2m");
+    assert_eq!(format_core_time_remaining(remaining_secs, 0.1), "14h 2m");
 }
 
 #[test]
 fn test_time_remaining_48m() {
     let remaining_secs = 48 * 60;
-    assert_eq!(format_time_remaining(remaining_secs), "48m");
+    assert_eq!(format_core_time_remaining(remaining_secs, 0.5), "48m");
 }
 
 #[test]
-fn test_time_remaining_zero_shows_0h_0m() {
-    assert_eq!(format_time_remaining(0), "0h 0m");
+fn test_time_remaining_zero_shows_ready() {
+    // When remaining_secs is 0 and ratio >= 1.0, the core is ready.
+    assert_eq!(format_core_time_remaining(0, 1.0), "Ready!");
 }
 
 #[test]
 fn test_time_remaining_exactly_1_hour() {
-    assert_eq!(format_time_remaining(3600), "1h 0m");
+    assert_eq!(format_core_time_remaining(3600, 0.5), "1h 0m");
 }
 
 #[test]
 fn test_time_remaining_exactly_24_hours() {
-    assert_eq!(format_time_remaining(24 * 3600), "24h 0m");
+    assert_eq!(format_core_time_remaining(24 * 3600, 0.0), "24h 0m");
 }
 
 #[test]
 fn test_time_remaining_1_minute() {
-    assert_eq!(format_time_remaining(60), "1m");
+    assert_eq!(format_core_time_remaining(60, 0.9), "1m");
 }
 
 #[test]
 fn test_time_remaining_90_seconds_truncates_to_1m() {
     // 90 seconds = 1 minute 30 seconds; sub-minute seconds are dropped
-    assert_eq!(format_time_remaining(90), "1m");
+    assert_eq!(format_core_time_remaining(90, 0.9), "1m");
 }
 
 #[test]
 fn test_time_remaining_59_seconds_shows_0m() {
-    // Less than 1 full minute, and hours = 0, so "0m"
-    // In the format: hours == 0 and minutes == 0 → fall through to "0h 0m"?
-    // Actually: remaining_secs=59, hours=0, minutes=0, remaining != 0 → "0m"
-    assert_eq!(format_time_remaining(59), "0m");
+    // Less than 1 full minute, hours = 0 — displays "0m"
+    assert_eq!(format_core_time_remaining(59, 0.9), "0m");
+}
+
+#[test]
+fn test_time_remaining_ready_when_ratio_at_one() {
+    assert_eq!(format_core_time_remaining(0, 1.0), "Ready!");
+}
+
+#[test]
+fn test_time_remaining_ready_when_ratio_exceeds_one() {
+    // ratio > 1.0 is possible when the tick that grants PR hasn't run yet.
+    assert_eq!(format_core_time_remaining(0, 1.5), "Ready!");
 }
 
 // =========================================================================

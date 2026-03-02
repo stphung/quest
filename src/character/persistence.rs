@@ -8,7 +8,7 @@ use std::io;
 
 use chrono::Utc;
 
-use super::manager::{CharacterInfo, CharacterManager, CharacterSaveData, ACCOUNT_FILES};
+use super::manager::{CharacterHeader, CharacterInfo, CharacterManager, CharacterSaveData};
 use super::name_validation::{sanitize_name, validate_name};
 use crate::core::constants::SAVE_FILE_VERSION;
 
@@ -146,6 +146,38 @@ impl CharacterManager {
         })
     }
 
+    /// Probes a JSON file to determine if it is a character save.
+    ///
+    /// Three possible outcomes:
+    /// - `Ok(Some(header))` — confirmed character file; header fields were parsed successfully.
+    /// - `Ok(None)` — confirmed non-character file; valid JSON but no `character_name` field,
+    ///   so this is an account-level save (haven.json, deep.json, etc.).  Skip it silently.
+    /// - `Err(_)` — could not determine (malformed JSON or I/O error); caller should treat the
+    ///   file as a potentially corrupted character save so it shows up in the list.
+    pub(super) fn load_character_header(
+        &self,
+        filename: &str,
+    ) -> io::Result<Option<CharacterHeader>> {
+        let filepath = self.quest_dir.join(filename);
+        let json_content = fs::read_to_string(filepath)?;
+
+        // Parse to a generic value so we can inspect structure without full deserialization.
+        let value: serde_json::Value = serde_json::from_str(&json_content)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+
+        // No `character_name` string field → this is an account-level file, not a character.
+        if !value.get("character_name").is_some_and(|v| v.is_string()) {
+            return Ok(None);
+        }
+
+        // Has `character_name` — deserialize the header fields we care about.
+        // If individual header fields are malformed, bubble up as Err so the caller
+        // treats it as a corrupted character (rather than silently skipping it).
+        let header = serde_json::from_value::<CharacterHeader>(value)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        Ok(Some(header))
+    }
+
     pub fn list_characters(&self) -> io::Result<Vec<CharacterInfo>> {
         let mut characters = Vec::new();
 
@@ -167,31 +199,56 @@ impl CharacterManager {
                 .unwrap_or("")
                 .to_string();
 
-            // Skip account-level JSON files (not character saves)
-            if ACCOUNT_FILES.contains(&filename.as_str()) {
-                continue;
-            }
-
-            // Try to load character
-            match self.load_character(&filename) {
-                Ok(state) => {
-                    characters.push(CharacterInfo {
-                        character_id: state.character_id,
-                        character_name: state.character_name,
-                        filename,
-                        character_level: state.character_level,
-                        prestige_rank: state.prestige_rank,
-                        play_time_seconds: state.play_time_seconds,
-                        last_save_time: state.last_save_time,
-                        attributes: state.attributes,
-                        equipment: state.equipment,
-                        ascension_level: state.ascension_level,
-                        storm_sigils: state.storm_sigils,
-                        is_corrupted: false,
-                    });
+            // Probe the file to determine how to handle it:
+            //   Ok(None)    → account-level file (no character_name), skip silently
+            //   Ok(Some(_)) → character file; proceed to full load
+            //   Err(_)      → malformed JSON or I/O error; include as corrupted character
+            match self.load_character_header(&filename) {
+                Ok(None) => {
+                    // Confirmed account-level file — skip without adding to list.
+                }
+                Ok(Some(header)) => {
+                    // Valid character header; do full load for equipment/sigils.
+                    match self.load_character(&filename) {
+                        Ok(state) => {
+                            characters.push(CharacterInfo {
+                                character_id: state.character_id,
+                                character_name: state.character_name,
+                                filename,
+                                character_level: state.character_level,
+                                prestige_rank: state.prestige_rank,
+                                play_time_seconds: state.play_time_seconds,
+                                last_save_time: state.last_save_time,
+                                attributes: state.attributes,
+                                equipment: state.equipment,
+                                ascension_level: state.ascension_level,
+                                storm_sigils: state.storm_sigils,
+                                is_corrupted: false,
+                            });
+                        }
+                        Err(_) => {
+                            // Header parsed but full load failed — show as corrupted with
+                            // whatever we already know from the header.
+                            characters.push(CharacterInfo {
+                                character_id: header.character_id,
+                                character_name: header.character_name,
+                                filename,
+                                character_level: header.character_level,
+                                prestige_rank: header.prestige_rank,
+                                play_time_seconds: header.play_time_seconds,
+                                last_save_time: header.last_save_time,
+                                attributes: super::attributes::Attributes::new(),
+                                equipment: crate::items::Equipment::new(),
+                                ascension_level: header.ascension_level,
+                                storm_sigils: crate::stormglass::sigils::StormSigils::new(),
+                                is_corrupted: true,
+                            });
+                        }
+                    }
                 }
                 Err(_) => {
-                    // Mark as corrupted but include in list
+                    // Malformed JSON or I/O error — we can't tell if this is a character file,
+                    // so include it as a corrupted entry so the player can see and delete it.
                     characters.push(CharacterInfo {
                         character_id: String::new(),
                         character_name: "[CORRUPTED]".to_string(),

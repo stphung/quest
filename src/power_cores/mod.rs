@@ -15,5 +15,6 @@ pub mod types;
 pub use tick::{apply_offline_power_cores, init_new_core, tick_power_cores};
 #[allow(unused_imports)]
 pub use types::{
-    fill_duration_secs, get_power_core_def, get_unlocked_cores, PowerCoreDef, ALL_POWER_CORES,
+    fill_duration_secs, fill_ratio, format_core_time_remaining, get_power_core_def,
+    get_unlocked_cores, PowerCoreDef, ALL_POWER_CORES,
 };

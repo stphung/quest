@@ -6,7 +6,7 @@ use crate::core::game_state::GameState;
 use crate::deep;
 use crate::enhancement;
 use crate::haven;
-use crate::history::{HistoryRepo, SaveEvent};
+use crate::history::{CommitMetadata, HistoryRepo, SaveEvent};
 
 /// Save all game state files (character, achievements, haven, enhancement, deep).
 ///
@@ -36,14 +36,14 @@ pub fn save_all(
     }
 
     if let (Some(event), Some(repo)) = (save_event, history_repo) {
-        let _ = repo.commit(
-            event,
-            state.character_level,
-            state.prestige_rank,
-            state.zone_progression.current_zone_id,
-            state.zone_progression.current_subzone_id,
-            state.play_time_seconds,
-            &state.character_name,
-        );
+        let meta = CommitMetadata {
+            level: state.character_level,
+            prestige: state.prestige_rank,
+            zone_id: state.zone_progression.current_zone_id,
+            subzone_id: state.zone_progression.current_subzone_id,
+            play_time_seconds: state.play_time_seconds,
+            character_name: state.character_name.clone(),
+        };
+        let _ = repo.commit(event, &meta);
     }
 }
