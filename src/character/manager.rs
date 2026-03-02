@@ -74,14 +74,23 @@ impl CharacterManager {
     }
 }
 
-/// Account-level JSON files that are not character saves
-pub(super) const ACCOUNT_FILES: &[&str] = &[
-    "haven.json",
-    "achievements.json",
-    "enhancement.json",
-    "deep.json",
-    ".cloud.json",
-];
+/// Minimal character data needed for the character select screen.
+///
+/// Parsed by [`CharacterManager::load_character_header()`] to avoid deserializing
+/// the full save (combat state, equipment, dungeon, etc.) during listing.
+/// Files without a `character_name` field (account-level saves like haven.json)
+/// are silently skipped because this struct requires the field.
+#[derive(Debug, Clone, Deserialize)]
+pub(super) struct CharacterHeader {
+    pub(super) character_id: String,
+    pub(super) character_name: String,
+    pub(super) character_level: u32,
+    pub(super) prestige_rank: u32,
+    pub(super) play_time_seconds: u64,
+    pub(super) last_save_time: i64,
+    #[serde(default)]
+    pub(super) ascension_level: u32,
+}
 
 #[cfg(test)]
 mod tests {
@@ -336,6 +345,26 @@ mod tests {
         let corrupted = list.iter().find(|c| c.filename == "corrupted_test.json");
         assert!(corrupted.is_some());
         assert!(corrupted.unwrap().is_corrupted);
+    }
+
+    #[test]
+    fn test_account_files_skipped_in_list() {
+        let (manager, _dir) = temp_manager();
+
+        // Write a valid account-level JSON file (no character_name field).
+        let haven_json = r#"{"buildings": [], "version": 1}"#;
+        fs::write(manager.quest_dir.join("haven.json"), haven_json).unwrap();
+
+        // Also write a valid character so the list is not empty.
+        let state = make_test_state("RealCharacter");
+        manager.save_character(&state).unwrap();
+
+        let list = manager.list_characters().expect("list_characters failed");
+
+        // Only the character file should appear — haven.json must be excluded.
+        assert_eq!(list.len(), 1, "expected 1 character, got {}", list.len());
+        assert_eq!(list[0].character_name, "RealCharacter");
+        assert!(!list.iter().any(|c| c.filename == "haven.json"));
     }
 
     #[test]

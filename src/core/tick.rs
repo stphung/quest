@@ -16,35 +16,13 @@ use crate::core::game_state::GameState;
 use crate::haven::Haven;
 use rand::Rng;
 
-/// New entry point using TickContext. Delegates to the existing game_tick().
-#[allow(deprecated)]
-pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> TickResult {
-    game_tick(
-        ctx.state,
-        ctx.tick_counter,
-        ctx.haven,
-        ctx.enhancement,
-        ctx.deep,
-        ctx.achievements,
-        ctx.debug_mode,
-        rng,
-    )
-}
-
 /// Processes a single 100ms game tick.
 ///
 /// Updates game state (combat, fishing, dungeon, challenges, achievements,
 /// play time) and returns a [`TickResult`] describing what happened.
 ///
 /// # Arguments
-/// - `state` — Mutable game state (character, combat, zones, equipment, etc.)
-/// - `tick_counter` — Counts ticks for play-time tracking (10 ticks = 1 second).
-///   Caller owns this counter across ticks.
-/// - `haven` — Mutable Haven state for bonus calculations and discovery.
-/// - `enhancement` — Mutable Enhancement state for soulforge discovery.
-/// - `deep` — Mutable Deep state for mercenary expedition discovery.
-/// - `achievements` — Mutable achievement state for unlock tracking.
-/// - `debug_mode` — When true, suppresses achievement/haven-save signals.
+/// - `ctx` — All mutable game state bundled into a [`TickContext`].
 /// - `rng` — Random number generator (any `impl Rng`). Pass
 ///   `&mut rand::rng()` in production, or a seeded
 ///   `rand_chacha::ChaCha8Rng` in tests for deterministic behavior.
@@ -61,8 +39,151 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
 /// - Persisting Deep to disk when `deep_changed` is true
 /// - Showing the Leviathan encounter modal when `leviathan_encounter` is `Some`
 /// - Showing achievement modal overlay when `achievement_modal_ready` is non-empty
+pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> TickResult {
+    let mut result = TickResult::default();
+    let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
+
+    // ── 0. Compute merged Haven + Sigil bonuses ─────────────────
+    let (haven_bonuses, sigil_bonuses) = tick_stages::compute_merged_bonuses(ctx.haven, ctx.state);
+
+    // ── 1. Process challenge AI thinking ────────────────────────
+    tick_stages::tick_challenge_ai(ctx.state, rng);
+
+    // ── 2. Try challenge discovery (skipped during Chrono Surge) ─
+    tick_stages::tick_challenge_discovery(ctx.state, &haven_bonuses, rng, &mut result);
+
+    // ── 3. Sync player max HP with cached derived stats ─────────
+    tick_stages::sync_derived_stats(ctx.state, ctx.enhancement, &sigil_bonuses);
+
+    // ── 4. Update dungeon exploration ───────────────────────────
+    tick_stages::process_dungeon_events(ctx.state, delta_time, &haven_bonuses, &mut result, rng);
+
+    // ── 5. Update fishing (mutually exclusive with combat) ──────
+    if tick_stages::process_fishing_tick(
+        ctx.state,
+        ctx.tick_counter,
+        delta_time,
+        &haven_bonuses,
+        ctx.achievements,
+        ctx.debug_mode,
+        &mut result,
+        rng,
+    ) {
+        // Fishing was active — skip combat, collect achievements and return
+        tick_stages::collect_achievement_events(ctx.achievements, &mut result);
+        return result;
+    }
+
+    // ── 6. Combat ───────────────────────────────────────────────
+    tick_stages::run_combat(
+        ctx.state,
+        delta_time,
+        &haven_bonuses,
+        &sigil_bonuses,
+        ctx.achievements,
+        ctx.deep,
+        ctx.debug_mode,
+        &mut result,
+        rng,
+    );
+
+    // ── 6b. Decay HUD flash timers ──────────────────────────────
+    ctx.state.combat_state.tick_hud(delta_time);
+
+    // ── 7. Spawn enemy if needed ────────────────────────────────
+    spawn_enemy_if_needed(ctx.state);
+
+    // ── 8. Update play time ─────────────────────────────────────
+    tick_stages::update_play_time(ctx.state, ctx.tick_counter);
+
+    // ── 9. Collect achievement notifications ────────────────────
+    tick_stages::collect_achievement_events(ctx.achievements, &mut result);
+
+    // ── 10. Haven discovery check ────────────────────────────────
+    tick_stages::tick_haven_discovery(
+        ctx.state,
+        ctx.haven,
+        ctx.achievements,
+        ctx.debug_mode,
+        &mut result,
+        rng,
+    );
+
+    // ── 11. Soulforge discovery check ────────────────────────────
+    tick_stages::tick_soulforge_discovery(
+        ctx.state,
+        ctx.enhancement,
+        ctx.achievements,
+        ctx.debug_mode,
+        &mut result,
+        rng,
+    );
+
+    // ── 11b. Deep discovery ───────────────────────────────────────
+    // Discovery is triggered by defeating The Expanse cycle boss.
+    // No per-tick random roll.
+
+    // ── 11c. Deep mission ticking ──────────────────────────────────
+    tick_stages::tick_deep_missions(
+        ctx.state,
+        ctx.deep,
+        ctx.achievements,
+        ctx.debug_mode,
+        &mut result,
+        rng,
+    );
+
+    // ── 11d. Fracture region unlock consumption ──────────────────
+    if let Some(region) = ctx.deep.persistent.pending_fracture_region_unlock.take() {
+        crate::zones::sync_account_zone_unlocks(
+            &mut ctx.state.zone_progression,
+            ctx.achievements
+                .is_unlocked(crate::achievements::AchievementId::StormsEnd),
+            ctx.deep.persistent.fracture_zone_cap,
+            ctx.state.prestige_rank,
+        );
+        result.events.push(TickEvent::FractureRegionUnlocked {
+            region,
+            message: format!("\u{1f30b} {}", region.unlock_log_line()),
+        });
+        result.deep_changed = true;
+    }
+
+    // Sync cached fracture zone cap for UI rendering
+    ctx.state.cached_fracture_zone_cap = ctx.deep.persistent.fracture_zone_cap;
+
+    // ── 12a. Power Cores tick ─────────────────────────────────────
+    crate::power_cores::tick::tick_power_cores(ctx.state, ctx.deep, ctx.achievements, &mut result);
+
+    // ── 12. Achievement modal accumulation ────────────────────────
+    if ctx.achievements.is_modal_ready() {
+        result.achievement_modal_ready = ctx.achievements.take_modal_queue();
+    }
+
+    result
+}
+
+/// Processes a single 100ms game tick.
+///
+/// # Deprecated
+/// Use [`game_tick_with_context`] instead. This function is a thin wrapper
+/// that constructs a [`TickContext`] and delegates to `game_tick_with_context`.
+///
+/// # Arguments
+/// - `state` — Mutable game state (character, combat, zones, equipment, etc.)
+/// - `tick_counter` — Counts ticks for play-time tracking (10 ticks = 1 second).
+///   Caller owns this counter across ticks.
+/// - `haven` — Mutable Haven state for bonus calculations and discovery.
+/// - `enhancement` — Mutable Enhancement state for soulforge discovery.
+/// - `deep` — Mutable Deep state for mercenary expedition discovery.
+/// - `achievements` — Mutable achievement state for unlock tracking.
+/// - `debug_mode` — When true, suppresses achievement/haven-save signals.
+/// - `rng` — Random number generator (any `impl Rng`). Pass
+///   `&mut rand::rng()` in production, or a seeded
+///   `rand_chacha::ChaCha8Rng` in tests for deterministic behavior.
 #[deprecated(note = "Use game_tick_with_context instead")]
 #[allow(clippy::too_many_arguments)]
+#[allow(dead_code)]
 pub fn game_tick<R: Rng>(
     state: &mut GameState,
     tick_counter: &mut u32,
@@ -73,112 +194,16 @@ pub fn game_tick<R: Rng>(
     debug_mode: bool,
     rng: &mut R,
 ) -> TickResult {
-    let mut result = TickResult::default();
-    let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
-
-    // ── 0. Compute merged Haven + Sigil bonuses ─────────────────
-    let (haven_bonuses, sigil_bonuses) = tick_stages::compute_merged_bonuses(haven, state);
-
-    // ── 1. Process challenge AI thinking ────────────────────────
-    tick_stages::tick_challenge_ai(state, rng);
-
-    // ── 2. Try challenge discovery (skipped during Chrono Surge) ─
-    tick_stages::tick_challenge_discovery(state, &haven_bonuses, rng, &mut result);
-
-    // ── 3. Sync player max HP with cached derived stats ─────────
-    tick_stages::sync_derived_stats(state, enhancement, &sigil_bonuses);
-
-    // ── 4. Update dungeon exploration ───────────────────────────
-    tick_stages::process_dungeon_events(state, delta_time, &haven_bonuses, &mut result, rng);
-
-    // ── 5. Update fishing (mutually exclusive with combat) ──────
-    if tick_stages::process_fishing_tick(
+    let mut ctx = TickContext {
         state,
         tick_counter,
-        delta_time,
-        &haven_bonuses,
-        achievements,
-        debug_mode,
-        &mut result,
-        rng,
-    ) {
-        // Fishing was active — skip combat, collect achievements and return
-        tick_stages::collect_achievement_events(achievements, &mut result);
-        return result;
-    }
-
-    // ── 6. Combat ───────────────────────────────────────────────
-    tick_stages::run_combat(
-        state,
-        delta_time,
-        &haven_bonuses,
-        &sigil_bonuses,
-        achievements,
-        deep,
-        debug_mode,
-        &mut result,
-        rng,
-    );
-
-    // ── 6b. Decay HUD flash timers ──────────────────────────────
-    state.combat_state.tick_hud(delta_time);
-
-    // ── 7. Spawn enemy if needed ────────────────────────────────
-    spawn_enemy_if_needed(state);
-
-    // ── 8. Update play time ─────────────────────────────────────
-    tick_stages::update_play_time(state, tick_counter);
-
-    // ── 9. Collect achievement notifications ────────────────────
-    tick_stages::collect_achievement_events(achievements, &mut result);
-
-    // ── 10. Haven discovery check ────────────────────────────────
-    tick_stages::tick_haven_discovery(state, haven, achievements, debug_mode, &mut result, rng);
-
-    // ── 11. Soulforge discovery check ────────────────────────────
-    tick_stages::tick_soulforge_discovery(
-        state,
+        haven,
         enhancement,
+        deep,
         achievements,
         debug_mode,
-        &mut result,
-        rng,
-    );
-
-    // ── 11b. Deep discovery ───────────────────────────────────────
-    // Discovery is triggered by defeating The Expanse cycle boss.
-    // No per-tick random roll.
-
-    // ── 11c. Deep mission ticking ──────────────────────────────────
-    tick_stages::tick_deep_missions(state, deep, achievements, debug_mode, &mut result, rng);
-
-    // ── 11d. Fracture region unlock consumption ──────────────────
-    if let Some(region) = deep.persistent.pending_fracture_region_unlock.take() {
-        crate::zones::sync_account_zone_unlocks(
-            &mut state.zone_progression,
-            achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
-            deep.persistent.fracture_zone_cap,
-            state.prestige_rank,
-        );
-        result.events.push(TickEvent::FractureRegionUnlocked {
-            region,
-            message: format!("\u{1f30b} {}", region.unlock_log_line()),
-        });
-        result.deep_changed = true;
-    }
-
-    // Sync cached fracture zone cap for UI rendering
-    state.cached_fracture_zone_cap = deep.persistent.fracture_zone_cap;
-
-    // ── 12a. Power Cores tick ─────────────────────────────────────
-    crate::power_cores::tick::tick_power_cores(state, deep, achievements, &mut result);
-
-    // ── 12. Achievement modal accumulation ────────────────────────
-    if achievements.is_modal_ready() {
-        result.achievement_modal_ready = achievements.take_modal_queue();
-    }
-
-    result
+    };
+    game_tick_with_context(&mut ctx, rng)
 }
 
 #[cfg(test)]

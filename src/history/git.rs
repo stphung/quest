@@ -10,7 +10,7 @@ use git2::{
     BranchType, Commit, IndexAddOption, ObjectType, Oid, Repository, Signature, StatusOptions,
 };
 
-use super::types::{CommitInfo, SaveEvent, TimelineInfo};
+use super::types::{CommitInfo, CommitMetadata, SaveEvent, TimelineInfo};
 
 // ── HistoryError ────────────────────────────────────────────────────────
 
@@ -143,17 +143,7 @@ impl HistoryRepo {
     ///
     /// Returns `Err(HistoryError::NothingToCommit)` if the working tree has no
     /// changes since the last commit.
-    #[allow(clippy::too_many_arguments)]
-    pub fn commit(
-        &self,
-        event: &SaveEvent,
-        level: u32,
-        prestige: u32,
-        zone_id: u32,
-        subzone_id: u32,
-        play_time_seconds: u64,
-        character_name: &str,
-    ) -> Result<(), HistoryError> {
+    pub fn commit(&self, event: &SaveEvent, meta: &CommitMetadata) -> Result<(), HistoryError> {
         // Check if there are any changes.
         if !self.has_changes()? {
             return Err(HistoryError::NothingToCommit);
@@ -168,12 +158,12 @@ impl HistoryRepo {
         let tree = self.repo.find_tree(tree_oid)?;
         let sig = Self::signature()?;
         let message = event.commit_message(
-            level,
-            prestige,
-            zone_id,
-            subzone_id,
-            play_time_seconds,
-            character_name,
+            meta.level,
+            meta.prestige,
+            meta.zone_id,
+            meta.subzone_id,
+            meta.play_time_seconds,
+            &meta.character_name,
         );
 
         let parent = self.head_commit()?;
