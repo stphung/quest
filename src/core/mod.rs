@@ -19,11 +19,7 @@ pub mod xp;
 
 pub mod power_rating;
 
-pub mod combat_context;
 pub mod game_state_serde;
-pub mod player_identity;
-pub mod progression_state;
-pub mod session_state;
 pub mod tick_context;
 
 pub use constants::*;

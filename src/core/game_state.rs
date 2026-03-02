@@ -6,10 +6,6 @@ use crate::character::attributes::Attributes;
 use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::PrestigeCombatBonuses;
 use crate::combat::types::CombatState;
-use crate::core::combat_context::CombatContext;
-use crate::core::player_identity::PlayerIdentity;
-use crate::core::progression_state::ProgressionState;
-use crate::core::session_state::SessionState;
 use crate::dungeon::types::Dungeon;
 use crate::fishing::types::{FishingSession, FishingState};
 use crate::items::equipment::Equipment;
@@ -116,18 +112,6 @@ pub struct GameState {
     pub cached_power_rating: f64,
     /// Cached fracture zone cap from Deep — used by UI for zone track rendering
     pub cached_fracture_zone_cap: u32,
-
-    // === Composed sub-structs (Phase 2 refactoring) ===
-    // These group existing fields for clearer module boundaries.
-    // During migration, both flat fields and sub-struct fields exist.
-    #[allow(dead_code)]
-    pub player: PlayerIdentity,
-    #[allow(dead_code)]
-    pub combat_ctx: CombatContext,
-    #[allow(dead_code)]
-    pub prog: ProgressionState,
-    #[allow(dead_code)]
-    pub sess: SessionState,
 }
 
 impl GameState {
@@ -139,25 +123,6 @@ impl GameState {
         let attributes = Attributes::new();
         let combat_state = CombatState::new(crate::core::constants::BASE_HP as u32);
         let equipment = Equipment::new();
-
-        let player = PlayerIdentity {
-            character_id: character_id.clone(),
-            character_name: character_name.clone(),
-            character_level: 1,
-            character_xp: 0,
-            attributes,
-            prestige_rank: 0,
-            total_prestige_count: 0,
-        };
-
-        let combat_ctx = CombatContext {
-            combat_state: combat_state.clone(),
-            equipment: equipment.clone(),
-            zone_progression: ZoneProgression::new(),
-            active_dungeon: None,
-            session_kills: 0,
-            consecutive_deaths: 0,
-        };
 
         Self {
             character_id,
@@ -198,34 +163,6 @@ impl GameState {
             cached_fracture_zone_cap: 0,
             chrono_surge_active: false,
             debug_force_overcharge: false,
-            player,
-            combat_ctx,
-            prog: ProgressionState {
-                fishing: FishingState::default(),
-                active_fishing: None,
-                stormglass: 0,
-                stormglass_discovered: false,
-                storm_sigils: StormSigils::new(),
-                challenge_menu: ChallengeMenu::new(),
-                chess_stats: ChessStats::default(),
-                active_minigame: None,
-                last_minigame_win: None,
-            },
-            sess: SessionState {
-                last_save_time: current_time,
-                play_time_seconds: 0,
-                chrono_surge_active: false,
-                debug_force_overcharge: false,
-                recent_drops: VecDeque::with_capacity(5),
-                xp_rate_samples: VecDeque::new(),
-                xp_this_second: 0,
-                ticker: Ticker::new(),
-                cached_derived_stats: DerivedStats::default(),
-                cached_prestige_bonuses: PrestigeCombatBonuses::default(),
-                derived_stats_dirty: true,
-                combat_seconds_this_tick: false,
-                game_over_shown_at: None,
-            },
         }
     }
 
@@ -262,54 +199,6 @@ impl GameState {
     /// Mark derived stats as needing recalculation (e.g., after equipment or attribute change).
     pub fn invalidate_derived_stats(&mut self) {
         self.derived_stats_dirty = true;
-    }
-
-    /// Copies flat field values into sub-struct fields.
-    /// Call after any mutation that changes flat fields (level-up, prestige, equip).
-    #[allow(dead_code)]
-    pub fn sync_sub_structs(&mut self) {
-        // PlayerIdentity
-        self.player.character_id = self.character_id.clone();
-        self.player.character_name = self.character_name.clone();
-        self.player.character_level = self.character_level;
-        self.player.character_xp = self.character_xp;
-        self.player.attributes = self.attributes;
-        self.player.prestige_rank = self.prestige_rank;
-        self.player.total_prestige_count = self.total_prestige_count;
-
-        // CombatContext
-        self.combat_ctx.combat_state = self.combat_state.clone();
-        self.combat_ctx.equipment = self.equipment.clone();
-        self.combat_ctx.zone_progression = self.zone_progression.clone();
-        self.combat_ctx.active_dungeon = self.active_dungeon.clone();
-        self.combat_ctx.session_kills = self.session_kills;
-        self.combat_ctx.consecutive_deaths = self.consecutive_deaths;
-
-        // ProgressionState
-        self.prog.fishing = self.fishing.clone();
-        self.prog.active_fishing = self.active_fishing.clone();
-        self.prog.stormglass = self.stormglass;
-        self.prog.stormglass_discovered = self.stormglass_discovered;
-        self.prog.storm_sigils = self.storm_sigils.clone();
-        self.prog.challenge_menu = self.challenge_menu.clone();
-        self.prog.chess_stats = self.chess_stats.clone();
-        self.prog.active_minigame = self.active_minigame.clone();
-        self.prog.last_minigame_win = self.last_minigame_win.clone();
-
-        // SessionState
-        self.sess.last_save_time = self.last_save_time;
-        self.sess.play_time_seconds = self.play_time_seconds;
-        self.sess.chrono_surge_active = self.chrono_surge_active;
-        self.sess.debug_force_overcharge = self.debug_force_overcharge;
-        self.sess.recent_drops = self.recent_drops.clone();
-        self.sess.xp_rate_samples = self.xp_rate_samples.clone();
-        self.sess.xp_this_second = self.xp_this_second;
-        self.sess.ticker = self.ticker.clone();
-        self.sess.cached_derived_stats = self.cached_derived_stats;
-        self.sess.cached_prestige_bonuses = self.cached_prestige_bonuses;
-        self.sess.derived_stats_dirty = self.derived_stats_dirty;
-        self.sess.combat_seconds_this_tick = self.combat_seconds_this_tick;
-        self.sess.game_over_shown_at = self.game_over_shown_at;
     }
 
     /// Recalculate and cache prestige combat bonuses from current prestige rank.
@@ -809,14 +698,6 @@ mod tests {
     }
 
     #[test]
-    fn test_progression_state_populated() {
-        let state = GameState::new("TestHero".to_string(), 1000);
-        assert_eq!(state.prog.stormglass, 0);
-        assert!(!state.prog.stormglass_discovered);
-        assert!(state.prog.active_fishing.is_none());
-    }
-
-    #[test]
     fn test_consecutive_deaths_transient() {
         let mut gs = GameState::new("Hero".to_string(), 0);
         assert_eq!(gs.consecutive_deaths, 0);
@@ -825,59 +706,6 @@ mod tests {
         let json = serde_json::to_string(&gs).unwrap();
         let loaded: GameState = serde_json::from_str(&json).unwrap();
         assert_eq!(loaded.consecutive_deaths, 0); // transient, not saved
-    }
-
-    #[test]
-    fn test_combat_context_populated() {
-        let state = GameState::new("TestHero".to_string(), 1000);
-        assert_eq!(state.combat_ctx.session_kills, 0);
-        assert_eq!(state.combat_ctx.consecutive_deaths, 0);
-        assert!(state.combat_ctx.active_dungeon.is_none());
-        assert_eq!(state.combat_ctx.zone_progression.current_zone_id, 1);
-        // combat_state and equipment should match the top-level fields
-        assert_eq!(
-            state.combat_ctx.combat_state.player_max_hp,
-            state.combat_state.player_max_hp
-        );
-    }
-
-    #[test]
-    fn test_player_identity_populated() {
-        let state = GameState::new("TestHero".to_string(), 1000);
-        assert_eq!(state.player.character_name, "TestHero");
-        assert_eq!(state.player.character_level, 1);
-        assert_eq!(state.player.character_xp, 0);
-        assert_eq!(state.player.prestige_rank, 0);
-        assert_eq!(state.player.total_prestige_count, 0);
-        // character_id should match the top-level field
-        assert_eq!(state.player.character_id, state.character_id);
-    }
-
-    #[test]
-    fn test_session_state_populated() {
-        let state = GameState::new("TestHero".to_string(), 1000);
-        assert_eq!(state.sess.last_save_time, 1000);
-        assert_eq!(state.sess.play_time_seconds, 0);
-        assert!(state.sess.derived_stats_dirty);
-        assert!(!state.sess.chrono_surge_active);
-        assert!(!state.sess.debug_force_overcharge);
-        assert!(!state.sess.combat_seconds_this_tick);
-        assert!(state.sess.game_over_shown_at.is_none());
-    }
-
-    #[test]
-    fn test_sync_sub_structs() {
-        let mut state = GameState::new("SyncTest".to_string(), 0);
-        // Mutate flat fields
-        state.character_level = 42;
-        state.prestige_rank = 5;
-        // Sub-struct should be out of sync
-        assert_ne!(state.player.character_level, 42);
-        // Sync
-        state.sync_sub_structs();
-        // Now sub-struct should match
-        assert_eq!(state.player.character_level, 42);
-        assert_eq!(state.player.prestige_rank, 5);
     }
 
     #[test]

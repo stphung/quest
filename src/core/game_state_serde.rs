@@ -68,62 +68,11 @@ impl FlatGameState {
         use crate::challenges::menu::ChallengeMenu;
         use crate::character::derived_stats::DerivedStats;
         use crate::character::prestige::PrestigeCombatBonuses;
-        use crate::core::combat_context::CombatContext;
         use crate::core::game_state::GameState;
-        use crate::core::player_identity::PlayerIdentity;
-        use crate::core::progression_state::ProgressionState;
-        use crate::core::session_state::SessionState;
         use crate::core::ticker::Ticker;
         use std::collections::VecDeque;
 
-        let player = PlayerIdentity {
-            character_id: self.character_id.clone(),
-            character_name: self.character_name.clone(),
-            character_level: self.character_level,
-            character_xp: self.character_xp,
-            attributes: self.attributes,
-            prestige_rank: self.prestige_rank,
-            total_prestige_count: self.total_prestige_count,
-        };
-
-        let combat_ctx = CombatContext {
-            combat_state: self.combat_state.clone(),
-            equipment: self.equipment.clone(),
-            zone_progression: self.zone_progression.clone(),
-            active_dungeon: self.active_dungeon.clone(),
-            session_kills: 0,
-            consecutive_deaths: 0,
-        };
-
-        let prog = ProgressionState {
-            fishing: self.fishing.clone(),
-            active_fishing: None,
-            stormglass: self.stormglass,
-            stormglass_discovered: self.stormglass_discovered,
-            storm_sigils: self.storm_sigils.clone(),
-            challenge_menu: ChallengeMenu::new(),
-            chess_stats: ChessStats::default(),
-            active_minigame: None,
-            last_minigame_win: None,
-        };
-
-        let sess = SessionState {
-            last_save_time: self.last_save_time,
-            play_time_seconds: self.play_time_seconds,
-            chrono_surge_active: false,
-            debug_force_overcharge: false,
-            recent_drops: VecDeque::with_capacity(5),
-            xp_rate_samples: VecDeque::new(),
-            xp_this_second: 0,
-            ticker: Ticker::new(),
-            cached_derived_stats: DerivedStats::default(),
-            cached_prestige_bonuses: PrestigeCombatBonuses::default(),
-            derived_stats_dirty: true,
-            combat_seconds_this_tick: false,
-            game_over_shown_at: None,
-        };
-
-        let mut state = GameState {
+        GameState {
             // Persisted fields
             character_id: self.character_id,
             character_name: self.character_name,
@@ -164,14 +113,7 @@ impl FlatGameState {
             game_over_shown_at: None,
             cached_power_rating: 0.0,
             cached_fracture_zone_cap: 0,
-            // Sub-structs
-            player,
-            combat_ctx,
-            prog,
-            sess,
-        };
-        state.sync_sub_structs();
-        state
+        }
     }
 }
 
@@ -229,12 +171,6 @@ mod tests {
         assert_eq!(restored.character_name, "RoundTrip");
         assert_eq!(restored.character_level, 1);
         assert_eq!(restored.last_save_time, 99999);
-        // Sub-structs should also be populated via sync_sub_structs
-        assert_eq!(restored.player.character_name, "RoundTrip");
-        assert_eq!(restored.player.character_level, 1);
-        assert_eq!(restored.combat_ctx.zone_progression.current_zone_id, 1);
-        assert_eq!(restored.sess.last_save_time, 99999);
-        assert_eq!(restored.prog.stormglass, 0);
     }
 
     #[test]
@@ -275,7 +211,6 @@ mod tests {
         assert_eq!(restored.character_name, "SerdeTest");
         assert_eq!(restored.character_level, 1);
         assert_eq!(restored.last_save_time, 54321);
-        assert_eq!(restored.player.character_name, "SerdeTest");
 
         // Verify JSON format is flat (no nested "player" key)
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
