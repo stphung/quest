@@ -323,9 +323,11 @@ struct IndicatorSegment {
 
 /// Build the indicator segments based on current state.
 ///
-/// - Save segment is always shown (when there is a last_save_time or is_saving).
+/// - Save segment is always shown.
 /// - Commit segment is shown only when `has_history_repo` is true.
 /// - Push segment is shown only when `has_cloud_config` is true.
+///
+/// Before any activity, segments show dimmed icons with `---` placeholder.
 #[allow(clippy::too_many_arguments)]
 fn build_save_indicator_segments(
     is_saving: bool,
@@ -341,7 +343,7 @@ fn build_save_indicator_segments(
 
     let mut segments = Vec::new();
 
-    // Save segment (always present when there is state to show)
+    // Save segment (always present)
     if is_saving {
         segments.push(IndicatorSegment {
             content: format!("\u{1F4BE} {}", spinner_char()),
@@ -350,6 +352,11 @@ fn build_save_indicator_segments(
     } else if let Some(time) = last_save_time {
         segments.push(IndicatorSegment {
             content: format!("\u{1F4BE} {}", time.format("%-I:%M %p")),
+            color: Color::DarkGray,
+        });
+    } else {
+        segments.push(IndicatorSegment {
+            content: "\u{1F4BE} ---".to_string(),
             color: Color::DarkGray,
         });
     }
@@ -366,6 +373,11 @@ fn build_save_indicator_segments(
                 content: format!("\u{1F4DD} {}", time.format("%-I:%M %p")),
                 color: Color::DarkGray,
             });
+        } else {
+            segments.push(IndicatorSegment {
+                content: "\u{1F4DD} ---".to_string(),
+                color: Color::DarkGray,
+            });
         }
     }
 
@@ -379,6 +391,11 @@ fn build_save_indicator_segments(
         } else if let Some(time) = last_push_time {
             segments.push(IndicatorSegment {
                 content: format!("\u{2601} {}", time.format("%-I:%M %p")),
+                color: Color::DarkGray,
+            });
+        } else {
+            segments.push(IndicatorSegment {
+                content: "\u{2601} ---".to_string(),
                 color: Color::DarkGray,
             });
         }
@@ -418,6 +435,7 @@ pub fn render_save_indicator(
         has_cloud_config,
     );
 
+    // Save segment is always present, so segments is never empty.
     if segments.is_empty() {
         return;
     }
@@ -554,9 +572,31 @@ mod tests {
     }
 
     #[test]
-    fn empty_no_save_yet() {
+    fn default_all_configured() {
         let segments =
             build_save_indicator_segments(false, None, false, None, false, None, true, true);
-        assert!(segments.is_empty());
+        assert_eq!(segments.len(), 3);
+        assert_eq!(segments[0].content, "\u{1F4BE} ---");
+        assert_eq!(segments[1].content, "\u{1F4DD} ---");
+        assert_eq!(segments[2].content, "\u{2601} ---");
+        assert!(segments.iter().all(|s| s.color == Color::DarkGray));
+    }
+
+    #[test]
+    fn default_no_history_no_cloud() {
+        let segments =
+            build_save_indicator_segments(false, None, false, None, false, None, false, false);
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].content, "\u{1F4BE} ---");
+        assert_eq!(segments[0].color, Color::DarkGray);
+    }
+
+    #[test]
+    fn default_with_history_only() {
+        let segments =
+            build_save_indicator_segments(false, None, false, None, false, None, true, false);
+        assert_eq!(segments.len(), 2);
+        assert_eq!(segments[0].content, "\u{1F4BE} ---");
+        assert_eq!(segments[1].content, "\u{1F4DD} ---");
     }
 }
