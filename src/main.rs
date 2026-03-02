@@ -1545,14 +1545,17 @@ fn main() -> io::Result<()> {
                                                 };
                                                 soulforge_ui.animation_tick = 0;
 
-                                                // Persist changes (only commit on success)
+                                                // Persist changes and commit
                                                 let soulforge_event = if result.success {
-                                                    Some(history::SaveEvent::SoulforgeEnhanced(
+                                                    history::SaveEvent::SoulforgeEnhanced(
                                                         slot_name.to_string(),
                                                         result.new_level,
-                                                    ))
+                                                    )
                                                 } else {
-                                                    None
+                                                    history::SaveEvent::SoulforgeFailed(
+                                                        slot_name.to_string(),
+                                                        result.new_level,
+                                                    )
                                                 };
                                                 if !debug_mode {
                                                     save_files(
@@ -1565,9 +1568,7 @@ fn main() -> io::Result<()> {
                                                     );
                                                     last_save_instant = Some(Instant::now());
                                                     last_save_time = Some(Local::now());
-                                                    if let Some(event) = soulforge_event {
-                                                        pending_commit = Some(event);
-                                                    }
+                                                    pending_commit = Some(soulforge_event);
                                                 }
                                             }
                                         }

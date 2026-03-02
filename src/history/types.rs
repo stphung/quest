@@ -23,6 +23,7 @@ pub enum SaveEvent {
     HavenRoomBuilt(String),
     HavenRoomUpgraded(String, u8),
     SoulforgeEnhanced(String, u8),
+    SoulforgeFailed(String, u8),
     ChallengeWon(String, String),
     GodItemForged(String),
     CharacterCreated(String),
@@ -59,6 +60,9 @@ impl SaveEvent {
             SaveEvent::HavenRoomUpgraded(room, tier) => format!("Upgraded {room} to T{tier}"),
             SaveEvent::SoulforgeEnhanced(slot, level) => {
                 format!("Enhanced {slot} to +{level}")
+            }
+            SaveEvent::SoulforgeFailed(slot, level) => {
+                format!("Enhancement failed on {slot} (dropped to +{level})")
             }
             SaveEvent::ChallengeWon(name, diff) => format!("Won {name} at {diff}"),
             SaveEvent::GodItemForged(name) => format!("Forged {name}"),
