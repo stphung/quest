@@ -24,6 +24,7 @@ use crate::core::game_state::GameState;
 use crate::deep::types::{DeepState, DeepUiState};
 use crate::enhancement;
 use crate::haven::Haven;
+use crate::main_helpers::game_context::GameContext;
 use crate::stormglass::types::ExchangeUiState;
 use crate::utils::debug_menu::DebugMenu;
 use deep_input::handle_deep;
@@ -36,22 +37,20 @@ pub use stormglass_input::check_sigil_animation_timeout;
 use stormglass_input::handle_stormglass_exchange;
 
 /// Main dispatcher for Game screen input. Handles the priority chain.
-#[allow(clippy::too_many_arguments)]
-pub fn handle_game_input(
-    key: KeyEvent,
-    state: &mut GameState,
-    haven: &mut Haven,
-    haven_ui: &mut HavenUiState,
-    soulforge_ui: &mut SoulforgeUiState,
-    exchange_ui: &mut ExchangeUiState,
-    deep_state: &mut DeepState,
-    deep_ui: &mut DeepUiState,
-    enhancement: &mut enhancement::EnhancementProgress,
-    overlay: &mut GameOverlay,
-    debug_menu: &mut DebugMenu,
-    debug_mode: bool,
-    achievements: &mut crate::achievements::Achievements,
-) -> InputResult {
+pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResult {
+    let state = &mut *ctx.state;
+    let haven = &mut *ctx.haven;
+    let haven_ui = &mut *ctx.haven_ui;
+    let soulforge_ui = &mut *ctx.soulforge_ui;
+    let exchange_ui = &mut *ctx.exchange_ui;
+    let deep_state = &mut *ctx.deep_state;
+    let deep_ui = &mut *ctx.deep_ui;
+    let enhancement = &mut *ctx.enhancement;
+    let overlay = &mut *ctx.overlay;
+    let debug_menu = &mut *ctx.debug_menu;
+    let debug_mode = ctx.debug_mode;
+    let achievements = &mut *ctx.achievements;
+
     // 0. Offline welcome overlay (any key dismisses)
     if matches!(overlay, GameOverlay::OfflineWelcome { .. }) {
         *overlay = GameOverlay::None;
@@ -212,34 +211,21 @@ pub fn handle_game_input(
         return InputResult::Continue;
     }
 
-    // 1. Haven discovery modal (blocks all other input)
-    if matches!(overlay, GameOverlay::HavenDiscovery) {
-        return handle_haven_discovery(key, overlay);
-    }
-
-    // 1a. Soulforge discovery modal (blocks all other input)
-    if matches!(overlay, GameOverlay::SoulforgeDiscovery) {
-        return handle_soulforge_discovery(key, overlay);
-    }
-
-    // 1b. Stormglass discovery modal (blocks all other input)
-    if matches!(overlay, GameOverlay::StormglassDiscovery) {
-        return handle_stormglass_discovery(key, overlay);
+    // 1. Discovery/unlock modals (Enter or Esc dismisses; blocks all other input)
+    if matches!(
+        overlay,
+        GameOverlay::HavenDiscovery
+            | GameOverlay::SoulforgeDiscovery
+            | GameOverlay::StormglassDiscovery
+            | GameOverlay::DeepDiscovery
+            | GameOverlay::FractureRegionUnlock { .. }
+    ) {
+        return handle_dismiss_overlay(key, overlay);
     }
 
     // 1c. Achievement unlocked modal (blocks all other input)
     if matches!(overlay, GameOverlay::AchievementUnlocked { .. }) {
         return handle_achievement_unlocked(key, overlay);
-    }
-
-    // 1d. Deep discovery modal (blocks all other input)
-    if matches!(overlay, GameOverlay::DeepDiscovery) {
-        return handle_deep_discovery(key, overlay);
-    }
-
-    // 1e. Fracture region unlock modal (blocks all other input)
-    if matches!(overlay, GameOverlay::FractureRegionUnlock { .. }) {
-        return handle_fracture_region_unlock(key, overlay);
     }
 
     // 1f. Ascension confirmation modal (blocks all other input)
@@ -356,35 +342,7 @@ pub fn handle_game_input(
     )
 }
 
-fn handle_haven_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
-    if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
-        *overlay = GameOverlay::None;
-    }
-    InputResult::Continue
-}
-
-fn handle_soulforge_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
-    if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
-        *overlay = GameOverlay::None;
-    }
-    InputResult::Continue
-}
-
-fn handle_stormglass_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
-    if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
-        *overlay = GameOverlay::None;
-    }
-    InputResult::Continue
-}
-
-fn handle_deep_discovery(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
-    if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
-        *overlay = GameOverlay::None;
-    }
-    InputResult::Continue
-}
-
-fn handle_fracture_region_unlock(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
+fn handle_dismiss_overlay(key: KeyEvent, overlay: &mut GameOverlay) -> InputResult {
     if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
         *overlay = GameOverlay::None;
     }

@@ -32,6 +32,7 @@ use main_helpers::achievements::track_input_achievements;
 use main_helpers::character_screens::{
     handle_creation_frame, handle_delete_frame, handle_rename_frame, ScreenTransition,
 };
+use main_helpers::chrono_surge::run_chrono_surge_batch;
 use main_helpers::input_routing::{route_game_input, InputAction};
 use main_helpers::offline::apply_offline_xp;
 use main_helpers::overlay::draw_game_overlays;
@@ -223,15 +224,7 @@ fn main() -> io::Result<()> {
     };
 
     // Cloud sync state
-    let mut cloud_config = history::cloud::load_config(&quest_dir);
-    let mut cloud_status = if cloud_config.is_some() {
-        history::cloud::CloudStatus::Linked
-    } else {
-        history::cloud::CloudStatus::Offline
-    };
-    let mut cloud_username = cloud_config.as_ref().map(|c| c.username.clone());
-    let (cloud_tx, cloud_rx) = std::sync::mpsc::channel::<history::cloud::CloudOpResult>();
-    let mut cloud_op_in_flight = false;
+    let mut cloud = main_helpers::cloud_sync::CloudSyncState::new(&quest_dir);
 
     // Load account-level Haven state
     let mut haven = haven::load_haven();
@@ -250,11 +243,11 @@ fn main() -> io::Result<()> {
     global_achievements.refresh_progress();
 
     // Auto-fetch from cloud on launch
-    if let Some(ref config) = cloud_config {
+    if let Some(ref config) = cloud.config {
         if history::cloud::fetch_all(&quest_dir, &config.token).is_ok() {
             match history::cloud::check_divergence(&quest_dir) {
                 Ok(Some(_divergence)) => {
-                    cloud_status = history::cloud::CloudStatus::OutOfSync;
+                    cloud.status = history::cloud::CloudStatus::OutOfSync;
                     // Divergence dialog will be shown when Time Vault opens
                 }
                 Ok(None) => {
@@ -331,17 +324,17 @@ fn main() -> io::Result<()> {
             &mut haven,
             &mut enhancement,
             &mut global_achievements,
-            &mut cloud_status,
-            &mut cloud_username,
+            &mut cloud.status,
+            &mut cloud.username,
             &quest_dir,
             &character_manager,
             &mut select_screen,
             &mut achievement_browser,
             &mut title_browser,
-            &mut cloud_config,
-            &cloud_tx,
-            &cloud_rx,
-            &mut cloud_op_in_flight,
+            &mut cloud.config,
+            &cloud.tx,
+            &cloud.rx,
+            &mut cloud.op_in_flight,
             &mut deep_state,
         )?;
 
@@ -495,124 +488,26 @@ fn main() -> io::Result<()> {
                         }
 
                         // Poll cloud sync results
-                        if cloud_op_in_flight {
-                            if let Ok(result) = cloud_rx.try_recv() {
-                                cloud_op_in_flight = false;
-                                match result {
-                                    history::cloud::CloudOpResult::TokenValidated {
-                                        username,
-                                        token,
-                                        repos,
-                                    } => {
-                                        // Token is valid — show the repo picker.
-                                        // Restore status based on whether we're already linked.
-                                        cloud_status = if cloud_config.is_some() {
-                                            history::cloud::CloudStatus::Linked
-                                        } else {
-                                            history::cloud::CloudStatus::Offline
-                                        };
-                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
-                                        {
-                                            browser.cloud_validated_token = Some(token);
-                                            browser.cloud_repos = repos;
-                                            browser.cloud_repo_selected = 0;
-                                            browser.cloud_repo_input.clear();
-                                            browser.cloud_username = Some(username);
-                                            browser.cloud_current_repo =
-                                                cloud_config.as_ref().map(|c| {
-                                                    history::cloud::repo_name_from_url(&c.repo_url)
-                                                });
-                                            browser.mode =
-                                            crate::ui::time_vault_scene::BrowserMode::SelectingRepo;
-                                        }
-                                    }
-                                    history::cloud::CloudOpResult::Linked(config) => {
-                                        cloud_username = Some(config.username.clone());
-                                        cloud_config = Some(config);
-                                        // Check if remote has different data
-                                        match history::cloud::check_divergence(&quest_dir) {
-                                            Ok(Some(_div)) => {
-                                                cloud_status =
-                                                    history::cloud::CloudStatus::OutOfSync;
-                                                if let GameOverlay::TimeVault { ref mut browser } =
-                                                    overlay
-                                                {
-                                                    browser.cloud_divergence = Some(_div);
-                                                }
-                                            }
-                                            _ => {
-                                                cloud_status = history::cloud::CloudStatus::Linked;
-                                                // Auto-push local saves on first link
-                                                if let Some(ref config) = cloud_config {
-                                                    main_helpers::cloud_ops::spawn_cloud_push(
-                                                        &mut cloud_op_in_flight,
-                                                        &cloud_tx,
-                                                        &quest_dir,
-                                                        &config.token,
-                                                    );
-                                                    cloud_status =
-                                                        history::cloud::CloudStatus::Syncing;
-                                                }
-                                            }
-                                        }
-                                    }
-                                    history::cloud::CloudOpResult::Pushed => {
-                                        cloud_status = history::cloud::CloudStatus::Linked;
-                                    }
-                                    history::cloud::CloudOpResult::Pulled => {
-                                        cloud_status = history::cloud::CloudStatus::Linked;
-                                        // Reload all state from disk
-                                        main_helpers::cloud_ops::reload_account_state(
-                                            &mut haven,
-                                            &mut enhancement,
-                                            &mut global_achievements,
-                                        );
-                                        // Reload active character from pulled data
-                                        let filename = format!("{}.json", state.character_name);
-                                        if let Ok(mut reloaded) =
-                                            character_manager.load_character(&filename)
-                                        {
-                                            reloaded.recalculate_derived_stats(&enhancement.levels);
-                                            reloaded.recalculate_prestige_bonuses();
-                                            state = reloaded;
-                                        }
-                                        state.last_save_time = Utc::now().timestamp();
-                                    }
-                                    history::cloud::CloudOpResult::Unlinked => {
-                                        cloud_config = None;
-                                        cloud_username = None;
-                                        cloud_status = history::cloud::CloudStatus::Offline;
-                                    }
-                                    history::cloud::CloudOpResult::Diverged(div) => {
-                                        cloud_status = history::cloud::CloudStatus::OutOfSync;
-                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
-                                        {
-                                            browser.cloud_divergence = Some(div);
-                                            browser.mode = crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
-                                        }
-                                    }
-                                    history::cloud::CloudOpResult::TokenUpdated(new_config) => {
-                                        cloud_status = history::cloud::CloudStatus::Linked;
-                                        cloud_username = Some(new_config.username.clone());
-                                        cloud_config = Some(new_config);
-                                    }
-                                    history::cloud::CloudOpResult::Failed(msg) => {
-                                        if history::cloud::is_auth_error(&msg) {
-                                            cloud_status =
-                                                history::cloud::CloudStatus::TokenExpired;
-                                        } else {
-                                            cloud_status = history::cloud::CloudStatus::Error(msg);
-                                        }
-                                    }
-                                }
-                                // Update Time Vault overlay if open
-                                if let GameOverlay::TimeVault { ref mut browser } = overlay {
-                                    browser.cloud_status = cloud_status.clone();
-                                    browser.cloud_username = cloud_username.clone();
-                                    browser.cloud_current_repo = cloud_config
-                                        .as_ref()
-                                        .map(|c| history::cloud::repo_name_from_url(&c.repo_url));
-                                }
+                        if let Some(cloud_result) = main_helpers::cloud_sync::poll_cloud_result(
+                            &mut cloud,
+                            &mut overlay,
+                            &quest_dir,
+                            &character_manager,
+                            &state.character_name,
+                            &enhancement,
+                        ) {
+                            if cloud_result.account_state_reloaded {
+                                main_helpers::cloud_ops::reload_account_state(
+                                    &mut haven,
+                                    &mut enhancement,
+                                    &mut global_achievements,
+                                );
+                            }
+                            if let Some(reloaded) = cloud_result.reloaded_state {
+                                state = reloaded;
+                            }
+                            if cloud_result.needs_save_timestamp {
+                                state.last_save_time = Utc::now().timestamp();
                             }
                         }
 
@@ -660,26 +555,30 @@ fn main() -> io::Result<()> {
                                 &enhancement.levels,
                                 &deep_state,
                             );
-                            draw_game_overlays(
-                                frame,
-                                &state,
-                                &overlay,
-                                &haven,
-                                &haven_ui,
-                                &soulforge_ui,
-                                &exchange_ui,
-                                &deep_state,
-                                &deep_ui,
-                                &enhancement,
-                                &global_achievements,
-                                debug_mode,
-                                &debug_menu,
-                                last_save_instant,
-                                last_save_time,
-                                chrono_surge.as_ref(),
-                                chrono_summary.as_ref(),
-                                &ctx,
-                            );
+                            {
+                                let game_ctx = main_helpers::game_context::GameContext {
+                                    state: &mut state,
+                                    haven: &mut haven,
+                                    haven_ui: &mut haven_ui,
+                                    soulforge_ui: &mut soulforge_ui,
+                                    exchange_ui: &mut exchange_ui,
+                                    deep_state: &mut deep_state,
+                                    deep_ui: &mut deep_ui,
+                                    enhancement: &mut enhancement,
+                                    overlay: &mut overlay,
+                                    debug_menu: &mut debug_menu,
+                                    debug_mode,
+                                    achievements: &mut global_achievements,
+                                };
+                                let extras = main_helpers::game_context::OverlayExtras {
+                                    last_save_instant,
+                                    last_save_time,
+                                    chrono_surge: chrono_surge.as_ref(),
+                                    chrono_summary: chrono_summary.as_ref(),
+                                    layout_ctx: &ctx,
+                                };
+                                draw_game_overlays(frame, &game_ctx, &extras);
+                            }
                         })?;
 
                         // Adaptive polling:
@@ -779,21 +678,23 @@ fn main() -> io::Result<()> {
                                 let prestige_before = state.prestige_rank;
                                 let fishing_rank_before = state.fishing.rank;
 
-                                let result = input::handle_game_input(
-                                    key_event,
-                                    &mut state,
-                                    &mut haven,
-                                    &mut haven_ui,
-                                    &mut soulforge_ui,
-                                    &mut exchange_ui,
-                                    &mut deep_state,
-                                    &mut deep_ui,
-                                    &mut enhancement,
-                                    &mut overlay,
-                                    &mut debug_menu,
-                                    debug_mode,
-                                    &mut global_achievements,
-                                );
+                                let result = {
+                                    let mut ctx = main_helpers::game_context::GameContext {
+                                        state: &mut state,
+                                        haven: &mut haven,
+                                        haven_ui: &mut haven_ui,
+                                        soulforge_ui: &mut soulforge_ui,
+                                        exchange_ui: &mut exchange_ui,
+                                        deep_state: &mut deep_state,
+                                        deep_ui: &mut deep_ui,
+                                        enhancement: &mut enhancement,
+                                        overlay: &mut overlay,
+                                        debug_menu: &mut debug_menu,
+                                        debug_mode,
+                                        achievements: &mut global_achievements,
+                                    };
+                                    input::handle_game_input(key_event, &mut ctx)
+                                };
 
                                 track_input_achievements(
                                     &mut state,
@@ -847,15 +748,15 @@ fn main() -> io::Result<()> {
                                                 crate::ui::time_vault_scene::TimeVaultState::new(
                                                     branches, commits,
                                                 );
-                                            vault_state.cloud_status = cloud_status.clone();
-                                            vault_state.cloud_username = cloud_username.clone();
+                                            vault_state.cloud_status = cloud.status.clone();
+                                            vault_state.cloud_username = cloud.username.clone();
                                             vault_state.cloud_current_repo =
-                                                cloud_config.as_ref().map(|c| {
+                                                cloud.config.as_ref().map(|c| {
                                                     history::cloud::repo_name_from_url(&c.repo_url)
                                                 });
                                             // If already out-of-sync, re-check divergence and show resolution dialog
                                             if matches!(
-                                                cloud_status,
+                                                cloud.status,
                                                 history::cloud::CloudStatus::OutOfSync
                                             ) {
                                                 if let Ok(Some(div)) =
@@ -1148,476 +1049,79 @@ fn main() -> io::Result<()> {
                                     continue;
                                 }
 
-                                // Handle cloud sync actions before routing
-                                if let InputResult::ValidateToken { ref token } = result {
-                                    if !cloud_op_in_flight {
-                                        cloud_op_in_flight = true;
-                                        let tx = cloud_tx.clone();
-                                        let tok = token.clone();
-                                        std::thread::spawn(move || {
-                                            let tx2 = tx.clone();
-                                            let result = std::panic::catch_unwind(
-                                                std::panic::AssertUnwindSafe(|| {
-                                                    match history::cloud::github_get_username(&tok)
-                                                    {
-                                                        Ok(username) => {
-                                                            let repos =
-                                                                history::cloud::github_list_repos(
-                                                                    &tok,
-                                                                )
-                                                                .unwrap_or_default();
-                                                            let _ = tx.send(
-                                                        history::cloud::CloudOpResult::TokenValidated {
-                                                            username,
-                                                            token: tok,
-                                                            repos,
-                                                        },
-                                                    );
-                                                        }
-                                                        Err(e) => {
-                                                            let _ = tx.send(
-                                                            history::cloud::CloudOpResult::Failed(
-                                                                e,
-                                                            ),
-                                                        );
-                                                        }
-                                                    }
-                                                }),
-                                            );
-                                            if result.is_err() {
-                                                let _ = tx2.send(
-                                                    history::cloud::CloudOpResult::Failed(
-                                                        "Cloud operation failed unexpectedly"
-                                                            .to_string(),
-                                                    ),
-                                                );
-                                            }
-                                        });
-                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
-                                        {
-                                            browser.cloud_status =
-                                                history::cloud::CloudStatus::Syncing;
-                                        }
-                                    }
+                                // Handle async cloud sync actions before routing
+                                if main_helpers::cloud_sync::dispatch_cloud_action(
+                                    &result,
+                                    &mut cloud,
+                                    &mut overlay,
+                                    &quest_dir,
+                                ) {
                                     continue;
                                 }
 
-                                // Change repo: re-use existing PAT from config
-                                if matches!(result, InputResult::ChangeRepo) {
-                                    if !cloud_op_in_flight {
-                                        if let Some(ref config) = cloud_config {
-                                            cloud_op_in_flight = true;
-                                            let tx = cloud_tx.clone();
-                                            let tok = config.token.clone();
-                                            std::thread::spawn(move || {
-                                                let tx2 = tx.clone();
-                                                let result = std::panic::catch_unwind(
-                                                    std::panic::AssertUnwindSafe(|| {
-                                                        match history::cloud::github_get_username(
-                                                            &tok,
-                                                        ) {
-                                                            Ok(username) => {
-                                                                let repos =
-                                                                history::cloud::github_list_repos(
-                                                                    &tok,
-                                                                )
-                                                                .unwrap_or_default();
-                                                                let _ = tx.send(
-                                                            history::cloud::CloudOpResult::TokenValidated {
-                                                                username,
-                                                                token: tok,
-                                                                repos,
-                                                            },
-                                                        );
-                                                            }
-                                                            Err(e) => {
-                                                                let _ = tx.send(
-                                                            history::cloud::CloudOpResult::Failed(e),
-                                                        );
-                                                            }
-                                                        }
-                                                    }),
-                                                );
-                                                if result.is_err() {
-                                                    let _ = tx2.send(
-                                                        history::cloud::CloudOpResult::Failed(
-                                                            "Cloud operation failed unexpectedly"
-                                                                .to_string(),
-                                                        ),
-                                                    );
-                                                }
-                                            });
-                                            if let GameOverlay::TimeVault { ref mut browser } =
-                                                overlay
-                                            {
-                                                browser.cloud_status =
-                                                    history::cloud::CloudStatus::Syncing;
-                                            }
-                                        }
-                                    }
-                                    continue;
-                                }
-
-                                if let InputResult::LinkCloud {
-                                    ref token,
-                                    ref repo_name,
-                                    private,
-                                } = result
+                                // Handle blocking resolve cloud actions
+                                if let Some(resolve_result) =
+                                    main_helpers::cloud_sync::apply_cloud_resolve(
+                                        &result,
+                                        &mut cloud,
+                                        &mut overlay,
+                                        &quest_dir,
+                                        &character_manager,
+                                        &state.character_name,
+                                        &enhancement,
+                                        history_repo.as_ref(),
+                                    )
                                 {
-                                    if !cloud_op_in_flight {
-                                        cloud_status = history::cloud::CloudStatus::Syncing;
-                                        cloud_op_in_flight = true;
-                                        let tx = cloud_tx.clone();
-                                        let dir = quest_dir.clone();
-                                        let tok = token.clone();
-                                        let rname = repo_name.clone();
-                                        std::thread::spawn(move || {
-                                            let tx2 = tx.clone();
-                                            let result = std::panic::catch_unwind(
-                                                std::panic::AssertUnwindSafe(|| {
-                                                    let res = match history::cloud::link_github(
-                                                        &dir, &tok, &rname, private,
-                                                    ) {
-                                                        Ok(config) => {
-                                                            history::cloud::CloudOpResult::Linked(
-                                                                config,
-                                                            )
-                                                        }
-                                                        Err(e) => {
-                                                            history::cloud::CloudOpResult::Failed(e)
-                                                        }
-                                                    };
-                                                    let _ = tx.send(res);
-                                                }),
-                                            );
-                                            if result.is_err() {
-                                                let _ = tx2.send(
-                                                    history::cloud::CloudOpResult::Failed(
-                                                        "Cloud operation failed unexpectedly"
-                                                            .to_string(),
-                                                    ),
-                                                );
-                                            }
-                                        });
-                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
-                                        {
-                                            browser.cloud_status = cloud_status.clone();
-                                        }
-                                    }
-                                    continue;
-                                }
-
-                                if matches!(result, InputResult::PushCloud) {
-                                    if !cloud_op_in_flight {
-                                        if let Some(ref config) = cloud_config {
-                                            cloud_status = history::cloud::CloudStatus::Syncing;
-                                            main_helpers::cloud_ops::spawn_cloud_push(
-                                                &mut cloud_op_in_flight,
-                                                &cloud_tx,
-                                                &quest_dir,
-                                                &config.token,
-                                            );
-                                            if let GameOverlay::TimeVault { ref mut browser } =
-                                                overlay
-                                            {
-                                                browser.cloud_status = cloud_status.clone();
-                                            }
-                                        }
-                                    }
-                                    continue;
-                                }
-
-                                if matches!(result, InputResult::PullCloud) {
-                                    if !cloud_op_in_flight {
-                                        if let Some(ref config) = cloud_config {
-                                            cloud_status = history::cloud::CloudStatus::Syncing;
-                                            cloud_op_in_flight = true;
-                                            let tx = cloud_tx.clone();
-                                            let dir = quest_dir.clone();
-                                            let tok = config.token.clone();
-                                            std::thread::spawn(move || {
-                                                let tx2 = tx.clone();
-                                                let result = std::panic::catch_unwind(
-                                                    std::panic::AssertUnwindSafe(|| {
-                                                        let res =
-                                                        (|| -> history::cloud::CloudOpResult {
-                                                            if let Err(e) =
-                                                                history::cloud::fetch_all(
-                                                                    &dir, &tok,
-                                                                )
-                                                            {
-                                                                return history::cloud::CloudOpResult::Failed(
-                                                            e,
-                                                        );
-                                                            }
-                                                            match history::cloud::check_divergence(&dir) {
-                                                        Ok(Some(div)) => {
-                                                            history::cloud::CloudOpResult::Diverged(div)
-                                                        }
-                                                        Ok(None) => {
-                                                            match history::cloud::fast_forward_all(&dir)
-                                                            {
-                                                                Ok(_) => {
-                                                                    history::cloud::CloudOpResult::Pulled
-                                                                }
-                                                                Err(e) => {
-                                                                    history::cloud::CloudOpResult::Failed(e)
-                                                                }
-                                                            }
-                                                        }
-                                                        Err(e) => {
-                                                            history::cloud::CloudOpResult::Failed(e)
-                                                        }
-                                                    }
-                                                        })(
-                                                        );
-                                                        let _ = tx.send(res);
-                                                    }),
-                                                );
-                                                if result.is_err() {
-                                                    let _ = tx2.send(
-                                                        history::cloud::CloudOpResult::Failed(
-                                                            "Cloud operation failed unexpectedly"
-                                                                .to_string(),
-                                                        ),
-                                                    );
-                                                }
-                                            });
-                                            if let GameOverlay::TimeVault { ref mut browser } =
-                                                overlay
-                                            {
-                                                browser.cloud_status = cloud_status.clone();
-                                            }
-                                        }
-                                    }
-                                    continue;
-                                }
-
-                                if matches!(result, InputResult::UnlinkCloud) {
-                                    let _ = history::cloud::unlink(&quest_dir);
-                                    cloud_config = None;
-                                    cloud_username = None;
-                                    cloud_status = history::cloud::CloudStatus::Offline;
-                                    if let GameOverlay::TimeVault { ref mut browser } = overlay {
-                                        browser.cloud_status = cloud_status.clone();
-                                        browser.cloud_username = None;
-                                    }
-                                    continue;
-                                }
-
-                                if let InputResult::UpdateToken { token } = result {
-                                    if !cloud_op_in_flight {
-                                        if let Some(ref config) = cloud_config {
-                                            cloud_op_in_flight = true;
-                                            cloud_status = history::cloud::CloudStatus::Syncing;
-                                            if let GameOverlay::TimeVault { ref mut browser } =
-                                                overlay
-                                            {
-                                                browser.cloud_status = cloud_status.clone();
-                                            }
-                                            let quest = quest_dir.clone();
-                                            let cfg = config.clone();
-                                            let tx = cloud_tx.clone();
-                                            std::thread::spawn(move || {
-                                                let tx2 = tx.clone();
-                                                let result = std::panic::catch_unwind(
-                                                    std::panic::AssertUnwindSafe(|| {
-                                                        let op_result = match history::cloud::update_token(
-                                                    &quest, &token, &cfg,
-                                                ) {
-                                                    Ok(new_config) => {
-                                                        history::cloud::CloudOpResult::TokenUpdated(
-                                                            new_config,
-                                                        )
-                                                    }
-                                                    Err(e) => {
-                                                        if history::cloud::is_auth_error(&e) {
-                                                            history::cloud::CloudOpResult::Failed(
-                                                                "invalid token".to_string(),
-                                                            )
-                                                        } else {
-                                                            history::cloud::CloudOpResult::Failed(e)
-                                                        }
-                                                    }
-                                                };
-                                                        let _ = tx.send(op_result);
-                                                    }),
-                                                );
-                                                if result.is_err() {
-                                                    let _ = tx2.send(
-                                                        history::cloud::CloudOpResult::Failed(
-                                                            "Cloud operation failed unexpectedly"
-                                                                .to_string(),
-                                                        ),
-                                                    );
-                                                }
-                                            });
-                                        }
-                                    }
-                                    continue;
-                                }
-
-                                if matches!(result, InputResult::ResolveKeepLocal) {
-                                    if !cloud_op_in_flight {
-                                        if let Some(ref config) = cloud_config {
-                                            cloud_status = history::cloud::CloudStatus::Syncing;
-                                            cloud_op_in_flight = true;
-                                            let tx = cloud_tx.clone();
-                                            let dir = quest_dir.clone();
-                                            let tok = config.token.clone();
-                                            std::thread::spawn(move || {
-                                                let tx2 = tx.clone();
-                                                let result = std::panic::catch_unwind(
-                                                    std::panic::AssertUnwindSafe(|| {
-                                                        let res = match history::cloud::force_push_branch(
-                                                    &dir, "main", &tok,
-                                                ) {
-                                                    Ok(()) => history::cloud::CloudOpResult::Pushed,
-                                                    Err(e) => history::cloud::CloudOpResult::Failed(e),
-                                                };
-                                                        let _ = tx.send(res);
-                                                    }),
-                                                );
-                                                if result.is_err() {
-                                                    let _ = tx2.send(
-                                                        history::cloud::CloudOpResult::Failed(
-                                                            "Cloud operation failed unexpectedly"
-                                                                .to_string(),
-                                                        ),
-                                                    );
-                                                }
-                                            });
-                                            if let GameOverlay::TimeVault { ref mut browser } =
-                                                overlay
-                                            {
-                                                browser.cloud_status = cloud_status.clone();
-                                            }
-                                        }
-                                    }
-                                    continue;
-                                }
-
-                                if matches!(result, InputResult::ResolveUseCloud) {
-                                    // Blocking: fetch + reset to remote, then reload
-                                    if let Some(ref config) = cloud_config {
-                                        let _ =
-                                            history::cloud::fetch_all(&quest_dir, &config.token);
-                                        let _ = history::cloud::reset_to_remote(&quest_dir, "main");
+                                    if resolve_result.account_state_reloaded {
                                         main_helpers::cloud_ops::reload_account_state(
                                             &mut haven,
                                             &mut enhancement,
                                             &mut global_achievements,
                                         );
-
-                                        // Reload character state
-                                        let filename = format!("{}.json", state.character_name);
-                                        if let Ok(mut reloaded) =
-                                            character_manager.load_character(&filename)
-                                        {
-                                            reloaded.recalculate_derived_stats(&enhancement.levels);
-                                            reloaded.recalculate_prestige_bonuses();
-                                            state = reloaded;
-                                        }
-                                        state.last_save_time = Utc::now().timestamp();
-
-                                        cloud_status = history::cloud::CloudStatus::Linked;
-                                        if let GameOverlay::TimeVault { ref mut browser } = overlay
-                                        {
-                                            browser.cloud_status = cloud_status.clone();
-                                            if let Some(ref repo) = history_repo {
-                                                if let Ok(branches) = repo.list_branches() {
-                                                    browser.branches = branches;
-                                                    if browser.selected_branch
-                                                        >= browser.branches.len()
-                                                    {
-                                                        browser.selected_branch = browser
-                                                            .branches
-                                                            .len()
-                                                            .saturating_sub(1);
-                                                    }
-                                                    if let Some(b) = browser
-                                                        .branches
-                                                        .get(browser.selected_branch)
-                                                    {
-                                                        browser.commits = repo
-                                                            .list_commits(&b.name)
-                                                            .unwrap_or_default();
-                                                        browser.selected_commit = 0;
-                                                    }
-                                                }
-                                            }
-                                        }
                                     }
-                                    continue;
-                                }
-
-                                if matches!(result, InputResult::ResolveKeepBoth) {
-                                    let _ = history::cloud::backup_and_reset(&quest_dir, "main");
-                                    main_helpers::cloud_ops::reload_account_state(
-                                        &mut haven,
-                                        &mut enhancement,
-                                        &mut global_achievements,
-                                    );
-
-                                    // Reload character state
-                                    let filename = format!("{}.json", state.character_name);
-                                    if let Ok(mut reloaded) =
-                                        character_manager.load_character(&filename)
-                                    {
-                                        reloaded.recalculate_derived_stats(&enhancement.levels);
-                                        reloaded.recalculate_prestige_bonuses();
+                                    if let Some(reloaded) = resolve_result.reloaded_state {
                                         state = reloaded;
                                     }
-                                    state.last_save_time = Utc::now().timestamp();
-
-                                    cloud_status = history::cloud::CloudStatus::Linked;
-                                    if let GameOverlay::TimeVault { ref mut browser } = overlay {
-                                        browser.cloud_status = cloud_status.clone();
-                                        browser.cloud_username = cloud_username.clone();
-                                        if let Some(ref repo) = history_repo {
-                                            if let Ok(branches) = repo.list_branches() {
-                                                browser.branches = branches;
-                                                if browser.selected_branch >= browser.branches.len()
-                                                {
-                                                    browser.selected_branch =
-                                                        browser.branches.len().saturating_sub(1);
-                                                }
-                                                if let Some(b) =
-                                                    browser.branches.get(browser.selected_branch)
-                                                {
-                                                    browser.commits = repo
-                                                        .list_commits(&b.name)
-                                                        .unwrap_or_default();
-                                                    browser.selected_commit = 0;
-                                                }
-                                            }
-                                        }
+                                    if resolve_result.needs_save_timestamp {
+                                        state.last_save_time = Utc::now().timestamp();
                                     }
                                     continue;
                                 }
 
-                                match route_game_input(
-                                    result,
-                                    &state,
-                                    &character_manager,
-                                    &global_achievements,
-                                    &haven,
-                                    &enhancement,
-                                    &deep_state,
-                                    debug_mode,
-                                    &mut last_save_instant,
-                                    &mut last_save_time,
-                                    history_repo.as_ref(),
-                                ) {
+                                let route_action = {
+                                    let route_ctx = main_helpers::game_context::GameContext {
+                                        state: &mut state,
+                                        haven: &mut haven,
+                                        haven_ui: &mut haven_ui,
+                                        soulforge_ui: &mut soulforge_ui,
+                                        exchange_ui: &mut exchange_ui,
+                                        deep_state: &mut deep_state,
+                                        deep_ui: &mut deep_ui,
+                                        enhancement: &mut enhancement,
+                                        overlay: &mut overlay,
+                                        debug_menu: &mut debug_menu,
+                                        debug_mode,
+                                        achievements: &mut global_achievements,
+                                    };
+                                    route_game_input(
+                                        result,
+                                        &route_ctx,
+                                        &character_manager,
+                                        &mut last_save_instant,
+                                        &mut last_save_time,
+                                        history_repo.as_ref(),
+                                    )
+                                };
+                                match route_action {
                                     InputAction::QuitToSelect => {
                                         break 'game_loop;
                                     }
                                     InputAction::ContinueAndPush => {
-                                        if !cloud_op_in_flight {
-                                            if let Some(ref config) = cloud_config {
+                                        if !cloud.op_in_flight {
+                                            if let Some(ref config) = cloud.config {
                                                 main_helpers::cloud_ops::spawn_cloud_push(
-                                                    &mut cloud_op_in_flight,
-                                                    &cloud_tx,
+                                                    &mut cloud.op_in_flight,
+                                                    &cloud.tx,
                                                     &quest_dir,
                                                     &config.token,
                                                 );
@@ -1717,50 +1221,18 @@ fn main() -> io::Result<()> {
                         if chrono_surge.is_some()
                             && last_tick.elapsed() >= Duration::from_millis(TICK_INTERVAL_MS)
                         {
-                            let batch = {
-                                let surge = chrono_surge.as_ref().unwrap();
-                                surge.current_batch_size().min(surge.ticks_remaining)
-                            };
+                            let batch_result = run_chrono_surge_batch(
+                                chrono_surge.as_mut().unwrap(),
+                                &mut state,
+                                &mut tick_counter,
+                                &mut haven,
+                                &mut enhancement,
+                                &mut deep_state,
+                                &mut global_achievements,
+                                debug_mode,
+                            );
 
-                            let mut rng = rand::rng();
-                            let mut needs_save = false;
-                            let sg_before_batch = state.stormglass;
-
-                            for _ in 0..batch {
-                                let mut ctx = core::tick_context::TickContext {
-                                    state: &mut state,
-                                    tick_counter: &mut tick_counter,
-                                    haven: &mut haven,
-                                    enhancement: &mut enhancement,
-                                    deep: &mut deep_state,
-                                    achievements: &mut global_achievements,
-                                    debug_mode,
-                                };
-                                let tick_result =
-                                    core::tick::game_tick_with_context(&mut ctx, &mut rng);
-
-                                // Keep surge path headless (same semantics as [Esc] skip):
-                                // collect summary counters only and avoid per-tick UI work.
-                                let surge = chrono_surge.as_mut().unwrap();
-                                tally_chrono_surge_events(surge, &tick_result.events);
-
-                                if tick_result.achievements_changed
-                                    || tick_result.haven_changed
-                                    || tick_result.enhancement_changed
-                                    || tick_result.god_items_changed
-                                    || tick_result.deep_changed
-                                {
-                                    needs_save = true;
-                                }
-
-                                surge.ticks_remaining -= 1;
-                            }
-
-                            // No SG earned during Chrono Surge — temporal displacement
-                            // prevents salvage from materializing
-                            state.stormglass = sg_before_batch;
-
-                            if needs_save && !debug_mode {
+                            if batch_result.needs_save && !debug_mode {
                                 save_all(
                                     &character_manager,
                                     &state,
@@ -1773,25 +1245,11 @@ fn main() -> io::Result<()> {
                                 );
                             }
 
-                            // Check if surge is complete
-                            let done = chrono_surge.as_ref().unwrap().ticks_remaining == 0;
-                            if done {
+                            if let Some((summary, surge_event)) = batch_result.completed {
                                 state.chrono_surge_active = false;
-                                let surge = chrono_surge.take().unwrap();
-                                chrono_summary = Some(ChronoSurgeSummary {
-                                    kills: surge.kills,
-                                    levels_gained: surge.levels_gained,
-                                    items_equipped: surge.items_equipped,
-                                    ticks_completed: surge.ticks_total,
-                                    ticks_total: surge.ticks_total,
-                                    overcharged: surge.overcharged,
-                                });
+                                chrono_surge = None;
+                                chrono_summary = Some(summary);
                                 if !debug_mode {
-                                    let surge_event = history::SaveEvent::ChronoSurge {
-                                        levels_gained: surge.levels_gained,
-                                        kills: surge.kills,
-                                        ticks: surge.ticks_total,
-                                    };
                                     save_all(
                                         &character_manager,
                                         &state,
@@ -1871,11 +1329,11 @@ fn main() -> io::Result<()> {
                                     );
 
                                     // Push to cloud after milestone commits
-                                    if save_event.is_some() && !cloud_op_in_flight {
-                                        if let Some(ref config) = cloud_config {
+                                    if save_event.is_some() && !cloud.op_in_flight {
+                                        if let Some(ref config) = cloud.config {
                                             main_helpers::cloud_ops::spawn_cloud_push(
-                                                &mut cloud_op_in_flight,
-                                                &cloud_tx,
+                                                &mut cloud.op_in_flight,
+                                                &cloud.tx,
                                                 &quest_dir,
                                                 &config.token,
                                             );

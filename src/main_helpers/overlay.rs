@@ -6,6 +6,7 @@ use crate::deep::{DeepState, DeepUiState};
 use crate::enhancement;
 use crate::haven;
 use crate::input::{GameOverlay, HavenUiState, SoulforgeUiState};
+use crate::main_helpers::game_context::{GameContext, OverlayExtras};
 use crate::stormglass::types::{ChronoSurgeState, ChronoSurgeSummary, ExchangeUiState};
 use crate::ui;
 use crate::utils;
@@ -78,50 +79,52 @@ fn draw_quit_confirm(frame: &mut ratatui::Frame, pending_count: usize) {
 }
 
 /// Draw all game overlays on top of the main game UI.
-#[allow(clippy::too_many_arguments)]
 pub fn draw_game_overlays(
     frame: &mut ratatui::Frame,
-    state: &GameState,
-    overlay: &GameOverlay,
-    haven: &haven::Haven,
-    haven_ui: &HavenUiState,
-    soulforge_ui: &SoulforgeUiState,
-    exchange_ui: &ExchangeUiState,
-    deep_state: &DeepState,
-    deep_ui: &DeepUiState,
-    enhancement: &enhancement::EnhancementProgress,
-    global_achievements: &achievements::Achievements,
-    debug_mode: bool,
-    debug_menu: &utils::debug_menu::DebugMenu,
-    last_save_instant: Option<Instant>,
-    last_save_time: Option<chrono::DateTime<chrono::Local>>,
-    chrono_surge: Option<&ChronoSurgeState>,
-    chrono_summary: Option<&ChronoSurgeSummary>,
-    ctx: &ui::responsive::LayoutContext,
+    ctx: &GameContext<'_>,
+    extras: &OverlayExtras<'_>,
 ) {
+    let state: &GameState = ctx.state;
+    let overlay: &GameOverlay = ctx.overlay;
+    let haven: &haven::Haven = ctx.haven;
+    let haven_ui: &HavenUiState = ctx.haven_ui;
+    let soulforge_ui: &SoulforgeUiState = ctx.soulforge_ui;
+    let exchange_ui: &ExchangeUiState = ctx.exchange_ui;
+    let deep_state: &DeepState = ctx.deep_state;
+    let deep_ui: &DeepUiState = ctx.deep_ui;
+    let enhancement: &enhancement::EnhancementProgress = ctx.enhancement;
+    let global_achievements: &achievements::Achievements = ctx.achievements;
+    let debug_mode: bool = ctx.debug_mode;
+    let debug_menu: &utils::debug_menu::DebugMenu = ctx.debug_menu;
+    let last_save_instant: Option<Instant> = extras.last_save_instant;
+    let last_save_time: Option<chrono::DateTime<chrono::Local>> = extras.last_save_time;
+    let chrono_surge: Option<&ChronoSurgeState> = extras.chrono_surge;
+    let chrono_summary: Option<&ChronoSurgeSummary> = extras.chrono_summary;
+    let layout_ctx: &ui::responsive::LayoutContext = extras.layout_ctx;
+
     let area = frame.area();
     match overlay {
         GameOverlay::OfflineWelcome { report } => {
-            ui::game_common::render_offline_welcome(frame, area, report, ctx);
+            ui::game_common::render_offline_welcome(frame, area, report, layout_ctx);
         }
         GameOverlay::PrestigeConfirm => {
-            ui::prestige_confirm::draw_prestige_confirm(frame, state, ctx);
+            ui::prestige_confirm::draw_prestige_confirm(frame, state, layout_ctx);
         }
         GameOverlay::HavenDiscovery => {
-            ui::haven_scene::render_haven_discovery_modal(frame, area, ctx);
+            ui::haven_scene::render_haven_discovery_modal(frame, area, layout_ctx);
         }
         GameOverlay::SoulforgeDiscovery => {
-            ui::soulforge_scene::render_soulforge_discovery_modal(frame, area, ctx);
+            ui::soulforge_scene::render_soulforge_discovery_modal(frame, area, layout_ctx);
         }
         GameOverlay::StormglassDiscovery => {
-            ui::stormglass_scene::render_stormglass_discovery_modal(frame, area, ctx);
+            ui::stormglass_scene::render_stormglass_discovery_modal(frame, area, layout_ctx);
         }
         GameOverlay::AchievementUnlocked { ref achievements } => {
             ui::achievement_browser_scene::render_achievement_unlocked_modal(
                 frame,
                 area,
                 achievements,
-                ctx,
+                layout_ctx,
             );
         }
         GameOverlay::VaultSelection {
@@ -138,7 +141,7 @@ pub fn draw_game_overlays(
                 selected_slots,
                 &enhancement.levels,
                 *confirm_pending,
-                ctx,
+                layout_ctx,
             );
         }
         GameOverlay::Achievements {
@@ -160,7 +163,7 @@ pub fn draw_game_overlays(
                     global_achievements,
                     browser,
                     enhancement,
-                    ctx,
+                    layout_ctx,
                 );
             }
         }
@@ -173,11 +176,16 @@ pub fn draw_game_overlays(
                 area,
                 *encounter_number,
                 *lure_consumed,
-                ctx,
+                layout_ctx,
             );
         }
         GameOverlay::LeviathanCatchMiss { lure_consumed } => {
-            ui::fishing_scene::render_leviathan_catch_miss_modal(frame, area, *lure_consumed, ctx);
+            ui::fishing_scene::render_leviathan_catch_miss_modal(
+                frame,
+                area,
+                *lure_consumed,
+                layout_ctx,
+            );
         }
         GameOverlay::QuitConfirm => {
             draw_quit_confirm(frame, state.challenge_menu.challenges.len());
@@ -196,7 +204,7 @@ pub fn draw_game_overlays(
             ui::time_vault_scene::draw_time_vault(frame, area, browser);
         }
         GameOverlay::DeepDiscovery => {
-            ui::deep_scene::render_deep_discovery_modal(frame, area, ctx);
+            ui::deep_scene::render_deep_discovery_modal(frame, area, layout_ctx);
         }
         GameOverlay::FractureRegionUnlock { region } => {
             ui::combat_scene::render_fracture_region_unlock_modal(
@@ -204,11 +212,13 @@ pub fn draw_game_overlays(
                 area,
                 *region,
                 state.ascension_level,
-                ctx,
+                layout_ctx,
             );
         }
         GameOverlay::AscensionConfirm => {
-            ui::ascension_scene::render_ascension_confirm(frame, area, state, deep_state, ctx);
+            ui::ascension_scene::render_ascension_confirm(
+                frame, area, state, deep_state, layout_ctx,
+            );
         }
         GameOverlay::None => {}
     }
@@ -223,7 +233,7 @@ pub fn draw_game_overlays(
             haven_ui.open_elapsed_ms(),
             state.prestige_rank,
             global_achievements,
-            ctx,
+            layout_ctx,
         );
         match haven_ui.confirmation {
             crate::input::HavenConfirmation::Build => {
@@ -234,7 +244,7 @@ pub fn draw_game_overlays(
                     room,
                     haven,
                     state.prestige_rank,
-                    ctx,
+                    layout_ctx,
                 );
             }
             crate::input::HavenConfirmation::Forge => {
@@ -243,7 +253,7 @@ pub fn draw_game_overlays(
                     area,
                     global_achievements,
                     state.prestige_rank,
-                    ctx,
+                    layout_ctx,
                 );
             }
             crate::input::HavenConfirmation::None => {}
@@ -258,47 +268,59 @@ pub fn draw_game_overlays(
             soulforge_ui,
             enhancement,
             state.prestige_rank,
-            ctx,
+            layout_ctx,
         );
     }
 
     // Stormglass Exchange overlay
     if exchange_ui.open {
-        ui::stormglass_scene::render_stormglass_exchange(frame, area, exchange_ui, state, ctx);
+        ui::stormglass_scene::render_stormglass_exchange(
+            frame,
+            area,
+            exchange_ui,
+            state,
+            layout_ctx,
+        );
     }
 
     // The Deep overlay
     if deep_ui.open {
-        ui::deep_scene::render_deep_overlay(frame, area, deep_state, deep_ui, None, ctx);
+        ui::deep_scene::render_deep_overlay(frame, area, deep_state, deep_ui, None, layout_ctx);
     }
 
     // Chrono Surge active: status banner at bottom
     if let Some(surge) = chrono_surge {
-        ui::stormglass_scene::render_chrono_surge_time_warp(frame, area, surge, ctx);
-        ui::stormglass_scene::render_chrono_surge_banner(frame, area, surge, ctx);
+        ui::stormglass_scene::render_chrono_surge_time_warp(frame, area, surge, layout_ctx);
+        ui::stormglass_scene::render_chrono_surge_banner(frame, area, surge, layout_ctx);
     }
 
     // Chrono Surge summary modal
     if let Some(summary) = chrono_summary {
-        ui::stormglass_scene::render_chrono_surge_summary(frame, area, summary, ctx);
+        ui::stormglass_scene::render_chrono_surge_summary(frame, area, summary, layout_ctx);
     }
 
     // Debug indicator / save indicator
     if debug_mode {
-        ui::debug_menu_scene::render_debug_indicator(frame, area, ctx);
+        ui::debug_menu_scene::render_debug_indicator(frame, area, layout_ctx);
         if debug_menu.is_open {
             ui::debug_menu_scene::render_debug_menu(
                 frame,
                 area,
                 debug_menu,
                 global_achievements.ui_border_style,
-                ctx,
+                layout_ctx,
             );
         }
     } else {
         let is_saving = last_save_instant
             .map(|t| t.elapsed() < Duration::from_secs(1))
             .unwrap_or(false);
-        ui::debug_menu_scene::render_save_indicator(frame, area, is_saving, last_save_time, ctx);
+        ui::debug_menu_scene::render_save_indicator(
+            frame,
+            area,
+            is_saving,
+            last_save_time,
+            layout_ctx,
+        );
     }
 }

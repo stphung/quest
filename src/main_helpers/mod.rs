@@ -2,7 +2,10 @@
 
 pub mod achievements;
 pub mod character_screens;
+pub mod chrono_surge;
 pub mod cloud_ops;
+pub mod cloud_sync;
+pub mod game_context;
 pub mod input_routing;
 pub mod offline;
 pub mod overlay;

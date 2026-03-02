@@ -7,13 +7,7 @@ use std::path::PathBuf;
 
 /// Get the achievements save file path (~/.quest/achievements.json).
 pub fn achievements_save_path() -> io::Result<PathBuf> {
-    let home_dir = dirs::home_dir().ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::NotFound,
-            "Could not determine home directory",
-        )
-    })?;
-    Ok(home_dir.join(".quest").join("achievements.json"))
+    Ok(crate::core::paths::get_quest_dir()?.join("achievements.json"))
 }
 
 /// Load achievements from disk, or return default if not found.
