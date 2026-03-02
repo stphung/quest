@@ -97,6 +97,21 @@ fn with_relative_prefix(
     }
 }
 
+fn format_power(n: u32) -> String {
+    if n < 1_000 {
+        return n.to_string();
+    }
+    let s = n.to_string();
+    let mut result = String::new();
+    for (i, c) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            result.push(',');
+        }
+        result.push(c);
+    }
+    result.chars().rev().collect()
+}
+
 #[allow(clippy::too_many_arguments)]
 fn build_startup_splash_text(
     update_status: Option<&UpdateInfoStatus>,
@@ -374,6 +389,7 @@ fn build_startup_splash_text(
             } else {
                 String::new()
             };
+            let power_str = format_power(total_power);
             let entry = if character.is_corrupted {
                 format!("{}{} (CORRUPTED)", marker, character.filename)
             } else if character.prestige_rank > 0 {
@@ -384,12 +400,12 @@ fn build_startup_splash_text(
                     character.prestige_rank,
                     character.character_level,
                     asc_part,
-                    total_power
+                    power_str
                 )
             } else {
                 format!(
                     "{}{} (Lv{}{} \u{00b7} {} pwr)",
-                    marker, display_name, character.character_level, asc_part, total_power
+                    marker, display_name, character.character_level, asc_part, power_str
                 )
             };
 
