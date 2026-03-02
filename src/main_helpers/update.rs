@@ -1,18 +1,24 @@
 //! Update check helpers.
 
 use crate::achievements;
+use crate::character::combat_bonuses::PrestigeCombatBonuses;
+use crate::character::derived_stats::DerivedStats;
 use crate::character::input::{process_select_input, SelectInput, SelectResult};
 use crate::character::manager::{CharacterInfo, CharacterManager};
+use crate::combat::events::CombatBonuses;
 use crate::core::constants::{UPDATE_CHECK_INTERVAL_SECONDS, UPDATE_CHECK_JITTER_SECONDS};
 use crate::core::game_state::GameState;
+use crate::core::power_rating::compute_power_rating;
 use crate::enhancement;
 use crate::haven;
 use crate::history::cloud::{CloudConfig, CloudOpResult, CloudStatus};
 use crate::history::HistoryRepo;
 use crate::input::time_vault_input::{handle_time_vault_input, TimeVaultAction};
+use crate::stormglass::sigils::SigilBonuses;
 use crate::ui;
 use crate::ui::achievement_browser_scene::AchievementBrowserState;
 use crate::ui::character_select::CharacterSelectScreen;
+use crate::ui::stats_prestige::to_roman;
 use crate::ui::throbber::block_spinner_char;
 use crate::ui::time_vault_scene::TimeVaultState;
 use crate::ui::title_browser_scene::TitleBrowserState;
@@ -91,6 +97,21 @@ fn with_relative_prefix(
     }
 }
 
+fn format_power(n: u32) -> String {
+    if n < 1_000 {
+        return n.to_string();
+    }
+    let s = n.to_string();
+    let mut result = String::new();
+    for (i, c) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            result.push(',');
+        }
+        result.push(c);
+    }
+    result.chars().rev().collect()
+}
+
 #[allow(clippy::too_many_arguments)]
 fn build_startup_splash_text(
     update_status: Option<&UpdateInfoStatus>,
@@ -102,6 +123,7 @@ fn build_startup_splash_text(
     cloud_config: Option<&CloudConfig>,
     haven: &haven::Haven,
     enhancement: &enhancement::EnhancementProgress,
+    deep_state: &crate::deep::DeepState,
 ) -> Vec<Line<'static>> {
     use crate::utils::build_info::{BUILD_COMMIT, BUILD_DATE};
     let now = Utc::now();
@@ -223,6 +245,19 @@ fn build_startup_splash_text(
             Style::default().fg(Color::Gray),
         ));
     }
+    if deep_state.persistent.discovered {
+        if !badges.is_empty() {
+            badges.push(Span::styled("   ", Style::default()));
+        }
+        badges.push(Span::styled(
+            "\u{26cf} ",
+            Style::default().fg(Color::Rgb(204, 153, 0)),
+        ));
+        badges.push(Span::styled(
+            format!("L{}", deep_state.persistent.deepest_layer_reached),
+            Style::default().fg(Color::Gray),
+        ));
+    }
     // Cloud sync badge with dot throbber
     {
         let cloud_badge_color = Color::Cyan;
@@ -303,22 +338,71 @@ fn build_startup_splash_text(
                 }
             };
 
-            let total_power: u32 = character.equipment.iter_equipped().map(|i| i.power()).sum();
+            // Compute full power rating (geometric mean of DPS and eHP)
+            let derived = DerivedStats::calculate_derived_stats(
+                &character.attributes,
+                &character.equipment,
+                &enhancement.levels,
+            );
+            let prestige_combat = PrestigeCombatBonuses::from_rank(character.prestige_rank);
+            let haven_bonuses = haven.compute_bonuses();
+            let sigil_bonuses = SigilBonuses::compute(&character.storm_sigils);
+            let combat_bonuses = CombatBonuses {
+                hp_regen_percent: haven_bonuses.hp_regen_percent,
+                hp_regen_delay_reduction: haven_bonuses.hp_regen_delay_reduction,
+                damage_percent: haven_bonuses.damage_percent + sigil_bonuses.damage_percent,
+                crit_chance_percent: haven_bonuses.crit_chance_percent
+                    + sigil_bonuses.crit_chance_percent
+                    + prestige_combat.crit_chance,
+                double_strike_chance: haven_bonuses.double_strike_chance
+                    + sigil_bonuses.double_strike_percent,
+                xp_gain_percent: haven_bonuses.xp_gain_percent + sigil_bonuses.xp_percent,
+                early_damage_percent: crate::god_items::equipped_god_item_damage_percent(
+                    &character.equipment,
+                ),
+                damage_reduction_percent: crate::god_items::equipped_god_item_dr(
+                    &character.equipment,
+                ) + sigil_bonuses.damage_reduction_percent,
+                attack_speed_percent: crate::god_items::equipped_god_item_attack_speed_percent(
+                    &character.equipment,
+                ) + sigil_bonuses.attack_speed_percent,
+                regen_reduction_percent: crate::god_items::equipped_god_item_regen_reduction_percent(
+                    &character.equipment,
+                ) + sigil_bonuses.regen_delay_percent,
+                flat_damage: prestige_combat.flat_damage,
+                flat_defense: prestige_combat.flat_defense,
+                ascension_multiplier: crate::ascension::ascension_combat_multiplier(
+                    character.ascension_level,
+                ),
+            };
+            // Max HP: derived base + prestige flat HP + ascension multiplier + sigil HP%
+            let base_max_hp = derived.max_hp + prestige_combat.flat_hp;
+            let after_ascension = (base_max_hp as f64 * combat_bonuses.ascension_multiplier) as u32;
+            let player_max_hp =
+                (after_ascension as f64 * (1.0 + sigil_bonuses.max_hp_percent / 100.0)) as u32;
+            let total_power = compute_power_rating(&derived, &combat_bonuses, player_max_hp) as u32;
+            let asc_prefix = if character.ascension_level > 0 {
+                format!("Asc {} \u{00b7} ", to_roman(character.ascension_level))
+            } else {
+                String::new()
+            };
+            let power_str = format_power(total_power);
             let entry = if character.is_corrupted {
                 format!("{}{} (CORRUPTED)", marker, character.filename)
             } else if character.prestige_rank > 0 {
                 format!(
-                    "{}{} (P{} Lv{} \u{00b7} {} pwr)",
+                    "{}{} ({}P{} Lv{} \u{00b7} {} pwr)",
                     marker,
                     display_name,
+                    asc_prefix,
                     character.prestige_rank,
                     character.character_level,
-                    total_power
+                    power_str
                 )
             } else {
                 format!(
-                    "{}{} (Lv{} \u{00b7} {} pwr)",
-                    marker, display_name, character.character_level, total_power
+                    "{}{} ({}Lv{} \u{00b7} {} pwr)",
+                    marker, display_name, asc_prefix, character.character_level, power_str
                 )
             };
 
@@ -883,6 +967,7 @@ pub fn show_startup_splash_screen(
             cloud_config.as_ref(),
             haven,
             enhancement,
+            deep_state,
         );
         terminal.draw(|f| {
             let area = f.area();
