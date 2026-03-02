@@ -460,8 +460,8 @@ fn main() -> io::Result<()> {
                     let mut last_push_time: Option<chrono::DateTime<chrono::Local>> = None;
                     // Deferred commit: save completes first, commit fires next tick
                     // so the save indicator resolves before the commit spinner starts.
-                    // Tuple: (event, should_push_to_cloud)
-                    let mut pending_commit: Option<(history::SaveEvent, bool)> = None;
+                    // Every commit also triggers a cloud push (if configured).
+                    let mut pending_commit: Option<history::SaveEvent> = None;
 
                     // Update check state - start initial background check immediately
                     let mut update_info: Option<UpdateInfo> = None;
@@ -532,7 +532,7 @@ fn main() -> io::Result<()> {
                                 .map(|t| t.elapsed() >= Duration::from_millis(500))
                                 .unwrap_or(true)
                         {
-                            if let Some((event, should_push)) = pending_commit.take() {
+                            if let Some(event) = pending_commit.take() {
                                 if let Some(ref repo) = history_repo {
                                     // Save spinner done — show timestamp, start commit
                                     last_save_instant = None;
@@ -540,7 +540,7 @@ fn main() -> io::Result<()> {
                                         last_commit_instant = Some(Instant::now());
                                         last_commit_time = Some(Local::now());
                                     }
-                                    if should_push && !cloud.op_in_flight {
+                                    if !cloud.op_in_flight {
                                         if let Some(ref config) = cloud.config {
                                             main_helpers::cloud_ops::spawn_cloud_push(
                                                 &mut cloud.op_in_flight,
@@ -716,7 +716,7 @@ fn main() -> io::Result<()> {
                                             );
                                             last_save_instant = Some(Instant::now());
                                             last_save_time = Some(Local::now());
-                                            pending_commit = Some((surge_event, false));
+                                            pending_commit = Some(surge_event);
                                         }
                                     }
                                     continue;
@@ -855,6 +855,16 @@ fn main() -> io::Result<()> {
                                         {
                                             last_commit_instant = Some(Instant::now());
                                             last_commit_time = Some(Local::now());
+                                            if !cloud.op_in_flight {
+                                                if let Some(ref config) = cloud.config {
+                                                    main_helpers::cloud_ops::spawn_cloud_push(
+                                                        &mut cloud.op_in_flight,
+                                                        &cloud.tx,
+                                                        &quest_dir,
+                                                        &config.token,
+                                                    );
+                                                }
+                                            }
                                         }
                                         if repo.restore_to(commit_id).is_ok() {
                                             // Reload all state from disk (git reset replaced files)
@@ -939,6 +949,16 @@ fn main() -> io::Result<()> {
                                         {
                                             last_commit_instant = Some(Instant::now());
                                             last_commit_time = Some(Local::now());
+                                            if !cloud.op_in_flight {
+                                                if let Some(ref config) = cloud.config {
+                                                    main_helpers::cloud_ops::spawn_cloud_push(
+                                                        &mut cloud.op_in_flight,
+                                                        &cloud.tx,
+                                                        &quest_dir,
+                                                        &config.token,
+                                                    );
+                                                }
+                                            }
                                         }
                                         if repo.fork_timeline(branch_name, commit_id).is_ok() {
                                             // Full state reload (fork checks out the new branch)
@@ -1020,6 +1040,16 @@ fn main() -> io::Result<()> {
                                         {
                                             last_commit_instant = Some(Instant::now());
                                             last_commit_time = Some(Local::now());
+                                            if !cloud.op_in_flight {
+                                                if let Some(ref config) = cloud.config {
+                                                    main_helpers::cloud_ops::spawn_cloud_push(
+                                                        &mut cloud.op_in_flight,
+                                                        &cloud.tx,
+                                                        &quest_dir,
+                                                        &config.token,
+                                                    );
+                                                }
+                                            }
                                         }
                                         if repo.switch_timeline(branch_name).is_ok() {
                                             // Full state reload (switch checks out the branch)
@@ -1182,7 +1212,7 @@ fn main() -> io::Result<()> {
                                         break 'game_loop;
                                     }
                                     InputAction::DeferCommit(event) => {
-                                        pending_commit = Some((event, true));
+                                        pending_commit = Some(event);
                                     }
                                     InputAction::Continue => {}
                                 }
@@ -1312,7 +1342,7 @@ fn main() -> io::Result<()> {
                                     );
                                     last_save_instant = Some(Instant::now());
                                     last_save_time = Some(Local::now());
-                                    pending_commit = Some((surge_event, false));
+                                    pending_commit = Some(surge_event);
                                 }
                             }
 
@@ -1379,7 +1409,7 @@ fn main() -> io::Result<()> {
                                     last_save_instant = Some(Instant::now());
                                     last_save_time = Some(Local::now());
                                     if let Some(event) = save_event {
-                                        pending_commit = Some((event, true));
+                                        pending_commit = Some(event);
                                     }
                                 }
 
@@ -1536,7 +1566,7 @@ fn main() -> io::Result<()> {
                                                     last_save_instant = Some(Instant::now());
                                                     last_save_time = Some(Local::now());
                                                     if let Some(event) = soulforge_event {
-                                                        pending_commit = Some((event, false));
+                                                        pending_commit = Some(event);
                                                     }
                                                 }
                                             }
