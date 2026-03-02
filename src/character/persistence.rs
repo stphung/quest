@@ -56,25 +56,6 @@ impl CharacterManager {
         let save_data: CharacterSaveData = serde_json::from_str(&json_content)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        let player = crate::core::player_identity::PlayerIdentity {
-            character_id: save_data.character_id.clone(),
-            character_name: save_data.character_name.clone(),
-            character_level: save_data.character_level,
-            character_xp: save_data.character_xp,
-            attributes: save_data.attributes,
-            prestige_rank: save_data.prestige_rank,
-            total_prestige_count: save_data.total_prestige_count,
-        };
-
-        let combat_ctx = crate::core::combat_context::CombatContext {
-            combat_state: save_data.combat_state.clone(),
-            equipment: save_data.equipment.clone(),
-            zone_progression: save_data.zone_progression.clone(),
-            active_dungeon: None,
-            session_kills: 0,
-            consecutive_deaths: 0,
-        };
-
         Ok(crate::core::game_state::GameState {
             character_id: save_data.character_id,
             character_name: save_data.character_name,
@@ -88,7 +69,7 @@ impl CharacterManager {
             combat_state: save_data.combat_state,
             equipment: save_data.equipment,
             active_dungeon: save_data.active_dungeon,
-            fishing: save_data.fishing.clone(),
+            fishing: save_data.fishing,
             active_fishing: None,
             zone_progression: save_data.zone_progression,
             challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
@@ -110,39 +91,10 @@ impl CharacterManager {
             cached_fracture_zone_cap: 0,
             stormglass: save_data.stormglass,
             stormglass_discovered: save_data.stormglass_discovered,
-            storm_sigils: save_data.storm_sigils.clone(),
+            storm_sigils: save_data.storm_sigils,
             ascension_level: save_data.ascension_level,
             chrono_surge_active: false,
             debug_force_overcharge: false,
-            player,
-            combat_ctx,
-            prog: crate::core::progression_state::ProgressionState {
-                fishing: save_data.fishing,
-                active_fishing: None,
-                stormglass: save_data.stormglass,
-                stormglass_discovered: save_data.stormglass_discovered,
-                storm_sigils: save_data.storm_sigils,
-                challenge_menu: crate::challenges::menu::ChallengeMenu::new(),
-                chess_stats: crate::challenges::chess::ChessStats::default(),
-                active_minigame: None,
-                last_minigame_win: None,
-            },
-            sess: crate::core::session_state::SessionState {
-                last_save_time: save_data.last_save_time,
-                play_time_seconds: save_data.play_time_seconds,
-                chrono_surge_active: false,
-                debug_force_overcharge: false,
-                recent_drops: std::collections::VecDeque::with_capacity(5),
-                xp_rate_samples: std::collections::VecDeque::new(),
-                xp_this_second: 0,
-                ticker: crate::core::ticker::Ticker::new(),
-                cached_derived_stats: crate::character::derived_stats::DerivedStats::default(),
-                cached_prestige_bonuses: crate::character::prestige::PrestigeCombatBonuses::default(
-                ),
-                derived_stats_dirty: true,
-                combat_seconds_this_tick: false,
-                game_over_shown_at: None,
-            },
         })
     }
 
