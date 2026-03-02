@@ -346,6 +346,7 @@ fn main() -> io::Result<()> {
             &cloud_rx,
             &mut cloud_op_in_flight,
             &mut power_cores_state,
+            &deep_state,
         )?;
 
         match splash_result {

@@ -102,6 +102,7 @@ fn build_startup_splash_text(
     cloud_config: Option<&CloudConfig>,
     haven: &haven::Haven,
     enhancement: &enhancement::EnhancementProgress,
+    deep: &crate::deep::DeepState,
 ) -> Vec<Line<'static>> {
     use crate::utils::build_info::{BUILD_COMMIT, BUILD_DATE};
     let now = Utc::now();
@@ -702,6 +703,7 @@ pub fn show_startup_splash_screen(
     cloud_rx: &std::sync::mpsc::Receiver<CloudOpResult>,
     cloud_op_in_flight: &mut bool,
     power_cores: &mut crate::power_cores::PowerCoreState,
+    deep: &crate::deep::DeepState,
 ) -> io::Result<StartupSplashResult> {
     let mut update_status: Option<UpdateInfoStatus> = None;
     let mut time_vault_browser: Option<TimeVaultState> = None;
@@ -883,6 +885,7 @@ pub fn show_startup_splash_screen(
             cloud_config.as_ref(),
             haven,
             enhancement,
+            deep,
         );
         terminal.draw(|f| {
             let area = f.area();
