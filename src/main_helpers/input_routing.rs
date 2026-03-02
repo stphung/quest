@@ -14,6 +14,8 @@ use super::persistence::save_all;
 pub enum InputAction {
     /// Continue the game loop normally.
     Continue,
+    /// Continue and trigger a cloud push (milestone event was committed).
+    ContinueAndPush,
     /// Player quit to character select — break the game loop.
     QuitToSelect,
 }
@@ -87,7 +89,7 @@ pub fn route_game_input(
                 *last_save_instant = Some(Instant::now());
                 *last_save_time = Some(Local::now());
             }
-            InputAction::Continue
+            InputAction::ContinueAndPush
         }
         // StartChronoSurge is handled directly in main.rs before reaching
         // route_game_input, but must be matched for exhaustiveness.
