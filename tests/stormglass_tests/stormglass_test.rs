@@ -3,7 +3,6 @@
 
 use quest::core::game_state::GameState;
 use quest::items::types::Rarity;
-use quest::power_cores::PowerCoreState;
 use quest::stormglass::{earning, spending, types};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -245,7 +244,6 @@ fn test_item_drop_salvage_awards_stormglass() {
             &mut enhancement,
             &mut quest::deep::DeepState::new(),
             &mut achievements,
-            &mut PowerCoreState::default(),
             false,
             &mut rng,
         );
@@ -383,7 +381,6 @@ fn test_chrono_surge_batch_accumulates_stats() {
             &mut enhancement,
             &mut quest::deep::DeepState::new(),
             &mut achievements,
-            &mut PowerCoreState::default(),
             false,
             &mut rng,
         );
@@ -499,7 +496,6 @@ fn test_first_salvage_discovers_stormglass() {
             &mut enhancement,
             &mut quest::deep::DeepState::new(),
             &mut achievements,
-            &mut PowerCoreState::default(),
             false,
             &mut rng,
         );
@@ -561,7 +557,6 @@ fn test_pre_p15_salvage_does_not_discover_stormglass() {
             &mut enhancement,
             &mut quest::deep::DeepState::new(),
             &mut achievements,
-            &mut PowerCoreState::default(),
             false,
             &mut rng,
         );
@@ -628,7 +623,6 @@ fn test_salvage_continues_after_prestige_rank_drops_below_15() {
             &mut enhancement,
             &mut quest::deep::DeepState::new(),
             &mut achievements,
-            &mut PowerCoreState::default(),
             false,
             &mut rng,
         );

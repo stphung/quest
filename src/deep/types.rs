@@ -5,8 +5,10 @@
 //! - **Account-level**: Guild rank, layer breakthroughs, infrastructure, familiarity
 //! - **Operational**: Mercenaries, active missions, Warband Marks
 
+use crate::achievements::AchievementId;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 // ── Discovery & Gate ─────────────────────────────────────────────────────────
 
@@ -699,6 +701,11 @@ pub struct DeepPersistent {
     /// Pending fracture region unlock notification (consumed by tick to show modal).
     #[serde(default)]
     pub pending_fracture_region_unlock: Option<crate::zones::FractureRegion>,
+    /// Power Core timestamps: maps each core's `AchievementId` to the Unix
+    /// timestamp (seconds) when the core last granted a prestige rank.
+    /// Missing entries are treated as "never granted" (timestamp = 0).
+    #[serde(default)]
+    pub power_core_last_granted: HashMap<AchievementId, i64>,
 }
 
 impl Default for DeepPersistent {
@@ -723,6 +730,7 @@ impl DeepPersistent {
             generation_records: Vec::new(),
             fracture_zone_cap: 11,
             pending_fracture_region_unlock: None,
+            power_core_last_granted: HashMap::new(),
         }
     }
 

@@ -18,9 +18,9 @@ use chrono::Utc;
 use quest::achievements::{AchievementId, Achievements};
 use quest::core::game_state::GameState;
 use quest::core::tick_types::{TickEvent, TickResult};
+use quest::deep::DeepState;
 use quest::power_cores::{
-    apply_offline_power_cores, fill_duration_secs, init_new_core, tick_power_cores, PowerCoreState,
-    ALL_POWER_CORES,
+    apply_offline_power_cores, fill_duration_secs, init_new_core, tick_power_cores, ALL_POWER_CORES,
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -66,17 +66,17 @@ fn count_power_core_granted_events(events: &[TickEvent]) -> usize {
 #[test]
 fn core_does_not_grant_before_fill_duration() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
+    let mut deep = DeepState::new();
     let achievements = ach_layer3();
     let mut result = TickResult::default();
 
     // Set last_granted_at to just now — zero elapsed time.
-    pc_state
-        .last_granted_at
+    deep.persistent
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreI, now());
 
     let pr_before = state.prestige_rank;
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut deep, &achievements, &mut result);
 
     assert_eq!(
         state.prestige_rank, pr_before,
@@ -88,8 +88,8 @@ fn core_does_not_grant_before_fill_duration() {
         "no PowerCoreGranted events should be emitted"
     );
     assert!(
-        !result.power_cores_changed,
-        "power_cores_changed must be false when nothing is granted"
+        !result.deep_changed,
+        "deep_changed must be false when nothing is granted"
     );
 }
 
@@ -100,18 +100,18 @@ fn core_does_not_grant_before_fill_duration() {
 #[test]
 fn core_grants_one_pr_when_fill_duration_elapsed() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
+    let mut deep = DeepState::new();
     let achievements = ach_layer3(); // Red Fault: 2 PR/day = 43200s fill
     let mut result = TickResult::default();
 
     let fill = fill_duration_secs(2); // 43200s
                                       // Simulate exactly one fill duration + 1 second of elapsed time.
-    pc_state
-        .last_granted_at
+    deep.persistent
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreI, now() - fill - 1);
 
     let pr_before = state.prestige_rank;
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut deep, &achievements, &mut result);
 
     assert_eq!(
         state.prestige_rank,
@@ -124,8 +124,8 @@ fn core_grants_one_pr_when_fill_duration_elapsed() {
         "exactly one PowerCoreGranted event expected"
     );
     assert!(
-        result.power_cores_changed,
-        "power_cores_changed must be set after a grant"
+        result.deep_changed,
+        "deep_changed must be set after a grant"
     );
 }
 
@@ -136,21 +136,22 @@ fn core_grants_one_pr_when_fill_duration_elapsed() {
 #[test]
 fn timer_resets_after_granting() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
+    let mut deep = DeepState::new();
     let achievements = ach_layer3();
     let mut result = TickResult::default();
 
     let fill = fill_duration_secs(2);
     let old_timestamp = now() - fill - 1;
-    pc_state
-        .last_granted_at
+    deep.persistent
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreI, old_timestamp);
 
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut deep, &achievements, &mut result);
 
     // The timestamp must have advanced by fill_secs from the old value.
-    let new_timestamp = pc_state
-        .last_granted_at
+    let new_timestamp = deep
+        .persistent
+        .power_core_last_granted
         .get(&AchievementId::PowerCoreI)
         .copied()
         .expect("timestamp should be present after grant");
@@ -169,7 +170,7 @@ fn timer_resets_after_granting() {
     // A second tick immediately after should NOT grant again.
     let mut result2 = TickResult::default();
     let pr_after_first = state.prestige_rank;
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result2);
+    tick_power_cores(&mut state, &mut deep, &achievements, &mut result2);
     assert_eq!(
         state.prestige_rank, pr_after_first,
         "no grant should occur immediately after reset"
@@ -188,7 +189,7 @@ fn timer_resets_after_granting() {
 #[test]
 fn multiple_cores_grant_independently() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
+    let mut deep = DeepState::new();
 
     // Unlock two cores: Layer3 (2 PR/day) and Layer7 (3 PR/day).
     let mut achievements = Achievements::default();
@@ -201,17 +202,17 @@ fn multiple_cores_grant_independently() {
     let fill_layer7 = fill_duration_secs(3);
 
     // Layer3: 1 full cycle elapsed → should grant 1 PR.
-    pc_state
-        .last_granted_at
+    deep.persistent
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreI, now() - fill_layer3 - 1);
 
     // Layer7: 1 full cycle elapsed → should grant 1 PR.
-    pc_state
-        .last_granted_at
+    deep.persistent
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreII, now() - fill_layer7 - 1);
 
     let pr_before = state.prestige_rank;
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut deep, &achievements, &mut result);
 
     // Each core grants 1 PR independently → total +2.
     assert_eq!(
@@ -226,8 +227,9 @@ fn multiple_cores_grant_independently() {
     );
 
     // Layer12 is NOT unlocked — its timestamp should not affect anything.
-    assert!(!pc_state
-        .last_granted_at
+    assert!(!deep
+        .persistent
+        .power_core_last_granted
         .contains_key(&AchievementId::PowerCoreIII));
 }
 
@@ -238,18 +240,18 @@ fn multiple_cores_grant_independently() {
 #[test]
 fn offline_catchup_48h_one_core_grants_four_pr() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
+    let mut deep = DeepState::new();
     let achievements = ach_layer3(); // Red Fault: 2 PR/day
 
     let fill = fill_duration_secs(2); // 43200s
     let elapsed_48h: i64 = 48 * 3600; // 172800s = exactly 4 fill cycles
 
-    pc_state
-        .last_granted_at
+    deep.persistent
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreI, now() - elapsed_48h - 1);
 
     let pr_before = state.prestige_rank;
-    let granted = apply_offline_power_cores(&mut state, &mut pc_state, &achievements);
+    let granted = apply_offline_power_cores(&mut state, &mut deep, &achievements);
 
     assert_eq!(
         granted, 4,
@@ -262,7 +264,7 @@ fn offline_catchup_48h_one_core_grants_four_pr() {
     );
 
     // Timestamp should have advanced by 4 fill durations.
-    let new_ts = pc_state.last_granted_at[&AchievementId::PowerCoreI];
+    let new_ts = deep.persistent.power_core_last_granted[&AchievementId::PowerCoreI];
     let expected_advance = fill * 4;
     let old_ts = now() - elapsed_48h - 1;
     assert_eq!(
@@ -279,7 +281,7 @@ fn offline_catchup_48h_one_core_grants_four_pr() {
 #[test]
 fn offline_catchup_24h_all_six_cores_correct_total() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
+    let mut deep = DeepState::new();
     let achievements = ach_all_cores();
 
     // 24h offline: each core completes floor(86400 / fill_duration) cycles.
@@ -293,13 +295,13 @@ fn offline_catchup_24h_all_six_cores_correct_total() {
     let elapsed_24h: i64 = 86400 + 60; // 24h + 60s to pass all fill durations
 
     for def in ALL_POWER_CORES {
-        pc_state
-            .last_granted_at
+        deep.persistent
+            .power_core_last_granted
             .insert(def.achievement_id, now() - elapsed_24h);
     }
 
     let pr_before = state.prestige_rank;
-    let granted = apply_offline_power_cores(&mut state, &mut pc_state, &achievements);
+    let granted = apply_offline_power_cores(&mut state, &mut deep, &achievements);
 
     // With 24h+60s elapsed and fill durations of 86400/N:
     // Layer3 (43200s fill): floor(86460 / 43200) = 2 cycles
@@ -327,7 +329,7 @@ fn offline_catchup_24h_all_six_cores_correct_total() {
 #[test]
 fn partial_progress_preserved_no_early_grant() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
+    let mut deep = DeepState::new();
     let achievements = ach_layer3(); // Red Fault: 2 PR/day, 43200s fill
     let mut result = TickResult::default();
 
@@ -336,12 +338,12 @@ fn partial_progress_preserved_no_early_grant() {
 
     assert!(elapsed_18h < fill, "sanity check: 9h < 12h fill");
 
-    pc_state
-        .last_granted_at
+    deep.persistent
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreI, now() - elapsed_18h);
 
     let pr_before = state.prestige_rank;
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut deep, &achievements, &mut result);
 
     assert_eq!(
         state.prestige_rank, pr_before,
@@ -354,7 +356,7 @@ fn partial_progress_preserved_no_early_grant() {
     );
 
     // The last_granted_at timestamp must remain unchanged (progress is preserved).
-    let ts = pc_state.last_granted_at[&AchievementId::PowerCoreI];
+    let ts = deep.persistent.power_core_last_granted[&AchievementId::PowerCoreI];
     let expected_ts = now() - elapsed_18h;
     // Allow ±2 seconds of clock drift in the test.
     assert!(
@@ -370,20 +372,20 @@ fn partial_progress_preserved_no_early_grant() {
 #[test]
 fn locked_cores_do_not_grant() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
+    let mut deep = DeepState::new();
     let achievements = Achievements::default(); // nothing unlocked
     let mut result = TickResult::default();
 
     // Pre-seed all cores with old timestamps.
     let far_past = now() - 86400 * 30; // 30 days ago
     for def in ALL_POWER_CORES {
-        pc_state
-            .last_granted_at
+        deep.persistent
+            .power_core_last_granted
             .insert(def.achievement_id, far_past);
     }
 
     let pr_before = state.prestige_rank;
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut deep, &achievements, &mut result);
 
     assert_eq!(
         state.prestige_rank, pr_before,
@@ -395,8 +397,8 @@ fn locked_cores_do_not_grant() {
         "no PowerCoreGranted events from locked cores"
     );
     assert!(
-        !result.power_cores_changed,
-        "power_cores_changed must remain false when nothing is processed"
+        !result.deep_changed,
+        "deep_changed must remain false when nothing is processed"
     );
 }
 
@@ -408,16 +410,16 @@ fn locked_cores_do_not_grant() {
 fn prestige_rank_incremented_on_grant() {
     let mut state = make_state();
     state.prestige_rank = 100; // Start at an arbitrary non-zero rank.
-    let mut pc_state = PowerCoreState::default();
+    let mut deep = DeepState::new();
     let achievements = ach_layer3();
     let mut result = TickResult::default();
 
     let fill = fill_duration_secs(2);
-    pc_state
-        .last_granted_at
+    deep.persistent
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreI, now() - fill - 1);
 
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut deep, &achievements, &mut result);
 
     assert_eq!(
         state.prestige_rank, 101,
@@ -432,16 +434,16 @@ fn prestige_rank_incremented_on_grant() {
 #[test]
 fn tick_event_power_core_granted_emitted_with_correct_name() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
+    let mut deep = DeepState::new();
     let achievements = ach_layer3(); // Red Fault
     let mut result = TickResult::default();
 
     let fill = fill_duration_secs(2);
-    pc_state
-        .last_granted_at
+    deep.persistent
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreI, now() - fill - 1);
 
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut deep, &achievements, &mut result);
 
     assert_eq!(result.events.len(), 1);
     match &result.events[0] {
@@ -459,24 +461,24 @@ fn tick_event_power_core_granted_emitted_with_correct_name() {
 #[test]
 fn rapid_successive_ticks_do_not_double_grant() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default();
+    let mut deep = DeepState::new();
     let achievements = ach_layer3();
 
     let fill = fill_duration_secs(2);
     // Exactly one cycle has elapsed.
-    pc_state
-        .last_granted_at
+    deep.persistent
+        .power_core_last_granted
         .insert(AchievementId::PowerCoreI, now() - fill - 1);
 
     // First tick: should grant 1 PR.
     let mut result1 = TickResult::default();
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result1);
+    tick_power_cores(&mut state, &mut deep, &achievements, &mut result1);
     let pr_after_first = state.prestige_rank;
     assert_eq!(count_power_core_granted_events(&result1.events), 1);
 
     // Immediately fire a second tick.
     let mut result2 = TickResult::default();
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result2);
+    tick_power_cores(&mut state, &mut deep, &achievements, &mut result2);
 
     assert_eq!(
         state.prestige_rank, pr_after_first,
@@ -491,7 +493,7 @@ fn rapid_successive_ticks_do_not_double_grant() {
     // Fire 10 more rapid ticks for good measure.
     for _ in 0..10 {
         let mut r = TickResult::default();
-        tick_power_cores(&mut state, &mut pc_state, &achievements, &mut r);
+        tick_power_cores(&mut state, &mut deep, &achievements, &mut r);
         assert_eq!(
             state.prestige_rank, pr_after_first,
             "rapid ticks must never double-grant"
@@ -506,18 +508,19 @@ fn rapid_successive_ticks_do_not_double_grant() {
 #[test]
 fn newly_unlocked_core_starts_from_current_time() {
     let mut state = make_state();
-    let mut pc_state = PowerCoreState::default(); // no entries — simulates brand-new core unlock
+    let mut deep = DeepState::new(); // no entries — simulates brand-new core unlock
     let achievements = ach_layer3();
     let mut result = TickResult::default();
 
     // last_granted_at for PowerCoreI is missing (timestamp = 0 / absent).
-    assert!(!pc_state
-        .last_granted_at
+    assert!(!deep
+        .persistent
+        .power_core_last_granted
         .contains_key(&AchievementId::PowerCoreI));
 
     let pr_before = state.prestige_rank;
     let time_before = now();
-    tick_power_cores(&mut state, &mut pc_state, &achievements, &mut result);
+    tick_power_cores(&mut state, &mut deep, &achievements, &mut result);
     let time_after = now();
 
     // No PR should be granted on first tick — it just sets the start time.
@@ -532,8 +535,9 @@ fn newly_unlocked_core_starts_from_current_time() {
     );
 
     // The timestamp should now be set to approximately now.
-    let ts = pc_state
-        .last_granted_at
+    let ts = deep
+        .persistent
+        .power_core_last_granted
         .get(&AchievementId::PowerCoreI)
         .copied()
         .expect("timestamp must be set after first tick");
@@ -543,18 +547,19 @@ fn newly_unlocked_core_starts_from_current_time() {
         "initial timestamp must be set to current time (got {ts}, expected {time_before}..{time_after})"
     );
 
-    // power_cores_changed should be true because we initialised the timestamp.
+    // deep_changed should be true because we initialised the timestamp.
     assert!(
-        result.power_cores_changed,
-        "power_cores_changed must be true after initialising a new core"
+        result.deep_changed,
+        "deep_changed must be true after initialising a new core"
     );
 
     // After the core is initialised with `init_new_core`, the same behaviour holds.
-    let mut pc_state2 = PowerCoreState::default();
-    init_new_core(&mut pc_state2, AchievementId::PowerCoreII);
+    let mut deep2 = DeepState::new();
+    init_new_core(&mut deep2, AchievementId::PowerCoreII);
 
-    let ts2 = pc_state2
-        .last_granted_at
+    let ts2 = deep2
+        .persistent
+        .power_core_last_granted
         .get(&AchievementId::PowerCoreII)
         .copied()
         .expect("init_new_core must set timestamp");
