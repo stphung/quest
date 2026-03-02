@@ -175,6 +175,34 @@ pub fn poll_cloud_result(
     Some(action_result)
 }
 
+/// Spawn a background thread that validates a GitHub token and fetches the repo list.
+fn spawn_token_validation(tx: &std::sync::mpsc::Sender<CloudOpResult>, token: String) {
+    let tx = tx.clone();
+    std::thread::spawn(move || {
+        let tx2 = tx.clone();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            match history::cloud::github_get_username(&token) {
+                Ok(username) => {
+                    let repos = history::cloud::github_list_repos(&token).unwrap_or_default();
+                    let _ = tx.send(CloudOpResult::TokenValidated {
+                        username,
+                        token,
+                        repos,
+                    });
+                }
+                Err(e) => {
+                    let _ = tx.send(CloudOpResult::Failed(e));
+                }
+            }
+        }));
+        if result.is_err() {
+            let _ = tx2.send(CloudOpResult::Failed(
+                "Cloud operation failed unexpectedly".to_string(),
+            ));
+        }
+    });
+}
+
 /// Dispatch async (non-blocking) cloud `InputResult` variants.
 ///
 /// Handles: `ValidateToken`, `ChangeRepo`, `LinkCloud`, `PushCloud`, `PullCloud`,
@@ -192,32 +220,7 @@ pub fn dispatch_cloud_action(
         InputResult::ValidateToken { token } => {
             if !cloud.op_in_flight {
                 cloud.op_in_flight = true;
-                let tx = cloud.tx.clone();
-                let tok = token.clone();
-                std::thread::spawn(move || {
-                    let tx2 = tx.clone();
-                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        match history::cloud::github_get_username(&tok) {
-                            Ok(username) => {
-                                let repos =
-                                    history::cloud::github_list_repos(&tok).unwrap_or_default();
-                                let _ = tx.send(CloudOpResult::TokenValidated {
-                                    username,
-                                    token: tok,
-                                    repos,
-                                });
-                            }
-                            Err(e) => {
-                                let _ = tx.send(CloudOpResult::Failed(e));
-                            }
-                        }
-                    }));
-                    if result.is_err() {
-                        let _ = tx2.send(CloudOpResult::Failed(
-                            "Cloud operation failed unexpectedly".to_string(),
-                        ));
-                    }
-                });
+                spawn_token_validation(&cloud.tx, token.clone());
                 if let GameOverlay::TimeVault { ref mut browser } = overlay {
                     browser.cloud_status = CloudStatus::Syncing;
                 }
@@ -228,32 +231,7 @@ pub fn dispatch_cloud_action(
             if !cloud.op_in_flight {
                 if let Some(ref config) = cloud.config {
                     cloud.op_in_flight = true;
-                    let tx = cloud.tx.clone();
-                    let tok = config.token.clone();
-                    std::thread::spawn(move || {
-                        let tx2 = tx.clone();
-                        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                            match history::cloud::github_get_username(&tok) {
-                                Ok(username) => {
-                                    let repos =
-                                        history::cloud::github_list_repos(&tok).unwrap_or_default();
-                                    let _ = tx.send(CloudOpResult::TokenValidated {
-                                        username,
-                                        token: tok,
-                                        repos,
-                                    });
-                                }
-                                Err(e) => {
-                                    let _ = tx.send(CloudOpResult::Failed(e));
-                                }
-                            }
-                        }));
-                        if result.is_err() {
-                            let _ = tx2.send(CloudOpResult::Failed(
-                                "Cloud operation failed unexpectedly".to_string(),
-                            ));
-                        }
-                    });
+                    spawn_token_validation(&cloud.tx, config.token.clone());
                     if let GameOverlay::TimeVault { ref mut browser } = overlay {
                         browser.cloud_status = CloudStatus::Syncing;
                     }
