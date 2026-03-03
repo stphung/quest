@@ -99,6 +99,7 @@ pub fn fill_ratio(elapsed: i64, fill_secs: i64) -> f64 {
 /// When `ratio >= 1.0` (core ready), returns `"Ready!"`.
 /// When `hours > 0`, returns `"Xh Ym"`.
 /// Otherwise returns `"Ym"`.
+#[allow(dead_code)]
 pub fn format_core_time_remaining(remaining_secs: i64, ratio: f64) -> String {
     if ratio >= 1.0 {
         "Ready!".to_string()

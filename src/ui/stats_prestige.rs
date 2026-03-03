@@ -9,9 +9,7 @@ use crate::core::game_logic::xp_for_next_level;
 use crate::core::game_state::GameState;
 use crate::deep::DeepState;
 use crate::fishing::types::{FishingState, RANK_NAMES};
-use crate::power_cores::{
-    fill_duration_secs, fill_ratio, format_core_time_remaining, ALL_POWER_CORES,
-};
+use crate::power_cores::{fill_duration_secs, fill_ratio, ALL_POWER_CORES};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -544,108 +542,312 @@ pub(crate) fn to_roman(n: u32) -> String {
     result
 }
 
-/// Draws the Power Cores section showing each unlocked core's fill progress.
+/// Draws the unified Deep panel: guild rank, missions, crew, and power core status.
 ///
-/// Only renders when the player has ≥1 unlocked power core.
-/// Returns the number of lines rendered (0 if no cores).
-pub(super) fn draw_power_cores_panel(
+/// Shows when The Deep is discovered. 8 rows total (6 content + 2 border).
+pub(super) fn draw_deep_panel(
     frame: &mut Frame,
     area: Rect,
     achievements: &crate::achievements::Achievements,
     deep: &DeepState,
 ) {
-    const AMBER: Color = Color::Rgb(255, 165, 0);
-    const BAR_WIDTH: usize = 16;
+    const AMBER: Color = Color::Rgb(220, 180, 60);
+    const CORE_AMBER: Color = Color::Rgb(255, 165, 0);
 
-    // Only show the panel once at least one core is unlocked.
-    let has_any = ALL_POWER_CORES
-        .iter()
-        .any(|c| achievements.is_unlocked(c.achievement_id));
-    if !has_any {
+    if !deep.persistent.discovered {
         return;
     }
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(" Power Cores ")
-        .border_style(Style::default().fg(super::themed_border_color(AMBER)));
-    let inner = super::render_themed_block(frame, area, block, AMBER, super::BorderFxContext);
-
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64;
+        .title(" The Deep ")
+        .border_style(Style::default().fg(super::themed_border_color(CORE_AMBER)));
+    let inner = super::render_themed_block(frame, area, block, CORE_AMBER, super::BorderFxContext);
 
     let mut lines: Vec<Line> = Vec::new();
+    let width = inner.width as usize;
 
-    for core in ALL_POWER_CORES {
-        let is_unlocked = achievements.is_unlocked(core.achievement_id);
+    // Row 1: Guild rank + Warband Marks
+    {
+        let rank_name = deep.persistent.guild_rank.display_name();
+        let marks = deep.prestige.warband_marks;
+        let marks_str = format!("\u{25c6} {} Warband Marks", marks);
+        let rank_part = format!("\u{2b21} {}", rank_name);
+        let padding = width.saturating_sub(rank_part.len() + marks_str.len());
 
-        let mut spans: Vec<Span<'static>> = Vec::new();
-
-        if is_unlocked {
-            // ❂ CoreName      [████░░░░░░░░] Xh Xm
-            spans.push(Span::styled(
-                "\u{2742} ",
-                Style::default().fg(AMBER).add_modifier(Modifier::BOLD),
-            ));
-
-            let name_padded = format!("{:<14}", core.name);
-            spans.push(Span::styled(name_padded, Style::default().fg(AMBER)));
-
-            let fill_secs = fill_duration_secs(core.pr_per_day);
-            let last_granted = deep
-                .persistent
-                .power_core_last_granted
-                .get(&core.achievement_id)
-                .copied()
-                .unwrap_or(0);
-
-            let elapsed = (now - last_granted).max(0);
-            let ratio = fill_ratio(elapsed, fill_secs);
-
-            let filled = (ratio * BAR_WIDTH as f64).round() as usize;
-            let empty = BAR_WIDTH.saturating_sub(filled);
-
-            let remaining_secs = (fill_secs - elapsed).max(0);
-            let time_str = format_core_time_remaining(remaining_secs, ratio);
-
-            spans.push(Span::styled("[", Style::default().fg(Color::DarkGray)));
-            spans.push(Span::styled(
-                "\u{2588}".repeat(filled),
+        lines.push(Line::from(vec![
+            Span::styled("\u{2b21} ", Style::default().fg(Color::White)),
+            Span::styled(rank_name.to_string(), Style::default().fg(Color::White)),
+            Span::raw(" ".repeat(padding)),
+            Span::styled("\u{25c6} ", Style::default().fg(AMBER)),
+            Span::styled(
+                format!("{} Warband Marks", marks),
                 Style::default().fg(AMBER),
+            ),
+        ]));
+    }
+
+    // Row 2: Missions + Next completion timer
+    {
+        let active = deep.prestige.active_mission_count();
+        let max_concurrent = crate::deep::effective_concurrent_missions(
+            deep.persistent.guild_rank,
+            deep.persistent.deepest_layer_reached,
+        );
+        let mission_str = format!("Missions {}/{}", active, max_concurrent);
+
+        let eta = next_mission_eta_secs(&deep.prestige);
+        let eta_str = match eta {
+            Some(secs) => format!("\u{25f7} Next: ~{}", format_eta(secs as u64)),
+            None => "\u{25f7} idle".to_string(),
+        };
+        let eta_color = match eta {
+            Some(secs) if secs < 900 => Color::Yellow,
+            _ => Color::DarkGray,
+        };
+
+        let padding = width.saturating_sub(mission_str.len() + eta_str.len());
+
+        lines.push(Line::from(vec![
+            Span::styled(mission_str, Style::default().fg(Color::Cyan)),
+            Span::raw(" ".repeat(padding)),
+            Span::styled(eta_str, Style::default().fg(eta_color)),
+        ]));
+    }
+
+    // Row 3: Crew glyphs + Frontier + Events
+    {
+        let mut crew_spans: Vec<Span> = Vec::new();
+        let mut available_count: usize = 0;
+        let mut on_mission_count: usize = 0;
+        let mut injured_count: usize = 0;
+
+        for merc in &deep.prestige.roster {
+            match merc.status {
+                crate::deep::MercStatus::Available => available_count += 1,
+                crate::deep::MercStatus::OnMission(_) => on_mission_count += 1,
+                crate::deep::MercStatus::Injured { .. } => injured_count += 1,
+                crate::deep::MercStatus::Lost => {} // skip
+            }
+        }
+
+        // Available mercs: ♦ (green)
+        if available_count > 0 {
+            crew_spans.push(Span::styled(
+                "\u{2666}".repeat(available_count),
+                Style::default().fg(Color::Green),
             ));
+        }
+        // Space between groups
+        if available_count > 0 && (on_mission_count > 0 || injured_count > 0) {
+            crew_spans.push(Span::raw(" "));
+        }
+        // On mission: ♢ (cyan)
+        if on_mission_count > 0 {
+            crew_spans.push(Span::styled(
+                "\u{2662}".repeat(on_mission_count),
+                Style::default().fg(Color::Cyan),
+            ));
+        }
+        if on_mission_count > 0 && injured_count > 0 {
+            crew_spans.push(Span::raw(" "));
+        }
+        // Injured: ✝ (red)
+        if injured_count > 0 {
+            crew_spans.push(Span::styled(
+                "\u{271d}".repeat(injured_count),
+                Style::default().fg(Color::Red),
+            ));
+        }
+
+        let crew_width: usize = available_count
+            + on_mission_count
+            + injured_count
+            + if available_count > 0 && (on_mission_count > 0 || injured_count > 0) {
+                1
+            } else {
+                0
+            }
+            + if on_mission_count > 0 && injured_count > 0 {
+                1
+            } else {
+                0
+            };
+
+        // Right side: Frontier + events
+        let frontier = deep.persistent.frontier_layer();
+        let events = pending_event_count(&deep.prestige);
+        let frontier_str = format!("Frontier L{}", frontier);
+        let event_str = if events > 0 {
+            format!("  \u{26a1}{}", events)
+        } else {
+            String::new()
+        };
+        let right_str_len = frontier_str.len() + event_str.len();
+
+        let padding = width.saturating_sub(crew_width + right_str_len);
+        crew_spans.push(Span::raw(" ".repeat(padding)));
+        crew_spans.push(Span::styled(
+            frontier_str,
+            Style::default().fg(Color::Rgb(120, 140, 170)),
+        ));
+        if events > 0 {
+            crew_spans.push(Span::styled(event_str, Style::default().fg(Color::Yellow)));
+        }
+
+        lines.push(Line::from(crew_spans));
+    }
+
+    // Row 4: Separator
+    {
+        let sep = "\u{2500}".repeat(width);
+        lines.push(Line::from(Span::styled(
+            sep,
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
+
+    // Rows 5-6: Core summary + badges
+    let summary = core_summary(achievements, deep);
+    {
+        // Row 5: "Cores: N ✓ Ready (+X PR)  ·  Next: Xh Ym" or "Cores: locked ..."
+        let mut spans: Vec<Span> = Vec::new();
+
+        if summary.unlocked_count == 0 {
+            let left = "Cores: locked";
+            let right = "First core at L3";
+            let padding = width.saturating_sub(left.len() + right.len());
             spans.push(Span::styled(
-                "\u{2591}".repeat(empty),
+                left.to_string(),
                 Style::default().fg(Color::DarkGray),
             ));
-            spans.push(Span::styled("] ", Style::default().fg(Color::DarkGray)));
-
-            let time_style = if ratio >= 1.0 {
+            spans.push(Span::raw(" ".repeat(padding)));
+            spans.push(Span::styled(
+                right.to_string(),
+                Style::default().fg(Color::DarkGray),
+            ));
+        } else if summary.ready_count > 0 && summary.next_ready_secs.is_none() {
+            // All unlocked cores are ready
+            let left = format!(
+                "Cores: {} \u{2713} Ready (+{} PR)",
+                summary.ready_count, summary.ready_pr
+            );
+            let right = "All ready!";
+            let padding = width.saturating_sub(left.len() + 4 + right.len());
+            spans.push(Span::styled(
+                "Cores: ",
+                Style::default().fg(Color::DarkGray),
+            ));
+            spans.push(Span::styled(
+                format!("{} \u{2713} Ready", summary.ready_count),
+                Style::default().fg(Color::Green),
+            ));
+            spans.push(Span::styled(
+                format!(" (+{} PR)", summary.ready_pr),
+                Style::default().fg(Color::Green),
+            ));
+            spans.push(Span::raw(
+                " ".repeat(padding.saturating_sub("Cores: ".len())),
+            ));
+            spans.push(Span::styled(
+                "All ready!".to_string(),
                 Style::default()
                     .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(Color::DarkGray)
-            };
-            spans.push(Span::styled(time_str, time_style));
+                    .add_modifier(Modifier::BOLD),
+            ));
         } else {
-            // ◇ CoreName      Layer XX
-            spans.push(Span::styled(
-                "\u{25c7} ",
-                Style::default().fg(Color::DarkGray),
-            ));
+            let ready_part = if summary.ready_count > 0 {
+                format!(
+                    "{} \u{2713} Ready (+{} PR)",
+                    summary.ready_count, summary.ready_pr
+                )
+            } else {
+                "0 \u{2713} Ready".to_string()
+            };
+            let next_part = match summary.next_ready_secs {
+                Some(secs) => format!("Next: {}", format_eta(secs as u64)),
+                None => String::new(),
+            };
+            let left_len = "Cores: ".len() + ready_part.len();
+            let right_len = next_part.len();
+            let padding = width.saturating_sub(left_len + 5 + right_len);
 
-            let name_padded = format!("{:<14}", core.name);
             spans.push(Span::styled(
-                name_padded,
+                "Cores: ",
                 Style::default().fg(Color::DarkGray),
             ));
+            if summary.ready_count > 0 {
+                spans.push(Span::styled(ready_part, Style::default().fg(Color::Green)));
+            } else {
+                spans.push(Span::styled(
+                    ready_part,
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+            spans.push(Span::raw(" ".repeat(padding)));
+            spans.push(Span::styled(
+                format!("  \u{00b7}  {}", next_part),
+                Style::default().fg(Color::DarkGray),
+            ));
+        }
 
-            spans.push(Span::styled(
-                format!("The Deep \u{00b7} L{}", core.required_layer),
-                Style::default().fg(Color::DarkGray),
-            ));
+        lines.push(Line::from(spans));
+    }
+
+    {
+        // Row 6: Per-core badges + PR/day
+        let mut spans: Vec<Span> = Vec::new();
+
+        for (i, badge) in summary.cores.iter().enumerate() {
+            if i > 0 {
+                spans.push(Span::raw(" "));
+            }
+            if badge.unlocked {
+                spans.push(Span::styled("\u{2742}", Style::default().fg(CORE_AMBER)));
+                if badge.ready {
+                    spans.push(Span::styled("\u{2713}", Style::default().fg(Color::Green)));
+                } else {
+                    let time = format_core_time_short(badge.remaining_secs);
+                    spans.push(Span::styled(time, Style::default().fg(Color::DarkGray)));
+                }
+            } else {
+                spans.push(Span::styled(
+                    format!("\u{25c7}L{}", badge.required_layer),
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+        }
+
+        // Right-align PR/day
+        let pr_str = format!("+{} PR/day", summary.total_pr_per_day);
+        // Calculate current badge width for padding
+        let badge_text: String = summary
+            .cores
+            .iter()
+            .enumerate()
+            .map(|(i, b)| {
+                let prefix = if i > 0 { " " } else { "" };
+                if b.unlocked {
+                    if b.ready {
+                        format!("{}\u{2742}\u{2713}", prefix)
+                    } else {
+                        format!(
+                            "{}\u{2742}{}",
+                            prefix,
+                            format_core_time_short(b.remaining_secs)
+                        )
+                    }
+                } else {
+                    format!("{}\u{25c7}L{}", prefix, b.required_layer)
+                }
+            })
+            .collect();
+        let badge_width = badge_text.chars().count();
+        let padding = width.saturating_sub(badge_width + pr_str.len());
+
+        if summary.total_pr_per_day > 0 {
+            spans.push(Span::raw(" ".repeat(padding)));
+            spans.push(Span::styled(pr_str, Style::default().fg(CORE_AMBER)));
         }
 
         lines.push(Line::from(spans));
@@ -656,7 +858,6 @@ pub(super) fn draw_power_cores_panel(
 }
 
 /// Returns seconds until the next active mission completes, or None if no active missions.
-#[allow(dead_code)]
 fn next_mission_eta_secs(prestige: &crate::deep::DeepPrestige) -> Option<i64> {
     let now = chrono::Utc::now();
     prestige
@@ -673,7 +874,6 @@ fn next_mission_eta_secs(prestige: &crate::deep::DeepPrestige) -> Option<i64> {
 }
 
 /// Count of active missions with pending events needing player response.
-#[allow(dead_code)]
 fn pending_event_count(prestige: &crate::deep::DeepPrestige) -> usize {
     prestige
         .active_missions
@@ -682,7 +882,6 @@ fn pending_event_count(prestige: &crate::deep::DeepPrestige) -> usize {
         .count()
 }
 
-#[allow(dead_code)]
 struct CoreSummary {
     ready_count: usize,
     ready_pr: u32,
@@ -692,7 +891,6 @@ struct CoreSummary {
     cores: Vec<CoreBadge>,
 }
 
-#[allow(dead_code)]
 struct CoreBadge {
     unlocked: bool,
     ready: bool,
@@ -700,7 +898,6 @@ struct CoreBadge {
     required_layer: u32,
 }
 
-#[allow(dead_code)]
 fn core_summary(
     achievements: &crate::achievements::Achievements,
     deep: &crate::deep::DeepState,
@@ -775,7 +972,6 @@ fn core_summary(
 }
 
 /// Format seconds into short form for core badges: "1h", "2h", "45m", "11h"
-#[allow(dead_code)]
 fn format_core_time_short(secs: i64) -> String {
     let secs = secs.max(0) as u64;
     let hours = secs / 3600;
