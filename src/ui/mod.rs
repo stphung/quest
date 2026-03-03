@@ -60,6 +60,8 @@ pub mod title_browser_scene;
 mod zone_bg;
 
 use crate::challenges::ActiveMinigame;
+use crate::combat::logic::effective_enemy_attack_interval;
+use crate::core::constants::{ATTACK_INTERVAL_SECONDS, BOSS_ENRAGE_SECONDS};
 use crate::core::game_state::GameState;
 use crate::utils::updater::UpdateInfo;
 use ratatui::{
@@ -1024,33 +1026,84 @@ fn draw_status_strip_dungeon(frame: &mut Frame, row0: Rect, row1: Rect, game_sta
     }
 }
 
-/// Combat/idle status strip: player HP on row 1, enemy HP or idle on row 2.
+/// Builds a text-based HP bar string, e.g. "████░░░░" for a given ratio and width.
+fn text_hp_bar(ratio: f64, width: usize) -> String {
+    let filled = (ratio * width as f64).round() as usize;
+    let empty = width.saturating_sub(filled);
+    let mut bar = String::with_capacity(width * 3);
+    for _ in 0..filled {
+        bar.push('\u{2588}'); // █
+    }
+    for _ in 0..empty {
+        bar.push('\u{2591}'); // ░
+    }
+    bar
+}
+
+/// Combat/idle status strip: player HP + attack timer + DPS on row 1,
+/// enemy HP + enemy timer (or enrage for bosses) on row 2.
 fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_state: &GameState) {
-    // Row 1: Player HP gauge
     let hp = &game_state.combat_state;
+    let derived = game_state.cached_derived_stats;
+
+    // DPS calculation (same as draw_combat_status in combat_scene.rs)
+    let base_dps = derived.total_damage() as f64 / ATTACK_INTERVAL_SECONDS;
+    let effective_dps = base_dps
+        * (1.0 + (derived.crit_chance_percent as f64 / 100.0) * (derived.crit_multiplier - 1.0));
+
+    // HP ratio for text bar
     let hp_ratio = if hp.player_max_hp > 0 {
         (hp.player_current_hp as f64 / hp.player_max_hp as f64).clamp(0.0, 1.0)
     } else {
         0.0
     };
-    let hp_label = format!("HP: {}/{}", hp.player_current_hp, hp.player_max_hp);
-    render_hp_bar_with_flash(
-        frame,
-        row0,
-        hp_label,
-        hp_ratio,
-        Color::Green,
-        game_state.combat_state.player_damage_floats.last(),
-    );
 
-    // Row 2: Enemy HP or idle status
+    // Row 1: Player HP text bar + attack timer + DPS
+    let bar_width = (row0.width as usize / 4).clamp(4, 10);
+    let hp_bar = text_hp_bar(hp_ratio, bar_width);
+
+    let mut row0_spans = vec![
+        Span::styled(
+            format!("HP:{}/{} ", hp.player_current_hp, hp.player_max_hp),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(hp_bar, Style::default().fg(Color::Green)),
+    ];
+
+    if hp.current_enemy.is_some() {
+        let player_interval = ATTACK_INTERVAL_SECONDS / derived.attack_speed_multiplier;
+        let player_next = (player_interval - hp.player_attack_timer).max(0.0);
+        let player_style = if player_next < 0.3 {
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Green)
+        };
+        row0_spans.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
+        row0_spans.push(Span::styled(
+            format!("You:{:.1}s", player_next),
+            player_style,
+        ));
+    }
+
+    row0_spans.push(Span::styled(
+        format!(" | DPS:{:.0}", effective_dps),
+        Style::default().fg(Color::DarkGray),
+    ));
+
+    let row0_line = Paragraph::new(Line::from(row0_spans)).alignment(Alignment::Center);
+    frame.render_widget(row0_line, row0);
+
+    // Row 2: Enemy HP + enemy timer / enrage, or idle message
     if let Some(enemy) = &hp.current_enemy {
         let enemy_ratio = if enemy.max_hp > 0 {
             (enemy.current_hp as f64 / enemy.max_hp as f64).clamp(0.0, 1.0)
         } else {
             0.0
         };
-        let enemy_label = format!("{}: {}/{}", enemy.name, enemy.current_hp, enemy.max_hp);
         let is_boss = game_state.zone_progression.fighting_boss || enemy.name.starts_with("Boss ");
         let hp_color = if is_boss {
             Color::LightRed
@@ -1062,21 +1115,63 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
                 .unwrap_or(game_state.zone_progression.current_zone_id);
             enemy_sprites::zone_palette(zone_id).primary
         };
-        render_hp_bar_with_flash(
-            frame,
-            row1,
-            enemy_label,
-            enemy_ratio,
-            hp_color,
-            game_state.combat_state.enemy_damage_floats.last(),
-        );
+
+        let enemy_bar = text_hp_bar(enemy_ratio, bar_width);
+
+        // Truncate enemy name to fit
+        let max_name_len = (row1.width as usize).saturating_sub(bar_width + 20).min(12);
+        let name: String = enemy.name.chars().take(max_name_len).collect();
+
+        let mut row1_spans = vec![
+            Span::styled(
+                format!("{}:{}/{} ", name, enemy.current_hp, enemy.max_hp),
+                Style::default().fg(Color::White),
+            ),
+            Span::styled(enemy_bar, Style::default().fg(hp_color)),
+        ];
+
+        // Boss enrage timer takes priority over enemy attack timer
+        if game_state.zone_progression.fighting_boss {
+            let remaining = (BOSS_ENRAGE_SECONDS - hp.boss_fight_timer).max(0.0);
+            let enrage_style = if remaining < 5.0 {
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+            } else if remaining < 10.0 {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default().fg(Color::Cyan)
+            };
+            row1_spans.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
+            row1_spans.push(Span::styled(
+                format!("\u{26a1}Enrage:{:.0}s", remaining),
+                enrage_style,
+            ));
+        } else {
+            let enemy_interval = effective_enemy_attack_interval(game_state);
+            let enemy_next = (enemy_interval - hp.enemy_attack_timer).max(0.0);
+            let enemy_style = if enemy_next < 0.3 {
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Red)
+            };
+            row1_spans.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
+            row1_spans.push(Span::styled(format!("Foe:{:.1}s", enemy_next), enemy_style));
+        }
+
+        let row1_line = Paragraph::new(Line::from(row1_spans)).alignment(Alignment::Center);
+        frame.render_widget(row1_line, row1);
     } else {
         let spinner = throbber::spinner_char();
         let msg = throbber::waiting_message(game_state.character_xp);
-        let text = Paragraph::new(Line::from(Span::styled(
-            format!("{} {}", spinner, msg),
-            Style::default().fg(Color::Yellow),
-        )))
+        let text = Paragraph::new(Line::from(vec![
+            Span::styled(
+                format!("{} {}", spinner, msg),
+                Style::default().fg(Color::Yellow),
+            ),
+            Span::styled(
+                format!(" | DPS:{:.0}", effective_dps),
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]))
         .alignment(Alignment::Center);
         frame.render_widget(text, row1);
     }
