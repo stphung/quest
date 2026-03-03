@@ -973,7 +973,12 @@ pub fn show_startup_splash_screen(
         })?;
 
         if event::poll(Duration::from_millis(100))? {
-            if let event::Event::Key(key_event) = event::read()? {
+            let ev = event::read()?;
+            if let event::Event::Resize(_, _) = &ev {
+                terminal.clear()?;
+                continue;
+            }
+            if let event::Event::Key(key_event) = ev {
                 if key_event.kind != KeyEventKind::Press {
                     continue;
                 }

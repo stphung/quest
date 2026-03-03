@@ -51,7 +51,6 @@ mod stats_attributes;
 mod stats_equipment;
 mod stats_panel;
 pub(crate) mod stats_prestige;
-mod stats_sigils;
 pub mod stormglass_scene;
 pub(crate) mod throbber;
 pub mod ticker;

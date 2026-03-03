@@ -51,7 +51,12 @@ pub fn handle_creation_frame(
 
     // Handle input
     if event::poll(Duration::from_millis(50))? {
-        if let Event::Key(key_event) = event::read()? {
+        let ev = event::read()?;
+        if let Event::Resize(_, _) = &ev {
+            terminal.clear()?;
+            return Ok(ScreenTransition::Stay);
+        }
+        if let Event::Key(key_event) = ev {
             if key_event.kind != KeyEventKind::Press {
                 return Ok(ScreenTransition::Stay);
             }
@@ -105,7 +110,12 @@ pub fn handle_delete_frame(
 
     // Handle input
     if event::poll(Duration::from_millis(50))? {
-        if let Event::Key(key_event) = event::read()? {
+        let ev = event::read()?;
+        if let Event::Resize(_, _) = &ev {
+            terminal.clear()?;
+            return Ok(ScreenTransition::Stay);
+        }
+        if let Event::Key(key_event) = ev {
             if key_event.kind != KeyEventKind::Press {
                 return Ok(ScreenTransition::Stay);
             }
@@ -160,7 +170,12 @@ pub fn handle_rename_frame(
 
     // Handle input
     if event::poll(Duration::from_millis(50))? {
-        if let Event::Key(key_event) = event::read()? {
+        let ev = event::read()?;
+        if let Event::Resize(_, _) = &ev {
+            terminal.clear()?;
+            return Ok(ScreenTransition::Stay);
+        }
+        if let Event::Key(key_event) = ev {
             if key_event.kind != KeyEventKind::Press {
                 return Ok(ScreenTransition::Stay);
             }

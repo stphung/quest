@@ -1,8 +1,9 @@
 //! Equipment rendering helpers for the stats panel.
 
 use crate::core::game_state::GameState;
+use crate::stormglass::sigils::StormSigils;
 use ratatui::{
-    layout::{Position, Rect},
+    layout::{Constraint, Layout, Position, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
@@ -23,11 +24,13 @@ pub(super) fn enhancement_style(level: u8) -> Style {
 
 /// Draws equipment with name + rarity color only, one line per slot (L tier).
 /// Table layout: Slot  Name  Rarity  Tier  ilvl (right-aligned columns).
+/// When storm sigils are etched, renders a sigil subsection below the equipment slots.
 pub(super) fn draw_equipment_names_only(
     frame: &mut Frame,
     area: Rect,
     game_state: &GameState,
     enhancement_levels: &[u8; 7],
+    storm_sigils: &StormSigils,
 ) {
     use crate::items::EquipmentSlot;
     let slot_order = [
@@ -64,13 +67,40 @@ pub(super) fn draw_equipment_names_only(
     } else {
         " Equipment ".to_string()
     };
+    let has_sigils = storm_sigils.etched_count() > 0;
+    let sigil_slot_count = crate::stormglass::sigils::MAX_SIGIL_SLOTS as u16;
+
+    // Compute content height so the bordered block doesn't extend into empty space.
+    // 7 equipment slots + (optional: 1 separator + 5 sigil slots) + 2 for borders
+    let content_height: u16 = 7 + if has_sigils { 1 + sigil_slot_count } else { 0 } + 2;
+    let block_height = content_height.min(area.height);
+    let block_area = Rect {
+        x: area.x,
+        y: area.y,
+        width: area.width,
+        height: block_height,
+    };
+
     let block = Block::default().borders(Borders::ALL).title(title);
     let block = super::themed_block(block);
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-    super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
+    let inner = block.inner(block_area);
+    frame.render_widget(block, block_area);
+    super::apply_themed_border_fx(frame, block_area, Color::White, super::BorderFxContext);
 
-    let width = inner.width as usize;
+    // Split inner area: equipment slots, optional titled separator + sigil slots
+    let (equip_area, sigil_area) = if has_sigils {
+        let chunks = Layout::vertical([
+            Constraint::Length(7),                // 7 equipment slots
+            Constraint::Length(1), // titled separator: ──── ᚱ Storm Sigils (N/5) ────
+            Constraint::Length(sigil_slot_count), // 5 sigil slot lines
+        ])
+        .split(inner);
+        (chunks[0], Some((chunks[1], chunks[2])))
+    } else {
+        (inner, None)
+    };
+
+    let width = equip_area.width as usize;
     let slot_col = 8; // "Weapon  " = 8 chars
 
     // Compute right columns dynamically by measuring actual display width.
@@ -185,16 +215,147 @@ pub(super) fn draw_equipment_names_only(
     }
 
     let paragraph = Paragraph::new(lines);
-    frame.render_widget(paragraph, inner);
+    frame.render_widget(paragraph, equip_area);
 
     // Soulforge visual effects scale with total enhancement level.
+    // Apply only to the equipment rows (not the sigil section).
     let total_enh: u16 = enhancement_levels.iter().map(|&l| l as u16).sum();
     if total_enh > 0 {
-        paint_soulforge_bg(frame, inner, enhancement_levels);
-        paint_soulforge_heat_line(frame, inner, enhancement_levels);
-        paint_soulforge_motes(frame, inner, total_enh, enhancement_levels);
+        paint_soulforge_bg(frame, equip_area, enhancement_levels);
+        paint_soulforge_heat_line(frame, equip_area, enhancement_levels);
+        paint_soulforge_motes(frame, equip_area, total_enh, enhancement_levels);
+    }
+
+    // Render sigil subsection if sigils are etched
+    if let Some((separator_area, sigils_area)) = sigil_area {
+        draw_sigil_separator(frame, separator_area, storm_sigils);
+        draw_sigil_slots(frame, sigils_area, storm_sigils);
+
+        // Sigil visual effects — scale with total grade score.
+        let grade_total = sigil_grade_total(storm_sigils);
+        if grade_total > 0 {
+            paint_sigil_bg(frame, sigils_area, grade_total);
+            paint_sigil_heat_line(frame, sigils_area, grade_total);
+            paint_sigil_motes(frame, sigils_area, grade_total);
+        }
     }
 }
+
+/// Draws a titled separator: `──── ᚱ Storm Sigils (N/5) ────`
+/// Matches the style used for Prestige and Attributes headers in the hero panel.
+fn draw_sigil_separator(frame: &mut Frame, area: Rect, storm_sigils: &StormSigils) {
+    let dw = super::scene_fx::display_width;
+    let etched = storm_sigils.etched_count();
+    let label = format!(
+        " \u{16B1} Storm Sigils ({}/{}) ",
+        etched, storm_sigils.slots_unlocked
+    );
+    let label_w = dw(&label);
+    let total_w = area.width as usize;
+    let remaining = total_w.saturating_sub(label_w);
+    let left_dashes = remaining / 2;
+    let right_dashes = remaining - left_dashes;
+    let storm_blue = Color::Rgb(100, 180, 255);
+    let sep = Paragraph::new(Line::from(vec![
+        Span::styled(
+            "\u{2500}".repeat(left_dashes),
+            Style::default().fg(storm_blue),
+        ),
+        Span::styled(
+            label,
+            Style::default().fg(storm_blue).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            "\u{2500}".repeat(right_dashes),
+            Style::default().fg(storm_blue),
+        ),
+    ]));
+    frame.render_widget(sep, area);
+}
+
+/// Draws the 5 sigil slot lines within the equipment panel.
+fn draw_sigil_slots(frame: &mut Frame, area: Rect, storm_sigils: &StormSigils) {
+    let width = area.width as usize;
+    let mut lines = Vec::new();
+
+    for (i, slot) in storm_sigils.sigils.iter().enumerate() {
+        if i < storm_sigils.slots_unlocked as usize {
+            // Unlocked slot: etched or empty
+            if let Some(sigil) = slot {
+                let icon = sigil.effect.icon();
+                let short = sigil.effect.short_name();
+                let value_label = sigil.effect.format_value(sigil.value);
+                let grade_str = sigil.grade.label();
+                let grade_padded = format!("{:<2}", grade_str);
+                let grade_color = sigil_grade_color(sigil.grade);
+
+                let left = format!("{} {}", icon, short);
+                let right = format!("{}  {}", value_label, grade_padded);
+                let dw = super::scene_fx::display_width;
+                let left_display_w = dw(&left);
+                let right_display_w = dw(&right);
+                let pad = width.saturating_sub(left_display_w + right_display_w + 3);
+
+                let grade_style = if grade_str.ends_with('+') {
+                    Style::default()
+                        .fg(grade_color)
+                        .add_modifier(Modifier::BOLD)
+                } else if grade_str.ends_with('-') {
+                    Style::default().fg(grade_color).add_modifier(Modifier::DIM)
+                } else {
+                    Style::default().fg(grade_color)
+                };
+
+                lines.push(Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled(left, Style::default().fg(Color::White)),
+                    Span::raw(" ".repeat(pad.max(1))),
+                    Span::styled(value_label, Style::default().fg(Color::Rgb(100, 180, 255))),
+                    Span::styled(format!("  {}", grade_padded), grade_style),
+                ]));
+            } else {
+                lines.push(Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled("\u{00b7} empty", Style::default().fg(Color::DarkGray)),
+                ]));
+            }
+        } else {
+            // Locked slot
+            lines.push(Line::from(vec![
+                Span::raw("  "),
+                Span::styled("\u{1f512} locked", Style::default().fg(Color::DarkGray)),
+            ]));
+        }
+    }
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, area);
+}
+
+/// Returns the color for a sigil grade tier letter.
+fn sigil_grade_color(grade: crate::stormglass::sigils::SigilGrade) -> Color {
+    match grade.tier_letter() {
+        'S' => Color::Rgb(255, 215, 0),
+        'A' => Color::Green,
+        'B' => Color::Cyan,
+        'C' => Color::White,
+        'D' => Color::Gray,
+        'E' => Color::DarkGray,
+        _ => Color::Red,
+    }
+}
+
+/// Sum of all etched sigil grade ordinals. F-=0, S+=20. Max = 5x20 = 100.
+fn sigil_grade_total(storm_sigils: &StormSigils) -> u16 {
+    storm_sigils
+        .sigils
+        .iter()
+        .filter_map(|s| s.as_ref())
+        .map(|s| s.grade as u16)
+        .sum()
+}
+
+// --- Soulforge visual effects (equipment section only) ---
 
 /// Returns a dimmed version of the soulforge color for the given enhancement levels.
 /// Uses the highest level's color tier, scaled by average intensity.
@@ -320,9 +481,9 @@ fn paint_soulforge_motes(
     let t = (total_enh as f64 / 70.0).min(1.0);
     let avg_level = enhancement_levels.iter().map(|&l| l as f64).sum::<f64>() / 7.0;
 
-    // Density: threshold 90 (sparse) → 12 (dense)
+    // Density: threshold 90 (sparse) -> 12 (dense)
     let threshold = (90.0 - t * 78.0) as u32;
-    // Rise speed: 600ms (slow) → 90ms (fast) per row
+    // Rise speed: 600ms (slow) -> 90ms (fast) per row
     let rise_rate = 600.0 - t * 510.0;
     let millis = current_millis() as f64;
     let rise_phase = (millis / rise_rate) as usize;
@@ -373,6 +534,160 @@ fn paint_soulforge_motes(
                     if trail_cell.symbol() == " " {
                         trail_cell.set_char('\u{00b7}');
                         trail_cell.set_fg(mote_color(enhancement_levels, brightness * 0.4));
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --- Storm sigil visual effects (sigil section only) ---
+
+/// Storm-blue color dimmed by a factor. Used for bg tint and heat line.
+fn storm_dim_color(grade_total: u16, dim: f64) -> Color {
+    // Blend from cool blue at low grades to bright electric blue at high grades
+    let t = (grade_total as f64 / 100.0).min(1.0);
+    let r = (60.0 + t * 40.0) * dim;
+    let g = (140.0 + t * 40.0) * dim;
+    let b = (220.0 + t * 35.0) * dim;
+    Color::Rgb(r as u8, g as u8, b as u8)
+}
+
+/// Faint storm-blue background tint scaling with grade total.
+fn paint_sigil_bg(frame: &mut Frame, inner: Rect, grade_total: u16) {
+    let t = (grade_total as f64 / 100.0).min(1.0);
+    let dim = 0.03 + t * 0.04;
+    let bg = storm_dim_color(grade_total, dim);
+
+    let buf = frame.buffer_mut();
+    for y in inner.y..inner.y + inner.height {
+        for x in inner.x..inner.x + inner.width {
+            if let Some(cell) = buf.cell_mut(Position::new(x, y)) {
+                cell.set_bg(bg);
+            }
+        }
+    }
+}
+
+/// Glowing storm-blue heat line along the bottom row.
+fn paint_sigil_heat_line(frame: &mut Frame, inner: Rect, grade_total: u16) {
+    if inner.height == 0 {
+        return;
+    }
+    let t = (grade_total as f64 / 100.0).min(1.0);
+    let bg = storm_dim_color(grade_total, 0.08 + t * 0.10);
+
+    let bottom_y = inner.y + inner.height - 1;
+    let buf = frame.buffer_mut();
+    for x in inner.x..inner.x + inner.width {
+        if let Some(cell) = buf.cell_mut(Position::new(x, bottom_y)) {
+            cell.set_bg(bg);
+        }
+    }
+    if inner.height >= 3 {
+        let bg2 = storm_dim_color(grade_total, 0.05 + t * 0.06);
+        let row2_y = inner.y + inner.height - 2;
+        for x in inner.x..inner.x + inner.width {
+            if let Some(cell) = buf.cell_mut(Position::new(x, row2_y)) {
+                cell.set_bg(bg2);
+            }
+        }
+    }
+}
+
+/// Rising storm motes with size/color/trail progression.
+fn paint_sigil_motes(frame: &mut Frame, inner: Rect, grade_total: u16) {
+    use super::scene_fx::{current_millis, hash2d};
+
+    let height = inner.height as usize;
+    let width = inner.width as usize;
+    if height == 0 || width == 0 {
+        return;
+    }
+
+    // Scale 0-100 into 0.0-1.0
+    let t = (grade_total as f64 / 100.0).min(1.0);
+
+    let threshold = (90.0 - t * 78.0) as u32;
+    let rise_rate = 600.0 - t * 510.0;
+    let millis = current_millis() as f64;
+    let rise_phase = (millis / rise_rate) as usize;
+    let has_trails = t >= 0.7;
+
+    let buf = frame.buffer_mut();
+    for y in inner.y..inner.y + inner.height {
+        for x in inner.x..inner.x + inner.width {
+            let row = (y - inner.y) as usize;
+            let col = (x - inner.x) as usize;
+
+            let seed = hash2d(
+                row.wrapping_add(rise_phase),
+                col.wrapping_add(rise_phase / 4),
+            );
+            if !seed.is_multiple_of(threshold) {
+                continue;
+            }
+
+            let Some(cell) = buf.cell_mut(Position::new(x, y)) else {
+                continue;
+            };
+            if cell.symbol() != " " {
+                continue;
+            }
+
+            let pulse = (millis * 0.003 + row as f64 * 0.8 + col as f64 * 0.6).sin();
+            if pulse < 0.0 {
+                continue;
+            }
+
+            let base_brightness = 80.0 + t * 100.0;
+            let brightness = base_brightness + pulse * 75.0;
+            let scale = (brightness / 255.0).min(1.0) * 0.35;
+
+            // Size progression: small at low, larger at high
+            let ch = if t >= 0.9 {
+                match seed % 8 {
+                    0 => '*',
+                    1..=2 => '\u{2726}',
+                    3..=4 => '\u{2022}',
+                    _ => '\u{00b7}',
+                }
+            } else if t >= 0.7 {
+                match seed % 6 {
+                    0..=1 => '\u{2726}',
+                    2..=3 => '\u{2022}',
+                    _ => '\u{00b7}',
+                }
+            } else if t >= 0.4 {
+                if seed.is_multiple_of(3) {
+                    '\u{2022}'
+                } else {
+                    '\u{00b7}'
+                }
+            } else {
+                '\u{00b7}'
+            };
+
+            // Storm-blue color
+            let fg = Color::Rgb(
+                (60.0 * scale) as u8,
+                (180.0 * scale) as u8,
+                (255.0 * scale) as u8,
+            );
+            cell.set_char(ch);
+            cell.set_fg(fg);
+
+            // Trail at high grades
+            if has_trails && y + 1 < inner.y + inner.height {
+                if let Some(trail_cell) = buf.cell_mut(Position::new(x, y + 1)) {
+                    if trail_cell.symbol() == " " {
+                        let trail_scale = scale * 0.4;
+                        trail_cell.set_char('\u{00b7}');
+                        trail_cell.set_fg(Color::Rgb(
+                            (60.0 * trail_scale) as u8,
+                            (180.0 * trail_scale) as u8,
+                            (255.0 * trail_scale) as u8,
+                        ));
                     }
                 }
             }

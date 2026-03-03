@@ -4,7 +4,6 @@ use super::responsive::{LayoutContext, SizeTier};
 use super::stats_attributes::{attr_bg_color, attr_color, format_modifier};
 use super::stats_equipment::draw_equipment_names_only;
 use super::stats_prestige::{draw_deep_panel, format_eta};
-use super::stats_sigils::draw_sigils_panel;
 use crate::character::attributes::AttributeType;
 use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::{get_adventurer_rank, get_prestige_tier};
@@ -72,7 +71,6 @@ pub fn draw_stats_panel(
 ) {
     match ctx.height_tier {
         SizeTier::XL | SizeTier::L => {
-            let etched = game_state.storm_sigils.etched_count();
             // Hero panel: 2 border + 2 header + 1 XP gauge + (4 or 5) prestige (incl sep) + 1 prestige gauge + 1 sep + 3 attrs
             let hero_height: u16 = if game_state.ascension_level > 0 {
                 15 // 2 + 2 + 1 + 5 + 1 + 1 + 3
@@ -83,13 +81,8 @@ pub fn draw_stats_panel(
 
             let mut constraints = vec![
                 Constraint::Length(hero_height), // Unified hero panel
+                Constraint::Min(0),              // Equipment (includes sigils subsection)
             ];
-            if etched > 0 {
-                constraints.push(Constraint::Length(
-                    crate::stormglass::sigils::MAX_SIGIL_SLOTS as u16 + 2,
-                )); // Sigils (all 5 slots)
-            }
-            constraints.push(Constraint::Min(0)); // Equipment
             if deep_panel_height > 0 {
                 constraints.push(Constraint::Length(deep_panel_height));
             }
@@ -99,17 +92,16 @@ pub fn draw_stats_panel(
                 .constraints(constraints)
                 .split(area);
 
-            let mut idx = 0;
-            draw_hero_panel(frame, chunks[idx], game_state, achievements);
-            idx += 1;
-            if etched > 0 {
-                draw_sigils_panel(frame, chunks[idx], &game_state.storm_sigils);
-                idx += 1;
-            }
-            draw_equipment_names_only(frame, chunks[idx], game_state, enhancement_levels);
-            idx += 1;
+            draw_hero_panel(frame, chunks[0], game_state, achievements);
+            draw_equipment_names_only(
+                frame,
+                chunks[1],
+                game_state,
+                enhancement_levels,
+                &game_state.storm_sigils,
+            );
             if deep_panel_height > 0 {
-                draw_deep_panel(frame, chunks[idx], achievements, deep);
+                draw_deep_panel(frame, chunks[2], achievements, deep);
             }
         }
         _ => {}
