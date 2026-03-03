@@ -8,12 +8,17 @@
 use super::scene_fx::{
     current_millis, draw_line, hash2d, lerp_channel, lerp_rgb, put_cell, render_buffer, SceneCell,
 };
-use crate::fishing::types::{FishingSession, FishingState};
+use super::stats_prestige::{
+    build_leviathan_tracker_line, build_leviathan_trophy_line, highest_fishing_badge,
+};
+use crate::achievements::Achievements;
+use crate::core::game_state::GameState;
+use crate::fishing::types::{FishingSession, FishingState, RANK_NAMES};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Gauge, Paragraph, Wrap},
     Frame,
 };
 
@@ -43,21 +48,22 @@ pub fn render_fishing_scene(
     frame: &mut Frame,
     area: Rect,
     session: &FishingSession,
-    _fishing_state: &FishingState,
+    game_state: &GameState,
+    achievements: &Achievements,
     _ctx: &super::responsive::LayoutContext,
 ) {
     // Main vertical layout (recent catches now shown in the Loot panel)
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // Header with spot name
+            Constraint::Length(4), // Header with rank + progress
             Constraint::Min(6),    // Water animation area
             Constraint::Length(4), // Catch progress + phase status
         ])
         .split(area);
 
-    // Draw header with spot name
-    draw_header(frame, chunks[0], session);
+    // Draw header with rank and progress gauge
+    draw_header(frame, chunks[0], session, game_state, achievements);
 
     // Draw water animation with bobber
     draw_water_scene(frame, chunks[1], session);
@@ -66,25 +72,98 @@ pub fn render_fishing_scene(
     draw_catch_progress(frame, chunks[2], session);
 }
 
-/// Draws the header with fishing spot name.
-fn draw_header(frame: &mut Frame, area: Rect, session: &FishingSession) {
-    let title = format!(" FISHING - {} ", session.spot_name);
+/// Draws the header with fishing rank and progress gauge.
+fn draw_header(
+    frame: &mut Frame,
+    area: Rect,
+    session: &FishingSession,
+    game_state: &GameState,
+    achievements: &Achievements,
+) {
+    use crate::achievements::AchievementId;
+
+    let title = match highest_fishing_badge(achievements) {
+        Some(icon) => format!(" Fishing - {} {} ", session.spot_name, icon),
+        None => format!(" Fishing - {} ", session.spot_name),
+    };
     let block = Block::default()
         .borders(Borders::ALL)
         .title(title)
         .border_style(Style::default().fg(super::themed_border_color(Color::Cyan)));
     let inner = super::render_themed_block(frame, area, block, Color::Cyan, super::BorderFxContext);
 
-    let header_text = vec![Line::from(vec![Span::styled(
-        format!("Fishing at {}", session.spot_name),
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD),
-    )])];
+    let fishing = &game_state.fishing;
+    let fish_required = FishingState::fish_required_for_rank(fishing.rank);
+    let fish_progress = fishing.fish_toward_next_rank;
+    let fish_ratio = if fish_required > 0 {
+        (fish_progress as f64 / fish_required as f64).min(1.0)
+    } else {
+        0.0
+    };
 
-    let header = Paragraph::new(header_text).alignment(Alignment::Center);
+    let is_max_rank = fishing.rank as usize >= RANK_NAMES.len();
+    let leviathan_caught = achievements.is_unlocked(AchievementId::StormLeviathan);
+    let show_leviathan_hunt = is_max_rank && fishing.rank >= 40 && !leviathan_caught;
+    let show_leviathan_trophy = is_max_rank && fishing.rank >= 40 && leviathan_caught;
 
-    frame.render_widget(header, inner);
+    let rank_line = Line::from(vec![
+        Span::styled(
+            "\u{1F3A3} Rank: ",
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("{} ({})", fishing.rank_name(), fishing.rank),
+            Style::default().fg(Color::Cyan),
+        ),
+    ]);
+
+    if inner.height >= 2 {
+        let inner_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Length(1)])
+            .split(inner);
+
+        if show_leviathan_hunt {
+            let hunt_line = Line::from(vec![Span::styled(
+                "\u{1F40B} Storm Leviathan Hunt",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )]);
+            frame.render_widget(Paragraph::new(hunt_line), inner_chunks[0]);
+            let tracker_line = build_leviathan_tracker_line(fishing);
+            frame.render_widget(Paragraph::new(tracker_line), inner_chunks[1]);
+        } else if show_leviathan_trophy {
+            frame.render_widget(Paragraph::new(rank_line), inner_chunks[0]);
+            let trophy_line = build_leviathan_trophy_line();
+            frame.render_widget(Paragraph::new(trophy_line), inner_chunks[1]);
+        } else {
+            frame.render_widget(Paragraph::new(rank_line), inner_chunks[0]);
+            let fish_label = if is_max_rank {
+                "Max Rank".to_string()
+            } else {
+                let next_rank = fishing.rank + 1;
+                let next_rank_name = RANK_NAMES[next_rank as usize - 1];
+                format!(
+                    "{}/{} to {} ({})",
+                    fish_progress, fish_required, next_rank_name, next_rank
+                )
+            };
+            let ratio = if is_max_rank { 1.0 } else { fish_ratio };
+            let fish_gauge = Gauge::default()
+                .gauge_style(
+                    Style::default()
+                        .fg(Color::Blue)
+                        .bg(Color::Rgb(8, 8, 28))
+                        .add_modifier(Modifier::BOLD),
+                )
+                .label(fish_label)
+                .ratio(ratio);
+            frame.render_widget(fish_gauge, inner_chunks[1]);
+        }
+    } else if inner.height >= 1 {
+        frame.render_widget(Paragraph::new(rank_line), inner);
+    }
 }
 
 /// Draws the ASCII water scene with bobber.

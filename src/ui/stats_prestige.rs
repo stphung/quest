@@ -1,14 +1,8 @@
 //! Prestige and fishing panel rendering helpers for the stats panel.
 
-use crate::achievements::{get_achievements_by_category, AchievementCategory, AchievementId};
-use crate::ascension::types::ascension_combat_multiplier;
-use crate::character::attributes::AttributeType;
-use crate::character::derived_stats::DerivedStats;
-use crate::character::prestige::{get_next_prestige_tier, get_prestige_tier};
-use crate::core::game_logic::xp_for_next_level;
-use crate::core::game_state::GameState;
+use crate::achievements::{get_achievements_by_category, AchievementCategory};
 use crate::deep::DeepState;
-use crate::fishing::types::{FishingState, RANK_NAMES};
+use crate::fishing::types::FishingState;
 use crate::power_cores::{fill_duration_secs, fill_ratio, ALL_POWER_CORES};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -88,7 +82,7 @@ fn current_millis() -> u128 {
         .as_millis()
 }
 
-fn prestige_ready_gauge_style() -> Style {
+pub(super) fn prestige_ready_gauge_style() -> Style {
     const PULSE_COLORS: [Color; 5] = [
         Color::Rgb(190, 118, 255),
         Color::Rgb(208, 138, 255),
@@ -103,308 +97,11 @@ fn prestige_ready_gauge_style() -> Style {
         .add_modifier(Modifier::BOLD)
 }
 
-/// Draws prestige information with CHA bonus
-pub(super) fn draw_prestige_info(
-    frame: &mut Frame,
-    area: Rect,
-    game_state: &GameState,
-    achievements: &crate::achievements::Achievements,
-) {
-    let title = match highest_prestige_badge(achievements) {
-        Some(icon) => format!(" Prestige {} ", icon),
-        None => " Prestige ".to_string(),
-    };
-    let prestige_block = Block::default().borders(Borders::ALL).title(title);
-    let prestige_block = super::themed_block(prestige_block);
-
-    let inner = prestige_block.inner(area);
-    frame.render_widget(prestige_block, area);
-    super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
-
-    let tier = get_prestige_tier(game_state.prestige_rank);
-    let cha_mod = game_state.attributes.modifier(AttributeType::Charisma);
-    let effective_multiplier =
-        DerivedStats::prestige_multiplier(tier.multiplier, &game_state.attributes);
-
-    // Build unlock hint for next prestige rank
-    let next_prestige = get_next_prestige_tier(game_state.prestige_rank);
-    let mult_delta = next_prestige.multiplier - tier.multiplier;
-    let unlock_hint = {
-        let mut unlocks = Vec::new();
-        // Check which zones unlock at the next prestige rank
-        let zones = crate::zones::get_all_zones();
-        for zone in zones {
-            if zone.prestige_requirement == next_prestige.rank {
-                unlocks.push(zone.name);
-            }
-        }
-        // Check for system unlocks at specific prestige gates
-        if next_prestige.rank == 10 {
-            unlocks.push("Haven");
-        }
-        if next_prestige.rank == 15 {
-            unlocks.push("Soulforge");
-            unlocks.push("Stormglass");
-        }
-        if unlocks.is_empty() {
-            format!("\u{1f513} +{:.2}x mult", mult_delta)
-        } else {
-            format!(
-                "\u{1f513} +{:.2}x mult \u{00b7} Unlocks: {}",
-                mult_delta,
-                unlocks.join(", ")
-            )
-        }
-    };
-
-    let mut prestige_text = vec![Line::from(vec![
-        Span::styled("🏆 Rank: ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled(
-            format!("{} ({})", game_state.prestige_rank, tier.name),
-            Style::default().fg(Color::Yellow),
-        ),
-        Span::styled(" | ", Style::default().fg(Color::DarkGray)),
-        Span::styled("🔄 ", Style::default()),
-        Span::styled(
-            format!("{}", game_state.total_prestige_count),
-            Style::default().fg(Color::Magenta),
-        ),
-    ])];
-    if game_state.ascension_level > 0 {
-        let asc_mult = ascension_combat_multiplier(game_state.ascension_level);
-        prestige_text.push(Line::from(vec![
-            Span::styled(
-                format!(
-                    "\u{2726} Ascension {} ",
-                    to_roman(game_state.ascension_level)
-                ),
-                Style::default()
-                    .fg(Color::Rgb(255, 215, 0))
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("\u{2014} ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                format!("\u{00d7}{:.1} power", asc_mult),
-                Style::default().fg(Color::Rgb(255, 215, 0)),
-            ),
-        ]));
-    }
-    prestige_text.push(Line::from({
-        let mut spans = vec![
-            Span::styled("⚡ XP: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::styled(
-                format!("{:.2}x", tier.multiplier),
-                Style::default().fg(Color::Cyan),
-            ),
-        ];
-        if cha_mod != 0 {
-            spans.push(Span::styled(
-                format!(" +{:.1} CHA", cha_mod as f64 * 0.1),
-                Style::default().fg(Color::Yellow),
-            ));
-        }
-        spans.push(Span::styled(
-            " \u{2192} ",
-            Style::default().fg(Color::DarkGray),
-        ));
-        spans.push(Span::styled(
-            format!("{:.2}x", effective_multiplier),
-            Style::default()
-                .fg(Color::Green)
-                .add_modifier(Modifier::BOLD),
-        ));
-        spans
-    }));
-    prestige_text.push(Line::from(Span::styled(
-        unlock_hint,
-        Style::default().fg(Color::DarkGray),
-    )));
-
-    // Prestige level progress bar (next_prestige already computed above for unlock hint)
-    let prestige_ratio =
-        (game_state.character_level as f64 / next_prestige.required_level as f64).min(1.0);
-    let prestige_eta = match game_state.xp_per_hour() {
-        Some(rate) if rate > 0 && game_state.character_level < next_prestige.required_level => {
-            // Sum XP needed from current level to prestige required level
-            let xp_remaining_current = xp_for_next_level(game_state.character_level)
-                .saturating_sub(game_state.character_xp);
-            let xp_future_levels: u64 = (game_state.character_level + 1
-                ..next_prestige.required_level)
-                .map(xp_for_next_level)
-                .sum();
-            let total_xp = xp_remaining_current + xp_future_levels;
-            let seconds = (total_xp as f64 / rate as f64 * 3600.0) as u64;
-            format!(" ({})", format_eta(seconds))
-        }
-        _ => String::new(),
-    };
-    let prestige_label = format!(
-        "Lv {}/{} to {} (P{}){}",
-        game_state.character_level,
-        next_prestige.required_level,
-        next_prestige.name,
-        next_prestige.rank,
-        prestige_eta
-    );
-    let prestige_ready = game_state.character_level >= next_prestige.required_level;
-    let prestige_gauge = Gauge::default()
-        .gauge_style(if prestige_ready {
-            prestige_ready_gauge_style()
-        } else {
-            Style::default()
-                .fg(Color::Rgb(180, 100, 255))
-                .bg(Color::Rgb(20, 10, 30))
-                .add_modifier(Modifier::BOLD)
-        })
-        .label(prestige_label)
-        .ratio(prestige_ratio);
-
-    let text_count = prestige_text.len(); // 3 without ascension, 4 with
-    let total_rows = text_count + 1; // +1 for gauge
-
-    if inner.height as usize >= total_rows {
-        // Full layout: all text lines + gauge
-        let constraints: Vec<Constraint> = (0..total_rows).map(|_| Constraint::Length(1)).collect();
-        let inner_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(constraints)
-            .split(inner);
-
-        for (i, line) in prestige_text.iter().enumerate() {
-            frame.render_widget(Paragraph::new(line.clone()), inner_chunks[i]);
-        }
-        frame.render_widget(prestige_gauge, inner_chunks[text_count]);
-    } else if inner.height >= 3 {
-        // Compact: rank + ascension (if present) + gauge, skip unlock hint and XP
-        let rows = inner.height as usize;
-        let constraints: Vec<Constraint> = (0..rows).map(|_| Constraint::Length(1)).collect();
-        let inner_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(constraints)
-            .split(inner);
-
-        // Always show rank (row 0) and gauge (last row)
-        frame.render_widget(Paragraph::new(prestige_text[0].clone()), inner_chunks[0]);
-        // Fill middle rows with remaining text lines in order
-        for i in 1..rows - 1 {
-            if i < text_count {
-                frame.render_widget(Paragraph::new(prestige_text[i].clone()), inner_chunks[i]);
-            }
-        }
-        frame.render_widget(prestige_gauge, inner_chunks[rows - 1]);
-    } else {
-        // Show as many text lines as fit, rank first
-        let lines_to_show = inner.height as usize;
-        let truncated: Vec<Line> = prestige_text.into_iter().take(lines_to_show).collect();
-        let prestige_paragraph = Paragraph::new(truncated);
-        frame.render_widget(prestige_paragraph, inner);
-    }
-}
-
 /// Draws the fishing panel with rank and progress bar.
-pub(super) fn draw_fishing_panel(
-    frame: &mut Frame,
-    area: Rect,
-    game_state: &GameState,
-    achievements: &crate::achievements::Achievements,
-) {
-    let title = match highest_fishing_badge(achievements) {
-        Some(icon) => format!(" Fishing {} ", icon),
-        None => " Fishing ".to_string(),
-    };
-    let block = Block::default().borders(Borders::ALL).title(title);
-    let block = super::themed_block(block);
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-    super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
-
-    let fish_required = FishingState::fish_required_for_rank(game_state.fishing.rank);
-    let fish_progress = game_state.fishing.fish_toward_next_rank;
-    let fish_ratio = if fish_required > 0 {
-        (fish_progress as f64 / fish_required as f64).min(1.0)
-    } else {
-        0.0
-    };
-
-    let rank_line = Line::from(vec![
-        Span::styled("🎣 Rank: ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled(
-            format!(
-                "{} ({})",
-                game_state.fishing.rank_name(),
-                game_state.fishing.rank
-            ),
-            Style::default().fg(Color::Cyan),
-        ),
-    ]);
-
-    let is_max_rank = game_state.fishing.rank as usize >= RANK_NAMES.len();
-    let leviathan_caught = achievements.is_unlocked(AchievementId::StormLeviathan);
-    let show_leviathan_hunt = is_max_rank && game_state.fishing.rank >= 40 && !leviathan_caught;
-    let show_leviathan_trophy = is_max_rank && game_state.fishing.rank >= 40 && leviathan_caught;
-
-    if inner.height >= 2 {
-        let inner_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Length(1)])
-            .split(inner);
-
-        if show_leviathan_hunt {
-            // Row 1: "Storm Leviathan Hunt" instead of rank
-            let hunt_line = Line::from(vec![Span::styled(
-                "🐋 Storm Leviathan Hunt",
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            )]);
-            frame.render_widget(Paragraph::new(hunt_line), inner_chunks[0]);
-            // Row 2: tracker with dots + charge bar
-            let tracker_line = build_leviathan_tracker_line(&game_state.fishing);
-            frame.render_widget(Paragraph::new(tracker_line), inner_chunks[1]);
-        } else if show_leviathan_trophy {
-            // Row 1: rank name
-            frame.render_widget(Paragraph::new(rank_line), inner_chunks[0]);
-            // Row 2: all dots filled + "Storm Leviathan ✓"
-            let trophy_line = build_leviathan_trophy_line();
-            frame.render_widget(Paragraph::new(trophy_line), inner_chunks[1]);
-        } else {
-            // Row 1: rank name
-            frame.render_widget(Paragraph::new(rank_line), inner_chunks[0]);
-            // Row 2: progress bar
-            let fish_label = if is_max_rank {
-                "Max Rank".to_string()
-            } else {
-                let next_rank = game_state.fishing.rank + 1;
-                let next_rank_name = RANK_NAMES[next_rank as usize - 1];
-                format!(
-                    "{}/{} to {} ({})",
-                    fish_progress, fish_required, next_rank_name, next_rank
-                )
-            };
-            let fish_ratio = if is_max_rank { 1.0 } else { fish_ratio };
-            let fish_gauge = Gauge::default()
-                .gauge_style(
-                    Style::default()
-                        .fg(Color::Blue)
-                        .bg(Color::Rgb(8, 8, 28))
-                        .add_modifier(Modifier::BOLD),
-                )
-                .label(fish_label)
-                .ratio(fish_ratio);
-            frame.render_widget(fish_gauge, inner_chunks[1]);
-        }
-    } else if inner.height >= 1 {
-        // Only room for one line — show rank
-        let rank_paragraph = Paragraph::new(rank_line);
-        frame.render_widget(rank_paragraph, inner);
-    }
-}
-
 /// Builds the Leviathan hunt tracker line for the fishing panel at rank 40.
 ///
 /// Layout: `🐋 ● ● ● ● ○ ○ ○ ○ ○ ○   ⚡ ▰▰▰▱▱▱▱ +6.5%`
-fn build_leviathan_tracker_line(fishing: &FishingState) -> Line<'static> {
+pub(super) fn build_leviathan_tracker_line(fishing: &FishingState) -> Line<'static> {
     let encounters = fishing.leviathan_encounters.min(10) as usize;
     let in_catch_phase = encounters >= 10;
 
@@ -486,7 +183,7 @@ fn build_leviathan_tracker_line(fishing: &FishingState) -> Line<'static> {
 /// Builds the Leviathan trophy line shown after the Leviathan has been caught.
 ///
 /// Layout: `🐋 ● ● ● ● ● ● ● ● ● ●   Storm Leviathan ✓`
-fn build_leviathan_trophy_line() -> Line<'static> {
+pub(super) fn build_leviathan_trophy_line() -> Line<'static> {
     let mut spans: Vec<Span<'static>> = Vec::new();
 
     // Whale prefix
@@ -569,11 +266,12 @@ pub(super) fn draw_deep_panel(
 
     // Row 1: Guild rank + Warband Marks
     {
+        let dw = super::scene_fx::display_width;
         let rank_name = deep.persistent.guild_rank.display_name();
         let marks = deep.prestige.warband_marks;
         let marks_str = format!("\u{25c6} {} Warband Marks", marks);
         let rank_part = format!("\u{2b21} {}", rank_name);
-        let padding = width.saturating_sub(rank_part.len() + marks_str.len());
+        let padding = width.saturating_sub(dw(&rank_part) + dw(&marks_str));
 
         lines.push(Line::from(vec![
             Span::styled("\u{2b21} ", Style::default().fg(Color::White)),
@@ -589,6 +287,7 @@ pub(super) fn draw_deep_panel(
 
     // Row 2: Missions + progress bar + ETA + events badge
     {
+        let dw = super::scene_fx::display_width;
         let active = deep.prestige.active_mission_count();
         let max_concurrent = crate::deep::effective_concurrent_missions(
             deep.persistent.guild_rank,
@@ -596,10 +295,11 @@ pub(super) fn draw_deep_panel(
         );
         let events = pending_event_count(&deep.prestige);
 
-        let mut spans: Vec<Span> = Vec::new();
+        let mut left_spans: Vec<Span> = Vec::new();
+        let mut right_spans: Vec<Span> = Vec::new();
 
         let msn_str = format!("Missions {}/{} ", active, max_concurrent);
-        spans.push(Span::styled(msn_str, Style::default().fg(Color::Cyan)));
+        left_spans.push(Span::styled(msn_str, Style::default().fg(Color::Cyan)));
 
         // Find the nearest active mission for the progress bar
         let now_chrono = chrono::Utc::now();
@@ -622,58 +322,64 @@ pub(super) fn draw_deep_panel(
             let progress = mission.progress(now_chrono);
             let filled = (progress * 12.0).round() as usize;
             let empty = 12 - filled;
-            spans.push(Span::styled("[", Style::default().fg(Color::DarkGray)));
+            left_spans.push(Span::styled("[", Style::default().fg(Color::DarkGray)));
             if filled > 0 {
-                spans.push(Span::styled(
+                left_spans.push(Span::styled(
                     "\u{2588}".repeat(filled),
                     Style::default().fg(CORE_AMBER),
                 ));
             }
             if empty > 0 {
-                spans.push(Span::styled(
+                left_spans.push(Span::styled(
                     "\u{2591}".repeat(empty),
                     Style::default().fg(Color::DarkGray),
                 ));
             }
-            spans.push(Span::styled("] ", Style::default().fg(Color::DarkGray)));
+            left_spans.push(Span::styled("]", Style::default().fg(Color::DarkGray)));
 
-            // ETA text
+            // ETA text (right-aligned)
             if let Some(secs) = eta {
                 let eta_color = if secs < 900 {
                     Color::Yellow
                 } else {
                     Color::DarkGray
                 };
-                spans.push(Span::styled(
+                right_spans.push(Span::styled(
                     format_eta(secs as u64),
                     Style::default().fg(eta_color),
                 ));
             }
         } else {
-            // No active missions: idle state
-            spans.push(Span::styled(
-                "         \u{25f7} idle",
+            // No active missions: idle state (right-aligned)
+            right_spans.push(Span::styled(
+                "\u{25f7} idle",
                 Style::default().fg(Color::DarkGray),
             ));
         }
 
-        // Right-align events badge
+        // Events badge (right-aligned, after ETA/idle)
         if events > 0 {
-            let event_str = format!("\u{26a1}{}", events);
-            // Calculate left side width to determine padding
-            let left_width: usize = spans.iter().map(|s| s.content.chars().count()).sum();
-            let right_width = event_str.chars().count();
-            let padding = width.saturating_sub(left_width + right_width);
-            spans.push(Span::raw(" ".repeat(padding)));
-            spans.push(Span::styled(event_str, Style::default().fg(Color::Yellow)));
+            right_spans.push(Span::styled(
+                format!("  \u{26a1}{}", events),
+                Style::default().fg(Color::Yellow),
+            ));
         }
+
+        // Combine with padding
+        let left_width: usize = left_spans.iter().map(|s| dw(&s.content)).sum();
+        let right_width: usize = right_spans.iter().map(|s| dw(&s.content)).sum();
+        let padding = width.saturating_sub(left_width + right_width);
+
+        let mut spans = left_spans;
+        spans.push(Span::raw(" ".repeat(padding)));
+        spans.extend(right_spans);
 
         lines.push(Line::from(spans));
     }
 
-    // Row 3: Crew glyphs + Frontier
+    // Row 3: Team glyphs + Frontier
     {
-        let mut crew_spans: Vec<Span> = Vec::new();
+        let mut team_spans: Vec<Span> = Vec::new();
         let mut available_count: usize = 0;
         let mut on_mission_count: usize = 0;
         let mut injured_count: usize = 0;
@@ -687,36 +393,42 @@ pub(super) fn draw_deep_panel(
             }
         }
 
+        let has_team = available_count > 0 || on_mission_count > 0 || injured_count > 0;
+        if has_team {
+            team_spans.push(Span::styled("Team ", Style::default().fg(Color::DarkGray)));
+        }
+
         // Available mercs: ♦ (green)
         if available_count > 0 {
-            crew_spans.push(Span::styled(
+            team_spans.push(Span::styled(
                 "\u{2666}".repeat(available_count),
                 Style::default().fg(Color::Green),
             ));
         }
         // Space between groups
         if available_count > 0 && (on_mission_count > 0 || injured_count > 0) {
-            crew_spans.push(Span::raw(" "));
+            team_spans.push(Span::raw(" "));
         }
         // On mission: ♢ (cyan)
         if on_mission_count > 0 {
-            crew_spans.push(Span::styled(
+            team_spans.push(Span::styled(
                 "\u{2662}".repeat(on_mission_count),
                 Style::default().fg(Color::Cyan),
             ));
         }
         if on_mission_count > 0 && injured_count > 0 {
-            crew_spans.push(Span::raw(" "));
+            team_spans.push(Span::raw(" "));
         }
         // Injured: ✝ (red)
         if injured_count > 0 {
-            crew_spans.push(Span::styled(
+            team_spans.push(Span::styled(
                 "\u{271d}".repeat(injured_count),
                 Style::default().fg(Color::Red),
             ));
         }
 
-        let crew_width: usize = available_count
+        let team_width: usize = if has_team { 5 } else { 0 } // "Team "
+            + available_count
             + on_mission_count
             + injured_count
             + if available_count > 0 && (on_mission_count > 0 || injured_count > 0) {
@@ -735,157 +447,110 @@ pub(super) fn draw_deep_panel(
         let frontier_str = format!("Frontier L{}", frontier);
         let right_str_len = frontier_str.len();
 
-        let padding = width.saturating_sub(crew_width + right_str_len);
-        crew_spans.push(Span::raw(" ".repeat(padding)));
-        crew_spans.push(Span::styled(
+        let padding = width.saturating_sub(team_width + right_str_len);
+        team_spans.push(Span::raw(" ".repeat(padding)));
+        team_spans.push(Span::styled(
             frontier_str,
             Style::default().fg(Color::Rgb(120, 140, 170)),
         ));
 
-        lines.push(Line::from(crew_spans));
+        lines.push(Line::from(team_spans));
     }
 
-    // Row 4: Separator
-    {
-        let sep = "\u{2500}".repeat(width);
-        lines.push(Line::from(Span::styled(
-            sep,
-            Style::default().fg(Color::DarkGray),
-        )));
-    }
-
-    // Rows 5-6: Core summary + badges
+    // Render header lines (rows 1-3) as a Paragraph in the top section,
+    // then render cores in a bordered sub-block below.
     let summary = core_summary(achievements, deep);
-    {
-        // Row 5: Aggregate core progress bar or locked state
-        let mut spans: Vec<Span> = Vec::new();
+    let core_count = summary.cores.len() as u16;
 
-        if summary.unlocked_count == 0 {
-            let left = "Cores: locked";
-            let right = "First core at L3";
-            let padding = width.saturating_sub(left.len() + right.len());
-            spans.push(Span::styled(
-                left.to_string(),
-                Style::default().fg(Color::DarkGray),
-            ));
-            spans.push(Span::raw(" ".repeat(padding)));
-            spans.push(Span::styled(
-                right.to_string(),
-                Style::default().fg(Color::DarkGray),
-            ));
-        } else {
-            let all_ready = summary.next_ready_secs.is_none();
-            let pr_d_str = format!("+{} PR/d", summary.total_pr_per_day);
+    // Split inner into: header (3 lines) + cores sub-block (remaining)
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(3), Constraint::Min(0)])
+        .split(inner);
 
-            // "Cores " label
-            spans.push(Span::styled("Cores ", Style::default().fg(Color::DarkGray)));
-
-            // 12-char progress bar [████████░░░░]
-            let bar_ratio = if all_ready {
-                1.0
-            } else {
-                summary.next_ready_ratio.unwrap_or(0.0)
-            };
-            let filled = (bar_ratio * 12.0).round() as usize;
-            let empty = 12 - filled;
-            spans.push(Span::styled("[", Style::default().fg(Color::DarkGray)));
-            if filled > 0 {
-                let bar_color = if all_ready { Color::Green } else { CORE_AMBER };
-                spans.push(Span::styled(
-                    "\u{2588}".repeat(filled),
-                    Style::default().fg(bar_color),
-                ));
-            }
-            if empty > 0 {
-                spans.push(Span::styled(
-                    "\u{2591}".repeat(empty),
-                    Style::default().fg(Color::DarkGray),
-                ));
-            }
-            spans.push(Span::styled("] ", Style::default().fg(Color::DarkGray)));
-
-            // ETA or "All ready!"
-            let eta_text = if all_ready {
-                "All ready!".to_string()
-            } else {
-                match summary.next_ready_secs {
-                    Some(secs) => format_eta(secs as u64),
-                    None => String::new(),
-                }
-            };
-
-            // "Cores " (6) + "[" (1) + 12 bar + "] " (2) + eta_text + padding + pr_d_str
-            let left_width = 6 + 1 + 12 + 2 + eta_text.len();
-            let right_width = pr_d_str.len();
-            let padding = width.saturating_sub(left_width + right_width);
-
-            if all_ready {
-                spans.push(Span::styled(
-                    eta_text,
-                    Style::default()
-                        .fg(Color::Green)
-                        .add_modifier(Modifier::BOLD),
-                ));
-            } else {
-                spans.push(Span::styled(eta_text, Style::default().fg(Color::DarkGray)));
-            }
-
-            spans.push(Span::raw(" ".repeat(padding)));
-            spans.push(Span::styled(pr_d_str, Style::default().fg(CORE_AMBER)));
-        }
-
-        lines.push(Line::from(spans));
-    }
-
-    {
-        // Row 6: Per-core rate·status pairs
-        let mut spans: Vec<Span> = Vec::new();
-
-        for (i, badge) in summary.cores.iter().enumerate() {
-            if i > 0 {
-                spans.push(Span::raw("  "));
-            }
-            if badge.unlocked {
-                if badge.ready {
-                    // Ready: "N·✓"
-                    spans.push(Span::styled(
-                        format!("{}", badge.pr_per_day),
-                        Style::default().fg(CORE_AMBER),
-                    ));
-                    spans.push(Span::styled(
-                        "\u{00b7}",
-                        Style::default().fg(Color::DarkGray),
-                    ));
-                    spans.push(Span::styled("\u{2713}", Style::default().fg(Color::Green)));
-                } else {
-                    // Filling: "N·Xh" or "N·Xm"
-                    spans.push(Span::styled(
-                        format!("{}", badge.pr_per_day),
-                        Style::default().fg(CORE_AMBER),
-                    ));
-                    spans.push(Span::styled(
-                        "\u{00b7}",
-                        Style::default().fg(Color::DarkGray),
-                    ));
-                    spans.push(Span::styled(
-                        format_core_time_short(badge.remaining_secs),
-                        Style::default().fg(Color::DarkGray),
-                    ));
-                }
-            } else {
-                // Locked: "◇LN"
-                spans.push(Span::styled(
-                    format!("\u{25c7}L{}", badge.required_layer),
-                    Style::default().fg(Color::DarkGray),
-                ));
-            }
-        }
-
-        lines.push(Line::from(spans));
-    }
-
+    // Render header lines
     let para = Paragraph::new(lines);
-    frame.render_widget(para, inner);
+    frame.render_widget(para, chunks[0]);
+
+    // Render "Power Cores" bordered sub-block
+    let total_pr_per_day: u32 = summary
+        .cores
+        .iter()
+        .filter(|c| c.unlocked)
+        .map(|c| c.pr_per_day)
+        .sum();
+    let pr_title = format!(" +{} PR/d ", total_pr_per_day);
+    let cores_block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Power Cores ")
+        .border_style(Style::default().fg(CORE_AMBER))
+        .title_bottom(Line::from(pr_title).right_aligned());
+    let cores_inner = cores_block.inner(chunks[1]);
+    frame.render_widget(cores_block, chunks[1]);
+
+    // Split cores_inner into N gauge rows
+    let mut gauge_constraints = Vec::new();
+    for _ in 0..core_count {
+        gauge_constraints.push(Constraint::Length(1));
+    }
+    let gauge_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(gauge_constraints)
+        .split(cores_inner);
+
+    // Render each core as a Gauge
+    for (i, badge) in summary.cores.iter().enumerate() {
+        let gauge_area = gauge_chunks[i];
+        if badge.unlocked {
+            if badge.ready {
+                let label = format!(
+                    "{} Power Core (+{} PR/d) \u{00b7} \u{2713} Ready",
+                    badge.name, badge.pr_per_day
+                );
+                let gauge = Gauge::default()
+                    .gauge_style(
+                        Style::default()
+                            .fg(Color::Green)
+                            .bg(Color::Rgb(8, 28, 8))
+                            .add_modifier(Modifier::BOLD),
+                    )
+                    .label(label)
+                    .ratio(1.0);
+                frame.render_widget(gauge, gauge_area);
+            } else {
+                let time_str = format_core_time_short(badge.remaining_secs);
+                let label = format!(
+                    "{} Power Core (+{} PR/d) \u{00b7} {}",
+                    badge.name, badge.pr_per_day, time_str
+                );
+                let gauge = Gauge::default()
+                    .gauge_style(
+                        Style::default()
+                            .fg(CORE_AMBER)
+                            .bg(Color::Rgb(28, 18, 0))
+                            .add_modifier(Modifier::BOLD),
+                    )
+                    .label(label)
+                    .ratio(badge.fill_ratio);
+                frame.render_widget(gauge, gauge_area);
+            }
+        } else {
+            let label = format!(
+                "{} Power Core (+{} PR/d) \u{00b7} Locked (L{})",
+                badge.name, badge.pr_per_day, badge.required_layer
+            );
+            let gauge = Gauge::default()
+                .gauge_style(
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .bg(Color::Rgb(15, 15, 15))
+                        .add_modifier(Modifier::BOLD),
+                )
+                .label(label)
+                .ratio(0.0);
+            frame.render_widget(gauge, gauge_area);
+        }
+    }
 }
 
 /// Returns seconds until the next active mission completes, or None if no active missions.
@@ -924,8 +589,10 @@ struct CoreSummary {
 }
 
 struct CoreBadge {
+    name: &'static str,
     unlocked: bool,
     ready: bool,
+    fill_ratio: f64,
     required_layer: u32,
     pr_per_day: u32,
     remaining_secs: i64,
@@ -935,10 +602,11 @@ fn format_core_time_short(secs: i64) -> String {
     let secs = secs.max(0) as u64;
     let hours = secs / 3600;
     let minutes = (secs % 3600) / 60;
+    let seconds = secs % 60;
     if hours > 0 {
-        format!("{}h", hours)
+        format!("{}h {:02}m {:02}s", hours, minutes, seconds)
     } else {
-        format!("{}m", minutes.max(1))
+        format!("{}m {:02}s", minutes.max(1), seconds)
     }
 }
 
@@ -983,8 +651,10 @@ fn core_summary(
                 summary.ready_count += 1;
                 summary.ready_pr += core.pr_per_day;
                 summary.cores.push(CoreBadge {
+                    name: core.name,
                     unlocked: true,
                     ready: true,
+                    fill_ratio: 1.0,
                     required_layer: core.required_layer,
                     pr_per_day: core.pr_per_day,
                     remaining_secs: 0,
@@ -1000,8 +670,10 @@ fn core_summary(
                     summary.next_ready_ratio = Some(ratio);
                 }
                 summary.cores.push(CoreBadge {
+                    name: core.name,
                     unlocked: true,
                     ready: false,
+                    fill_ratio: ratio,
                     required_layer: core.required_layer,
                     pr_per_day: core.pr_per_day,
                     remaining_secs: remaining,
@@ -1009,10 +681,12 @@ fn core_summary(
             }
         } else {
             summary.cores.push(CoreBadge {
+                name: core.name,
                 unlocked: false,
                 ready: false,
+                fill_ratio: 0.0,
                 required_layer: core.required_layer,
-                pr_per_day: 0,
+                pr_per_day: core.pr_per_day,
                 remaining_secs: 0,
             });
         }
@@ -1024,7 +698,7 @@ fn core_summary(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::achievements::Achievements;
+    use crate::achievements::{AchievementId, Achievements};
 
     #[test]
     fn test_highest_prestige_badge_uses_existing_top_rank() {

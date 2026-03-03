@@ -954,7 +954,14 @@ fn draw_right_content(
                     game_state.stormglass_discovered,
                 );
             } else if let Some(ref session) = game_state.active_fishing {
-                fishing_scene::render_fishing_scene(frame, area, session, &game_state.fishing, ctx);
+                fishing_scene::render_fishing_scene(
+                    frame,
+                    area,
+                    session,
+                    game_state,
+                    achievements,
+                    ctx,
+                );
             } else if let Some(dungeon) = &game_state.active_dungeon {
                 draw_dungeon_view(frame, area, game_state, dungeon, achievements, ctx);
             } else {
