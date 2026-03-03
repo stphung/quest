@@ -598,7 +598,7 @@ pub(super) fn draw_deep_panel(
 
         let mut spans: Vec<Span> = Vec::new();
 
-        let msn_str = format!("Msn {}/{} ", active, max_concurrent);
+        let msn_str = format!("Missions {}/{} ", active, max_concurrent);
         spans.push(Span::styled(msn_str, Style::default().fg(Color::Cyan)));
 
         // Find the nearest active mission for the progress bar
@@ -757,7 +757,7 @@ pub(super) fn draw_deep_panel(
     // Rows 5-6: Core summary + badges
     let summary = core_summary(achievements, deep);
     {
-        // Row 5: "Cores: N ✓ (+X PR)  Next: Xh Ym  +N PR/d" or "Cores: locked ..."
+        // Row 5: Aggregate core progress bar or locked state
         let mut spans: Vec<Span> = Vec::new();
 
         if summary.unlocked_count == 0 {
@@ -773,84 +773,64 @@ pub(super) fn draw_deep_panel(
                 right.to_string(),
                 Style::default().fg(Color::DarkGray),
             ));
-        } else if summary.ready_count > 0 && summary.next_ready_secs.is_none() {
-            // All unlocked cores are ready
-            let left_text = format!(
-                "Cores: {} \u{2713} (+{} PR)",
-                summary.ready_count, summary.ready_pr
-            );
-            let pr_d_str = format!("+{} PR/d", summary.total_pr_per_day);
-            let mid_text = "All ready!";
-            // left_text + "  " + mid_text + padding + pr_d_str
-            let used = left_text.len() + 2 + mid_text.len() + 2 + pr_d_str.len();
-            let padding = width.saturating_sub(used);
-            spans.push(Span::styled(
-                "Cores: ",
-                Style::default().fg(Color::DarkGray),
-            ));
-            spans.push(Span::styled(
-                format!("{} \u{2713}", summary.ready_count),
-                Style::default().fg(Color::Green),
-            ));
-            spans.push(Span::styled(
-                format!(" (+{} PR)", summary.ready_pr),
-                Style::default().fg(Color::Green),
-            ));
-            spans.push(Span::raw("  "));
-            spans.push(Span::styled(
-                "All ready!".to_string(),
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ));
-            spans.push(Span::raw(" ".repeat(padding)));
-            spans.push(Span::raw("  "));
-            spans.push(Span::styled(pr_d_str, Style::default().fg(CORE_AMBER)));
         } else {
-            let ready_part = if summary.ready_count > 0 {
-                format!(
-                    "{} \u{2713} (+{} PR)",
-                    summary.ready_count, summary.ready_pr
-                )
-            } else {
-                "0 \u{2713}".to_string()
-            };
-            let next_part = match summary.next_ready_secs {
-                Some(secs) => format!("Next: {}", format_eta(secs as u64)),
-                None => String::new(),
-            };
+            let all_ready = summary.next_ready_secs.is_none();
             let pr_d_str = format!("+{} PR/d", summary.total_pr_per_day);
-            let left_len = "Cores: ".len() + ready_part.len();
-            let mid_len = if next_part.is_empty() {
-                0
-            } else {
-                2 + next_part.len()
-            };
-            let right_len = 2 + pr_d_str.len();
-            let used = left_len + mid_len + right_len;
-            let padding = width.saturating_sub(used);
 
-            spans.push(Span::styled(
-                "Cores: ",
-                Style::default().fg(Color::DarkGray),
-            ));
-            if summary.ready_count > 0 {
-                spans.push(Span::styled(ready_part, Style::default().fg(Color::Green)));
+            // "Cores " label
+            spans.push(Span::styled("Cores ", Style::default().fg(Color::DarkGray)));
+
+            // 12-char progress bar [████████░░░░]
+            let bar_ratio = if all_ready {
+                1.0
             } else {
+                summary.next_ready_ratio.unwrap_or(0.0)
+            };
+            let filled = (bar_ratio * 12.0).round() as usize;
+            let empty = 12 - filled;
+            spans.push(Span::styled("[", Style::default().fg(Color::DarkGray)));
+            if filled > 0 {
+                let bar_color = if all_ready { Color::Green } else { CORE_AMBER };
                 spans.push(Span::styled(
-                    ready_part,
+                    "\u{2588}".repeat(filled),
+                    Style::default().fg(bar_color),
+                ));
+            }
+            if empty > 0 {
+                spans.push(Span::styled(
+                    "\u{2591}".repeat(empty),
                     Style::default().fg(Color::DarkGray),
                 ));
             }
-            if !next_part.is_empty() {
-                spans.push(Span::raw("  "));
+            spans.push(Span::styled("] ", Style::default().fg(Color::DarkGray)));
+
+            // ETA or "All ready!"
+            let eta_text = if all_ready {
+                "All ready!".to_string()
+            } else {
+                match summary.next_ready_secs {
+                    Some(secs) => format_eta(secs as u64),
+                    None => String::new(),
+                }
+            };
+
+            // "Cores " (6) + "[" (1) + 12 bar + "] " (2) + eta_text + padding + pr_d_str
+            let left_width = 6 + 1 + 12 + 2 + eta_text.len();
+            let right_width = pr_d_str.len();
+            let padding = width.saturating_sub(left_width + right_width);
+
+            if all_ready {
                 spans.push(Span::styled(
-                    next_part,
-                    Style::default().fg(Color::DarkGray),
+                    eta_text,
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
                 ));
+            } else {
+                spans.push(Span::styled(eta_text, Style::default().fg(Color::DarkGray)));
             }
+
             spans.push(Span::raw(" ".repeat(padding)));
-            spans.push(Span::raw("  "));
             spans.push(Span::styled(pr_d_str, Style::default().fg(CORE_AMBER)));
         }
 
@@ -858,39 +838,42 @@ pub(super) fn draw_deep_panel(
     }
 
     {
-        // Row 6: Per-core mini progress bars
+        // Row 6: Per-core rate·status pairs
         let mut spans: Vec<Span> = Vec::new();
 
         for (i, badge) in summary.cores.iter().enumerate() {
             if i > 0 {
-                spans.push(Span::raw(" "));
+                spans.push(Span::raw("  "));
             }
             if badge.unlocked {
-                spans.push(Span::styled("\u{2742}", Style::default().fg(CORE_AMBER)));
-                let filled = (badge.fill_ratio * 4.0).round() as usize;
-                let empty = 4 - filled;
                 if badge.ready {
-                    // Ready cores: all filled in Green
+                    // Ready: "N·✓"
                     spans.push(Span::styled(
-                        "\u{2588}".repeat(4),
-                        Style::default().fg(Color::Green),
+                        format!("{}", badge.pr_per_day),
+                        Style::default().fg(CORE_AMBER),
                     ));
+                    spans.push(Span::styled(
+                        "\u{00b7}",
+                        Style::default().fg(Color::DarkGray),
+                    ));
+                    spans.push(Span::styled("\u{2713}", Style::default().fg(Color::Green)));
                 } else {
-                    // Filling cores: filled in Amber, empty in DarkGray
-                    if filled > 0 {
-                        spans.push(Span::styled(
-                            "\u{2588}".repeat(filled),
-                            Style::default().fg(CORE_AMBER),
-                        ));
-                    }
-                    if empty > 0 {
-                        spans.push(Span::styled(
-                            "\u{2591}".repeat(empty),
-                            Style::default().fg(Color::DarkGray),
-                        ));
-                    }
+                    // Filling: "N·Xh" or "N·Xm"
+                    spans.push(Span::styled(
+                        format!("{}", badge.pr_per_day),
+                        Style::default().fg(CORE_AMBER),
+                    ));
+                    spans.push(Span::styled(
+                        "\u{00b7}",
+                        Style::default().fg(Color::DarkGray),
+                    ));
+                    spans.push(Span::styled(
+                        format_core_time_short(badge.remaining_secs),
+                        Style::default().fg(Color::DarkGray),
+                    ));
                 }
             } else {
+                // Locked: "◇LN"
                 spans.push(Span::styled(
                     format!("\u{25c7}L{}", badge.required_layer),
                     Style::default().fg(Color::DarkGray),
@@ -936,14 +919,27 @@ struct CoreSummary {
     unlocked_count: usize,
     total_pr_per_day: u32,
     next_ready_secs: Option<i64>,
+    next_ready_ratio: Option<f64>,
     cores: Vec<CoreBadge>,
 }
 
 struct CoreBadge {
     unlocked: bool,
     ready: bool,
-    fill_ratio: f64,
     required_layer: u32,
+    pr_per_day: u32,
+    remaining_secs: i64,
+}
+
+fn format_core_time_short(secs: i64) -> String {
+    let secs = secs.max(0) as u64;
+    let hours = secs / 3600;
+    let minutes = (secs % 3600) / 60;
+    if hours > 0 {
+        format!("{}h", hours)
+    } else {
+        format!("{}m", minutes.max(1))
+    }
 }
 
 fn core_summary(
@@ -961,6 +957,7 @@ fn core_summary(
         unlocked_count: 0,
         total_pr_per_day: 0,
         next_ready_secs: None,
+        next_ready_ratio: None,
         cores: Vec::new(),
     };
 
@@ -988,30 +985,35 @@ fn core_summary(
                 summary.cores.push(CoreBadge {
                     unlocked: true,
                     ready: true,
-                    fill_ratio: 1.0,
                     required_layer: core.required_layer,
+                    pr_per_day: core.pr_per_day,
+                    remaining_secs: 0,
                 });
             } else {
                 if let Some(current_next) = summary.next_ready_secs {
                     if remaining < current_next {
                         summary.next_ready_secs = Some(remaining);
+                        summary.next_ready_ratio = Some(ratio);
                     }
                 } else {
                     summary.next_ready_secs = Some(remaining);
+                    summary.next_ready_ratio = Some(ratio);
                 }
                 summary.cores.push(CoreBadge {
                     unlocked: true,
                     ready: false,
-                    fill_ratio: ratio,
                     required_layer: core.required_layer,
+                    pr_per_day: core.pr_per_day,
+                    remaining_secs: remaining,
                 });
             }
         } else {
             summary.cores.push(CoreBadge {
                 unlocked: false,
                 ready: false,
-                fill_ratio: 0.0,
                 required_layer: core.required_layer,
+                pr_per_day: 0,
+                remaining_secs: 0,
             });
         }
     }
@@ -1080,5 +1082,6 @@ mod tests {
         assert_eq!(summary.unlocked_count, 0);
         assert_eq!(summary.total_pr_per_day, 0);
         assert!(summary.next_ready_secs.is_none());
+        assert!(summary.next_ready_ratio.is_none());
     }
 }
