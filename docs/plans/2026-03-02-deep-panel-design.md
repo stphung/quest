@@ -5,18 +5,18 @@
 
 ## Overview
 
-Merge the Power Cores panel and Deep status into a single unified panel titled "The Deep" in the stats column. Same 8-row height as the current Power Cores panel (6 content rows + 2 border rows).
+Merge the Power Cores panel and Deep status into a single unified panel titled "The Deep" in the stats column. Same 8-row height as the current Power Cores panel (6 content rows + 2 border rows). Features mini progress bars for both missions and power cores.
 
 ## Layout
 
 ```
 ┌─ The Deep ───────────────────────────────────┐
 │ Row 1: Guild rank + Warband Marks            │
-│ Row 2: Mission slots + next completion       │
-│ Row 3: Crew glyphs + Frontier + events       │
+│ Row 2: Msn N/M [progress bar] ~ETA   ⚡N     │
+│ Row 3: Crew glyphs + Frontier                │
 │ Row 4: ─────────── separator ───────────────│
-│ Row 5: Core summary (ready count, next ETA)  │
-│ Row 6: Per-core status badges                │
+│ Row 5: Core summary + PR/d                   │
+│ Row 6: Per-core mini progress bars           │
 └──────────────────────────────────────────────┘
 ```
 
@@ -29,26 +29,30 @@ Merge the Power Cores panel and Deep status into a single unified panel titled "
 - Left: `⬡` hex icon (White) + guild rank name
 - Right-aligned: `◆` (Amber) + Warband Marks count
 
-### Row 2: Missions + Timer
+### Row 2: Missions + Progress Bar + Events
 ```
-│ Missions 2/2     ◷ Next: ~45m               │
+│ Msn 2/2 [████████░░░░] ~45m          ⚡1     │
 ```
-- Left: `Missions N/M` (Cyan) — active count / max concurrent slots
-- Right: `◷ Next: ~Xh Ym` — time until next mission completes
+- Left: `Msn N/M` (Cyan) — active count / max concurrent slots
+- Center: 12-char progress bar showing nearest mission completion
+  - Fill chars: `█` (Amber), empty: `░` (DarkGray)
+  - Progress = nearest mission's elapsed / total duration
+  - Only shown when active missions exist
+- After bar: `~Xh Ym` time remaining
   - Yellow when < 15 minutes
   - DarkGray otherwise
-  - `◷ idle` when no active missions
+- Right-aligned: `⚡N` in Yellow (pending events count, omit if 0)
+- When no active missions: `Msn 0/N          ◷ idle` (no bar)
 
-### Row 3: Crew + Frontier + Events
+### Row 3: Crew + Frontier
 ```
-│ ♦♦♦ ♢ ✝          Frontier L7    ⚡1          │
+│ ♦♦♦ ♢ ✝          Frontier L7                 │
 ```
 - Left: One glyph per mercenary, grouped by status with spaces between groups:
   - `♦` Green — Available (ready for assignment)
   - `♢` Cyan — On Mission (deployed)
   - `✝` Red — Injured (benched)
-- Center-right: `Frontier LN` in Gray-blue
-- Far right: `⚡N` in Yellow (pending events count, omit if 0)
+- Right-aligned: `Frontier LN` in Gray-blue
 - Empty roster: row shows only Frontier on the right, left side blank
 
 ### Row 4: Separator
@@ -58,22 +62,26 @@ Merge the Power Cores panel and Deep status into a single unified panel titled "
 
 ### Row 5: Core Summary
 ```
-│ Cores: 2 ✓ Ready (+4 PR)  ·  Next: 2h 45m   │
+│ Cores: 2 ✓ (+4 PR)  Next: 2h 45m  +8 PR/d   │
 ```
-- Ready count in Green + total PR available to collect
-- `Next: Xh Ym` — time until next core grants PR
-- When all unlocked cores are ready: `All ready!` in Green+Bold
+- `Cores:` label in DarkGray
+- Ready count + claimable PR in Green
+- `Next: Xh Ym` — time until next core grants PR (DarkGray)
+- Right-aligned: `+N PR/d` (Amber) — current daily PR generation rate
+- When all unlocked cores ready: `All ready!` in Green+Bold (replaces Next)
 - When no cores unlocked: `Cores: locked    First core at L3`
 
-### Row 6: Per-Core Badges
+### Row 6: Per-Core Mini Progress Bars
 ```
-│ ❂✓ ❂✓ ❂2h ◇L18 ◇L25 ◇L30     +8 PR/day     │
+│ ❂████ ❂████ ❂██░░ ◇L18 ◇L25 ◇L30           │
 ```
-- `❂` (Amber) = unlocked core, followed by:
-  - `✓` (Green) if ready
-  - `Xh` (DarkGray) time remaining
-- `◇` (DarkGray) = locked core, followed by unlock layer (e.g., `L18`)
-- Right-aligned: `+N PR/day` (Amber) — current total daily PR generation rate
+- Each unlocked core: `❂` (Amber) + 4-char progress bar
+  - Fill chars: `█` (Amber for filling, Green for ready)
+  - Empty chars: `░` (DarkGray)
+  - Ready cores: all 4 filled in Green
+  - Filling cores: proportional fill in Amber
+- Locked cores: `◇LN` (DarkGray) with unlock layer
+- Cores separated by spaces
 
 ## State Examples
 
@@ -81,7 +89,7 @@ Merge the Power Cores panel and Deep status into a single unified panel titled "
 ```
 ┌─ The Deep ───────────────────────────────────┐
 │ ⬡ Freelancers    ◆ 0 Warband Marks          │
-│ Missions 0/1     ◷ idle                      │
+│ Msn 0/1          ◷ idle                      │
 │                   Frontier L1                │
 │─────────────────────────────────────────────│
 │ Cores: locked    First core at L3            │
@@ -89,15 +97,15 @@ Merge the Power Cores panel and Deep status into a single unified panel titled "
 └──────────────────────────────────────────────┘
 ```
 
-### Early game (1 core, small crew)
+### Early game (1 core filling, 1 mission active)
 ```
 ┌─ The Deep ───────────────────────────────────┐
 │ ⬡ Freelancers    ◆ 80 Warband Marks         │
-│ Missions 0/1     ◷ idle                      │
+│ Msn 1/1 [████░░░░░░░░] ~3h 15m              │
 │ ♦♦                Frontier L3                │
 │─────────────────────────────────────────────│
 │ Cores: 0 ✓ Ready            Next: 4h 30m     │
-│ ❂4h ◇L7 ◇L12 ◇L18 ◇L25 ◇L30   +2 PR/day    │
+│ ❂██░░ ◇L7 ◇L12 ◇L18 ◇L25 ◇L30    +2 PR/day │
 └──────────────────────────────────────────────┘
 ```
 
@@ -105,11 +113,11 @@ Merge the Power Cores panel and Deep status into a single unified panel titled "
 ```
 ┌─ The Deep ───────────────────────────────────┐
 │ ⬡ Company        ◆ 1250 Warband Marks       │
-│ Missions 2/2     ◷ Next: ~45m               │
-│ ♦♦♦ ♢ ✝          Frontier L7    ⚡1          │
+│ Msn 2/2 [████████░░░░] ~45m          ⚡1     │
+│ ♦♦♦ ♢ ✝          Frontier L7                 │
 │─────────────────────────────────────────────│
-│ Cores: 2 ✓ Ready (+4 PR)  ·  Next: 2h 45m   │
-│ ❂✓ ❂✓ ❂2h ◇L18 ◇L25 ◇L30     +8 PR/day     │
+│ Cores: 2 ✓ (+4 PR)                +8 PR/d    │
+│ ❂████ ❂████ ❂██░░ ◇L18 ◇L25 ◇L30           │
 └──────────────────────────────────────────────┘
 ```
 
@@ -117,23 +125,35 @@ Merge the Power Cores panel and Deep status into a single unified panel titled "
 ```
 ┌─ The Deep ───────────────────────────────────┐
 │ ⬡ Vanguard ★     ◆ 8200 Warband Marks       │
-│ Missions 2/4     ◷ Next: ~1h 20m            │
+│ Msn 2/4 [██████████░░] ~1h 20m              │
 │ ♦♦♦♦ ♢♢ ✝✝       Frontier L30               │
 │─────────────────────────────────────────────│
-│ Cores: 1 ✓ Ready (+6 PR)  ·  Next: 1h 05m   │
-│ ❂✓ ❂1h ❂3h ❂5h ❂8h ❂11h      +48 PR/day    │
+│ Cores: 1 ✓ (+6 PR)  Next: 1h 05m  +48 PR/d  │
+│ ❂████ ❂███░ ❂██░░ ❂█░░░ ❂░░░░ ❂░░░░         │
 └──────────────────────────────────────────────┘
 ```
 
-### All cores ready
+### All cores ready, no missions
 ```
 ┌─ The Deep ───────────────────────────────────┐
 │ ⬡ Vanguard ★     ◆ 12000 Warband Marks      │
-│ Missions 0/4     ◷ idle                      │
+│ Msn 0/4          ◷ idle                      │
 │ ♦♦♦♦♦♦♦♦          Frontier L30               │
 │─────────────────────────────────────────────│
-│ Cores: 6 ✓ Ready (+48 PR) ·  All ready!      │
-│ ❂✓ ❂✓ ❂✓ ❂✓ ❂✓ ❂✓            +48 PR/day     │
+│ Cores: 6 ✓ (+48 PR)  All ready!    +48 PR/d  │
+│ ❂████ ❂████ ❂████ ❂████ ❂████ ❂████         │
+└──────────────────────────────────────────────┘
+```
+
+### Mission about to complete (<15m)
+```
+┌─ The Deep ───────────────────────────────────┐
+│ ⬡ Battalion      ◆ 3400 Warband Marks       │
+│ Msn 1/3 [████████████] ~8m                   │
+│ ♦♦♦♦♦             Frontier L18               │
+│─────────────────────────────────────────────│
+│ Cores: 3 ✓ (+12 PR)  All ready!   +12 PR/d   │
+│ ❂████ ❂████ ❂████ ◇L18 ◇L25 ◇L30           │
 └──────────────────────────────────────────────┘
 ```
 
@@ -143,30 +163,33 @@ Merge the Power Cores panel and Deep status into a single unified panel titled "
 |---------|-------|-------|
 | `⬡` guild rank icon | White | |
 | `◆` Warband Marks | Amber `Rgb(220,180,60)` | |
-| Mission count | Cyan | |
-| `◷` timer | Yellow (<15m), DarkGray (otherwise) | |
+| `Msn N/M` | Cyan | |
+| Mission bar fill `█` | Amber `Rgb(255,165,0)` | |
+| Mission bar empty `░` | DarkGray | |
+| Mission ETA text | Yellow (<15m), DarkGray (otherwise) | |
 | `◷ idle` | DarkGray | |
 | `♦` available merc | Green | |
 | `♢` deployed merc | Cyan | |
 | `✝` injured merc | Red | |
-| Frontier label | Gray-blue | |
+| Frontier label | Gray-blue `Rgb(120,140,170)` | |
 | `⚡` events | Yellow | |
-| `❂` unlocked core | Amber | |
+| `❂` unlocked core | Amber `Rgb(255,165,0)` | |
+| Core bar fill (filling) `█` | Amber `Rgb(255,165,0)` | |
+| Core bar fill (ready) `█` | Green | |
+| Core bar empty `░` | DarkGray | |
 | `◇` locked core | DarkGray | |
-| `✓` ready | Green | |
-| Core time remaining | DarkGray | |
 | `All ready!` | Green + Bold | |
-| `+N PR/day` | Amber | |
+| `+N PR/d` | Amber `Rgb(255,165,0)` | |
 | Panel border | Amber (themed) | Same as current Power Cores |
 | Separator | DarkGray | |
 
 ## Implementation Notes
 
-- Replaces `draw_power_cores_panel()` in `src/ui/stats_prestige.rs`
-- Panel title changes from `" Power Cores "` to `" The Deep "`
-- Height remains `8` rows (same `Constraint` in `draw_stats_panel()`)
-- Panel visibility: shown when Deep is discovered (same condition as current Power Cores)
+- Panel function: `draw_deep_panel()` in `src/ui/stats_prestige.rs`
+- Panel title: `" The Deep "`
+- Height: `8` rows (6 content + 2 border)
+- Panel visibility: shown when `deep.persistent.discovered` is true
+- Mission progress bar: 12 chars wide, uses nearest active mission's `progress(Utc::now())`
+- Core mini bars: 4 chars wide per core, uses `fill_ratio()` from power_cores
 - Crew glyphs: iterate `prestige.roster`, skip `MercStatus::Lost`, emit one glyph per merc grouped by status
-- Core badges: iterate `ALL_POWER_CORES`, check unlock status and fill progress
-- PR/day: sum of `core.pr_per_day()` for all unlocked cores
 - Merc statuses are mutually exclusive: `Available | OnMission(id) | Injured { missions_remaining } | Lost`
