@@ -886,9 +886,71 @@ fn draw_right_panel(
 
 /// Draws the 2-row status strip at the bottom of the unified right panel.
 /// Shows context-sensitive info: combat HP, fishing status, dungeon status, or idle.
-fn draw_status_strip(frame: &mut Frame, area: Rect, _game_state: &GameState) {
-    // Placeholder — implemented in Task 2
-    let _ = (frame, area);
+fn draw_status_strip(frame: &mut Frame, area: Rect, game_state: &GameState) {
+    if area.height < 2 {
+        return;
+    }
+
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Length(1)])
+        .split(area);
+
+    // Row 1: Player HP gauge
+    let hp = &game_state.combat_state;
+    let hp_ratio = if hp.player_max_hp > 0 {
+        (hp.player_current_hp as f64 / hp.player_max_hp as f64).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let hp_label = format!("HP: {}/{}", hp.player_current_hp, hp.player_max_hp);
+    render_hp_bar_with_flash(
+        frame,
+        rows[0],
+        hp_label,
+        hp_ratio,
+        Color::Green,
+        game_state.combat_state.player_damage_floats.last(),
+    );
+
+    // Row 2: Enemy HP or idle status
+    if let Some(enemy) = &hp.current_enemy {
+        let enemy_ratio = if enemy.max_hp > 0 {
+            (enemy.current_hp as f64 / enemy.max_hp as f64).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let enemy_label = format!("{}: {}/{}", enemy.name, enemy.current_hp, enemy.max_hp);
+        let is_boss =
+            game_state.zone_progression.fighting_boss || enemy.name.starts_with("Boss ");
+        let hp_color = if is_boss {
+            Color::LightRed
+        } else {
+            let zone_id = game_state
+                .active_dungeon
+                .as_ref()
+                .map(|d| d.zone_id)
+                .unwrap_or(game_state.zone_progression.current_zone_id);
+            enemy_sprites::zone_palette(zone_id).primary
+        };
+        render_hp_bar_with_flash(
+            frame,
+            rows[1],
+            enemy_label,
+            enemy_ratio,
+            hp_color,
+            game_state.combat_state.enemy_damage_floats.last(),
+        );
+    } else {
+        let spinner = throbber::spinner_char();
+        let msg = throbber::waiting_message(game_state.character_xp);
+        let text = Paragraph::new(Line::from(Span::styled(
+            format!("{} {}", spinner, msg),
+            Style::default().fg(Color::Yellow),
+        )))
+        .alignment(Alignment::Center);
+        frame.render_widget(text, rows[1]);
+    }
 }
 
 /// Draws the main content area of the right panel based on current activity.
