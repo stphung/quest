@@ -1,10 +1,11 @@
 //! Stats panel coordinator — delegates to submodules for rendering.
 
 use super::responsive::{LayoutContext, SizeTier};
-use super::stats_attributes::draw_attributes_compact;
+use super::stats_attributes::{attr_bg_color, attr_color, format_modifier};
 use super::stats_equipment::draw_equipment_names_only;
-use super::stats_prestige::{draw_deep_panel, draw_fishing_panel, draw_prestige_info, format_eta};
+use super::stats_prestige::{draw_deep_panel, format_eta};
 use super::stats_sigils::draw_sigils_panel;
+use crate::character::attributes::AttributeType;
 use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::{get_adventurer_rank, get_prestige_tier};
 use crate::core::game_logic::xp_for_next_level;
@@ -72,28 +73,26 @@ pub fn draw_stats_panel(
     match ctx.height_tier {
         SizeTier::XL | SizeTier::L => {
             let etched = game_state.storm_sigils.etched_count();
-            let prestige_height = if game_state.ascension_level > 0 {
-                7 // 5 inner rows + 2 border
+            // Hero panel: 2 border + 2 header + 1 XP gauge + (4 or 5) prestige (incl sep) + 1 prestige gauge + 1 sep + 3 attrs
+            let hero_height: u16 = if game_state.ascension_level > 0 {
+                15 // 2 + 2 + 1 + 5 + 1 + 1 + 3
             } else {
-                6 // 4 inner rows + 2 border
+                14 // 2 + 2 + 1 + 4 + 1 + 1 + 3
             };
-            let deep_panel_height: u16 = if deep.persistent.discovered { 8 } else { 0 };
+            let deep_panel_height: u16 = if deep.persistent.discovered { 13 } else { 0 };
 
             let mut constraints = vec![
-                Constraint::Length(5), // Header (name, level+power, time+rate, XP gauge)
-                Constraint::Length(prestige_height), // Prestige
-                Constraint::Length(4), // Fishing
+                Constraint::Length(hero_height), // Unified hero panel
             ];
-            if deep_panel_height > 0 {
-                constraints.push(Constraint::Length(deep_panel_height));
-            }
-            constraints.push(Constraint::Length(5)); // Attributes
             if etched > 0 {
                 constraints.push(Constraint::Length(
                     crate::stormglass::sigils::MAX_SIGIL_SLOTS as u16 + 2,
                 )); // Sigils (all 5 slots)
             }
             constraints.push(Constraint::Min(0)); // Equipment
+            if deep_panel_height > 0 {
+                constraints.push(Constraint::Length(deep_panel_height));
+            }
 
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -101,45 +100,36 @@ pub fn draw_stats_panel(
                 .split(area);
 
             let mut idx = 0;
-            draw_header(frame, chunks[idx], game_state, achievements);
-            idx += 1;
-            draw_prestige_info(frame, chunks[idx], game_state, achievements);
-            idx += 1;
-            draw_fishing_panel(frame, chunks[idx], game_state, achievements);
-            idx += 1;
-            if deep_panel_height > 0 {
-                draw_deep_panel(frame, chunks[idx], achievements, deep);
-                idx += 1;
-            }
-            draw_attributes_compact(frame, chunks[idx], game_state);
+            draw_hero_panel(frame, chunks[idx], game_state, achievements);
             idx += 1;
             if etched > 0 {
                 draw_sigils_panel(frame, chunks[idx], &game_state.storm_sigils);
                 idx += 1;
             }
             draw_equipment_names_only(frame, chunks[idx], game_state, enhancement_levels);
+            idx += 1;
+            if deep_panel_height > 0 {
+                draw_deep_panel(frame, chunks[idx], achievements, deep);
+            }
         }
         _ => {}
     }
 }
 
-/// Draws the header with character level, XP bar, and play time
-fn draw_header(
+/// Draws the unified hero panel combining header, prestige, and attributes.
+fn draw_hero_panel(
     frame: &mut Frame,
     area: Rect,
     game_state: &GameState,
     achievements: &crate::achievements::Achievements,
 ) {
-    let xp_needed = xp_for_next_level(game_state.character_level);
-    let xp_ratio = if xp_needed > 0 {
-        (game_state.character_xp as f64 / xp_needed as f64).min(1.0)
-    } else {
-        0.0
-    };
+    use super::stats_prestige::{highest_prestige_badge, prestige_ready_gauge_style, to_roman};
+    use crate::ascension::types::ascension_combat_multiplier;
+    use crate::character::prestige::get_next_prestige_tier;
 
-    let rank = get_adventurer_rank(game_state.character_level);
-    let play_time = format_play_time(game_state.play_time_seconds);
+    let dw = super::scene_fx::display_width;
 
+    // Panel title: character name with optional title
     let title_suffix = achievements.selected_title.and_then(|id| {
         if achievements.is_unlocked(id) {
             crate::achievements::titles::get_title_text(id)
@@ -155,22 +145,28 @@ fn draw_header(
         Some(icon) => format!(" {} {} ", name_with_title, icon),
         None => format!(" {} ", name_with_title),
     };
-    let header_block = Block::default().borders(Borders::ALL).title(header_title);
-    let header_block = super::themed_block(header_block);
-    let inner = header_block.inner(area);
-    frame.render_widget(header_block, area);
+    let block = Block::default().borders(Borders::ALL).title(header_title);
+    let block = super::themed_block(block);
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
     super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
 
+    let width = inner.width as usize;
+    let xp_needed = xp_for_next_level(game_state.character_level);
+
+    // === Build header text lines (2 lines) ===
+    let mut header_lines: Vec<Line> = Vec::new();
+
     // Row 1: Level + Power Level (right-aligned)
+    let rank = get_adventurer_rank(game_state.character_level);
     let power = game_state.cached_power_rating as u64;
     let power_str = format!(
         "\u{26a1} Power Level: {}",
         super::game_common::format_number_short(power)
     );
     let level_str = format!("Level {} {}", game_state.character_level, rank);
-    // Pad power to right-align within inner width
-    let gap = (inner.width as usize).saturating_sub(level_str.len() + power_str.len());
-    let row1 = Line::from(vec![
+    let gap = width.saturating_sub(dw(&level_str) + dw(&power_str));
+    header_lines.push(Line::from(vec![
         Span::styled(
             level_str,
             Style::default()
@@ -184,9 +180,10 @@ fn draw_header(
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         ),
-    ]);
+    ]));
 
     // Row 2: Play time + XP rate
+    let play_time = format_play_time(game_state.play_time_seconds);
     let rate_suffix = match game_state.xp_per_hour() {
         Some(rate) => {
             let xp_remaining = xp_needed.saturating_sub(game_state.character_xp);
@@ -204,13 +201,174 @@ fn draw_header(
         }
         None => String::new(),
     };
-    let row2 = Line::from(vec![
+    header_lines.push(Line::from(vec![
         Span::styled("\u{23f1}\u{fe0f} ", Style::default().fg(Color::Cyan)),
         Span::styled(play_time, Style::default().fg(Color::Cyan)),
         Span::styled(rate_suffix, Style::default().fg(Color::Cyan)),
-    ]);
+    ]));
 
-    // Row 3: XP gauge
+    // === Build prestige text lines (3-4 lines + titled separator) ===
+    let mut prestige_lines: Vec<Line> = Vec::new();
+
+    // Titled separator: ──── Prestige ⭐ ────
+    {
+        let label = match highest_prestige_badge(achievements) {
+            Some(icon) => format!(" Prestige {} ", icon),
+            None => " Prestige ".to_string(),
+        };
+        let label_w = dw(&label);
+        let remaining = width.saturating_sub(label_w);
+        let left_dashes = remaining / 2;
+        let right_dashes = remaining - left_dashes;
+        prestige_lines.push(Line::from(vec![
+            Span::styled(
+                "\u{2500}".repeat(left_dashes),
+                Style::default().fg(Color::DarkGray),
+            ),
+            Span::styled(
+                label,
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                "\u{2500}".repeat(right_dashes),
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]));
+    }
+
+    let tier = get_prestige_tier(game_state.prestige_rank);
+    let cha_mod = game_state.attributes.modifier(AttributeType::Charisma);
+    let effective_multiplier =
+        DerivedStats::prestige_multiplier(tier.multiplier, &game_state.attributes);
+
+    // Prestige row 1: Rank + prestige count
+    let rank_spans = vec![
+        Span::styled("🏆 Rank: ", Style::default().add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{} ({})", game_state.prestige_rank, tier.name),
+            Style::default().fg(Color::Yellow),
+        ),
+        Span::styled(" | ", Style::default().fg(Color::DarkGray)),
+        Span::styled("🔄 ", Style::default()),
+        Span::styled(
+            format!("{}", game_state.total_prestige_count),
+            Style::default().fg(Color::Magenta),
+        ),
+    ];
+    prestige_lines.push(Line::from(rank_spans));
+
+    // Prestige row 2 (optional): Ascension
+    if game_state.ascension_level > 0 {
+        let asc_mult = ascension_combat_multiplier(game_state.ascension_level);
+        prestige_lines.push(Line::from(vec![
+            Span::styled(
+                format!(
+                    "\u{2726} Ascension {} ",
+                    to_roman(game_state.ascension_level)
+                ),
+                Style::default()
+                    .fg(Color::Rgb(255, 215, 0))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("\u{2014} ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("\u{00d7}{:.1} power", asc_mult),
+                Style::default().fg(Color::Rgb(255, 215, 0)),
+            ),
+        ]));
+    }
+
+    // Prestige row 3: XP multiplier
+    let mut xp_spans = vec![
+        Span::styled("⚡ XP: ", Style::default().add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{:.2}x", tier.multiplier),
+            Style::default().fg(Color::Cyan),
+        ),
+    ];
+    if cha_mod != 0 {
+        xp_spans.push(Span::styled(
+            format!(" +{:.1} CHA", cha_mod as f64 * 0.1),
+            Style::default().fg(Color::Yellow),
+        ));
+    }
+    xp_spans.push(Span::styled(
+        " \u{2192} ",
+        Style::default().fg(Color::DarkGray),
+    ));
+    xp_spans.push(Span::styled(
+        format!("{:.2}x", effective_multiplier),
+        Style::default()
+            .fg(Color::Green)
+            .add_modifier(Modifier::BOLD),
+    ));
+    prestige_lines.push(Line::from(xp_spans));
+
+    // Prestige row 4: Unlock hint
+    let next_prestige = get_next_prestige_tier(game_state.prestige_rank);
+    let mult_delta = next_prestige.multiplier - tier.multiplier;
+    let unlock_hint = {
+        let mut unlocks = Vec::new();
+        let zones = crate::zones::get_all_zones();
+        for zone in zones {
+            if zone.prestige_requirement == next_prestige.rank {
+                unlocks.push(zone.name);
+            }
+        }
+        if next_prestige.rank == 10 {
+            unlocks.push("Haven");
+        }
+        if next_prestige.rank == 15 {
+            unlocks.push("Soulforge");
+            unlocks.push("Stormglass");
+        }
+        if unlocks.is_empty() {
+            format!("\u{1f513} +{:.2}x mult", mult_delta)
+        } else {
+            format!(
+                "\u{1f513} +{:.2}x mult \u{00b7} Unlocks: {}",
+                mult_delta,
+                unlocks.join(", ")
+            )
+        }
+    };
+    prestige_lines.push(Line::from(Span::styled(
+        unlock_hint,
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    // === LAYOUT ===
+    // header text (2) + XP gauge (1) + prestige text (separator + 3-4 lines) + prestige gauge (1) + separator (1) + attr gauges (3)
+    let header_count = header_lines.len() as u16;
+    let prestige_count = prestige_lines.len() as u16;
+
+    let constraints = vec![
+        Constraint::Length(header_count),   // header text
+        Constraint::Length(1),              // XP gauge
+        Constraint::Length(prestige_count), // prestige text (includes separator)
+        Constraint::Length(1),              // prestige gauge
+        Constraint::Length(1),              // separator
+        Constraint::Length(1),              // attr row 1
+        Constraint::Length(1),              // attr row 2
+        Constraint::Length(1),              // attr row 3
+    ];
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(inner);
+
+    // Render header text
+    frame.render_widget(Paragraph::new(header_lines), chunks[0]);
+
+    // XP gauge
+    let xp_ratio = if xp_needed > 0 {
+        (game_state.character_xp as f64 / xp_needed as f64).min(1.0)
+    } else {
+        0.0
+    };
     let xp_label = format!(
         "XP: {}/{} ({:.1}%)",
         game_state.character_xp,
@@ -226,22 +384,108 @@ fn draw_header(
         )
         .label(xp_label)
         .ratio(xp_ratio);
+    frame.render_widget(xp_gauge, chunks[1]);
 
-    if inner.height >= 3 {
-        let inner_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1),
-                Constraint::Length(1),
-                Constraint::Length(1),
-            ])
-            .split(inner);
+    // Render prestige text
+    frame.render_widget(Paragraph::new(prestige_lines), chunks[2]);
 
-        frame.render_widget(Paragraph::new(vec![row1]), inner_chunks[0]);
-        frame.render_widget(Paragraph::new(vec![row2]), inner_chunks[1]);
-        frame.render_widget(xp_gauge, inner_chunks[2]);
-    } else if inner.height >= 1 {
-        frame.render_widget(Paragraph::new(vec![row1]), inner);
+    // Prestige gauge
+    let prestige_ratio =
+        (game_state.character_level as f64 / next_prestige.required_level as f64).min(1.0);
+    let prestige_eta = match game_state.xp_per_hour() {
+        Some(rate) if rate > 0 && game_state.character_level < next_prestige.required_level => {
+            let xp_remaining_current = xp_for_next_level(game_state.character_level)
+                .saturating_sub(game_state.character_xp);
+            let xp_future_levels: u64 = (game_state.character_level + 1
+                ..next_prestige.required_level)
+                .map(xp_for_next_level)
+                .sum();
+            let total_xp = xp_remaining_current + xp_future_levels;
+            let seconds = (total_xp as f64 / rate as f64 * 3600.0) as u64;
+            format!(" ({})", format_eta(seconds))
+        }
+        _ => String::new(),
+    };
+    let prestige_label = format!(
+        "Lv {}/{} to {} (P{}){}",
+        game_state.character_level,
+        next_prestige.required_level,
+        next_prestige.name,
+        next_prestige.rank,
+        prestige_eta
+    );
+    let prestige_ready = game_state.character_level >= next_prestige.required_level;
+    let prestige_gauge = Gauge::default()
+        .gauge_style(if prestige_ready {
+            prestige_ready_gauge_style()
+        } else {
+            Style::default()
+                .fg(Color::Rgb(180, 100, 255))
+                .bg(Color::Rgb(20, 10, 30))
+                .add_modifier(Modifier::BOLD)
+        })
+        .label(prestige_label)
+        .ratio(prestige_ratio);
+    frame.render_widget(prestige_gauge, chunks[3]);
+
+    // Titled separator before attributes: ──── Attributes ────
+    {
+        let label = " Attributes ";
+        let label_w = dw(label);
+        let remaining = width.saturating_sub(label_w);
+        let left_dashes = remaining / 2;
+        let right_dashes = remaining - left_dashes;
+        let sep = Paragraph::new(Line::from(vec![
+            Span::styled(
+                "\u{2500}".repeat(left_dashes),
+                Style::default().fg(Color::DarkGray),
+            ),
+            Span::styled(
+                label,
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                "\u{2500}".repeat(right_dashes),
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]));
+        frame.render_widget(sep, chunks[4]);
+    }
+
+    // Attribute gauges (3 rows, 2 columns each)
+    let cap = game_state.get_attribute_cap();
+    let pairs = [
+        (AttributeType::Strength, AttributeType::Intelligence),
+        (AttributeType::Dexterity, AttributeType::Wisdom),
+        (AttributeType::Constitution, AttributeType::Charisma),
+    ];
+
+    for (row_idx, (left, right)) in pairs.iter().enumerate() {
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(chunks[5 + row_idx]);
+
+        for (col_idx, at) in [left, right].iter().enumerate() {
+            let val = game_state.attributes.get(**at);
+            let modifier = game_state.attributes.modifier(**at);
+            let mod_str = format_modifier(modifier);
+            let fg = attr_color(**at);
+            let bg = attr_bg_color(**at);
+            let ratio = if cap > 0 {
+                (val as f64 / cap as f64).min(1.0)
+            } else {
+                0.0
+            };
+            let label = format!("{} {}/{} ({})", at.abbrev(), val, cap, mod_str);
+            let gauge = Gauge::default()
+                .gauge_style(Style::default().fg(fg).bg(bg).add_modifier(Modifier::BOLD))
+                .label(label)
+                .ratio(ratio);
+            frame.render_widget(gauge, cols[col_idx]);
+        }
     }
 }
 

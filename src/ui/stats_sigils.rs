@@ -51,9 +51,10 @@ pub(super) fn draw_sigils_panel(
 
                 let left = format!("{} {}", icon, short);
                 let right = format!("{}  {}", value_label, grade_padded);
-                let left_display_w = unicode_width::UnicodeWidthStr::width(left.as_str());
-                let right_len = right.len();
-                let pad = width.saturating_sub(left_display_w + right_len + 3);
+                let dw = super::scene_fx::display_width;
+                let left_display_w = dw(&left);
+                let right_display_w = dw(&right);
+                let pad = width.saturating_sub(left_display_w + right_display_w + 3);
 
                 let grade_style = if grade_str.ends_with('+') {
                     Style::default()
