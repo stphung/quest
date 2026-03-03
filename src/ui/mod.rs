@@ -824,8 +824,10 @@ fn draw_challenge_banner(
     frame.render_widget(banner, area);
 }
 
-/// Draws the right panel with a stable 2-part layout: zone info and content.
-/// The content area changes based on activity but zone info stays fixed.
+/// Draws the right panel with a bordered outer frame (L/XL tiers).
+/// Minigames skip the border and get zone info + full content instead.
+/// Non-minigame activities get: outer border with zone title, zone info (top),
+/// content (middle), and a context-sensitive status strip (bottom 2 rows).
 fn draw_right_panel(
     frame: &mut Frame,
     area: Rect,
@@ -833,26 +835,60 @@ fn draw_right_panel(
     achievements: &crate::achievements::Achievements,
     ctx: &LayoutContext,
 ) {
-    // Zone info + progress bar at top (compact during minigames for more grid space)
-    let zone_height = if game_state.active_minigame.is_some() {
-        3
-    } else if ctx.tier >= SizeTier::XL {
-        9
-    } else {
-        10
-    };
+    // Skip border wrapping for minigames — they have their own frames
+    if game_state.active_minigame.is_some() {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3),
+                Constraint::Min(10),
+            ])
+            .split(area);
+        stats_panel::draw_zone_info(frame, chunks[0], game_state, achievements, ctx);
+        draw_right_content(frame, chunks[1], game_state, achievements, ctx);
+        return;
+    }
+
+    // Get zone name and color for the border
+    use crate::zones::get_all_zones;
+    let zones = get_all_zones();
+    let prog = &game_state.zone_progression;
+    let zone = zones.iter().find(|z| z.id == prog.current_zone_id);
+    let zone_name = zone.map(|z| z.name).unwrap_or("Unknown");
+    let zone_color = stats_panel::zone_color_for_id(prog.current_zone_id);
+
+    // Outer bordered block with zone name as title
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(themed_border_color(zone_color)))
+        .title(format!(" {} ", zone_name))
+        .title_style(Style::default().fg(zone_color).add_modifier(Modifier::BOLD));
+    let block = themed_block(block);
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    apply_themed_border_fx(frame, area, zone_color, BorderFxContext);
+
+    // Split inner into zone info (top), content (middle), status strip (bottom)
+    let zone_height = if ctx.tier >= SizeTier::XL { 6 } else { 7 };
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(zone_height), // Zone info + segmented progress bar
-            Constraint::Min(10),             // Content (changes by activity)
+            Constraint::Length(zone_height),
+            Constraint::Min(8),
+            Constraint::Length(2),
         ])
-        .split(area);
+        .split(inner);
 
     stats_panel::draw_zone_info(frame, chunks[0], game_state, achievements, ctx);
-
-    // Content area — dispatched by current activity
     draw_right_content(frame, chunks[1], game_state, achievements, ctx);
+    draw_status_strip(frame, chunks[2], game_state);
+}
+
+/// Draws the 2-row status strip at the bottom of the unified right panel.
+/// Shows context-sensitive info: combat HP, fishing status, dungeon status, or idle.
+fn draw_status_strip(frame: &mut Frame, area: Rect, _game_state: &GameState) {
+    // Placeholder — implemented in Task 2
+    let _ = (frame, area);
 }
 
 /// Draws the main content area of the right panel based on current activity.

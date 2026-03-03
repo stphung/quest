@@ -489,6 +489,18 @@ fn draw_hero_panel(
     }
 }
 
+/// Returns the accent color for a zone based on its ID.
+pub(super) fn zone_color_for_id(zone_id: u32) -> Color {
+    match zone_id {
+        1..=2 => Color::Green,
+        3..=4 => Color::Yellow,
+        5..=6 => Color::Red,
+        7..=8 => Color::Magenta,
+        9..=10 => Color::Cyan,
+        _ => Color::White,
+    }
+}
+
 pub(super) fn draw_zone_info(
     frame: &mut Frame,
     area: Rect,
@@ -512,14 +524,7 @@ pub(super) fn draw_zone_info(
     let boss_name = subzone.map(|s| s.boss.name).unwrap_or("Unknown Boss");
     let total_subzones = zone.map(|z| z.subzones.len()).unwrap_or(0);
 
-    let zone_color = match prog.current_zone_id {
-        1..=2 => Color::Green,
-        3..=4 => Color::Yellow,
-        5..=6 => Color::Red,
-        7..=8 => Color::Magenta,
-        9..=10 => Color::Cyan,
-        _ => Color::White,
-    };
+    let zone_color = zone_color_for_id(prog.current_zone_id);
 
     let description_color = zone_description_tint(prog.current_zone_id);
 
