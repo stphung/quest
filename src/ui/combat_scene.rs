@@ -108,60 +108,28 @@ pub fn draw_combat_scene(
 }
 
 /// Full combat scene with 3D sprite (XL/L tier).
+/// No border or HP bars — those are handled by the unified right panel.
+/// Only renders: optional regen throbber + 3D sprite + floating damage.
 fn draw_combat_full(
     frame: &mut Frame,
     area: Rect,
     game_state: &GameState,
-    achievements: &crate::achievements::Achievements,
+    _achievements: &crate::achievements::Achievements,
 ) {
-    // Single outer border wrapping everything
-    let title = combat_title(achievements);
-    let outer_block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(super::themed_border_color(Color::Red)))
-        .title(title)
-        .title_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD));
-    let outer_block = super::themed_block(outer_block);
-
-    let inner = outer_block.inner(area);
-    frame.render_widget(outer_block, area);
-    super::apply_themed_border_fx(frame, area, Color::Red, super::BorderFxContext);
-
     let is_regen = game_state.combat_state.is_regenerating;
 
-    let is_boss = game_state.zone_progression.fighting_boss;
-    let status_lines = if is_boss { 2 } else { 1 };
-
-    let mut constraints = vec![Constraint::Length(1)]; // Player HP
     if is_regen {
-        constraints.push(Constraint::Length(1)); // Regen throbber
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Min(5)])
+            .split(area);
+        draw_regen_throbber(frame, chunks[0], game_state);
+        render_combat_3d(frame, chunks[1], game_state);
+        draw_floating_damage(frame, chunks[1], game_state);
+    } else {
+        render_combat_3d(frame, area, game_state);
+        draw_floating_damage(frame, area, game_state);
     }
-    constraints.push(Constraint::Min(5)); // Sprite
-    constraints.push(Constraint::Length(1)); // Enemy HP
-    constraints.push(Constraint::Length(status_lines)); // Status (2 lines during boss)
-
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(constraints)
-        .split(inner);
-
-    let mut idx = 0;
-    draw_player_hp(frame, chunks[idx], game_state);
-    idx += 1;
-
-    if is_regen {
-        draw_regen_throbber(frame, chunks[idx], game_state);
-        idx += 1;
-    }
-
-    render_combat_3d(frame, chunks[idx], game_state);
-    draw_floating_damage(frame, chunks[idx], game_state);
-    idx += 1;
-
-    draw_enemy_hp(frame, chunks[idx], game_state);
-    idx += 1;
-
-    draw_combat_status(frame, chunks[idx], game_state);
 }
 
 /// Compact combat scene for M tier: HP bars + sprite + status.
