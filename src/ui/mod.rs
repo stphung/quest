@@ -896,8 +896,10 @@ fn draw_status_strip(frame: &mut Frame, area: Rect, game_state: &GameState) {
         .constraints([Constraint::Length(1), Constraint::Length(1)])
         .split(area);
 
-    // Priority: fishing > dungeon > combat/idle
-    if let Some(ref session) = game_state.active_fishing {
+    // Priority: dungeon > fishing > combat/idle
+    if game_state.active_dungeon.is_some() {
+        draw_status_strip_dungeon(frame, rows[0], rows[1], game_state);
+    } else if let Some(ref session) = game_state.active_fishing {
         draw_status_strip_fishing(frame, rows[0], rows[1], session, game_state);
     } else {
         draw_status_strip_combat(frame, rows[0], rows[1], game_state);
@@ -946,6 +948,80 @@ fn draw_status_strip_fishing(
     )))
     .alignment(Alignment::Center);
     frame.render_widget(phase, row1);
+}
+
+/// Dungeon status strip: player HP with room/key info on row 1, enemy HP or status on row 2.
+fn draw_status_strip_dungeon(
+    frame: &mut Frame,
+    row0: Rect,
+    row1: Rect,
+    game_state: &GameState,
+) {
+    // Row 1: Player HP gauge with room/key info in label
+    let hp = &game_state.combat_state;
+    let hp_ratio = if hp.player_max_hp > 0 {
+        (hp.player_current_hp as f64 / hp.player_max_hp as f64).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let room_info = if let Some(ref dungeon) = game_state.active_dungeon {
+        let cleared = dungeon.rooms_cleared;
+        let total = dungeon.room_count();
+        let key_str = if dungeon.has_key { " \u{1f511}" } else { "" };
+        format!(
+            "HP: {}/{}  |  Room {}/{}{}",
+            hp.player_current_hp, hp.player_max_hp, cleared, total, key_str
+        )
+    } else {
+        format!("HP: {}/{}", hp.player_current_hp, hp.player_max_hp)
+    };
+    render_hp_bar_with_flash(
+        frame,
+        row0,
+        room_info,
+        hp_ratio,
+        Color::Green,
+        game_state.combat_state.player_damage_floats.last(),
+    );
+
+    // Row 2: Enemy HP or dungeon idle
+    if let Some(enemy) = &hp.current_enemy {
+        let enemy_ratio = if enemy.max_hp > 0 {
+            (enemy.current_hp as f64 / enemy.max_hp as f64).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let enemy_label = format!("{}: {}/{}", enemy.name, enemy.current_hp, enemy.max_hp);
+        let is_boss = enemy.name.starts_with("Boss ");
+        let hp_color = if is_boss {
+            Color::LightRed
+        } else {
+            let zone_id = game_state
+                .active_dungeon
+                .as_ref()
+                .map(|d| d.zone_id)
+                .unwrap_or(game_state.zone_progression.current_zone_id);
+            enemy_sprites::zone_palette(zone_id).primary
+        };
+        render_hp_bar_with_flash(
+            frame,
+            row1,
+            enemy_label,
+            enemy_ratio,
+            hp_color,
+            game_state.combat_state.enemy_damage_floats.last(),
+        );
+    } else {
+        let spinner = throbber::spinner_char();
+        let text = Paragraph::new(Line::from(Span::styled(
+            format!("{} Exploring the dungeon...", spinner),
+            Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::ITALIC),
+        )))
+        .alignment(Alignment::Center);
+        frame.render_widget(text, row1);
+    }
 }
 
 /// Combat/idle status strip: player HP on row 1, enemy HP or idle on row 2.
@@ -1128,74 +1204,29 @@ fn draw_right_content(
     }
 }
 
-/// Returns the icon of the highest unlocked dungeon achievement, if any.
-fn highest_dungeon_badge(achievements: &crate::achievements::Achievements) -> Option<&'static str> {
-    use crate::achievements::AchievementId;
-
-    let dungeon_achievements = [
-        AchievementId::DungeonMasterX,
-        AchievementId::DungeonMasterIX,
-        AchievementId::DungeonMasterVIII,
-        AchievementId::DungeonMasterVII,
-        AchievementId::DungeonMasterVI,
-        AchievementId::DungeonMasterV,
-        AchievementId::DungeonMasterIV,
-        AchievementId::DungeonMasterIII,
-        AchievementId::DungeonMasterII,
-        AchievementId::DungeonMasterI,
-        AchievementId::DungeonDiver,
-    ];
-
-    for id in dungeon_achievements {
-        if achievements.is_unlocked(id) {
-            return crate::achievements::data::get_achievement_def(id).map(|def| def.icon);
-        }
-    }
-    None
-}
-
-/// Draws the dungeon view with combat HUD overlay on the map.
-/// Instead of splitting into separate dungeon map + combat panels,
-/// combat info (HP bars, status) is rendered inside the dungeon panel.
+/// Draws the dungeon view: status line + map (no border or HP bars).
+/// The unified right panel provides the outer border and status strip.
 fn draw_dungeon_view(
     frame: &mut Frame,
     area: Rect,
-    game_state: &GameState,
+    _game_state: &GameState,
     dungeon: &crate::dungeon::types::Dungeon,
-    achievements: &crate::achievements::Achievements,
+    _achievements: &crate::achievements::Achievements,
     _ctx: &LayoutContext,
 ) {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    // Single border wrapping everything
-    let dungeon_title = match highest_dungeon_badge(achievements) {
-        Some(icon) => format!(" Dungeon {} ", icon),
-        None => " Dungeon ".to_string(),
-    };
-    let block = Block::default()
-        .title(dungeon_title)
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(themed_border_color(Color::Magenta)));
-    let inner = render_themed_block(frame, area, block, Color::Magenta, BorderFxContext);
-
-    // Layout: player HP, dungeon status, map, enemy HP, combat status
-    let inner_chunks = Layout::default()
+    let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // Player HP
-            Constraint::Length(1), // Dungeon status line
-            Constraint::Min(0),    // Map (fills remaining space)
-            Constraint::Length(1), // Enemy HP
-            Constraint::Length(1), // Combat status
+            Constraint::Length(1), // Dungeon status line (size, rooms, key)
+            Constraint::Min(0),    // Map (fills remaining)
         ])
-        .split(inner);
-
-    // Player HP bar
-    combat_scene::draw_player_hp(frame, inner_chunks[0], game_state);
+        .split(area);
 
     // Dungeon status (size, rooms cleared, key)
     let status_widget = dungeon_map::DungeonStatusWidget::new(dungeon);
-    frame.render_widget(status_widget, inner_chunks[1]);
+    frame.render_widget(status_widget, chunks[0]);
 
     // Calculate blink phase (0.5 second cycle)
     let millis = SystemTime::now()
@@ -1205,15 +1236,9 @@ fn draw_dungeon_view(
     let blink_phase = (millis % 500) as f64 / 500.0;
 
     // Dungeon map backdrop + map overlay
-    draw_dungeon_backdrop(frame, inner_chunks[2], dungeon.zone_id);
+    draw_dungeon_backdrop(frame, chunks[1], dungeon.zone_id);
     let map_widget = dungeon_map::DungeonMapWidget::new(dungeon, blink_phase);
-    frame.render_widget(map_widget, inner_chunks[2]);
-
-    // Enemy HP bar
-    combat_scene::draw_enemy_hp(frame, inner_chunks[3], game_state);
-
-    // Combat status (timers, DPS)
-    combat_scene::draw_combat_status(frame, inner_chunks[4], game_state);
+    frame.render_widget(map_widget, chunks[1]);
 }
 
 /// Draws a black backdrop behind the dungeon map.
