@@ -1,7 +1,7 @@
 //! The Deep — Layer infrastructure sub-view rendering.
 
 use crate::deep::{
-    base_marks_earned, effective_duration_secs, infrastructure_build_cost, layer_power_thresholds,
+    effective_duration_secs, layer_power_thresholds,
     DeepState, DeepUiState, FamiliarityLevel, Infrastructure, LayerTier, MissionType,
 };
 use ratatui::style::Color;
@@ -88,31 +88,29 @@ fn render_familiarity_bar_with_thresholds(
     }
 }
 
-/// Infrastructure slot display tuned for the world-map list: built slots show letters,
-/// missing slots show dots so structure progress is readable at a glance.
-fn infra_slots_world(layer: &crate::deep::types::LayerRecord) -> String {
-    let o = if layer.has_infrastructure(Infrastructure::Outpost) {
-        'O'
-    } else {
-        '\u{00b7}'
-    };
-    let c = if layer.has_infrastructure(Infrastructure::SupplyCache) {
-        'C'
-    } else {
-        '\u{00b7}'
-    };
-    let w = if layer.has_infrastructure(Infrastructure::Watchtower) {
-        'W'
-    } else {
-        '\u{00b7}'
-    };
-    let b = if layer.has_infrastructure(Infrastructure::Bridge) {
-        'B'
-    } else {
-        '\u{00b7}'
-    };
-    format!("[{}{}{}{}]", o, c, w, b)
+/// Render infrastructure slots as aligned icon columns directly into the buffer.
+///
+/// Each slot occupies 2 terminal columns (1-wide symbol + 1 space), giving a
+/// fixed-width table that aligns across all layer rows.
+fn render_infra_slots(
+    buffer: &mut [Vec<SceneCell>],
+    row: i32,
+    start_col: i32,
+    layer: &crate::deep::types::LayerRecord,
+) {
+    let mut col = start_col;
+    for infra in Infrastructure::ALL {
+        if layer.has_infrastructure(*infra) {
+            put_cell(buffer, row, col, infra.icon(), Color::White);
+        } else {
+            put_cell(buffer, row, col, '\u{00b7}', Color::DarkGray); // middot
+        }
+        col += 2; // 1 for symbol/middot, 1 for spacing
+    }
 }
+
+/// Total display width consumed by infra slots (4 slots x 2 cols each, minus trailing space).
+const INFRA_SLOTS_WIDTH: i32 = 7;
 
 /// Symbol + color for layer progression state in the descent shaft.
 fn shaft_status(layer_index: u32, frontier: u32, cleared: bool) -> (&'static str, Color) {
@@ -483,12 +481,12 @@ fn render_layers_compact(
             Color::Rgb(30, 45, 70)
         };
 
-        let infra_str = infra_slots_world(layer);
-        let tier_name: String = tier.display_name().chars().take(12).collect();
-        let line = format!(
-            "\u{2502} {} L{:02}  {:12}  {}",
-            status_glyph, layer.index, tier_name, infra_str,
+        let tier_name: String = tier.display_name().chars().take(16).collect();
+        let prefix = format!(
+            "\u{2502} {} L{:02}  {:16}  ",
+            status_glyph, layer.index, tier_name,
         );
+        let infra_col = 1 + prefix.len() as i32;
 
         if is_sel {
             for c in 1..width.saturating_sub(1) {
@@ -498,7 +496,7 @@ fn render_layers_compact(
             }
         }
 
-        put_text(buffer, row, 1, &line, Color::White);
+        put_text(buffer, row, 1, &prefix, Color::White);
         put_text(buffer, row, 1, "\u{2502}", shaft_color);
         put_text(buffer, row, 3, status_glyph, status_color);
         if is_sel {
@@ -506,9 +504,11 @@ fn render_layers_compact(
         }
         // Layer number in tier color
         put_text(buffer, row, 5, &format!("L{:02}", layer.index), tc);
+        // Infrastructure emoji columns
+        render_infra_slots(buffer, row, infra_col, layer);
         // Frontier label at end of line
         if layer.index == frontier && !layer.cleared {
-            let front_col = 1 + line.len() as i32 + 2;
+            let front_col = infra_col + INFRA_SLOTS_WIDTH + 2;
             put_text(buffer, row, front_col, "FRONTIER", Color::Yellow);
         }
         row += 1;
@@ -609,12 +609,12 @@ fn render_layers_split(
             Color::Rgb(30, 45, 70)
         };
 
-        let infra_str = infra_slots_world(layer);
-        let tier_name: String = tier.display_name().chars().take(14).collect();
-        let line = format!(
-            "\u{2502} {} L{:02}  {:14}  {}",
-            status_glyph, layer.index, tier_name, infra_str,
+        let tier_name: String = tier.display_name().chars().take(16).collect();
+        let prefix = format!(
+            "\u{2502} {} L{:02}  {:16}  ",
+            status_glyph, layer.index, tier_name,
         );
+        let infra_col = 1 + prefix.len() as i32;
 
         if is_sel {
             for c in 1..(list_width.saturating_sub(1)) {
@@ -624,7 +624,7 @@ fn render_layers_split(
             }
         }
 
-        put_text(buffer, row, 1, &line, Color::White);
+        put_text(buffer, row, 1, &prefix, Color::White);
         put_text(buffer, row, 1, "\u{2502}", shaft_color);
         put_text(buffer, row, 3, status_glyph, status_color);
         if is_sel {
@@ -632,9 +632,11 @@ fn render_layers_split(
         }
         // Layer number in tier color
         put_text(buffer, row, 5, &format!("L{:02}", layer.index), tc);
+        // Infrastructure emoji columns
+        render_infra_slots(buffer, row, infra_col, layer);
         // Frontier tag
         if layer.index == frontier && !layer.cleared {
-            let front_col = 1 + line.len() as i32 + 1;
+            let front_col = infra_col + INFRA_SLOTS_WIDTH + 1;
             if front_col < list_width as i32 - 2 {
                 put_text(buffer, row, front_col, "FRONT", Color::Yellow);
             }
@@ -645,7 +647,7 @@ fn render_layers_split(
                 if layer.index == needed_layer && !layer.cleared {
                     let marker = format!("\u{2605} Rank {}", next_rank.0);
                     let marker_col = (list_width as i32 - marker.len() as i32 - 1)
-                        .max(1 + line.len() as i32 + 1);
+                        .max(infra_col + INFRA_SLOTS_WIDTH + 1);
                     if marker_col < list_width as i32 {
                         put_text(buffer, row, marker_col, &marker, Color::Rgb(255, 215, 0));
                     }
@@ -826,7 +828,7 @@ fn render_layers_split(
         }
     }
 
-    // Infrastructure
+    // Infrastructure — single merged list: built items in green, unbuilt in gray with cost
     row += 1;
     if row >= content_bottom {
         return;
@@ -836,169 +838,39 @@ fn render_layers_split(
         buffer,
         row,
         detail_inner_left,
-        &format!("Infrastructure  [{}/4 built]", built_count),
+        &format!("Infrastructure  [{}/4]", built_count),
         Color::Cyan,
     );
     row += 1;
+
+    let bridge_count = deep
+        .persistent
+        .layers
+        .iter()
+        .filter(|l| l.has_infrastructure(Infrastructure::Bridge))
+        .count();
 
     for infra in Infrastructure::ALL {
         if row >= content_bottom {
             break;
         }
         let built = layer.has_infrastructure(*infra);
-        let check = if built { "[\u{2713}]" } else { "[ ]" };
-        let check_color = if built { Color::Green } else { Color::DarkGray };
-        let desc_color = if built { Color::White } else { Color::DarkGray };
-        put_text(buffer, row, detail_inner_left, check, check_color);
-        let desc_text = format!("{:12}  {}", infra.display_name(), short_infra_desc(*infra));
-        put_text(buffer, row, detail_inner_left + 4, &desc_text, desc_color);
-        // Show cost for unbuilt infrastructure with affordability color
-        if !built {
-            let cost = infrastructure_build_cost(*infra, layer.index);
-            let cost_str = format!("{}M", cost);
-            let cost_col = detail_inner_left + 4 + desc_text.len() as i32 + 2;
-            let cost_color = if deep.prestige.warband_marks >= cost {
-                Color::Green
-            } else {
-                Color::LightRed
-            };
-            if cost_col < width as i32 - cost_str.len() as i32 - 1 {
-                put_text(buffer, row, cost_col, &cost_str, cost_color);
-            }
-        }
-        row += 1;
-        // ROI context line for unbuilt infrastructure
-        if !built && row < content_bottom {
-            let roi_hint = match infra {
-                Infrastructure::Outpost => "Saves ~25% time on every mission here".to_string(),
-                Infrastructure::SupplyCache => {
-                    let cost = infrastructure_build_cost(*infra, layer.index);
-                    let base_supply = base_marks_earned(MissionType::SupplyRun, layer.index);
-                    let extra_per_run = (base_supply as f64 * 0.75).round() as u32;
-                    if extra_per_run > 0 {
-                        let runs = (cost as f64 / extra_per_run as f64).ceil() as u32;
-                        format!(
-                            "~{} supply runs to recoup ({}M extra/run)",
-                            runs, extra_per_run
-                        )
-                    } else {
-                        "Boosts supply run yields".to_string()
-                    }
-                }
-                Infrastructure::Watchtower => "Instant value: +40 familiarity on build".to_string(),
-                Infrastructure::Bridge => {
-                    let bridge_count = deep
-                        .persistent
-                        .layers
-                        .iter()
-                        .filter(|l| l.has_infrastructure(Infrastructure::Bridge))
-                        .count();
-                    if bridge_count == 0 {
-                        "First bridge: -2% on deeper missions".to_string()
-                    } else {
-                        format!(
-                            "Bridge #{}: -{}% total",
-                            bridge_count + 1,
-                            ((bridge_count + 1) as u32).min(15) * 2
-                        )
-                    }
-                }
-            };
-            put_text(
-                buffer,
-                row,
-                detail_inner_left + 4,
-                &roi_hint,
-                Color::Rgb(60, 90, 130),
-            );
-            row += 1;
-        }
-    }
+        let icon_col = detail_inner_left + 2;
+        let text_col = icon_col + 2;
 
-    // BUILD OPTIONS — list unbuilt infrastructure with ROI descriptions
-    let unbuilt: Vec<&Infrastructure> = Infrastructure::ALL
-        .iter()
-        .filter(|i| !layer.has_infrastructure(**i))
-        .collect();
-    if !unbuilt.is_empty() && row + 2 < content_bottom {
-        row += 1;
-        put_text(
-            buffer,
-            row,
-            detail_inner_left,
-            "BUILD OPTIONS",
-            DEEP_BORDER_COLOR,
-        );
-        row += 1;
-
-        for infra in &unbuilt {
-            if row >= content_bottom {
-                break;
-            }
-            let cost = infrastructure_build_cost(**infra, layer.index);
-            let roi = match infra {
-                Infrastructure::Outpost => "-25% mission duration".to_string(),
-                Infrastructure::SupplyCache => {
-                    let runs = if cost > 0 { cost / 40 } else { 1 };
-                    format!("~{} supply runs to break even", runs.max(1))
-                }
-                Infrastructure::Watchtower => "+40 familiarity immediately".to_string(),
-                Infrastructure::Bridge => {
-                    let bridge_count = deep
-                        .persistent
-                        .layers
-                        .iter()
-                        .filter(|l| l.has_infrastructure(Infrastructure::Bridge))
-                        .count();
-                    if bridge_count == 0 {
-                        "Skip this layer on deeper missions (-2% duration)".to_string()
-                    } else {
-                        let new_reduction = ((bridge_count + 1) as u32).min(15) * 2;
-                        format!(
-                            "Skip layer (-{}% total with {} bridge{})",
-                            new_reduction,
-                            bridge_count + 1,
-                            if bridge_count == 0 { "" } else { "s" },
-                        )
-                    }
-                }
-            };
-            let line = format!("  {}  {}  ({}M)", infra.display_name(), roi, cost);
-            let cost_color = if deep.prestige.warband_marks >= cost {
-                Color::White
-            } else {
-                Color::DarkGray
-            };
-            put_text(buffer, row, detail_inner_left, &line, cost_color);
-            // Highlight cost portion with affordability color
-            let cost_label = format!("({}M)", cost);
-            if let Some(pos) = line.rfind(&cost_label) {
-                let afford_color = if deep.prestige.warband_marks >= cost {
-                    Color::Green
-                } else {
-                    Color::LightRed
-                };
-                put_text(
-                    buffer,
-                    row,
-                    detail_inner_left + pos as i32,
-                    &cost_label,
-                    afford_color,
-                );
-            }
-            row += 1;
+        if built {
+            // Built: green icon + active effect description
+            put_cell(buffer, row, icon_col, infra.icon(), Color::Green);
+            let effect = active_infra_effect(*infra, bridge_count);
+            let line = format!("{:12}  {}", infra.display_name(), effect);
+            put_text(buffer, row, text_col, &line, Color::Green);
+        } else {
+            // Unbuilt: gray icon + description
+            put_cell(buffer, row, icon_col, infra.icon(), Color::DarkGray);
+            let desc = short_infra_desc(*infra);
+            let line = format!("{:12}  {}", infra.display_name(), desc);
+            put_text(buffer, row, text_col, &line, Color::DarkGray);
         }
-    }
-
-    // First-visit infrastructure hint
-    if ui.layer_visit_count < 3 && row < content_bottom {
-        put_text(
-            buffer,
-            row,
-            detail_inner_left,
-            "  Build via Construction missions (safe, 4-8h). Permanent.",
-            Color::Rgb(50, 80, 110),
-        );
         row += 1;
     }
 
@@ -1019,7 +891,7 @@ fn render_layers_split(
 
         let mut modifiers: Vec<String> = Vec::new();
         if has_outpost {
-            modifiers.push("-25% Outpost".to_string());
+            modifiers.push(format!("-25% {} Outpost", Infrastructure::Outpost.icon()));
         }
         let fam_reduction = ((1.0 - fam_level.duration_factor()) * 100.0).round() as u32;
         if fam_reduction > 0 {
@@ -1027,7 +899,11 @@ fn render_layers_split(
         }
         let bridge_pct = bridge_count.min(15) * 2;
         if bridge_pct > 0 {
-            modifiers.push(format!("-{}% Bridge", bridge_pct));
+            modifiers.push(format!(
+                "-{}% {} Bridge",
+                bridge_pct,
+                Infrastructure::Bridge.icon()
+            ));
         }
 
         if modifiers.is_empty() {
@@ -1105,6 +981,19 @@ fn short_infra_desc(infra: Infrastructure) -> &'static str {
         Infrastructure::Outpost => "-25% duration on this layer",
         Infrastructure::SupplyCache => "+50% Warband Marks from supply runs",
         Infrastructure::Watchtower => "+40 familiarity instantly",
-        Infrastructure::Bridge => "Skip this layer on deep push",
+        Infrastructure::Bridge => "-2% duration per bridge (max -30%)",
+    }
+}
+
+/// Active effect text for built infrastructure (contextual for Bridge).
+fn active_infra_effect(infra: Infrastructure, total_bridges: usize) -> String {
+    match infra {
+        Infrastructure::Outpost => "-25% duration".to_string(),
+        Infrastructure::SupplyCache => "+50% Marks on supply runs".to_string(),
+        Infrastructure::Watchtower => "+40 familiarity granted".to_string(),
+        Infrastructure::Bridge => {
+            let pct = (total_bridges as u32).min(15) * 2;
+            format!("-{}% total ({} bridge{})", pct, total_bridges, if total_bridges == 1 { "" } else { "s" })
+        }
     }
 }
