@@ -3,9 +3,7 @@
 use super::responsive::{LayoutContext, SizeTier};
 use super::stats_attributes::draw_attributes_compact;
 use super::stats_equipment::draw_equipment_names_only;
-use super::stats_prestige::{
-    draw_fishing_panel, draw_power_cores_panel, draw_prestige_info, format_eta,
-};
+use super::stats_prestige::{draw_deep_panel, draw_fishing_panel, draw_prestige_info, format_eta};
 use super::stats_sigils::draw_sigils_panel;
 use crate::character::derived_stats::DerivedStats;
 use crate::character::prestige::{get_adventurer_rank, get_prestige_tier};
@@ -79,20 +77,15 @@ pub fn draw_stats_panel(
             } else {
                 6 // 4 inner rows + 2 border
             };
-            let unlocked_cores = crate::power_cores::get_unlocked_cores(achievements).len();
-            let power_cores_height = if unlocked_cores > 0 {
-                crate::power_cores::ALL_POWER_CORES.len() as u16 + 2 // all 6 cores + 2 border rows
-            } else {
-                0
-            };
+            let deep_panel_height: u16 = if deep.persistent.discovered { 8 } else { 0 };
 
             let mut constraints = vec![
                 Constraint::Length(5), // Header (name, level+power, time+rate, XP gauge)
                 Constraint::Length(prestige_height), // Prestige
                 Constraint::Length(4), // Fishing
             ];
-            if power_cores_height > 0 {
-                constraints.push(Constraint::Length(power_cores_height)); // Power Cores
+            if deep_panel_height > 0 {
+                constraints.push(Constraint::Length(deep_panel_height));
             }
             constraints.push(Constraint::Length(5)); // Attributes
             if etched > 0 {
@@ -114,8 +107,8 @@ pub fn draw_stats_panel(
             idx += 1;
             draw_fishing_panel(frame, chunks[idx], game_state, achievements);
             idx += 1;
-            if power_cores_height > 0 {
-                draw_power_cores_panel(frame, chunks[idx], achievements, deep);
+            if deep_panel_height > 0 {
+                draw_deep_panel(frame, chunks[idx], achievements, deep);
                 idx += 1;
             }
             draw_attributes_compact(frame, chunks[idx], game_state);

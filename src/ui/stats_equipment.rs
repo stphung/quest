@@ -8,6 +8,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 /// Returns the style for an enhancement prefix based on its color tier.
 pub(super) fn enhancement_style(level: u8) -> Style {
@@ -72,20 +73,8 @@ pub(super) fn draw_equipment_names_only(
     let width = inner.width as usize;
     let slot_col = 8; // "Weapon  " = 8 chars
 
-    // Compute right columns dynamically to fit actual power values.
+    // Compute right columns dynamically by measuring actual display width.
     // Layout per row: "{:>9}  T{t}  Z{z} ⚡{pow}[+{bonus}]"
-    let digit_count = |n: u32| -> usize {
-        if n == 0 {
-            return 1;
-        }
-        let mut count = 0;
-        let mut v = n;
-        while v > 0 {
-            count += 1;
-            v /= 10;
-        }
-        count
-    };
     let right_cols = slot_order
         .iter()
         .enumerate()
@@ -94,20 +83,18 @@ pub(super) fn draw_equipment_names_only(
             let bp = item.power();
             let mult = crate::enhancement::enhancement_multiplier(enhancement_levels[idx]);
             let eb = (bp as f64 * mult).round() as u32 - bp;
-            // Display-cell widths:
-            //   rarity {:>9} = 9, "  T{}" = 3+digits, "  Z{}" = 3+digits,
-            //   " ⚡{}" = 2+digits (⚡ = 1 cell), "+{}" = 1+digits if bonus > 0
-            let mut w = 9
-                + 3
-                + digit_count(item.tier as u32)
-                + 3
-                + digit_count(item.ilvl / 10)
-                + 2
-                + digit_count(bp);
+            let mut right_text = format!(
+                "{:>9}  T{}  Z{} \u{26A1}{}",
+                item.rarity.name(),
+                item.tier,
+                item.ilvl / 10,
+                bp
+            );
             if eb > 0 {
-                w += 1 + digit_count(eb);
+                use std::fmt::Write;
+                let _ = write!(right_text, "+{}", eb);
             }
-            Some(w)
+            Some(UnicodeWidthStr::width(right_text.as_str()))
         })
         .max()
         .unwrap_or(18);
@@ -124,16 +111,29 @@ pub(super) fn draw_equipment_names_only(
 
             let enh_level = enhancement_levels[idx];
             let prefix = crate::enhancement::enhancement_prefix(enh_level);
-            let prefix_len = prefix.len();
+            let prefix_width = UnicodeWidthStr::width(prefix.as_str());
 
-            let max_name_len = name_max.saturating_sub(prefix_len);
-            let item_name = if item.display_name.len() > max_name_len && max_name_len > 3 {
-                format!("{}...", &item.display_name[..max_name_len - 3])
+            let max_name_width = name_max.saturating_sub(prefix_width);
+            let name_display_width = UnicodeWidthStr::width(item.display_name.as_str());
+            let item_name = if name_display_width > max_name_width && max_name_width > 3 {
+                // Truncate by display width, not byte length
+                let target = max_name_width - 3;
+                let mut w = 0;
+                let mut end = 0;
+                for (i, ch) in item.display_name.char_indices() {
+                    let cw = UnicodeWidthChar::width(ch).unwrap_or(1);
+                    if w + cw > target {
+                        break;
+                    }
+                    w += cw;
+                    end = i + ch.len_utf8();
+                }
+                format!("{}...", &item.display_name[..end])
             } else {
                 item.display_name.clone()
             };
-            let name_len = prefix_len + item_name.len();
-            let pad = name_max.saturating_sub(name_len);
+            let name_width = prefix_width + UnicodeWidthStr::width(item_name.as_str());
+            let pad = name_max.saturating_sub(name_width);
 
             let mut spans = vec![Span::styled(
                 format!("{:>6}  ", slot_label),
