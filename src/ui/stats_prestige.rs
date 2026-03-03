@@ -587,35 +587,91 @@ pub(super) fn draw_deep_panel(
         ]));
     }
 
-    // Row 2: Missions + Next completion timer
+    // Row 2: Missions + progress bar + ETA + events badge
     {
         let active = deep.prestige.active_mission_count();
         let max_concurrent = crate::deep::effective_concurrent_missions(
             deep.persistent.guild_rank,
             deep.persistent.deepest_layer_reached,
         );
-        let mission_str = format!("Missions {}/{}", active, max_concurrent);
+        let events = pending_event_count(&deep.prestige);
+
+        let mut spans: Vec<Span> = Vec::new();
+
+        let msn_str = format!("Msn {}/{} ", active, max_concurrent);
+        spans.push(Span::styled(msn_str, Style::default().fg(Color::Cyan)));
+
+        // Find the nearest active mission for the progress bar
+        let now_chrono = chrono::Utc::now();
+        let nearest_mission = deep
+            .prestige
+            .active_missions
+            .iter()
+            .filter(|m| {
+                matches!(
+                    m.status,
+                    crate::deep::MissionStatus::Active | crate::deep::MissionStatus::EventPending
+                )
+            })
+            .min_by_key(|m| m.ends_at);
 
         let eta = next_mission_eta_secs(&deep.prestige);
-        let eta_str = match eta {
-            Some(secs) => format!("\u{25f7} Next: {}", format_eta(secs as u64)),
-            None => "\u{25f7} idle".to_string(),
-        };
-        let eta_color = match eta {
-            Some(secs) if secs < 900 => Color::Yellow,
-            _ => Color::DarkGray,
-        };
 
-        let padding = width.saturating_sub(mission_str.len() + eta_str.len());
+        if let Some(mission) = nearest_mission {
+            // Build 12-char progress bar [████████░░░░]
+            let progress = mission.progress(now_chrono);
+            let filled = (progress * 12.0).round() as usize;
+            let empty = 12 - filled;
+            spans.push(Span::styled("[", Style::default().fg(Color::DarkGray)));
+            if filled > 0 {
+                spans.push(Span::styled(
+                    "\u{2588}".repeat(filled),
+                    Style::default().fg(CORE_AMBER),
+                ));
+            }
+            if empty > 0 {
+                spans.push(Span::styled(
+                    "\u{2591}".repeat(empty),
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+            spans.push(Span::styled("] ", Style::default().fg(Color::DarkGray)));
 
-        lines.push(Line::from(vec![
-            Span::styled(mission_str, Style::default().fg(Color::Cyan)),
-            Span::raw(" ".repeat(padding)),
-            Span::styled(eta_str, Style::default().fg(eta_color)),
-        ]));
+            // ETA text
+            if let Some(secs) = eta {
+                let eta_color = if secs < 900 {
+                    Color::Yellow
+                } else {
+                    Color::DarkGray
+                };
+                spans.push(Span::styled(
+                    format_eta(secs as u64),
+                    Style::default().fg(eta_color),
+                ));
+            }
+        } else {
+            // No active missions: idle state
+            spans.push(Span::styled(
+                "         \u{25f7} idle",
+                Style::default().fg(Color::DarkGray),
+            ));
+        }
+
+        // Right-align events badge
+        if events > 0 {
+            let event_str = format!("\u{26a1}{}", events);
+            // Calculate left side width to determine padding
+            let left_width: usize = spans.iter().map(|s| s.content.chars().count()).sum();
+            let right_width = event_str.chars().count();
+            let padding = width.saturating_sub(left_width + right_width);
+            spans.push(Span::raw(" ".repeat(padding)));
+            spans.push(Span::styled(event_str, Style::default().fg(Color::Yellow)));
+        }
+
+        lines.push(Line::from(spans));
     }
 
-    // Row 3: Crew glyphs + Frontier + Events
+    // Row 3: Crew glyphs + Frontier
     {
         let mut crew_spans: Vec<Span> = Vec::new();
         let mut available_count: usize = 0;
@@ -674,16 +730,10 @@ pub(super) fn draw_deep_panel(
                 0
             };
 
-        // Right side: Frontier + events
+        // Right side: Frontier only
         let frontier = deep.persistent.frontier_layer();
-        let events = pending_event_count(&deep.prestige);
         let frontier_str = format!("Frontier L{}", frontier);
-        let event_str = if events > 0 {
-            format!("  \u{26a1}{}", events)
-        } else {
-            String::new()
-        };
-        let right_str_len = frontier_str.len() + event_str.len();
+        let right_str_len = frontier_str.len();
 
         let padding = width.saturating_sub(crew_width + right_str_len);
         crew_spans.push(Span::raw(" ".repeat(padding)));
@@ -691,9 +741,6 @@ pub(super) fn draw_deep_panel(
             frontier_str,
             Style::default().fg(Color::Rgb(120, 140, 170)),
         ));
-        if events > 0 {
-            crew_spans.push(Span::styled(event_str, Style::default().fg(Color::Yellow)));
-        }
 
         lines.push(Line::from(crew_spans));
     }
@@ -710,7 +757,7 @@ pub(super) fn draw_deep_panel(
     // Rows 5-6: Core summary + badges
     let summary = core_summary(achievements, deep);
     {
-        // Row 5: "Cores: N ✓ Ready (+X PR)  ·  Next: Xh Ym" or "Cores: locked ..."
+        // Row 5: "Cores: N ✓ (+X PR)  Next: Xh Ym  +N PR/d" or "Cores: locked ..."
         let mut spans: Vec<Span> = Vec::new();
 
         if summary.unlocked_count == 0 {
@@ -729,46 +776,59 @@ pub(super) fn draw_deep_panel(
         } else if summary.ready_count > 0 && summary.next_ready_secs.is_none() {
             // All unlocked cores are ready
             let left_text = format!(
-                "Cores: {} \u{2713} Ready (+{} PR)",
+                "Cores: {} \u{2713} (+{} PR)",
                 summary.ready_count, summary.ready_pr
             );
-            let right_text = "All ready!";
-            let padding = width.saturating_sub(left_text.len() + right_text.len());
+            let pr_d_str = format!("+{} PR/d", summary.total_pr_per_day);
+            let mid_text = "All ready!";
+            // left_text + "  " + mid_text + padding + pr_d_str
+            let used = left_text.len() + 2 + mid_text.len() + 2 + pr_d_str.len();
+            let padding = width.saturating_sub(used);
             spans.push(Span::styled(
                 "Cores: ",
                 Style::default().fg(Color::DarkGray),
             ));
             spans.push(Span::styled(
-                format!("{} \u{2713} Ready", summary.ready_count),
+                format!("{} \u{2713}", summary.ready_count),
                 Style::default().fg(Color::Green),
             ));
             spans.push(Span::styled(
                 format!(" (+{} PR)", summary.ready_pr),
                 Style::default().fg(Color::Green),
             ));
-            spans.push(Span::raw(" ".repeat(padding)));
+            spans.push(Span::raw("  "));
             spans.push(Span::styled(
                 "All ready!".to_string(),
                 Style::default()
                     .fg(Color::Green)
                     .add_modifier(Modifier::BOLD),
             ));
+            spans.push(Span::raw(" ".repeat(padding)));
+            spans.push(Span::raw("  "));
+            spans.push(Span::styled(pr_d_str, Style::default().fg(CORE_AMBER)));
         } else {
             let ready_part = if summary.ready_count > 0 {
                 format!(
-                    "{} \u{2713} Ready (+{} PR)",
+                    "{} \u{2713} (+{} PR)",
                     summary.ready_count, summary.ready_pr
                 )
             } else {
-                "0 \u{2713} Ready".to_string()
+                "0 \u{2713}".to_string()
             };
             let next_part = match summary.next_ready_secs {
                 Some(secs) => format!("Next: {}", format_eta(secs as u64)),
                 None => String::new(),
             };
+            let pr_d_str = format!("+{} PR/d", summary.total_pr_per_day);
             let left_len = "Cores: ".len() + ready_part.len();
-            let right_len = next_part.len();
-            let padding = width.saturating_sub(left_len + 5 + right_len);
+            let mid_len = if next_part.is_empty() {
+                0
+            } else {
+                2 + next_part.len()
+            };
+            let right_len = 2 + pr_d_str.len();
+            let used = left_len + mid_len + right_len;
+            let padding = width.saturating_sub(used);
 
             spans.push(Span::styled(
                 "Cores: ",
@@ -782,18 +842,23 @@ pub(super) fn draw_deep_panel(
                     Style::default().fg(Color::DarkGray),
                 ));
             }
+            if !next_part.is_empty() {
+                spans.push(Span::raw("  "));
+                spans.push(Span::styled(
+                    next_part,
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
             spans.push(Span::raw(" ".repeat(padding)));
-            spans.push(Span::styled(
-                format!("  \u{00b7}  {}", next_part),
-                Style::default().fg(Color::DarkGray),
-            ));
+            spans.push(Span::raw("  "));
+            spans.push(Span::styled(pr_d_str, Style::default().fg(CORE_AMBER)));
         }
 
         lines.push(Line::from(spans));
     }
 
     {
-        // Row 6: Per-core badges + PR/day
+        // Row 6: Per-core mini progress bars
         let mut spans: Vec<Span> = Vec::new();
 
         for (i, badge) in summary.cores.iter().enumerate() {
@@ -802,11 +867,28 @@ pub(super) fn draw_deep_panel(
             }
             if badge.unlocked {
                 spans.push(Span::styled("\u{2742}", Style::default().fg(CORE_AMBER)));
+                let filled = (badge.fill_ratio * 4.0).round() as usize;
+                let empty = 4 - filled;
                 if badge.ready {
-                    spans.push(Span::styled("\u{2713}", Style::default().fg(Color::Green)));
+                    // Ready cores: all filled in Green
+                    spans.push(Span::styled(
+                        "\u{2588}".repeat(4),
+                        Style::default().fg(Color::Green),
+                    ));
                 } else {
-                    let time = format_core_time_short(badge.remaining_secs);
-                    spans.push(Span::styled(time, Style::default().fg(Color::DarkGray)));
+                    // Filling cores: filled in Amber, empty in DarkGray
+                    if filled > 0 {
+                        spans.push(Span::styled(
+                            "\u{2588}".repeat(filled),
+                            Style::default().fg(CORE_AMBER),
+                        ));
+                    }
+                    if empty > 0 {
+                        spans.push(Span::styled(
+                            "\u{2591}".repeat(empty),
+                            Style::default().fg(Color::DarkGray),
+                        ));
+                    }
                 }
             } else {
                 spans.push(Span::styled(
@@ -814,38 +896,6 @@ pub(super) fn draw_deep_panel(
                     Style::default().fg(Color::DarkGray),
                 ));
             }
-        }
-
-        // Right-align PR/day
-        let pr_str = format!("+{} PR/day", summary.total_pr_per_day);
-        // Calculate current badge width for padding
-        let badge_text: String = summary
-            .cores
-            .iter()
-            .enumerate()
-            .map(|(i, b)| {
-                let prefix = if i > 0 { " " } else { "" };
-                if b.unlocked {
-                    if b.ready {
-                        format!("{}\u{2742}\u{2713}", prefix)
-                    } else {
-                        format!(
-                            "{}\u{2742}{}",
-                            prefix,
-                            format_core_time_short(b.remaining_secs)
-                        )
-                    }
-                } else {
-                    format!("{}\u{25c7}L{}", prefix, b.required_layer)
-                }
-            })
-            .collect();
-        let badge_width = badge_text.chars().count();
-        let padding = width.saturating_sub(badge_width + pr_str.len());
-
-        if summary.total_pr_per_day > 0 {
-            spans.push(Span::raw(" ".repeat(padding)));
-            spans.push(Span::styled(pr_str, Style::default().fg(CORE_AMBER)));
         }
 
         lines.push(Line::from(spans));
@@ -892,7 +942,7 @@ struct CoreSummary {
 struct CoreBadge {
     unlocked: bool,
     ready: bool,
-    remaining_secs: i64,
+    fill_ratio: f64,
     required_layer: u32,
 }
 
@@ -938,7 +988,7 @@ fn core_summary(
                 summary.cores.push(CoreBadge {
                     unlocked: true,
                     ready: true,
-                    remaining_secs: 0,
+                    fill_ratio: 1.0,
                     required_layer: core.required_layer,
                 });
             } else {
@@ -952,7 +1002,7 @@ fn core_summary(
                 summary.cores.push(CoreBadge {
                     unlocked: true,
                     ready: false,
-                    remaining_secs: remaining,
+                    fill_ratio: ratio,
                     required_layer: core.required_layer,
                 });
             }
@@ -960,25 +1010,13 @@ fn core_summary(
             summary.cores.push(CoreBadge {
                 unlocked: false,
                 ready: false,
-                remaining_secs: 0,
+                fill_ratio: 0.0,
                 required_layer: core.required_layer,
             });
         }
     }
 
     summary
-}
-
-/// Format seconds into short form for core badges: "1h", "2h", "45m", "11h"
-fn format_core_time_short(secs: i64) -> String {
-    let secs = secs.max(0) as u64;
-    let hours = secs / 3600;
-    let minutes = (secs % 3600) / 60;
-    if hours > 0 {
-        format!("{}h", hours)
-    } else {
-        format!("{}m", minutes.max(1))
-    }
 }
 
 #[cfg(test)]
