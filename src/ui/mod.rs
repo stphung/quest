@@ -839,10 +839,7 @@ fn draw_right_panel(
     if game_state.active_minigame.is_some() {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(3),
-                Constraint::Min(10),
-            ])
+            .constraints([Constraint::Length(3), Constraint::Min(10)])
             .split(area);
         stats_panel::draw_zone_info(frame, chunks[0], game_state, achievements, ctx);
         draw_right_content(frame, chunks[1], game_state, achievements, ctx);
@@ -875,7 +872,7 @@ fn draw_right_panel(
         .constraints([
             Constraint::Length(zone_height), // Zone info
             Constraint::Length(1),           // Divider
-            Constraint::Min(8),             // Content
+            Constraint::Min(8),              // Content
             Constraint::Length(1),           // Divider
             Constraint::Length(2),           // Status strip
         ])
@@ -886,8 +883,7 @@ fn draw_right_panel(
     // Horizontal dividers styled with zone border color
     let divider_style = Style::default().fg(themed_border_color(zone_color));
     let divider_char = panel_border_chars().h;
-    let divider_str: String = std::iter::repeat_n(divider_char, chunks[1].width as usize)
-        .collect();
+    let divider_str: String = std::iter::repeat_n(divider_char, chunks[1].width as usize).collect();
     let divider = Paragraph::new(divider_str.as_str()).style(divider_style);
     frame.render_widget(divider.clone(), chunks[1]);
     frame.render_widget(divider, chunks[3]);
@@ -930,10 +926,7 @@ fn draw_status_strip_fishing(
     let caught = session.fish_caught.len() as u32;
     let total = session.total_fish;
     let rank_text = Paragraph::new(Line::from(vec![
-        Span::styled(
-            "Rank: ",
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
+        Span::styled("Rank: ", Style::default().add_modifier(Modifier::BOLD)),
         Span::styled(rank_name, Style::default().fg(Color::Cyan)),
         Span::raw(format!("  |  Caught: {}/{}", caught, total)),
     ]))
@@ -963,12 +956,7 @@ fn draw_status_strip_fishing(
 }
 
 /// Dungeon status strip: player HP with room/key info on row 1, enemy HP or status on row 2.
-fn draw_status_strip_dungeon(
-    frame: &mut Frame,
-    row0: Rect,
-    row1: Rect,
-    game_state: &GameState,
-) {
+fn draw_status_strip_dungeon(frame: &mut Frame, row0: Rect, row1: Rect, game_state: &GameState) {
     // Row 1: Player HP gauge with room/key info in label
     let hp = &game_state.combat_state;
     let hp_ratio = if hp.player_max_hp > 0 {
@@ -1037,12 +1025,7 @@ fn draw_status_strip_dungeon(
 }
 
 /// Combat/idle status strip: player HP on row 1, enemy HP or idle on row 2.
-fn draw_status_strip_combat(
-    frame: &mut Frame,
-    row0: Rect,
-    row1: Rect,
-    game_state: &GameState,
-) {
+fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_state: &GameState) {
     // Row 1: Player HP gauge
     let hp = &game_state.combat_state;
     let hp_ratio = if hp.player_max_hp > 0 {
@@ -1068,8 +1051,7 @@ fn draw_status_strip_combat(
             0.0
         };
         let enemy_label = format!("{}: {}/{}", enemy.name, enemy.current_hp, enemy.max_hp);
-        let is_boss =
-            game_state.zone_progression.fighting_boss || enemy.name.starts_with("Boss ");
+        let is_boss = game_state.zone_progression.fighting_boss || enemy.name.starts_with("Boss ");
         let hp_color = if is_boss {
             Color::LightRed
         } else {
