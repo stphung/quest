@@ -2,6 +2,7 @@
 
 use crate::achievements::{get_achievements_by_category, AchievementCategory};
 use crate::deep::DeepState;
+use crate::fishing::types::FishingState;
 use crate::power_cores::{fill_duration_secs, fill_ratio, ALL_POWER_CORES};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -25,6 +26,137 @@ pub(super) fn highest_prestige_badge(
         }
     }
     None
+}
+
+/// Returns the icon of the highest unlocked fishing rank achievement, if any.
+pub(super) fn highest_fishing_badge(
+    achievements: &crate::achievements::Achievements,
+) -> Option<&'static str> {
+    use crate::achievements::AchievementId;
+
+    let fishing_achievements = [
+        AchievementId::FishermanIV,
+        AchievementId::FishermanIII,
+        AchievementId::FishermanII,
+        AchievementId::FishermanI,
+    ];
+
+    for id in fishing_achievements {
+        if achievements.is_unlocked(id) {
+            return crate::achievements::data::get_achievement_def(id).map(|def| def.icon);
+        }
+    }
+    None
+}
+
+/// Builds the Leviathan hunt tracker line for the fishing panel at rank 40.
+///
+/// Layout: `🐋 ● ● ● ● ○ ○ ○ ○ ○ ○   ⚡ ▰▰▰▱▱▱▱ +6.5%`
+pub(super) fn build_leviathan_tracker_line(fishing: &FishingState) -> Line<'static> {
+    let encounters = fishing.leviathan_encounters.min(10) as usize;
+    let in_catch_phase = encounters >= 10;
+
+    let mut spans: Vec<Span<'static>> = Vec::new();
+
+    // Whale prefix
+    spans.push(Span::styled(
+        "\u{1F40B} ",
+        Style::default().add_modifier(Modifier::BOLD),
+    ));
+
+    // Encounter progress dots
+    for i in 0..10 {
+        if i < encounters {
+            spans.push(Span::styled("\u{25CF} ", Style::default().fg(Color::Cyan)));
+        } else {
+            spans.push(Span::styled(
+                "\u{25CB} ",
+                Style::default().fg(Color::DarkGray),
+            ));
+        }
+    }
+
+    // Separator
+    spans.push(Span::raw("  "));
+
+    // Lightning bolt
+    spans.push(Span::styled(
+        "\u{26A1} ",
+        Style::default()
+            .fg(Color::Rgb(100, 180, 255))
+            .add_modifier(Modifier::BOLD),
+    ));
+
+    if !fishing.storm_lure_active {
+        spans.push(Span::styled("--", Style::default().fg(Color::DarkGray)));
+    } else {
+        // Charge bar: 7 ticks representing miss_ramp 0-10%
+        let filled = (fishing.lure_miss_ramp / 0.10 * 7.0).round() as usize;
+        let filled = filled.min(7);
+        for i in 0..7 {
+            if i < filled {
+                spans.push(Span::styled(
+                    "\u{25B0}",
+                    Style::default().fg(Color::Rgb(100, 180, 255)),
+                ));
+            } else {
+                spans.push(Span::styled(
+                    "\u{25B1}",
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+        }
+        spans.push(Span::raw(" "));
+
+        // Percentage
+        let bonus = fishing.lure_tracking_bonus + fishing.lure_miss_ramp;
+        if in_catch_phase {
+            // Show total catch chance (base 25% + bonus)
+            let catch_pct = (0.25 + bonus) * 100.0;
+            spans.push(Span::styled(
+                format!("{:.1}%", catch_pct),
+                Style::default()
+                    .fg(Color::Rgb(100, 180, 255))
+                    .add_modifier(Modifier::BOLD),
+            ));
+        } else {
+            // Show lure bonus added to encounter chance
+            spans.push(Span::styled(
+                format!("+{:.1}%", bonus * 100.0),
+                Style::default().fg(Color::Rgb(100, 180, 255)),
+            ));
+        }
+    }
+
+    Line::from(spans)
+}
+
+/// Builds the Leviathan trophy line shown after the Leviathan has been caught.
+///
+/// Layout: `🐋 ● ● ● ● ● ● ● ● ● ●   Storm Leviathan ✓`
+pub(super) fn build_leviathan_trophy_line() -> Line<'static> {
+    let mut spans: Vec<Span<'static>> = Vec::new();
+
+    // Whale prefix
+    spans.push(Span::styled(
+        "\u{1F40B} ",
+        Style::default().add_modifier(Modifier::BOLD),
+    ));
+
+    // All 10 dots filled
+    for _ in 0..10 {
+        spans.push(Span::styled("\u{25CF} ", Style::default().fg(Color::Cyan)));
+    }
+
+    spans.push(Span::raw("  "));
+    spans.push(Span::styled(
+        "Storm Leviathan \u{2713}",
+        Style::default()
+            .fg(Color::Green)
+            .add_modifier(Modifier::BOLD),
+    ));
+
+    Line::from(spans)
 }
 
 /// Formats seconds into a human-readable ETA (e.g., "~3m", "~1h 20m", "~2d 5h").
