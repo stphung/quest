@@ -38,7 +38,7 @@ pub fn render_fishing_scene(
         .constraints([
             Constraint::Length(2), // Header: rank + progress (no border)
             Constraint::Length(1), // Divider line
-            Constraint::Min(5),   // Water animation
+            Constraint::Min(5),    // Water animation
         ])
         .split(area);
 
@@ -47,11 +47,9 @@ pub fn render_fishing_scene(
 
     // Draw horizontal divider matching the outer panel style
     let divider_char = super::panel_border_chars().h;
-    let zone_color = super::stats_panel::zone_color_for_id(
-        game_state.zone_progression.current_zone_id,
-    );
-    let divider_str: String =
-        std::iter::repeat_n(divider_char, chunks[1].width as usize).collect();
+    let zone_color =
+        super::stats_panel::zone_color_for_id(game_state.zone_progression.current_zone_id);
+    let divider_str: String = std::iter::repeat_n(divider_char, chunks[1].width as usize).collect();
     let divider = Paragraph::new(divider_str.as_str())
         .style(Style::default().fg(super::themed_border_color(zone_color)));
     frame.render_widget(divider, chunks[1]);
