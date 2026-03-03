@@ -71,6 +71,7 @@ pub(super) fn draw_equipment_names_only(
 
     let width = inner.width as usize;
     let slot_col = 8; // "Weapon  " = 8 chars
+
     // Compute right columns dynamically to fit actual power values.
     // Layout per row: "{:>9}  T{t}  Z{z} ⚡{pow}[+{bonus}]"
     let digit_count = |n: u32| -> usize {
