@@ -508,9 +508,7 @@ pub(super) fn draw_zone_info(
     achievements: &crate::achievements::Achievements,
     _ctx: &LayoutContext,
 ) {
-    use super::scene_fx::{
-        display_width, put_cell, put_text, put_text_centered, render_buffer, SceneCell,
-    };
+    use super::scene_fx::{put_cell, put_text, put_text_centered, render_buffer, SceneCell};
     use crate::zones::get_all_zones;
 
     let zones = get_all_zones();
@@ -519,28 +517,16 @@ pub(super) fn draw_zone_info(
     let zone = zones.iter().find(|z| z.id == prog.current_zone_id);
     let subzone = zone.and_then(|z| z.subzones.iter().find(|s| s.id == prog.current_subzone_id));
 
-    let zone_name = zone.map(|z| z.name).unwrap_or("Unknown");
     let subzone_name = subzone.map(|s| s.name).unwrap_or("Unknown");
     let boss_name = subzone.map(|s| s.boss.name).unwrap_or("Unknown Boss");
     let total_subzones = zone.map(|z| z.subzones.len()).unwrap_or(0);
 
-    let zone_color = zone_color_for_id(prog.current_zone_id);
-
     let description_color = zone_description_tint(prog.current_zone_id);
 
-    // --- Render the outer border block ---
-    let location_title = match highest_zone_badge(achievements) {
-        Some(icon) => format!(" Location {} ", icon),
-        None => " Location ".to_string(),
-    };
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(super::themed_border_color(zone_color)))
-        .title(location_title);
-    let inner = super::render_themed_block(frame, area, block, zone_color, super::BorderFxContext);
-
-    let width = inner.width as usize;
-    let height = inner.height as usize;
+    // No internal border — the unified right panel provides the outer frame.
+    // Render directly into the given area.
+    let width = area.width as usize;
+    let height = area.height as usize;
     if width == 0 || height == 0 {
         return;
     }
@@ -549,25 +535,20 @@ pub(super) fn draw_zone_info(
     let mut buffer = vec![vec![SceneCell::default(); width]; height];
     super::zone_bg::paint_zone_track_bg(&mut buffer, prog.current_zone_id, 0.35);
 
-    // --- Row 0: Zone name line (multi-color, centered) ---
-    let prefix = format!("Zone {}: ", prog.current_zone_id);
-    let separator = " | ";
-    let suffix = format!(" ({}/{})", prog.current_subzone_id, total_subzones);
-    let full_row0 = format!(
-        "{}{}{}{}{}",
-        prefix, zone_name, separator, subzone_name, suffix
-    );
-    let start_col = ((width as i32 - display_width(&full_row0) as i32) / 2).max(0);
-    let mut col = start_col;
-    put_text(&mut buffer, 0, col, &prefix, Color::White);
-    col += display_width(&prefix) as i32;
-    put_text(&mut buffer, 0, col, zone_name, zone_color);
-    col += display_width(zone_name) as i32;
-    put_text(&mut buffer, 0, col, separator, Color::White);
-    col += display_width(separator) as i32;
-    put_text(&mut buffer, 0, col, subzone_name, Color::White);
-    col += display_width(subzone_name) as i32;
-    put_text(&mut buffer, 0, col, &suffix, Color::DarkGray);
+    // --- Row 0: Subzone line (compact — zone name is in outer panel title) ---
+    let badge = highest_zone_badge(achievements).unwrap_or("");
+    let subzone_line = if badge.is_empty() {
+        format!(
+            "Subzone {}/{}: {}",
+            prog.current_subzone_id, total_subzones, subzone_name
+        )
+    } else {
+        format!(
+            "{} Subzone {}/{}: {}",
+            badge, prog.current_subzone_id, total_subzones, subzone_name
+        )
+    };
+    put_text_centered(&mut buffer, 0, width, &subzone_line, Color::White);
 
     // --- Row 1: Boss progress ---
     if height > 1 {
@@ -692,7 +673,7 @@ pub(super) fn draw_zone_info(
         }
     }
 
-    render_buffer(frame, inner, &buffer);
+    render_buffer(frame, area, &buffer);
 }
 
 /// Center a label within a given width, padding with spaces.
