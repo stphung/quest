@@ -128,18 +128,6 @@ fn test_player_attack_normal_produces_tick_event() {
             ..
         }
     )));
-
-    // Verify message content
-    if let Some(TickEvent::PlayerAttack { message, .. }) = result.events.first() {
-        assert!(
-            message.contains("15"),
-            "Message should contain damage amount"
-        );
-        assert!(
-            !message.contains("CRITICAL"),
-            "Normal hit should not say CRITICAL"
-        );
-    }
 }
 
 #[test]
@@ -176,17 +164,6 @@ fn test_player_attack_critical_produces_crit_message() {
             ..
         }
     )));
-
-    if let Some(TickEvent::PlayerAttack { message, .. }) = result.events.first() {
-        assert!(
-            message.contains("CRITICAL"),
-            "Crit hit message should contain CRITICAL"
-        );
-        assert!(
-            message.contains("30"),
-            "Crit message should contain damage amount"
-        );
-    }
 }
 
 // =============================================================================
@@ -223,13 +200,8 @@ fn test_player_attack_blocked_produces_weapon_needed_event() {
         TickEvent::PlayerAttackBlocked { .. }
     )));
 
-    if let Some(TickEvent::PlayerAttackBlocked {
-        weapon_needed,
-        message,
-    }) = result.events.first()
-    {
+    if let Some(TickEvent::PlayerAttackBlocked { weapon_needed }) = result.events.first() {
         assert_eq!(weapon_needed, "Stormbreaker");
-        assert!(message.contains("Stormbreaker"));
     }
 }
 
@@ -265,15 +237,9 @@ fn test_enemy_attack_produces_event_with_enemy_name() {
         TickEvent::EnemyAttack { damage: 8, .. }
     )));
 
-    if let Some(TickEvent::EnemyAttack {
-        enemy_name,
-        message,
-        ..
-    }) = result.events.first()
-    {
+    if let Some(TickEvent::EnemyAttack { enemy_name, damage }) = result.events.first() {
         assert_eq!(enemy_name, "Darkfang Orc");
-        assert!(message.contains("Darkfang Orc"));
-        assert!(message.contains("8"));
+        assert_eq!(*damage, 8);
     }
 }
 
@@ -309,9 +275,8 @@ fn test_damage_reflected_produces_event() {
         TickEvent::DamageReflected { damage: 5, .. }
     )));
 
-    if let Some(TickEvent::DamageReflected { message, .. }) = result.events.first() {
-        assert!(message.contains("5"));
-        assert!(message.contains("reflected"));
+    if let Some(TickEvent::DamageReflected { damage }) = result.events.first() {
+        assert_eq!(*damage, 5);
     }
 }
 
@@ -417,13 +382,11 @@ fn test_enemy_died_message_contains_enemy_name_and_xp() {
 
     if let Some(TickEvent::EnemyDefeated {
         enemy_name,
-        message,
-        ..
+        xp_gained,
     }) = result.events.first()
     {
         assert_eq!(enemy_name, "Shadow Drake");
-        assert!(message.contains("Shadow Drake"));
-        assert!(message.contains("500"));
+        assert_eq!(*xp_gained, 500);
     }
 }
 
@@ -521,17 +484,7 @@ fn test_player_died_produces_event() {
         &mut rng,
     );
 
-    assert!(has_event(&result, |e| matches!(
-        e,
-        TickEvent::PlayerDied { .. }
-    )));
-
-    if let Some(TickEvent::PlayerDied { message }) = result.events.first() {
-        assert!(
-            message.contains("died"),
-            "Death message should mention death"
-        );
-    }
+    assert!(has_event(&result, |e| matches!(e, TickEvent::PlayerDied)));
 }
 
 // =============================================================================
@@ -562,15 +515,8 @@ fn test_player_died_in_dungeon_produces_event() {
 
     assert!(has_event(&result, |e| matches!(
         e,
-        TickEvent::PlayerDiedInDungeon { .. }
+        TickEvent::PlayerDiedInDungeon
     )));
-
-    if let Some(TickEvent::PlayerDiedInDungeon { message }) = result.events.first() {
-        assert!(
-            message.contains("prestige"),
-            "Dungeon death message should mention no prestige loss"
-        );
-    }
 }
 
 // =============================================================================
@@ -616,12 +562,11 @@ fn test_elite_defeated_produces_dungeon_elite_event_with_xp() {
     // Should have enemy name
     if let Some(TickEvent::DungeonEliteDefeated {
         enemy_name,
-        message,
-        ..
+        xp_gained,
     }) = result.events.first()
     {
         assert_eq!(enemy_name, "Elite Guardian");
-        assert!(message.contains("800"));
+        assert_eq!(*xp_gained, 800);
     }
 }
 
@@ -662,7 +607,6 @@ fn test_boss_defeated_produces_dungeon_boss_event() {
     if let Some(TickEvent::DungeonBossDefeated {
         xp_gained,
         enemy_name,
-        message,
         ..
     }) = result
         .events
@@ -671,7 +615,6 @@ fn test_boss_defeated_produces_dungeon_boss_event() {
     {
         assert_eq!(*xp_gained, 2000);
         assert_eq!(enemy_name, "Dungeon Boss");
-        assert!(message.contains("Dungeon Complete"));
     }
 
     // Dungeon should be cleared after boss defeat
@@ -750,13 +693,12 @@ fn test_subzone_boss_defeated_subzone_complete() {
     // Session kills should increment
     assert_eq!(state.session_kills, 1);
 
-    if let Some(TickEvent::SubzoneBossDefeated { message, .. }) = result
+    if let Some(TickEvent::SubzoneBossDefeated { xp_gained, .. }) = result
         .events
         .iter()
         .find(|e| matches!(e, TickEvent::SubzoneBossDefeated { .. }))
     {
-        assert!(message.contains("Boss defeated"));
-        assert!(message.contains("600"));
+        assert_eq!(*xp_gained, 600);
     }
 }
 
@@ -789,14 +731,20 @@ fn test_subzone_boss_defeated_zone_complete() {
         &mut rng,
     );
 
-    if let Some(TickEvent::SubzoneBossDefeated { message, .. }) = result
+    if let Some(TickEvent::SubzoneBossDefeated {
+        xp_gained,
+        result: defeat_result,
+        ..
+    }) = result
         .events
         .iter()
         .find(|e| matches!(e, TickEvent::SubzoneBossDefeated { .. }))
     {
-        assert!(message.contains("Meadow"));
-        assert!(message.contains("conquered"));
-        assert!(message.contains("1200"));
+        assert_eq!(*xp_gained, 1200);
+        assert!(matches!(
+            defeat_result,
+            BossDefeatResult::ZoneComplete { .. }
+        ));
     }
 }
 
@@ -829,14 +777,21 @@ fn test_subzone_boss_defeated_zone_gated() {
         &mut rng,
     );
 
-    if let Some(TickEvent::SubzoneBossDefeated { message, .. }) = result
+    if let Some(TickEvent::SubzoneBossDefeated {
+        result: defeat_result,
+        ..
+    }) = result
         .events
         .iter()
         .find(|e| matches!(e, TickEvent::SubzoneBossDefeated { .. }))
     {
-        assert!(message.contains("Dark Forest"));
-        assert!(message.contains("conquered"));
-        assert!(message.contains("Prestige 5"));
+        assert!(matches!(
+            defeat_result,
+            BossDefeatResult::ZoneCompleteButGated {
+                required_prestige: 5,
+                ..
+            }
+        ));
     }
 }
 
@@ -866,13 +821,15 @@ fn test_subzone_boss_defeated_storms_end() {
         &mut rng,
     );
 
-    if let Some(TickEvent::SubzoneBossDefeated { message, .. }) = result
+    if let Some(TickEvent::SubzoneBossDefeated {
+        result: defeat_result,
+        ..
+    }) = result
         .events
         .iter()
         .find(|e| matches!(e, TickEvent::SubzoneBossDefeated { .. }))
     {
-        assert!(message.contains("All zones conquered"));
-        assert!(message.contains("completed the game"));
+        assert!(matches!(defeat_result, BossDefeatResult::StormsEnd));
     }
 }
 
@@ -902,12 +859,15 @@ fn test_subzone_boss_defeated_expanse_cycle() {
         &mut rng,
     );
 
-    if let Some(TickEvent::SubzoneBossDefeated { message, .. }) = result
+    if let Some(TickEvent::SubzoneBossDefeated {
+        result: defeat_result,
+        ..
+    }) = result
         .events
         .iter()
         .find(|e| matches!(e, TickEvent::SubzoneBossDefeated { .. }))
     {
-        assert!(message.contains("Expanse cycles anew"));
+        assert!(matches!(defeat_result, BossDefeatResult::ExpanseCycle));
     }
 }
 

@@ -273,22 +273,17 @@ fn test_dungeon_boss_completion_triggers_achievement() {
                 xp_gained,
                 bonus_xp,
                 total_xp,
-                message,
                 ..
             } = e
             {
-                Some((*xp_gained, *bonus_xp, *total_xp, message.clone()))
+                Some((*xp_gained, *bonus_xp, *total_xp))
             } else {
                 None
             }
         });
-        if let Some((xp, bonus, total, msg)) = boss_evt {
+        if let Some((xp, bonus, total)) = boss_evt {
             assert!(xp > 0, "Boss XP should be positive");
             assert!(total >= xp + bonus, "Total should include boss + bonus XP");
-            assert!(
-                msg.contains("Dungeon Complete"),
-                "Message should describe completion"
-            );
         }
     }
 }
@@ -314,11 +309,11 @@ fn test_no_dungeon_events_without_active_dungeon() {
         !has(&all_events, |e| matches!(
             e,
             TickEvent::DungeonRoomEntered { .. }
-                | TickEvent::DungeonKeyFound { .. }
-                | TickEvent::DungeonBossUnlocked { .. }
+                | TickEvent::DungeonKeyFound
+                | TickEvent::DungeonBossUnlocked
                 | TickEvent::DungeonBossDefeated { .. }
                 | TickEvent::DungeonEliteDefeated { .. }
-                | TickEvent::DungeonFailed { .. }
+                | TickEvent::DungeonFailed
                 | TickEvent::DungeonCompleted { .. }
                 | TickEvent::DungeonTreasureFound { .. }
         )),
@@ -375,23 +370,18 @@ fn test_player_death_in_overworld_emits_event() {
     let mut all_events = Vec::new();
     for _ in 0..10_000 {
         all_events.extend(tick(&mut state, &mut tc, &mut ach, &mut r));
-        if has(&all_events, |e| matches!(e, TickEvent::PlayerDied { .. })) {
+        if has(&all_events, |e| matches!(e, TickEvent::PlayerDied)) {
             break;
         }
     }
 
-    if has(&all_events, |e| matches!(e, TickEvent::PlayerDied { .. })) {
-        let msg = all_events.iter().find_map(|e| {
-            if let TickEvent::PlayerDied { message } = e {
-                Some(message.clone())
-            } else {
-                None
-            }
-        });
-        assert!(msg.is_some());
+    // Probabilistic: weak character fighting boss should eventually die.
+    // If it doesn't happen, that's OK — we've locked the event contract.
+    if has(&all_events, |e| matches!(e, TickEvent::PlayerDied)) {
+        // PlayerDied is now a unit variant — no message to verify
         assert!(
-            msg.unwrap().contains("died"),
-            "Death message should mention death"
+            !state.zone_progression.fighting_boss,
+            "Boss fight should reset after death"
         );
     }
 }
@@ -418,27 +408,12 @@ fn test_player_death_in_dungeon_preserves_prestige() {
         }
     }
 
-    if has(&all_events, |e| {
-        matches!(e, TickEvent::PlayerDiedInDungeon { .. })
-    }) {
+    if has(&all_events, |e| matches!(e, TickEvent::PlayerDiedInDungeon)) {
         assert_eq!(
             state.prestige_rank, 5,
             "Prestige preserved after dungeon death"
         );
         assert!(state.active_dungeon.is_none(), "Dungeon cleared");
-
-        let msg = all_events.iter().find_map(|e| {
-            if let TickEvent::PlayerDiedInDungeon { message } = e {
-                Some(message.clone())
-            } else {
-                None
-            }
-        });
-        assert!(msg.is_some());
-        assert!(
-            msg.unwrap().contains("prestige"),
-            "Message should mention prestige safety"
-        );
     }
 }
 

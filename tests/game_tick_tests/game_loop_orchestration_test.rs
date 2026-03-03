@@ -504,20 +504,8 @@ fn test_player_attack_event_has_message_and_damage() {
             &mut rng,
         );
         for event in &result.events {
-            if let TickEvent::PlayerAttack {
-                damage,
-                was_crit,
-                message,
-            } = event
-            {
+            if let TickEvent::PlayerAttack { damage, .. } = event {
                 assert!(*damage > 0, "Attack damage must be positive");
-                assert!(!message.is_empty(), "Attack message must be non-empty");
-                if *was_crit {
-                    assert!(
-                        message.contains("CRITICAL"),
-                        "Crit message should contain CRITICAL"
-                    );
-                }
                 found = true;
                 break;
             }
@@ -548,18 +536,9 @@ fn test_enemy_attack_event_has_enemy_name() {
             &mut rng,
         );
         for event in &result.events {
-            if let TickEvent::EnemyAttack {
-                damage,
-                enemy_name,
-                message,
-            } = event
-            {
+            if let TickEvent::EnemyAttack { damage, enemy_name } = event {
                 assert!(*damage > 0, "Enemy damage must be positive");
                 assert!(!enemy_name.is_empty(), "Enemy name must be non-empty");
-                assert!(
-                    message.contains("hits you"),
-                    "Message should describe attack"
-                );
                 found = true;
                 break;
             }
@@ -593,17 +572,9 @@ fn test_enemy_defeated_event_has_xp_and_message() {
             if let TickEvent::EnemyDefeated {
                 xp_gained,
                 enemy_name: _,
-                message,
             } = event
             {
                 assert!(*xp_gained > 0, "XP gained must be positive");
-                // Note: enemy_name may be empty because update_combat clears the
-                // current_enemy before the event is constructed (the name is read
-                // from state.combat_state.current_enemy which may already be None)
-                assert!(
-                    message.contains("defeated"),
-                    "Message should contain 'defeated'"
-                );
                 found = true;
                 break;
             }
@@ -638,12 +609,7 @@ fn test_player_died_event_message_format() {
             &mut rng,
         );
         for event in &result.events {
-            if let TickEvent::PlayerDied { message } = event {
-                assert!(
-                    message.contains("died") || message.contains("Boss encounter reset"),
-                    "Death message should describe death: {}",
-                    message
-                );
+            if matches!(event, TickEvent::PlayerDied) {
                 found = true;
                 break;
             }
@@ -804,13 +770,8 @@ fn test_achievement_unlocked_event_message_format() {
             &mut rng,
         );
         for event in &result.events {
-            if let TickEvent::AchievementUnlocked { name, message } = event {
+            if let TickEvent::AchievementUnlocked { name } = event {
                 assert!(!name.is_empty(), "Achievement name must be non-empty");
-                assert!(
-                    message.contains("Achievement Unlocked"),
-                    "Message must contain 'Achievement Unlocked': {}",
-                    message
-                );
                 found = true;
                 break;
             }
@@ -1015,21 +976,8 @@ fn test_subzone_boss_defeat_message_contains_xp() {
             &mut rng,
         );
         for event in &result.events {
-            if let TickEvent::SubzoneBossDefeated {
-                xp_gained, message, ..
-            } = event
-            {
+            if let TickEvent::SubzoneBossDefeated { xp_gained, .. } = event {
                 assert!(*xp_gained > 0, "Boss XP must be positive");
-                assert!(
-                    message.contains("XP"),
-                    "Boss defeat message should mention XP: {}",
-                    message
-                );
-                assert!(
-                    message.contains("Boss defeated") || message.contains("conquered"),
-                    "Message should describe boss defeat: {}",
-                    message
-                );
                 found = true;
                 break;
             }

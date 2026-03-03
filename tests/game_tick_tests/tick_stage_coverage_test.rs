@@ -116,15 +116,8 @@ fn test_tick_event_player_attack_crit_has_crit_message() {
 
     // With high DEX and prestige bonuses, should get at least one crit in 5k ticks
     if !crits.is_empty() {
-        if let TickEvent::PlayerAttack {
-            was_crit, message, ..
-        } = &crits[0]
-        {
+        if let TickEvent::PlayerAttack { was_crit, .. } = &crits[0] {
             assert!(*was_crit);
-            assert!(
-                message.contains("CRITICAL"),
-                "Crit message should contain CRITICAL"
-            );
         }
     }
 }
@@ -156,26 +149,12 @@ fn test_tick_event_player_died_overworld() {
         5_000,
     );
 
-    let player_died = events
-        .iter()
-        .any(|e| matches!(e, TickEvent::PlayerDied { .. }));
+    let player_died = events.iter().any(|e| matches!(e, TickEvent::PlayerDied));
 
     assert!(
         player_died,
         "Player with 1 HP should die to boss and produce PlayerDied event"
     );
-
-    // Verify message
-    let died_event = events
-        .iter()
-        .find(|e| matches!(e, TickEvent::PlayerDied { .. }))
-        .unwrap();
-    if let TickEvent::PlayerDied { message } = died_event {
-        assert!(
-            message.contains("died"),
-            "PlayerDied message should mention death"
-        );
-    }
 }
 
 // =============================================================================
@@ -213,7 +192,7 @@ fn test_tick_event_player_died_in_dungeon() {
         for event in &result.events {
             if matches!(
                 event,
-                TickEvent::PlayerDiedInDungeon { .. } | TickEvent::DungeonFailed { .. }
+                TickEvent::PlayerDiedInDungeon | TickEvent::DungeonFailed
             ) {
                 died_in_dungeon = true;
             }
@@ -226,11 +205,11 @@ fn test_tick_event_player_died_in_dungeon() {
 
     let dungeon_death = all_events
         .iter()
-        .any(|e| matches!(e, TickEvent::PlayerDiedInDungeon { .. }));
+        .any(|e| matches!(e, TickEvent::PlayerDiedInDungeon));
 
     let dungeon_failed = all_events
         .iter()
-        .any(|e| matches!(e, TickEvent::DungeonFailed { .. }));
+        .any(|e| matches!(e, TickEvent::DungeonFailed));
 
     // Either PlayerDiedInDungeon or DungeonFailed should appear
     assert!(
@@ -243,20 +222,6 @@ fn test_tick_event_player_died_in_dungeon() {
         state.active_dungeon.is_none(),
         "Dungeon should be cleared after death"
     );
-
-    // If we got a PlayerDiedInDungeon, verify the message mentions dungeon/escaped
-    if dungeon_death {
-        let death_event = all_events
-            .iter()
-            .find(|e| matches!(e, TickEvent::PlayerDiedInDungeon { .. }))
-            .unwrap();
-        if let TickEvent::PlayerDiedInDungeon { message } = death_event {
-            assert!(
-                message.contains("dungeon") || message.contains("escaped"),
-                "PlayerDiedInDungeon message should reference dungeon"
-            );
-        }
-    }
 }
 
 // =============================================================================
@@ -358,7 +323,7 @@ fn test_fishing_early_return_skips_all_combat_stages() {
                 TickEvent::PlayerAttack { .. }
                     | TickEvent::EnemyAttack { .. }
                     | TickEvent::EnemyDefeated { .. }
-                    | TickEvent::PlayerDied { .. }
+                    | TickEvent::PlayerDied
                     | TickEvent::SubzoneBossDefeated { .. }
             )
         })
@@ -1096,17 +1061,8 @@ fn test_subzone_boss_defeated_advances_progression() {
         .iter()
         .find(|e| matches!(e, TickEvent::SubzoneBossDefeated { .. }));
 
-    if let Some(TickEvent::SubzoneBossDefeated {
-        xp_gained,
-        result,
-        message,
-    }) = boss_event
-    {
+    if let Some(TickEvent::SubzoneBossDefeated { xp_gained, result }) = boss_event {
         assert!(*xp_gained > 0, "Boss XP should be positive");
-        assert!(
-            !message.is_empty(),
-            "Boss defeat message should not be empty"
-        );
         // Should advance to subzone 2
         if let quest::zones::BossDefeatResult::SubzoneComplete { new_subzone_id } = result {
             assert_eq!(*new_subzone_id, 2);
@@ -1157,12 +1113,8 @@ fn test_achievement_unlocked_event_format() {
         .collect();
 
     if !achievement_events.is_empty() {
-        if let TickEvent::AchievementUnlocked { name, message } = &achievement_events[0] {
+        if let TickEvent::AchievementUnlocked { name } = &achievement_events[0] {
             assert!(!name.is_empty(), "Achievement name should not be empty");
-            assert!(
-                message.contains("Achievement Unlocked"),
-                "Message should contain 'Achievement Unlocked'"
-            );
         }
     }
 }
@@ -1274,7 +1226,7 @@ fn test_dungeon_boss_defeated_event_fields() {
         let found = result.events.iter().any(|e| {
             matches!(
                 e,
-                TickEvent::DungeonBossDefeated { .. } | TickEvent::DungeonFailed { .. }
+                TickEvent::DungeonBossDefeated { .. } | TickEvent::DungeonFailed
             )
         });
         all_events.extend(result.events);
@@ -1291,7 +1243,6 @@ fn test_dungeon_boss_defeated_event_fields() {
         xp_gained,
         bonus_xp,
         total_xp,
-        message,
         ..
     }) = boss_defeated
     {
@@ -1299,10 +1250,6 @@ fn test_dungeon_boss_defeated_event_fields() {
         assert!(
             *total_xp >= *xp_gained + *bonus_xp,
             "Total should include base + bonus"
-        );
-        assert!(
-            message.contains("Dungeon Complete"),
-            "Message should mention dungeon complete"
         );
     }
 }
@@ -1339,7 +1286,7 @@ fn test_dungeon_elite_defeated_event() {
             matches!(
                 e,
                 TickEvent::DungeonEliteDefeated { .. }
-                    | TickEvent::DungeonFailed { .. }
+                    | TickEvent::DungeonFailed
                     | TickEvent::DungeonBossDefeated { .. }
             )
         });
@@ -1353,15 +1300,8 @@ fn test_dungeon_elite_defeated_event() {
         .iter()
         .find(|e| matches!(e, TickEvent::DungeonEliteDefeated { .. }));
 
-    if let Some(TickEvent::DungeonEliteDefeated {
-        xp_gained, message, ..
-    }) = elite_event
-    {
+    if let Some(TickEvent::DungeonEliteDefeated { xp_gained, .. }) = elite_event {
         assert!(*xp_gained > 0, "Elite XP should be positive");
-        assert!(
-            !message.is_empty(),
-            "Elite defeat message should not be empty"
-        );
     }
 }
 

@@ -4,12 +4,14 @@
 //! pure game-logic events from [`core::tick`] to UI types like
 //! [`VisualEffect`] and [`EffectType`].
 
+use crate::ascension::ascension_combat_multiplier;
 use crate::combat::types::{DamageFlash, DAMAGE_FLASH_DURATION};
 use crate::core::game_state::{GameState, TickerEntry, TickerSegment};
 use crate::core::tick::TickEvent;
 use crate::items::types::Rarity;
 use crate::ui::combat_effects::{EffectType, VisualEffect};
 use crate::ui::rarity_color;
+use crate::ui::stats_prestige::to_roman;
 use crate::zones::BossDefeatResult;
 use ratatui::style::Color;
 
@@ -32,14 +34,15 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
     let mut fracture_region_unlocked = None;
     for event in events {
         match event {
-            TickEvent::PlayerAttack {
-                damage,
-                was_crit,
-                message,
-            } => {
+            TickEvent::PlayerAttack { damage, was_crit } => {
+                let message = if *was_crit {
+                    format!("\u{1f4a5} CRITICAL HIT for {} damage!", damage)
+                } else {
+                    format!("\u{2694} You hit for {} damage", damage)
+                };
                 game_state
                     .combat_state
-                    .add_log_entry(message.clone(), *was_crit, true);
+                    .add_log_entry(message, *was_crit, true);
 
                 let (text, color, bold) = if *was_crit {
                     (format!("\u{2605}{}\u{2605}", damage), Color::Yellow, true)
@@ -62,10 +65,9 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 let impact_effect = VisualEffect::new(EffectType::HitImpact, 0.3);
                 game_state.combat_state.visual_effects.push(impact_effect);
             }
-            TickEvent::PlayerAttackBlocked { message, .. } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
+            TickEvent::PlayerAttackBlocked { weapon_needed } => {
+                let message = format!("\u{1f6ab} {} required to damage this foe!", weapon_needed);
+                game_state.combat_state.add_log_entry(message, false, true);
                 game_state
                     .combat_state
                     .enemy_damage_floats
@@ -76,12 +78,9 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                         remaining: DAMAGE_FLASH_DURATION,
                     });
             }
-            TickEvent::EnemyAttack {
-                damage, message, ..
-            } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, false);
+            TickEvent::EnemyAttack { damage, enemy_name } => {
+                let message = format!("\u{1f6e1} {} hits you for {} damage", enemy_name, damage);
+                game_state.combat_state.add_log_entry(message, false, false);
                 game_state
                     .combat_state
                     .player_damage_floats
@@ -92,10 +91,9 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                         remaining: DAMAGE_FLASH_DURATION,
                     });
             }
-            TickEvent::DamageReflected { damage, message } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
+            TickEvent::DamageReflected { damage } => {
+                let message = format!("\u{1f4a5} {} reflected!", damage);
+                game_state.combat_state.add_log_entry(message, false, true);
                 game_state
                     .combat_state
                     .enemy_damage_floats
@@ -118,13 +116,11 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     });
             }
             TickEvent::EnemyDefeated {
-                xp_gained: _,
-                message,
-                ..
+                xp_gained,
+                enemy_name,
             } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
+                let message = format!("\u{2728} {} defeated! +{} XP", enemy_name, xp_gained);
+                game_state.combat_state.add_log_entry(message, false, true);
             }
             TickEvent::BossEnrage { message } => {
                 game_state
@@ -138,10 +134,22 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     segments: None,
                 });
             }
-            TickEvent::PlayerDied { message } | TickEvent::PlayerDiedInDungeon { message } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, false);
+            TickEvent::PlayerDied => {
+                let message = "\u{1f480} You died! Boss encounter reset.".to_string();
+                game_state.combat_state.add_log_entry(message, false, false);
+                game_state.ticker.push(TickerEntry {
+                    icon: "\u{2620}",
+                    text: "Slain!".to_string(),
+                    color: Color::Red,
+                    bold: true,
+                    segments: None,
+                });
+            }
+            TickEvent::PlayerDiedInDungeon => {
+                let message =
+                    "\u{1f480} You fell in the dungeon... (escaped without prestige loss)"
+                        .to_string();
+                game_state.combat_state.add_log_entry(message, false, false);
                 game_state.ticker.push(TickerEntry {
                     icon: "\u{2620}",
                     text: "Slain!".to_string(),
@@ -200,14 +208,63 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     segments: Some(segs),
                 });
             }
-            TickEvent::SubzoneBossDefeated {
-                xp_gained: _,
-                message,
-                result,
-            } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
+            TickEvent::SubzoneBossDefeated { xp_gained, result } => {
+                // Build message from BossDefeatResult
+                let message = match result {
+                    BossDefeatResult::SubzoneComplete { .. } => {
+                        format!(
+                            "\u{1f451} Boss defeated! +{} XP \u{2014} Moving to next area.",
+                            xp_gained
+                        )
+                    }
+                    BossDefeatResult::ZoneComplete {
+                        old_zone,
+                        new_zone_id,
+                    } => {
+                        let new_zone = crate::zones::get_zone(*new_zone_id)
+                            .map(|z| z.name)
+                            .unwrap_or("???");
+                        format!(
+                            "\u{1f451} {} conquered! +{} XP \u{2014} Advancing to {}!",
+                            old_zone, xp_gained, new_zone
+                        )
+                    }
+                    BossDefeatResult::ZoneCompleteButGated {
+                        zone_name,
+                        required_prestige,
+                    } => {
+                        format!(
+                            "\u{1f451} {} conquered! +{} XP \u{2014} Next zone requires Prestige {}.",
+                            zone_name, xp_gained, required_prestige
+                        )
+                    }
+                    BossDefeatResult::StormsEnd => {
+                        format!(
+                            "\u{1f451} All zones conquered! +{} XP \u{2014} You have completed the game!",
+                            xp_gained
+                        )
+                    }
+                    BossDefeatResult::WeaponRequired { .. } => {
+                        // Should not reach here — filtered at event creation
+                        String::new()
+                    }
+                    BossDefeatResult::ExpanseCycle => {
+                        format!(
+                            "\u{1f451} The Endless defeated! +{} XP \u{2014} The Expanse cycles anew...",
+                            xp_gained
+                        )
+                    }
+                    BossDefeatResult::FractureCycle { zone_id } => {
+                        let zone_name = crate::zones::get_zone(*zone_id)
+                            .map(|z| z.name)
+                            .unwrap_or("Unknown");
+                        format!(
+                            "\u{1f451} {} conquered! +{} XP \u{2014} Zone cycles anew...",
+                            zone_name, xp_gained
+                        )
+                    }
+                };
+                game_state.combat_state.add_log_entry(message, false, true);
                 // Push zone advancement to ticker
                 match result {
                     BossDefeatResult::SubzoneComplete { .. } => {
@@ -267,11 +324,15 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     _ => {} // WeaponRequired doesn't go to ticker
                 }
             }
-            TickEvent::DungeonRoomEntered { message, .. }
-            | TickEvent::DungeonBossUnlocked { message } => {
+            TickEvent::DungeonRoomEntered { message, .. } => {
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, true);
+            }
+            TickEvent::DungeonBossUnlocked => {
+                let message = "\u{1f479} Somewhere deep in the dungeon, a sealed door grinds open."
+                    .to_string();
+                game_state.combat_state.add_log_entry(message, false, true);
             }
             TickEvent::DungeonTreasureFound {
                 item_name,
@@ -280,11 +341,14 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 ilvl,
                 power,
                 equipped,
-                message,
             } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
+                let status = if *equipped {
+                    "Equipped!"
+                } else {
+                    "Kept current gear"
+                };
+                let message = format!("\u{1f48e} Found: {} [{}]", item_name, status);
+                game_state.combat_state.add_log_entry(message, false, true);
                 let rc = rarity_color(*rarity);
                 let tc = crate::ui::tier_color(*tier);
                 let mut segs = vec![
@@ -324,10 +388,9 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     segments: Some(segs),
                 });
             }
-            TickEvent::DungeonKeyFound { message } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
+            TickEvent::DungeonKeyFound => {
+                let message = "\u{1f5dd}\u{fe0f} A heavy key clatters to the ground. The way forward is open.".to_string();
+                game_state.combat_state.add_log_entry(message, false, true);
                 game_state.ticker.push(TickerEntry {
                     icon: "\u{1F5DD}",
                     text: "Key found!".to_string(),
@@ -336,10 +399,17 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     segments: None,
                 });
             }
-            TickEvent::DungeonBossDefeated { message, .. } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
+            TickEvent::DungeonBossDefeated {
+                bonus_xp,
+                total_xp,
+                items_collected,
+                ..
+            } => {
+                let message = format!(
+                    "\u{1f3c6} Dungeon Complete! +{} bonus XP ({} total, {} items)",
+                    bonus_xp, total_xp, items_collected
+                );
+                game_state.combat_state.add_log_entry(message, false, true);
                 game_state.ticker.push(TickerEntry {
                     icon: "\u{1F451}",
                     text: "Dungeon Boss!".to_string(),
@@ -348,10 +418,15 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     segments: None,
                 });
             }
-            TickEvent::DungeonEliteDefeated { message, .. } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
+            TickEvent::DungeonEliteDefeated {
+                xp_gained,
+                enemy_name,
+            } => {
+                let message = format!(
+                    "\u{2694}\u{fe0f} {} defeated! +{} XP",
+                    enemy_name, xp_gained
+                );
+                game_state.combat_state.add_log_entry(message, false, true);
                 game_state.ticker.push(TickerEntry {
                     icon: "\u{2694}",
                     text: "Elite!".to_string(),
@@ -360,10 +435,15 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     segments: None,
                 });
             }
-            TickEvent::DungeonCompleted { message, .. } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
+            TickEvent::DungeonCompleted {
+                xp_earned,
+                items_collected,
+            } => {
+                let message = format!(
+                    "\u{1f3c6} Dungeon Complete! +{} XP, {} items found",
+                    xp_earned, items_collected
+                );
+                game_state.combat_state.add_log_entry(message, false, true);
                 game_state.ticker.push(TickerEntry {
                     icon: "\u{1F3F0}",
                     text: "Dungeon Complete!".to_string(),
@@ -372,10 +452,11 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     segments: None,
                 });
             }
-            TickEvent::DungeonFailed { message } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, false);
+            TickEvent::DungeonFailed => {
+                let message =
+                    "\u{1f480} The dungeon spits you out, broken but alive. No prestige lost."
+                        .to_string();
+                game_state.combat_state.add_log_entry(message, false, false);
                 game_state.ticker.push(TickerEntry {
                     icon: "\u{1F480}",
                     text: "Dungeon failed".to_string(),
@@ -475,10 +556,9 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     segments: None,
                 });
             }
-            TickEvent::AchievementUnlocked { name, message } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
+            TickEvent::AchievementUnlocked { name } => {
+                let message = format!("\u{1f3c6} Achievement Unlocked: {}", name);
+                game_state.combat_state.add_log_entry(message, false, true);
                 game_state.ticker.push(TickerEntry {
                     icon: "\u{1F3C6}",
                     text: name.clone(),
@@ -611,10 +691,14 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 });
                 fracture_region_unlocked = Some(*region);
             }
-            TickEvent::Ascended { message, level } => {
-                game_state
-                    .combat_state
-                    .add_log_entry(message.clone(), false, true);
+            TickEvent::Ascended { level } => {
+                let roman = to_roman(*level);
+                let multiplier = ascension_combat_multiplier(*level);
+                let message = format!(
+                    "\u{2728} Ascended to Ascension {}! ({:.1}x multiplier)",
+                    roman, multiplier
+                );
+                game_state.combat_state.add_log_entry(message, false, true);
                 game_state.ticker.push(TickerEntry {
                     icon: "\u{2728}",
                     text: format!("Ascension {}!", level),
@@ -632,13 +716,14 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     segments: None,
                 });
             }
-            TickEvent::CombatRetreat { message, .. } => {
+            TickEvent::CombatRetreat { zone_name } => {
+                let message = format!("\u{1f3c3} Overwhelmed! You retreat to {}...", zone_name);
                 game_state
                     .combat_state
                     .add_log_entry(message.clone(), false, false);
                 game_state.ticker.push(TickerEntry {
                     icon: "\u{1f3c3}",
-                    text: message.clone(),
+                    text: message,
                     color: Color::Yellow,
                     bold: true,
                     segments: None,

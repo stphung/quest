@@ -1,5 +1,6 @@
 //! Bug report overlay: shows a compact game-state preview and clipboard status.
 
+use crate::ui::responsive::LayoutContext;
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
@@ -14,6 +15,7 @@ pub fn draw_bug_report_overlay(
     summary: &str,
     clipboard_ready: bool,
     error: &Option<String>,
+    _layout_ctx: &LayoutContext,
 ) {
     let size = frame.area();
 
@@ -90,7 +92,7 @@ pub fn draw_bug_report_overlay(
 }
 
 /// Draws a minimal centered modal showing a URL the user can copy manually.
-pub fn draw_browser_link_modal(frame: &mut Frame, url: &str) {
+pub fn draw_browser_link_modal(frame: &mut Frame, url: &str, _layout_ctx: &LayoutContext) {
     let size = frame.area();
 
     let w = ((url.len() as u16) + 8)
