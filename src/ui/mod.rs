@@ -868,20 +868,32 @@ fn draw_right_panel(
     frame.render_widget(block, area);
     apply_themed_border_fx(frame, area, zone_color, BorderFxContext);
 
-    // Split inner into zone info (top), content (middle), status strip (bottom)
+    // Split inner into zone info, divider, content, divider, status strip
     let zone_height = if ctx.tier >= SizeTier::XL { 6 } else { 7 };
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(zone_height),
-            Constraint::Min(8),
-            Constraint::Length(2),
+            Constraint::Length(zone_height), // Zone info
+            Constraint::Length(1),           // Divider
+            Constraint::Min(8),             // Content
+            Constraint::Length(1),           // Divider
+            Constraint::Length(2),           // Status strip
         ])
         .split(inner);
 
     stats_panel::draw_zone_info(frame, chunks[0], game_state, achievements, ctx);
-    draw_right_content(frame, chunks[1], game_state, achievements, ctx);
-    draw_status_strip(frame, chunks[2], game_state);
+
+    // Horizontal dividers styled with zone border color
+    let divider_style = Style::default().fg(themed_border_color(zone_color));
+    let divider_char = panel_border_chars().h;
+    let divider_str: String = std::iter::repeat_n(divider_char, chunks[1].width as usize)
+        .collect();
+    let divider = Paragraph::new(divider_str.as_str()).style(divider_style);
+    frame.render_widget(divider.clone(), chunks[1]);
+    frame.render_widget(divider, chunks[3]);
+
+    draw_right_content(frame, chunks[2], game_state, achievements, ctx);
+    draw_status_strip(frame, chunks[4], game_state);
 }
 
 /// Draws the 2-row status strip at the bottom of the unified right panel.
