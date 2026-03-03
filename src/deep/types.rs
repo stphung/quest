@@ -275,10 +275,10 @@ impl Infrastructure {
     /// rendering widths across terminal emulators.
     pub fn icon(self) -> char {
         match self {
-            Infrastructure::Outpost => '\u{2691}',    // ⚑ (black flag — claimed territory)
+            Infrastructure::Outpost => '\u{2691}', // ⚑ (black flag — claimed territory)
             Infrastructure::SupplyCache => '\u{25c8}', // ◈ (diamond in box — treasure)
-            Infrastructure::Watchtower => '\u{25ce}',  // ◎ (bullseye — observation)
-            Infrastructure::Bridge => '\u{21d2}',     // ⇒ (double arrow — passage)
+            Infrastructure::Watchtower => '\u{25ce}', // ◎ (bullseye — observation)
+            Infrastructure::Bridge => '\u{21d2}',  // ⇒ (double arrow — passage)
         }
     }
 

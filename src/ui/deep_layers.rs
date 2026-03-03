@@ -1,8 +1,8 @@
 //! The Deep — Layer infrastructure sub-view rendering.
 
 use crate::deep::{
-    effective_duration_secs, layer_power_thresholds,
-    DeepState, DeepUiState, FamiliarityLevel, Infrastructure, LayerTier, MissionType,
+    effective_duration_secs, layer_power_thresholds, DeepState, DeepUiState, FamiliarityLevel,
+    Infrastructure, LayerTier, MissionType,
 };
 use ratatui::style::Color;
 
@@ -993,7 +993,12 @@ fn active_infra_effect(infra: Infrastructure, total_bridges: usize) -> String {
         Infrastructure::Watchtower => "+40 familiarity granted".to_string(),
         Infrastructure::Bridge => {
             let pct = (total_bridges as u32).min(15) * 2;
-            format!("-{}% total ({} bridge{})", pct, total_bridges, if total_bridges == 1 { "" } else { "s" })
+            format!(
+                "-{}% total ({} bridge{})",
+                pct,
+                total_bridges,
+                if total_bridges == 1 { "" } else { "s" }
+            )
         }
     }
 }
