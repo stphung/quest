@@ -885,7 +885,7 @@ fn draw_right_panel(
 }
 
 /// Draws the 2-row status strip at the bottom of the unified right panel.
-/// Shows context-sensitive info: combat HP, fishing status, dungeon status, or idle.
+/// Shows context-sensitive info: fishing status, dungeon HP, combat HP, or idle.
 fn draw_status_strip(frame: &mut Frame, area: Rect, game_state: &GameState) {
     if area.height < 2 {
         return;
@@ -896,6 +896,65 @@ fn draw_status_strip(frame: &mut Frame, area: Rect, game_state: &GameState) {
         .constraints([Constraint::Length(1), Constraint::Length(1)])
         .split(area);
 
+    // Priority: fishing > dungeon > combat/idle
+    if let Some(ref session) = game_state.active_fishing {
+        draw_status_strip_fishing(frame, rows[0], rows[1], session, game_state);
+    } else {
+        draw_status_strip_combat(frame, rows[0], rows[1], game_state);
+    }
+}
+
+/// Fishing status strip: rank/caught on row 1, phase on row 2.
+fn draw_status_strip_fishing(
+    frame: &mut Frame,
+    row0: Rect,
+    row1: Rect,
+    session: &crate::fishing::types::FishingSession,
+    game_state: &GameState,
+) {
+    let rank_name = game_state.fishing.rank_name();
+    let caught = session.fish_caught.len() as u32;
+    let total = session.total_fish;
+    let rank_text = Paragraph::new(Line::from(vec![
+        Span::styled(
+            "Rank: ",
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(rank_name, Style::default().fg(Color::Cyan)),
+        Span::raw(format!("  |  Caught: {}/{}", caught, total)),
+    ]))
+    .alignment(Alignment::Center);
+    frame.render_widget(rank_text, row0);
+
+    let spinner = throbber::spinner_char();
+    let (phase_text, phase_color) = match session.phase {
+        crate::fishing::types::FishingPhase::Casting => {
+            (format!("{} Casting line...", spinner), Color::White)
+        }
+        crate::fishing::types::FishingPhase::Waiting => {
+            (format!("{} Waiting for bite...", spinner), Color::Cyan)
+        }
+        crate::fishing::types::FishingPhase::Reeling => {
+            ("\u{1f41f} FISH ON! Reeling in!".to_string(), Color::Yellow)
+        }
+    };
+    let phase = Paragraph::new(Line::from(Span::styled(
+        phase_text,
+        Style::default()
+            .fg(phase_color)
+            .add_modifier(Modifier::BOLD),
+    )))
+    .alignment(Alignment::Center);
+    frame.render_widget(phase, row1);
+}
+
+/// Combat/idle status strip: player HP on row 1, enemy HP or idle on row 2.
+fn draw_status_strip_combat(
+    frame: &mut Frame,
+    row0: Rect,
+    row1: Rect,
+    game_state: &GameState,
+) {
     // Row 1: Player HP gauge
     let hp = &game_state.combat_state;
     let hp_ratio = if hp.player_max_hp > 0 {
@@ -906,7 +965,7 @@ fn draw_status_strip(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let hp_label = format!("HP: {}/{}", hp.player_current_hp, hp.player_max_hp);
     render_hp_bar_with_flash(
         frame,
-        rows[0],
+        row0,
         hp_label,
         hp_ratio,
         Color::Green,
@@ -935,7 +994,7 @@ fn draw_status_strip(frame: &mut Frame, area: Rect, game_state: &GameState) {
         };
         render_hp_bar_with_flash(
             frame,
-            rows[1],
+            row1,
             enemy_label,
             enemy_ratio,
             hp_color,
@@ -949,7 +1008,7 @@ fn draw_status_strip(frame: &mut Frame, area: Rect, game_state: &GameState) {
             Style::default().fg(Color::Yellow),
         )))
         .alignment(Alignment::Center);
-        frame.render_widget(text, rows[1]);
+        frame.render_widget(text, row1);
     }
 }
 

@@ -24,52 +24,19 @@ use ratatui::{
 
 /// Renders the fishing scene UI.
 ///
-/// # Layout
-/// ```text
-/// +---------------------------------------+
-/// |  FISHING - [Spot Name]                |
-/// +---------------------------------------+
-/// |     ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~         |
-/// |       ~~~~~~ O ~~~~~~                 |
-/// |     ~ ~ ~ ~ ~|~ ~ ~ ~ ~ ~ ~           |
-/// |              |                        |
-/// +---------------------------------------+
-/// |  Caught: X/Y fish                     |
-/// +---------------------------------------+
-/// |  [Uncommon] Trout - 180 XP            |
-/// |  [Common] Carp - 65 XP                |
-/// |  [Rare] Salmon - 520 XP  [Item]       |
-/// +---------------------------------------+
-/// |  Rank: [Rank Name] (N)                |
-/// |  Progress: ████████░░ X/Y             |
-/// +---------------------------------------+
-/// ```
+/// In the unified right panel (L/XL tiers), the header (rank + progress) and
+/// catch progress (phase status) are handled by the status strip and zone info.
+/// This function now renders only the water animation, filling the content area.
 pub fn render_fishing_scene(
     frame: &mut Frame,
     area: Rect,
     session: &FishingSession,
-    game_state: &GameState,
-    achievements: &Achievements,
+    _game_state: &GameState,
+    _achievements: &Achievements,
     _ctx: &super::responsive::LayoutContext,
 ) {
-    // Main vertical layout (recent catches now shown in the Loot panel)
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(4), // Header with rank + progress
-            Constraint::Min(6),    // Water animation area
-            Constraint::Length(4), // Catch progress + phase status
-        ])
-        .split(area);
-
-    // Draw header with rank and progress gauge
-    draw_header(frame, chunks[0], session, game_state, achievements);
-
-    // Draw water animation with bobber
-    draw_water_scene(frame, chunks[1], session);
-
-    // Draw catch progress
-    draw_catch_progress(frame, chunks[2], session);
+    // Water animation fills the entire content area
+    draw_water_scene(frame, area, session);
 }
 
 /// Draws the header with fishing rank and progress gauge.
