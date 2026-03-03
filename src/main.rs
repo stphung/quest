@@ -650,7 +650,12 @@ fn main() -> io::Result<()> {
                         // In realtime mode, first poll may block until next frame; subsequent polls
                         // are non-blocking so we can flush queued input quickly.
                         while event::poll(poll_duration)? {
-                            if let Event::Key(key_event) = event::read()? {
+                            let ev = event::read()?;
+                            if let Event::Resize(_, _) = &ev {
+                                terminal.clear()?;
+                                break;
+                            }
+                            if let Event::Key(key_event) = ev {
                                 // Only handle key press events (ignore release/repeat)
                                 if key_event.kind != KeyEventKind::Press {
                                     if !realtime_mode {
