@@ -598,7 +598,7 @@ pub(super) fn draw_deep_panel(
 
         let eta = next_mission_eta_secs(&deep.prestige);
         let eta_str = match eta {
-            Some(secs) => format!("\u{25f7} Next: ~{}", format_eta(secs as u64)),
+            Some(secs) => format!("\u{25f7} Next: {}", format_eta(secs as u64)),
             None => "\u{25f7} idle".to_string(),
         };
         let eta_color = match eta {
@@ -728,12 +728,12 @@ pub(super) fn draw_deep_panel(
             ));
         } else if summary.ready_count > 0 && summary.next_ready_secs.is_none() {
             // All unlocked cores are ready
-            let left = format!(
+            let left_text = format!(
                 "Cores: {} \u{2713} Ready (+{} PR)",
                 summary.ready_count, summary.ready_pr
             );
-            let right = "All ready!";
-            let padding = width.saturating_sub(left.len() + 4 + right.len());
+            let right_text = "All ready!";
+            let padding = width.saturating_sub(left_text.len() + right_text.len());
             spans.push(Span::styled(
                 "Cores: ",
                 Style::default().fg(Color::DarkGray),
@@ -746,9 +746,7 @@ pub(super) fn draw_deep_panel(
                 format!(" (+{} PR)", summary.ready_pr),
                 Style::default().fg(Color::Green),
             ));
-            spans.push(Span::raw(
-                " ".repeat(padding.saturating_sub("Cores: ".len())),
-            ));
+            spans.push(Span::raw(" ".repeat(padding)));
             spans.push(Span::styled(
                 "All ready!".to_string(),
                 Style::default()
