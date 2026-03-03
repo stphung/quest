@@ -3,8 +3,6 @@
 //! Displays the active fishing session with animated water, catch progress,
 //! caught fish list, and fishing rank progression.
 
-#![allow(dead_code)]
-
 use super::scene_fx::{
     current_millis, draw_line, hash2d, lerp_channel, lerp_rgb, put_cell, render_buffer, SceneCell,
 };
@@ -24,26 +22,8 @@ use ratatui::{
 
 /// Renders the fishing scene UI.
 ///
-/// # Layout
-/// ```text
-/// +---------------------------------------+
-/// |  FISHING - [Spot Name]                |
-/// +---------------------------------------+
-/// |     ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~         |
-/// |       ~~~~~~ O ~~~~~~                 |
-/// |     ~ ~ ~ ~ ~|~ ~ ~ ~ ~ ~ ~           |
-/// |              |                        |
-/// +---------------------------------------+
-/// |  Caught: X/Y fish                     |
-/// +---------------------------------------+
-/// |  [Uncommon] Trout - 180 XP            |
-/// |  [Common] Carp - 65 XP                |
-/// |  [Rare] Salmon - 520 XP  [Item]       |
-/// +---------------------------------------+
-/// |  Rank: [Rank Name] (N)                |
-/// |  Progress: ████████░░ X/Y             |
-/// +---------------------------------------+
-/// ```
+/// Layout: fishing header (rank + progress gauge, 2 rows) + water animation (fills rest).
+/// The status strip (catch count + phase) is handled separately by the unified panel.
 pub fn render_fishing_scene(
     frame: &mut Frame,
     area: Rect,
@@ -52,45 +32,46 @@ pub fn render_fishing_scene(
     achievements: &Achievements,
     _ctx: &super::responsive::LayoutContext,
 ) {
-    // Main vertical layout (recent catches now shown in the Loot panel)
+    // 3-part layout: header (2 rows) + divider (1 row) + water animation
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(4), // Header with rank + progress
-            Constraint::Min(6),    // Water animation area
-            Constraint::Length(4), // Catch progress + phase status
+            Constraint::Length(2), // Header: rank + progress (no border)
+            Constraint::Length(1), // Divider line
+            Constraint::Min(5),    // Water animation
         ])
         .split(area);
 
     // Draw header with rank and progress gauge
     draw_header(frame, chunks[0], session, game_state, achievements);
 
-    // Draw water animation with bobber
-    draw_water_scene(frame, chunks[1], session);
+    // Draw horizontal divider matching the outer panel style
+    let divider_char = super::panel_border_chars().h;
+    let zone_color =
+        super::stats_panel::zone_color_for_id(game_state.zone_progression.current_zone_id);
+    let divider_str: String = std::iter::repeat_n(divider_char, chunks[1].width as usize).collect();
+    let divider = Paragraph::new(divider_str.as_str())
+        .style(Style::default().fg(super::themed_border_color(zone_color)));
+    frame.render_widget(divider, chunks[1]);
 
-    // Draw catch progress
-    draw_catch_progress(frame, chunks[2], session);
+    // Draw water animation with bobber
+    draw_water_scene(frame, chunks[2], session);
 }
 
-/// Draws the header with fishing rank and progress gauge.
+/// Draws the fishing header: rank + progress gauge (or Leviathan tracker).
+/// No border — separated from the water scene by a divider line rendered by the caller.
 fn draw_header(
     frame: &mut Frame,
     area: Rect,
-    session: &FishingSession,
+    _session: &FishingSession,
     game_state: &GameState,
     achievements: &Achievements,
 ) {
     use crate::achievements::AchievementId;
 
-    let title = match highest_fishing_badge(achievements) {
-        Some(icon) => format!(" Fishing - {} {} ", session.spot_name, icon),
-        None => format!(" Fishing - {} ", session.spot_name),
-    };
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(title)
-        .border_style(Style::default().fg(super::themed_border_color(Color::Cyan)));
-    let inner = super::render_themed_block(frame, area, block, Color::Cyan, super::BorderFxContext);
+    if area.height < 1 {
+        return;
+    }
 
     let fishing = &game_state.fishing;
     let fish_required = FishingState::fish_required_for_rank(fishing.rank);
@@ -106,6 +87,7 @@ fn draw_header(
     let show_leviathan_hunt = is_max_rank && fishing.rank >= 40 && !leviathan_caught;
     let show_leviathan_trophy = is_max_rank && fishing.rank >= 40 && leviathan_caught;
 
+    let badge = highest_fishing_badge(achievements);
     let rank_line = Line::from(vec![
         Span::styled(
             "\u{1F3A3} Rank: ",
@@ -115,13 +97,18 @@ fn draw_header(
             format!("{} ({})", fishing.rank_name(), fishing.rank),
             Style::default().fg(Color::Cyan),
         ),
+        Span::raw(if let Some(icon) = badge {
+            format!("  {}", icon)
+        } else {
+            String::new()
+        }),
     ]);
 
-    if inner.height >= 2 {
+    if area.height >= 2 {
         let inner_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(1), Constraint::Length(1)])
-            .split(inner);
+            .split(area);
 
         if show_leviathan_hunt {
             let hunt_line = Line::from(vec![Span::styled(
@@ -161,8 +148,8 @@ fn draw_header(
                 .ratio(ratio);
             frame.render_widget(fish_gauge, inner_chunks[1]);
         }
-    } else if inner.height >= 1 {
-        frame.render_widget(Paragraph::new(rank_line), inner);
+    } else {
+        frame.render_widget(Paragraph::new(rank_line), area);
     }
 }
 
@@ -606,60 +593,6 @@ fn render_bobber_and_line(
             );
         }
     }
-}
-
-/// Draws the catch progress indicator with current phase.
-fn draw_catch_progress(frame: &mut Frame, area: Rect, session: &FishingSession) {
-    use crate::fishing::types::FishingPhase;
-
-    use super::throbber::spinner_char;
-
-    let spinner = spinner_char();
-
-    let caught = session.fish_caught.len() as u32;
-    let total = session.total_fish;
-
-    // Get phase text and color
-    let (phase_text, phase_color) = match session.phase {
-        FishingPhase::Casting => (format!("{} Casting line...", spinner), Color::White),
-        FishingPhase::Waiting => (format!("{} Waiting for bite...", spinner), Color::Cyan),
-        FishingPhase::Reeling => ("🐟 FISH ON! Reeling in!".to_string(), Color::Yellow),
-    };
-
-    let progress_text = vec![
-        Line::from(vec![
-            Span::styled("Caught: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::styled(
-                format!("{}/{}", caught, total),
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::raw(" fish"),
-        ]),
-        Line::from(vec![Span::styled(
-            phase_text,
-            Style::default()
-                .fg(phase_color)
-                .add_modifier(Modifier::BOLD),
-        )]),
-    ];
-
-    let progress_block = Block::default()
-        .borders(Borders::ALL)
-        .title(" Status ")
-        .border_style(Style::default().fg(super::themed_border_color(Color::Yellow)));
-    let inner = super::render_themed_block(
-        frame,
-        area,
-        progress_block,
-        Color::Yellow,
-        super::BorderFxContext,
-    );
-
-    let progress_paragraph = Paragraph::new(progress_text).alignment(Alignment::Center);
-
-    frame.render_widget(progress_paragraph, inner);
 }
 
 /// Data for each Storm Leviathan encounter stage.

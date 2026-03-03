@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cargo fmt",
+            "command": "./scripts/fmt-hook.sh",
             "timeout": 30
           }
         ]

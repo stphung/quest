@@ -49,55 +49,6 @@ pub(super) fn highest_fishing_badge(
     None
 }
 
-/// Formats seconds into a human-readable ETA (e.g., "~3m", "~1h 20m", "~2d 5h").
-pub(super) fn format_eta(seconds: u64) -> String {
-    if seconds < 60 {
-        return "~<1m".to_string();
-    }
-    let minutes = seconds / 60;
-    if minutes < 60 {
-        return format!("~{}m", minutes);
-    }
-    let hours = minutes / 60;
-    let remaining_mins = minutes % 60;
-    if hours < 24 {
-        if remaining_mins > 0 {
-            return format!("~{}h {}m", hours, remaining_mins);
-        }
-        return format!("~{}h", hours);
-    }
-    let days = hours / 24;
-    let remaining_hours = hours % 24;
-    if remaining_hours > 0 {
-        format!("~{}d {}h", days, remaining_hours)
-    } else {
-        format!("~{}d", days)
-    }
-}
-
-fn current_millis() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis()
-}
-
-pub(super) fn prestige_ready_gauge_style() -> Style {
-    const PULSE_COLORS: [Color; 5] = [
-        Color::Rgb(190, 118, 255),
-        Color::Rgb(208, 138, 255),
-        Color::Rgb(228, 168, 245),
-        Color::Rgb(248, 198, 185),
-        Color::Rgb(255, 221, 120),
-    ];
-    let idx = ((current_millis() / 220) % PULSE_COLORS.len() as u128) as usize;
-    Style::default()
-        .fg(PULSE_COLORS[idx])
-        .bg(Color::Rgb(25, 15, 35))
-        .add_modifier(Modifier::BOLD)
-}
-
-/// Draws the fishing panel with rank and progress bar.
 /// Builds the Leviathan hunt tracker line for the fishing panel at rank 40.
 ///
 /// Layout: `🐋 ● ● ● ● ○ ○ ○ ○ ○ ○   ⚡ ▰▰▰▱▱▱▱ +6.5%`
@@ -206,6 +157,54 @@ pub(super) fn build_leviathan_trophy_line() -> Line<'static> {
     ));
 
     Line::from(spans)
+}
+
+/// Formats seconds into a human-readable ETA (e.g., "~3m", "~1h 20m", "~2d 5h").
+pub(super) fn format_eta(seconds: u64) -> String {
+    if seconds < 60 {
+        return "~<1m".to_string();
+    }
+    let minutes = seconds / 60;
+    if minutes < 60 {
+        return format!("~{}m", minutes);
+    }
+    let hours = minutes / 60;
+    let remaining_mins = minutes % 60;
+    if hours < 24 {
+        if remaining_mins > 0 {
+            return format!("~{}h {}m", hours, remaining_mins);
+        }
+        return format!("~{}h", hours);
+    }
+    let days = hours / 24;
+    let remaining_hours = hours % 24;
+    if remaining_hours > 0 {
+        format!("~{}d {}h", days, remaining_hours)
+    } else {
+        format!("~{}d", days)
+    }
+}
+
+fn current_millis() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+}
+
+pub(super) fn prestige_ready_gauge_style() -> Style {
+    const PULSE_COLORS: [Color; 5] = [
+        Color::Rgb(190, 118, 255),
+        Color::Rgb(208, 138, 255),
+        Color::Rgb(228, 168, 245),
+        Color::Rgb(248, 198, 185),
+        Color::Rgb(255, 221, 120),
+    ];
+    let idx = ((current_millis() / 220) % PULSE_COLORS.len() as u128) as usize;
+    Style::default()
+        .fg(PULSE_COLORS[idx])
+        .bg(Color::Rgb(25, 15, 35))
+        .add_modifier(Modifier::BOLD)
 }
 
 /// Converts a small positive integer to a Roman numeral string.
