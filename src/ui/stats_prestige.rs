@@ -655,6 +655,138 @@ pub(super) fn draw_power_cores_panel(
     frame.render_widget(para, inner);
 }
 
+/// Returns seconds until the next active mission completes, or None if no active missions.
+#[allow(dead_code)]
+fn next_mission_eta_secs(prestige: &crate::deep::DeepPrestige) -> Option<i64> {
+    let now = chrono::Utc::now();
+    prestige
+        .active_missions
+        .iter()
+        .filter(|m| {
+            matches!(
+                m.status,
+                crate::deep::MissionStatus::Active | crate::deep::MissionStatus::EventPending
+            )
+        })
+        .map(|m| (m.ends_at - now).num_seconds().max(0))
+        .min()
+}
+
+/// Count of active missions with pending events needing player response.
+#[allow(dead_code)]
+fn pending_event_count(prestige: &crate::deep::DeepPrestige) -> usize {
+    prestige
+        .active_missions
+        .iter()
+        .filter(|m| m.has_pending_event())
+        .count()
+}
+
+#[allow(dead_code)]
+struct CoreSummary {
+    ready_count: usize,
+    ready_pr: u32,
+    unlocked_count: usize,
+    total_pr_per_day: u32,
+    next_ready_secs: Option<i64>,
+    cores: Vec<CoreBadge>,
+}
+
+#[allow(dead_code)]
+struct CoreBadge {
+    unlocked: bool,
+    ready: bool,
+    remaining_secs: i64,
+    required_layer: u32,
+}
+
+#[allow(dead_code)]
+fn core_summary(
+    achievements: &crate::achievements::Achievements,
+    deep: &crate::deep::DeepState,
+) -> CoreSummary {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+
+    let mut summary = CoreSummary {
+        ready_count: 0,
+        ready_pr: 0,
+        unlocked_count: 0,
+        total_pr_per_day: 0,
+        next_ready_secs: None,
+        cores: Vec::new(),
+    };
+
+    for core in ALL_POWER_CORES {
+        let is_unlocked = achievements.is_unlocked(core.achievement_id);
+
+        if is_unlocked {
+            summary.unlocked_count += 1;
+            summary.total_pr_per_day += core.pr_per_day;
+
+            let fill_secs = fill_duration_secs(core.pr_per_day);
+            let last_granted = deep
+                .persistent
+                .power_core_last_granted
+                .get(&core.achievement_id)
+                .copied()
+                .unwrap_or(0);
+            let elapsed = (now - last_granted).max(0);
+            let ratio = fill_ratio(elapsed, fill_secs);
+            let remaining = (fill_secs - elapsed).max(0);
+
+            if ratio >= 1.0 {
+                summary.ready_count += 1;
+                summary.ready_pr += core.pr_per_day;
+                summary.cores.push(CoreBadge {
+                    unlocked: true,
+                    ready: true,
+                    remaining_secs: 0,
+                    required_layer: core.required_layer,
+                });
+            } else {
+                if let Some(current_next) = summary.next_ready_secs {
+                    if remaining < current_next {
+                        summary.next_ready_secs = Some(remaining);
+                    }
+                } else {
+                    summary.next_ready_secs = Some(remaining);
+                }
+                summary.cores.push(CoreBadge {
+                    unlocked: true,
+                    ready: false,
+                    remaining_secs: remaining,
+                    required_layer: core.required_layer,
+                });
+            }
+        } else {
+            summary.cores.push(CoreBadge {
+                unlocked: false,
+                ready: false,
+                remaining_secs: 0,
+                required_layer: core.required_layer,
+            });
+        }
+    }
+
+    summary
+}
+
+/// Format seconds into short form for core badges: "1h", "2h", "45m", "11h"
+#[allow(dead_code)]
+fn format_core_time_short(secs: i64) -> String {
+    let secs = secs.max(0) as u64;
+    let hours = secs / 3600;
+    let minutes = (secs % 3600) / 60;
+    if hours > 0 {
+        format!("{}h", hours)
+    } else {
+        format!("{}m", minutes.max(1))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -692,5 +824,29 @@ mod tests {
     #[test]
     fn test_to_roman_zero() {
         assert_eq!(to_roman(0), "0");
+    }
+
+    #[test]
+    fn test_next_mission_eta_no_missions() {
+        let prestige = crate::deep::DeepPrestige::default();
+        assert_eq!(next_mission_eta_secs(&prestige), None);
+    }
+
+    #[test]
+    fn test_pending_event_count_no_events() {
+        let prestige = crate::deep::DeepPrestige::default();
+        assert_eq!(pending_event_count(&prestige), 0);
+    }
+
+    #[test]
+    fn test_core_summary_no_cores() {
+        let achievements = Achievements::default();
+        let deep = crate::deep::DeepState::default();
+        let summary = core_summary(&achievements, &deep);
+        assert_eq!(summary.ready_count, 0);
+        assert_eq!(summary.ready_pr, 0);
+        assert_eq!(summary.unlocked_count, 0);
+        assert_eq!(summary.total_pr_per_day, 0);
+        assert!(summary.next_ready_secs.is_none());
     }
 }
