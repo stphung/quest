@@ -70,11 +70,47 @@ pub(super) fn draw_equipment_names_only(
     super::apply_themed_border_fx(frame, area, Color::White, super::BorderFxContext);
 
     let width = inner.width as usize;
-    // Right-side columns: " Legendary  T9  100  ⚡999" = 27 chars fixed
-    //   rarity(9) + gap(2) + tier(2) + gap(2) + ilvl(3) + gap(1) + power(~6) + trailing(2) = 27
-    let right_cols = 27;
-    // Left side: "Weapon  " = 8 chars
-    let slot_col = 8;
+    let slot_col = 8; // "Weapon  " = 8 chars
+
+    // Compute right columns dynamically to fit actual power values.
+    // Layout per row: "{:>9}  T{t}  Z{z} ⚡{pow}[+{bonus}]"
+    let digit_count = |n: u32| -> usize {
+        if n == 0 {
+            return 1;
+        }
+        let mut count = 0;
+        let mut v = n;
+        while v > 0 {
+            count += 1;
+            v /= 10;
+        }
+        count
+    };
+    let right_cols = slot_order
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, slot)| {
+            let item = game_state.equipment.get(*slot).as_ref()?;
+            let bp = item.power();
+            let mult = crate::enhancement::enhancement_multiplier(enhancement_levels[idx]);
+            let eb = (bp as f64 * mult).round() as u32 - bp;
+            // Display-cell widths:
+            //   rarity {:>9} = 9, "  T{}" = 3+digits, "  Z{}" = 3+digits,
+            //   " ⚡{}" = 2+digits (⚡ = 1 cell), "+{}" = 1+digits if bonus > 0
+            let mut w = 9
+                + 3
+                + digit_count(item.tier as u32)
+                + 3
+                + digit_count(item.ilvl / 10)
+                + 2
+                + digit_count(bp);
+            if eb > 0 {
+                w += 1 + digit_count(eb);
+            }
+            Some(w)
+        })
+        .max()
+        .unwrap_or(18);
     // Name gets whatever remains
     let name_max = width.saturating_sub(slot_col + right_cols);
 
