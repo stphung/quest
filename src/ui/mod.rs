@@ -1008,6 +1008,12 @@ fn draw_status_strip_dungeon(frame: &mut Frame, row0: Rect, row1: Rect, game_sta
         };
         enemy_segments.push(Span::styled(format!("Foe:{:.1}s", enemy_next), enemy_style));
 
+        let enemy_dps = enemy.damage as f64 / enemy_interval;
+        enemy_segments.push(Span::styled(
+            format!("DPS:{:.0}", enemy_dps),
+            Style::default().fg(Color::DarkGray),
+        ));
+
         draw_status_row(
             frame,
             row1,
@@ -1215,6 +1221,7 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
         let mut enemy_segments: Vec<Span> = Vec::new();
 
         // Boss enrage timer takes priority over enemy attack timer
+        let enemy_interval = effective_enemy_attack_interval(game_state);
         if game_state.zone_progression.fighting_boss {
             let remaining = (BOSS_ENRAGE_SECONDS - hp.boss_fight_timer).max(0.0);
             let enrage_style = if remaining < 5.0 {
@@ -1229,7 +1236,6 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
                 enrage_style,
             ));
         } else {
-            let enemy_interval = effective_enemy_attack_interval(game_state);
             let enemy_next = (enemy_interval - hp.enemy_attack_timer).max(0.0);
             let enemy_style = if enemy_next < 0.3 {
                 Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
@@ -1238,6 +1244,12 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
             };
             enemy_segments.push(Span::styled(format!("Foe:{:.1}s", enemy_next), enemy_style));
         }
+
+        let enemy_dps = enemy.damage as f64 / enemy_interval;
+        enemy_segments.push(Span::styled(
+            format!("DPS:{:.0}", enemy_dps),
+            Style::default().fg(Color::DarkGray),
+        ));
 
         draw_status_row(
             frame,
