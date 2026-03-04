@@ -11,7 +11,7 @@ use super::deep_shared::{
     draw_deep_card, render_progress_bar as render_card_progress_bar, truncate_text,
 };
 use super::responsive::{LayoutContext, SizeTier};
-use super::scene_fx::{put_cell, put_text, put_text_centered, SceneCell};
+use super::scene_fx::{display_width, put_cell, put_text, put_text_centered, SceneCell};
 
 pub(super) fn layer_tier_color(tier: LayerTier) -> Color {
     match tier {
@@ -343,14 +343,20 @@ pub(super) fn render_layers(
     );
 
     // ── Infrastructure legend ──
-    let legend = "\u{25c6}=Cleared  \u{25b6}=Frontier  \u{2592}=Unknown    [OCWB]=Infrastructure";
-    let legend_col = (width as i32 - legend.len() as i32 - 1).max(1);
+    let legend = format!(
+        "\u{25c6}=Cleared  \u{25b6}=Frontier  \u{2592}=Unknown    {}=Outpost {}=Cache {}=Tower {}=Bridge",
+        Infrastructure::Outpost.icon(),
+        Infrastructure::SupplyCache.icon(),
+        Infrastructure::Watchtower.icon(),
+        Infrastructure::Bridge.icon(),
+    );
+    let legend_col = (width as i32 - display_width(&legend) as i32 - 1).max(1);
     if height as i32 - 2 > 1 {
         put_text(
             buffer,
             height as i32 - 2,
             legend_col,
-            &truncate_text(legend, width.saturating_sub(2)),
+            &truncate_text(&legend, width.saturating_sub(2)),
             Color::Rgb(50, 70, 100),
         );
     }
