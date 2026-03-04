@@ -109,7 +109,7 @@ pub fn draw_combat_scene(
 
 /// Full combat scene with 3D sprite (XL/L tier).
 /// No border or HP bars — those are handled by the unified right panel.
-/// Only renders: optional regen throbber + 3D sprite + floating damage.
+/// Only renders: optional regen throbber + 3D sprite.
 fn draw_combat_full(
     frame: &mut Frame,
     area: Rect,
@@ -125,10 +125,8 @@ fn draw_combat_full(
             .split(area);
         draw_regen_throbber(frame, chunks[0], game_state);
         render_combat_3d(frame, chunks[1], game_state);
-        draw_floating_damage(frame, chunks[1], game_state);
     } else {
         render_combat_3d(frame, area, game_state);
-        draw_floating_damage(frame, area, game_state);
     }
 }
 
