@@ -6,10 +6,9 @@ use ratatui::{
     layout::{Constraint, Layout, Position, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
     Frame,
 };
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 /// Returns the style for an enhancement prefix based on its color tier.
 pub(super) fn enhancement_style(level: u8) -> Style {
@@ -100,122 +99,90 @@ pub(super) fn draw_equipment_names_only(
         (inner, None)
     };
 
-    let width = equip_area.width as usize;
-    let slot_col = 8; // "Weapon  " = 8 chars
-
-    // Compute right columns dynamically by measuring actual display width.
-    // Layout per row: "{:>9}  T{t}  Z{z} ⚡{pow}[+{bonus}]"
-    let right_cols = slot_order
-        .iter()
-        .enumerate()
-        .filter_map(|(idx, slot)| {
-            let item = game_state.equipment.get(*slot).as_ref()?;
-            let bp = item.power();
-            let mult = crate::enhancement::enhancement_multiplier(enhancement_levels[idx]);
-            let eb = (bp as f64 * mult).round() as u32 - bp;
-            let mut right_text = format!(
-                "{:>9}  T{}  Z{} \u{26A1}{}",
-                item.rarity.name(),
-                item.tier,
-                item.ilvl / 10,
-                bp
-            );
-            if eb > 0 {
-                use std::fmt::Write;
-                let _ = write!(right_text, "+{}", eb);
-            }
-            Some(UnicodeWidthStr::width(right_text.as_str()))
-        })
-        .max()
-        .unwrap_or(18);
-    // Name gets whatever remains
-    let name_max = width.saturating_sub(slot_col + right_cols);
-
-    let mut lines = Vec::new();
+    let mut equip_rows = Vec::new();
 
     for (idx, slot_enum) in slot_order.iter().enumerate() {
         let item = game_state.equipment.get(*slot_enum);
         let slot_label = slot_enum.name();
+
         if let Some(item) = item {
             let rarity_color = super::rarity_color(item.rarity);
-
             let enh_level = enhancement_levels[idx];
             let prefix = crate::enhancement::enhancement_prefix(enh_level);
-            let prefix_width = UnicodeWidthStr::width(prefix.as_str());
 
-            let max_name_width = name_max.saturating_sub(prefix_width);
-            let name_display_width = UnicodeWidthStr::width(item.display_name.as_str());
-            let item_name = if name_display_width > max_name_width && max_name_width > 3 {
-                // Truncate by display width, not byte length
-                let target = max_name_width - 3;
-                let mut w = 0;
-                let mut end = 0;
-                for (i, ch) in item.display_name.char_indices() {
-                    let cw = UnicodeWidthChar::width(ch).unwrap_or(1);
-                    if w + cw > target {
-                        break;
-                    }
-                    w += cw;
-                    end = i + ch.len_utf8();
-                }
-                format!("{}...", &item.display_name[..end])
-            } else {
-                item.display_name.clone()
-            };
-            let name_width = prefix_width + UnicodeWidthStr::width(item_name.as_str());
-            let pad = name_max.saturating_sub(name_width);
-
-            let mut spans = vec![Span::styled(
-                format!("{:>6}  ", slot_label),
-                Style::default().add_modifier(Modifier::BOLD),
-            )];
+            // Name cell: enhancement prefix + item name
+            let mut name_spans = Vec::new();
             if !prefix.is_empty() {
-                spans.push(Span::styled(prefix, enhancement_style(enh_level)));
+                name_spans.push(Span::styled(prefix, enhancement_style(enh_level)));
             }
-            spans.push(Span::styled(item_name, Style::default().fg(rarity_color)));
-            spans.push(Span::raw(" ".repeat(pad)));
-            spans.push(Span::styled(
-                format!("{:>9}", item.rarity.name()),
+            name_spans.push(Span::styled(
+                item.display_name.clone(),
                 Style::default().fg(rarity_color),
             ));
-            spans.push(Span::styled(
-                format!("  T{}", item.tier),
-                Style::default().fg(super::tier_color(item.tier)),
-            ));
-            spans.push(Span::styled(
-                format!("  Z{}", item.ilvl / 10),
-                Style::default().fg(Color::DarkGray),
-            ));
+
+            // Power cell: ⚡base[+bonus]
             let base_power = item.power();
-            spans.push(Span::styled(
-                format!(" \u{26A1}{}", base_power),
+            let enh_mult = crate::enhancement::enhancement_multiplier(enh_level);
+            let enh_bonus = (base_power as f64 * enh_mult).round() as u32 - base_power;
+            let mut power_spans = vec![Span::styled(
+                format!("\u{26A1}{}", base_power),
                 Style::default().fg(Color::Cyan),
-            ));
-            let enh_bonus = {
-                let mult = crate::enhancement::enhancement_multiplier(enhancement_levels[idx]);
-                (base_power as f64 * mult).round() as u32 - base_power
-            };
+            )];
             if enh_bonus > 0 {
-                spans.push(Span::styled(
+                power_spans.push(Span::styled(
                     format!("+{}", enh_bonus),
-                    enhancement_style(enhancement_levels[idx]),
+                    enhancement_style(enh_level),
                 ));
             }
 
-            lines.push(Line::from(spans));
-        } else {
-            lines.push(Line::from(vec![
-                Span::styled(
-                    format!("{:>6}  ", slot_label),
+            equip_rows.push(Row::new([
+                Cell::from(Span::styled(
+                    format!("{:>6}", slot_label),
                     Style::default().add_modifier(Modifier::BOLD),
-                ),
-                Span::styled("[Empty]", Style::default().fg(Color::DarkGray)),
+                )),
+                Cell::from(Line::from(name_spans)),
+                Cell::from(Span::styled(
+                    format!("{:>9}", item.rarity.name()),
+                    Style::default().fg(rarity_color),
+                )),
+                Cell::from(Span::styled(
+                    format!("T{}", item.tier),
+                    Style::default().fg(super::tier_color(item.tier)),
+                )),
+                Cell::from(Span::styled(
+                    format!("Z{}", item.ilvl / 10),
+                    Style::default().fg(Color::DarkGray),
+                )),
+                Cell::from(Line::from(power_spans)),
+            ]));
+        } else {
+            equip_rows.push(Row::new([
+                Cell::from(Span::styled(
+                    format!("{:>6}", slot_label),
+                    Style::default().add_modifier(Modifier::BOLD),
+                )),
+                Cell::from(Span::styled(
+                    "[Empty]",
+                    Style::default().fg(Color::DarkGray),
+                )),
+                Cell::default(),
+                Cell::default(),
+                Cell::default(),
+                Cell::default(),
             ]));
         }
     }
 
-    let paragraph = Paragraph::new(lines);
-    frame.render_widget(paragraph, equip_area);
+    let equip_widths = [
+        Constraint::Length(6),  // Slot
+        Constraint::Min(4),     // Name (fills remaining)
+        Constraint::Length(9),  // Rarity
+        Constraint::Length(2),  // Tier
+        Constraint::Length(3),  // Zone
+        Constraint::Length(10), // Power
+    ];
+    let equip_table = Table::new(equip_rows, equip_widths).column_spacing(1);
+    frame.render_widget(equip_table, equip_area);
 
     // Soulforge visual effects scale with total enhancement level.
     // Apply only to the equipment rows (not the sigil section).
@@ -274,27 +241,29 @@ fn draw_sigil_separator(frame: &mut Frame, area: Rect, storm_sigils: &StormSigil
 }
 
 /// Draws the 5 sigil slot lines within the equipment panel.
+/// Each etched sigil: [Icon+Name] [LineGauge with value label] [Grade]
 fn draw_sigil_slots(frame: &mut Frame, area: Rect, storm_sigils: &StormSigils) {
-    let width = area.width as usize;
-    let mut lines = Vec::new();
+    use ratatui::widgets::LineGauge;
+
+    let row_constraints: Vec<Constraint> = storm_sigils
+        .sigils
+        .iter()
+        .map(|_| Constraint::Length(1))
+        .collect();
+    let rows = Layout::vertical(row_constraints).split(area);
 
     for (i, slot) in storm_sigils.sigils.iter().enumerate() {
+        if i >= rows.len() {
+            break;
+        }
+        let row_area = rows[i];
+
         if i < storm_sigils.slots_unlocked as usize {
-            // Unlocked slot: etched or empty
             if let Some(sigil) = slot {
                 let icon = sigil.effect.icon();
                 let short = sigil.effect.short_name();
-                let value_label = sigil.effect.format_value(sigil.value);
                 let grade_str = sigil.grade.label();
-                let grade_padded = format!("{:<2}", grade_str);
                 let grade_color = sigil_grade_color(sigil.grade);
-
-                let left = format!("{} {}", icon, short);
-                let right = format!("{}  {}", value_label, grade_padded);
-                let dw = super::scene_fx::display_width;
-                let left_display_w = dw(&left);
-                let right_display_w = dw(&right);
-                let pad = width.saturating_sub(left_display_w + right_display_w + 3);
 
                 let grade_style = if grade_str.ends_with('+') {
                     Style::default()
@@ -306,30 +275,70 @@ fn draw_sigil_slots(frame: &mut Frame, area: Rect, storm_sigils: &StormSigils) {
                     Style::default().fg(grade_color)
                 };
 
-                lines.push(Line::from(vec![
-                    Span::raw("  "),
-                    Span::styled(left, Style::default().fg(Color::White)),
-                    Span::raw(" ".repeat(pad.max(1))),
-                    Span::styled(value_label, Style::default().fg(Color::Rgb(100, 180, 255))),
-                    Span::styled(format!("  {}", grade_padded), grade_style),
-                ]));
+                let (min_val, max_val) = sigil.effect.range();
+                let ratio = if max_val > min_val {
+                    ((sigil.value - min_val) / (max_val - min_val)).clamp(0.0, 1.0)
+                } else {
+                    1.0
+                };
+                let value_label = if sigil.effect
+                    == crate::stormglass::sigils::SigilEffectType::RegenDelayPercent
+                {
+                    format!("-{:.1}%", sigil.value)
+                } else {
+                    format!("+{:.1}%", sigil.value)
+                };
+
+                // Split row: [name 14] [gauge fills] [value 7] [grade 3]
+                let cols = Layout::horizontal([
+                    Constraint::Length(14),
+                    Constraint::Min(6),
+                    Constraint::Length(7),
+                    Constraint::Length(3),
+                ])
+                .split(row_area);
+
+                let name_para = Paragraph::new(Span::styled(
+                    format!("{} {}", icon, short),
+                    Style::default().fg(Color::White),
+                ));
+                frame.render_widget(name_para, cols[0]);
+
+                let gauge = LineGauge::default()
+                    .filled_style(
+                        Style::default()
+                            .fg(grade_color)
+                            .add_modifier(Modifier::BOLD),
+                    )
+                    .unfilled_style(Style::default().fg(Color::DarkGray))
+                    .label("")
+                    .ratio(ratio);
+                frame.render_widget(gauge, cols[1]);
+
+                let value_para = Paragraph::new(Span::styled(
+                    format!("{:>7}", value_label),
+                    Style::default().fg(Color::White),
+                ));
+                frame.render_widget(value_para, cols[2]);
+
+                let grade_para =
+                    Paragraph::new(Span::styled(format!(" {:<2}", grade_str), grade_style));
+                frame.render_widget(grade_para, cols[3]);
             } else {
-                lines.push(Line::from(vec![
-                    Span::raw("  "),
-                    Span::styled("\u{00b7} empty", Style::default().fg(Color::DarkGray)),
-                ]));
+                let empty_para = Paragraph::new(Span::styled(
+                    "\u{00b7} empty",
+                    Style::default().fg(Color::DarkGray),
+                ));
+                frame.render_widget(empty_para, row_area);
             }
         } else {
-            // Locked slot
-            lines.push(Line::from(vec![
-                Span::raw("  "),
-                Span::styled("\u{1f512} locked", Style::default().fg(Color::DarkGray)),
-            ]));
+            let locked_para = Paragraph::new(Span::styled(
+                "\u{1f512} locked",
+                Style::default().fg(Color::DarkGray),
+            ));
+            frame.render_widget(locked_para, row_area);
         }
     }
-
-    let paragraph = Paragraph::new(lines);
-    frame.render_widget(paragraph, area);
 }
 
 /// Returns the color for a sigil grade tier letter.
