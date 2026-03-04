@@ -958,31 +958,54 @@ fn draw_status_strip_fishing(
 
 /// Dungeon status strip: player HP with room/key info on row 1, enemy HP or status on row 2.
 fn draw_status_strip_dungeon(frame: &mut Frame, row0: Rect, row1: Rect, game_state: &GameState) {
-    // Row 1: Player HP gauge with room/key info in label
     let hp = &game_state.combat_state;
+    let derived = game_state.cached_derived_stats;
+
+    // HP ratio for text bar
     let hp_ratio = if hp.player_max_hp > 0 {
         (hp.player_current_hp as f64 / hp.player_max_hp as f64).clamp(0.0, 1.0)
     } else {
         0.0
     };
-    let room_info = if let Some(ref dungeon) = game_state.active_dungeon {
+
+    // Row 1: Player HP + attack timer + room/key info
+    let player_label = format_hp_label("HP", hp.player_current_hp, hp.player_max_hp);
+    let mut segments: Vec<Span> = Vec::new();
+
+    if hp.current_enemy.is_some() {
+        let player_interval = ATTACK_INTERVAL_SECONDS / derived.attack_speed_multiplier;
+        let player_next = (player_interval - hp.player_attack_timer).max(0.0);
+        let player_style = if player_next < 0.3 {
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Green)
+        };
+        segments.push(Span::styled(
+            format!("You:{:.1}s", player_next),
+            player_style,
+        ));
+    }
+
+    if let Some(ref dungeon) = game_state.active_dungeon {
         let cleared = dungeon.rooms_cleared;
         let total = dungeon.room_count();
         let key_str = if dungeon.has_key { " \u{1f511}" } else { "" };
-        format!(
-            "HP: {}/{}  |  Room {}/{}{}",
-            hp.player_current_hp, hp.player_max_hp, cleared, total, key_str
-        )
-    } else {
-        format!("HP: {}/{}", hp.player_current_hp, hp.player_max_hp)
-    };
-    render_hp_bar_with_flash(
+        segments.push(Span::styled(
+            format!("Rm {}/{}{}", cleared, total, key_str),
+            Style::default().fg(Color::Magenta),
+        ));
+    }
+
+    draw_status_row(
         frame,
         row0,
-        room_info,
+        &player_label,
         hp_ratio,
         Color::Green,
-        game_state.combat_state.player_damage_floats.last(),
+        &segments,
+        hp.player_damage_floats.last(),
     );
 
     // Row 2: Enemy HP or dungeon idle
@@ -992,7 +1015,6 @@ fn draw_status_strip_dungeon(frame: &mut Frame, row0: Rect, row1: Rect, game_sta
         } else {
             0.0
         };
-        let enemy_label = format!("{}: {}/{}", enemy.name, enemy.current_hp, enemy.max_hp);
         let is_boss = enemy.name.starts_with("Boss ");
         let hp_color = if is_boss {
             Color::LightRed
@@ -1004,13 +1026,29 @@ fn draw_status_strip_dungeon(frame: &mut Frame, row0: Rect, row1: Rect, game_sta
                 .unwrap_or(game_state.zone_progression.current_zone_id);
             enemy_sprites::zone_palette(zone_id).primary
         };
-        render_hp_bar_with_flash(
+
+        // Truncate enemy name to 12 chars max
+        let name: String = enemy.name.chars().take(12).collect();
+        let enemy_label = format_hp_label(&name, enemy.current_hp, enemy.max_hp);
+
+        let mut enemy_segments: Vec<Span> = Vec::new();
+        let enemy_interval = effective_enemy_attack_interval(game_state);
+        let enemy_next = (enemy_interval - hp.enemy_attack_timer).max(0.0);
+        let enemy_style = if enemy_next < 0.3 {
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Red)
+        };
+        enemy_segments.push(Span::styled(format!("Foe:{:.1}s", enemy_next), enemy_style));
+
+        draw_status_row(
             frame,
             row1,
-            enemy_label,
+            &enemy_label,
             enemy_ratio,
             hp_color,
-            game_state.combat_state.enemy_damage_floats.last(),
+            &enemy_segments,
+            hp.enemy_damage_floats.last(),
         );
     } else {
         let spinner = throbber::spinner_char();
@@ -1041,7 +1079,6 @@ fn text_hp_bar(ratio: f64, width: usize) -> String {
 
 /// Formats an HP label like "HP:340/500" or "Goblin:12.4K/25K" using short
 /// number formatting for values >= 10,000.
-#[allow(dead_code)]
 fn format_hp_label(name: &str, current: u32, max: u32) -> String {
     let cur_s = game_common::format_number_short(current as u64);
     let max_s = game_common::format_number_short(max as u64);
@@ -1055,7 +1092,6 @@ fn format_hp_label(name: &str, current: u32, max: u32) -> String {
 /// - `bar_color`: color for the filled portion of the text bar
 /// - `segments`: additional info spans rendered after the bar (timers, DPS, room info)
 /// - `flash`: optional damage flash rendered right-aligned at row end
-#[allow(dead_code)]
 fn draw_status_row(
     frame: &mut Frame,
     area: Rect,
@@ -1075,7 +1111,9 @@ fn draw_status_row(
     let mut spans: Vec<Span> = Vec::with_capacity(8);
     spans.push(Span::styled(
         format!("{} ", hp_label),
-        Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+        Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD),
     ));
     spans.push(Span::styled(hp_bar, Style::default().fg(bar_color)));
 
@@ -1132,19 +1170,9 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
         0.0
     };
 
-    // Row 1: Player HP text bar + attack timer + DPS
-    let bar_width = (row0.width as usize / 4).clamp(4, 10);
-    let hp_bar = text_hp_bar(hp_ratio, bar_width);
-
-    let mut row0_spans = vec![
-        Span::styled(
-            format!("HP:{}/{} ", hp.player_current_hp, hp.player_max_hp),
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(hp_bar, Style::default().fg(Color::Green)),
-    ];
+    // Row 1: Player HP + attack timer + DPS
+    let player_label = format_hp_label("HP", hp.player_current_hp, hp.player_max_hp);
+    let mut segments: Vec<Span> = Vec::new();
 
     if hp.current_enemy.is_some() {
         let player_interval = ATTACK_INTERVAL_SECONDS / derived.attack_speed_multiplier;
@@ -1156,20 +1184,26 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
         } else {
             Style::default().fg(Color::Green)
         };
-        row0_spans.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
-        row0_spans.push(Span::styled(
+        segments.push(Span::styled(
             format!("You:{:.1}s", player_next),
             player_style,
         ));
     }
 
-    row0_spans.push(Span::styled(
-        format!(" | DPS:{:.0}", effective_dps),
+    segments.push(Span::styled(
+        format!("DPS:{:.0}", effective_dps),
         Style::default().fg(Color::DarkGray),
     ));
 
-    let row0_line = Paragraph::new(Line::from(row0_spans)).alignment(Alignment::Center);
-    frame.render_widget(row0_line, row0);
+    draw_status_row(
+        frame,
+        row0,
+        &player_label,
+        hp_ratio,
+        Color::Green,
+        &segments,
+        hp.player_damage_floats.last(),
+    );
 
     // Row 2: Enemy HP + enemy timer / enrage, or idle message
     if let Some(enemy) = &hp.current_enemy {
@@ -1190,19 +1224,11 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
             enemy_sprites::zone_palette(zone_id).primary
         };
 
-        let enemy_bar = text_hp_bar(enemy_ratio, bar_width);
+        // Truncate enemy name to 12 chars max
+        let name: String = enemy.name.chars().take(12).collect();
+        let enemy_label = format_hp_label(&name, enemy.current_hp, enemy.max_hp);
 
-        // Truncate enemy name to fit
-        let max_name_len = (row1.width as usize).saturating_sub(bar_width + 20).min(12);
-        let name: String = enemy.name.chars().take(max_name_len).collect();
-
-        let mut row1_spans = vec![
-            Span::styled(
-                format!("{}:{}/{} ", name, enemy.current_hp, enemy.max_hp),
-                Style::default().fg(Color::White),
-            ),
-            Span::styled(enemy_bar, Style::default().fg(hp_color)),
-        ];
+        let mut enemy_segments: Vec<Span> = Vec::new();
 
         // Boss enrage timer takes priority over enemy attack timer
         if game_state.zone_progression.fighting_boss {
@@ -1214,8 +1240,7 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
             } else {
                 Style::default().fg(Color::Cyan)
             };
-            row1_spans.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
-            row1_spans.push(Span::styled(
+            enemy_segments.push(Span::styled(
                 format!("\u{26a1}Enrage:{:.0}s", remaining),
                 enrage_style,
             ));
@@ -1227,12 +1252,18 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
             } else {
                 Style::default().fg(Color::Red)
             };
-            row1_spans.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
-            row1_spans.push(Span::styled(format!("Foe:{:.1}s", enemy_next), enemy_style));
+            enemy_segments.push(Span::styled(format!("Foe:{:.1}s", enemy_next), enemy_style));
         }
 
-        let row1_line = Paragraph::new(Line::from(row1_spans)).alignment(Alignment::Center);
-        frame.render_widget(row1_line, row1);
+        draw_status_row(
+            frame,
+            row1,
+            &enemy_label,
+            enemy_ratio,
+            hp_color,
+            &enemy_segments,
+            hp.enemy_damage_floats.last(),
+        );
     } else {
         let spinner = throbber::spinner_char();
         let msg = throbber::waiting_message(game_state.character_xp);
