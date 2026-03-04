@@ -138,46 +138,6 @@ pub fn put_text_centered(
     put_text(buffer, row, col.max(0), text, fg);
 }
 
-/// Draws a simple line with `/`, `\` or `|` glyphs based on slope.
-pub fn draw_line(
-    buffer: &mut [Vec<SceneCell>],
-    mut x0: i32,
-    mut y0: i32,
-    x1: i32,
-    y1: i32,
-    fg: Color,
-) {
-    let dx = (x1 - x0).abs();
-    let sx = if x0 < x1 { 1 } else { -1 };
-    let dy = -(y1 - y0).abs();
-    let sy = if y0 < y1 { 1 } else { -1 };
-    let mut err = dx + dy;
-
-    let line_char = if (x1 - x0).abs() <= 1 {
-        '|'
-    } else if x1 > x0 {
-        '\\'
-    } else {
-        '/'
-    };
-
-    loop {
-        put_cell(buffer, y0, x0, line_char, fg);
-        if x0 == x1 && y0 == y1 {
-            break;
-        }
-        let e2 = 2 * err;
-        if e2 >= dy {
-            err += dy;
-            x0 += sx;
-        }
-        if e2 <= dx {
-            err += dx;
-            y0 += sy;
-        }
-    }
-}
-
 /// Flushes a scene buffer to the frame with run-length style batching by color.
 /// Continuation cells (after wide characters) are skipped so the terminal
 /// renders wide chars at their correct 2-column width.

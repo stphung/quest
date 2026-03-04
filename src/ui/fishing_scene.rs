@@ -3,9 +3,7 @@
 //! Displays the active fishing session with animated water, catch progress,
 //! caught fish list, and fishing rank progression.
 
-use super::scene_fx::{
-    current_millis, draw_line, hash2d, lerp_channel, lerp_rgb, put_cell, render_buffer, SceneCell,
-};
+use super::scene_fx::{current_millis, hash2d, lerp_channel, lerp_rgb};
 use super::stats_prestige::{
     build_leviathan_tracker_line, build_leviathan_trophy_line, highest_fishing_badge,
 };
@@ -15,8 +13,12 @@ use crate::fishing::types::{FishingSession, FishingState, RANK_NAMES};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
+    symbols::Marker,
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Gauge, Paragraph, Wrap},
+    widgets::{
+        canvas::{Canvas, Painter, Shape},
+        Block, Borders, Clear, Gauge, Paragraph, Wrap,
+    },
     Frame,
 };
 
@@ -153,7 +155,707 @@ fn draw_header(
     }
 }
 
-/// Draws the ASCII water scene with bobber.
+/// Canvas HalfBlock sky: gradient, celestial body, stars, clouds, shoreline, sailboat.
+struct SkyShape {
+    width: usize,
+    horizon: usize,
+    wave_tick: f64,
+    dusk: f64,
+    mast_x: i32,
+    mast_top: i32,
+}
+
+impl SkyShape {
+    fn paint_px(&self, painter: &mut Painter, gx: i32, gy: i32, color: (u8, u8, u8)) {
+        if gx >= 0 && (gx as usize) < self.width && gy >= 0 && (gy as usize) < self.horizon * 2 {
+            painter.paint(
+                gx as usize,
+                gy as usize,
+                Color::Rgb(color.0, color.1, color.2),
+            );
+        }
+    }
+}
+
+impl Shape for SkyShape {
+    fn draw(&self, painter: &mut Painter) {
+        let sky_py = self.horizon * 2;
+        if sky_py == 0 || self.width == 0 {
+            return;
+        }
+
+        let top = lerp_rgb((118, 196, 248), (20, 34, 66), self.dusk);
+        let low = lerp_rgb((210, 232, 252), (116, 96, 132), self.dusk);
+
+        // 1. Sky gradient — per-pixel row interpolation
+        for gy in 0..sky_py {
+            let py_t = if sky_py <= 1 {
+                0.0
+            } else {
+                gy as f64 / (sky_py - 1) as f64
+            };
+            let bg = lerp_rgb(top, low, py_t);
+            for gx in 0..self.width {
+                painter.paint(gx, gy, Color::Rgb(bg.0, bg.1, bg.2));
+            }
+        }
+
+        // 1b. Horizon color bleed — warm sunset/dusk glow near horizon
+        if self.dusk > 0.35 && sky_py > 0 {
+            let glow_strength = ((self.dusk - 0.35) / 0.65).min(1.0);
+            let glow_band = 6.min(sky_py);
+            let warm = if self.dusk < 0.65 {
+                (255, 160, 80) // sunset orange
+            } else {
+                (180, 100, 140) // deep dusk purple-pink
+            };
+            for gy in (sky_py - glow_band)..sky_py {
+                let band_t = 1.0 - (sky_py - 1 - gy) as f64 / glow_band.max(1) as f64;
+                let blend = band_t * glow_strength * 0.35;
+                let py_t = gy as f64 / (sky_py - 1).max(1) as f64;
+                let base = lerp_rgb(top, low, py_t);
+                let blended = lerp_rgb(base, warm, blend);
+                for gx in 0..self.width {
+                    painter.paint(gx, gy, Color::Rgb(blended.0, blended.1, blended.2));
+                }
+            }
+        }
+
+        // 2. Celestial body — pixel circle with halo
+        let orb_col =
+            (self.width as f64 * 0.78 + (self.wave_tick * 0.08).sin() * 3.0).round() as i32;
+        let orb_row = (self.horizon as f64 * 0.32 + (self.wave_tick * 0.04).sin()).round() as i32;
+        let orb_cy = orb_row * 2;
+        let (orb_bright, orb_dim) = if self.dusk < 0.56 {
+            ((255u8, 228, 152), (240u8, 216, 140))
+        } else {
+            ((232u8, 238, 255), (200u8, 210, 235))
+        };
+        for dy in -3..=3i32 {
+            for dx in -3..=3i32 {
+                let dist = ((dx * dx + dy * dy) as f64).sqrt();
+                if dist <= 1.2 {
+                    self.paint_px(painter, orb_col + dx, orb_cy + dy, orb_bright);
+                } else if dist <= 2.5 {
+                    self.paint_px(painter, orb_col + dx, orb_cy + dy, orb_dim);
+                }
+            }
+        }
+
+        // 3. Stars — single bright pixels at hash-based positions
+        if self.dusk > 0.25 {
+            let twinkle_tick = (self.wave_tick / 1.8) as usize;
+            for row in 0..self.horizon.saturating_sub(1) {
+                for col in 0..self.width {
+                    if hash2d(row, col).is_multiple_of(97) {
+                        let bright =
+                            hash2d(row + twinkle_tick, col + twinkle_tick).is_multiple_of(3);
+                        let color = if bright {
+                            (244, 246, 255)
+                        } else {
+                            (184, 190, 232)
+                        };
+                        let gy = row as i32 * 2;
+                        self.paint_px(painter, col as i32, gy, color);
+                        if bright {
+                            self.paint_px(painter, col as i32, gy + 1, color);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Clouds — pixel clusters drifting
+        for &(base_x, y_ratio, speed, pat_len, shade) in &[
+            (6.0f64, 0.18f64, 0.040f64, 4, 148u8),
+            (18.0, 0.28, 0.032, 6, 140),
+            (34.0, 0.16, 0.052, 8, 132),
+            (12.0, 0.44, 0.026, 5, 126),
+            (44.0, 0.36, 0.036, 4, 130),
+        ] {
+            let drift = (self.wave_tick * speed) % self.width as f64;
+            let cx = (base_x - drift).rem_euclid(self.width as f64) as i32;
+            let row = (self.horizon as f64 * y_ratio).round() as usize;
+            let gy = (row * 2) as i32;
+            let tint = lerp_channel(shade, 208, 1.0 - self.dusk);
+            let top_color = (
+                tint.saturating_add(12),
+                tint.saturating_add(12),
+                tint.saturating_add(18),
+            );
+            let bot_color = (tint.saturating_sub(8), tint.saturating_sub(8), tint);
+            for dx in 0..pat_len {
+                let gx = ((cx + dx) as usize % self.width) as i32;
+                self.paint_px(painter, gx, gy, top_color);
+                self.paint_px(painter, gx, gy + 1, bot_color);
+            }
+        }
+
+        // 5. Shoreline silhouettes — pixel columns at horizon edge
+        for col in 0..self.width {
+            let far_h =
+                (1.0 + ((col as f64 * 0.24 + self.wave_tick * 0.012).sin() + 1.0) * 1.1) * 2.0;
+            let near_h = (1.0
+                + ((col as f64 * 0.15 + self.wave_tick * 0.020 + 1.5).sin() + 1.0) * 1.5)
+                * 2.0;
+
+            let far_color = (
+                lerp_channel(84, 62, self.dusk),
+                lerp_channel(110, 90, self.dusk),
+                lerp_channel(126, 114, self.dusk),
+            );
+            let near_color = (
+                lerp_channel(70, 52, self.dusk),
+                lerp_channel(96, 74, self.dusk),
+                lerp_channel(110, 98, self.dusk),
+            );
+
+            for (h, color) in [(far_h, far_color), (near_h, near_color)] {
+                let pixels = h.round() as i32;
+                for dy in 0..pixels {
+                    let gy = sky_py as i32 - 1 - dy;
+                    self.paint_px(painter, col as i32, gy, color);
+                }
+            }
+        }
+
+        // 6. Sailboat sky — pixel art for pennant, sail, mast, rigging
+        let mx = self.mast_x;
+        let mt = self.mast_top * 2; // pixel y of mast_top row
+        let pennant: (u8, u8, u8) = (255, 96, 72);
+        let sail_edge: (u8, u8, u8) = (245, 235, 215);
+        let sail_fill: (u8, u8, u8) = (238, 228, 208);
+        let mast_c: (u8, u8, u8) = (210, 168, 104);
+        let rigging: (u8, u8, u8) = (160, 130, 80);
+
+        // Pennant (2 pixels at mast_top row, col+1)
+        self.paint_px(painter, mx + 1, mt, pennant);
+        self.paint_px(painter, mx + 1, mt + 1, pennant);
+        self.paint_px(painter, mx + 2, mt, (220, 72, 52));
+        self.paint_px(painter, mx + 2, mt + 1, (220, 72, 52));
+
+        // Mast — vertical pixels from mast_top to mast_top+2 (3 terminal rows = 6 pixels)
+        for dy in 0..6 {
+            self.paint_px(painter, mx, mt + dy, mast_c);
+        }
+
+        // Sail row 1 (mast_top+1): diagonal edge
+        let r1 = mt + 2;
+        self.paint_px(painter, mx - 1, r1, sail_edge);
+        self.paint_px(painter, mx - 1, r1 + 1, sail_edge);
+
+        // Sail row 2 (mast_top+2): wider diagonal + fill
+        let r2 = mt + 4;
+        self.paint_px(painter, mx - 2, r2, sail_edge);
+        self.paint_px(painter, mx - 2, r2 + 1, sail_edge);
+        self.paint_px(painter, mx - 1, r2, sail_fill);
+        self.paint_px(painter, mx - 1, r2 + 1, sail_fill);
+
+        // Rigging — aft diagonal (starboard side)
+        self.paint_px(painter, mx + 1, r1, rigging);
+        self.paint_px(painter, mx + 1, r1 + 1, rigging);
+        self.paint_px(painter, mx + 2, r2, rigging);
+        self.paint_px(painter, mx + 2, r2 + 1, rigging);
+        // Extended aft rigging
+        let r3 = mt + 6;
+        self.paint_px(painter, mx + 3, r3, rigging);
+        self.paint_px(painter, mx + 3, r3 + 1, rigging);
+
+        // Forestay — front diagonal rope from mast top toward bow
+        self.paint_px(painter, mx - 2, r1, rigging);
+        self.paint_px(painter, mx - 2, r1 + 1, rigging);
+        self.paint_px(painter, mx - 3, r2, rigging);
+        self.paint_px(painter, mx - 3, r2 + 1, rigging);
+    }
+}
+
+/// Canvas HalfBlock water surface with per-pixel depth gradient and wave animation.
+struct WaterSurface {
+    width: usize,
+    water_rows: usize,
+    horizon: usize,
+    wave_tick: f64,
+    dusk: f64,
+    boat_x: f64,
+    sky_pixels: usize, // gy offset = horizon * 2
+}
+
+impl Shape for WaterSurface {
+    fn draw(&self, painter: &mut Painter) {
+        let total_py = self.water_rows * 2;
+        if total_py == 0 || self.width == 0 {
+            return;
+        }
+
+        let near = lerp_rgb((48, 136, 192), (30, 70, 112), self.dusk);
+        let deep = lerp_rgb((10, 60, 112), (5, 22, 52), self.dusk);
+        let sky_low = lerp_rgb((210, 232, 252), (116, 96, 132), self.dusk);
+
+        for gy in 0..total_py {
+            let depth_t = if total_py <= 1 {
+                0.0
+            } else {
+                gy as f64 / (total_py - 1) as f64
+            };
+
+            let mut base = lerp_rgb(near, deep, depth_t.powf(0.85));
+
+            // Soften horizon seam: blend top 3 pixels toward sky horizon color
+            if gy < 3 {
+                let blend_t = (gy as f64 + 1.0) / 4.0;
+                base = lerp_rgb(sky_low, base, blend_t);
+            }
+
+            let crest = lerp_rgb((154, 226, 248), (98, 184, 226), depth_t);
+            let row_equiv = self.horizon as f64 + gy as f64 / 2.0;
+
+            for gx in 0..self.width {
+                let primary = (gx as f64 * (0.24 + depth_t * 0.06)
+                    + self.wave_tick * (0.055 + depth_t * 0.045))
+                    .sin();
+                let secondary =
+                    (gx as f64 * 0.11 - self.wave_tick * 0.043 + row_equiv * 0.92).cos();
+                let wave = primary * 0.72 + secondary * 0.28;
+
+                let mut color = if wave > 0.74 {
+                    // Foam/whitecaps on wave crests
+                    let crest_intensity = ((wave - 0.06) / 1.34).min(1.0);
+                    let blended = lerp_rgb(base, crest, crest_intensity * 0.55);
+                    let foam_t = ((wave - 0.74) / 0.26).min(1.0);
+                    lerp_rgb(blended, (240, 248, 255), foam_t * 0.7)
+                } else if wave > 0.06 {
+                    let intensity = ((wave - 0.06) / 1.34).min(1.0);
+                    let blended = lerp_rgb(base, crest, intensity * 0.55);
+                    let shimmer = (((gx as f64 * 0.09 + self.wave_tick * 0.19).sin() + 1.0)
+                        * 0.5
+                        * 18.0
+                        * intensity) as u8;
+                    (
+                        blended.0.saturating_add(shimmer),
+                        blended.1.saturating_add(shimmer / 2),
+                        blended.2.saturating_add(shimmer / 3),
+                    )
+                } else {
+                    base
+                };
+
+                // Caustic light patterns — dancing bright spots near the surface
+                let caustic_x = (gx as f64 * 0.31 + self.wave_tick * 0.17).sin();
+                let caustic_y = (gy as f64 * 0.43 + self.wave_tick * 0.13).cos();
+                let caustic = (caustic_x * caustic_y + 1.0) * 0.5;
+                if caustic > 0.7 {
+                    let boost = ((caustic - 0.7) / 0.3 * (1.0 - depth_t) * 0.15 * 255.0) as u8;
+                    color = (
+                        color.0.saturating_add(boost / 3),
+                        color.1.saturating_add(boost),
+                        color.2.saturating_add(boost / 2),
+                    );
+                }
+
+                // Horizon foam line — animated bright strip at water's edge
+                if gy < 3 {
+                    let foam_wave = (gx as f64 * 0.18 + self.wave_tick * 0.09).sin();
+                    if foam_wave > 0.2 {
+                        let foam_t =
+                            ((foam_wave - 0.2) / 0.8).min(1.0) * (1.0 - gy as f64 / 3.0) * 0.5;
+                        color = lerp_rgb(color, (230, 245, 255), foam_t);
+                    }
+                }
+
+                // Celestial body reflection — vertical shimmering streak
+                let orb_col =
+                    (self.width as f64 * 0.78 + (self.wave_tick * 0.08).sin() * 3.0).round();
+                let reflect_wobble = (gy as f64 * 0.3 + self.wave_tick * 0.15).sin() * 1.5;
+                let dist_from_orb = (gx as f64 - orb_col - reflect_wobble).abs();
+                if dist_from_orb < 3.0 {
+                    let reflect_t = 1.0 - dist_from_orb / 3.0;
+                    let reflect_wave = (gy as f64 * 0.25 + self.wave_tick * 0.12).sin() * 0.5 + 0.5;
+                    let reflect_strength = reflect_t * reflect_wave * (1.0 - depth_t * 0.7) * 0.35;
+                    let orb_color = if self.dusk < 0.56 {
+                        (255, 228, 152)
+                    } else {
+                        (200, 210, 240)
+                    };
+                    color = lerp_rgb(color, orb_color, reflect_strength);
+                }
+
+                // Lantern glow on water — warm tint near boat at night
+                if self.dusk > 0.4 {
+                    let dx = gx as f64 - self.boat_x;
+                    let dy = gy as f64 * 0.5;
+                    let lantern_dist = (dx * dx + dy * dy).sqrt();
+                    if lantern_dist < 8.0 {
+                        let glow_t =
+                            (1.0 - lantern_dist / 8.0) * ((self.dusk - 0.4) / 0.6).min(1.0) * 0.2;
+                        color = lerp_rgb(color, (255, 200, 80), glow_t);
+                    }
+                }
+
+                // Wake pattern — V-shaped lighter streak behind boat hull
+                let wake_x = gx as f64 - self.boat_x;
+                let wake_depth = gy as f64;
+                if wake_depth > 4.0 && wake_depth < 24.0 {
+                    let arm_width = wake_depth * 0.3;
+                    let dist_to_arm = (wake_x.abs() - arm_width).abs();
+                    if dist_to_arm < 1.5 {
+                        let fade = (1.0 - (wake_depth - 4.0) / 20.0) * 0.25;
+                        let sharpness = 1.0 - dist_to_arm / 1.5;
+                        color = lerp_rgb(color, (200, 240, 255), fade * sharpness);
+                    }
+                }
+
+                painter.paint(
+                    gx,
+                    self.sky_pixels + gy,
+                    Color::Rgb(color.0, color.1, color.2),
+                );
+            }
+        }
+    }
+}
+
+/// Canvas HalfBlock sailboat hull, deck, keel, and sail bottom row.
+/// Drawn after WaterSurface so boat pixels overwrite water.
+struct BoatShape {
+    mast_x: usize,
+    top_py: usize,
+    dusk: f64,
+    width: usize,
+    total_py: usize,
+}
+
+impl Shape for BoatShape {
+    fn draw(&self, painter: &mut Painter) {
+        let mx = self.mast_x as i32;
+
+        // Color palette
+        let hull_dark: (u8, u8, u8) = (94, 58, 36);
+        let hull_mid: (u8, u8, u8) = (140, 90, 52);
+        let hull_light: (u8, u8, u8) = (188, 140, 86);
+        let deck: (u8, u8, u8) = (188, 148, 96);
+        let mast: (u8, u8, u8) = (210, 168, 104);
+        let sail_edge: (u8, u8, u8) = (245, 235, 215);
+        let sail_fill: (u8, u8, u8) = (238, 228, 208);
+        let sail_edge_lo: (u8, u8, u8) = (235, 225, 205);
+        let sail_fill_lo: (u8, u8, u8) = (232, 222, 200);
+        let mast_lo: (u8, u8, u8) = (200, 158, 94);
+
+        // Lantern vs mast at sail position
+        let (mast_top, mast_bot) = if self.dusk > 0.4 {
+            let g = ((self.dusk - 0.4) / 0.6).min(1.0);
+            (
+                (
+                    (180.0 + g * 75.0) as u8,
+                    (140.0 + g * 60.0) as u8,
+                    (40.0 + g * 40.0) as u8,
+                ),
+                (
+                    (160.0 + g * 55.0) as u8,
+                    (120.0 + g * 40.0) as u8,
+                    (30.0 + g * 30.0) as u8,
+                ),
+            )
+        } else {
+            (mast, mast_lo)
+        };
+
+        // Pixel table: (dx from mast_x, dpy from top_py, color)
+        let pixels: &[(i32, usize, (u8, u8, u8))] = &[
+            // py0: sail bottom upper half
+            (-2, 0, sail_edge),
+            (-1, 0, sail_fill),
+            (0, 0, mast_top),
+            // py1: sail bottom lower half
+            (-2, 1, sail_edge_lo),
+            (-1, 1, sail_fill_lo),
+            (0, 1, mast_bot),
+            // py2: deck upper half
+            (-3, 2, hull_light),
+            (-2, 2, deck),
+            (-1, 2, deck),
+            (0, 2, mast),
+            (1, 2, deck),
+            (2, 2, deck),
+            (3, 2, deck),
+            // py3: deck lower half (full width with taper)
+            (-6, 3, deck),
+            (-5, 3, hull_mid),
+            (-4, 3, hull_mid),
+            (-3, 3, hull_dark),
+            (-2, 3, hull_dark),
+            (-1, 3, hull_dark),
+            (0, 3, hull_dark),
+            (1, 3, hull_dark),
+            (2, 3, hull_dark),
+            (3, 3, hull_dark),
+            (4, 3, hull_mid),
+            (5, 3, hull_mid),
+            (6, 3, deck),
+            // py4: hull upper
+            (-4, 4, hull_mid),
+            (-3, 4, hull_dark),
+            (-2, 4, hull_dark),
+            (-1, 4, hull_dark),
+            (0, 4, hull_dark),
+            (1, 4, hull_dark),
+            (2, 4, hull_dark),
+            (3, 4, hull_dark),
+            (4, 4, hull_mid),
+            // py5: hull lower
+            (-3, 5, hull_dark),
+            (-2, 5, hull_dark),
+            (-1, 5, hull_dark),
+            (0, 5, hull_dark),
+            (1, 5, hull_dark),
+            (2, 5, hull_dark),
+            (3, 5, hull_dark),
+            // py6: keel upper
+            (-2, 6, hull_dark),
+            (-1, 6, hull_dark),
+            (0, 6, hull_dark),
+            (1, 6, hull_dark),
+            (2, 6, hull_dark),
+            // py7: keel lower
+            (-1, 7, hull_dark),
+            (0, 7, hull_dark),
+            (1, 7, hull_dark),
+        ];
+
+        for &(dx, dpy, color) in pixels {
+            let gx = mx + dx;
+            let gy = self.top_py + dpy;
+            if gx >= 0 && (gx as usize) < self.width && gy < self.total_py {
+                painter.paint(gx as usize, gy, Color::Rgb(color.0, color.1, color.2));
+            }
+        }
+
+        // Waterline highlight — bright refraction pixels at hull edges
+        let waterline_color = Color::Rgb(160, 210, 240);
+        let waterline_py = self.top_py + 4;
+        if waterline_py < self.total_py {
+            for dx in [-7, -6, 7, 8] {
+                let gx = mx + dx;
+                if gx >= 0 && (gx as usize) < self.width {
+                    painter.paint(gx as usize, waterline_py, waterline_color);
+                }
+            }
+        }
+
+        // Keel reflection glow — soft light beneath the hull
+        let keel_glow = Color::Rgb(80, 140, 180);
+        let keel_py = self.top_py + 8;
+        if keel_py < self.total_py {
+            for dx in -2..=2 {
+                let gx = mx + dx;
+                if gx >= 0 && (gx as usize) < self.width {
+                    painter.paint(gx as usize, keel_py, keel_glow);
+                }
+            }
+        }
+    }
+}
+
+/// Canvas HalfBlock fishing line, fish shadows, and ripple rings.
+/// Drawn after water but before boat so the line emerges from under the hull.
+struct FishingDetailsShape {
+    line_x0: i32,
+    line_y0: i32,
+    line_x1: i32,
+    line_y1: i32,
+    bobber_gx: i32,
+    bobber_gy: i32,
+    ripple_radius: i32,
+    wave_tick: f64,
+    width: usize,
+    water_rows: usize,
+    sky_pixels: usize,
+    shadow_bobber_x: i32,
+    shadow_bobber_wy: i32,
+    is_waiting: bool,
+    total_py: usize,
+}
+
+impl FishingDetailsShape {
+    fn paint_pixel(&self, painter: &mut Painter, gx: i32, gy: i32, color: Color) {
+        if gx >= 0 && (gx as usize) < self.width && gy >= 0 && (gy as usize) < self.total_py {
+            painter.paint(gx as usize, gy as usize, color);
+        }
+    }
+
+    fn paint_bresenham(
+        &self,
+        painter: &mut Painter,
+        mut x0: i32,
+        mut y0: i32,
+        x1: i32,
+        y1: i32,
+        color: Color,
+    ) {
+        let dx = (x1 - x0).abs();
+        let sx = if x0 < x1 { 1 } else { -1 };
+        let dy = -(y1 - y0).abs();
+        let sy = if y0 < y1 { 1 } else { -1 };
+        let mut err = dx + dy;
+
+        loop {
+            self.paint_pixel(painter, x0, y0, color);
+            if x0 == x1 && y0 == y1 {
+                break;
+            }
+            let e2 = 2 * err;
+            if e2 >= dy {
+                err += dy;
+                x0 += sx;
+            }
+            if e2 <= dx {
+                err += dx;
+                y0 += sy;
+            }
+        }
+    }
+
+    fn draw_shadows(&self, painter: &mut Painter) {
+        // Oval offsets: 5 wide × 3 tall fish shape
+        let core: &[(i32, i32)] = &[(-1, 0), (0, -1), (0, 0), (0, 1), (1, 0)];
+        let wings: &[(i32, i32)] = &[(-2, 0), (2, 0)];
+
+        for i in 0..3 {
+            let seed = i as f64 * 137.5;
+            let speed = 0.018 * (i as f64 * 0.4 + 1.0);
+
+            let mut fx = ((seed + self.wave_tick * speed).sin() * self.width as f64 * 0.35
+                + self.width as f64 * 0.5)
+                .round() as i32;
+            let mut fy = ((seed * 2.3 + self.wave_tick * speed * 0.8).sin()
+                * (self.water_rows as f64 * 0.3)
+                + self.water_rows as f64 * 0.4
+                + i as f64 * 2.0)
+                .round() as i32;
+
+            // Shadow 0 veers toward bobber during Waiting
+            if self.is_waiting && i == 0 {
+                let approach = ((self.wave_tick * 0.03).sin() * 0.5 + 0.5).min(1.0) * 0.6;
+                fx += ((self.shadow_bobber_x - fx) as f64 * approach).round() as i32;
+                fy += ((self.shadow_bobber_wy - fy) as f64 * approach * 0.5).round() as i32;
+            }
+
+            // Depth-based fade: deeper shadows blend toward deep water color
+            let depth_t = fy as f64 / self.water_rows.max(1) as f64;
+            let fade = (depth_t * 0.6).clamp(0.0, 1.0);
+            let dark = lerp_rgb((18, 38, 68), (10, 50, 100), fade);
+            let light = lerp_rgb((24, 48, 80), (14, 54, 104), fade);
+            let shadow_dark = Color::Rgb(dark.0, dark.1, dark.2);
+            let shadow_light = Color::Rgb(light.0, light.1, light.2);
+
+            // Convert to scene-global pixel coords
+            let gy_center = self.sky_pixels as i32 + fy * 2;
+            for &(dx, dy) in core {
+                self.paint_pixel(painter, fx + dx, gy_center + dy, shadow_dark);
+            }
+            for &(dx, dy) in wings {
+                self.paint_pixel(painter, fx + dx, gy_center + dy, shadow_light);
+            }
+        }
+    }
+
+    fn draw_bobber_trail(&self, painter: &mut Painter) {
+        // Only during reeling (ripple_radius == 2 signals reeling phase)
+        if self.ripple_radius < 2 {
+            return;
+        }
+
+        let trail: &[(i32, i32, (u8, u8, u8))] = &[
+            (3, 0, (160, 220, 245)),
+            (5, 1, (130, 200, 235)),
+            (8, -1, (110, 185, 225)),
+            (11, 0, (90, 170, 215)),
+            (14, 1, (70, 155, 205)),
+        ];
+        for &(dx, dy, c) in trail {
+            let wobble = ((self.wave_tick * 0.3 + dx as f64 * 0.5).sin() * 1.0).round() as i32;
+            let gx = self.bobber_gx + dx;
+            let gy = self.bobber_gy + dy + wobble;
+            self.paint_pixel(painter, gx, gy, Color::Rgb(c.0, c.1, c.2));
+        }
+    }
+
+    fn draw_ripples(&self, painter: &mut Painter) {
+        use std::f64::consts::PI;
+
+        for ring in 1..=self.ripple_radius {
+            let pr = ring * 2; // pixel radius
+            let num_points = (pr * 6).max(12) as usize;
+            let color = if ring == 1 {
+                Color::Rgb(196, 236, 255)
+            } else {
+                Color::Rgb(146, 206, 238)
+            };
+            for i in 0..num_points {
+                let theta = i as f64 * 2.0 * PI / num_points as f64;
+                let rx = (self.bobber_gx as f64 + pr as f64 * theta.cos()).round() as i32;
+                let ry = (self.bobber_gy as f64 + pr as f64 * theta.sin()).round() as i32;
+                self.paint_pixel(painter, rx, ry, color);
+            }
+        }
+    }
+}
+
+impl Shape for FishingDetailsShape {
+    fn draw(&self, painter: &mut Painter) {
+        // 1. Fish shadows (underneath everything)
+        self.draw_shadows(painter);
+
+        // 2. Fishing line: shadow then bright
+        self.paint_bresenham(
+            painter,
+            self.line_x0 + 1,
+            self.line_y0,
+            self.line_x1 + 1,
+            self.line_y1,
+            Color::Rgb(38, 52, 78),
+        );
+        self.paint_bresenham(
+            painter,
+            self.line_x0,
+            self.line_y0,
+            self.line_x1,
+            self.line_y1,
+            Color::Rgb(255, 208, 122),
+        );
+
+        // 3. Bobber wake trail (reeling only)
+        self.draw_bobber_trail(painter);
+
+        // 4. Ripple rings around bobber
+        self.draw_ripples(painter);
+    }
+}
+
+/// Write a character with fg color onto the frame buffer, preserving the existing bg.
+fn overlay_fg(frame: &mut Frame, area: Rect, row: i32, col: i32, ch: char, fg: Color) {
+    if row < 0 || col < 0 {
+        return;
+    }
+    let (r, c) = (row as u16, col as u16);
+    if r >= area.height || c >= area.width {
+        return;
+    }
+    let cell = &mut frame.buffer_mut()[(area.x + c, area.y + r)];
+    cell.set_char(ch);
+    cell.set_fg(fg);
+}
+
+/// Shared bobber parameters by fishing phase.
+fn bobber_params(session: &FishingSession) -> (f64, f64, f64, char, Color, i32) {
+    use crate::fishing::types::FishingPhase;
+    match session.phase {
+        FishingPhase::Casting => (0.66, 0.45, 0.0, '○', Color::Rgb(240, 248, 255), 1),
+        FishingPhase::Waiting => (0.58, 0.60, 0.2, '◉', Color::Rgb(255, 236, 214), 1),
+        FishingPhase::Reeling => (0.50, 1.10, 0.9, '●', Color::Rgb(255, 96, 82), 2),
+    }
+}
+
+/// Draws the full fishing scene as a single Canvas HalfBlock surface.
 fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
     let water_block = Block::default().borders(Borders::LEFT | Borders::RIGHT);
     let inner = water_block.inner(area);
@@ -165,341 +867,94 @@ fn draw_water_scene(frame: &mut Frame, area: Rect, session: &FishingSession) {
 
     let width = inner.width as usize;
     let height = inner.height as usize;
-    let mut buffer = vec![vec![SceneCell::default(); width]; height];
-
     let millis = current_millis() as f64;
     let wave_tick = millis / 110.0;
     let dusk = ((millis / 16_000.0).sin() * 0.5 + 0.5).powf(1.2);
     let horizon = ((height as f64 * 0.34).round() as usize).clamp(1, height.saturating_sub(2));
+    let water_rows = height - horizon;
+    let total_py = height * 2;
+    let sky_pixels = horizon * 2;
 
-    render_sky_and_shoreline(&mut buffer, width, height, horizon, wave_tick, dusk);
-    render_water_surface(&mut buffer, height, horizon, wave_tick);
-    render_sailboat(&mut buffer, width, horizon, height, wave_tick);
-    render_bobber_and_line(&mut buffer, session, width, height, horizon, wave_tick);
-
-    render_buffer(frame, inner, &buffer);
-}
-
-/// Sky gradient, celestial body, stars, clouds, and distant shoreline silhouettes.
-fn render_sky_and_shoreline(
-    buffer: &mut [Vec<SceneCell>],
-    width: usize,
-    height: usize,
-    horizon: usize,
-    wave_tick: f64,
-    dusk: f64,
-) {
-    // Sky and water background gradients
-    for (row, row_cells) in buffer.iter_mut().enumerate() {
-        let bg_rgb = if row < horizon {
-            let row_t = if horizon <= 1 {
-                0.0
-            } else {
-                row as f64 / (horizon - 1) as f64
-            };
-            let top = lerp_rgb((118, 196, 248), (20, 34, 66), dusk);
-            let low = lerp_rgb((210, 232, 252), (116, 96, 132), dusk);
-            lerp_rgb(top, low, row_t)
-        } else {
-            let row_t = if height - horizon <= 1 {
-                0.0
-            } else {
-                (row - horizon) as f64 / (height - horizon - 1) as f64
-            };
-            let near = lerp_rgb((48, 136, 192), (30, 70, 112), dusk);
-            let deep = lerp_rgb((10, 60, 112), (5, 22, 52), dusk);
-            lerp_rgb(near, deep, row_t.powf(0.85))
-        };
-
-        let bg = Color::Rgb(bg_rgb.0, bg_rgb.1, bg_rgb.2);
-        for cell in row_cells {
-            cell.bg = bg;
-        }
-    }
-
-    // Celestial body
-    let orb_col = ((width as f64 * 0.78) + (wave_tick * 0.08).sin() * 3.0).round() as i32;
-    let orb_row = ((horizon as f64 * 0.32) + (wave_tick * 0.04).sin()).round() as i32;
-    let (orb_char, orb_color) = if dusk < 0.56 {
-        ('●', Color::Rgb(255, 228, 152))
-    } else {
-        ('◑', Color::Rgb(232, 238, 255))
-    };
-    for (dx, dy, ch, fg) in [
-        (0, 0, orb_char, orb_color),
-        (-1, 0, '·', Color::Rgb(240, 226, 176)),
-        (1, 0, '·', Color::Rgb(240, 226, 176)),
-        (0, -1, '·', Color::Rgb(236, 220, 170)),
-        (0, 1, '·', Color::Rgb(236, 220, 170)),
-    ] {
-        put_cell(&mut buffer[..], orb_row + dy, orb_col + dx, ch, fg);
-    }
-
-    // Stars appear as dusk settles
-    if dusk > 0.25 {
-        let twinkle_tick = (wave_tick / 1.8) as usize;
-        for (row, row_cells) in buffer
-            .iter_mut()
-            .enumerate()
-            .take(horizon.saturating_sub(1))
-        {
-            for (col, cell) in row_cells.iter_mut().enumerate() {
-                if hash2d(row, col).is_multiple_of(97) && cell.ch == ' ' {
-                    let bright = hash2d(row + twinkle_tick, col + twinkle_tick).is_multiple_of(3);
-                    *cell = SceneCell::new(
-                        if bright { '*' } else { '.' },
-                        if bright {
-                            Color::Rgb(244, 246, 255)
-                        } else {
-                            Color::Rgb(184, 190, 232)
-                        },
-                        cell.bg,
-                    );
-                }
-            }
-        }
-    }
-
-    // Sky clouds
-    for &(base_x, y_ratio, speed, pattern, shade) in &[
-        (6.0, 0.18, 0.040, "~~", 148u8),
-        (18.0, 0.28, 0.032, "~~~", 140),
-        (34.0, 0.16, 0.052, "~~~~", 132),
-        (12.0, 0.44, 0.026, "~ ~", 126),
-        (44.0, 0.36, 0.036, "~~", 130),
-    ] {
-        let drift = (wave_tick * speed) % width as f64;
-        let cx = ((base_x - drift).rem_euclid(width as f64)) as usize;
-        let row = ((horizon as f64 * y_ratio).round() as usize).min(horizon.saturating_sub(1));
-        for (i, ch) in pattern.chars().enumerate() {
-            if ch == ' ' {
-                continue;
-            }
-            let col = (cx + i) % width;
-            if buffer[row][col].ch == ' ' {
-                let tint = lerp_channel(shade, 208, 1.0 - dusk);
-                buffer[row][col] = SceneCell::new(
-                    ch,
-                    Color::Rgb(tint, tint, tint.saturating_add(8)),
-                    buffer[row][col].bg,
-                );
-            }
-        }
-    }
-
-    // Distant shoreline silhouettes
-    for col in 0..width {
-        let far_h =
-            (1.0 + ((col as f64 * 0.24 + wave_tick * 0.012).sin() + 1.0) * 1.1).round() as i32;
-        let near_h = (1.0 + ((col as f64 * 0.15 + wave_tick * 0.020 + 1.5).sin() + 1.0) * 1.5)
-            .round() as i32;
-
-        for (height_delta, ch, color) in [
-            (
-                far_h,
-                '░',
-                Color::Rgb(
-                    lerp_channel(84, 62, dusk),
-                    lerp_channel(110, 90, dusk),
-                    lerp_channel(126, 114, dusk),
-                ),
-            ),
-            (
-                near_h,
-                '▒',
-                Color::Rgb(
-                    lerp_channel(70, 52, dusk),
-                    lerp_channel(96, 74, dusk),
-                    lerp_channel(110, 98, dusk),
-                ),
-            ),
-        ] {
-            let top = horizon as i32 - height_delta;
-            for row in top.max(0)..=horizon as i32 {
-                put_cell(&mut buffer[..], row, col as i32, ch, color);
-            }
-        }
-    }
-}
-
-/// Layered animated water surface with wave patterns and shimmer.
-fn render_water_surface(
-    buffer: &mut [Vec<SceneCell>],
-    height: usize,
-    horizon: usize,
-    wave_tick: f64,
-) {
-    for (row, row_cells) in buffer.iter_mut().enumerate().skip(horizon) {
-        let depth_t = if height - horizon <= 1 {
-            0.0
-        } else {
-            (row - horizon) as f64 / (height - horizon - 1) as f64
-        };
-        let crest = lerp_rgb((154, 226, 248), (98, 184, 226), depth_t);
-        for (col, cell) in row_cells.iter_mut().enumerate() {
-            let primary = (col as f64 * (0.24 + depth_t * 0.06)
-                + wave_tick * (0.055 + depth_t * 0.045))
-                .sin();
-            let secondary = (col as f64 * 0.11 - wave_tick * 0.043 + row as f64 * 0.92).cos();
-            let wave = primary * 0.72 + secondary * 0.28;
-
-            let ch = if wave > 0.74 {
-                '≈'
-            } else if wave > 0.38 {
-                '~'
-            } else if wave > 0.06 {
-                '-'
-            } else if wave > -0.34 {
-                '·'
-            } else {
-                ' '
-            };
-
-            if ch != ' ' {
-                let shimmer =
-                    (((col as f64 * 0.09 + wave_tick * 0.19).sin() + 1.0) * 0.5 * 18.0) as u8;
-                *cell = SceneCell::new(
-                    ch,
-                    Color::Rgb(
-                        crest.0.saturating_add(shimmer),
-                        crest.1.saturating_add(shimmer / 2),
-                        crest.2.saturating_add(shimmer / 3),
-                    ),
-                    cell.bg,
-                );
-            }
-        }
-    }
-}
-
-/// Halfblock sailboat with gentle bob near the horizon.
-fn render_sailboat(
-    buffer: &mut [Vec<SceneCell>],
-    width: usize,
-    horizon: usize,
-    height: usize,
-    wave_tick: f64,
-) {
+    // Shared boat geometry
     let boat_center = ((width as f64 * 0.35) + (wave_tick * 0.04).sin() * 2.0).round() as i32;
     let deck_row = (horizon + 1).min(height.saturating_sub(4)) as i32;
     let mast_x = boat_center;
     let mast_top = deck_row - 3;
 
-    // Colour palette
-    let hull_dark = (94, 58, 36);
-    let hull_mid = (140, 90, 52);
-    let hull_light = (188, 140, 86);
-    let deck_color = (188, 148, 96);
-    let mast_color = Color::Rgb(210, 168, 104);
-    let sail_color = Color::Rgb(245, 235, 215);
-    let pennant_color = Color::Rgb(255, 96, 72);
+    // Bobber position (shared by Canvas shapes and character overlays)
+    let (bobber_ratio, bobber_amp, bobber_sink, _, _, ripple_radius) = bobber_params(session);
+    let bobber_x = ((width as f64 * bobber_ratio) + (wave_tick * 0.065).sin() * 2.5).round() as i32;
+    let bobber_base = horizon + ((height - horizon).max(2) / 5);
+    let bobber_y = (bobber_base as f64 + (wave_tick * 0.085).sin() * bobber_amp + bobber_sink)
+        .round()
+        .clamp((horizon + 1) as f64, (height.saturating_sub(2)) as f64) as i32;
+    let is_waiting = matches!(session.phase, crate::fishing::types::FishingPhase::Waiting);
 
-    // Helper: set a cell with explicit fg, bg, and char
-    let set = |buf: &mut [Vec<SceneCell>],
-               r: i32,
-               c: i32,
-               ch: char,
-               fg: (u8, u8, u8),
-               bg: (u8, u8, u8)| {
-        if r < 0 || c < 0 {
-            return;
-        }
-        let (ru, cu) = (r as usize, c as usize);
-        if ru < buf.len() && cu < buf[ru].len() {
-            buf[ru][cu] = SceneCell::new(
-                ch,
-                Color::Rgb(fg.0, fg.1, fg.2),
-                Color::Rgb(bg.0, bg.1, bg.2),
-            );
-        }
+    // === Canvas shapes (all in scene-global pixel coords) ===
+    let sky = SkyShape {
+        width,
+        horizon,
+        wave_tick,
+        dusk,
+        mast_x,
+        mast_top,
+    };
+    let water = WaterSurface {
+        width,
+        water_rows,
+        horizon,
+        wave_tick,
+        dusk,
+        boat_x: mast_x as f64,
+        sky_pixels,
+    };
+    let fishing = FishingDetailsShape {
+        line_x0: mast_x,
+        line_y0: (mast_top * 2).max(0),
+        line_x1: bobber_x,
+        line_y1: bobber_y * 2,
+        bobber_gx: bobber_x,
+        bobber_gy: bobber_y * 2,
+        ripple_radius,
+        wave_tick,
+        width,
+        water_rows,
+        sky_pixels,
+        shadow_bobber_x: bobber_x,
+        shadow_bobber_wy: bobber_y - horizon as i32,
+        is_waiting,
+        total_py,
+    };
+    let boat = BoatShape {
+        mast_x: mast_x.max(0) as usize,
+        top_py: sky_pixels,
+        dusk,
+        width,
+        total_py,
     };
 
-    // Helper: get bg color tuple at a buffer position
-    let bg_at = |buf: &[Vec<SceneCell>], r: i32, c: i32| -> (u8, u8, u8) {
-        if r < 0 || c < 0 {
-            return (0, 0, 0);
-        }
-        let (ru, cu) = (r as usize, c as usize);
-        if ru < buf.len() && cu < buf[ru].len() {
-            match buf[ru][cu].bg {
-                Color::Rgb(r, g, b) => (r, g, b),
-                _ => (0, 0, 0),
-            }
-        } else {
-            (0, 0, 0)
-        }
-    };
+    let canvas = Canvas::default()
+        .x_bounds([0.0, width as f64])
+        .y_bounds([0.0, total_py as f64])
+        .marker(Marker::HalfBlock)
+        .background_color(Color::Rgb(10, 30, 60))
+        .paint(|ctx| {
+            ctx.draw(&sky);
+            ctx.draw(&water);
+            ctx.draw(&fishing);
+            ctx.draw(&boat);
+        });
+    frame.render_widget(canvas, inner);
 
-    // Row 0: pennant at mast top
-    put_cell(buffer, mast_top, mast_x + 1, '▸', pennant_color);
-
-    // Rows 1-2: sail (triangular) + mast
-    put_cell(buffer, mast_top + 1, mast_x - 1, '╱', sail_color);
-    put_cell(buffer, mast_top + 1, mast_x, '│', mast_color);
-
-    put_cell(buffer, mast_top + 2, mast_x - 2, '╱', sail_color);
-    let sail_fill = Color::Rgb(238, 228, 208);
-    put_cell(buffer, mast_top + 2, mast_x - 1, '░', sail_fill);
-    put_cell(buffer, mast_top + 2, mast_x, '│', mast_color);
-
-    // Row 3: deck -- halfblock tapered edges blending into surrounding bg
-    let dr = deck_row;
-    let bg0 = bg_at(buffer, dr, mast_x - 6);
-    set(buffer, dr, mast_x - 6, '▄', deck_color, bg0);
-    let bg1 = bg_at(buffer, dr, mast_x - 5);
-    set(buffer, dr, mast_x - 5, '▄', hull_mid, bg1);
-    let bg2 = bg_at(buffer, dr, mast_x - 4);
-    set(buffer, dr, mast_x - 4, '▟', hull_mid, bg2);
-    // Solid deck section
-    for dx in -3..=3 {
-        let c = if dx == 0 { '│' } else { '█' };
-        let fg = if dx == 0 {
-            match mast_color {
-                Color::Rgb(r, g, b) => (r, g, b),
-                _ => deck_color,
-            }
-        } else {
-            deck_color
-        };
-        set(buffer, dr, mast_x + dx, c, fg, hull_dark);
-    }
-    // Right taper
-    let bg3 = bg_at(buffer, dr, mast_x + 4);
-    set(buffer, dr, mast_x + 4, '▙', hull_mid, bg3);
-    let bg4 = bg_at(buffer, dr, mast_x + 5);
-    set(buffer, dr, mast_x + 5, '▄', hull_mid, bg4);
-    let bg5 = bg_at(buffer, dr, mast_x + 6);
-    set(buffer, dr, mast_x + 6, '▄', deck_color, bg5);
-
-    // Row 4: hull bottom
-    let hr = deck_row + 1;
-    let bg_l3 = bg_at(buffer, hr, mast_x - 4);
-    set(buffer, hr, mast_x - 4, '▀', hull_mid, bg_l3);
-    let bg_l2 = bg_at(buffer, hr, mast_x - 3);
-    set(buffer, hr, mast_x - 3, '▄', hull_dark, bg_l2);
-    for dx in -2..=2 {
-        set(buffer, hr, mast_x + dx, '█', hull_dark, hull_dark);
-    }
-    let bg_r2 = bg_at(buffer, hr, mast_x + 3);
-    set(buffer, hr, mast_x + 3, '▄', hull_dark, bg_r2);
-    let bg_r3 = bg_at(buffer, hr, mast_x + 4);
-    set(buffer, hr, mast_x + 4, '▀', hull_mid, bg_r3);
-
-    // Row 5: keel/waterline
-    let kr = deck_row + 2;
-    for dx in -1..=1 {
-        let bg_k = bg_at(buffer, kr, mast_x + dx);
-        set(buffer, kr, mast_x + dx, '▀', hull_dark, bg_k);
-    }
-
-    // Small highlight stripe on upper hull for depth
-    let bg_hl = bg_at(buffer, dr, mast_x - 3);
-    set(buffer, dr, mast_x - 3, '▓', hull_light, bg_hl);
+    // === CHARACTER OVERLAYS (bobber symbol + splash effects) ===
+    overlay_bobber_effects(frame, inner, session, width, height, horizon, wave_tick);
 }
 
-/// Bobber, fishing line, ripples, and splash effects.
-fn render_bobber_and_line(
-    buffer: &mut [Vec<SceneCell>],
+/// Bobber character and splash/bubble effects overlaid on the full-scene Canvas.
+#[allow(clippy::too_many_arguments)]
+fn overlay_bobber_effects(
+    frame: &mut Frame,
+    area: Rect,
     session: &FishingSession,
     width: usize,
     height: usize,
@@ -508,18 +963,8 @@ fn render_bobber_and_line(
 ) {
     use crate::fishing::types::FishingPhase;
 
-    // Sailboat mast position (must match render_sailboat for line origin)
-    let boat_center = ((width as f64 * 0.35) + (wave_tick * 0.04).sin() * 2.0).round() as i32;
-    let deck_row = (horizon + 1).min(height.saturating_sub(4)) as i32;
-    let mast_x = boat_center;
-    let mast_top = deck_row - 3;
-
-    let (bobber_ratio, bobber_amp, bobber_sink, bobber_char, bobber_color, ripple_radius) =
-        match session.phase {
-            FishingPhase::Casting => (0.66, 0.45, 0.0, '○', Color::Rgb(240, 248, 255), 1),
-            FishingPhase::Waiting => (0.58, 0.60, 0.2, '◉', Color::Rgb(255, 236, 214), 1),
-            FishingPhase::Reeling => (0.50, 1.10, 0.9, '●', Color::Rgb(255, 96, 82), 2),
-        };
+    let (bobber_ratio, bobber_amp, bobber_sink, bobber_char, bobber_color, _) =
+        bobber_params(session);
 
     let bobber_x = ((width as f64 * bobber_ratio) + (wave_tick * 0.065).sin() * 2.5).round() as i32;
     let bobber_base = horizon + ((height - horizon).max(2) / 5);
@@ -527,56 +972,42 @@ fn render_bobber_and_line(
         .round()
         .clamp((horizon + 1) as f64, (height.saturating_sub(2)) as f64) as i32;
 
-    // Fishing line: shadow then bright
-    draw_line(
-        buffer,
-        mast_x + 1,
-        mast_top.max(0),
-        bobber_x + 1,
-        bobber_y,
-        Color::Rgb(38, 52, 78),
-    );
-    draw_line(
-        buffer,
-        mast_x,
-        mast_top.max(0),
-        bobber_x,
-        bobber_y,
-        Color::Rgb(255, 208, 122),
-    );
+    // Bobber character (area covers full scene, so scene row = overlay row)
+    overlay_fg(frame, area, bobber_y, bobber_x, bobber_char, bobber_color);
 
-    // Bobber
-    put_cell(buffer, bobber_y, bobber_x, bobber_char, bobber_color);
-
-    // Ripples around bobber
-    for ring in 1..=ripple_radius {
-        let ch = if ring == 1 { 'o' } else { '.' };
-        let fg = if ring == 1 {
-            Color::Rgb(196, 236, 255)
-        } else {
-            Color::Rgb(146, 206, 238)
-        };
-        for &(dx, dy) in &[
-            (-ring, 0),
-            (ring, 0),
-            (0, -ring),
-            (0, ring),
-            (-ring, -ring),
-            (ring, -ring),
-            (-ring, ring),
-            (ring, ring),
-        ] {
-            put_cell(buffer, bobber_y + dy, bobber_x + dx, ch, fg);
-        }
-    }
-
-    // Splash effect during reeling
+    // Splash effect and bubble trail during reeling
     if session.phase == FishingPhase::Reeling {
+        // Bubble trail below bobber
+        let trail_chars = ['°', '·', '∘'];
+        for i in 1..=3i32 {
+            let wobble = if (wave_tick as i64 + i as i64) % 2 == 0 {
+                1
+            } else {
+                -1
+            };
+            let fade = (1.0 - i as f64 / 4.0).max(0.0);
+            let c = (
+                (80.0 + fade * 120.0) as u8,
+                (160.0 + fade * 80.0) as u8,
+                255u8,
+            );
+            overlay_fg(
+                frame,
+                area,
+                bobber_y + i,
+                bobber_x + wobble,
+                trail_chars[(i - 1) as usize],
+                Color::Rgb(c.0, c.1, c.2),
+            );
+        }
+
+        // Main splash
         let splash_row = bobber_y - 1;
-        let splash_x = bobber_x + if ((wave_tick as i32) & 1) == 0 { 4 } else { -4 };
+        let splash_x = bobber_x + if ((wave_tick as i64) & 1) == 0 { 4 } else { -4 };
         for (i, ch) in "<><".chars().enumerate() {
-            put_cell(
-                buffer,
+            overlay_fg(
+                frame,
+                area,
                 splash_row,
                 splash_x + i as i32,
                 ch,
@@ -584,13 +1015,39 @@ fn render_bobber_and_line(
             );
         }
         for &(dx, dy, ch) in &[(-1, -1, '\''), (2, -1, '\''), (0, -2, '`')] {
-            put_cell(
-                buffer,
+            overlay_fg(
+                frame,
+                area,
                 splash_row + dy,
                 splash_x + dx,
                 ch,
                 Color::Rgb(216, 242, 255),
             );
+        }
+
+        // Enhanced spray: wider arc of droplets around the bobber
+        let spray_phase = (wave_tick * 0.5) as i64;
+        let spray_offsets: &[(i32, i32, char)] = &[
+            (-3, -1, '\''),
+            (3, -1, '`'),
+            (-2, -2, '·'),
+            (2, -2, '·'),
+            (-4, 0, '·'),
+            (4, 0, '·'),
+        ];
+        for &(dx, dy, ch) in spray_offsets {
+            // Alternate visibility per tick for animation
+            let visible = (spray_phase + dx.abs() as i64) % 3 != 0;
+            if visible {
+                overlay_fg(
+                    frame,
+                    area,
+                    bobber_y + dy,
+                    bobber_x + dx,
+                    ch,
+                    Color::Rgb(196, 236, 255),
+                );
+            }
         }
     }
 }
