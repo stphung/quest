@@ -1026,14 +1026,17 @@ fn draw_status_strip_dungeon(frame: &mut Frame, row0: Rect, row1: Rect, game_sta
         );
     } else {
         let spinner = throbber::spinner_char();
-        let text = Paragraph::new(Line::from(Span::styled(
-            format!("{} Exploring the dungeon...", spinner),
-            Style::default()
-                .fg(Color::Magenta)
-                .add_modifier(Modifier::ITALIC),
-        )))
-        .alignment(Alignment::Center);
-        frame.render_widget(text, row1);
+        let idle_label = format!("{} Exploring...", spinner);
+        draw_status_row(
+            frame,
+            row1,
+            &idle_label,
+            0.0,
+            Color::DarkGray,
+            label_width,
+            &[],
+            None,
+        );
     }
 }
 
@@ -1264,18 +1267,20 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
     } else {
         let spinner = throbber::spinner_char();
         let msg = throbber::waiting_message(game_state.character_xp);
-        let text = Paragraph::new(Line::from(vec![
-            Span::styled(
-                format!("{} {}", spinner, msg),
-                Style::default().fg(Color::Yellow),
-            ),
-            Span::styled(
-                format!(" | DPS:{:.0}", effective_dps),
+        let idle_label = format!("{} {}", spinner, msg);
+        draw_status_row(
+            frame,
+            row1,
+            &idle_label,
+            0.0,
+            Color::DarkGray,
+            label_width,
+            &[Span::styled(
+                format!("DPS:{:.0}", effective_dps),
                 Style::default().fg(Color::DarkGray),
-            ),
-        ]))
-        .alignment(Alignment::Center);
-        frame.render_widget(text, row1);
+            )],
+            None,
+        );
     }
 }
 
