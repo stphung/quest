@@ -718,6 +718,7 @@ fn draw_s_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
         &label,
         ratio,
         Color::Green,
+        0,
         &[],
         game_state.combat_state.player_damage_floats.last(),
     );
@@ -734,6 +735,7 @@ fn draw_s_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
             &label,
             ratio,
             Color::Red,
+            0,
             &[],
             game_state.combat_state.enemy_damage_floats.last(),
         );
@@ -925,8 +927,17 @@ fn draw_status_strip_dungeon(frame: &mut Frame, row0: Rect, row1: Rect, game_sta
         0.0
     };
 
-    // Row 1: Player HP + attack timer + room/key info
+    // Pre-compute both labels for alignment
     let player_label = format_hp_label("HP", hp.player_current_hp, hp.player_max_hp);
+    let enemy_label = hp.current_enemy.as_ref().map(|enemy| {
+        let name: String = enemy.name.chars().take(12).collect();
+        format_hp_label(&name, enemy.current_hp, enemy.max_hp)
+    });
+    let label_width = enemy_label
+        .as_ref()
+        .map_or(player_label.len(), |el| player_label.len().max(el.len()));
+
+    // Row 1: Player HP + attack timer + room/key info
     let mut segments: Vec<Span> = Vec::new();
 
     if hp.current_enemy.is_some() {
@@ -961,6 +972,7 @@ fn draw_status_strip_dungeon(frame: &mut Frame, row0: Rect, row1: Rect, game_sta
         &player_label,
         hp_ratio,
         Color::Green,
+        label_width,
         &segments,
         hp.player_damage_floats.last(),
     );
@@ -984,9 +996,7 @@ fn draw_status_strip_dungeon(frame: &mut Frame, row0: Rect, row1: Rect, game_sta
             enemy_sprites::zone_palette(zone_id).primary
         };
 
-        // Truncate enemy name to 12 chars max
-        let name: String = enemy.name.chars().take(12).collect();
-        let enemy_label = format_hp_label(&name, enemy.current_hp, enemy.max_hp);
+        let enemy_label = enemy_label.unwrap();
 
         let mut enemy_segments: Vec<Span> = Vec::new();
         let enemy_interval = effective_enemy_attack_interval(game_state);
@@ -1004,6 +1014,7 @@ fn draw_status_strip_dungeon(frame: &mut Frame, row0: Rect, row1: Rect, game_sta
             &enemy_label,
             enemy_ratio,
             hp_color,
+            label_width,
             &enemy_segments,
             hp.enemy_damage_floats.last(),
         );
@@ -1047,14 +1058,17 @@ fn format_hp_label(name: &str, current: u32, max: u32) -> String {
 /// - `hp_label`: pre-formatted string like "HP:340/500"
 /// - `hp_ratio`: 0.0..=1.0 fill ratio for the text bar
 /// - `bar_color`: color for the filled portion of the text bar
+/// - `label_width`: minimum character width for the label column (pads with spaces for alignment)
 /// - `segments`: additional info spans rendered after the bar (timers, DPS, room info)
 /// - `flash`: optional damage flash rendered right-aligned at row end
+#[allow(clippy::too_many_arguments)]
 fn draw_status_row(
     frame: &mut Frame,
     area: Rect,
     hp_label: &str,
     hp_ratio: f64,
     bar_color: Color,
+    label_width: usize,
     segments: &[Span],
     flash: Option<&crate::combat::types::DamageFlash>,
 ) {
@@ -1066,8 +1080,13 @@ fn draw_status_row(
     let hp_bar = text_hp_bar(hp_ratio, bar_width);
 
     let mut spans: Vec<Span> = Vec::with_capacity(8);
+    let padded_label = if hp_label.len() < label_width {
+        format!("{:width$} ", hp_label, width = label_width)
+    } else {
+        format!("{} ", hp_label)
+    };
     spans.push(Span::styled(
-        format!("{} ", hp_label),
+        padded_label,
         Style::default()
             .fg(Color::White)
             .add_modifier(Modifier::BOLD),
@@ -1127,8 +1146,17 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
         0.0
     };
 
-    // Row 1: Player HP + attack timer + DPS
+    // Pre-compute both labels for alignment
     let player_label = format_hp_label("HP", hp.player_current_hp, hp.player_max_hp);
+    let enemy_label = hp.current_enemy.as_ref().map(|enemy| {
+        let name: String = enemy.name.chars().take(12).collect();
+        format_hp_label(&name, enemy.current_hp, enemy.max_hp)
+    });
+    let label_width = enemy_label
+        .as_ref()
+        .map_or(player_label.len(), |el| player_label.len().max(el.len()));
+
+    // Row 1: Player HP + attack timer + DPS
     let mut segments: Vec<Span> = Vec::new();
 
     if hp.current_enemy.is_some() {
@@ -1158,6 +1186,7 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
         &player_label,
         hp_ratio,
         Color::Green,
+        label_width,
         &segments,
         hp.player_damage_floats.last(),
     );
@@ -1181,9 +1210,7 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
             enemy_sprites::zone_palette(zone_id).primary
         };
 
-        // Truncate enemy name to 12 chars max
-        let name: String = enemy.name.chars().take(12).collect();
-        let enemy_label = format_hp_label(&name, enemy.current_hp, enemy.max_hp);
+        let enemy_label = enemy_label.unwrap();
 
         let mut enemy_segments: Vec<Span> = Vec::new();
 
@@ -1218,6 +1245,7 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
             &enemy_label,
             enemy_ratio,
             hp_color,
+            label_width,
             &enemy_segments,
             hp.enemy_damage_floats.last(),
         );
