@@ -30,6 +30,7 @@ jobs:
   clippy:
     name: Clippy
     if: github.event_name == 'pull_request'
+    needs: [fmt]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,6 +43,7 @@ jobs:
   test:
     name: Test
     if: github.event_name == 'pull_request'
+    needs: [fmt]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,6 +56,7 @@ jobs:
   audit:
     name: Audit
     if: github.event_name == 'pull_request'
+    needs: [fmt]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +67,7 @@ jobs:
   coverage:
     name: Coverage
     if: github.event_name == 'pull_request'
+    needs: [fmt]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
