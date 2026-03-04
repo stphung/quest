@@ -283,11 +283,7 @@ impl Shape for SkyShape {
                 tint.saturating_add(12),
                 tint.saturating_add(18),
             );
-            let bot_color = (
-                tint.saturating_sub(8),
-                tint.saturating_sub(8),
-                tint,
-            );
+            let bot_color = (tint.saturating_sub(8), tint.saturating_sub(8), tint);
             for dx in 0..pat_len {
                 let gx = ((cx + dx) as usize % self.width) as i32;
                 self.paint_px(painter, gx, gy, top_color);
