@@ -35,9 +35,61 @@ fn pulsing_border_color(millis: u128) -> Color {
 
 // ── Backdrop ──────────────────────────────────────────────────────────────────
 
-/// Paint the deep cave backdrop: dark blue gradient, stalactite ceiling,
-/// drifting dust particles, bioluminescent glow patches, and water shimmer.
-/// Visual parameters vary subtly based on the active view.
+/// Tier-specific gradient palette: (top_rgb, bottom_rgb).
+fn tier_gradient(tier: Option<LayerTier>) -> ((u8, u8, u8), (u8, u8, u8)) {
+    match tier {
+        Some(LayerTier::Shallows) => ((8, 18, 12), (3, 8, 5)),
+        Some(LayerTier::Warrens) => ((16, 12, 6), (6, 4, 2)),
+        Some(LayerTier::Hollows) => ((12, 8, 20), (5, 3, 10)),
+        Some(LayerTier::SunkenReach) => ((6, 14, 22), (2, 6, 12)),
+        Some(LayerTier::Abyss) => ((18, 8, 10), (8, 2, 4)),
+        Some(LayerTier::Void) => ((14, 10, 20), (6, 4, 10)),
+        None => ((5, 8, 20), (2, 3, 8)),
+    }
+}
+
+/// Tier-specific particle colors: (hot, cool) for rising dust.
+fn tier_particle_colors(tier: Option<LayerTier>) -> ((u8, u8, u8), (u8, u8, u8)) {
+    match tier {
+        Some(LayerTier::Shallows) => ((50, 100, 60), (20, 40, 25)),
+        Some(LayerTier::Warrens) => ((90, 65, 30), (35, 25, 12)),
+        Some(LayerTier::Hollows) => ((80, 50, 120), (30, 18, 50)),
+        Some(LayerTier::SunkenReach) => ((50, 90, 150), (18, 35, 60)),
+        Some(LayerTier::Abyss) => ((120, 60, 30), (50, 20, 10)),
+        Some(LayerTier::Void) => ((140, 120, 50), (50, 40, 15)),
+        None => ((60, 80, 140), (20, 30, 60)),
+    }
+}
+
+/// Tier-specific glow target color for bioluminescent patches.
+fn tier_glow_color(tier: Option<LayerTier>) -> (u8, u8, u8) {
+    match tier {
+        Some(LayerTier::Shallows) => (20, 60, 30),
+        Some(LayerTier::Warrens) => (60, 40, 15),
+        Some(LayerTier::Hollows) => (40, 20, 60),
+        Some(LayerTier::SunkenReach) => (15, 45, 65),
+        Some(LayerTier::Abyss) => (70, 25, 10),
+        Some(LayerTier::Void) => (60, 50, 15),
+        None => (10, 40, 50),
+    }
+}
+
+/// Tier-specific fog band color (desaturated, lighter version of tier palette).
+fn tier_fog_color(tier: Option<LayerTier>) -> (u8, u8, u8) {
+    match tier {
+        Some(LayerTier::Shallows) => (30, 50, 35),
+        Some(LayerTier::Warrens) => (50, 40, 25),
+        Some(LayerTier::Hollows) => (40, 30, 55),
+        Some(LayerTier::SunkenReach) => (25, 40, 60),
+        Some(LayerTier::Abyss) => (55, 30, 20),
+        Some(LayerTier::Void) => (50, 45, 30),
+        None => (25, 35, 55),
+    }
+}
+
+/// Paint the deep cave backdrop: HalfBlock gradient, stalactite ceiling,
+/// tier-colored particles, bioluminescent glow patches, fog bands, and shimmer.
+/// Visual parameters vary based on frontier tier and active view.
 #[allow(clippy::needless_range_loop)]
 pub(super) fn paint_deep_backdrop(
     buffer: &mut [Vec<SceneCell>],
@@ -51,37 +103,45 @@ pub(super) fn paint_deep_backdrop(
     }
     let width = buffer[0].len();
 
-    // View-specific gradient tints: Layers is darker/deeper,
-    // EventResponse has a warmer tension tint, others use the default cave blue.
+    // 1. HalfBlock gradient — 2x vertical pixel resolution.
+    //    View overrides take precedence, otherwise use tier-specific palette.
     let (top_rgb, bottom_rgb) = match view {
-        DeepView::Infrastructure => ((4u8, 6u8, 16u8), (1u8, 2u8, 6u8)),
-        DeepView::EventResponse => ((8u8, 6u8, 18u8), (4u8, 2u8, 8u8)),
-        _ => match frontier_tier {
-            Some(LayerTier::Abyss) => ((8u8, 6u8, 18u8), (5u8, 2u8, 6u8)),
-            Some(LayerTier::Void) => ((10u8, 4u8, 16u8), (6u8, 1u8, 4u8)),
-            _ => ((5u8, 8u8, 20u8), (2u8, 3u8, 8u8)),
-        },
+        DeepView::Infrastructure => ((6, 8, 20), (2, 3, 8)),
+        DeepView::EventResponse => ((12, 8, 22), (5, 3, 10)),
+        _ => tier_gradient(frontier_tier),
     };
+    let total_py = height * 2;
     for (row, row_cells) in buffer.iter_mut().enumerate() {
-        let t = if height <= 1 {
+        let py_top = row * 2;
+        let py_bot = (py_top + 1).min(total_py.saturating_sub(1));
+        let t_top = if total_py <= 1 {
             0.0
         } else {
-            row as f64 / (height - 1) as f64
+            py_top as f64 / (total_py - 1) as f64
         };
-        let rgb = lerp_rgb(top_rgb, bottom_rgb, t);
-        let bg = Color::Rgb(rgb.0, rgb.1, rgb.2);
+        let t_bot = if total_py <= 1 {
+            0.0
+        } else {
+            py_bot as f64 / (total_py - 1) as f64
+        };
+        let color_top = lerp_rgb(top_rgb, bottom_rgb, t_top);
+        let color_bot = lerp_rgb(top_rgb, bottom_rgb, t_bot);
+        let fg = Color::Rgb(color_top.0, color_top.1, color_top.2);
+        let bg = Color::Rgb(color_bot.0, color_bot.1, color_bot.2);
         for cell in row_cells.iter_mut() {
+            cell.ch = '\u{2580}'; // ▀
+            cell.fg = fg;
             cell.bg = bg;
         }
     }
 
     // 2. Stalactite ceiling features (subtle rock formations at rows 0-2)
     let stalactite_chars: &[char] = &['\u{2502}', '\u{2551}', '\u{00a6}']; // │ ║ ¦
-    let stalactite_count = width / 8; // one every ~8 columns
+    let stalactite_count = width / 8;
     for i in 0..stalactite_count {
         let seed = hash2d(i, 41);
         let col = ((seed as usize) * 7 + i * 8) % width;
-        let hang_len = 1 + (hash2d(i, 43) as usize % 3); // 1-3 rows
+        let hang_len = 1 + (hash2d(i, 43) as usize % 3);
         let ch = stalactite_chars[(hash2d(i, 47) as usize) % stalactite_chars.len()];
         for r in 0..hang_len.min(height) {
             let t = r as f64 / 3.0;
@@ -96,14 +156,18 @@ pub(super) fn paint_deep_backdrop(
         }
     }
 
-    // 3. Drifting dust particles (cave air) — rising slowly
-    //    View-specific: Layers has more particles (busy underground),
-    //    EventResponse has faster, warmer particles (tension).
+    // 3. Drifting dust particles — rising slowly, tier-colored.
+    //    View overrides for particle speed/count; tier colors for hue.
     let particle_chars: &[char] = &['\u{00b7}', '\u{2022}', '\u{2218}']; // · • ∘
-    let (particle_count, particle_speed, particle_hot, particle_cool) = match view {
-        DeepView::Infrastructure => (16, 1.2, (40u8, 60u8, 110u8), (15u8, 20u8, 45u8)),
-        DeepView::EventResponse => (14, 2.5, (80u8, 60u8, 120u8), (30u8, 20u8, 50u8)),
-        _ => (12, 1.5, (60u8, 80u8, 140u8), (20u8, 30u8, 60u8)),
+    let (particle_count, particle_speed) = match view {
+        DeepView::Infrastructure => (16, 1.2),
+        DeepView::EventResponse => (14, 2.5),
+        _ => (12, 1.5),
+    };
+    let (particle_hot, particle_cool) = match view {
+        DeepView::EventResponse => ((80u8, 60u8, 120u8), (30u8, 20u8, 50u8)),
+        DeepView::Infrastructure => ((40, 60, 110), (15, 20, 45)),
+        _ => tier_particle_colors(frontier_tier),
     };
 
     for i in 0..particle_count {
@@ -126,10 +190,27 @@ pub(super) fn paint_deep_backdrop(
         );
     }
 
-    // 4. Slow-falling water droplets (descending, sparse)
-    let drop_chars: &[char] = &[',', '\''];
+    // 4. Slow-falling droplets / ember sparks — tier-themed.
+    //    Deep tiers (Abyss/Void) get rising ember sparks; others get water drops.
+    let is_deep_tier = matches!(
+        frontier_tier,
+        Some(LayerTier::Abyss) | Some(LayerTier::Void)
+    );
+    let (drop_hot, drop_cool) = if is_deep_tier {
+        tier_particle_colors(frontier_tier)
+    } else {
+        let (hot, cool) = tier_particle_colors(frontier_tier);
+        ((hot.0 / 2, hot.1, hot.2), (cool.0 / 2, cool.1, cool.2))
+    };
+    let ember_chars: &[char] = &['*', '\u{00b7}'];
+    let water_chars: &[char] = &[',', '\''];
+    let drop_chars: &[char] = if is_deep_tier {
+        ember_chars
+    } else {
+        water_chars
+    };
     let drop_count = 4;
-    let drop_speed = 3.0;
+    let drop_speed = if is_deep_tier { 2.0 } else { 3.0 };
     for i in 0..drop_count {
         let seed = hash2d(i, 53);
         let col = (seed as usize) % width.max(1);
@@ -137,35 +218,49 @@ pub(super) fn paint_deep_backdrop(
 
         let phase_offset = (seed as f64) * 0.47;
         let pos = (phase_offset + millis as f64 * drop_speed / 1000.0) % height as f64;
-        let row = pos as i32;
+        let row = if is_deep_tier {
+            // Ember sparks rise
+            (height - 1) as f64 - pos
+        } else {
+            pos
+        };
 
         let t = pos / height.max(1) as f64;
-        let rgb = lerp_rgb((40, 70, 120), (15, 25, 50), t);
-        put_cell(buffer, row, col as i32, ch, Color::Rgb(rgb.0, rgb.1, rgb.2));
+        let rgb = lerp_rgb(drop_hot, drop_cool, t);
+        put_cell(
+            buffer,
+            row as i32,
+            col as i32,
+            ch,
+            Color::Rgb(rgb.0, rgb.1, rgb.2),
+        );
     }
 
-    // 5. Bioluminescent glow patches (faint pulsing spots — cave crystals/fungi)
+    // 5. Bioluminescent glow patches — tier-colored pulsing spots.
+    let glow_target = tier_glow_color(frontier_tier);
     let glow_count = 5;
     for i in 0..glow_count {
         let seed = hash2d(i, 71);
         let col = (seed as usize) % width.max(1);
         let glow_row = (hash2d(i, 73) as usize) % height.max(1);
 
-        // Slow independent pulse per patch
         let pulse_phase = millis as f64 / 2000.0 + (seed as f64) * 0.61;
         let pulse = (pulse_phase.sin() * 0.5 + 0.5).clamp(0.0, 1.0);
         let brightness = 0.3 + pulse * 0.7;
 
         if glow_row < height && col < width {
-            // Tint the background cell with a faint cyan-green glow
+            // Tint the background cell with a faint tier-colored glow
             if let Color::Rgb(r, g, b) = buffer[glow_row][col].bg {
-                let glow_target = (10, 40, 50);
                 let mixed = lerp_rgb((r, g, b), glow_target, brightness * 0.35);
                 buffer[glow_row][col].bg = Color::Rgb(mixed.0, mixed.1, mixed.2);
             }
-            // Render a faint glow character
             let glow_char = if pulse > 0.6 { '*' } else { '\u{00b7}' };
-            let gc = lerp_rgb((15, 50, 60), (30, 100, 120), brightness);
+            let bright_glow = (
+                (glow_target.0 as u16 * 2).min(255) as u8,
+                (glow_target.1 as u16 * 2).min(255) as u8,
+                (glow_target.2 as u16 * 2).min(255) as u8,
+            );
+            let gc = lerp_rgb(glow_target, bright_glow, brightness);
             put_cell(
                 buffer,
                 glow_row as i32,
@@ -176,7 +271,7 @@ pub(super) fn paint_deep_backdrop(
         }
     }
 
-    // 6. Faint water-reflection shimmer (very subtle bg undulation in lower third)
+    // 6. Faint shimmer (subtle bg undulation in lower third)
     let shimmer_phase = millis as f64 / 200.0;
     let shimmer_start_row = (height * 2) / 3;
     for row in shimmer_start_row..height {
@@ -187,6 +282,33 @@ pub(super) fn paint_deep_backdrop(
                 if let Color::Rgb(r, g, b) = buffer[row][col].bg {
                     let new_b = (b as i16 + shift).clamp(0, 255) as u8;
                     buffer[row][col].bg = Color::Rgb(r, g, new_b);
+                }
+            }
+        }
+    }
+
+    // 7. Drifting fog bands — 3 horizontal bands that drift slowly upward.
+    let fog_color = tier_fog_color(frontier_tier);
+    for i in 0..3usize {
+        let seed = hash2d(i, 97);
+        let speed = 0.3 + (seed as f64 % 100.0) / 200.0;
+        let band_center =
+            ((seed as f64 * 0.37 + millis as f64 * speed / 1000.0) % height as f64) as usize;
+        let band_width = 2 + hash2d(i, 99) as usize % 3;
+
+        for offset in 0..band_width {
+            let row = (band_center + offset) % height;
+            let edge_t = if band_width <= 1 {
+                0.5
+            } else {
+                offset as f64 / (band_width - 1) as f64
+            };
+            // Bell-shaped: strongest in middle of band, fades at edges
+            let fog_strength = 0.06 * (1.0 - (edge_t - 0.5).abs() * 2.0);
+            for col in 0..width {
+                if let Color::Rgb(r, g, b) = buffer[row][col].bg {
+                    let mixed = lerp_rgb((r, g, b), fog_color, fog_strength);
+                    buffer[row][col].bg = Color::Rgb(mixed.0, mixed.1, mixed.2);
                 }
             }
         }
