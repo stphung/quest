@@ -1089,10 +1089,15 @@ fn draw_status_row(
     let hp_bar = text_hp_bar(hp_ratio, bar_width);
 
     let mut spans: Vec<Span> = Vec::with_capacity(8);
-    let padded_label = if hp_label.len() < label_width {
-        format!("{:width$} ", hp_label, width = label_width)
+    let label: &str = if label_width > 0 && hp_label.len() > label_width {
+        &hp_label[..hp_label.floor_char_boundary(label_width)]
     } else {
-        format!("{} ", hp_label)
+        hp_label
+    };
+    let padded_label = if label_width > 0 && label.len() < label_width {
+        format!("{:width$} ", label, width = label_width)
+    } else {
+        format!("{} ", label)
     };
     spans.push(Span::styled(
         padded_label,
