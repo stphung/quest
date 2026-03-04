@@ -927,15 +927,14 @@ fn draw_status_strip_dungeon(frame: &mut Frame, row0: Rect, row1: Rect, game_sta
         0.0
     };
 
-    // Pre-compute both labels for alignment
+    // Pre-compute both labels; use fixed label column width to avoid jumps
+    // when enemies appear/disappear.
     let player_label = format_hp_label("HP", hp.player_current_hp, hp.player_max_hp);
     let enemy_label = hp.current_enemy.as_ref().map(|enemy| {
         let name: String = enemy.name.chars().take(12).collect();
         format_hp_label(&name, enemy.current_hp, enemy.max_hp)
     });
-    let label_width = enemy_label
-        .as_ref()
-        .map_or(player_label.len(), |el| player_label.len().max(el.len()));
+    let label_width = (row0.width as usize / 3).clamp(12, 22);
 
     // Row 1: Player HP + attack timer + room/key info
     let mut segments: Vec<Span> = Vec::new();
@@ -1160,15 +1159,14 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
         0.0
     };
 
-    // Pre-compute both labels for alignment
+    // Pre-compute both labels; use fixed label column width to avoid jumps
+    // when enemies appear/disappear.
     let player_label = format_hp_label("HP", hp.player_current_hp, hp.player_max_hp);
     let enemy_label = hp.current_enemy.as_ref().map(|enemy| {
         let name: String = enemy.name.chars().take(12).collect();
         format_hp_label(&name, enemy.current_hp, enemy.max_hp)
     });
-    let label_width = enemy_label
-        .as_ref()
-        .map_or(player_label.len(), |el| player_label.len().max(el.len()));
+    let label_width = (row0.width as usize / 3).clamp(12, 22);
 
     // Row 1: Player HP + attack timer + DPS
     let mut segments: Vec<Span> = Vec::new();
