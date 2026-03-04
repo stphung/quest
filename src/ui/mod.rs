@@ -67,7 +67,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Paragraph},
+    widgets::{Block, BorderType, Borders, Gauge, Paragraph},
     Frame,
 };
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -1039,20 +1039,6 @@ fn draw_status_strip_dungeon(frame: &mut Frame, row0: Rect, row1: Rect, game_sta
     }
 }
 
-/// Builds a text-based HP bar string, e.g. "████░░░░" for a given ratio and width.
-fn text_hp_bar(ratio: f64, width: usize) -> String {
-    let filled = (ratio * width as f64).round() as usize;
-    let empty = width.saturating_sub(filled);
-    let mut bar = String::with_capacity(width * 3);
-    for _ in 0..filled {
-        bar.push('\u{2588}'); // █
-    }
-    for _ in 0..empty {
-        bar.push('\u{2591}'); // ░
-    }
-    bar
-}
-
 /// Formats an HP label like "HP:340/500" or "Goblin:12.4K/25K" using short
 /// number formatting for values >= 10,000.
 fn format_hp_label(name: &str, current: u32, max: u32) -> String {
@@ -1061,13 +1047,16 @@ fn format_hp_label(name: &str, current: u32, max: u32) -> String {
     format!("{}:{}/{}", name, cur_s, max_s)
 }
 
-/// Renders one status strip row: `Label:cur/max [████░░░░] | seg | seg ... flash`
+/// Renders one status strip row: `[Label ████████░░░░] | seg | seg ... flash`
 ///
-/// - `hp_label`: pre-formatted string like "HP:340/500"
-/// - `hp_ratio`: 0.0..=1.0 fill ratio for the text bar
-/// - `bar_color`: color for the filled portion of the text bar
-/// - `label_width`: minimum character width for the label column (pads with spaces for alignment)
-/// - `segments`: additional info spans rendered after the bar (timers, DPS, room info)
+/// Uses a ratatui Gauge for the HP bar, with the label embedded inside.
+/// The gauge occupies a fixed-width left column; segments and flash fill the right.
+///
+/// - `hp_label`: pre-formatted string like "HP:340/500" (shown as gauge label)
+/// - `hp_ratio`: 0.0..=1.0 fill ratio for the gauge
+/// - `bar_color`: color for the filled portion of the gauge
+/// - `label_width`: character width for the gauge column
+/// - `segments`: additional info spans rendered after the gauge (timers, DPS, room info)
 /// - `flash`: optional damage flash rendered right-aligned at row end
 #[allow(clippy::too_many_arguments)]
 fn draw_status_row(
@@ -1084,27 +1073,29 @@ fn draw_status_row(
         return;
     }
 
-    let bar_width = (area.width as usize / 6).clamp(4, 10);
-    let hp_bar = text_hp_bar(hp_ratio, bar_width);
-
-    let mut spans: Vec<Span> = Vec::with_capacity(8);
+    // Truncate label to fit gauge column
     let label: &str = if label_width > 0 && hp_label.len() > label_width {
         &hp_label[..hp_label.floor_char_boundary(label_width)]
     } else {
         hp_label
     };
-    let padded_label = if label_width > 0 && label.len() < label_width {
-        format!("{:width$} ", label, width = label_width)
-    } else {
-        format!("{} ", label)
-    };
-    spans.push(Span::styled(
-        padded_label,
-        Style::default()
-            .fg(Color::White)
-            .add_modifier(Modifier::BOLD),
-    ));
-    spans.push(Span::styled(hp_bar, Style::default().fg(bar_color)));
+
+    // Layout: [gauge (fixed)] [info spans (fill)]
+    let gauge_width = (label_width as u16 + 2).min(area.width);
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(gauge_width), Constraint::Min(1)])
+        .split(area);
+
+    // Left: Gauge with embedded label
+    let gauge = Gauge::default()
+        .gauge_style(Style::default().fg(bar_color).add_modifier(Modifier::BOLD))
+        .label(label)
+        .ratio(hp_ratio.clamp(0.0, 1.0));
+    frame.render_widget(gauge, chunks[0]);
+
+    // Right: segments + flash as a single Line
+    let mut spans: Vec<Span> = Vec::with_capacity(8);
 
     for seg in segments {
         spans.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
@@ -1115,7 +1106,7 @@ fn draw_status_row(
     if let Some(flash) = flash {
         let used: usize = spans.iter().map(|s| s.content.chars().count()).sum();
         let flash_len = flash.text.chars().count();
-        let available = (area.width as usize).saturating_sub(used + 1);
+        let available = (chunks[1].width as usize).saturating_sub(used + 1);
         if flash_len <= available {
             let pad = available.saturating_sub(flash_len);
             if pad > 0 {
@@ -1137,8 +1128,10 @@ fn draw_status_row(
         }
     }
 
-    let line = Paragraph::new(Line::from(spans)).alignment(Alignment::Left);
-    frame.render_widget(line, area);
+    if !spans.is_empty() {
+        let info = Paragraph::new(Line::from(spans));
+        frame.render_widget(info, chunks[1]);
+    }
 }
 
 /// Combat/idle status strip: player HP + attack timer + DPS on row 1,
