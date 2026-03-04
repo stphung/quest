@@ -1111,16 +1111,13 @@ fn draw_status_strip_table(
     };
 
     let player_label = format_hp_label("HP", hp.player_current_hp, hp.player_max_hp);
-    let hp_gauge_width = (row0.width / 3).clamp(12, 22) + 2;
 
-    // Shared column constraints for both rows (table-like alignment)
+    // Proportional 4-column layout: [HP Gauge] [Timer w/ label] [Info] [Flash]
     let col_constraints = [
-        Constraint::Length(hp_gauge_width), // HP Gauge
-        Constraint::Length(2),              // Spacer
-        Constraint::Length(8),              // Timer label (e.g. "You:1.2s")
-        Constraint::Min(8),                 // Timer LineGauge (fills remaining)
-        Constraint::Length(8),              // Info (DPS / room)
-        Constraint::Length(10),             // Flash
+        Constraint::Percentage(38), // HP Gauge
+        Constraint::Fill(1),        // Timer LineGauge (with label)
+        Constraint::Percentage(15), // Info (DPS / room)
+        Constraint::Percentage(15), // Flash
     ];
 
     // --- Row 1: Player ---
@@ -1146,28 +1143,22 @@ fn draw_status_strip_table(
         } else {
             Color::Green
         };
-        (format!("You:{:.1}s", next), ratio, color)
+        (format!(" You:{:.1}s", next), ratio, color)
     } else {
-        (format!("You:{:.1}s", player_interval), 0.0, Color::DarkGray)
+        (format!(" You:{:.1}s", player_interval), 0.0, Color::DarkGray)
     };
-
-    let timer_label = Paragraph::new(Span::styled(
-        &player_timer_label,
-        Style::default().fg(player_timer_color),
-    ));
-    frame.render_widget(timer_label, cols0[2]);
 
     let timer_gauge = LineGauge::default()
         .filled_style(Style::default().fg(player_timer_color))
         .unfilled_style(Style::default().fg(Color::DarkGray))
-        .label("")
+        .label(player_timer_label.as_str())
         .ratio(player_timer_ratio.clamp(0.0, 1.0));
-    frame.render_widget(timer_gauge, cols0[3]);
+    frame.render_widget(timer_gauge, cols0[1]);
 
     let info_text = Paragraph::new(Line::from(row1_info.clone()));
-    frame.render_widget(info_text, cols0[4]);
+    frame.render_widget(info_text, cols0[2]);
 
-    render_flash(frame, cols0[5], hp.player_damage_floats.last());
+    render_flash(frame, cols0[3], hp.player_damage_floats.last());
 
     // --- Row 2: Enemy or idle ---
     let cols1 = Layout::horizontal(col_constraints).split(row1);
@@ -1190,7 +1181,10 @@ fn draw_status_strip_table(
             enemy_sprites::zone_palette(zone_id).primary
         };
 
-        let name: String = enemy.name.chars().take(12).collect();
+        // Dynamic name truncation based on gauge width
+        let gauge_width = cols1[0].width as usize;
+        let name_budget = gauge_width.saturating_sub(12).max(4);
+        let name: String = enemy.name.chars().take(name_budget).collect();
         let enemy_label = format_hp_label(&name, enemy.current_hp, enemy.max_hp);
 
         let enemy_gauge = Gauge::default()
@@ -1201,7 +1195,7 @@ fn draw_status_strip_table(
 
         let enemy_interval = effective_enemy_attack_interval(game_state);
 
-        // Boss enrage spans timer label + gauge columns; normal enemies use LineGauge
+        // Boss enrage uses the timer column; normal enemies use LineGauge
         if game_state.zone_progression.fighting_boss {
             let remaining = (BOSS_ENRAGE_SECONDS - hp.boss_fight_timer).max(0.0);
             let enrage_style = if remaining < 5.0 {
@@ -1211,17 +1205,11 @@ fn draw_status_strip_table(
             } else {
                 Style::default().fg(Color::Cyan)
             };
-            let enrage_area = Rect {
-                x: cols1[2].x,
-                y: cols1[2].y,
-                width: cols1[2].width + cols1[3].width,
-                height: 1,
-            };
             let enrage_text = Paragraph::new(Span::styled(
-                format!("\u{26a1}Enrage:{:.0}s", remaining),
+                format!(" \u{26a1}Enrage:{:.0}s", remaining),
                 enrage_style,
             ));
-            frame.render_widget(enrage_text, enrage_area);
+            frame.render_widget(enrage_text, cols1[1]);
         } else {
             let enemy_next = (enemy_interval - hp.enemy_attack_timer).max(0.0);
             let ratio = 1.0 - (enemy_next / enemy_interval);
@@ -1231,18 +1219,12 @@ fn draw_status_strip_table(
                 Color::Red
             };
 
-            let foe_label = Paragraph::new(Span::styled(
-                format!("Foe:{:.1}s", enemy_next),
-                Style::default().fg(color),
-            ));
-            frame.render_widget(foe_label, cols1[2]);
-
             let foe_gauge = LineGauge::default()
                 .filled_style(Style::default().fg(color))
                 .unfilled_style(Style::default().fg(Color::DarkGray))
-                .label("")
+                .label(format!(" Foe:{:.1}s", enemy_next))
                 .ratio(ratio.clamp(0.0, 1.0));
-            frame.render_widget(foe_gauge, cols1[3]);
+            frame.render_widget(foe_gauge, cols1[1]);
         }
 
         // Enemy DPS
@@ -1251,9 +1233,9 @@ fn draw_status_strip_table(
             format!(" DPS:{:.0}", enemy_dps),
             Style::default().fg(Color::DarkGray),
         ));
-        frame.render_widget(enemy_dps_text, cols1[4]);
+        frame.render_widget(enemy_dps_text, cols1[2]);
 
-        render_flash(frame, cols1[5], hp.enemy_damage_floats.last());
+        render_flash(frame, cols1[3], hp.enemy_damage_floats.last());
     } else {
         // Idle row
         let idle_gauge = Gauge::default()
@@ -1262,18 +1244,12 @@ fn draw_status_strip_table(
             .ratio(0.0);
         frame.render_widget(idle_gauge, cols1[0]);
 
-        let foe_label = Paragraph::new(Span::styled(
-            "Foe:---",
-            Style::default().fg(Color::DarkGray),
-        ));
-        frame.render_widget(foe_label, cols1[2]);
-
         let foe_gauge = LineGauge::default()
             .filled_style(Style::default().fg(Color::DarkGray))
             .unfilled_style(Style::default().fg(Color::DarkGray))
-            .label("")
+            .label(" Foe:---")
             .ratio(0.0);
-        frame.render_widget(foe_gauge, cols1[3]);
+        frame.render_widget(foe_gauge, cols1[1]);
     }
 }
 
