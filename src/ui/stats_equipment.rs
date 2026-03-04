@@ -188,8 +188,7 @@ pub(super) fn draw_equipment_names_only(
     // Apply only to the equipment rows (not the sigil section).
     let total_enh: u16 = enhancement_levels.iter().map(|&l| l as u16).sum();
     if total_enh > 0 {
-        paint_soulforge_bg(frame, equip_area, enhancement_levels);
-        paint_soulforge_heat_line(frame, equip_area, enhancement_levels);
+        paint_soulforge_gradient(frame, equip_area, enhancement_levels);
         paint_soulforge_motes(frame, equip_area, total_enh, enhancement_levels);
     }
 
@@ -201,8 +200,7 @@ pub(super) fn draw_equipment_names_only(
         // Sigil visual effects — scale with total grade score.
         let grade_total = sigil_grade_total(storm_sigils);
         if grade_total > 0 {
-            paint_sigil_bg(frame, sigils_area, grade_total);
-            paint_sigil_heat_line(frame, sigils_area, grade_total);
+            paint_sigil_gradient(frame, sigils_area, grade_total);
             paint_sigil_motes(frame, sigils_area, grade_total);
         }
     }
@@ -364,70 +362,70 @@ fn sigil_grade_total(storm_sigils: &StormSigils) -> u16 {
         .sum()
 }
 
-// --- Soulforge visual effects (equipment section only) ---
+// --- Shared HalfBlock gradient helper ---
 
-/// Returns a dimmed version of the soulforge color for the given enhancement levels.
-/// Uses the highest level's color tier, scaled by average intensity.
-fn soulforge_dim_color(enhancement_levels: &[u8; 7], dim: f64) -> (u8, u8, u8) {
-    let max_level = enhancement_levels.iter().copied().max().unwrap_or(0);
-    let (cr, cg, cb) = crate::enhancement::enhancement_color_rgb(max_level);
-    (
-        (cr as f64 * dim) as u8,
-        (cg as f64 * dim) as u8,
-        (cb as f64 * dim) as u8,
-    )
-}
-
-/// Paints a faint soulforge-colored background tint on the equipment panel.
-fn paint_soulforge_bg(frame: &mut Frame, inner: Rect, enhancement_levels: &[u8; 7]) {
-    let avg = enhancement_levels.iter().map(|&l| l as f64).sum::<f64>() / 7.0;
-    let intensity = (avg / 10.0).min(1.0);
-    let dim = 0.03 + intensity * 0.04;
-    let (r, g, b) = soulforge_dim_color(enhancement_levels, dim);
-    let bg = Color::Rgb(r, g, b);
-
-    let buf = frame.buffer_mut();
-    for y in inner.y..inner.y + inner.height {
-        for x in inner.x..inner.x + inner.width {
-            if let Some(cell) = buf.cell_mut(Position::new(x, y)) {
-                cell.set_bg(bg);
-            }
-        }
-    }
-}
-
-/// Paints a glowing heat line along the bottom row — the forge source.
-/// Faint ember at low levels, bright at max. Motes appear to rise from here.
-fn paint_soulforge_heat_line(frame: &mut Frame, inner: Rect, enhancement_levels: &[u8; 7]) {
-    if inner.height == 0 {
+/// Applies a vertical gradient to an area using HalfBlock pixel resolution.
+/// Empty cells get `▀` with fg=top pixel, bg=bottom pixel (2x vertical resolution).
+/// Text cells get bg set to the bottom pixel color (preserves readability).
+fn paint_halfblock_gradient(
+    frame: &mut Frame,
+    area: Rect,
+    gradient_fn: impl Fn(usize) -> (u8, u8, u8),
+) {
+    let total_py = area.height as usize * 2;
+    if total_py == 0 {
         return;
     }
-    let avg = enhancement_levels.iter().map(|&l| l as f64).sum::<f64>() / 7.0;
-    let intensity = (avg / 10.0).min(1.0);
-    // Bottom row bg: dim 8% at low, 18% at max
-    let dim = 0.08 + intensity * 0.10;
-    let (r, g, b) = soulforge_dim_color(enhancement_levels, dim);
-    let bg = Color::Rgb(r, g, b);
 
-    let bottom_y = inner.y + inner.height - 1;
     let buf = frame.buffer_mut();
-    for x in inner.x..inner.x + inner.width {
-        if let Some(cell) = buf.cell_mut(Position::new(x, bottom_y)) {
-            cell.set_bg(bg);
-        }
-    }
-    // Second-to-bottom row gets a lighter glow if panel is tall enough
-    if inner.height >= 3 {
-        let dim2 = 0.05 + intensity * 0.06;
-        let (r2, g2, b2) = soulforge_dim_color(enhancement_levels, dim2);
-        let bg2 = Color::Rgb(r2, g2, b2);
-        let row2_y = inner.y + inner.height - 2;
-        for x in inner.x..inner.x + inner.width {
-            if let Some(cell) = buf.cell_mut(Position::new(x, row2_y)) {
-                cell.set_bg(bg2);
+    for y in area.y..area.y + area.height {
+        let py_top = ((y - area.y) as usize) * 2;
+        let py_bot = (py_top + 1).min(total_py - 1);
+        let c_top = gradient_fn(py_top);
+        let c_bot = gradient_fn(py_bot);
+        let fg_top = Color::Rgb(c_top.0, c_top.1, c_top.2);
+        let bg_bot = Color::Rgb(c_bot.0, c_bot.1, c_bot.2);
+
+        for x in area.x..area.x + area.width {
+            if let Some(cell) = buf.cell_mut(Position::new(x, y)) {
+                if cell.symbol() == " " || cell.symbol() == "\u{2580}" {
+                    cell.set_char('\u{2580}'); // ▀
+                    cell.set_fg(fg_top);
+                    cell.set_bg(bg_bot);
+                } else {
+                    cell.set_bg(bg_bot);
+                }
             }
         }
     }
+}
+
+// --- Soulforge visual effects (equipment section only) ---
+
+/// Soulforge gradient: dark at top, ember glow at bottom. 2x vertical resolution.
+fn paint_soulforge_gradient(frame: &mut Frame, inner: Rect, enhancement_levels: &[u8; 7]) {
+    let max_level = enhancement_levels.iter().copied().max().unwrap_or(0);
+    let (cr, cg, cb) = crate::enhancement::enhancement_color_rgb(max_level);
+    let avg = enhancement_levels.iter().map(|&l| l as f64).sum::<f64>() / 7.0;
+    let intensity = (avg / 10.0).min(1.0);
+
+    let base_dim = 0.03 + intensity * 0.04;
+    let heat_dim = 0.08 + intensity * 0.10;
+    let total_py = inner.height as usize * 2;
+
+    paint_halfblock_gradient(frame, inner, |py| {
+        let t = if total_py <= 1 {
+            0.0
+        } else {
+            py as f64 / (total_py - 1) as f64
+        };
+        let dim = base_dim + (heat_dim - base_dim) * t.powf(2.5);
+        (
+            (cr as f64 * dim) as u8,
+            (cg as f64 * dim) as u8,
+            (cb as f64 * dim) as u8,
+        )
+    });
 }
 
 /// Selects mote character based on enhancement tier (A: size progression).
@@ -517,7 +515,7 @@ fn paint_soulforge_motes(
             let Some(cell) = buf.cell_mut(Position::new(x, y)) else {
                 continue;
             };
-            if cell.symbol() != " " {
+            if cell.symbol() != " " && cell.symbol() != "\u{2580}" {
                 continue;
             }
 
@@ -540,7 +538,7 @@ fn paint_soulforge_motes(
             // C: trail — place a dimmer dot one row below the mote
             if has_trails && y + 1 < inner.y + inner.height {
                 if let Some(trail_cell) = buf.cell_mut(Position::new(x, y + 1)) {
-                    if trail_cell.symbol() == " " {
+                    if trail_cell.symbol() == " " || trail_cell.symbol() == "\u{2580}" {
                         trail_cell.set_char('\u{00b7}');
                         trail_cell.set_fg(mote_color(enhancement_levels, brightness * 0.4));
                     }
@@ -552,56 +550,26 @@ fn paint_soulforge_motes(
 
 // --- Storm sigil visual effects (sigil section only) ---
 
-/// Storm-blue color dimmed by a factor. Used for bg tint and heat line.
-fn storm_dim_color(grade_total: u16, dim: f64) -> Color {
-    // Blend from cool blue at low grades to bright electric blue at high grades
+/// Storm sigil gradient: dark at top, storm-blue glow at bottom. 2x vertical resolution.
+fn paint_sigil_gradient(frame: &mut Frame, inner: Rect, grade_total: u16) {
     let t = (grade_total as f64 / 100.0).min(1.0);
-    let r = (60.0 + t * 40.0) * dim;
-    let g = (140.0 + t * 40.0) * dim;
-    let b = (220.0 + t * 35.0) * dim;
-    Color::Rgb(r as u8, g as u8, b as u8)
-}
+    let sr = 60.0 + t * 40.0;
+    let sg = 140.0 + t * 40.0;
+    let sb = 220.0 + t * 35.0;
 
-/// Faint storm-blue background tint scaling with grade total.
-fn paint_sigil_bg(frame: &mut Frame, inner: Rect, grade_total: u16) {
-    let t = (grade_total as f64 / 100.0).min(1.0);
-    let dim = 0.03 + t * 0.04;
-    let bg = storm_dim_color(grade_total, dim);
+    let base_dim = 0.03 + t * 0.04;
+    let heat_dim = 0.08 + t * 0.10;
+    let total_py = inner.height as usize * 2;
 
-    let buf = frame.buffer_mut();
-    for y in inner.y..inner.y + inner.height {
-        for x in inner.x..inner.x + inner.width {
-            if let Some(cell) = buf.cell_mut(Position::new(x, y)) {
-                cell.set_bg(bg);
-            }
-        }
-    }
-}
-
-/// Glowing storm-blue heat line along the bottom row.
-fn paint_sigil_heat_line(frame: &mut Frame, inner: Rect, grade_total: u16) {
-    if inner.height == 0 {
-        return;
-    }
-    let t = (grade_total as f64 / 100.0).min(1.0);
-    let bg = storm_dim_color(grade_total, 0.08 + t * 0.10);
-
-    let bottom_y = inner.y + inner.height - 1;
-    let buf = frame.buffer_mut();
-    for x in inner.x..inner.x + inner.width {
-        if let Some(cell) = buf.cell_mut(Position::new(x, bottom_y)) {
-            cell.set_bg(bg);
-        }
-    }
-    if inner.height >= 3 {
-        let bg2 = storm_dim_color(grade_total, 0.05 + t * 0.06);
-        let row2_y = inner.y + inner.height - 2;
-        for x in inner.x..inner.x + inner.width {
-            if let Some(cell) = buf.cell_mut(Position::new(x, row2_y)) {
-                cell.set_bg(bg2);
-            }
-        }
-    }
+    paint_halfblock_gradient(frame, inner, |py| {
+        let pt = if total_py <= 1 {
+            0.0
+        } else {
+            py as f64 / (total_py - 1) as f64
+        };
+        let dim = base_dim + (heat_dim - base_dim) * pt.powf(2.0);
+        ((sr * dim) as u8, (sg * dim) as u8, (sb * dim) as u8)
+    });
 }
 
 /// Rising storm motes with size/color/trail progression.
@@ -640,7 +608,7 @@ fn paint_sigil_motes(frame: &mut Frame, inner: Rect, grade_total: u16) {
             let Some(cell) = buf.cell_mut(Position::new(x, y)) else {
                 continue;
             };
-            if cell.symbol() != " " {
+            if cell.symbol() != " " && cell.symbol() != "\u{2580}" {
                 continue;
             }
 
@@ -689,7 +657,7 @@ fn paint_sigil_motes(frame: &mut Frame, inner: Rect, grade_total: u16) {
             // Trail at high grades
             if has_trails && y + 1 < inner.y + inner.height {
                 if let Some(trail_cell) = buf.cell_mut(Position::new(x, y + 1)) {
-                    if trail_cell.symbol() == " " {
+                    if trail_cell.symbol() == " " || trail_cell.symbol() == "\u{2580}" {
                         let trail_scale = scale * 0.4;
                         trail_cell.set_char('\u{00b7}');
                         trail_cell.set_fg(Color::Rgb(
