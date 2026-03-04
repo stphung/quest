@@ -67,7 +67,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Gauge, Paragraph},
+    widgets::{Block, BorderType, Borders, Gauge, LineGauge, Paragraph},
     Frame,
 };
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -703,66 +703,24 @@ fn draw_s_layout(
     stats_panel::draw_footer_minimal(frame, chunks[6], game_state);
 }
 
-/// Renders an HP gauge with an optional damage flash number to the right.
-///
-/// If `flash` is `Some` and the area is wide enough, the gauge is split: the gauge fills
-/// the left portion and the flash text is right-aligned in a fixed-width column on the right.
-fn render_hp_bar_with_flash(
-    frame: &mut Frame,
-    area: Rect,
-    label: String,
-    ratio: f64,
-    gauge_color: Color,
-    flash: Option<&crate::combat::types::DamageFlash>,
-) {
-    let gauge = Gauge::default()
-        .gauge_style(
-            Style::default()
-                .fg(gauge_color)
-                .add_modifier(Modifier::BOLD),
-        )
-        .label(label)
-        .ratio(ratio);
-
-    if let Some(flash) = flash {
-        let flash_width = (flash.text.chars().count() as u16) + 1;
-        if area.width > flash_width + 15 {
-            let chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Min(15), Constraint::Length(flash_width)])
-                .split(area);
-
-            frame.render_widget(gauge, chunks[0]);
-
-            let mut style = Style::default().fg(flash.color);
-            if flash.bold {
-                style = style.add_modifier(Modifier::BOLD);
-            }
-            let flash_para =
-                Paragraph::new(Span::styled(&flash.text, style)).alignment(Alignment::Right);
-            frame.render_widget(flash_para, chunks[1]);
-        } else {
-            frame.render_widget(gauge, area);
-        }
-    } else {
-        frame.render_widget(gauge, area);
-    }
-}
-
 /// Draws player HP bar for S tier (borderless, single line) with optional damage flash.
 fn draw_s_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let ratio = game_state.combat_state.player_current_hp as f64
         / game_state.combat_state.player_max_hp as f64;
-    let label = format!(
-        "HP: {}/{}",
-        game_state.combat_state.player_current_hp, game_state.combat_state.player_max_hp
+    let label = format_hp_label(
+        "HP",
+        game_state.combat_state.player_current_hp,
+        game_state.combat_state.player_max_hp,
     );
-    render_hp_bar_with_flash(
+    draw_status_row(
         frame,
         area,
-        label,
+        &label,
         ratio,
         Color::Green,
+        0,
+        None,
+        &[],
         game_state.combat_state.player_damage_floats.last(),
     );
 }
@@ -771,13 +729,16 @@ fn draw_s_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
 fn draw_s_enemy_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     if let Some(enemy) = &game_state.combat_state.current_enemy {
         let ratio = enemy.current_hp as f64 / enemy.max_hp as f64;
-        let label = format!("{}: {}/{}", enemy.name, enemy.current_hp, enemy.max_hp);
-        render_hp_bar_with_flash(
+        let label = format_hp_label(&enemy.name, enemy.current_hp, enemy.max_hp);
+        draw_status_row(
             frame,
             area,
-            label,
+            &label,
             ratio,
             Color::Red,
+            0,
+            None,
+            &[],
             game_state.combat_state.enemy_damage_floats.last(),
         );
     }
@@ -956,147 +917,261 @@ fn draw_status_strip_fishing(
     frame.render_widget(phase, row1);
 }
 
-/// Dungeon status strip: player HP with room/key info on row 1, enemy HP or status on row 2.
+/// Dungeon status strip: delegates to shared table layout with room/key info.
 fn draw_status_strip_dungeon(frame: &mut Frame, row0: Rect, row1: Rect, game_state: &GameState) {
-    // Row 1: Player HP gauge with room/key info in label
-    let hp = &game_state.combat_state;
-    let hp_ratio = if hp.player_max_hp > 0 {
-        (hp.player_current_hp as f64 / hp.player_max_hp as f64).clamp(0.0, 1.0)
-    } else {
-        0.0
-    };
-    let room_info = if let Some(ref dungeon) = game_state.active_dungeon {
-        let cleared = dungeon.rooms_cleared;
-        let total = dungeon.room_count();
+    // Row 1 info: room/key progress
+    let row1_info = if let Some(ref dungeon) = game_state.active_dungeon {
         let key_str = if dungeon.has_key { " \u{1f511}" } else { "" };
-        format!(
-            "HP: {}/{}  |  Room {}/{}{}",
-            hp.player_current_hp, hp.player_max_hp, cleared, total, key_str
+        Span::styled(
+            format!(
+                " Rm {}/{}{}",
+                dungeon.rooms_cleared,
+                dungeon.room_count(),
+                key_str
+            ),
+            Style::default().fg(Color::Magenta),
         )
     } else {
-        format!("HP: {}/{}", hp.player_current_hp, hp.player_max_hp)
+        Span::default()
     };
-    render_hp_bar_with_flash(
-        frame,
-        row0,
-        room_info,
-        hp_ratio,
-        Color::Green,
-        game_state.combat_state.player_damage_floats.last(),
-    );
+    let idle_msg = format!("{} Exploring...", throbber::spinner_char());
+    draw_status_strip_table(frame, row0, row1, game_state, &row1_info, &idle_msg);
+}
 
-    // Row 2: Enemy HP or dungeon idle
-    if let Some(enemy) = &hp.current_enemy {
-        let enemy_ratio = if enemy.max_hp > 0 {
-            (enemy.current_hp as f64 / enemy.max_hp as f64).clamp(0.0, 1.0)
-        } else {
-            0.0
-        };
-        let enemy_label = format!("{}: {}/{}", enemy.name, enemy.current_hp, enemy.max_hp);
-        let is_boss = enemy.name.starts_with("Boss ");
-        let hp_color = if is_boss {
-            Color::LightRed
-        } else {
-            let zone_id = game_state
-                .active_dungeon
-                .as_ref()
-                .map(|d| d.zone_id)
-                .unwrap_or(game_state.zone_progression.current_zone_id);
-            enemy_sprites::zone_palette(zone_id).primary
-        };
-        render_hp_bar_with_flash(
-            frame,
-            row1,
-            enemy_label,
-            enemy_ratio,
-            hp_color,
-            game_state.combat_state.enemy_damage_floats.last(),
-        );
+/// Formats an HP label like "HP:340/500" or "Goblin:12.4K/25K" using short
+/// number formatting for values >= 10,000.
+fn format_hp_label(name: &str, current: u32, max: u32) -> String {
+    let cur_s = game_common::format_number_short(current as u64);
+    let max_s = game_common::format_number_short(max as u64);
+    format!("{}:{}/{}", name, cur_s, max_s)
+}
+
+/// Attack timer gauge info for `draw_status_row`.
+struct TimerGauge {
+    label: String,
+    /// 0.0 = just attacked, 1.0 = about to attack
+    ratio: f64,
+    color: Color,
+}
+
+/// Renders one status strip row: `[HP Gauge] [Timer Gauge] | seg | seg ... flash`
+///
+/// Uses ratatui Gauges for both the HP bar and the optional attack timer.
+/// Layout: `[HP gauge (fixed)] [timer gauge (fixed, optional)] [text segments + flash (fill)]`
+#[allow(clippy::too_many_arguments)]
+fn draw_status_row(
+    frame: &mut Frame,
+    area: Rect,
+    hp_label: &str,
+    hp_ratio: f64,
+    bar_color: Color,
+    label_width: usize,
+    timer: Option<&TimerGauge>,
+    segments: &[Span],
+    flash: Option<&crate::combat::types::DamageFlash>,
+) {
+    if area.width == 0 || area.height == 0 {
+        return;
+    }
+
+    // Truncate HP label to fit gauge column
+    let label: &str = if label_width > 0 && hp_label.len() > label_width {
+        &hp_label[..hp_label.floor_char_boundary(label_width)]
     } else {
-        let spinner = throbber::spinner_char();
-        let text = Paragraph::new(Line::from(Span::styled(
-            format!("{} Exploring the dungeon...", spinner),
-            Style::default()
-                .fg(Color::Magenta)
-                .add_modifier(Modifier::ITALIC),
-        )))
-        .alignment(Alignment::Center);
-        frame.render_widget(text, row1);
+        hp_label
+    };
+
+    // Layout: [HP gauge] [timer gauge (optional)] [info text]
+    let hp_gauge_width = (label_width as u16 + 2).min(area.width);
+    let timer_width: u16 = if timer.is_some() { 11 } else { 0 };
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Length(hp_gauge_width),
+            Constraint::Length(timer_width),
+            Constraint::Min(1),
+        ])
+        .split(area);
+
+    // HP Gauge
+    let gauge = Gauge::default()
+        .gauge_style(Style::default().fg(bar_color).add_modifier(Modifier::BOLD))
+        .label(label)
+        .ratio(hp_ratio.clamp(0.0, 1.0));
+    frame.render_widget(gauge, chunks[0]);
+
+    // Timer Gauge (optional) — thin line gauge for attack cooldown
+    if let Some(timer) = timer {
+        let timer_gauge = LineGauge::default()
+            .filled_style(Style::default().fg(timer.color))
+            .unfilled_style(Style::default().fg(Color::DarkGray))
+            .label(timer.label.as_str())
+            .ratio(timer.ratio.clamp(0.0, 1.0));
+        frame.render_widget(timer_gauge, chunks[1]);
+    }
+
+    // Text segments + flash
+    let info_area = chunks[2];
+    let mut spans: Vec<Span> = Vec::with_capacity(8);
+
+    for seg in segments {
+        spans.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
+        spans.push(seg.clone());
+    }
+
+    // Flash: render right-aligned in remaining space
+    if let Some(flash) = flash {
+        let used: usize = spans.iter().map(|s| s.content.chars().count()).sum();
+        let flash_len = flash.text.chars().count();
+        let available = (info_area.width as usize).saturating_sub(used + 1);
+        if flash_len <= available {
+            let pad = available.saturating_sub(flash_len);
+            if pad > 0 {
+                spans.push(Span::raw(" ".repeat(pad)));
+            }
+            let progress = 1.0 - (flash.remaining / crate::combat::types::DAMAGE_FLASH_DURATION);
+            let style = if progress > 0.8 {
+                Style::default().fg(Color::DarkGray)
+            } else if progress > 0.6 {
+                Style::default().fg(flash.color)
+            } else {
+                let mut s = Style::default().fg(flash.color);
+                if flash.bold {
+                    s = s.add_modifier(Modifier::BOLD);
+                }
+                s
+            };
+            spans.push(Span::styled(&flash.text, style));
+        }
+    }
+
+    if !spans.is_empty() {
+        let info = Paragraph::new(Line::from(spans));
+        frame.render_widget(info, info_area);
     }
 }
 
-/// Builds a text-based HP bar string, e.g. "████░░░░" for a given ratio and width.
-fn text_hp_bar(ratio: f64, width: usize) -> String {
-    let filled = (ratio * width as f64).round() as usize;
-    let empty = width.saturating_sub(filled);
-    let mut bar = String::with_capacity(width * 3);
-    for _ in 0..filled {
-        bar.push('\u{2588}'); // █
-    }
-    for _ in 0..empty {
-        bar.push('\u{2591}'); // ░
-    }
-    bar
-}
-
-/// Combat/idle status strip: player HP + attack timer + DPS on row 1,
-/// enemy HP + enemy timer (or enrage for bosses) on row 2.
+/// Combat/idle status strip: delegates to shared table layout with player DPS.
 fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_state: &GameState) {
-    let hp = &game_state.combat_state;
     let derived = game_state.cached_derived_stats;
-
-    // DPS calculation (same as draw_combat_status in combat_scene.rs)
     let base_dps = derived.total_damage() as f64 / ATTACK_INTERVAL_SECONDS;
     let effective_dps = base_dps
         * (1.0 + (derived.crit_chance_percent as f64 / 100.0) * (derived.crit_multiplier - 1.0));
 
-    // HP ratio for text bar
+    let row1_info = Span::styled(
+        format!(" DPS:{:.0}", effective_dps),
+        Style::default().fg(Color::DarkGray),
+    );
+    let msg = throbber::waiting_message(game_state.character_xp);
+    let idle_msg = format!("{} {}", throbber::spinner_char(), msg);
+    draw_status_strip_table(frame, row0, row1, game_state, &row1_info, &idle_msg);
+}
+
+/// Renders a damage flash right-aligned in the given area.
+fn render_flash(frame: &mut Frame, area: Rect, flash: Option<&crate::combat::types::DamageFlash>) {
+    if let Some(flash) = flash {
+        let progress = 1.0 - (flash.remaining / crate::combat::types::DAMAGE_FLASH_DURATION);
+        let style = if progress > 0.8 {
+            Style::default().fg(Color::DarkGray)
+        } else if progress > 0.6 {
+            Style::default().fg(flash.color)
+        } else {
+            let mut s = Style::default().fg(flash.color);
+            if flash.bold {
+                s = s.add_modifier(Modifier::BOLD);
+            }
+            s
+        };
+        let text = Paragraph::new(Span::styled(&flash.text, style))
+            .alignment(ratatui::layout::Alignment::Right);
+        frame.render_widget(text, area);
+    }
+}
+
+/// Shared table-layout status strip for combat and dungeon contexts.
+/// Columns: [HP Gauge] [Spacer] [Timer Label] [Timer LineGauge] [Info] [Flash]
+///
+/// `row1_info`: right-column content for the player row (DPS or room info).
+/// `idle_msg`: label shown in the HP gauge area when no enemy is present.
+fn draw_status_strip_table(
+    frame: &mut Frame,
+    row0: Rect,
+    row1: Rect,
+    game_state: &GameState,
+    row1_info: &Span,
+    idle_msg: &str,
+) {
+    let hp = &game_state.combat_state;
+    let derived = game_state.cached_derived_stats;
+
     let hp_ratio = if hp.player_max_hp > 0 {
         (hp.player_current_hp as f64 / hp.player_max_hp as f64).clamp(0.0, 1.0)
     } else {
         0.0
     };
 
-    // Row 1: Player HP text bar + attack timer + DPS
-    let bar_width = (row0.width as usize / 4).clamp(4, 10);
-    let hp_bar = text_hp_bar(hp_ratio, bar_width);
+    let player_label = format_hp_label("HP", hp.player_current_hp, hp.player_max_hp);
+    let hp_gauge_width = (row0.width / 3).clamp(12, 22) + 2;
 
-    let mut row0_spans = vec![
-        Span::styled(
-            format!("HP:{}/{} ", hp.player_current_hp, hp.player_max_hp),
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(hp_bar, Style::default().fg(Color::Green)),
+    // Shared column constraints for both rows (table-like alignment)
+    let col_constraints = [
+        Constraint::Length(hp_gauge_width), // HP Gauge
+        Constraint::Length(2),              // Spacer
+        Constraint::Length(8),              // Timer label (e.g. "You:1.2s")
+        Constraint::Min(8),                 // Timer LineGauge (fills remaining)
+        Constraint::Length(8),              // Info (DPS / room)
+        Constraint::Length(10),             // Flash
     ];
 
-    if hp.current_enemy.is_some() {
-        let player_interval = ATTACK_INTERVAL_SECONDS / derived.attack_speed_multiplier;
-        let player_next = (player_interval - hp.player_attack_timer).max(0.0);
-        let player_style = if player_next < 0.3 {
+    // --- Row 1: Player ---
+    let cols0 = Layout::horizontal(col_constraints).split(row0);
+
+    let gauge = Gauge::default()
+        .gauge_style(
             Style::default()
                 .fg(Color::Green)
-                .add_modifier(Modifier::BOLD)
+                .add_modifier(Modifier::BOLD),
+        )
+        .label(player_label.as_str())
+        .ratio(hp_ratio.clamp(0.0, 1.0));
+    frame.render_widget(gauge, cols0[0]);
+
+    let player_interval = ATTACK_INTERVAL_SECONDS / derived.attack_speed_multiplier;
+    let (player_timer_label, player_timer_ratio, player_timer_color) = if hp.current_enemy.is_some()
+    {
+        let next = (player_interval - hp.player_attack_timer).max(0.0);
+        let ratio = 1.0 - (next / player_interval);
+        let color = if next < 0.3 {
+            Color::LightGreen
         } else {
-            Style::default().fg(Color::Green)
+            Color::Green
         };
-        row0_spans.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
-        row0_spans.push(Span::styled(
-            format!("You:{:.1}s", player_next),
-            player_style,
-        ));
-    }
+        (format!("You:{:.1}s", next), ratio, color)
+    } else {
+        (format!("You:{:.1}s", player_interval), 0.0, Color::DarkGray)
+    };
 
-    row0_spans.push(Span::styled(
-        format!(" | DPS:{:.0}", effective_dps),
-        Style::default().fg(Color::DarkGray),
+    let timer_label = Paragraph::new(Span::styled(
+        &player_timer_label,
+        Style::default().fg(player_timer_color),
     ));
+    frame.render_widget(timer_label, cols0[2]);
 
-    let row0_line = Paragraph::new(Line::from(row0_spans)).alignment(Alignment::Center);
-    frame.render_widget(row0_line, row0);
+    let timer_gauge = LineGauge::default()
+        .filled_style(Style::default().fg(player_timer_color))
+        .unfilled_style(Style::default().fg(Color::DarkGray))
+        .label("")
+        .ratio(player_timer_ratio.clamp(0.0, 1.0));
+    frame.render_widget(timer_gauge, cols0[3]);
 
-    // Row 2: Enemy HP + enemy timer / enrage, or idle message
+    let info_text = Paragraph::new(Line::from(row1_info.clone()));
+    frame.render_widget(info_text, cols0[4]);
+
+    render_flash(frame, cols0[5], hp.player_damage_floats.last());
+
+    // --- Row 2: Enemy or idle ---
+    let cols1 = Layout::horizontal(col_constraints).split(row1);
+
     if let Some(enemy) = &hp.current_enemy {
         let enemy_ratio = if enemy.max_hp > 0 {
             (enemy.current_hp as f64 / enemy.max_hp as f64).clamp(0.0, 1.0)
@@ -1115,21 +1190,18 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
             enemy_sprites::zone_palette(zone_id).primary
         };
 
-        let enemy_bar = text_hp_bar(enemy_ratio, bar_width);
+        let name: String = enemy.name.chars().take(12).collect();
+        let enemy_label = format_hp_label(&name, enemy.current_hp, enemy.max_hp);
 
-        // Truncate enemy name to fit
-        let max_name_len = (row1.width as usize).saturating_sub(bar_width + 20).min(12);
-        let name: String = enemy.name.chars().take(max_name_len).collect();
+        let enemy_gauge = Gauge::default()
+            .gauge_style(Style::default().fg(hp_color).add_modifier(Modifier::BOLD))
+            .label(enemy_label.as_str())
+            .ratio(enemy_ratio.clamp(0.0, 1.0));
+        frame.render_widget(enemy_gauge, cols1[0]);
 
-        let mut row1_spans = vec![
-            Span::styled(
-                format!("{}:{}/{} ", name, enemy.current_hp, enemy.max_hp),
-                Style::default().fg(Color::White),
-            ),
-            Span::styled(enemy_bar, Style::default().fg(hp_color)),
-        ];
+        let enemy_interval = effective_enemy_attack_interval(game_state);
 
-        // Boss enrage timer takes priority over enemy attack timer
+        // Boss enrage spans timer label + gauge columns; normal enemies use LineGauge
         if game_state.zone_progression.fighting_boss {
             let remaining = (BOSS_ENRAGE_SECONDS - hp.boss_fight_timer).max(0.0);
             let enrage_style = if remaining < 5.0 {
@@ -1139,40 +1211,69 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
             } else {
                 Style::default().fg(Color::Cyan)
             };
-            row1_spans.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
-            row1_spans.push(Span::styled(
+            let enrage_area = Rect {
+                x: cols1[2].x,
+                y: cols1[2].y,
+                width: cols1[2].width + cols1[3].width,
+                height: 1,
+            };
+            let enrage_text = Paragraph::new(Span::styled(
                 format!("\u{26a1}Enrage:{:.0}s", remaining),
                 enrage_style,
             ));
+            frame.render_widget(enrage_text, enrage_area);
         } else {
-            let enemy_interval = effective_enemy_attack_interval(game_state);
             let enemy_next = (enemy_interval - hp.enemy_attack_timer).max(0.0);
-            let enemy_style = if enemy_next < 0.3 {
-                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+            let ratio = 1.0 - (enemy_next / enemy_interval);
+            let color = if enemy_next < 0.3 {
+                Color::LightRed
             } else {
-                Style::default().fg(Color::Red)
+                Color::Red
             };
-            row1_spans.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
-            row1_spans.push(Span::styled(format!("Foe:{:.1}s", enemy_next), enemy_style));
+
+            let foe_label = Paragraph::new(Span::styled(
+                format!("Foe:{:.1}s", enemy_next),
+                Style::default().fg(color),
+            ));
+            frame.render_widget(foe_label, cols1[2]);
+
+            let foe_gauge = LineGauge::default()
+                .filled_style(Style::default().fg(color))
+                .unfilled_style(Style::default().fg(Color::DarkGray))
+                .label("")
+                .ratio(ratio.clamp(0.0, 1.0));
+            frame.render_widget(foe_gauge, cols1[3]);
         }
 
-        let row1_line = Paragraph::new(Line::from(row1_spans)).alignment(Alignment::Center);
-        frame.render_widget(row1_line, row1);
+        // Enemy DPS
+        let enemy_dps = enemy.damage as f64 / enemy_interval;
+        let enemy_dps_text = Paragraph::new(Span::styled(
+            format!(" DPS:{:.0}", enemy_dps),
+            Style::default().fg(Color::DarkGray),
+        ));
+        frame.render_widget(enemy_dps_text, cols1[4]);
+
+        render_flash(frame, cols1[5], hp.enemy_damage_floats.last());
     } else {
-        let spinner = throbber::spinner_char();
-        let msg = throbber::waiting_message(game_state.character_xp);
-        let text = Paragraph::new(Line::from(vec![
-            Span::styled(
-                format!("{} {}", spinner, msg),
-                Style::default().fg(Color::Yellow),
-            ),
-            Span::styled(
-                format!(" | DPS:{:.0}", effective_dps),
-                Style::default().fg(Color::DarkGray),
-            ),
-        ]))
-        .alignment(Alignment::Center);
-        frame.render_widget(text, row1);
+        // Idle row
+        let idle_gauge = Gauge::default()
+            .gauge_style(Style::default().fg(Color::DarkGray))
+            .label(idle_msg)
+            .ratio(0.0);
+        frame.render_widget(idle_gauge, cols1[0]);
+
+        let foe_label = Paragraph::new(Span::styled(
+            "Foe:---",
+            Style::default().fg(Color::DarkGray),
+        ));
+        frame.render_widget(foe_label, cols1[2]);
+
+        let foe_gauge = LineGauge::default()
+            .filled_style(Style::default().fg(Color::DarkGray))
+            .unfilled_style(Style::default().fg(Color::DarkGray))
+            .label("")
+            .ratio(0.0);
+        frame.render_widget(foe_gauge, cols1[3]);
     }
 }
 
