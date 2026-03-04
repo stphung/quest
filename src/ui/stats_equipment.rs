@@ -388,7 +388,7 @@ fn paint_halfblock_gradient(
 
         for x in area.x..area.x + area.width {
             if let Some(cell) = buf.cell_mut(Position::new(x, y)) {
-                if cell.symbol() == " " {
+                if cell.symbol() == " " || cell.symbol() == "\u{2580}" {
                     cell.set_char('\u{2580}'); // ▀
                     cell.set_fg(fg_top);
                     cell.set_bg(bg_bot);
@@ -515,7 +515,7 @@ fn paint_soulforge_motes(
             let Some(cell) = buf.cell_mut(Position::new(x, y)) else {
                 continue;
             };
-            if cell.symbol() != " " {
+            if cell.symbol() != " " && cell.symbol() != "\u{2580}" {
                 continue;
             }
 
@@ -538,7 +538,7 @@ fn paint_soulforge_motes(
             // C: trail — place a dimmer dot one row below the mote
             if has_trails && y + 1 < inner.y + inner.height {
                 if let Some(trail_cell) = buf.cell_mut(Position::new(x, y + 1)) {
-                    if trail_cell.symbol() == " " {
+                    if trail_cell.symbol() == " " || trail_cell.symbol() == "\u{2580}" {
                         trail_cell.set_char('\u{00b7}');
                         trail_cell.set_fg(mote_color(enhancement_levels, brightness * 0.4));
                     }
@@ -608,7 +608,7 @@ fn paint_sigil_motes(frame: &mut Frame, inner: Rect, grade_total: u16) {
             let Some(cell) = buf.cell_mut(Position::new(x, y)) else {
                 continue;
             };
-            if cell.symbol() != " " {
+            if cell.symbol() != " " && cell.symbol() != "\u{2580}" {
                 continue;
             }
 
@@ -657,7 +657,7 @@ fn paint_sigil_motes(frame: &mut Frame, inner: Rect, grade_total: u16) {
             // Trail at high grades
             if has_trails && y + 1 < inner.y + inner.height {
                 if let Some(trail_cell) = buf.cell_mut(Position::new(x, y + 1)) {
-                    if trail_cell.symbol() == " " {
+                    if trail_cell.symbol() == " " || trail_cell.symbol() == "\u{2580}" {
                         let trail_scale = scale * 0.4;
                         trail_cell.set_char('\u{00b7}');
                         trail_cell.set_fg(Color::Rgb(
