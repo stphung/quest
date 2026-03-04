@@ -1039,6 +1039,81 @@ fn text_hp_bar(ratio: f64, width: usize) -> String {
     bar
 }
 
+/// Formats an HP label like "HP:340/500" or "Goblin:12.4K/25K" using short
+/// number formatting for values >= 10,000.
+#[allow(dead_code)]
+fn format_hp_label(name: &str, current: u32, max: u32) -> String {
+    let cur_s = game_common::format_number_short(current as u64);
+    let max_s = game_common::format_number_short(max as u64);
+    format!("{}:{}/{}", name, cur_s, max_s)
+}
+
+/// Renders one status strip row: `Label:cur/max [████░░░░] | seg | seg ... flash`
+///
+/// - `hp_label`: pre-formatted string like "HP:340/500"
+/// - `hp_ratio`: 0.0..=1.0 fill ratio for the text bar
+/// - `bar_color`: color for the filled portion of the text bar
+/// - `segments`: additional info spans rendered after the bar (timers, DPS, room info)
+/// - `flash`: optional damage flash rendered right-aligned at row end
+#[allow(dead_code)]
+fn draw_status_row(
+    frame: &mut Frame,
+    area: Rect,
+    hp_label: &str,
+    hp_ratio: f64,
+    bar_color: Color,
+    segments: &[Span],
+    flash: Option<&crate::combat::types::DamageFlash>,
+) {
+    if area.width == 0 || area.height == 0 {
+        return;
+    }
+
+    let bar_width = (area.width as usize / 6).clamp(4, 10);
+    let hp_bar = text_hp_bar(hp_ratio, bar_width);
+
+    let mut spans: Vec<Span> = Vec::with_capacity(8);
+    spans.push(Span::styled(
+        format!("{} ", hp_label),
+        Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+    ));
+    spans.push(Span::styled(hp_bar, Style::default().fg(bar_color)));
+
+    for seg in segments {
+        spans.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
+        spans.push(seg.clone());
+    }
+
+    // Flash: render right-aligned in remaining space
+    if let Some(flash) = flash {
+        let used: usize = spans.iter().map(|s| s.content.chars().count()).sum();
+        let flash_len = flash.text.chars().count();
+        let available = (area.width as usize).saturating_sub(used + 1);
+        if flash_len <= available {
+            let pad = available.saturating_sub(flash_len);
+            if pad > 0 {
+                spans.push(Span::raw(" ".repeat(pad)));
+            }
+            let progress = 1.0 - (flash.remaining / crate::combat::types::DAMAGE_FLASH_DURATION);
+            let style = if progress > 0.8 {
+                Style::default().fg(Color::DarkGray)
+            } else if progress > 0.6 {
+                Style::default().fg(flash.color)
+            } else {
+                let mut s = Style::default().fg(flash.color);
+                if flash.bold {
+                    s = s.add_modifier(Modifier::BOLD);
+                }
+                s
+            };
+            spans.push(Span::styled(&flash.text, style));
+        }
+    }
+
+    let line = Paragraph::new(Line::from(spans)).alignment(Alignment::Left);
+    frame.render_widget(line, area);
+}
+
 /// Combat/idle status strip: player HP + attack timer + DPS on row 1,
 /// enemy HP + enemy timer (or enrage for bosses) on row 2.
 fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_state: &GameState) {
