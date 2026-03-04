@@ -1145,7 +1145,11 @@ fn draw_status_strip_table(
         };
         (format!(" You:{:.1}s", next), ratio, color)
     } else {
-        (format!(" You:{:.1}s", player_interval), 0.0, Color::DarkGray)
+        (
+            format!(" You:{:.1}s", player_interval),
+            0.0,
+            Color::DarkGray,
+        )
     };
 
     let timer_gauge = LineGauge::default()
