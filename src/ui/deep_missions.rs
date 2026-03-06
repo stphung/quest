@@ -318,265 +318,7 @@ fn draw_panel_outline(
     put_cell(buffer, bottom, right, '\u{2518}', color);
 }
 
-// ── Compact Hub (S-tier) ─────────────────────────────────────────────────────
-
-/// Render a compact hub for S-tier (small) terminals.
-/// Shows guild summary, active missions, and navigation keys in minimal space.
-fn render_compact_hub(
-    buffer: &mut [Vec<SceneCell>],
-    width: usize,
-    height: usize,
-    deep: &DeepState,
-    ui: &DeepUiState,
-) {
-    if width == 0 || height < 4 {
-        return;
-    }
-    let mut row = 0i32;
-
-    // Title line with generation counter
-    put_text(buffer, row, 1, "THE DEEP", SECTION_LABEL_COLOR);
-    let gen_label = format!("Gen.{}", deep.prestige.generation_number.max(1));
-    let gen_col = (width as i32) - gen_label.len() as i32 - 1;
-    put_text(buffer, row, gen_col.max(12), &gen_label, Color::DarkGray);
-    row += 1;
-
-    // Atmospheric quote
-    let quotes = [
-        "\"The tunnels breathe.\"",
-        "\"Stone remembers.\"",
-        "\"Deeper. Always deeper.\"",
-        "\"The dark welcomes you.\"",
-        "\"Echoes of the fallen.\"",
-    ];
-    let millis = super::scene_fx::current_millis();
-    let quote_idx = (millis / 12_000) as usize % quotes.len();
-    put_text(buffer, row, 1, quotes[quote_idx], Color::Rgb(60, 80, 120));
-    row += 1;
-
-    // Separator
-    let sep: String = "\u{2500}".repeat(width.saturating_sub(2));
-    put_text(buffer, row, 1, &sep, Color::DarkGray);
-    row += 1;
-
-    // Guild info
-    let rank = deep.persistent.guild_rank;
-    let guild_line = format!(
-        "GUILD  {} (Rank {})    L{}",
-        rank.display_name(),
-        rank.0,
-        deep.persistent.deepest_layer_reached.max(1)
-    );
-    put_text(buffer, row, 1, &guild_line, Color::White);
-    row += 1;
-
-    let marks_line = format!("WARBAND MARKS  {}", deep.prestige.warband_marks);
-    put_text(buffer, row, 1, &marks_line, MARKS_COLOR);
-    row += 1;
-
-    // Separator
-    put_text(buffer, row, 1, &sep, Color::DarkGray);
-    row += 1;
-
-    // Roster (compact)
-    let roster = &deep.prestige.roster;
-    if roster.is_empty() {
-        put_text(buffer, row, 1, "  No mercs yet.", Color::DarkGray);
-    } else {
-        for (i, merc) in roster.iter().enumerate() {
-            if row >= height as i32 - 1 {
-                break;
-            }
-            if matches!(merc.status, MercStatus::Lost) {
-                continue;
-            }
-            let is_selected = ui.selected_index == i;
-            let arch_abbr = super::deep_roster::archetype_abbrev(merc.archetype);
-            let status = match &merc.status {
-                MercStatus::Available => "Rdy",
-                MercStatus::OnMission(_) => "Msn",
-                MercStatus::Injured { .. } => "Inj",
-                MercStatus::Lost => "Lost",
-            };
-            let cursor = if is_selected { ">" } else { " " };
-            let line = format!(
-                "{} {} [{}] L{}  {}",
-                cursor, merc.name, arch_abbr, merc.level, status
-            );
-            let max_len = width.saturating_sub(1);
-            let display: String = if line.chars().count() > max_len {
-                line.chars().take(max_len).collect()
-            } else {
-                line
-            };
-            let color = if is_selected {
-                Color::Cyan
-            } else {
-                Color::White
-            };
-            put_text(buffer, row, 1, &display, color);
-            row += 1;
-        }
-    }
-
-    // Warband log (compact, if space)
-    let log = &deep.prestige.warband_log;
-    if !log.is_empty() && row < height as i32 - 2 {
-        put_text(buffer, row, 1, &sep, Color::DarkGray);
-        row += 1;
-        for entry in log.iter().rev().take(3) {
-            if row >= height as i32 - 1 {
-                break;
-            }
-            let (icon, color) = match entry.outcome {
-                crate::deep::MissionOutcome::Success => ("\u{2713}", Color::Green),
-                crate::deep::MissionOutcome::PartialSuccess => ("\u{25cb}", Color::Yellow),
-                crate::deep::MissionOutcome::Failure => ("\u{2717}", Color::LightRed),
-            };
-            let line = format!(
-                "{} L{} {} {}M",
-                icon, entry.layer, entry.mission_name, entry.marks_earned
-            );
-            put_text(buffer, row, 1, &line, color);
-            row += 1;
-        }
-    }
-
-    // Navigation keys (footer)
-    put_text(
-        buffer,
-        height as i32 - 1,
-        1,
-        "[\u{2190}/\u{2192}] Switch View  [?] Help",
-        SECTION_LABEL_COLOR,
-    );
-}
-
-// ── Hub view ──────────────────────────────────────────────────────────────────
-
-/// Render the main Hub view (Status tab) with Roster/Recruit sub-tabs.
-pub(super) fn render_hub(
-    buffer: &mut [Vec<SceneCell>],
-    width: usize,
-    height: usize,
-    deep: &DeepState,
-    ui: &DeepUiState,
-    ctx: &LayoutContext,
-) {
-    if height < 4 || width < 20 {
-        return;
-    }
-
-    if ctx.tier <= SizeTier::S {
-        render_compact_hub(buffer, width, height, deep, ui);
-        return;
-    }
-
-    // ── Sub-tab strip: Roster / Recruit ──
-    let roster = &deep.prestige.roster;
-    let max_roster = deep.persistent.guild_rank.max_roster() as usize;
-    let live_count = roster
-        .iter()
-        .filter(|m| !matches!(m.status, MercStatus::Lost))
-        .count();
-    let pool_count = deep.prestige.recruit_pool.candidates.len();
-
-    let roster_label = format!("Roster ({}/{})", live_count, max_roster);
-    let recruit_label = format!("Recruit ({})", pool_count);
-
-    let col_start = 2i32;
-    let roster_color = if !ui.status_show_recruit {
-        Color::Rgb(120, 200, 255)
-    } else {
-        Color::Rgb(60, 80, 110)
-    };
-    let recruit_col = col_start + roster_label.len() as i32 + 4;
-    let recruit_color = if ui.status_show_recruit {
-        Color::Rgb(120, 200, 255)
-    } else {
-        Color::Rgb(60, 80, 110)
-    };
-
-    put_text(buffer, 0, col_start, &roster_label, roster_color);
-    put_text(buffer, 0, recruit_col, &recruit_label, recruit_color);
-
-    // Thick underline under selected sub-tab
-    if !ui.status_show_recruit {
-        let underline: String = "\u{2501}".repeat(roster_label.len());
-        put_text(buffer, 1, col_start, &underline, Color::Rgb(120, 200, 255));
-    } else {
-        let underline: String = "\u{2501}".repeat(recruit_label.len());
-        put_text(
-            buffer,
-            1,
-            recruit_col,
-            &underline,
-            Color::Rgb(120, 200, 255),
-        );
-    }
-
-    // Separator below sub-tabs
-    let sep_color = Color::Rgb(28, 49, 74);
-    for c in 1i32..(width as i32 - 1) {
-        if buffer.len() > 2 {
-            put_cell(buffer, 2, c, '\u{2500}', sep_color);
-        }
-    }
-
-    // ── Flash message ──
-    if let Some(msg) = &ui.flash_message {
-        put_text(buffer, height as i32 - 2, 1, msg, Color::LightRed);
-    }
-
-    // ── Footer ──
-    let footer = if ui.status_show_recruit {
-        match ctx.tier {
-            SizeTier::S => {
-                "[\u{2190}/\u{2192}]Switch  [\u{2191}/\u{2193}]Nav  [Enter]Recruit  [Tab]Toggle  [Esc]Close"
-            }
-            _ => {
-                "[\u{2190}/\u{2192}] Switch View  [\u{2191}/\u{2193}] Navigate  [Enter] Recruit  [Tab] Switch  [Esc] Close"
-            }
-        }
-    } else {
-        match ctx.tier {
-            SizeTier::S => "[\u{2190}/\u{2192}]Switch  [\u{2191}/\u{2193}]Nav  [G]Rank  [Tab]Toggle  [Esc]Close",
-            _ => "[\u{2190}/\u{2192}] Switch View  [\u{2191}/\u{2193}] Navigate  [G] Guild Rank  [Tab] Switch  [Esc] Close",
-        }
-    };
-    put_text(buffer, height as i32 - 1, 1, footer, Color::DarkGray);
-    let help_hint = "[?] Help";
-    let help_col = (width as i32 - help_hint.len() as i32 - 1).max(footer.len() as i32 + 2);
-    put_text(
-        buffer,
-        height as i32 - 1,
-        help_col,
-        help_hint,
-        Color::Rgb(50, 70, 100),
-    );
-
-    let content_top = 3i32; // after sub-tab labels + underline + separator
-    let content_height = height.saturating_sub(4); // minus sub-tab header (3) and footer (1)
-
-    if ui.status_show_recruit {
-        // ── Recruit sub-view ──
-        if content_height > 0 {
-            super::deep_roster::render_recruit(
-                &mut buffer[3..],
-                width,
-                content_height,
-                deep,
-                ui,
-                ctx,
-            );
-        }
-    } else {
-        // ── Roster sub-view (default) ──
-        render_hub_roster(buffer, width, height, deep, ui, ctx, content_top);
-    }
-}
-
-/// Render the roster content within the Status tab (below the sub-tab header).
+/// Render the roster content.
 fn render_hub_roster(
     buffer: &mut [Vec<SceneCell>],
     width: usize,
@@ -610,7 +352,7 @@ fn render_hub_roster(
             buffer,
             row + 2,
             width,
-            "No mercenaries yet. [Tab] to switch to Recruit view.",
+            "No mercenaries yet. Go to Recruit tab to hire.",
             Color::Rgb(60, 80, 110),
         );
     } else {
@@ -752,10 +494,37 @@ fn render_hub_roster(
     }
 }
 
-// ── New Mission view ──────────────────────────────────────────────────────────
+// ── Standalone tab views ─────────────────────────────────────────────────────
 
-/// Render the New Mission sub-view.
-pub(super) fn render_new_mission(
+/// Render the Active missions tab (standalone, no sub-tab toggle).
+pub(super) fn render_active(
+    buffer: &mut [Vec<SceneCell>],
+    width: usize,
+    height: usize,
+    deep: &DeepState,
+    ui: &DeepUiState,
+    _ctx: &LayoutContext,
+) {
+    if height < 4 || width < 20 {
+        return;
+    }
+
+    // Footer
+    if let Some(msg) = &ui.flash_message {
+        put_text(buffer, height as i32 - 2, 1, msg, Color::LightRed);
+    }
+    let footer =
+        "[\u{2190}/\u{2192}] Switch  [\u{2191}/\u{2193}] Navigate  [Enter] Select  [Esc] Close";
+    put_text(buffer, height as i32 - 1, 1, footer, Color::DarkGray);
+
+    let content_top = 0i32;
+    let content_bottom = height as i32 - 2;
+
+    render_active_missions_content(buffer, width, content_top, content_bottom, deep, ui);
+}
+
+/// Render the Deploy (available missions) tab (standalone, no sub-tab toggle).
+pub(super) fn render_deploy(
     buffer: &mut [Vec<SceneCell>],
     width: usize,
     height: usize,
@@ -769,89 +538,18 @@ pub(super) fn render_new_mission(
 
     let is_compact = ctx.tier <= SizeTier::S || width < 60;
 
-    // ── Sub-tab strip: Active / Available ──
-    let toggle_row = 0i32;
-    let active_count = deep.prestige.active_mission_count() + deep.prestige.pending_results.len();
-    let pool_count = deep.prestige.available_missions.len();
-    {
-        let active_label = format!("Active ({})", active_count);
-        let pool_label = format!("Available ({})", pool_count);
-
-        let col_start = 2i32;
-        let active_color = if ui.missions_show_active {
-            Color::Rgb(120, 200, 255)
-        } else {
-            Color::Rgb(60, 80, 110)
-        };
-        let pool_col = col_start + active_label.len() as i32 + 4;
-        let pool_color = if !ui.missions_show_active {
-            Color::Rgb(120, 200, 255)
-        } else {
-            Color::Rgb(60, 80, 110)
-        };
-
-        put_text(buffer, toggle_row, col_start, &active_label, active_color);
-        put_text(buffer, toggle_row, pool_col, &pool_label, pool_color);
-
-        // Thick underline under selected sub-tab
-        let underline_row = toggle_row + 1;
-        if ui.missions_show_active {
-            let underline: String = "\u{2501}".repeat(active_label.len());
-            put_text(
-                buffer,
-                underline_row,
-                col_start,
-                &underline,
-                Color::Rgb(120, 200, 255),
-            );
-        } else {
-            let underline: String = "\u{2501}".repeat(pool_label.len());
-            put_text(
-                buffer,
-                underline_row,
-                pool_col,
-                &underline,
-                Color::Rgb(120, 200, 255),
-            );
-        }
-    }
-
-    // Separator below sub-tabs
-    let sep_color = Color::Rgb(28, 49, 74);
-    for c in 1i32..(width as i32 - 1) {
-        if buffer.len() > 2 {
-            put_cell(buffer, 2, c, '\u{2500}', sep_color);
-        }
-    }
-
-    // ── Footer (context-sensitive) ──
-    let footer = if ui.staging_mission_index.is_some() {
-        if is_compact {
-            "[\u{2191}/\u{2193}] Select  [Space] Toggle  [Enter] Launch  [Esc] Cancel"
-        } else {
-            "[\u{2191}/\u{2193}] Navigate  [Space] Toggle Merc  [Enter] Launch Mission  [Esc] Cancel"
-        }
-    } else if ui.missions_show_active {
-        if is_compact {
-            "[\u{2191}/\u{2193}]Nav  [Enter]Select  [Tab]Switch  [Esc]Close"
-        } else {
-            "[\u{2191}/\u{2193}] Navigate  [Enter] Select  [Tab] Switch  [Esc] Close"
-        }
-    } else if is_compact {
-        "[\u{2191}/\u{2193}]Select  [Enter]Assign  [Tab]Switch  [Esc]Close"
-    } else {
-        "[\u{2191}/\u{2193}] Select Mission  [Enter] Assign Squad  [Tab] Switch  [Esc] Close"
-    };
+    // Footer
     if let Some(msg) = &ui.flash_message {
         put_text(buffer, height as i32 - 2, 1, msg, Color::LightRed);
     }
+    let footer = if ui.staging_mission_index.is_some() {
+        "[\u{2191}/\u{2193}] Navigate  [Space] Toggle Merc  [Enter] Launch  [Esc] Cancel"
+    } else {
+        "[\u{2190}/\u{2192}] Switch  [\u{2191}/\u{2193}] Select  [Enter] Assign Squad  [Esc] Close"
+    };
     put_text(buffer, height as i32 - 1, 1, footer, Color::DarkGray);
 
-    let content_top = 3i32; // after sub-tab labels + underline + separator
-    let content_bottom = height as i32 - 2;
-    let content_height = (content_bottom - content_top).max(0) as usize;
-
-    // Right-aligned marks in footer
+    // Right-aligned marks
     let marks_display = format!("\u{25c6} {} Warband Marks", deep.prestige.warband_marks);
     let marks_col = (width as i32 - marks_display.len() as i32 - 2).max(1);
     let min_marks_col = footer.chars().count() as i32 + 3;
@@ -865,13 +563,9 @@ pub(super) fn render_new_mission(
         );
     }
 
-    // ── Active missions sub-view ──
-    if ui.missions_show_active {
-        render_active_missions_content(buffer, width, content_top, content_bottom, deep, ui);
-        return;
-    }
-
-    // ── Available sub-view (existing behavior below) ──
+    let content_top = 0i32;
+    let content_bottom = height as i32 - 2;
+    let content_height = (content_bottom - content_top).max(0) as usize;
     let available = &deep.prestige.available_missions;
 
     if available.is_empty() {
@@ -883,14 +577,13 @@ pub(super) fn render_new_mission(
             "No missions available.",
             Color::DarkGray,
         );
-
         let active_count = deep.prestige.active_mission_count();
         if active_count == 0 && deep.prestige.roster.is_empty() {
             put_text_centered(
                 buffer,
                 mid,
                 width,
-                "Recruit mercs first \u{2014} go to Status, [Tab] to Recruit.",
+                "Recruit mercs first \u{2014} go to Recruit tab.",
                 Color::Rgb(50, 70, 100),
             );
         } else if active_count > 0 {
@@ -901,13 +594,6 @@ pub(super) fn render_new_mission(
                 "Mission pool refreshes over time.",
                 Color::Rgb(50, 70, 100),
             );
-            put_text_centered(
-                buffer,
-                mid + 1,
-                width,
-                "Check back after current missions complete.",
-                Color::Rgb(40, 55, 80),
-            );
         } else {
             put_text_centered(
                 buffer,
@@ -915,13 +601,6 @@ pub(super) fn render_new_mission(
                 width,
                 "Mission pool refreshes periodically.",
                 Color::Rgb(50, 70, 100),
-            );
-            put_text_centered(
-                buffer,
-                mid + 1,
-                width,
-                "Return in a few minutes.",
-                Color::Rgb(40, 55, 80),
             );
         }
         return;
@@ -952,7 +631,40 @@ pub(super) fn render_new_mission(
     }
 }
 
-/// Render active missions content for the Missions tab active sub-view.
+/// Render the Roster tab (standalone, no sub-tab toggle).
+pub(super) fn render_roster(
+    buffer: &mut [Vec<SceneCell>],
+    width: usize,
+    height: usize,
+    deep: &DeepState,
+    ui: &DeepUiState,
+    ctx: &LayoutContext,
+) {
+    if height < 4 || width < 20 {
+        return;
+    }
+
+    // Footer
+    if let Some(msg) = &ui.flash_message {
+        put_text(buffer, height as i32 - 2, 1, msg, Color::LightRed);
+    }
+    let footer =
+        "[\u{2190}/\u{2192}] Switch  [\u{2191}/\u{2193}] Navigate  [G] Guild Rank  [Esc] Close";
+    put_text(buffer, height as i32 - 1, 1, footer, Color::DarkGray);
+    let help_hint = "[?] Help";
+    let help_col = (width as i32 - help_hint.len() as i32 - 1).max(footer.len() as i32 + 2);
+    put_text(
+        buffer,
+        height as i32 - 1,
+        help_col,
+        help_hint,
+        Color::Rgb(50, 70, 100),
+    );
+
+    render_hub_roster(buffer, width, height, deep, ui, ctx, 0);
+}
+
+/// Render active missions content.
 fn render_active_missions_content(
     buffer: &mut [Vec<SceneCell>],
     width: usize,
@@ -973,7 +685,7 @@ fn render_active_missions_content(
             buffer,
             mid,
             width,
-            "No active missions. [Tab] to Available to start one.",
+            "No active missions. Go to Deploy tab to start one.",
             Color::DarkGray,
         );
 

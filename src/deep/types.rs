@@ -965,15 +965,15 @@ impl Default for DeepState {
 /// Sub-view within The Deep overlay.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeepView {
-    /// Main hub showing warband operations (active missions, results, logs).
-    Hub,
+    /// Active missions in progress — progress bars, events, results.
+    Active,
     /// Available missions — select and assign squad.
     NewMission,
     /// Mercenary roster — stats, status, archetype.
     Roster,
     /// Layer map and infrastructure state.
     Infrastructure,
-    /// Check-in event response (shown when a mission has a pending event).
+    /// Check-in event response (shown as modal over Active).
     EventResponse,
     /// Recruit new mercs from the rotating pool.
     Recruit,
@@ -983,15 +983,17 @@ impl DeepView {
     /// The navigable tabs in order.
     pub const TABS: &[DeepView] = &[
         DeepView::Infrastructure,
+        DeepView::Active,
         DeepView::NewMission,
-        DeepView::Hub,
+        DeepView::Roster,
+        DeepView::Recruit,
     ];
 
     /// Short label for rendering in the tab bar.
     pub fn tab_label(self) -> &'static str {
         match self {
-            DeepView::Hub => "Team",
-            DeepView::NewMission => "Missions",
+            DeepView::Active => "Active",
+            DeepView::NewMission => "Deploy",
             DeepView::Roster => "Roster",
             DeepView::Infrastructure => "Layers",
             DeepView::EventResponse => "Events",
@@ -1042,10 +1044,6 @@ pub struct DeepUiState {
     pub recruit_visit_count: u8,
     /// Whether the event response modal is open over the hub.
     pub event_modal_open: bool,
-    /// Missions tab sub-view: true = active missions, false = available pool.
-    pub missions_show_active: bool,
-    /// Status tab sub-view: false = roster (default), true = recruit.
-    pub status_show_recruit: bool,
     /// Whether [?] help reference panel is shown.
     pub show_help: bool,
     /// Mercs from last prestige shown in farewell screen: (name, level, missions_completed).
@@ -1070,8 +1068,6 @@ impl DeepUiState {
             event_visit_count: 0,
             recruit_visit_count: 0,
             event_modal_open: false,
-            missions_show_active: true,
-            status_show_recruit: false,
             show_help: false,
             farewell_mercs: Vec::new(),
         }
@@ -1084,7 +1080,7 @@ impl DeepUiState {
         self.event_mission_id = None;
         self.event_choice_index = 0;
         self.event_modal_open = false;
-        self.missions_show_active = true;
+
         self.staging_mission_index = None;
         self.staged_squad.clear();
         self.flash_message = None;
@@ -1099,7 +1095,7 @@ impl DeepUiState {
         self.event_mission_id = None;
         self.event_choice_index = 0;
         self.event_modal_open = false;
-        self.missions_show_active = true;
+
         self.staging_mission_index = None;
         self.staged_squad.clear();
         self.flash_message = None;

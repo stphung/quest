@@ -40,17 +40,6 @@ fn quality_label(merc: &Mercenary) -> (&'static str, Color) {
     }
 }
 
-/// 3-letter archetype abbreviation.
-pub(super) fn archetype_abbrev(archetype: MercArchetype) -> &'static str {
-    match archetype {
-        MercArchetype::Vanguard => "VAN",
-        MercArchetype::Scout => "SCT",
-        MercArchetype::Arcanist => "ARC",
-        MercArchetype::Medic => "MED",
-        MercArchetype::Saboteur => "SAB",
-    }
-}
-
 /// Archetype role tag and description.
 fn archetype_role_desc(archetype: MercArchetype) -> (&'static str, &'static str) {
     match archetype {
