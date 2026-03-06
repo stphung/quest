@@ -1666,7 +1666,12 @@ pub fn render_chrono_surge_summary(
     _ctx: &super::responsive::LayoutContext,
 ) {
     let overlay_width = 48u16.min(area.width.saturating_sub(4));
-    let overlay_height = 14u16.min(area.height.saturating_sub(2));
+    let base_height = if summary.missions_completed > 0 {
+        15u16
+    } else {
+        14u16
+    };
+    let overlay_height = base_height.min(area.height.saturating_sub(2));
     let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
     let y = area.y + (area.height.saturating_sub(overlay_height)) / 2;
     let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
@@ -1708,11 +1713,17 @@ pub fn render_chrono_surge_summary(
     }
 
     // Stats
-    let stats = [
+    let mut stats: Vec<String> = vec![
         format!("\u{2694}  Kills: {}", summary.kills),
         format!("\u{2B06}  Levels gained: +{}", summary.levels_gained),
         format!("\u{1F528} Items equipped: {}", summary.items_equipped),
     ];
+    if summary.missions_completed > 0 {
+        stats.push(format!(
+            "\u{1F4DC} Missions completed: {}",
+            summary.missions_completed
+        ));
+    }
 
     let start_row = 2i32;
     for (i, line) in stats.iter().enumerate() {
