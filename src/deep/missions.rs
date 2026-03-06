@@ -1121,6 +1121,38 @@ pub fn tick_mission(
     tick_mission_events(mission, &squad_archetypes, now, rng)
 }
 
+/// Accelerate all active missions by subtracting `acceleration` from their `ends_at`.
+///
+/// Called during Chrono Surge to fast-forward mission timers. Events trigger
+/// naturally via the existing `tick_all_missions` flow since shifting `ends_at`
+/// increases `progress()` for the same wall-clock `now`.
+///
+/// Returns the number of missions whose `ends_at` fell into the past (became
+/// completable) during this acceleration. The caller tallies this for the surge
+/// summary. Actual mission resolution happens in `tick_all_missions`.
+pub fn accelerate_missions(prestige: &mut DeepPrestige, acceleration: Duration) -> u32 {
+    let now = Utc::now();
+    let mut newly_completed = 0u32;
+
+    for mission in &mut prestige.active_missions {
+        if !matches!(
+            mission.status,
+            MissionStatus::Active | MissionStatus::EventPending
+        ) {
+            continue;
+        }
+
+        let was_elapsed = mission.is_time_elapsed(now);
+        mission.ends_at -= acceleration;
+
+        if !was_elapsed && mission.is_time_elapsed(now) {
+            newly_completed += 1;
+        }
+    }
+
+    newly_completed
+}
+
 /// Tick all active missions in `prestige`.
 ///
 /// Resolves events and, for missions that have elapsed, moves them to
@@ -3213,5 +3245,126 @@ mod tests {
             "Overpowered squad should succeed ≥80% ({}/50)",
             success_count
         );
+    }
+
+    #[test]
+    fn test_accelerate_missions_shifts_ends_at() {
+        let now = Utc::now();
+        let mut prestige = DeepPrestige::default();
+        let acceleration = Duration::seconds(3600); // 1 hour
+
+        // Create a mission that ends in 4 hours
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            squad: vec![],
+            started_at: now,
+            ends_at: now + Duration::hours(4),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+        prestige.active_missions.push(mission);
+
+        let completed = accelerate_missions(&mut prestige, acceleration);
+
+        assert_eq!(completed, 0);
+        let m = &prestige.active_missions[0];
+        // ends_at should be shifted 1 hour earlier
+        let expected = now + Duration::hours(3);
+        let diff = (m.ends_at - expected).num_seconds().abs();
+        assert!(diff < 2, "ends_at not shifted correctly: diff={diff}s");
+    }
+
+    #[test]
+    fn test_accelerate_missions_completes_mission() {
+        let now = Utc::now();
+        let mut prestige = DeepPrestige::default();
+        let acceleration = Duration::seconds(7200); // 2 hours
+
+        // Create a mission that ends in 1 hour
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            squad: vec![],
+            started_at: now - Duration::hours(3),
+            ends_at: now + Duration::hours(1),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+        prestige.active_missions.push(mission);
+
+        let completed = accelerate_missions(&mut prestige, acceleration);
+
+        assert_eq!(completed, 1);
+        // Mission still in active_missions (tick_all_missions handles moving to pending_results)
+        let m = &prestige.active_missions[0];
+        assert!(
+            m.is_time_elapsed(now),
+            "Mission should be time-elapsed after acceleration"
+        );
+    }
+
+    #[test]
+    fn test_accelerate_missions_skips_non_active() {
+        let now = Utc::now();
+        let mut prestige = DeepPrestige::default();
+        let acceleration = Duration::seconds(3600);
+
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            squad: vec![],
+            started_at: now,
+            ends_at: now + Duration::hours(4),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Completed,
+            result: None,
+            is_first_orders: false,
+        };
+        let original_ends_at = mission.ends_at;
+        prestige.active_missions.push(mission);
+
+        let completed = accelerate_missions(&mut prestige, acceleration);
+
+        assert_eq!(completed, 0);
+        assert_eq!(prestige.active_missions[0].ends_at, original_ends_at);
+    }
+
+    #[test]
+    fn test_accelerate_missions_multiple() {
+        let now = Utc::now();
+        let mut prestige = DeepPrestige::default();
+        let acceleration = Duration::seconds(3600);
+
+        for i in 1..=3 {
+            prestige.active_missions.push(Mission {
+                id: i,
+                mission_type: MissionType::SupplyRun,
+                layer: 1,
+                squad: vec![],
+                started_at: now,
+                ends_at: now + Duration::hours(i as i64),
+                events: vec![],
+                pending_event_index: 0,
+                status: MissionStatus::Active,
+                result: None,
+                is_first_orders: false,
+            });
+        }
+
+        let completed = accelerate_missions(&mut prestige, acceleration);
+
+        // Mission 1 (1h duration) should now be elapsed
+        assert_eq!(completed, 1);
     }
 }
