@@ -3279,7 +3279,9 @@ mod tests {
         let m = &prestige.active_missions[0];
         // Both timestamps shifted 1 hour earlier; total duration unchanged
         let diff_ends = (m.ends_at - (now + Duration::hours(3))).num_seconds().abs();
-        let diff_start = (m.started_at - (now - Duration::hours(1))).num_seconds().abs();
+        let diff_start = (m.started_at - (now - Duration::hours(1)))
+            .num_seconds()
+            .abs();
         assert!(diff_ends < 2, "ends_at not shifted: diff={diff_ends}s");
         assert!(diff_start < 2, "started_at not shifted: diff={diff_start}s");
         assert_eq!((m.ends_at - m.started_at).num_seconds(), 4 * 3600);
