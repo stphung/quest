@@ -458,10 +458,10 @@ fn render_frontier_bar(buffer: &mut [Vec<SceneCell>], width: usize, deep: &DeepS
 
 // ── Tab bar ──────────────────────────────────────────────────────────────────
 
-/// Abbreviated tab labels for narrow terminals.
+/// Abbreviated tab labels for narrow terminals (no icons).
 fn abbrev_label(view: DeepView) -> &'static str {
     match view {
-        DeepView::Hub => "H",
+        DeepView::Active => "Actv",
         DeepView::EventResponse => "Evt",
         DeepView::NewMission => "Msn",
         DeepView::Roster => "Rst",
@@ -470,24 +470,67 @@ fn abbrev_label(view: DeepView) -> &'static str {
     }
 }
 
-/// Render the tab bar at row 0 of the buffer with state badges.
+/// Tab label with thematic unicode icon prefix.
+fn icon_label(view: DeepView, deep: &DeepState) -> String {
+    match view {
+        DeepView::Infrastructure => {
+            let depth = deep.persistent.deepest_layer_reached.max(1);
+            format!("\u{26cf} Layers (L{})", depth) // ⛏ Layers (L7)
+        }
+        DeepView::Active => {
+            let active = deep.prestige.active_missions.len();
+            let max = crate::deep::effective_concurrent_missions(
+                deep.persistent.guild_rank,
+                deep.persistent.deepest_layer_reached,
+            );
+            format!("\u{25b6} Active {}/{}", active, max) // ▶ Active 2/3
+        }
+        DeepView::NewMission => {
+            let avail = deep.prestige.available_missions.len();
+            format!("\u{2694} Deploy ({})", avail) // ⚔ Deploy (5)
+        }
+        DeepView::Roster => {
+            let alive = deep
+                .prestige
+                .roster
+                .iter()
+                .filter(|m| !matches!(m.status, crate::deep::MercStatus::Lost))
+                .count();
+            let max = deep.persistent.guild_rank.max_roster();
+            format!("\u{265f} Roster {}/{}", alive, max) // ♟ Roster 5/7
+        }
+        DeepView::Recruit => {
+            let avail = deep.prestige.recruit_pool.candidates.len();
+            format!("\u{2726} Recruit ({})", avail) // ✦ Recruit (3)
+        }
+        DeepView::EventResponse => "Events".to_string(),
+    }
+}
+
+/// Render a full-width proportional tab bar at row 0 with icons and state badges.
 fn render_tab_bar(buffer: &mut [Vec<SceneCell>], width: usize, active: DeepView, deep: &DeepState) {
-    if buffer.is_empty() {
+    if buffer.is_empty() || width < 6 {
         return;
     }
+
+    // Fill row 0 background
+    let inactive_bg = Color::Rgb(9, 18, 31);
     for c in 0..width {
         if c < buffer[0].len() {
-            buffer[0][c].bg = Color::Rgb(9, 18, 31);
+            buffer[0][c].bg = inactive_bg;
         }
     }
 
-    // Compute badges for all tabs
+    let tab_count = DeepView::TABS.len();
+    if tab_count == 0 {
+        return;
+    }
+
+    // Compute badges for each tab
     let badges: Vec<(String, Color)> = DeepView::TABS
         .iter()
         .map(|&tab| match tab {
-            DeepView::Hub => (String::new(), Color::DarkGray),
-            DeepView::NewMission => {
-                // Missions tab: show events badge only (no count)
+            DeepView::Active => {
                 let events = deep
                     .prestige
                     .active_missions
@@ -495,110 +538,118 @@ fn render_tab_bar(buffer: &mut [Vec<SceneCell>], width: usize, active: DeepView,
                     .filter(|m| m.has_pending_event())
                     .count();
                 if events > 0 {
-                    (format!("\u{26a1}{}", events), Color::Yellow)
+                    (format!(" \u{26a1}{}", events), Color::Yellow)
                 } else {
                     (String::new(), Color::DarkGray)
                 }
             }
-            DeepView::Recruit => (String::new(), Color::DarkGray),
-            DeepView::Infrastructure => (String::new(), Color::DarkGray),
-            // Roster and EventResponse are not in TABS, but exhaustive match requires them
-            DeepView::Roster | DeepView::EventResponse => (String::new(), Color::DarkGray),
+            _ => (String::new(), Color::DarkGray),
         })
         .collect();
 
-    // Check if full labels fit; use abbreviations if they don't
-    let full_width: usize = DeepView::TABS
-        .iter()
-        .enumerate()
-        .map(|(i, tab)| {
-            let label_len = tab.tab_label().len();
-            let badge_len = badges[i].0.len();
-            (if i > 0 { 1 } else { 0 }) + label_len + badge_len + 2 // brackets
-        })
-        .sum();
-    let use_abbrev = full_width + 2 > width;
+    // Determine if we should use abbreviated labels (narrow terminal)
+    let use_abbrev = width < 40;
 
-    let mut col = 1i32;
-    let mut active_tab_start = 0i32;
-    let mut active_tab_len = 0i32;
+    // Proportional tab widths: divide evenly, last tab absorbs remainder
+    let usable_width = width;
+    let base_tab_w = usable_width / tab_count;
+    let mut tab_widths: Vec<usize> = vec![base_tab_w; tab_count];
+    let remainder = usable_width - base_tab_w * tab_count;
+    if let Some(last) = tab_widths.last_mut() {
+        *last += remainder;
+    }
+
+    let active_bg = Color::Rgb(18, 36, 62);
+    let active_text = Color::Rgb(120, 200, 255);
+    let inactive_text = Color::Rgb(82, 106, 140);
+    let divider_color = Color::Rgb(44, 65, 94);
+
+    let mut col = 0usize;
+    let mut active_start = 0usize;
+    let mut active_end = 0usize;
+
     for (i, &tab) in DeepView::TABS.iter().enumerate() {
-        if i > 0 {
-            put_text(buffer, 0, col, "\u{2502}", Color::Rgb(44, 65, 94));
-            col += 1;
+        let tw = tab_widths[i];
+        let is_active = tab == active;
+
+        // Paint background for rows 0 (top padding) and 1 (label)
+        if is_active {
+            for row in 0..2.min(buffer.len()) {
+                for c in col..col + tw {
+                    if c < buffer[row].len() {
+                        buffer[row][c].bg = active_bg;
+                    }
+                }
+            }
+            active_start = col;
+            active_end = col + tw;
         }
 
-        let (badge, badge_color) = &badges[i];
+        // Build label text
         let label = if use_abbrev {
-            abbrev_label(tab)
+            abbrev_label(tab).to_string()
         } else {
-            tab.tab_label()
+            icon_label(tab, deep)
         };
-        // In abbreviated mode, drop badge counts (keep symbol only)
+        let (badge, badge_color) = &badges[i];
         let badge_display = if use_abbrev && badge.len() > 1 {
             badge
                 .chars()
-                .next()
-                .map(|c| c.to_string())
+                .find(|c| !c.is_whitespace())
+                .map(|c| format!(" {}", c))
                 .unwrap_or_default()
         } else {
             badge.clone()
         };
 
-        let full = if badge_display.is_empty() {
-            format!("[{}]", label)
+        // Center the label+badge horizontally within the tab region
+        let label_dw = super::scene_fx::display_width(&label);
+        let badge_dw = super::scene_fx::display_width(&badge_display);
+        let total_dw = label_dw + badge_dw;
+        let pad_left = if tw > total_dw {
+            (tw - total_dw) / 2
         } else {
-            format!("[{}{}]", label, badge_display)
+            0
         };
 
-        let is_active = tab == active;
         let tab_color = if is_active {
-            Color::Rgb(120, 200, 255)
+            active_text
         } else {
-            Color::Rgb(82, 106, 140)
+            inactive_text
         };
 
-        // Active tab gets a subtle highlighted background
-        let tab_len = full.len();
-        for c in col..(col + tab_len as i32) {
-            if c >= 0 && (c as usize) < width {
-                buffer[0][c as usize].bg = if is_active {
-                    Color::Rgb(18, 36, 62)
-                } else {
-                    Color::Rgb(11, 22, 37)
-                };
+        // Label on row 1 (vertically centered: row 0 = padding, row 1 = label, row 2 = underline)
+        let text_col = col + pad_left;
+        put_text(buffer, 1, text_col as i32, &label, tab_color);
+
+        if !badge_display.is_empty() {
+            let badge_col = text_col + label_dw;
+            put_text(buffer, 1, badge_col as i32, &badge_display, *badge_color);
+        }
+
+        // Dividers span rows 0 and 1
+        if i + 1 < tab_count {
+            let div_col = col + tw;
+            if div_col < width {
+                put_cell(buffer, 0, div_col as i32, '\u{2502}', divider_color);
+                put_cell(buffer, 1, div_col as i32, '\u{2502}', divider_color);
             }
         }
 
-        put_text(buffer, 0, col, &full, tab_color);
-
-        // Overcolor badge portion when tab is not active
-        if !badge_display.is_empty() && !is_active {
-            let badge_col = col + 1 + label.len() as i32;
-            put_text(buffer, 0, badge_col, &badge_display, *badge_color);
-        }
-
-        // Track active tab position for underline
-        if is_active {
-            active_tab_start = col;
-            active_tab_len = full.len() as i32;
-        }
-        col += full.len() as i32;
+        col += tw;
     }
 
-    // Separator below tabs with active tab underline highlight
-    let sep_color = Color::Rgb(28, 49, 74);
-    let active_underline_color = Color::Rgb(95, 176, 236);
-    for c in 1i32..(width as i32 - 1) {
-        let ch = '\u{2500}'; // ─
-        let color = if c >= active_tab_start && c < active_tab_start + active_tab_len {
-            active_underline_color
-        } else {
-            sep_color
-        };
-        // Render separator on row 1 (below tab labels on row 0)
-        if buffer.len() > 1 {
-            put_cell(buffer, 1, c, ch, color);
+    // Separator line below tabs (row 2)
+    if buffer.len() > 2 {
+        let sep_color = Color::Rgb(28, 49, 74);
+        let active_underline = Color::Rgb(95, 176, 236);
+        for c in 0..width {
+            let color = if c >= active_start && c < active_end {
+                active_underline
+            } else {
+                sep_color
+            };
+            put_cell(buffer, 2, c as i32, '\u{2501}', color); // ━ (heavy horizontal)
         }
     }
 }
@@ -653,18 +704,25 @@ pub fn render_deep_overlay(
     // ── Tab bar (row 2) ──
     render_tab_bar(&mut buffer[2..], width, ui.view, deep);
 
-    // Sub-views render below status bar (row 0), frontier bar (row 1), tab bar (row 2),
-    // and separator (row 3). Content starts at row 4.
-    let content_height = height.saturating_sub(4);
-    let content_buffer = &mut buffer[4..];
+    // Sub-views render below status bar (row 0), frontier bar (row 1), tab bar (rows 2-3),
+    // and separator (row 4). Content starts at row 5.
+    let content_height = height.saturating_sub(5);
+    let content_buffer = &mut buffer[5..];
 
     // Dispatch to the appropriate sub-view
     match ui.view {
-        DeepView::Hub => {
-            super::deep_missions::render_hub(content_buffer, width, content_height, deep, ui, ctx);
+        DeepView::Active => {
+            super::deep_missions::render_active(
+                content_buffer,
+                width,
+                content_height,
+                deep,
+                ui,
+                ctx,
+            );
         }
         DeepView::NewMission => {
-            super::deep_missions::render_new_mission(
+            super::deep_missions::render_deploy(
                 content_buffer,
                 width,
                 content_height,
@@ -674,25 +732,39 @@ pub fn render_deep_overlay(
             );
         }
         DeepView::Roster => {
-            // Roster is no longer a separate tab; absorbed into Status tab.
+            super::deep_missions::render_roster(
+                content_buffer,
+                width,
+                content_height,
+                deep,
+                ui,
+                ctx,
+            );
         }
         DeepView::Recruit => {
-            // Recruit is now a sub-view within the Status tab.
+            super::deep_roster::render_recruit(
+                content_buffer,
+                width,
+                content_height,
+                deep,
+                ui,
+                ctx,
+            );
         }
         DeepView::Infrastructure => {
             super::deep_layers::render_layers(content_buffer, width, content_height, deep, ui, ctx);
         }
         DeepView::EventResponse => {
-            // Events are now rendered as a modal over Hub; this arm is unreachable.
+            // Events are rendered as a modal over Active; this arm is unreachable.
         }
     }
 
-    // Event badge footer reminder when not on missions tab
-    if ui.view != DeepView::NewMission
+    // Event badge footer reminder when not on Active tab
+    if ui.view != DeepView::Active
         && ui.view != DeepView::Infrastructure
         && deep.prestige.has_any_pending_event()
     {
-        let reminder = "\u{26a1} Event pending \u{2014} [\u{2192}] to Missions";
+        let reminder = "\u{26a1} Event pending \u{2014} [\u{2192}] to Active";
         let rem_col = (width as i32 - reminder.len() as i32) / 2;
         put_text(
             &mut buffer,
@@ -805,7 +877,7 @@ fn render_farewell_modal(frame: &mut Frame, area: Rect, mercs: &[(String, u32, u
 /// Per-view reference content for the [?] help panel.
 fn help_content(view: DeepView) -> &'static [&'static str] {
     match view {
-        DeepView::Hub => &[
+        DeepView::Active => &[
             "THE DEEP \u{2014} Quick Reference",
             "",
             "Warband Marks",

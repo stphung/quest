@@ -152,12 +152,16 @@ fn test_ui_state_open_clears_staging() {
 #[test]
 fn test_view_tab_cycle_next() {
     use quest::deep::DeepView;
-    // Infrastructure → NewMission → Hub → Infrastructure (3 tabs)
+    // Infrastructure → Active → NewMission → Roster → Recruit → Infrastructure (5 tabs)
     let mut view = DeepView::Infrastructure;
+    view = view.next_tab();
+    assert_eq!(view, DeepView::Active);
     view = view.next_tab();
     assert_eq!(view, DeepView::NewMission);
     view = view.next_tab();
-    assert_eq!(view, DeepView::Hub);
+    assert_eq!(view, DeepView::Roster);
+    view = view.next_tab();
+    assert_eq!(view, DeepView::Recruit);
     // Wraps around
     view = view.next_tab();
     assert_eq!(view, DeepView::Infrastructure);
@@ -166,12 +170,15 @@ fn test_view_tab_cycle_next() {
 #[test]
 fn test_view_tab_cycle_prev() {
     use quest::deep::DeepView;
-    // Infrastructure → Hub → NewMission → Infrastructure (3 tabs)
     let mut view = DeepView::Infrastructure;
     view = view.prev_tab();
-    assert_eq!(view, DeepView::Hub);
+    assert_eq!(view, DeepView::Recruit);
+    view = view.prev_tab();
+    assert_eq!(view, DeepView::Roster);
     view = view.prev_tab();
     assert_eq!(view, DeepView::NewMission);
+    view = view.prev_tab();
+    assert_eq!(view, DeepView::Active);
     view = view.prev_tab();
     assert_eq!(view, DeepView::Infrastructure);
 }
@@ -179,23 +186,17 @@ fn test_view_tab_cycle_prev() {
 #[test]
 fn test_view_non_tabbed_views_not_in_tab_cycle() {
     use quest::deep::DeepView;
-    // EventResponse is a modal, Roster and Recruit are sub-views of Status tab.
+    // EventResponse is a modal, not in TABS.
     let view = DeepView::EventResponse;
     assert_eq!(view.next_tab(), DeepView::EventResponse);
     assert_eq!(view.prev_tab(), DeepView::EventResponse);
-    let view = DeepView::Roster;
-    assert_eq!(view.next_tab(), DeepView::Roster);
-    assert_eq!(view.prev_tab(), DeepView::Roster);
-    let view = DeepView::Recruit;
-    assert_eq!(view.next_tab(), DeepView::Recruit);
-    assert_eq!(view.prev_tab(), DeepView::Recruit);
 }
 
 #[test]
 fn test_view_tab_labels() {
     use quest::deep::DeepView;
-    assert_eq!(DeepView::Hub.tab_label(), "Team");
-    assert_eq!(DeepView::NewMission.tab_label(), "Missions");
+    assert_eq!(DeepView::Active.tab_label(), "Active");
+    assert_eq!(DeepView::NewMission.tab_label(), "Deploy");
     assert_eq!(DeepView::Roster.tab_label(), "Roster");
     assert_eq!(DeepView::Infrastructure.tab_label(), "Layers");
     assert_eq!(DeepView::EventResponse.tab_label(), "Events");
@@ -203,13 +204,13 @@ fn test_view_tab_labels() {
 }
 
 #[test]
-fn test_view_tabs_constant_excludes_event_response() {
+fn test_view_tabs_constant() {
     use quest::deep::DeepView;
     assert!(!DeepView::TABS.contains(&DeepView::EventResponse));
-    assert!(!DeepView::TABS.contains(&DeepView::Roster));
-    assert!(!DeepView::TABS.contains(&DeepView::Recruit));
-    assert!(DeepView::TABS.contains(&DeepView::Hub));
-    assert_eq!(DeepView::TABS.len(), 3);
+    assert!(DeepView::TABS.contains(&DeepView::Active));
+    assert!(DeepView::TABS.contains(&DeepView::Roster));
+    assert!(DeepView::TABS.contains(&DeepView::Recruit));
+    assert_eq!(DeepView::TABS.len(), 5);
 }
 
 #[test]
