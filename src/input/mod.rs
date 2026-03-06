@@ -250,7 +250,7 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
 
     // 2.8. The Deep overlay
     if deep_ui.open {
-        return handle_deep(key, deep_state, deep_ui, state, achievements, debug_mode);
+        return handle_deep(key, deep_state, deep_ui, state, achievements);
     }
 
     // 3. Vault item selection
