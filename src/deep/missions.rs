@@ -1121,11 +1121,14 @@ pub fn tick_mission(
     tick_mission_events(mission, &squad_archetypes, now, rng)
 }
 
-/// Accelerate all active missions by subtracting `acceleration` from their `ends_at`.
+/// Accelerate all active missions by subtracting `acceleration` from both
+/// `started_at` and `ends_at`.
 ///
-/// Called during Chrono Surge to fast-forward mission timers. Events trigger
-/// naturally via the existing `tick_all_missions` flow since shifting `ends_at`
-/// increases `progress()` for the same wall-clock `now`.
+/// Called during Chrono Surge to fast-forward mission timers. Shifting both
+/// timestamps keeps the total duration unchanged while increasing elapsed time
+/// (`now - started_at`), so `progress()` reflects the acceleration correctly.
+/// Events trigger naturally via the existing `tick_all_missions` flow since
+/// the higher progress crosses event trigger thresholds.
 ///
 /// Returns the number of missions whose `ends_at` fell into the past (became
 /// completable) during this acceleration. The caller tallies this for the surge
@@ -1143,6 +1146,7 @@ pub fn accelerate_missions(prestige: &mut DeepPrestige, acceleration: Duration) 
         }
 
         let was_elapsed = mission.is_time_elapsed(now);
+        mission.started_at -= acceleration;
         mission.ends_at -= acceleration;
 
         if !was_elapsed && mission.is_time_elapsed(now) {
@@ -3273,10 +3277,12 @@ mod tests {
 
         assert_eq!(completed, 0);
         let m = &prestige.active_missions[0];
-        // ends_at should be shifted 1 hour earlier
-        let expected = now + Duration::hours(3);
-        let diff = (m.ends_at - expected).num_seconds().abs();
-        assert!(diff < 2, "ends_at not shifted correctly: diff={diff}s");
+        // Both timestamps shifted 1 hour earlier; total duration unchanged
+        let diff_ends = (m.ends_at - (now + Duration::hours(3))).num_seconds().abs();
+        let diff_start = (m.started_at - (now - Duration::hours(1))).num_seconds().abs();
+        assert!(diff_ends < 2, "ends_at not shifted: diff={diff_ends}s");
+        assert!(diff_start < 2, "started_at not shifted: diff={diff_start}s");
+        assert_eq!((m.ends_at - m.started_at).num_seconds(), 4 * 3600);
     }
 
     #[test]
