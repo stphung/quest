@@ -1,5 +1,7 @@
 //! Chrono Surge batched tick execution.
 
+use chrono::Duration;
+
 use crate::achievements::Achievements;
 use crate::core::game_state::GameState;
 use crate::core::tick_context::TickContext;
@@ -74,6 +76,17 @@ pub fn run_chrono_surge_batch(
         }
 
         surge.ticks_remaining -= 1;
+    }
+
+    // Accelerate Deep mission timers by the wall-clock equivalent of this batch.
+    if deep_state.persistent.discovered {
+        let acceleration = Duration::milliseconds((batch as i64) * 100);
+        let missions_done =
+            crate::deep::missions::accelerate_missions(&mut deep_state.prestige, acceleration);
+        if missions_done > 0 {
+            surge.missions_completed += missions_done;
+            needs_save = true;
+        }
     }
 
     // No SG earned during Chrono Surge — temporal displacement
