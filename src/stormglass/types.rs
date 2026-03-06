@@ -196,6 +196,7 @@ pub struct ChronoSurgeState {
     pub kills: u64,
     pub levels_gained: u32,
     pub items_equipped: u32,
+    pub missions_completed: u32,
     /// Whether this surge was overcharged by an active Sigil of Overcharge.
     pub overcharged: bool,
     /// Milliseconds since epoch when this surge was created (for flash timing).
@@ -214,6 +215,7 @@ impl ChronoSurgeState {
             kills: 0,
             levels_gained: 0,
             items_equipped: 0,
+            missions_completed: 0,
             overcharged,
             created_at_ms: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -252,6 +254,7 @@ pub struct ChronoSurgeSummary {
     pub kills: u64,
     pub levels_gained: u32,
     pub items_equipped: u32,
+    pub missions_completed: u32,
     pub ticks_completed: u64,
     pub ticks_total: u64,
     /// Whether this surge was overcharged by an active Sigil of Overcharge.

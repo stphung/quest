@@ -701,6 +701,7 @@ fn main() -> io::Result<()> {
                                             kills: surge.kills,
                                             levels_gained: surge.levels_gained,
                                             items_equipped: surge.items_equipped,
+                                            missions_completed: surge.missions_completed,
                                             ticks_completed: surge.ticks_total,
                                             ticks_total: surge.ticks_total,
                                             overcharged: surge.overcharged,
