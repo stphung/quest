@@ -465,6 +465,49 @@ impl Shape for SkyShape {
             }
         }
 
+        // 5b. Mountain light bleed — backlit glow where orb meets mountain edge
+        {
+            let orb_glow_color = if self.dusk < 0.56 {
+                (255u8, 220, 140) // warm gold for sun
+            } else {
+                (200u8, 215, 240) // cool white for moon
+            };
+
+            // Recompute orb position (same as section 2)
+            let orb_col_f = self.width as f64 * 0.78 + (self.wave_tick * 0.08).sin() * 3.0;
+
+            for col in 0..self.width {
+                let dist_to_orb = (col as f64 - orb_col_f).abs();
+                if dist_to_orb > 6.0 {
+                    continue;
+                }
+
+                // Find top of tallest mountain at this column (recompute near layer height)
+                let near = &layers[2]; // near layer is tallest visually at horizon
+                let mut h = near.base_height;
+                for &(freq, amp, phase) in &near.waves {
+                    h += (col as f64 * freq + phase).sin() * amp;
+                }
+                let jitter = (hash2d(42 + col, near.base_height as usize) % 5) as f64 * 0.4 - 0.8;
+                h = (h + jitter).max(1.0);
+                let peak_gy = sky_py as i32 - (h * 2.0).round() as i32;
+
+                // Paint glow on 1-2 pixels above the mountain peak
+                let glow_strength = (1.0 - dist_to_orb / 6.0) * 0.20;
+                for dy in 0..2i32 {
+                    let gy = peak_gy - 1 - dy;
+                    if gy < 0 || gy as usize >= sky_py {
+                        continue;
+                    }
+                    let fade = glow_strength * (1.0 - dy as f64 * 0.5);
+                    let py_t = gy as f64 / (sky_py - 1).max(1) as f64;
+                    let base = lerp_rgb(top, low, py_t);
+                    let blended = lerp_rgb(base, orb_glow_color, fade);
+                    self.paint_px(painter, col as i32, gy, blended);
+                }
+            }
+        }
+
         // 6. Sailboat sky — pixel art for pennant, sail, mast, rigging
         let mx = self.mast_x;
         let mt = self.mast_top * 2; // pixel y of mast_top row
