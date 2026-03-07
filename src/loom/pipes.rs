@@ -583,9 +583,13 @@ pub fn pipe_flow_rate(loom: &LoomState, pipe_idx: usize) -> f64 {
                 None => return 0.0,
             }
         }
-        LoomNodeRef::Refinery(_idx) => {
-            // Refineries don't have a production rate for pipe flow queries yet.
-            return 0.0;
+        LoomNodeRef::Refinery(idx) => {
+            // Refineries output at whatever rate they have buffered product.
+            // Use buffer * amount as a rough rate indicator.
+            match loom.persistent.refineries.get(idx) {
+                Some(r) if !r.under_construction && !r.stalled => r.amount * 5.0, // base throughput
+                _ => return 0.0,
+            }
         }
     };
     let rate_limited = from_rate * pipe.split_ratio;
@@ -918,6 +922,48 @@ mod tests {
             transferred <= 5.0 + 0.01,
             "transferred {} should be capped at T1 bandwidth 5/hr",
             transferred
+        );
+    }
+
+    #[test]
+    fn test_pipe_flow_extractor_to_refinery() {
+        use crate::loom::types::{NodeNature, Refinery, Resource};
+        let mut loom = loom_with_two_unlocked_nodes();
+        // Fill Ember Spindle buffer.
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer = 10.0;
+        // Add a completed refinery.
+        loom.persistent.refineries.push(Refinery::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+        ));
+        // Add pipe from Ember to Refinery 0.
+        loom.persistent.pipes.push(Pipe {
+            from: LoomNodeRef::Extractor(NodeId::EmberSpindle),
+            to: LoomNodeRef::Refinery(0),
+            tier: PipeTier::T1,
+            split_ratio: 1.0,
+            under_construction: false,
+            construction_ticks_remaining: 0,
+        });
+
+        let deliveries = tick_pipe_flow(&mut loom, 3600.0); // 1 hour.
+                                                            // Should have delivered some Ember to the refinery.
+        let refinery_deliveries: Vec<_> = deliveries
+            .iter()
+            .filter(|(nr, _, _)| matches!(nr, LoomNodeRef::Refinery(0)))
+            .collect();
+        assert!(
+            !refinery_deliveries.is_empty(),
+            "should have transferred resources to refinery"
         );
     }
 
