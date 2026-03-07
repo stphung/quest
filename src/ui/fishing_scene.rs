@@ -872,6 +872,47 @@ impl Shape for WaterSurface {
                     base
                 };
 
+                // Per-pixel noise ripples — fine-grain choppy texture
+                {
+                    let noise = hash2d(
+                        gx + (self.wave_tick * 1.7) as usize,
+                        gy + (self.wave_tick * 1.3) as usize,
+                    );
+                    let jitter = (noise % 9) as i8 - 4; // -4 to +4
+                    let scaled = (jitter as f64 * (1.0 - depth_t * 0.6)) as i8;
+                    color = (
+                        (color.0 as i16 + scaled as i16).clamp(0, 255) as u8,
+                        (color.1 as i16 + scaled as i16).clamp(0, 255) as u8,
+                        (color.2 as i16 + (scaled as i16 / 2)).clamp(0, 255) as u8,
+                    );
+                }
+
+                // Cross-waves — short perpendicular waves creating diamond pattern
+                {
+                    let cross =
+                        (gy as f64 * 0.35 + self.wave_tick * 0.065 + gx as f64 * 0.04).sin();
+                    if cross > 0.5 {
+                        let cross_t = ((cross - 0.5) / 0.5).min(1.0) * (1.0 - depth_t * 0.7) * 0.08;
+                        color = (
+                            color.0.saturating_add((cross_t * 255.0) as u8),
+                            color.1.saturating_add((cross_t * 200.0) as u8),
+                            color.2.saturating_add((cross_t * 160.0) as u8),
+                        );
+                    }
+                }
+
+                // Micro whitecaps — flickering bright spots across the surface
+                {
+                    let flicker = hash2d(
+                        gx.wrapping_add((self.wave_tick * 3.1) as usize),
+                        gy.wrapping_add((self.wave_tick * 2.7) as usize),
+                    );
+                    if flicker.is_multiple_of(47) && depth_t < 0.6 {
+                        let sparkle = (1.0 - depth_t) * 0.35;
+                        color = lerp_rgb(color, (245, 250, 255), sparkle);
+                    }
+                }
+
                 // Caustic light patterns — dancing bright spots near the surface
                 let caustic_x = (gx as f64 * 0.31 + self.wave_tick * 0.17).sin();
                 let caustic_y = (gy as f64 * 0.43 + self.wave_tick * 0.13).cos();
