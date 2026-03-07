@@ -645,6 +645,12 @@ impl DebugAction {
                         recipe.output,
                         recipe.amount,
                         recipe.tier,
+                        vec![crate::loom::types::LoomNodeRef::Extractor(
+                            crate::loom::types::NodeId::EmberSpindle,
+                        )],
+                        vec![crate::loom::types::LoomNodeRef::Extractor(
+                            crate::loom::types::NodeId::VoidCondenser,
+                        )],
                     );
                     loom.persistent.refineries.push(r);
                     "T1 Refinery built (debug)."
@@ -666,6 +672,10 @@ impl DebugAction {
                         recipe.output,
                         recipe.amount,
                         recipe.tier,
+                        vec![crate::loom::types::LoomNodeRef::Refinery(0)],
+                        vec![crate::loom::types::LoomNodeRef::Extractor(
+                            crate::loom::types::NodeId::ReflectionLens,
+                        )],
                     );
                     loom.persistent.refineries.push(r);
                     "T2 Refinery built (debug)."
@@ -674,10 +684,6 @@ impl DebugAction {
                 }
             }
             Self::LoomClearRefineries => {
-                loom.persistent.pipes.retain(|p| {
-                    !matches!(p.from, crate::loom::types::LoomNodeRef::Refinery(_))
-                        && !matches!(p.to, crate::loom::types::LoomNodeRef::Refinery(_))
-                });
                 loom.persistent.refineries.clear();
                 "All refineries cleared."
             }

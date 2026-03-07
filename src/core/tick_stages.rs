@@ -1009,33 +1009,14 @@ pub(super) fn tick_loom(
         }
     }
 
-    // Tick pipe construction (decrement timers, complete when done).
-    let completed_pipes = crate::loom::tick_pipe_construction(loom);
-    if !completed_pipes.is_empty() {
-        result.loom_changed = true;
-    }
-
     // Tick refinery construction (decrement timers, complete when done).
     let completed_refineries = crate::loom::tick_refinery_construction(loom);
     if !completed_refineries.is_empty() {
         result.loom_changed = true;
     }
 
-    // Tick pipe flow (transfer resources through active pipes).
-    let deliveries = crate::loom::tick_pipe_flow(loom, TICK_SECONDS);
-
-    // Collect refinery-bound deliveries before process_reactions consumes deliveries.
-    let refinery_deliveries: Vec<_> = deliveries
-        .iter()
-        .filter(|(nr, _, _)| matches!(nr, crate::loom::LoomNodeRef::Refinery(_)))
-        .cloned()
-        .collect();
-
-    // Process reactions from pipe deliveries (combinatorial recipes).
-    let _reactions = crate::loom::process_reactions(loom, deliveries);
-
-    // Process refinery reactions from pipe deliveries.
-    let _refinery_reactions = crate::loom::process_refinery_reactions(loom, refinery_deliveries);
+    // Tick direct-pull refinery processing.
+    let refinery_produced = crate::loom::tick_refinery_pull(loom, TICK_SECONDS);
 
     // Update stall flags for UI display.
     crate::loom::tick_stall_detection(loom);
@@ -1044,7 +1025,12 @@ pub(super) fn tick_loom(
     crate::loom::tick_refinery_stall_detection(loom);
 
     // Tick base production for all unlocked nodes.
-    let _produced = crate::loom::tick_base_production(loom, TICK_SECONDS);
+    let mut produced = crate::loom::tick_base_production(loom, TICK_SECONDS);
+
+    // Merge refinery production into base production map for pattern sustain.
+    for (resource, amount) in refinery_produced {
+        *produced.entry(resource).or_insert(0.0) += amount;
+    }
 
     // Tick neighbor unlocking.
     let newly_unlocked = crate::loom::tick_neighbor_unlocking(loom, TICK_SECONDS);

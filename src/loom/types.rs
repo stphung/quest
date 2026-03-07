@@ -128,9 +128,16 @@ pub struct Refinery {
     /// Ticks remaining for construction.
     #[serde(default)]
     pub construction_ticks_remaining: u32,
+    /// Sources for input A — extractors or lower-tier refineries.
+    #[serde(default)]
+    pub sources_a: Vec<LoomNodeRef>,
+    /// Sources for input B — extractors or lower-tier refineries.
+    #[serde(default)]
+    pub sources_b: Vec<LoomNodeRef>,
 }
 
 impl Refinery {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         input_a: Resource,
         input_b: Resource,
@@ -138,6 +145,8 @@ impl Refinery {
         output: Resource,
         amount: f64,
         tier: u8,
+        sources_a: Vec<LoomNodeRef>,
+        sources_b: Vec<LoomNodeRef>,
     ) -> Self {
         Self {
             input_a,
@@ -152,6 +161,8 @@ impl Refinery {
             stalled: false,
             under_construction: false,
             construction_ticks_remaining: 0,
+            sources_a,
+            sources_b,
         }
     }
 }
@@ -205,40 +216,6 @@ impl LoomNode {
     }
 }
 
-/// Pipe bandwidth tiers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum PipeTier {
-    T1, // 5/hr
-    T2, // 12/hr
-    T3, // 25/hr
-    T4, // 50/hr
-}
-
-impl PipeTier {
-    pub fn bandwidth(&self) -> f64 {
-        match self {
-            PipeTier::T1 => 5.0,
-            PipeTier::T2 => 12.0,
-            PipeTier::T3 => 25.0,
-            PipeTier::T4 => 50.0,
-        }
-    }
-}
-
-/// A directional pipe between two nodes.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Pipe {
-    pub from: LoomNodeRef,
-    pub to: LoomNodeRef,
-    pub tier: PipeTier,
-    /// What fraction of the source node's output goes through this pipe (0.0-1.0).
-    pub split_ratio: f64,
-    #[serde(default)]
-    pub under_construction: bool,
-    #[serde(default)]
-    pub construction_ticks_remaining: u32,
-}
-
 /// A discovered recipe in the codex.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodexEntry {
@@ -282,8 +259,6 @@ pub struct LoomPersistent {
     #[serde(default = "default_nodes")]
     pub nodes: Vec<LoomNode>,
     #[serde(default)]
-    pub pipes: Vec<Pipe>,
-    #[serde(default)]
     pub codex: Vec<CodexEntry>,
     #[serde(default)]
     pub active_pattern: usize,
@@ -316,7 +291,6 @@ impl Default for LoomPersistent {
             discovered: false,
             archetype: None,
             nodes: default_nodes(),
-            pipes: Vec::new(),
             codex: Vec::new(),
             active_pattern: 0,
             patterns: Vec::new(),
@@ -362,7 +336,6 @@ pub struct LoomUiState {
     pub open: bool,
     pub view: LoomView,
     pub selected_node: usize,
-    pub selected_pipe: usize,
     pub selected_archetype: usize,
     /// Scroll offset for the Codex view (number of lines scrolled down).
     pub codex_scroll: usize,
@@ -374,7 +347,6 @@ impl LoomUiState {
             open: false,
             view: LoomView::FlowView,
             selected_node: 0,
-            selected_pipe: 0,
             selected_archetype: 0,
             codex_scroll: 0,
         }
@@ -400,7 +372,6 @@ mod tests {
         let state = LoomState::new();
         assert!(!state.persistent.discovered);
         assert_eq!(state.persistent.nodes.len(), 6);
-        assert!(state.persistent.pipes.is_empty());
         assert!(state.persistent.codex.is_empty());
         assert_eq!(state.persistent.active_pattern, 0);
     }
@@ -427,6 +398,8 @@ mod tests {
             Resource::ForgedLight,
             1.0,
             1,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         );
         assert_eq!(r.input_a, Resource::Ember);
         assert_eq!(r.input_b, Resource::VoidEssence);
@@ -438,6 +411,8 @@ mod tests {
         assert!((r.buffer - 0.0).abs() < 0.001);
         assert!((r.buffer_capacity - 20.0).abs() < 0.001);
         assert_eq!(r.level, 1);
+        assert_eq!(r.sources_a.len(), 1);
+        assert_eq!(r.sources_b.len(), 1);
     }
 
     #[test]
