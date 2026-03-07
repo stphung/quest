@@ -291,29 +291,95 @@ impl Shape for SkyShape {
             }
         }
 
-        // 5. Shoreline silhouettes — pixel columns at horizon edge
-        for col in 0..self.width {
-            let far_h =
-                (1.0 + ((col as f64 * 0.24 + self.wave_tick * 0.012).sin() + 1.0) * 1.1) * 2.0;
-            let near_h = (1.0
-                + ((col as f64 * 0.15 + self.wave_tick * 0.020 + 1.5).sin() + 1.0) * 1.5)
-                * 2.0;
+        // 5. Mountain silhouettes — 3 depth layers with textured ridgelines
+        // Layers: far (tallest, most faded), mid, near (shortest, most saturated)
+        struct MountainLayer {
+            // sine wave components: (frequency, amplitude, phase_offset)
+            waves: [(f64, f64, f64); 3],
+            base_height: f64, // minimum height in pixels
+            color_day: (u8, u8, u8),
+            color_night: (u8, u8, u8),
+            peak_tint_day: (u8, u8, u8), // lighter color for peak pixels
+            peak_tint_night: (u8, u8, u8),
+            has_tree_fringe: bool,
+        }
 
-            let far_color = (
-                lerp_channel(84, 62, self.dusk),
-                lerp_channel(110, 90, self.dusk),
-                lerp_channel(126, 114, self.dusk),
-            );
-            let near_color = (
-                lerp_channel(70, 52, self.dusk),
-                lerp_channel(96, 74, self.dusk),
-                lerp_channel(110, 98, self.dusk),
-            );
+        let layers = [
+            // Far range — gentle tall peaks, blue-grey, most faded
+            MountainLayer {
+                waves: [(0.08, 4.0, 0.0), (0.19, 2.0, 1.2), (0.37, 0.8, 3.7)],
+                base_height: 3.0,
+                color_day: (100, 120, 145),
+                color_night: (50, 60, 82),
+                peak_tint_day: (120, 140, 165),
+                peak_tint_night: (62, 72, 95),
+                has_tree_fringe: false,
+            },
+            // Mid range — moderate peaks, blue-green
+            MountainLayer {
+                waves: [(0.12, 3.0, 2.5), (0.26, 1.8, 0.8), (0.45, 0.6, 5.1)],
+                base_height: 2.0,
+                color_day: (78, 105, 120),
+                color_night: (42, 58, 72),
+                peak_tint_day: (95, 122, 138),
+                peak_tint_night: (54, 70, 85),
+                has_tree_fringe: false,
+            },
+            // Near range — sharp short peaks, dark green-grey, tree fringe
+            MountainLayer {
+                waves: [(0.15, 2.5, 1.0), (0.33, 1.5, 4.2), (0.52, 0.5, 2.3)],
+                base_height: 1.5,
+                color_day: (60, 85, 95),
+                color_night: (35, 48, 62),
+                peak_tint_day: (75, 100, 112),
+                peak_tint_night: (45, 58, 74),
+                has_tree_fringe: true,
+            },
+        ];
 
-            for (h, color) in [(far_h, far_color), (near_h, near_color)] {
-                let pixels = h.round() as i32;
+        for layer in &layers {
+            let base_color = lerp_rgb(layer.color_day, layer.color_night, self.dusk);
+            let peak_color = lerp_rgb(layer.peak_tint_day, layer.peak_tint_night, self.dusk);
+
+            for col in 0..self.width {
+                // Sum sine waves + hash jitter for ridgeline height
+                let mut h = layer.base_height;
+                for &(freq, amp, phase) in &layer.waves {
+                    h += (col as f64 * freq + phase).sin() * amp;
+                }
+                // Per-column jitter from hash for irregularity
+                let jitter = (hash2d(42 + col, layer.base_height as usize) % 5) as f64 * 0.4 - 0.8;
+                h = (h + jitter).max(1.0);
+
+                let pixels = (h * 2.0).round() as i32;
                 for dy in 0..pixels {
                     let gy = sky_py as i32 - 1 - dy;
+                    // Vertical gradient: base at bottom, peak tint at top
+                    let vert_t = if pixels <= 1 {
+                        1.0
+                    } else {
+                        dy as f64 / (pixels - 1) as f64
+                    };
+                    let mut color = lerp_rgb(base_color, peak_color, vert_t);
+
+                    // Tree fringe: alternating hash-based texture on top 2 pixels
+                    if layer.has_tree_fringe && dy >= pixels - 2 {
+                        let is_dark = hash2d(col, dy as usize).is_multiple_of(3);
+                        if is_dark {
+                            color = (
+                                color.0.saturating_sub(12),
+                                color.1.saturating_sub(8),
+                                color.2.saturating_sub(10),
+                            );
+                        } else {
+                            color = (
+                                color.0.saturating_add(6),
+                                color.1.saturating_add(10),
+                                color.2.saturating_add(4),
+                            );
+                        }
+                    }
+
                     self.paint_px(painter, col as i32, gy, color);
                 }
             }
