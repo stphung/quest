@@ -599,6 +599,7 @@ fn main() -> io::Result<()> {
                                 enhancement.discovered,
                                 state.stormglass_discovered,
                                 &deep_state,
+                                loom_state.persistent.discovered,
                                 &global_achievements,
                                 &enhancement.levels,
                                 &deep_state,

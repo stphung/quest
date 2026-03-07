@@ -385,6 +385,7 @@ pub fn draw_ui_with_update(
     soulforge_discovered: bool,
     stormglass_discovered: bool,
     deep_state: &crate::deep::DeepState,
+    loom_discovered: bool,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
     deep_for_cores: &crate::deep::DeepState,
@@ -421,6 +422,7 @@ pub fn draw_ui_with_update(
                 soulforge_discovered,
                 stormglass_discovered,
                 deep_indicator,
+                loom_discovered,
                 show_ascend,
                 achievements,
                 enhancement_levels,
@@ -436,6 +438,7 @@ pub fn draw_ui_with_update(
                 soulforge_discovered,
                 stormglass_discovered,
                 deep_indicator,
+                loom_discovered,
                 achievements,
             );
         }
@@ -461,6 +464,7 @@ fn draw_xl_l_layout(
     soulforge_discovered: bool,
     stormglass_discovered: bool,
     deep_indicator: stats_panel::DeepIndicatorStatus,
+    loom_discovered: bool,
     show_ascend: bool,
     achievements: &crate::achievements::Achievements,
     enhancement_levels: &[u8; 7],
@@ -543,6 +547,7 @@ fn draw_xl_l_layout(
         soulforge_discovered,
         stormglass_discovered,
         deep_indicator,
+        loom_discovered,
         show_ascend,
         achievements.pending_count(),
         ctx,
@@ -563,6 +568,7 @@ fn draw_m_layout(
     soulforge_discovered: bool,
     stormglass_discovered: bool,
     deep_indicator: stats_panel::DeepIndicatorStatus,
+    loom_discovered: bool,
     achievements: &crate::achievements::Achievements,
 ) {
     let area = frame.area();
@@ -624,6 +630,7 @@ fn draw_m_layout(
         soulforge_discovered,
         stormglass_discovered,
         deep_indicator,
+        loom_discovered,
         achievements.pending_count(),
     );
 }

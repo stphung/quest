@@ -303,6 +303,11 @@ pub fn draw_game_overlays(
         ui::deep_scene::render_deep_overlay(frame, area, deep_state, deep_ui, None, layout_ctx);
     }
 
+    // Loom of Worlds overlay
+    if ctx.loom_ui.open {
+        ui::loom_scene::render_loom_overlay(frame, area, ctx.loom_state, ctx.loom_ui);
+    }
+
     // Chrono Surge active: status banner at bottom
     if let Some(surge) = chrono_surge {
         ui::stormglass_scene::render_chrono_surge_time_warp(frame, area, surge, layout_ctx);
