@@ -256,12 +256,6 @@ pub struct WovenPattern {
     pub index: u32,
     pub name: String,
     pub requirements: Vec<PatternRequirement>,
-    pub sustain_seconds: u32,
-    #[serde(default)]
-    pub sustained_seconds: u32,
-    /// Sub-second fractional carry so that 10 × 0.1s ticks accumulate to 1s.
-    #[serde(default)]
-    pub sustained_seconds_frac: f64,
     #[serde(default)]
     pub completed: bool,
 }
@@ -270,7 +264,12 @@ pub struct WovenPattern {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatternRequirement {
     pub resource: Resource,
-    pub rate_per_hour: f64,
+    /// Total amount of this resource needed to complete the pattern.
+    #[serde(alias = "rate_per_hour")]
+    pub amount: f64,
+    /// Accumulated production so far.
+    #[serde(default)]
+    pub accumulated: f64,
 }
 
 /// All persistent Loom state (saved to loom.json).
@@ -451,5 +450,29 @@ mod tests {
     fn test_refinery_limit_zero_with_no_patterns() {
         let state = LoomState::new();
         assert_eq!(state.persistent.max_refineries(), 0);
+    }
+
+    #[test]
+    fn test_pattern_requirement_fields() {
+        let req = PatternRequirement {
+            resource: Resource::Ember,
+            amount: 5.0,
+            accumulated: 0.0,
+        };
+        assert_eq!(req.resource, Resource::Ember);
+        assert!((req.amount - 5.0).abs() < 1e-9);
+        assert!((req.accumulated - 0.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_woven_pattern_no_timer_fields() {
+        let pattern = WovenPattern {
+            index: 0,
+            name: "Test".to_string(),
+            requirements: vec![],
+            completed: false,
+        };
+        assert!(!pattern.completed);
+        assert_eq!(pattern.index, 0);
     }
 }

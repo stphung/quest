@@ -608,7 +608,9 @@ impl DebugAction {
             Self::LoomCompletePattern => {
                 let idx = loom.persistent.active_pattern;
                 if let Some(p) = loom.persistent.patterns.get_mut(idx) {
-                    p.sustained_seconds = p.sustain_seconds;
+                    for req in &mut p.requirements {
+                        req.accumulated = req.amount;
+                    }
                     p.completed = true;
                 }
                 if loom.persistent.active_pattern + 1 < loom.persistent.patterns.len() {
@@ -620,7 +622,9 @@ impl DebugAction {
                 let target = n.min(loom.persistent.patterns.len().saturating_sub(1));
                 for i in 0..target {
                     if let Some(p) = loom.persistent.patterns.get_mut(i) {
-                        p.sustained_seconds = p.sustain_seconds;
+                        for req in &mut p.requirements {
+                            req.accumulated = req.amount;
+                        }
                         p.completed = true;
                     }
                 }

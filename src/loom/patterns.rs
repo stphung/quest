@@ -1,47 +1,43 @@
 //! Woven Pattern tracking, completion, and progression.
 //!
 //! Patterns are the sole progression gate in the Loom of Worlds.
-//! Each tick, if all required production rates are being sustained,
-//! the sustain timer increments. When the timer reaches the required
-//! duration, the pattern completes and the next pattern unlocks.
+//! Each tick, production rates accumulate toward per-resource amount targets.
+//! When every requirement's accumulated value reaches its target amount,
+//! the pattern completes and the next pattern unlocks.
 #![allow(dead_code)]
 
 use super::types::{LoomPersistent, Resource};
 use std::collections::HashMap;
 
-// ── Rate checking ──────────────────────────────────────────────────────────────
+// ── Completion check ───────────────────────────────────────────────────────────
 
-/// Check if all requirements of the active pattern are met given current rates.
+/// Check if all requirements of the active pattern have been fully accumulated.
 ///
-/// Returns `true` if every required resource is meeting or exceeding its rate,
-/// `false` if any rate is deficient or if there is no active pattern.
-pub fn active_pattern_requirements_met(
-    persistent: &LoomPersistent,
-    rates: &HashMap<Resource, f64>,
-) -> bool {
+/// Returns `true` if every required resource has `accumulated >= amount`,
+/// `false` if any requirement is deficient or if there is no active pattern.
+pub fn active_pattern_requirements_met(persistent: &LoomPersistent) -> bool {
     let Some(pattern) = persistent.patterns.get(persistent.active_pattern) else {
         return false;
     };
     if pattern.completed {
         return false;
     }
-    pattern.requirements.iter().all(|req| {
-        let current = rates.get(&req.resource).copied().unwrap_or(0.0);
-        current >= req.rate_per_hour
-    })
+    pattern
+        .requirements
+        .iter()
+        .all(|req| req.accumulated >= req.amount)
 }
 
-// ── Sustain timer ──────────────────────────────────────────────────────────────
+// ── Accumulator tick ───────────────────────────────────────────────────────────
 
-/// Tick the sustain timer for the active pattern.
+/// Tick the accumulator for the active pattern.
 ///
 /// Called once per game tick. `delta_seconds` is the wall-clock time elapsed
 /// since the last tick (typically 0.1s for a 100ms tick interval).
 /// `rates` maps each resource to its current production rate in units/hour.
 ///
-/// - If all requirements are met: increments `sustained_seconds` by `delta_seconds`.
-/// - If any requirement is unmet: pauses (does not reset).
-/// - When `sustained_seconds` reaches `sustain_seconds`: completes the pattern.
+/// Each requirement accumulates `rate * delta_hours` up to its `amount` cap.
+/// When every requirement is fully accumulated, the pattern completes.
 ///
 /// Returns `true` if a pattern was completed during this tick (so the caller
 /// can emit a `TickEvent` and set `loom_changed = true`).
@@ -50,31 +46,27 @@ pub fn tick_pattern_sustain(
     rates: &HashMap<Resource, f64>,
     delta_seconds: f64,
 ) -> bool {
-    if !active_pattern_requirements_met(persistent, rates) {
-        return false;
-    }
-
     let Some(pattern) = persistent.patterns.get_mut(persistent.active_pattern) else {
         return false;
     };
-
-    // Accumulate fractional seconds so sub-second ticks (0.1s each) sum correctly.
-    // Use a tiny epsilon when flooring to avoid IEEE 754 issues where 10 × 0.1
-    // accumulates to 0.9999... instead of 1.0.
-    const EPSILON: f64 = 1e-9;
-    pattern.sustained_seconds_frac += delta_seconds;
-    let carry = (pattern.sustained_seconds_frac + EPSILON).floor() as u32;
-    if carry > 0 {
-        pattern.sustained_seconds_frac = (pattern.sustained_seconds_frac - carry as f64).max(0.0);
-        pattern.sustained_seconds =
-            (pattern.sustained_seconds + carry).min(pattern.sustain_seconds);
+    if pattern.completed {
+        return false;
     }
 
-    if pattern.sustained_seconds >= pattern.sustain_seconds {
+    let delta_hours = delta_seconds / 3600.0;
+    for req in &mut pattern.requirements {
+        let rate = rates.get(&req.resource).copied().unwrap_or(0.0);
+        req.accumulated = (req.accumulated + rate * delta_hours).min(req.amount);
+    }
+
+    if pattern
+        .requirements
+        .iter()
+        .all(|req| req.accumulated >= req.amount)
+    {
         complete_active_pattern(persistent);
         return true;
     }
-
     false
 }
 
@@ -115,22 +107,16 @@ pub fn all_patterns_complete(persistent: &LoomPersistent) -> bool {
     !persistent.patterns.is_empty() && persistent.patterns.iter().all(|p| p.completed)
 }
 
-/// Returns a per-requirement met/unmet status for the active pattern.
-/// Useful for the pattern bar UI to render individual checkmarks.
-pub fn active_pattern_requirement_status(
-    persistent: &LoomPersistent,
-    rates: &HashMap<Resource, f64>,
-) -> Vec<bool> {
+/// Returns `(accumulated, amount)` for each requirement of the active pattern.
+/// Useful for the pattern bar UI to render individual progress indicators.
+pub fn active_pattern_requirement_status(persistent: &LoomPersistent) -> Vec<(f64, f64)> {
     let Some(pattern) = persistent.patterns.get(persistent.active_pattern) else {
         return Vec::new();
     };
     pattern
         .requirements
         .iter()
-        .map(|req| {
-            let current = rates.get(&req.resource).copied().unwrap_or(0.0);
-            current >= req.rate_per_hour
-        })
+        .map(|req| (req.accumulated, req.amount))
         .collect()
 }
 
@@ -155,92 +141,89 @@ mod tests {
     // ── active_pattern_requirements_met ───────────────────────────────────────
 
     #[test]
-    fn test_requirements_met_when_all_rates_sufficient() {
-        let state = state_with_patterns();
-        // Pattern 0 "First Thread": Ember 2/hr
-        let r = rates(&[(Resource::Ember, 2.0)]);
-        assert!(active_pattern_requirements_met(&state.persistent, &r));
+    fn test_requirements_met_when_fully_accumulated() {
+        let mut state = state_with_patterns();
+        // Pattern 0 "First Thread": Ember amount = 1.0; set accumulated to exactly 1.0.
+        state.persistent.patterns[0].requirements[0].accumulated = 1.0;
+        assert!(active_pattern_requirements_met(&state.persistent));
     }
 
     #[test]
-    fn test_requirements_not_met_when_rate_too_low() {
+    fn test_requirements_not_met_when_partially_accumulated() {
         let state = state_with_patterns();
-        // Pattern 0: needs Ember 2/hr; provide 1/hr
-        let r = rates(&[(Resource::Ember, 1.0)]);
-        assert!(!active_pattern_requirements_met(&state.persistent, &r));
-    }
-
-    #[test]
-    fn test_requirements_not_met_when_resource_absent() {
-        let state = state_with_patterns();
-        // Pattern 0: needs Ember 2/hr; provide nothing
-        let r = rates(&[]);
-        assert!(!active_pattern_requirements_met(&state.persistent, &r));
-    }
-
-    #[test]
-    fn test_requirements_met_exactly_at_threshold() {
-        let state = state_with_patterns();
-        // Pattern 0: needs Ember 2.0/hr; provide exactly 2.0/hr
-        let r = rates(&[(Resource::Ember, 2.0)]);
-        assert!(active_pattern_requirements_met(&state.persistent, &r));
+        // Pattern 0 starts with 0 accumulated; amount = 1.0 → not met.
+        assert!(!active_pattern_requirements_met(&state.persistent));
     }
 
     #[test]
     fn test_requirements_not_met_when_pattern_already_completed() {
         let mut state = state_with_patterns();
-        // Manually mark pattern 0 as completed without advancing active_pattern.
+        // Fully accumulate then mark as completed.
+        state.persistent.patterns[0].requirements[0].accumulated = 1.0;
         state.persistent.patterns[0].completed = true;
-        let r = rates(&[(Resource::Ember, 5.0)]);
         // active_pattern is still 0, which is completed → should return false.
-        assert!(!active_pattern_requirements_met(&state.persistent, &r));
+        assert!(!active_pattern_requirements_met(&state.persistent));
     }
 
     // ── tick_pattern_sustain ──────────────────────────────────────────────────
 
     #[test]
-    fn test_sustain_timer_increments_when_rates_met() {
+    fn test_accumulator_increases_when_rate_provided() {
         let mut state = state_with_patterns();
-        let r = rates(&[(Resource::Ember, 3.0)]); // above 2/hr threshold
-
-        tick_pattern_sustain(&mut state.persistent, &r, 1.0);
-
-        assert_eq!(state.persistent.patterns[0].sustained_seconds, 1);
+        // Pattern 0 "First Thread": Ember amount = 1.0.
+        // At 2.0/hr for 0.1s (tick), delta_hours = 0.1/3600 ≈ 2.778e-5 hr.
+        // accumulated += 2.0 * 2.778e-5 ≈ 5.556e-5.
+        let r = rates(&[(Resource::Ember, 2.0)]);
+        tick_pattern_sustain(&mut state.persistent, &r, 0.1);
+        let acc = state.persistent.patterns[0].requirements[0].accumulated;
+        assert!(acc > 0.0, "accumulated should be positive after a tick");
+        assert!(
+            acc < 1.0,
+            "should not complete in a single 0.1s tick at 2/hr"
+        );
     }
 
     #[test]
-    fn test_sustain_timer_pauses_when_rates_unmet() {
+    fn test_accumulator_zero_when_no_rate() {
         let mut state = state_with_patterns();
-        state.persistent.patterns[0].sustained_seconds = 10;
-
-        let r = rates(&[(Resource::Ember, 0.5)]); // below threshold
+        let r = rates(&[]);
         tick_pattern_sustain(&mut state.persistent, &r, 1.0);
-
-        // Timer should not change.
-        assert_eq!(state.persistent.patterns[0].sustained_seconds, 10);
+        let acc = state.persistent.patterns[0].requirements[0].accumulated;
+        assert!((acc).abs() < 1e-9, "no rate means no accumulation");
     }
 
     #[test]
-    fn test_sustain_timer_does_not_reset_when_rates_recover() {
+    fn test_accumulator_does_not_reset() {
         let mut state = state_with_patterns();
-        state.persistent.patterns[0].sustained_seconds = 100;
-
-        let r = rates(&[(Resource::Ember, 3.0)]);
+        // Pre-set some accumulated progress.
+        state.persistent.patterns[0].requirements[0].accumulated = 0.5;
+        // Tick with zero rate — should not reset.
+        let r = rates(&[]);
         tick_pattern_sustain(&mut state.persistent, &r, 1.0);
-
-        // Should have continued from 100, not reset.
-        assert_eq!(state.persistent.patterns[0].sustained_seconds, 101);
+        let acc = state.persistent.patterns[0].requirements[0].accumulated;
+        assert!((acc - 0.5).abs() < 1e-9, "accumulated must not reset");
     }
 
     #[test]
-    fn test_pattern_completes_when_sustain_reached() {
+    fn test_accumulator_capped_at_amount() {
         let mut state = state_with_patterns();
-        // Set timer just below the threshold (pattern 0 sustain = 1800s).
-        state.persistent.patterns[0].sustained_seconds = 1799;
+        // Supply a huge rate to ensure we don't exceed amount = 1.0.
+        let r = rates(&[(Resource::Ember, 1_000_000.0)]);
+        tick_pattern_sustain(&mut state.persistent, &r, 3600.0);
+        let req = &state.persistent.patterns[0].requirements[0];
+        assert!(
+            req.accumulated <= req.amount + 1e-9,
+            "accumulated must not exceed amount"
+        );
+    }
 
-        let r = rates(&[(Resource::Ember, 3.0)]);
-        let completed = tick_pattern_sustain(&mut state.persistent, &r, 1.0);
-
+    #[test]
+    fn test_pattern_completes_when_fully_accumulated() {
+        let mut state = state_with_patterns();
+        // Set accumulated just below amount, then push it over.
+        state.persistent.patterns[0].requirements[0].accumulated = 0.9999;
+        let r = rates(&[(Resource::Ember, 1_000_000.0)]);
+        let completed = tick_pattern_sustain(&mut state.persistent, &r, 3600.0);
         assert!(completed);
         assert!(state.persistent.patterns[0].completed);
     }
@@ -248,23 +231,18 @@ mod tests {
     #[test]
     fn test_active_pattern_advances_after_completion() {
         let mut state = state_with_patterns();
-        state.persistent.patterns[0].sustained_seconds = 1799;
-
-        let r = rates(&[(Resource::Ember, 3.0)]);
-        tick_pattern_sustain(&mut state.persistent, &r, 1.0);
-
-        // active_pattern should now point to pattern 1.
+        state.persistent.patterns[0].requirements[0].accumulated = 0.9999;
+        let r = rates(&[(Resource::Ember, 1_000_000.0)]);
+        tick_pattern_sustain(&mut state.persistent, &r, 3600.0);
         assert_eq!(state.persistent.active_pattern, 1);
     }
 
     #[test]
-    fn test_no_completion_returned_when_rates_unmet() {
+    fn test_no_completion_when_accumulation_insufficient() {
         let mut state = state_with_patterns();
-        state.persistent.patterns[0].sustained_seconds = 1799;
-
-        let r = rates(&[(Resource::Ember, 0.0)]); // unmet
+        // Pattern 0 amount = 1.0. At 0.001/hr for 1s we accumulate ~2.78e-7.
+        let r = rates(&[(Resource::Ember, 0.001)]);
         let completed = tick_pattern_sustain(&mut state.persistent, &r, 1.0);
-
         assert!(!completed);
         assert!(!state.persistent.patterns[0].completed);
     }
@@ -272,14 +250,29 @@ mod tests {
     #[test]
     fn test_sub_second_ticks_accumulate_correctly() {
         let mut state = state_with_patterns();
-        let r = rates(&[(Resource::Ember, 3.0)]);
-
-        // 10 ticks of 0.1s each should sum to 1 second.
-        for _ in 0..10 {
-            tick_pattern_sustain(&mut state.persistent, &r, 0.1);
+        // 36_000 ticks of 0.1s each = 3600s = 1 hour.
+        // At 2.0/hr, should accumulate 2.0 total (capped at amount = 1.0 so pattern completes).
+        let r = rates(&[(Resource::Ember, 2.0)]);
+        let mut completed = false;
+        for _ in 0..36_000 {
+            if tick_pattern_sustain(&mut state.persistent, &r, 0.1) {
+                completed = true;
+                break;
+            }
         }
+        assert!(
+            completed,
+            "pattern should complete after 1hr at 2/hr for amount=1.0"
+        );
+    }
 
-        assert_eq!(state.persistent.patterns[0].sustained_seconds, 1);
+    #[test]
+    fn test_no_progress_on_zero_delta() {
+        let mut state = state_with_patterns();
+        let r = rates(&[(Resource::Ember, 3.0)]);
+        tick_pattern_sustain(&mut state.persistent, &r, 0.0);
+        let acc = state.persistent.patterns[0].requirements[0].accumulated;
+        assert!((acc).abs() < 1e-9);
     }
 
     // ── all_patterns_complete ─────────────────────────────────────────────────
@@ -305,34 +298,47 @@ mod tests {
         assert!(!all_patterns_complete(&state.persistent));
     }
 
+    #[test]
+    fn test_all_complete_returns_false_with_one_remaining() {
+        let mut state = state_with_patterns();
+        let n = state.persistent.patterns.len();
+        for p in state.persistent.patterns.iter_mut().take(n - 1) {
+            p.completed = true;
+        }
+        assert!(!all_patterns_complete(&state.persistent));
+    }
+
     // ── active_pattern_requirement_status ────────────────────────────────────
 
     #[test]
-    fn test_requirement_status_all_met() {
-        let state = state_with_patterns();
-        let r = rates(&[(Resource::Ember, 5.0)]);
-        let status = active_pattern_requirement_status(&state.persistent, &r);
-        assert_eq!(status, vec![true]);
-    }
-
-    #[test]
-    fn test_requirement_status_partial() {
+    fn test_requirement_status_returns_accumulated_and_amount() {
         let mut state = state_with_patterns();
-        // Advance to pattern 1 "The Bridge": Ember 3/hr + Reflection 1/hr
-        state.persistent.patterns[0].completed = true;
-        state.persistent.active_pattern = 1;
-
-        let r = rates(&[(Resource::Ember, 5.0), (Resource::Reflection, 0.5)]);
-        let status = active_pattern_requirement_status(&state.persistent, &r);
-        assert_eq!(status, vec![true, false]);
+        // Set accumulated to half of amount.
+        state.persistent.patterns[0].requirements[0].accumulated = 0.5;
+        let status = active_pattern_requirement_status(&state.persistent);
+        assert_eq!(status.len(), 1);
+        let (acc, amt) = status[0];
+        assert!((acc - 0.5).abs() < 1e-9);
+        assert!((amt - 1.0).abs() < 1e-9);
     }
 
     #[test]
     fn test_requirement_status_empty_when_no_patterns() {
         let state = LoomState::new();
-        let r = rates(&[]);
-        let status = active_pattern_requirement_status(&state.persistent, &r);
+        let status = active_pattern_requirement_status(&state.persistent);
         assert!(status.is_empty());
+    }
+
+    #[test]
+    fn test_requirement_status_length_matches_requirement_count() {
+        let mut state = state_with_patterns();
+        // Advance to pattern 4 "Full Circle" which has 6 requirements.
+        for i in 0..4 {
+            state.persistent.patterns[i].completed = true;
+        }
+        state.persistent.active_pattern = 4;
+        let status = active_pattern_requirement_status(&state.persistent);
+        assert_eq!(status.len(), 6);
     }
 
     // ── advance_to_next_pattern ───────────────────────────────────────────────
@@ -340,14 +346,12 @@ mod tests {
     #[test]
     fn test_advance_skips_already_completed_patterns() {
         let mut state = state_with_patterns();
-        // Complete patterns 0 and 1 manually.
         state.persistent.patterns[0].completed = true;
         state.persistent.patterns[1].completed = true;
         state.persistent.active_pattern = 0;
 
         advance_to_next_pattern(&mut state.persistent);
 
-        // Should skip to pattern 2.
         assert_eq!(state.persistent.active_pattern, 2);
     }
 
@@ -362,122 +366,38 @@ mod tests {
 
         advance_to_next_pattern(&mut state.persistent);
 
-        // No uncompleted pattern exists; active_pattern should remain at last.
         assert_eq!(state.persistent.active_pattern, last);
     }
 
     // ── multi-requirement patterns ────────────────────────────────────────────
 
     #[test]
-    fn test_requirements_met_with_multiple_resources_all_satisfied() {
+    fn test_multi_requirement_all_accumulated_completes() {
         let mut state = state_with_patterns();
-        // Advance to pattern 3 "Balancing Act": Ember 2/hr + Reflection 2/hr + VoidEssence 2/hr.
-        state.persistent.patterns[0].completed = true;
-        state.persistent.patterns[1].completed = true;
-        state.persistent.patterns[2].completed = true;
-        state.persistent.active_pattern = 3;
-
-        let r = rates(&[
-            (Resource::Ember, 2.0),
-            (Resource::Reflection, 2.0),
-            (Resource::VoidEssence, 2.0),
-        ]);
-        assert!(active_pattern_requirements_met(&state.persistent, &r));
-    }
-
-    #[test]
-    fn test_requirements_not_met_when_one_of_multiple_resources_missing() {
-        let mut state = state_with_patterns();
-        // Pattern 3 "Balancing Act": requires Ember, Reflection, VoidEssence all at 2/hr.
-        state.persistent.patterns[0].completed = true;
-        state.persistent.patterns[1].completed = true;
-        state.persistent.patterns[2].completed = true;
-        state.persistent.active_pattern = 3;
-
-        // Provide only two of the three required resources.
-        let r = rates(&[(Resource::Ember, 2.0), (Resource::Reflection, 2.0)]);
-        assert!(!active_pattern_requirements_met(&state.persistent, &r));
-    }
-
-    // ── tick_pattern_sustain edge cases ───────────────────────────────────────
-
-    #[test]
-    fn test_sustain_timer_does_not_complete_before_threshold() {
-        let mut state = state_with_patterns();
-        // Pattern 0 sustain = 1800s. After 1799 ticks of 1s each, should not complete.
-        let r = rates(&[(Resource::Ember, 3.0)]);
-        let mut completed = false;
-        for _ in 0..1799 {
-            completed = tick_pattern_sustain(&mut state.persistent, &r, 1.0);
-            if completed {
-                break;
-            }
-        }
-        assert!(!completed);
-        assert_eq!(state.persistent.patterns[0].sustained_seconds, 1799);
-        assert!(!state.persistent.patterns[0].completed);
-    }
-
-    #[test]
-    fn test_sustain_timer_capped_at_sustain_seconds() {
-        let mut state = state_with_patterns();
-        // Set timer just one tick below completion.
-        state.persistent.patterns[0].sustained_seconds = 1799;
-
-        let r = rates(&[(Resource::Ember, 3.0)]);
-        tick_pattern_sustain(&mut state.persistent, &r, 1.0);
-
-        // sustained_seconds should be capped at sustain_seconds (1800), not exceed it.
-        assert!(state.persistent.patterns[0].sustained_seconds <= 1800);
-    }
-
-    // ── all_patterns_complete edge cases ──────────────────────────────────────
-
-    #[test]
-    fn test_all_complete_returns_false_with_one_remaining() {
-        let mut state = state_with_patterns();
-        let n = state.persistent.patterns.len();
-        // Complete all except the last.
-        for p in state.persistent.patterns.iter_mut().take(n - 1) {
-            p.completed = true;
-        }
-        assert!(!all_patterns_complete(&state.persistent));
-    }
-
-    // ── active_pattern_requirement_status ─────────────────────────────────────
-
-    #[test]
-    fn test_requirement_status_all_unmet() {
-        let state = state_with_patterns();
-        // Pattern 0 needs Ember 2/hr; provide 0.
-        let r = rates(&[]);
-        let status = active_pattern_requirement_status(&state.persistent, &r);
-        assert_eq!(status, vec![false]);
-    }
-
-    #[test]
-    fn test_requirement_status_length_matches_requirement_count() {
-        let mut state = state_with_patterns();
-        // Advance to pattern 4 "Full Circle" which has 6 requirements.
-        for i in 0..4 {
+        // Advance to pattern 3 "Balancing Act": 3 reqs, each amount = 3.0.
+        for i in 0..3 {
             state.persistent.patterns[i].completed = true;
         }
-        state.persistent.active_pattern = 4;
-
-        let r = rates(&[]);
-        let status = active_pattern_requirement_status(&state.persistent, &r);
-        // Pattern 4 has 6 requirements (all six base resources).
-        assert_eq!(status.len(), 6);
+        state.persistent.active_pattern = 3;
+        // Fully accumulate all three requirements.
+        for req in &mut state.persistent.patterns[3].requirements {
+            req.accumulated = req.amount;
+        }
+        assert!(active_pattern_requirements_met(&state.persistent));
     }
 
-    // ── tick_pattern_sustain with zero delta ──────────────────────────────────
-
     #[test]
-    fn test_sustain_timer_no_progress_on_zero_delta() {
+    fn test_multi_requirement_partial_does_not_complete() {
         let mut state = state_with_patterns();
-        let r = rates(&[(Resource::Ember, 3.0)]);
-        tick_pattern_sustain(&mut state.persistent, &r, 0.0);
-        assert_eq!(state.persistent.patterns[0].sustained_seconds, 0);
-        assert!((state.persistent.patterns[0].sustained_seconds_frac).abs() < 1e-9);
+        // Advance to pattern 3 "Balancing Act".
+        for i in 0..3 {
+            state.persistent.patterns[i].completed = true;
+        }
+        state.persistent.active_pattern = 3;
+        // Accumulate only the first two requirements fully.
+        state.persistent.patterns[3].requirements[0].accumulated = 3.0;
+        state.persistent.patterns[3].requirements[1].accumulated = 3.0;
+        // Third requirement stays at 0.
+        assert!(!active_pattern_requirements_met(&state.persistent));
     }
 }

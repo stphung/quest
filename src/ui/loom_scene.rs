@@ -1840,8 +1840,7 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
         return;
     }
 
-    let empty_rates = std::collections::HashMap::new();
-    let req_status = active_pattern_requirement_status(&loom_state.persistent, &empty_rates);
+    let req_status = active_pattern_requirement_status(&loom_state.persistent);
     let all_done = all_patterns_complete(&loom_state.persistent);
 
     let block = Block::default()
@@ -1885,10 +1884,11 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
         pattern.name
     );
 
-    // Line 2: per-requirement status chips (check/cross + resource + rate).
+    // Line 2: per-requirement status chips (accumulated/amount + resource name).
     let mut req_spans: Vec<Span> = vec![Span::raw(" ")];
     for (i, req) in pattern.requirements.iter().enumerate() {
-        let met = req_status.get(i).copied().unwrap_or(false);
+        let (accumulated, amount) = req_status.get(i).copied().unwrap_or((0.0, 0.0));
+        let met = accumulated >= amount;
         let check = if met { "\u{2713}" } else { "\u{2717}" };
         let color = if met {
             Color::Rgb(80, 200, 120)
@@ -1897,7 +1897,7 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
         };
         let res_name = resource_name(&req.resource);
         req_spans.push(Span::styled(
-            format!("{} {} {:.0}/hr ", check, res_name, req.rate_per_hour),
+            format!("{} {} {:.1}/{:.1} ", check, res_name, accumulated, amount),
             Style::default().fg(color),
         ));
         if i + 1 < pattern.requirements.len() {
@@ -1908,12 +1908,24 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
         }
     }
 
-    // Line 3: progress bar.
-    let progress_line = build_progress_line(
-        pattern.sustained_seconds,
-        pattern.sustain_seconds,
-        inner.width,
-    );
+    // Line 3: progress bar — use the minimum completion ratio across all requirements.
+    let min_ratio = if pattern.requirements.is_empty() {
+        0.0
+    } else {
+        pattern
+            .requirements
+            .iter()
+            .map(|req| {
+                if req.amount > 0.0 {
+                    req.accumulated / req.amount
+                } else {
+                    1.0
+                }
+            })
+            .fold(f64::INFINITY, f64::min)
+            .min(1.0)
+    };
+    let progress_line = build_progress_line_ratio(min_ratio, inner.width);
 
     let mut lines: Vec<Line> = vec![
         Line::from(Span::styled(
@@ -1931,22 +1943,15 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
     );
 }
 
-/// Build the sustain progress bar line.
-fn build_progress_line(sustained: u32, total: u32, width: u16) -> Line<'static> {
-    if total == 0 {
-        return Line::from("");
-    }
-
-    let elapsed_str = format_mmss(sustained);
-    let total_str = format_mmss(total);
-
+/// Build the pattern progress bar line from a completion ratio in [0.0, 1.0].
+fn build_progress_line_ratio(ratio: f64, width: u16) -> Line<'static> {
     let label_prefix = " Weaving: ";
-    let time_suffix = format!("  {}/{}", elapsed_str, total_str);
+    let pct_suffix = format!("  {:.0}%", (ratio * 100.0).min(100.0));
     let bar_width = (width as usize)
-        .saturating_sub(label_prefix.len() + time_suffix.len() + 2)
+        .saturating_sub(label_prefix.len() + pct_suffix.len() + 2)
         .min(40);
 
-    let filled = ((sustained as usize * bar_width) / (total as usize)).min(bar_width);
+    let filled = ((ratio * bar_width as f64) as usize).min(bar_width);
     let empty = bar_width.saturating_sub(filled);
 
     let bar = format!(
@@ -1954,17 +1959,13 @@ fn build_progress_line(sustained: u32, total: u32, width: u16) -> Line<'static> 
         label_prefix,
         "\u{2588}".repeat(filled),
         "\u{2591}".repeat(empty),
-        time_suffix,
+        pct_suffix,
     );
 
     Line::from(Span::styled(
         bar,
         Style::default().fg(Color::Rgb(160, 100, 220)),
     ))
-}
-
-fn format_mmss(seconds: u32) -> String {
-    format!("{}:{:02}", seconds / 60, seconds % 60)
 }
 
 // ── Navigation hints ──────────────────────────────────────────────────────────
