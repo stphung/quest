@@ -221,6 +221,46 @@ impl Shape for SkyShape {
             }
         }
 
+        // 1c. Haze bands — thin warm-tinted bands in lower sky, slow drift
+        {
+            let haze_bands: [(f64, f64, f64); 3] = [
+                // (y_ratio in sky, drift_speed, opacity)
+                (0.68, 0.020, 0.18),
+                (0.76, 0.015, 0.15),
+                (0.84, 0.022, 0.12),
+            ];
+            let haze_warm_day = (220u8, 210, 195);
+            let haze_warm_dusk = (240u8, 170, 120);
+            let haze_tint = lerp_rgb(haze_warm_day, haze_warm_dusk, self.dusk);
+
+            for &(y_ratio, drift_speed, opacity) in &haze_bands {
+                let row = (sky_py as f64 * y_ratio).round() as usize;
+                if row >= sky_py {
+                    continue;
+                }
+                let drift = (self.wave_tick * drift_speed) % self.width as f64;
+                for gx in 0..self.width {
+                    // Patchy coverage via sine modulation
+                    let coverage = ((gx as f64 + drift) * 0.12).sin() * 0.5 + 0.5;
+                    if coverage < 0.3 {
+                        continue;
+                    }
+                    let blend = opacity * coverage;
+                    let py_t = row as f64 / (sky_py - 1).max(1) as f64;
+                    let base = lerp_rgb(top, low, py_t);
+                    let blended = lerp_rgb(base, haze_tint, blend);
+                    painter.paint(gx, row, Color::Rgb(blended.0, blended.1, blended.2));
+                    // Paint second pixel row for 2px tall band
+                    if row + 1 < sky_py {
+                        let base2 =
+                            lerp_rgb(top, low, (row + 1) as f64 / (sky_py - 1).max(1) as f64);
+                        let blended2 = lerp_rgb(base2, haze_tint, blend * 0.7);
+                        painter.paint(gx, row + 1, Color::Rgb(blended2.0, blended2.1, blended2.2));
+                    }
+                }
+            }
+        }
+
         // 2. Celestial body — pixel circle with halo
         let orb_col =
             (self.width as f64 * 0.78 + (self.wave_tick * 0.08).sin() * 3.0).round() as i32;
