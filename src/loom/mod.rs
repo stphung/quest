@@ -9,13 +9,14 @@ pub mod types;
 pub use discovery::complete_discovery;
 #[allow(unused_imports)]
 pub use logic::{
-    archetype_nodes, check_node_stall, codex_hint_indices, loom_production_bonus,
-    node_conversion_multiplier, node_effective_rate, node_level_multiplier, node_native_resource,
-    node_neighbor_unlock_count, node_neighbor_unlock_speed_multiplier, node_neighbors,
-    node_throughput_multiplier, node_upgrade_cost, node_upgrade_cost_multiplier, process_reactions,
-    resonance_early_feedback_active, select_archetype, tick_base_production,
+    archetype_nodes, check_node_stall, codex_hint_indices, effective_buffer_capacity,
+    effective_node_base_rate, effective_pipe_bandwidth, loom_external_bonuses,
+    loom_production_bonus, node_conversion_multiplier, node_effective_rate, node_level_multiplier,
+    node_native_resource, node_neighbor_unlock_count, node_neighbor_unlock_speed_multiplier,
+    node_neighbors, node_throughput_multiplier, node_upgrade_cost, node_upgrade_cost_multiplier,
+    process_reactions, resonance_early_feedback_active, select_archetype, tick_base_production,
     tick_loom_staggered_unlock, tick_neighbor_unlocking, tick_stall_detection, try_upgrade_node,
-    SECOND_NODE_UNLOCK_SECONDS,
+    LoomExternalBonuses, SECOND_NODE_UNLOCK_SECONDS,
 };
 #[allow(unused_imports)]
 pub use patterns::{

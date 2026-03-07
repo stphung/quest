@@ -1667,3 +1667,221 @@ mod tests {
         assert!(loom_production_bonus(1, 1, 1, 1) >= 1.0);
     }
 }
+
+// ---------------------------------------------------------------------------
+// External system bonuses — granular per-aspect bonuses (Task #20 supplement)
+// ---------------------------------------------------------------------------
+
+/// Pre-computed bonuses from existing game systems that boost Loom production.
+///
+/// Breaks external bonuses into three separate axes so callers can apply them
+/// only where relevant (production rate, buffer capacity, pipe bandwidth).
+/// Passed via explicit parameters following the Haven bonus injection pattern —
+/// Loom logic never imports Haven/Deep/Stormglass/Ascension directly.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct LoomExternalBonuses {
+    /// Additive fraction bonus on all node base production rates (e.g. 0.10 = +10%).
+    pub production_rate_bonus: f64,
+    /// Additive fraction bonus on buffer capacity for all nodes (e.g. 0.20 = +20%).
+    pub buffer_capacity_bonus: f64,
+    /// Additive fraction bonus on all pipe bandwidth (e.g. 0.15 = +15%).
+    pub pipe_bandwidth_bonus: f64,
+}
+
+/// Compute granular Loom bonuses from the current state of existing game systems.
+///
+/// # Parameters
+/// - `haven_damage_percent`: Haven Armory damage bonus (0-25.0). Each 5% maps to
+///   +1% production rate (max +5% at 25%).
+/// - `deep_guild_rank`: Deep guild rank 1-5. Each rank above 1 adds +5% buffer
+///   capacity (max +20% at rank 5).
+/// - `ascension_level`: Current ascension level (0 = none). Each level adds +2%
+///   pipe bandwidth, capped at +12% (level 6).
+/// - `stormglass_balance`: Current Stormglass balance. Every 100k SG adds +1%
+///   production rate, capped at +5% (500k SG).
+///
+/// All bonuses are additive within their category and independent of each other.
+/// Haven and Stormglass bonuses stack additively into `production_rate_bonus`.
+pub fn loom_external_bonuses(
+    haven_damage_percent: f64,
+    deep_guild_rank: u8,
+    ascension_level: u32,
+    stormglass_balance: u64,
+) -> LoomExternalBonuses {
+    // Haven Armory: up to +25% damage maps linearly to up to +5% production rate.
+    let haven_production = (haven_damage_percent / 5.0).min(5.0) / 100.0;
+
+    // Stormglass: +1% per 100k balance, capped at +5% (500k).
+    let sg_production = (stormglass_balance as f64 / 100_000.0).min(5.0) / 100.0;
+
+    let production_rate_bonus = haven_production + sg_production;
+
+    // Deep guild rank: +5% buffer capacity per rank above 1, capped at +20% (rank 5).
+    let rank_above_one = deep_guild_rank.saturating_sub(1) as f64;
+    let buffer_capacity_bonus = (rank_above_one * 5.0).min(20.0) / 100.0;
+
+    // Ascension: +2% pipe bandwidth per level, capped at +12% (level 6).
+    let pipe_bandwidth_bonus = (ascension_level as f64 * 2.0).min(12.0) / 100.0;
+
+    LoomExternalBonuses {
+        production_rate_bonus,
+        buffer_capacity_bonus,
+        pipe_bandwidth_bonus,
+    }
+}
+
+/// Apply external bonuses to a node's effective base production rate.
+pub fn effective_node_base_rate(node: &LoomNode, bonuses: &LoomExternalBonuses) -> f64 {
+    node.base_rate * (1.0 + bonuses.production_rate_bonus)
+}
+
+/// Apply external bonuses to a node's effective buffer capacity.
+pub fn effective_buffer_capacity(node: &LoomNode, bonuses: &LoomExternalBonuses) -> f64 {
+    node.buffer_capacity * (1.0 + bonuses.buffer_capacity_bonus)
+}
+
+/// Apply external bonuses to a pipe's effective bandwidth (units/hour).
+pub fn effective_pipe_bandwidth(
+    tier: super::types::PipeTier,
+    bonuses: &LoomExternalBonuses,
+) -> f64 {
+    tier.bandwidth() * (1.0 + bonuses.pipe_bandwidth_bonus)
+}
+
+#[cfg(test)]
+mod external_bonus_tests {
+    use super::*;
+
+    #[test]
+    fn test_no_bonuses_when_all_systems_at_minimum() {
+        let b = loom_external_bonuses(0.0, 1, 0, 0);
+        assert!((b.production_rate_bonus).abs() < 1e-9);
+        assert!((b.buffer_capacity_bonus).abs() < 1e-9);
+        assert!((b.pipe_bandwidth_bonus).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_haven_armory_max_gives_five_percent_production() {
+        let b = loom_external_bonuses(25.0, 1, 0, 0);
+        assert!((b.production_rate_bonus - 0.05).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_haven_bonus_capped_at_five_percent() {
+        let b = loom_external_bonuses(200.0, 1, 0, 0);
+        assert!((b.production_rate_bonus - 0.05).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_deep_guild_rank_2_gives_five_percent_buffer() {
+        let b = loom_external_bonuses(0.0, 2, 0, 0);
+        assert!((b.buffer_capacity_bonus - 0.05).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_deep_guild_rank_5_gives_twenty_percent_buffer() {
+        let b = loom_external_bonuses(0.0, 5, 0, 0);
+        assert!((b.buffer_capacity_bonus - 0.20).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_deep_guild_rank_1_gives_no_buffer_bonus() {
+        let b = loom_external_bonuses(0.0, 1, 0, 0);
+        assert!((b.buffer_capacity_bonus).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_ascension_level_1_gives_two_percent_bandwidth() {
+        let b = loom_external_bonuses(0.0, 1, 1, 0);
+        assert!((b.pipe_bandwidth_bonus - 0.02).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_ascension_level_6_gives_twelve_percent_bandwidth() {
+        let b = loom_external_bonuses(0.0, 1, 6, 0);
+        assert!((b.pipe_bandwidth_bonus - 0.12).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_ascension_capped_at_twelve_percent() {
+        let b = loom_external_bonuses(0.0, 1, 10, 0);
+        assert!((b.pipe_bandwidth_bonus - 0.12).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_stormglass_100k_gives_one_percent_production() {
+        let b = loom_external_bonuses(0.0, 1, 0, 100_000);
+        assert!((b.production_rate_bonus - 0.01).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_stormglass_500k_gives_five_percent_production() {
+        let b = loom_external_bonuses(0.0, 1, 0, 500_000);
+        assert!((b.production_rate_bonus - 0.05).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_stormglass_capped_at_five_percent() {
+        let b = loom_external_bonuses(0.0, 1, 0, 2_000_000);
+        assert!((b.production_rate_bonus - 0.05).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_haven_and_stormglass_stack_additively() {
+        // Haven T3 (25 dmg% -> 5%) + 500k SG (5%) = 10%
+        let b = loom_external_bonuses(25.0, 1, 0, 500_000);
+        assert!((b.production_rate_bonus - 0.10).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_all_systems_at_max_gives_correct_totals() {
+        let b = loom_external_bonuses(25.0, 5, 6, 500_000);
+        assert!((b.production_rate_bonus - 0.10).abs() < 1e-9);
+        assert!((b.buffer_capacity_bonus - 0.20).abs() < 1e-9);
+        assert!((b.pipe_bandwidth_bonus - 0.12).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_effective_node_base_rate_applies_production_bonus() {
+        let mut node = LoomNode::new(NodeId::EmberSpindle);
+        node.base_rate = 10.0;
+        let b = LoomExternalBonuses {
+            production_rate_bonus: 0.10,
+            ..Default::default()
+        };
+        assert!((effective_node_base_rate(&node, &b) - 11.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_effective_buffer_capacity_applies_buffer_bonus() {
+        let mut node = LoomNode::new(NodeId::EmberSpindle);
+        node.buffer_capacity = 20.0;
+        let b = LoomExternalBonuses {
+            buffer_capacity_bonus: 0.20,
+            ..Default::default()
+        };
+        assert!((effective_buffer_capacity(&node, &b) - 24.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_effective_pipe_bandwidth_applies_bandwidth_bonus() {
+        use super::super::types::PipeTier;
+        let b = LoomExternalBonuses {
+            pipe_bandwidth_bonus: 0.10,
+            ..Default::default()
+        };
+        // T1 base = 5.0/hr, +10% = 5.5
+        assert!((effective_pipe_bandwidth(PipeTier::T1, &b) - 5.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_effective_pipe_bandwidth_t4_with_max_bonus() {
+        use super::super::types::PipeTier;
+        let b = LoomExternalBonuses {
+            pipe_bandwidth_bonus: 0.12,
+            ..Default::default()
+        };
+        // T4 base = 50.0/hr, +12% = 56.0
+        assert!((effective_pipe_bandwidth(PipeTier::T4, &b) - 56.0).abs() < 1e-9);
+    }
+}
