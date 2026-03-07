@@ -488,6 +488,8 @@ fn handle_debug_menu(
                 *overlay = GameOverlay::StormglassDiscovery;
             } else if msg == "The Deep discovered!" {
                 *overlay = GameOverlay::DeepDiscovery;
+            } else if msg == "Loom discovered." {
+                *overlay = GameOverlay::LoomDiscovery;
             } else if msg.contains("Red Fault unlocked") {
                 *overlay = GameOverlay::FractureRegionUnlock {
                     region: crate::zones::FractureRegion::RedFault,

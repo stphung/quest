@@ -233,7 +233,7 @@ pub fn draw_game_overlays(
             );
         }
         GameOverlay::LoomDiscovery => {
-            // Placeholder: Loom discovery modal rendering handled by wiring agent.
+            ui::loom_scene::render_loom_discovery_modal(frame, area, layout_ctx);
         }
         GameOverlay::None => {}
     }

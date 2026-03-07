@@ -1295,3 +1295,54 @@ fn resource_name(resource: &crate::loom::types::Resource) -> &'static str {
         Resource::WovenReality => "WovenReality",
     }
 }
+
+// ── Discovery modal ─────────────────────────────────────────────────────────
+
+pub fn render_loom_discovery_modal(
+    frame: &mut Frame,
+    area: Rect,
+    _ctx: &super::responsive::LayoutContext,
+) {
+    let modal_width = 56u16.min(area.width.saturating_sub(4));
+    let modal_height = 12u16.min(area.height.saturating_sub(4));
+    let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
+    let modal_area = Rect::new(x, y, modal_width, modal_height);
+
+    frame.render_widget(Clear, modal_area);
+
+    let block = Block::default()
+        .title(" \u{25b6} New System Unlocked \u{25c0} ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(super::themed_border_color(LOOM_BORDER_COLOR)));
+    let inner = super::render_themed_block(
+        frame,
+        modal_area,
+        block,
+        LOOM_BORDER_COLOR,
+        super::BorderFxContext,
+    );
+
+    let text = Paragraph::new(vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "\u{1f9f5} The Loom of Worlds awakens!",
+            Style::default().fg(Color::LightMagenta),
+        )),
+        Line::from(""),
+        Line::from("A vast pipeline network hums with"),
+        Line::from("potential. Six nodes await your command."),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Press [L] to open the Loom.",
+            Style::default().fg(Color::Yellow),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "[Enter/Esc] Dismiss",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ])
+    .alignment(Alignment::Center);
+    frame.render_widget(text, inner);
+}
