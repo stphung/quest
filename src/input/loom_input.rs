@@ -37,7 +37,12 @@ pub(super) fn handle_loom(
                 LoomView::Codex => {
                     loom_ui.codex_scroll = loom_ui.codex_scroll.saturating_sub(1);
                 }
-                _ => {
+                LoomView::FlowView => {
+                    // 3x2 grid: Up moves up one row (subtract 2).
+                    loom_ui.selected_node = loom_ui.selected_node.saturating_sub(2);
+                    loom_ui.selected_pipe = 0;
+                }
+                LoomView::ListDetail => {
                     loom_ui.selected_node = loom_ui.selected_node.saturating_sub(1);
                     loom_ui.selected_pipe = 0;
                 }
@@ -54,12 +59,35 @@ pub(super) fn handle_loom(
                 LoomView::Codex => {
                     loom_ui.codex_scroll = loom_ui.codex_scroll.saturating_add(1);
                 }
-                _ => {
+                LoomView::FlowView => {
+                    // 3x2 grid: Down moves down one row (add 2).
+                    if loom_ui.selected_node + 2 < 6 {
+                        loom_ui.selected_node += 2;
+                    }
+                    loom_ui.selected_pipe = 0;
+                }
+                LoomView::ListDetail => {
                     if loom_ui.selected_node + 1 < 6 {
                         loom_ui.selected_node += 1;
                     }
                     loom_ui.selected_pipe = 0;
                 }
+            }
+            InputResult::Continue
+        }
+        KeyCode::Left if loom_ui.view == LoomView::FlowView => {
+            // 3x2 grid: Left moves to the left column (even index).
+            if loom_ui.selected_node % 2 == 1 {
+                loom_ui.selected_node -= 1;
+                loom_ui.selected_pipe = 0;
+            }
+            InputResult::Continue
+        }
+        KeyCode::Right if loom_ui.view == LoomView::FlowView => {
+            // 3x2 grid: Right moves to the right column (odd index).
+            if loom_ui.selected_node.is_multiple_of(2) && loom_ui.selected_node + 1 < 6 {
+                loom_ui.selected_node += 1;
+                loom_ui.selected_pipe = 0;
             }
             InputResult::Continue
         }
@@ -71,7 +99,9 @@ pub(super) fn handle_loom(
             adjust_selected_pipe(loom_state, loom_ui, 0.05);
             InputResult::NeedsSave
         }
-        KeyCode::Char('u') | KeyCode::Char('U') if loom_ui.view == LoomView::ListDetail => {
+        KeyCode::Char('u') | KeyCode::Char('U')
+            if loom_ui.view == LoomView::ListDetail || loom_ui.view == LoomView::FlowView =>
+        {
             let node_id = crate::loom::types::NodeId::ALL[loom_ui.selected_node.min(5)];
             if crate::loom::try_upgrade_node(loom_state, node_id) {
                 InputResult::NeedsSave
