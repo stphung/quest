@@ -722,6 +722,52 @@ fn refinery_tier_unlock_threshold(tier: u8) -> usize {
     }
 }
 
+/// Returns the tiers currently unlocked based on completed pattern count.
+pub fn unlocked_tiers(loom: &LoomState) -> Vec<u8> {
+    let completed = loom
+        .persistent
+        .patterns
+        .iter()
+        .filter(|p| p.completed)
+        .count();
+    let mut tiers = Vec::new();
+    for tier in 1u8..=3 {
+        if completed >= refinery_tier_unlock_threshold(tier) {
+            tiers.push(tier);
+        }
+    }
+    tiers
+}
+
+/// Returns the build cost for a refinery of the given tier.
+pub fn refinery_build_cost_public(tier: u8) -> f64 {
+    refinery_build_cost(tier)
+}
+
+/// Returns all eligible source nodes for a given refinery tier.
+pub fn eligible_sources_for_tier(
+    loom: &LoomState,
+    tier: u8,
+    resource: Resource,
+) -> Vec<LoomNodeRef> {
+    let mut sources = Vec::new();
+    // Extractors that produce the needed resource.
+    for node in &loom.persistent.nodes {
+        if node.unlocked && node_native_resource(node.id) == resource {
+            sources.push(LoomNodeRef::Extractor(node.id));
+        }
+    }
+    // Refineries of lower tier that output the needed resource.
+    for (i, r) in loom.persistent.refineries.iter().enumerate() {
+        if r.output == resource
+            && valid_source_for_tier(LoomNodeRef::Refinery(i), tier, &loom.persistent.refineries)
+        {
+            sources.push(LoomNodeRef::Refinery(i));
+        }
+    }
+    sources
+}
+
 /// Attempt to build a new Refinery locked to the given recipe.
 ///
 /// # Errors

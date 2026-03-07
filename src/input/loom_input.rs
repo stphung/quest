@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 
 use super::types::InputResult;
-use crate::loom::types::{LoomState, LoomUiState, LoomView};
+use crate::loom::types::{BuildState, BuildStep, LoomNodeRef, LoomState, LoomUiState, LoomView};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 /// Top-level dispatcher for the Loom of Worlds overlay input.
@@ -11,6 +11,11 @@ pub(super) fn handle_loom(
     loom_state: &mut LoomState,
     loom_ui: &mut LoomUiState,
 ) -> InputResult {
+    // If build flow is active, route input there first.
+    if loom_ui.build.is_some() {
+        return handle_build_input(key, loom_state, loom_ui);
+    }
+
     match key.code {
         KeyCode::Esc => {
             loom_ui.open = false;
@@ -112,6 +117,12 @@ pub(super) fn handle_loom(
             }
             InputResult::Continue
         }
+        KeyCode::Char('b') | KeyCode::Char('B')
+            if loom_ui.view == LoomView::FlowView || loom_ui.view == LoomView::ListDetail =>
+        {
+            start_build(loom_state, loom_ui);
+            InputResult::Continue
+        }
         KeyCode::Char('d') | KeyCode::Char('D')
             if loom_ui.view == LoomView::FlowView && loom_ui.selected_node >= 6 =>
         {
@@ -129,6 +140,185 @@ pub(super) fn handle_loom(
             }
         }
         _ => InputResult::Continue,
+    }
+}
+
+/// Start the build refinery flow.
+fn start_build(loom_state: &LoomState, loom_ui: &mut LoomUiState) {
+    let tiers = crate::loom::unlocked_tiers(loom_state);
+    if tiers.is_empty() {
+        return; // No tiers unlocked yet.
+    }
+    // Default to lowest unlocked tier.
+    let tier = tiers[0];
+    let available: Vec<usize> = crate::loom::recipes::all_recipes()
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.tier == tier)
+        .map(|(i, _)| i)
+        .collect();
+    if available.is_empty() {
+        return;
+    }
+    loom_ui.build = Some(BuildState {
+        step: BuildStep::SelectRecipe { cursor: 0 },
+        tier,
+        recipe_index: available[0],
+        available_recipes: available,
+        eligible_sources_a: Vec::new(),
+        eligible_sources_b: Vec::new(),
+        selected_sources_a: Vec::new(),
+        selected_sources_b: Vec::new(),
+    });
+}
+
+/// Handle input while in the build refinery flow.
+fn handle_build_input(
+    key: KeyEvent,
+    loom_state: &mut LoomState,
+    loom_ui: &mut LoomUiState,
+) -> InputResult {
+    // Esc always cancels the build flow.
+    if key.code == KeyCode::Esc {
+        loom_ui.build = None;
+        return InputResult::Continue;
+    }
+
+    let build = loom_ui.build.as_mut().unwrap();
+
+    match &mut build.step {
+        BuildStep::SelectRecipe { cursor } => {
+            let recipes = crate::loom::recipes::all_recipes();
+            match key.code {
+                KeyCode::Up => {
+                    *cursor = cursor.saturating_sub(1);
+                }
+                KeyCode::Down => {
+                    if *cursor + 1 < build.available_recipes.len() {
+                        *cursor += 1;
+                    }
+                }
+                KeyCode::Enter => {
+                    let recipe_idx = build.available_recipes[*cursor];
+                    build.recipe_index = recipe_idx;
+                    let recipe = &recipes[recipe_idx];
+                    // Compute eligible sources for input A.
+                    let sources_a = crate::loom::eligible_sources_for_tier(
+                        loom_state,
+                        build.tier,
+                        recipe.input_a,
+                    );
+                    let sources_b = crate::loom::eligible_sources_for_tier(
+                        loom_state,
+                        build.tier,
+                        recipe.input_b,
+                    );
+                    build.eligible_sources_a = sources_a.clone();
+                    build.eligible_sources_b = sources_b.clone();
+                    // If no eligible sources for either input, can't proceed.
+                    if sources_a.is_empty() || sources_b.is_empty() {
+                        // Stay on recipe select — player needs more nodes unlocked.
+                        return InputResult::Continue;
+                    }
+                    let toggle = vec![false; sources_a.len()];
+                    build.step = BuildStep::SelectSourcesA { cursor: 0, toggle };
+                }
+                _ => {}
+            }
+            InputResult::Continue
+        }
+        BuildStep::SelectSourcesA { cursor, toggle } => {
+            match key.code {
+                KeyCode::Up => {
+                    *cursor = cursor.saturating_sub(1);
+                }
+                KeyCode::Down => {
+                    if *cursor + 1 < toggle.len() {
+                        *cursor += 1;
+                    }
+                }
+                KeyCode::Char(' ') => {
+                    // Toggle source selection.
+                    toggle[*cursor] = !toggle[*cursor];
+                }
+                KeyCode::Enter => {
+                    let selected: Vec<LoomNodeRef> = build
+                        .eligible_sources_a
+                        .iter()
+                        .zip(toggle.iter())
+                        .filter(|(_, &t)| t)
+                        .map(|(&s, _)| s)
+                        .collect();
+                    if selected.is_empty() {
+                        return InputResult::Continue; // Must select at least one.
+                    }
+                    // Store selected sources and move to input B.
+                    let build = loom_ui.build.as_mut().unwrap();
+                    build.selected_sources_a = selected;
+                    let toggle_b = vec![false; build.eligible_sources_b.len()];
+                    build.step = BuildStep::SelectSourcesB {
+                        cursor: 0,
+                        toggle: toggle_b,
+                    };
+                }
+                _ => {}
+            }
+            InputResult::Continue
+        }
+        BuildStep::SelectSourcesB { cursor, toggle } => {
+            match key.code {
+                KeyCode::Up => {
+                    *cursor = cursor.saturating_sub(1);
+                }
+                KeyCode::Down => {
+                    if *cursor + 1 < toggle.len() {
+                        *cursor += 1;
+                    }
+                }
+                KeyCode::Char(' ') => {
+                    toggle[*cursor] = !toggle[*cursor];
+                }
+                KeyCode::Enter => {
+                    let selected: Vec<LoomNodeRef> = build
+                        .eligible_sources_b
+                        .iter()
+                        .zip(toggle.iter())
+                        .filter(|(_, &t)| t)
+                        .map(|(&s, _)| s)
+                        .collect();
+                    if selected.is_empty() {
+                        return InputResult::Continue;
+                    }
+                    let build = loom_ui.build.as_mut().unwrap();
+                    build.selected_sources_b = selected;
+                    build.step = BuildStep::Confirm;
+                }
+                _ => {}
+            }
+            InputResult::Continue
+        }
+        BuildStep::Confirm => match key.code {
+            KeyCode::Enter => {
+                let recipes = crate::loom::recipes::all_recipes();
+                let recipe = &recipes[build.recipe_index];
+                let sources_a = build.selected_sources_a.clone();
+                let sources_b = build.selected_sources_b.clone();
+                let result = crate::loom::build_refinery(
+                    loom_state,
+                    recipe.input_a,
+                    recipe.input_b,
+                    recipe.node_nature,
+                    sources_a,
+                    sources_b,
+                );
+                loom_ui.build = None;
+                match result {
+                    Ok(_) => InputResult::NeedsSave,
+                    Err(_) => InputResult::Continue,
+                }
+            }
+            _ => InputResult::Continue,
+        },
     }
 }
 

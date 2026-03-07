@@ -157,6 +157,11 @@ pub fn render_loom_overlay(
         }
     }
 
+    // Render build overlay on top if active.
+    if ui.build.is_some() {
+        render_build_overlay(frame, inner, loom_state, ui);
+    }
+
     render_nav_hints(frame, area, &*ui);
 }
 
@@ -2057,6 +2062,240 @@ fn build_progress_line_ratio(ratio: f64, width: u16) -> Line<'static> {
         bar,
         Style::default().fg(Color::Rgb(160, 100, 220)),
     ))
+}
+
+// ── Build Refinery Overlay ────────────────────────────────────────────────────
+
+fn render_build_overlay(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &LoomUiState) {
+    let build = match &ui.build {
+        Some(b) => b,
+        None => return,
+    };
+
+    let popup_w = area.width.clamp(30, 50);
+    let popup_h = area.height.clamp(10, 20);
+    let popup_x = area.x + (area.width.saturating_sub(popup_w)) / 2;
+    let popup_y = area.y + (area.height.saturating_sub(popup_h)) / 2;
+    let popup = Rect::new(popup_x, popup_y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup);
+
+    let recipes = crate::loom::recipes::all_recipes();
+
+    let (title, lines) = match &build.step {
+        crate::loom::BuildStep::SelectRecipe { cursor } => {
+            let mut lines = Vec::new();
+            lines.push(Line::from(Span::styled(
+                format!(" T{} Recipes:", build.tier),
+                Style::default().fg(Color::Rgb(180, 140, 220)),
+            )));
+            lines.push(Line::from(""));
+            for (i, &ridx) in build.available_recipes.iter().enumerate() {
+                let r = &recipes[ridx];
+                let marker = if i == *cursor { "\u{25b6} " } else { "  " };
+                let color = if i == *cursor {
+                    Color::White
+                } else {
+                    Color::Rgb(140, 110, 170)
+                };
+                lines.push(Line::from(Span::styled(
+                    format!(
+                        "{}{} + {} \u{2192} {}",
+                        marker,
+                        resource_name(&r.input_a),
+                        resource_name(&r.input_b),
+                        resource_name(&r.output),
+                    ),
+                    Style::default().fg(color),
+                )));
+            }
+            lines.push(Line::from(""));
+            let cost = crate::loom::refinery_build_cost_public(build.tier);
+            lines.push(Line::from(Span::styled(
+                format!(" Build cost: {:.0} of input A resource", cost),
+                Style::default().fg(Color::Rgb(100, 80, 130)),
+            )));
+            (" Build Refinery ", lines)
+        }
+        crate::loom::BuildStep::SelectSourcesA { cursor, toggle } => {
+            let r = &recipes[build.recipe_index];
+            let mut lines = Vec::new();
+            lines.push(Line::from(Span::styled(
+                format!(
+                    " {} + {} \u{2192} {}",
+                    resource_name(&r.input_a),
+                    resource_name(&r.input_b),
+                    resource_name(&r.output)
+                ),
+                Style::default().fg(Color::Rgb(180, 140, 220)),
+            )));
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                format!(" Select sources for {}:", resource_name(&r.input_a)),
+                Style::default().fg(Color::Rgb(140, 110, 170)),
+            )));
+            for (i, src) in build.eligible_sources_a.iter().enumerate() {
+                let marker = if i == *cursor { "\u{25b6}" } else { " " };
+                let check = if toggle[i] { "[\u{2713}]" } else { "[ ]" };
+                let name = source_display_name(src, loom_state);
+                let color = if i == *cursor {
+                    Color::White
+                } else {
+                    Color::Rgb(140, 110, 170)
+                };
+                lines.push(Line::from(Span::styled(
+                    format!(" {} {} {}", marker, check, name),
+                    Style::default().fg(color),
+                )));
+            }
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                " [Space] Toggle  [Enter] Next",
+                Style::default().fg(Color::DarkGray),
+            )));
+            (" Sources: Input A ", lines)
+        }
+        crate::loom::BuildStep::SelectSourcesB { cursor, toggle } => {
+            let r = &recipes[build.recipe_index];
+            let mut lines = Vec::new();
+            lines.push(Line::from(Span::styled(
+                format!(
+                    " {} + {} \u{2192} {}",
+                    resource_name(&r.input_a),
+                    resource_name(&r.input_b),
+                    resource_name(&r.output)
+                ),
+                Style::default().fg(Color::Rgb(180, 140, 220)),
+            )));
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                format!(" Select sources for {}:", resource_name(&r.input_b)),
+                Style::default().fg(Color::Rgb(140, 110, 170)),
+            )));
+            for (i, src) in build.eligible_sources_b.iter().enumerate() {
+                let marker = if i == *cursor { "\u{25b6}" } else { " " };
+                let check = if toggle[i] { "[\u{2713}]" } else { "[ ]" };
+                let name = source_display_name(src, loom_state);
+                let color = if i == *cursor {
+                    Color::White
+                } else {
+                    Color::Rgb(140, 110, 170)
+                };
+                lines.push(Line::from(Span::styled(
+                    format!(" {} {} {}", marker, check, name),
+                    Style::default().fg(color),
+                )));
+            }
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                " [Space] Toggle  [Enter] Next",
+                Style::default().fg(Color::DarkGray),
+            )));
+            (" Sources: Input B ", lines)
+        }
+        crate::loom::BuildStep::Confirm => {
+            let r = &recipes[build.recipe_index];
+            let mut lines = Vec::new();
+            lines.push(Line::from(Span::styled(
+                format!(
+                    " {} + {} \u{2192} {}",
+                    resource_name(&r.input_a),
+                    resource_name(&r.input_b),
+                    resource_name(&r.output)
+                ),
+                Style::default().fg(Color::Rgb(180, 140, 220)),
+            )));
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                " Sources A:",
+                Style::default().fg(Color::Rgb(140, 110, 170)),
+            )));
+            for src in &build.selected_sources_a {
+                lines.push(Line::from(Span::styled(
+                    format!("   {}", source_display_name(src, loom_state)),
+                    Style::default().fg(Color::Rgb(120, 100, 160)),
+                )));
+            }
+            lines.push(Line::from(Span::styled(
+                " Sources B:",
+                Style::default().fg(Color::Rgb(140, 110, 170)),
+            )));
+            for src in &build.selected_sources_b {
+                lines.push(Line::from(Span::styled(
+                    format!("   {}", source_display_name(src, loom_state)),
+                    Style::default().fg(Color::Rgb(120, 100, 160)),
+                )));
+            }
+            lines.push(Line::from(""));
+            let cost = crate::loom::refinery_build_cost_public(build.tier);
+            let stockpile = loom_state
+                .persistent
+                .stockpiles
+                .get(&r.input_a)
+                .copied()
+                .unwrap_or(0.0);
+            let can_afford = stockpile >= cost;
+            let cost_color = if can_afford {
+                Color::Rgb(100, 180, 100)
+            } else {
+                Color::Rgb(180, 80, 80)
+            };
+            lines.push(Line::from(Span::styled(
+                format!(
+                    " Cost: {:.0} {} (have {:.1})",
+                    cost,
+                    resource_name(&r.input_a),
+                    stockpile
+                ),
+                Style::default().fg(cost_color),
+            )));
+            lines.push(Line::from(""));
+            if can_afford {
+                lines.push(Line::from(Span::styled(
+                    " [Enter] Build  [Esc] Cancel",
+                    Style::default().fg(Color::DarkGray),
+                )));
+            } else {
+                lines.push(Line::from(Span::styled(
+                    " Insufficient resources. [Esc] Cancel",
+                    Style::default().fg(Color::Rgb(180, 80, 80)),
+                )));
+            }
+            (" Confirm Build ", lines)
+        }
+    };
+
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Rgb(160, 120, 200)));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    let para = Paragraph::new(lines);
+    frame.render_widget(para, inner);
+}
+
+fn source_display_name(src: &crate::loom::types::LoomNodeRef, loom_state: &LoomState) -> String {
+    match src {
+        crate::loom::types::LoomNodeRef::Extractor(node_id) => {
+            let rate = loom_state
+                .persistent
+                .nodes
+                .iter()
+                .find(|n| n.id == *node_id)
+                .map(|n| crate::loom::node_effective_rate(loom_state, n))
+                .unwrap_or(0.0);
+            format!("{} ({:.1}/hr)", node_id.name(), rate)
+        }
+        crate::loom::types::LoomNodeRef::Refinery(idx) => {
+            if let Some(r) = loom_state.persistent.refineries.get(*idx) {
+                format!("R{} {} ({:.1}x)", idx, resource_name(&r.output), r.amount)
+            } else {
+                format!("R{} (unknown)", idx)
+            }
+        }
+    }
 }
 
 // ── Navigation hints ──────────────────────────────────────────────────────────

@@ -330,6 +330,38 @@ pub enum LoomView {
     Codex,
 }
 
+/// Which step of the refinery build flow the player is on.
+#[derive(Debug, Clone)]
+pub enum BuildStep {
+    /// Selecting a recipe from the filtered list. `cursor` indexes into the available recipes.
+    SelectRecipe { cursor: usize },
+    /// Selecting sources for input A. `toggle[i]` = whether source i is selected.
+    SelectSourcesA { cursor: usize, toggle: Vec<bool> },
+    /// Selecting sources for input B.
+    SelectSourcesB { cursor: usize, toggle: Vec<bool> },
+    /// Confirm build — shows summary and expected throughput.
+    Confirm,
+}
+
+/// State for the multi-step refinery build flow.
+#[derive(Debug, Clone)]
+pub struct BuildState {
+    pub step: BuildStep,
+    pub tier: u8,
+    /// Index into `all_recipes()` for the selected recipe.
+    pub recipe_index: usize,
+    /// Available recipes for current tier (indices into all_recipes()).
+    pub available_recipes: Vec<usize>,
+    /// Eligible source nodes for input A.
+    pub eligible_sources_a: Vec<LoomNodeRef>,
+    /// Eligible source nodes for input B.
+    pub eligible_sources_b: Vec<LoomNodeRef>,
+    /// Selected sources for input A (populated after SelectSourcesA step).
+    pub selected_sources_a: Vec<LoomNodeRef>,
+    /// Selected sources for input B (populated after SelectSourcesB step).
+    pub selected_sources_b: Vec<LoomNodeRef>,
+}
+
 /// Runtime-only UI state (not serialized).
 #[derive(Debug)]
 pub struct LoomUiState {
@@ -341,6 +373,8 @@ pub struct LoomUiState {
     pub codex_scroll: usize,
     /// Frame counter for throbber animation (incremented each render call).
     pub throbber_frame: u32,
+    /// Active build flow state, if any.
+    pub build: Option<BuildState>,
 }
 
 impl LoomUiState {
@@ -352,6 +386,7 @@ impl LoomUiState {
             selected_archetype: 0,
             codex_scroll: 0,
             throbber_frame: 0,
+            build: None,
         }
     }
 
