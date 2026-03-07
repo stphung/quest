@@ -114,8 +114,9 @@ pub fn render_loom_overlay(
     frame: &mut Frame,
     area: Rect,
     loom_state: &LoomState,
-    ui: &LoomUiState,
+    ui: &mut LoomUiState,
 ) {
+    ui.throbber_frame = ui.throbber_frame.wrapping_add(1);
     frame.render_widget(Clear, area);
 
     let view_name = match ui.view {
@@ -156,7 +157,7 @@ pub fn render_loom_overlay(
         }
     }
 
-    render_nav_hints(frame, area, ui);
+    render_nav_hints(frame, area, &*ui);
 }
 
 // ── View renderers ────────────────────────────────────────────────────────────
@@ -433,7 +434,7 @@ fn render_recipe_slots(
 }
 
 /// Render a single machine node box into the cell buffer.
-/// Returns the row just below the box (where port labels go).
+/// Returns the row just below the box.
 fn render_node_box(
     buffer: &mut [Vec<SceneCell>],
     top: i32,
@@ -540,9 +541,34 @@ fn render_node_box(
     }
     put_cell(buffer, top + 3, left + w - 1, v, border_color);
 
-    // Row 4: recipe slots.
+    // Row 4: consumer count (how many refineries pull from this extractor).
     put_cell(buffer, top + 4, left, v, border_color);
-    render_recipe_slots(buffer, top + 4, left + 1, inner_w, node, loom_state);
+    if node.unlocked {
+        let node_ref = crate::loom::types::LoomNodeRef::Extractor(node.id);
+        let consumer_count = loom_state
+            .persistent
+            .refineries
+            .iter()
+            .filter(|r| r.sources_a.contains(&node_ref) || r.sources_b.contains(&node_ref))
+            .count();
+        let consumer_text = if consumer_count == 0 {
+            "no consumers".to_string()
+        } else {
+            format!(
+                "{} consumer{}",
+                consumer_count,
+                if consumer_count == 1 { "" } else { "s" }
+            )
+        };
+        let consumer_color = if consumer_count == 0 {
+            Color::Rgb(60, 45, 80)
+        } else {
+            Color::Rgb(100, 160, 120)
+        };
+        for (i, ch) in consumer_text.chars().enumerate().take(inner_w) {
+            put_cell(buffer, top + 4, left + 1 + i as i32, ch, consumer_color);
+        }
+    }
     put_cell(buffer, top + 4, left + w - 1, v, border_color);
 
     // Row 5: bottom border.
@@ -555,29 +581,43 @@ fn render_node_box(
     top + NODE_BOX_HEIGHT as i32
 }
 
-/// Render port labels below a node box.
-fn render_port_labels(
-    buffer: &mut [Vec<SceneCell>],
-    row: i32,
-    left: i32,
-    node_id: crate::loom::types::NodeId,
-    loom_state: &LoomState,
-    selected: bool,
-    selected_node_id: crate::loom::types::NodeId,
-) {
-    // Port labels removed — direct-pull model has no pipes to display.
-    let _ = (
-        buffer,
-        row,
-        left,
-        node_id,
-        loom_state,
-        selected,
-        selected_node_id,
-    );
+/// Two-letter abbreviation for a LoomNodeRef used in source badges.
+fn noderef_short(r: crate::loom::types::LoomNodeRef, idx: usize) -> String {
+    use crate::loom::types::{LoomNodeRef, NodeId};
+    match r {
+        LoomNodeRef::Extractor(id) => match id {
+            NodeId::EmberSpindle => "ES".to_string(),
+            NodeId::ReflectionLens => "RL".to_string(),
+            NodeId::VoidCondenser => "VC".to_string(),
+            NodeId::MemoryArchive => "MA".to_string(),
+            NodeId::SilenceWell => "SW".to_string(),
+            NodeId::ResonanceForge => "RF".to_string(),
+        },
+        LoomNodeRef::Refinery(_) => format!("R{}", idx),
+    }
+}
+
+/// Braille throbber character for a given frame counter and tier.
+/// T1: advances every 5 frames (slow), T2: every 3 frames, T3: every 1 frame.
+/// Stalled: frozen at frame 0.
+fn throbber_char(throbber_frame: u32, tier: u8, stalled: bool) -> char {
+    const FRAMES: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    if stalled {
+        return FRAMES[0];
+    }
+    let step = match tier {
+        1 => 5u32,
+        2 => 3u32,
+        _ => 1u32,
+    };
+    let idx = ((throbber_frame / step) as usize) % FRAMES.len();
+    FRAMES[idx]
 }
 
 /// Render a single refinery node box into the cell buffer.
+///
+/// Compact row format:
+///   ⠹ T1 ForgedLight    Emb←[ES] Voi←[VC]  2.0/hr  ████░░░░░░
 fn render_refinery_box(
     buffer: &mut [Vec<SceneCell>],
     top: i32,
@@ -585,6 +625,7 @@ fn render_refinery_box(
     refinery: &crate::loom::types::Refinery,
     selected: bool,
     index: usize,
+    throbber_frame: u32,
 ) {
     let w = NODE_BOX_WIDTH as i32;
     let h = NODE_BOX_HEIGHT as i32;
@@ -624,47 +665,122 @@ fn render_refinery_box(
     }
     put_cell(buffer, top + h - 1, left + w - 1, br, border_color);
 
-    // Row 0 (top+1): Title — "R{i} T{tier}→{output}" or building status.
-    let title = if refinery.under_construction {
-        format!("R{} [Building...]", index)
-    } else {
-        format!(
-            "R{} T{}\u{2192}{}",
-            index,
-            refinery.tier,
-            resource_short(&refinery.output)
-        )
-    };
+    let inner_w = (w - 2) as usize;
     let title_color = if selected {
         Color::White
     } else {
         Color::Rgb(160, 130, 190)
     };
-    let inner_w = (w - 2) as usize;
-    for (i, ch) in title.chars().enumerate().take(inner_w) {
-        put_cell(buffer, top + 1, left + 1 + i as i32, ch, title_color);
+
+    if refinery.under_construction {
+        // Row 1: "R{i} [Building...]" with construction ticks.
+        let ticks = refinery.construction_ticks_remaining;
+        let secs = ticks / 10;
+        let title = format!("R{} [Building... {}s]", index, secs);
+        for (i, ch) in title.chars().enumerate().take(inner_w) {
+            put_cell(
+                buffer,
+                top + 1,
+                left + 1 + i as i32,
+                ch,
+                Color::Rgb(100, 80, 130),
+            );
+        }
+        // Rows 2-4: empty interior during construction.
+        return;
     }
 
-    // Row 1 (top+2): Gear animation texture.
-    let millis = current_millis();
-    let frame = (millis / 400) % 2;
-    let gear_color = if refinery.stalled {
-        Color::Rgb(100, 40, 40)
-    } else if refinery.under_construction {
-        Color::Rgb(60, 50, 70)
+    // Row 1 (top+1): "⠹ T{tier} {output_name}" — throbber + tier badge + output.
+    let throb = throbber_char(throbber_frame, refinery.tier, refinery.stalled);
+    let throb_color = if refinery.stalled {
+        Color::Rgb(160, 60, 60)
     } else {
-        Color::Rgb(120, 90, 160)
+        Color::Rgb(140, 100, 200)
     };
-    for x in 0..inner_w as i32 {
-        let ch = if (x as u128 + frame).is_multiple_of(2) {
-            '\u{2699}'
-        } else {
-            '\u{b7}'
-        };
-        put_cell(buffer, top + 2, left + 1 + x, ch, gear_color);
+    put_cell(buffer, top + 1, left + 1, throb, throb_color);
+    put_cell(buffer, top + 1, left + 2, ' ', LOOM_BG);
+    let tier_str = format!("T{}", refinery.tier);
+    let tier_color = match refinery.tier {
+        1 => Color::Rgb(100, 160, 100),
+        2 => Color::Rgb(160, 140, 80),
+        _ => Color::Rgb(180, 100, 200),
+    };
+    let mut col = left + 3;
+    for ch in tier_str.chars() {
+        put_cell(buffer, top + 1, col, ch, tier_color);
+        col += 1;
+    }
+    put_cell(buffer, top + 1, col, ' ', LOOM_BG);
+    col += 1;
+    let out_name = resource_short(&refinery.output);
+    for ch in out_name.chars() {
+        if col >= left + w - 1 {
+            break;
+        }
+        put_cell(buffer, top + 1, col, ch, title_color);
+        col += 1;
     }
 
-    // Row 2 (top+3): Buffer bar.
+    // Row 2 (top+2): Source badges — "{ResourceShort}←[SourceShort]" for each source.
+    col = left + 1;
+    let source_label_color = Color::Rgb(100, 80, 140);
+    let arrow_color = Color::Rgb(80, 60, 100);
+
+    // sources_a first, then sources_b.
+    let all_sources: Vec<(
+        crate::loom::types::Resource,
+        &crate::loom::types::LoomNodeRef,
+    )> = {
+        let mut v: Vec<(
+            crate::loom::types::Resource,
+            &crate::loom::types::LoomNodeRef,
+        )> = Vec::new();
+        for src in &refinery.sources_a {
+            v.push((refinery.input_a, src));
+        }
+        for src in &refinery.sources_b {
+            v.push((refinery.input_b, src));
+        }
+        v
+    };
+
+    for (res, src) in &all_sources {
+        let short_src = match src {
+            crate::loom::types::LoomNodeRef::Extractor(_) => noderef_short(**src, 0),
+            crate::loom::types::LoomNodeRef::Refinery(ri) => format!("R{}", ri),
+        };
+        let res_short = resource_short(res);
+        // Format: "Emb←[ES] "
+        let badge = format!("{}←[{}] ", res_short, short_src);
+        for ch in badge.chars() {
+            if col >= left + w - 1 {
+                break;
+            }
+            let fg = if ch == '[' || ch == ']' || ch == '\u{2190}' {
+                arrow_color
+            } else {
+                source_label_color
+            };
+            put_cell(buffer, top + 2, col, ch, fg);
+            col += 1;
+        }
+    }
+
+    if all_sources.is_empty() {
+        // Show "no sources" hint.
+        let hint = "no sources";
+        for (i, ch) in hint.chars().enumerate().take(inner_w) {
+            put_cell(
+                buffer,
+                top + 2,
+                left + 1 + i as i32,
+                ch,
+                Color::Rgb(60, 45, 80),
+            );
+        }
+    }
+
+    // Row 3 (top+3): Buffer bar.
     let fill_pct = if refinery.buffer_capacity > 0.0 {
         (refinery.buffer / refinery.buffer_capacity).min(1.0)
     } else {
@@ -698,14 +814,24 @@ fn render_refinery_box(
         put_cell(buffer, top + 3, left + 1 + i as i32, ch, fg);
     }
 
-    // Row 3 (top+4): Recipe summary — "{input_a}+{input_b}▶{output}".
+    // Row 4 (top+4): Recipe summary — "{input_a}+{input_b}▶{output}" with stall warning.
+    let stall_suffix = if refinery.stalled {
+        " \u{26a0}STALL"
+    } else {
+        ""
+    };
     let recipe_text = format!(
-        "{}+{}\u{25b6}{}",
+        "{}+{}\u{25b6}{}{}",
         resource_short(&refinery.input_a),
         resource_short(&refinery.input_b),
-        resource_short(&refinery.output)
+        resource_short(&refinery.output),
+        stall_suffix,
     );
-    let recipe_color = Color::Rgb(100, 80, 130);
+    let recipe_color = if refinery.stalled {
+        Color::Rgb(180, 80, 80)
+    } else {
+        Color::Rgb(100, 80, 130)
+    };
     for (i, ch) in recipe_text.chars().enumerate().take(inner_w) {
         put_cell(buffer, top + 4, left + 1 + i as i32, ch, recipe_color);
     }
@@ -1011,19 +1137,84 @@ fn render_flow_sidebar_refinery(
             ),
         ]));
 
-        // Source connections.
-        let sources_a_count = refinery.sources_a.len();
-        let sources_b_count = refinery.sources_b.len();
-        if sources_a_count > 0 || sources_b_count > 0 {
-            lines.push(Line::from(""));
+        // Source connections — show per-input sources.
+        lines.push(Line::from(""));
+        if refinery.sources_a.is_empty() && refinery.sources_b.is_empty() {
+            lines.push(Line::from(Span::styled(
+                " No sources assigned",
+                Style::default().fg(Color::Rgb(80, 60, 110)),
+            )));
+        } else {
             lines.push(Line::from(vec![
-                Span::styled(" Sources: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(" In-A (", Style::default().fg(Color::DarkGray)),
                 Span::styled(
-                    format!("A:{} B:{}", sources_a_count, sources_b_count),
-                    Style::default().fg(Color::Rgb(140, 100, 180)),
+                    resource_short(&refinery.input_a),
+                    Style::default().fg(Color::Rgb(180, 140, 220)),
                 ),
+                Span::styled("):", Style::default().fg(Color::DarkGray)),
             ]));
+            if refinery.sources_a.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    "   none",
+                    Style::default().fg(Color::Rgb(60, 45, 80)),
+                )));
+            } else {
+                for src in &refinery.sources_a {
+                    let src_name = match src {
+                        crate::loom::types::LoomNodeRef::Extractor(id) => id.name(),
+                        crate::loom::types::LoomNodeRef::Refinery(_) => "Refinery",
+                    };
+                    let src_color = noderef_color(*src);
+                    lines.push(Line::from(vec![
+                        Span::styled("   \u{2190} ", Style::default().fg(Color::DarkGray)),
+                        Span::styled(src_name, Style::default().fg(src_color)),
+                    ]));
+                }
+            }
+            lines.push(Line::from(vec![
+                Span::styled(" In-B (", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    resource_short(&refinery.input_b),
+                    Style::default().fg(Color::Rgb(180, 140, 220)),
+                ),
+                Span::styled("):", Style::default().fg(Color::DarkGray)),
+            ]));
+            if refinery.sources_b.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    "   none",
+                    Style::default().fg(Color::Rgb(60, 45, 80)),
+                )));
+            } else {
+                for src in &refinery.sources_b {
+                    let src_name = match src {
+                        crate::loom::types::LoomNodeRef::Extractor(id) => id.name(),
+                        crate::loom::types::LoomNodeRef::Refinery(_) => "Refinery",
+                    };
+                    let src_color = noderef_color(*src);
+                    lines.push(Line::from(vec![
+                        Span::styled("   \u{2190} ", Style::default().fg(Color::DarkGray)),
+                        Span::styled(src_name, Style::default().fg(src_color)),
+                    ]));
+                }
+            }
         }
+
+        // Status line.
+        let status_text = if refinery.stalled {
+            " Status: STALLED"
+        } else {
+            " Status: Running"
+        };
+        let status_color = if refinery.stalled {
+            Color::Rgb(220, 60, 60)
+        } else {
+            Color::Rgb(80, 200, 120)
+        };
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            status_text,
+            Style::default().fg(status_color),
+        )));
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             " [D]emolish",
@@ -1149,7 +1340,15 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
                 (col_spacing + NODE_BOX_WIDTH + col_spacing) as i32
             };
             let is_sel = ui.selected_node >= 6 && (ui.selected_node - 6) == i;
-            render_refinery_box(&mut buffer, top, left_col, refinery, is_sel, i);
+            render_refinery_box(
+                &mut buffer,
+                top,
+                left_col,
+                refinery,
+                is_sel,
+                i,
+                ui.throbber_frame,
+            );
         }
     }
 

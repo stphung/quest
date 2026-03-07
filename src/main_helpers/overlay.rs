@@ -86,7 +86,7 @@ fn draw_quit_confirm(
 /// Draw all game overlays on top of the main game UI.
 pub fn draw_game_overlays(
     frame: &mut ratatui::Frame,
-    ctx: &GameContext<'_>,
+    ctx: &mut GameContext<'_>,
     extras: &OverlayExtras<'_>,
 ) {
     let state: &GameState = ctx.state;

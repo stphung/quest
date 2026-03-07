@@ -339,6 +339,8 @@ pub struct LoomUiState {
     pub selected_archetype: usize,
     /// Scroll offset for the Codex view (number of lines scrolled down).
     pub codex_scroll: usize,
+    /// Frame counter for throbber animation (incremented each render call).
+    pub throbber_frame: u32,
 }
 
 impl LoomUiState {
@@ -349,6 +351,7 @@ impl LoomUiState {
             selected_node: 0,
             selected_archetype: 0,
             codex_scroll: 0,
+            throbber_frame: 0,
         }
     }
 

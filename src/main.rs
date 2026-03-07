@@ -605,7 +605,7 @@ fn main() -> io::Result<()> {
                                 &deep_state,
                             );
                             {
-                                let game_ctx = main_helpers::game_context::GameContext {
+                                let mut game_ctx = main_helpers::game_context::GameContext {
                                     state: &mut state,
                                     haven: &mut haven,
                                     haven_ui: &mut haven_ui,
@@ -634,7 +634,7 @@ fn main() -> io::Result<()> {
                                     chrono_summary: chrono_summary.as_ref(),
                                     layout_ctx: &ctx,
                                 };
-                                draw_game_overlays(frame, &game_ctx, &extras);
+                                draw_game_overlays(frame, &mut game_ctx, &extras);
                             }
                         })?;
 
