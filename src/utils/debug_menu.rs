@@ -61,6 +61,9 @@ enum DebugAction {
     LoomGrantResources,
     LoomCompletePattern,
     LoomAdvanceToPattern(usize),
+    LoomBuildTestRefineryT1,
+    LoomBuildTestRefineryT2,
+    LoomClearRefineries,
 }
 
 const DEBUG_ACTIONS: &[DebugAction] = &[
@@ -165,7 +168,7 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::SetEnhancement(8),
     DebugAction::SetEnhancement(9),
     DebugAction::SetEnhancement(10),
-    // Loom of Worlds debug actions (indices 98–108)
+    // Loom of Worlds debug actions (indices 98–111)
     DebugAction::TriggerLoomDiscovery,
     DebugAction::LoomSelectArchetype(LoomArchetype::BurnBright),
     DebugAction::LoomSelectArchetype(LoomArchetype::ReachWide),
@@ -177,6 +180,9 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::LoomAdvanceToPattern(5),
     DebugAction::LoomAdvanceToPattern(10),
     DebugAction::LoomAdvanceToPattern(17),
+    DebugAction::LoomBuildTestRefineryT1,
+    DebugAction::LoomBuildTestRefineryT2,
+    DebugAction::LoomClearRefineries,
 ];
 
 const CHALLENGE_ACTIONS: &[DebugAction] = &[
@@ -305,6 +311,9 @@ const LOOM_ACTIONS: &[DebugAction] = &[
     DebugAction::LoomAdvanceToPattern(5),
     DebugAction::LoomAdvanceToPattern(10),
     DebugAction::LoomAdvanceToPattern(17),
+    DebugAction::LoomBuildTestRefineryT1,
+    DebugAction::LoomBuildTestRefineryT2,
+    DebugAction::LoomClearRefineries,
 ];
 const BORDER_OPTION_START_INDEX: usize = DEBUG_ACTIONS.len();
 
@@ -383,6 +392,9 @@ impl DebugAction {
                 10 => 107,
                 _ => 108, // 17
             },
+            Self::LoomBuildTestRefineryT1 => 109,
+            Self::LoomBuildTestRefineryT2 => 110,
+            Self::LoomClearRefineries => 111,
         }
     }
 
@@ -510,6 +522,9 @@ impl DebugAction {
             Self::LoomAdvanceToPattern(5) => "Loom: Jump to Pattern 6",
             Self::LoomAdvanceToPattern(10) => "Loom: Jump to Pattern 11",
             Self::LoomAdvanceToPattern(_) => "Loom: Jump to Final Pattern",
+            Self::LoomBuildTestRefineryT1 => "Build T1 Refinery (Ember+Void\u{2192}ForgedLight)",
+            Self::LoomBuildTestRefineryT2 => "Build T2 Refinery (FrgLt+Refl\u{2192}EchoGlass)",
+            Self::LoomClearRefineries => "Clear All Refineries",
         }
     }
 
@@ -611,6 +626,56 @@ impl DebugAction {
                 }
                 loom.persistent.active_pattern = target;
                 "Advanced to pattern."
+            }
+            Self::LoomBuildTestRefineryT1 => {
+                let (a, b, nature) = (
+                    crate::loom::types::Resource::Ember,
+                    crate::loom::types::Resource::VoidEssence,
+                    crate::loom::types::NodeNature::Heat,
+                );
+                if let Some(recipe) = crate::loom::recipes::find_recipe(a, b, nature) {
+                    let r = crate::loom::types::Refinery::new(
+                        recipe.input_a,
+                        recipe.input_b,
+                        recipe.node_nature,
+                        recipe.output,
+                        recipe.amount,
+                        recipe.tier,
+                    );
+                    loom.persistent.refineries.push(r);
+                    "T1 Refinery built (debug)."
+                } else {
+                    "No T1 recipe found."
+                }
+            }
+            Self::LoomBuildTestRefineryT2 => {
+                let (a, b, nature) = (
+                    crate::loom::types::Resource::ForgedLight,
+                    crate::loom::types::Resource::Reflection,
+                    crate::loom::types::NodeNature::Form,
+                );
+                if let Some(recipe) = crate::loom::recipes::find_recipe(a, b, nature) {
+                    let r = crate::loom::types::Refinery::new(
+                        recipe.input_a,
+                        recipe.input_b,
+                        recipe.node_nature,
+                        recipe.output,
+                        recipe.amount,
+                        recipe.tier,
+                    );
+                    loom.persistent.refineries.push(r);
+                    "T2 Refinery built (debug)."
+                } else {
+                    "No T2 recipe found."
+                }
+            }
+            Self::LoomClearRefineries => {
+                loom.persistent.pipes.retain(|p| {
+                    !matches!(p.from, crate::loom::types::LoomNodeRef::Refinery(_))
+                        && !matches!(p.to, crate::loom::types::LoomNodeRef::Refinery(_))
+                });
+                loom.persistent.refineries.clear();
+                "All refineries cleared."
             }
         }
     }
