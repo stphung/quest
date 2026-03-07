@@ -586,6 +586,40 @@ pub fn codex_hint_indices(codex: &[crate::loom::types::CodexEntry]) -> Vec<usize
     recipes::adjacent_recipe_indices(&discovered_indices)
 }
 
+/// Compute a Loom production multiplier from external systems.
+///
+/// Each contributing system provides a small additive bonus that is meaningful
+/// early (before the player has built up Loom infrastructure) but becomes
+/// negligible relative to Loom upgrades at endgame.
+///
+/// # Parameters
+/// - `deep_layer`: The player's deepest Deep layer reached (0 = not started).
+/// - `haven_tree_level`: Total Haven skill tree points invested (0 = no Haven).
+/// - `sigil_count`: Number of Storm Sigils currently etched (0–12).
+/// - `ascension_level`: Current Ascension level (0 = not ascended).
+///
+/// # Returns
+/// A multiplier ≥ 1.0 to apply to every node's effective production rate.
+/// The formula is `1.0 + sum_of_bonuses` where each system contributes:
+/// - Deep: +0.5% per layer (capped at layer 30 → +15%)
+/// - Haven: +0.3% per tree level (capped at 50 levels → +15%)
+/// - Sigils: +1.0% per etched sigil (capped at 12 → +12%)
+/// - Ascension: +2.0% per ascension level (capped at level 10 → +20%)
+///
+/// Total cap: roughly +62% at absolute max investment across all systems.
+pub fn loom_production_bonus(
+    deep_layer: u32,
+    haven_tree_level: u32,
+    sigil_count: u32,
+    ascension_level: u32,
+) -> f64 {
+    let deep_bonus = (deep_layer.min(30) as f64) * 0.005;
+    let haven_bonus = (haven_tree_level.min(50) as f64) * 0.003;
+    let sigil_bonus = (sigil_count.min(12) as f64) * 0.010;
+    let ascension_bonus = (ascension_level.min(10) as f64) * 0.020;
+    1.0 + deep_bonus + haven_bonus + sigil_bonus + ascension_bonus
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1539,5 +1573,97 @@ mod tests {
         );
         assert_eq!(codex.len(), 1, "commutative match should not duplicate");
         assert!(codex[0].discovered);
+    }
+
+    // ── loom_production_bonus ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_loom_production_bonus_zero_inputs_is_one() {
+        let bonus = loom_production_bonus(0, 0, 0, 0);
+        assert!(
+            (bonus - 1.0).abs() < 1e-9,
+            "no bonuses should return 1.0, got {}",
+            bonus
+        );
+    }
+
+    #[test]
+    fn test_loom_production_bonus_deep_layer_contribution() {
+        // 10 deep layers → +5%
+        let bonus = loom_production_bonus(10, 0, 0, 0);
+        assert!(
+            (bonus - 1.05).abs() < 1e-9,
+            "10 deep layers should give 1.05, got {}",
+            bonus
+        );
+    }
+
+    #[test]
+    fn test_loom_production_bonus_haven_tree_contribution() {
+        // 10 haven tree levels → +3%
+        let bonus = loom_production_bonus(0, 10, 0, 0);
+        assert!(
+            (bonus - 1.03).abs() < 1e-9,
+            "10 haven levels should give 1.03, got {}",
+            bonus
+        );
+    }
+
+    #[test]
+    fn test_loom_production_bonus_sigil_contribution() {
+        // 6 sigils → +6%
+        let bonus = loom_production_bonus(0, 0, 6, 0);
+        assert!(
+            (bonus - 1.06).abs() < 1e-9,
+            "6 sigils should give 1.06, got {}",
+            bonus
+        );
+    }
+
+    #[test]
+    fn test_loom_production_bonus_ascension_contribution() {
+        // 3 ascension levels → +6%
+        let bonus = loom_production_bonus(0, 0, 0, 3);
+        assert!(
+            (bonus - 1.06).abs() < 1e-9,
+            "3 ascension levels should give 1.06, got {}",
+            bonus
+        );
+    }
+
+    #[test]
+    fn test_loom_production_bonus_all_systems_additive() {
+        // 10 deep + 10 haven + 6 sigils + 3 ascension = 5% + 3% + 6% + 6% = 20%
+        let bonus = loom_production_bonus(10, 10, 6, 3);
+        assert!(
+            (bonus - 1.20).abs() < 1e-9,
+            "combined bonus should be 1.20, got {}",
+            bonus
+        );
+    }
+
+    #[test]
+    fn test_loom_production_bonus_caps_are_enforced() {
+        // Values beyond the caps should give same result as capped values.
+        let capped = loom_production_bonus(30, 50, 12, 10);
+        let over_cap = loom_production_bonus(100, 200, 50, 50);
+        assert!(
+            (capped - over_cap).abs() < 1e-9,
+            "over-cap inputs should equal capped: {} vs {}",
+            capped,
+            over_cap
+        );
+        // Max bonus: 15% + 15% + 12% + 20% = 62%
+        assert!(
+            (capped - 1.62).abs() < 1e-9,
+            "max bonus should be 1.62, got {}",
+            capped
+        );
+    }
+
+    #[test]
+    fn test_loom_production_bonus_always_at_least_one() {
+        assert!(loom_production_bonus(0, 0, 0, 0) >= 1.0);
+        assert!(loom_production_bonus(1, 1, 1, 1) >= 1.0);
     }
 }

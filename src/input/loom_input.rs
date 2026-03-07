@@ -67,6 +67,14 @@ pub(super) fn handle_loom(
             adjust_selected_pipe(loom_state, loom_ui, 0.05);
             InputResult::NeedsSave
         }
+        KeyCode::Char('u') | KeyCode::Char('U') if loom_ui.view == LoomView::ListDetail => {
+            let node_id = crate::loom::types::NodeId::ALL[loom_ui.selected_node.min(5)];
+            if crate::loom::try_upgrade_node(loom_state, node_id) {
+                InputResult::NeedsSave
+            } else {
+                InputResult::Continue
+            }
+        }
         KeyCode::Char('p') | KeyCode::Char('P') if loom_ui.view == LoomView::ListDetail => {
             // Cycle pipe selection within the selected node's outgoing pipes.
             let node_id = crate::loom::types::NodeId::ALL[loom_ui.selected_node.min(5)];

@@ -315,6 +315,8 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
                 achievements,
                 overlay,
                 debug_menu,
+                loom_state,
+                loom_ui,
             );
         }
     }
@@ -456,6 +458,8 @@ fn handle_debug_menu(
     achievements: &mut crate::achievements::Achievements,
     overlay: &mut GameOverlay,
     debug_menu: &mut DebugMenu,
+    loom_state: &mut crate::loom::LoomState,
+    loom_ui: &mut crate::loom::LoomUiState,
 ) -> InputResult {
     match key.code {
         KeyCode::Tab | KeyCode::Right => debug_menu.navigate_next_category(),
@@ -463,7 +467,15 @@ fn handle_debug_menu(
         KeyCode::Up => debug_menu.navigate_up(),
         KeyCode::Down => debug_menu.navigate_down(),
         KeyCode::Enter => {
-            let msg = debug_menu.trigger_selected(state, haven, enhancement, deep, achievements);
+            let msg = debug_menu.trigger_selected(
+                state,
+                haven,
+                enhancement,
+                deep,
+                achievements,
+                loom_state,
+                loom_ui,
+            );
             state
                 .combat_state
                 .add_log_entry(format!("[DEBUG] {}", msg), false, true);

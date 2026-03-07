@@ -169,6 +169,9 @@ fn render_archetype_selection(
 }
 
 fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
+    use crate::loom::types::NodeId;
+    use crate::loom::{node_effective_rate, node_native_resource, pipe_flow_rate};
+
     // Reserve 4 rows at the bottom for the pattern bar when patterns are initialized.
     let has_patterns = !loom_state.persistent.patterns.is_empty();
     let pattern_bar_height = if has_patterns { 4u16 } else { 0u16 };
@@ -181,33 +184,441 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
     let diagram_area = chunks[0];
     let pattern_area = chunks[1];
 
-    let mut lines = vec![
-        Line::from(""),
-        Line::from(Span::styled(
-            " Nodes \u{2014} Buffer Status",
-            Style::default().fg(Color::Rgb(180, 120, 220)),
-        )),
-        Line::from(""),
+    // Split diagram into left (node diagram) and right (stockpiles) panels.
+    let h_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Min(0), Constraint::Length(26)])
+        .split(diagram_area);
+
+    let diagram_left = h_chunks[0];
+    let stockpile_right = h_chunks[1];
+
+    // ── Left: node flow diagram ───────────────────────────────────────────────
+
+    // Archetype pairs: each row shows left-node ──pipe──▶ right-node.
+    // Rows: (EmberSpindle, VoidCondenser), (ReflectionLens, MemoryArchive), (SilenceWell, ResonanceForge).
+    let pairs: [(NodeId, NodeId); 3] = [
+        (NodeId::EmberSpindle, NodeId::VoidCondenser),
+        (NodeId::ReflectionLens, NodeId::MemoryArchive),
+        (NodeId::SilenceWell, NodeId::ResonanceForge),
     ];
 
-    for node in &loom_state.persistent.nodes {
-        lines.push(build_node_buffer_line(node, diagram_area.width));
+    let mut lines: Vec<Line> = vec![Line::from("")];
+
+    for (left_id, right_id) in &pairs {
+        let left_node = loom_state
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == *left_id)
+            .unwrap();
+        let right_node = loom_state
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == *right_id)
+            .unwrap();
+
+        let left_rate = node_effective_rate(loom_state, left_node);
+        let right_rate = node_effective_rate(loom_state, right_node);
+
+        // Find active pipe between this pair in either direction.
+        let lr_pipe_idx = loom_state
+            .persistent
+            .pipes
+            .iter()
+            .enumerate()
+            .find_map(|(i, p)| {
+                if p.from == *left_id && p.to == *right_id && !p.under_construction {
+                    Some((i, true))
+                } else if p.from == *right_id && p.to == *left_id && !p.under_construction {
+                    Some((i, false))
+                } else {
+                    None
+                }
+            });
+
+        // Also check for any pipe from left to anywhere else (cross-pair).
+        let left_has_cross = loom_state.persistent.pipes.iter().any(|p| {
+            p.from == *left_id && p.to != *right_id && p.to != *left_id && !p.under_construction
+        });
+        let right_has_cross = loom_state.persistent.pipes.iter().any(|p| {
+            p.from == *right_id && p.to != *left_id && p.to != *right_id && !p.under_construction
+        });
+
+        // Line 1: node names + level + stall.
+        lines.push(build_flow_node_header_line(
+            left_node,
+            right_node,
+            left_has_cross,
+            right_has_cross,
+        ));
+
+        // Line 2: buffer bars.
+        lines.push(build_flow_buffer_line(left_node, right_node));
+
+        // Line 3: production rate + pipe connector.
+        let pipe_label = match &lr_pipe_idx {
+            Some((idx, left_to_right)) => {
+                let flow = pipe_flow_rate(loom_state, *idx);
+                let arrow = if *left_to_right {
+                    "\u{25b6}"
+                } else {
+                    "\u{25c4}"
+                };
+                let tier = loom_state.persistent.pipes[*idx].tier;
+                format!(
+                    "{}{:.1}/hr{}",
+                    if *left_to_right {
+                        "\u{2500}\u{2500}"
+                    } else {
+                        ""
+                    },
+                    flow,
+                    arrow
+                ) + &format!("[{:?}]", tier)
+            }
+            None => {
+                // Check for construction pipe.
+                let constr = loom_state.persistent.pipes.iter().any(|p| {
+                    (p.from == *left_id && p.to == *right_id
+                        || p.from == *right_id && p.to == *left_id)
+                        && p.under_construction
+                });
+                if constr {
+                    "\u{2508}\u{2508}[build]\u{2508}\u{2508}".to_string()
+                } else {
+                    "           ".to_string()
+                }
+            }
+        };
+
+        lines.push(build_flow_rate_line(
+            left_node,
+            left_rate,
+            right_node,
+            right_rate,
+            &pipe_label,
+        ));
+
+        // Gap between pairs.
+        lines.push(Line::from(""));
+    }
+
+    // Show cross-pair pipes summary if any exist.
+    let cross_pipes: Vec<_> = loom_state
+        .persistent
+        .pipes
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| {
+            // Cross-pair: not within same archetype pair.
+            let same_pair = pairs
+                .iter()
+                .any(|(l, r)| (p.from == *l && p.to == *r) || (p.from == *r && p.to == *l));
+            !same_pair && !p.under_construction
+        })
+        .collect();
+
+    if !cross_pipes.is_empty() {
+        lines.push(Line::from(Span::styled(
+            " Cross-node pipes:",
+            Style::default().fg(Color::Rgb(140, 100, 180)),
+        )));
+        for (idx, pipe) in &cross_pipes {
+            let flow = pipe_flow_rate(loom_state, *idx);
+            let resource = node_native_resource(pipe.from);
+            lines.push(Line::from(vec![
+                Span::styled("  ", Style::default()),
+                Span::styled(
+                    pipe.from.name(),
+                    Style::default().fg(Color::Rgb(180, 140, 220)),
+                ),
+                Span::styled(
+                    format!(" \u{2500}{:.1}/hr\u{25b6} ", flow),
+                    Style::default().fg(Color::Rgb(100, 160, 100)),
+                ),
+                Span::styled(
+                    pipe.to.name(),
+                    Style::default().fg(Color::Rgb(180, 140, 220)),
+                ),
+                Span::styled(
+                    format!(" ({}) {:?}", resource_name(&resource), pipe.tier),
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ]));
+        }
     }
 
     let para = Paragraph::new(lines)
         .alignment(Alignment::Left)
         .style(Style::default().bg(Color::Rgb(10, 5, 18)));
-    frame.render_widget(para, diagram_area);
+    frame.render_widget(para, diagram_left);
+
+    // ── Right: stockpiles panel ───────────────────────────────────────────────
+    render_stockpiles_panel(frame, stockpile_right, loom_state);
 
     if has_patterns {
         render_pattern_bar(frame, pattern_area, loom_state);
     }
 }
 
+/// Build the header line for a node pair: "Name Lv stall  |  Name Lv stall".
+fn build_flow_node_header_line(
+    left: &crate::loom::types::LoomNode,
+    right: &crate::loom::types::LoomNode,
+    left_cross: bool,
+    right_cross: bool,
+) -> Line<'static> {
+    fn node_header(node: &crate::loom::types::LoomNode, has_cross: bool) -> Vec<Span<'static>> {
+        if !node.unlocked {
+            return vec![Span::styled(
+                format!("  {:<16} [locked]", node.id.name()),
+                Style::default().fg(Color::Rgb(50, 38, 65)),
+            )];
+        }
+        let stall = if node.stalled {
+            Span::styled(" \u{26a0}", Style::default().fg(Color::Rgb(220, 60, 60)))
+        } else {
+            Span::styled("  ", Style::default())
+        };
+        let cross = if has_cross {
+            Span::styled("\u{2197}", Style::default().fg(Color::Rgb(160, 120, 200)))
+        } else {
+            Span::styled(" ", Style::default())
+        };
+        // Confluence nodes (non-base-nature) get a ✦ marker.
+        let marker = match node.id.nature() {
+            crate::loom::types::NodeNature::Heat
+            | crate::loom::types::NodeNature::Form
+            | crate::loom::types::NodeNature::Void
+            | crate::loom::types::NodeNature::Pattern
+            | crate::loom::types::NodeNature::Stillness
+            | crate::loom::types::NodeNature::Vibration => " ",
+        };
+        vec![
+            Span::styled(
+                format!(" {:<16}", node.id.name()),
+                Style::default().fg(Color::Rgb(200, 160, 240)),
+            ),
+            Span::styled(
+                format!("L{}", node.level),
+                Style::default().fg(Color::Rgb(120, 90, 160)),
+            ),
+            stall,
+            cross,
+            Span::styled(marker, Style::default()),
+        ]
+    }
+
+    let mut spans = node_header(left, left_cross);
+    spans.push(Span::styled(
+        "  \u{2502}  ",
+        Style::default().fg(Color::Rgb(60, 45, 80)),
+    ));
+    spans.extend(node_header(right, right_cross));
+    Line::from(spans)
+}
+
+/// Build the buffer bar line for a node pair.
+fn build_flow_buffer_line(
+    left: &crate::loom::types::LoomNode,
+    right: &crate::loom::types::LoomNode,
+) -> Line<'static> {
+    fn node_buffer(node: &crate::loom::types::LoomNode) -> Vec<Span<'static>> {
+        if !node.unlocked {
+            return vec![Span::styled(format!("{:26}", ""), Style::default())];
+        }
+        let fill = if node.buffer_capacity > 0.0 {
+            (node.buffer / node.buffer_capacity).min(1.0)
+        } else {
+            0.0
+        };
+        let bar_color = if node.stalled || fill >= 0.90 {
+            Color::Rgb(220, 60, 60)
+        } else if fill >= 0.75 {
+            Color::Rgb(220, 180, 60)
+        } else {
+            Color::Rgb(60, 200, 100)
+        };
+        let filled = ((fill * 8.0) as usize).min(8);
+        let empty = 8usize.saturating_sub(filled);
+        vec![
+            Span::styled("  [", Style::default().fg(Color::DarkGray)),
+            Span::styled("\u{2588}".repeat(filled), Style::default().fg(bar_color)),
+            Span::styled(
+                "\u{2591}".repeat(empty),
+                Style::default().fg(Color::Rgb(40, 30, 55)),
+            ),
+            Span::styled("] ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{:>4.1}/{:.1}", node.buffer, node.buffer_capacity),
+                Style::default().fg(bar_color),
+            ),
+        ]
+    }
+
+    let mut spans = node_buffer(left);
+    spans.push(Span::styled(
+        "  \u{2502}  ",
+        Style::default().fg(Color::Rgb(60, 45, 80)),
+    ));
+    spans.extend(node_buffer(right));
+    Line::from(spans)
+}
+
+/// Build the production rate + pipe connector line.
+fn build_flow_rate_line(
+    left: &crate::loom::types::LoomNode,
+    left_rate: f64,
+    right: &crate::loom::types::LoomNode,
+    right_rate: f64,
+    pipe_label: &str,
+) -> Line<'static> {
+    let left_rate_str = if left.unlocked {
+        format!("  {:.1}/hr", left_rate)
+    } else {
+        format!("{:10}", "")
+    };
+    let right_rate_str = if right.unlocked {
+        format!("  {:.1}/hr", right_rate)
+    } else {
+        format!("{:10}", "")
+    };
+
+    // Pipe label centered in 11 chars.
+    let pipe_center = format!("{:^11}", pipe_label);
+
+    Line::from(vec![
+        Span::styled(
+            left_rate_str,
+            Style::default().fg(Color::Rgb(100, 160, 100)),
+        ),
+        Span::styled(pipe_center, Style::default().fg(Color::Rgb(140, 100, 180))),
+        Span::styled(
+            right_rate_str,
+            Style::default().fg(Color::Rgb(100, 160, 100)),
+        ),
+    ])
+}
+
+/// Render the stockpiles side panel.
+fn render_stockpiles_panel(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
+    use crate::loom::types::Resource;
+
+    let block = Block::default()
+        .title(" Stockpiles ")
+        .borders(Borders::LEFT)
+        .border_style(Style::default().fg(Color::Rgb(60, 45, 80)));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    // Base resources.
+    let base_resources = [
+        Resource::Ember,
+        Resource::Reflection,
+        Resource::VoidEssence,
+        Resource::Memory,
+        Resource::Silence,
+        Resource::Resonance,
+    ];
+    // Confluence + reaction products.
+    let derived_resources = [
+        Resource::ForgedLight,
+        Resource::EchoGlass,
+        Resource::StillbornSong,
+        Resource::CondensedEmber,
+        Resource::EmberEcho,
+        Resource::PurifiedVoid,
+        Resource::WovenReality,
+    ];
+
+    let mut lines: Vec<Line> = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            " Base",
+            Style::default().fg(Color::Rgb(120, 90, 140)),
+        )),
+    ];
+
+    for res in &base_resources {
+        let amount = loom_state
+            .persistent
+            .stockpiles
+            .get(res)
+            .copied()
+            .unwrap_or(0.0);
+        let color = if amount > 0.0 {
+            Color::Rgb(200, 160, 240)
+        } else {
+            Color::Rgb(50, 38, 65)
+        };
+        lines.push(Line::from(Span::styled(
+            format!(" {:<12}{:>5.1}", resource_name(res), amount),
+            Style::default().fg(color),
+        )));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        " Derived",
+        Style::default().fg(Color::Rgb(120, 90, 140)),
+    )));
+
+    for res in &derived_resources {
+        let amount = loom_state
+            .persistent
+            .stockpiles
+            .get(res)
+            .copied()
+            .unwrap_or(0.0);
+        if amount > 0.0 {
+            lines.push(Line::from(Span::styled(
+                format!(" {:<12}{:>5.1}", resource_name(res), amount),
+                Style::default().fg(Color::Rgb(220, 180, 255)),
+            )));
+        }
+    }
+
+    let any_derived = derived_resources.iter().any(|r| {
+        loom_state
+            .persistent
+            .stockpiles
+            .get(r)
+            .copied()
+            .unwrap_or(0.0)
+            > 0.0
+    });
+    if !any_derived {
+        lines.push(Line::from(Span::styled(
+            " (none yet)",
+            Style::default().fg(Color::Rgb(50, 38, 65)),
+        )));
+    }
+
+    lines.truncate(inner.height as usize);
+    frame.render_widget(
+        Paragraph::new(lines).style(Style::default().bg(Color::Rgb(10, 5, 18))),
+        inner,
+    );
+}
+
 fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &LoomUiState) {
     use crate::loom::types::NodeId;
+    use crate::loom::{node_effective_rate, node_upgrade_cost};
+
+    // Split into left list (60%) and right detail panel (40%).
+    let h_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(58), Constraint::Percentage(42)])
+        .split(area);
+    let list_area = h_chunks[0];
+    let detail_area = h_chunks[1];
 
     let nodes = NodeId::ALL;
+    let selected_node_id = nodes[ui.selected_node.min(nodes.len() - 1)];
+
+    // ── Left: node list ────────────────────────────────────────────────────────
     let mut lines = vec![
         Line::from(""),
         Line::from(Span::styled(
@@ -218,32 +629,68 @@ fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui:
     ];
 
     for (i, node_id) in nodes.iter().enumerate() {
+        let node = loom_state
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == *node_id)
+            .unwrap();
         let is_selected = ui.selected_node == i;
         let prefix = if is_selected { "\u{25b6} " } else { "  " };
-        let color = if is_selected {
+
+        let color = if !node.unlocked {
+            Color::Rgb(60, 45, 80)
+        } else if is_selected {
             Color::White
         } else {
             Color::Rgb(120, 80, 160)
         };
+
+        let stall_marker = if node.stalled {
+            Span::styled(" \u{26a0}", Style::default().fg(Color::Rgb(220, 60, 60)))
+        } else {
+            Span::raw("")
+        };
+        let lock_marker = if !node.unlocked {
+            Span::styled(" [locked]", Style::default().fg(Color::Rgb(60, 45, 80)))
+        } else {
+            Span::raw("")
+        };
+
         lines.push(Line::from(vec![
             Span::styled(prefix, Style::default().fg(color)),
-            Span::styled(node_id.name(), Style::default().fg(color)),
             Span::styled(
-                format!(" \u{2014} {:?}", node_id.nature()),
-                Style::default().fg(Color::DarkGray),
+                format!("{:<16}", node_id.name()),
+                Style::default().fg(color),
             ),
+            if node.unlocked {
+                Span::styled(
+                    format!("L{}", node.level),
+                    Style::default().fg(Color::Rgb(100, 75, 140)),
+                )
+            } else {
+                Span::raw("")
+            },
+            stall_marker,
+            lock_marker,
         ]));
 
-        // Show outgoing pipes for the selected node.
-        if is_selected {
+        // Show pipes for the selected node inline in the list.
+        if is_selected && node.unlocked {
             let outgoing_pipes: Vec<_> = loom_state
                 .persistent
                 .pipes
                 .iter()
                 .filter(|p| p.from == *node_id && !p.under_construction)
                 .collect();
+            let construction_pipes: Vec<_> = loom_state
+                .persistent
+                .pipes
+                .iter()
+                .filter(|p| p.from == *node_id && p.under_construction)
+                .collect();
 
-            if outgoing_pipes.is_empty() {
+            if outgoing_pipes.is_empty() && construction_pipes.is_empty() {
                 lines.push(Line::from(Span::styled(
                     "     no outgoing pipes",
                     Style::default().fg(Color::Rgb(60, 45, 80)),
@@ -262,35 +709,230 @@ fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui:
                         Color::Rgb(100, 70, 130)
                     };
                     let ratio_pct = (pipe.split_ratio * 100.0).round() as u32;
-                    let bar = build_ratio_bar(pipe.split_ratio, 10);
+                    let bar = build_ratio_bar(pipe.split_ratio, 8);
                     lines.push(Line::from(vec![
                         Span::styled(pipe_prefix, Style::default().fg(pipe_color)),
                         Span::styled(
-                            format!("\u{2192} {}", pipe.to.name()),
+                            format!("\u{2192} {:<14}", pipe.to.name()),
                             Style::default().fg(pipe_color),
                         ),
                         Span::styled(
-                            format!("  [{:>3}%] {}", ratio_pct, bar),
+                            format!("{:>3}% {}", ratio_pct, bar),
                             Style::default().fg(pipe_color),
-                        ),
-                        Span::styled(
-                            format!("  {:?}", pipe.tier),
-                            Style::default().fg(Color::DarkGray),
                         ),
                     ]));
                 }
+                for pipe in &construction_pipes {
+                    lines.push(Line::from(vec![
+                        Span::styled("     ", Style::default()),
+                        Span::styled(
+                            format!("\u{2508} {} ", pipe.to.name()),
+                            Style::default().fg(Color::Rgb(80, 60, 110)),
+                        ),
+                        Span::styled("[building]", Style::default().fg(Color::Rgb(80, 60, 110))),
+                    ]));
+                }
+            }
+            if !outgoing_pipes.is_empty() {
                 lines.push(Line::from(Span::styled(
-                    "   [P] Select pipe  [\u{2190}/\u{2192}] Adjust ratio",
+                    "   [P] Cycle pipe  [\u{2190}/\u{2192}] Ratio",
                     Style::default().fg(Color::DarkGray),
                 )));
             }
         }
     }
 
-    let para = Paragraph::new(lines)
-        .alignment(Alignment::Left)
-        .style(Style::default().bg(Color::Rgb(10, 5, 18)));
-    frame.render_widget(para, area);
+    frame.render_widget(
+        Paragraph::new(lines)
+            .alignment(Alignment::Left)
+            .style(Style::default().bg(Color::Rgb(10, 5, 18))),
+        list_area,
+    );
+
+    // ── Right: selected node detail panel ─────────────────────────────────────
+    let detail_block = Block::default()
+        .title(format!(" {} ", selected_node_id.name()))
+        .borders(Borders::LEFT)
+        .border_style(Style::default().fg(Color::Rgb(80, 60, 110)));
+    let detail_inner = detail_block.inner(detail_area);
+    frame.render_widget(detail_block, detail_area);
+
+    let selected_node = loom_state
+        .persistent
+        .nodes
+        .iter()
+        .find(|n| n.id == selected_node_id)
+        .unwrap();
+
+    let mut detail_lines: Vec<Line> = vec![Line::from("")];
+
+    if !selected_node.unlocked {
+        detail_lines.push(Line::from(Span::styled(
+            " [Locked]",
+            Style::default().fg(Color::Rgb(80, 60, 110)),
+        )));
+        detail_lines.push(Line::from(Span::styled(
+            " Unlock via neighbor",
+            Style::default().fg(Color::Rgb(60, 45, 80)),
+        )));
+        detail_lines.push(Line::from(""));
+        // Show unlock progress bar if partially unlocked.
+        if selected_node.unlock_progress > 0.0 {
+            let prog_pct = (selected_node.unlock_progress / 2.0).min(1.0);
+            let filled = ((prog_pct * 10.0) as usize).min(10);
+            let empty = 10usize.saturating_sub(filled);
+            detail_lines.push(Line::from(vec![
+                Span::styled(" Progress [", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    "\u{2588}".repeat(filled),
+                    Style::default().fg(Color::Rgb(100, 80, 160)),
+                ),
+                Span::styled(
+                    "\u{2591}".repeat(empty),
+                    Style::default().fg(Color::Rgb(40, 30, 55)),
+                ),
+                Span::styled("]", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {:.1}h", selected_node.unlock_progress),
+                    Style::default().fg(Color::Rgb(100, 80, 160)),
+                ),
+            ]));
+        }
+    } else {
+        // Nature and native resource.
+        let nature_name = node_nature_name(selected_node_id.nature());
+        let native = crate::loom::node_native_resource(selected_node_id);
+        detail_lines.push(Line::from(vec![
+            Span::styled(" Nature: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(nature_name, Style::default().fg(Color::Rgb(180, 140, 220))),
+        ]));
+        detail_lines.push(Line::from(vec![
+            Span::styled(" Produces: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                resource_name(&native),
+                Style::default().fg(Color::Rgb(220, 180, 255)),
+            ),
+        ]));
+        detail_lines.push(Line::from(""));
+
+        // Buffer bar.
+        let fill = if selected_node.buffer_capacity > 0.0 {
+            (selected_node.buffer / selected_node.buffer_capacity).min(1.0)
+        } else {
+            0.0
+        };
+        let bar_color = if selected_node.stalled || fill >= 0.90 {
+            Color::Rgb(220, 60, 60)
+        } else if fill >= 0.75 {
+            Color::Rgb(220, 180, 60)
+        } else {
+            Color::Rgb(60, 200, 100)
+        };
+        let filled_cells = ((fill * 12.0) as usize).min(12);
+        let empty_cells = 12usize.saturating_sub(filled_cells);
+        detail_lines.push(Line::from(vec![
+            Span::styled(" Buffer [", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "\u{2588}".repeat(filled_cells),
+                Style::default().fg(bar_color),
+            ),
+            Span::styled(
+                "\u{2591}".repeat(empty_cells),
+                Style::default().fg(Color::Rgb(40, 30, 55)),
+            ),
+            Span::styled("]", Style::default().fg(Color::DarkGray)),
+        ]));
+        detail_lines.push(Line::from(vec![
+            Span::styled(
+                format!(
+                    " {:.1}/{:.1}",
+                    selected_node.buffer, selected_node.buffer_capacity
+                ),
+                Style::default().fg(bar_color),
+            ),
+            if selected_node.stalled {
+                Span::styled(
+                    " \u{26a0} STALLED",
+                    Style::default().fg(Color::Rgb(220, 60, 60)),
+                )
+            } else {
+                Span::raw("")
+            },
+        ]));
+        detail_lines.push(Line::from(""));
+
+        // Production rate.
+        let rate = node_effective_rate(loom_state, selected_node);
+        detail_lines.push(Line::from(vec![
+            Span::styled(" Rate: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{:.1}/hr", rate),
+                Style::default().fg(Color::Rgb(100, 200, 120)),
+            ),
+            Span::styled(
+                format!(" (Lv{})", selected_node.level),
+                Style::default().fg(Color::Rgb(80, 60, 100)),
+            ),
+        ]));
+        detail_lines.push(Line::from(""));
+
+        // Upgrade cost.
+        let upgrade_cost = node_upgrade_cost(loom_state, selected_node_id);
+        let can_upgrade = selected_node.buffer >= upgrade_cost;
+        let upgrade_color = if can_upgrade {
+            Color::Rgb(180, 255, 180)
+        } else {
+            Color::Rgb(100, 75, 80)
+        };
+        detail_lines.push(Line::from(vec![
+            Span::styled(" Upgrade: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{:.0} {}", upgrade_cost, resource_name(&native)),
+                Style::default().fg(upgrade_color),
+            ),
+        ]));
+        if can_upgrade {
+            detail_lines.push(Line::from(Span::styled(
+                " [U] Upgrade node",
+                Style::default().fg(Color::Rgb(120, 200, 120)),
+            )));
+        } else {
+            detail_lines.push(Line::from(Span::styled(
+                " (insufficient buffer)",
+                Style::default().fg(Color::Rgb(80, 60, 70)),
+            )));
+        }
+
+        // Incoming pipe count.
+        let incoming = loom_state
+            .persistent
+            .pipes
+            .iter()
+            .filter(|p| p.to == selected_node_id && !p.under_construction)
+            .count();
+        let outgoing = loom_state
+            .persistent
+            .pipes
+            .iter()
+            .filter(|p| p.from == selected_node_id && !p.under_construction)
+            .count();
+        if incoming > 0 || outgoing > 0 {
+            detail_lines.push(Line::from(""));
+            detail_lines.push(Line::from(vec![
+                Span::styled(" Pipes: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!("\u{2190}{} \u{2192}{}", incoming, outgoing),
+                    Style::default().fg(Color::Rgb(140, 100, 180)),
+                ),
+            ]));
+        }
+    }
+
+    detail_lines.truncate(detail_inner.height as usize);
+    frame.render_widget(
+        Paragraph::new(detail_lines).style(Style::default().bg(Color::Rgb(10, 5, 18))),
+        detail_inner,
+    );
 }
 
 /// Build a compact inline ratio bar (e.g. "████░░░░░░" for 40%).
@@ -615,7 +1257,7 @@ fn render_nav_hints(frame: &mut Frame, area: Rect, ui: &LoomUiState) {
     let hints = if ui.view == LoomView::ArchetypeSelection {
         " [Up/Down] Select  [Enter] Confirm  [Esc] Close "
     } else if ui.view == LoomView::ListDetail {
-        " [Tab] Switch View  [Up/Down] Node  [P] Pipe  [\u{2190}/\u{2192}] Ratio  [Esc] Close "
+        " [Tab] Switch View  [Up/Down] Node  [U] Upgrade  [P] Pipe  [\u{2190}/\u{2192}] Ratio  [Esc] Close "
     } else {
         " [Tab] Switch View  [Up/Down] Navigate  [Esc] Close "
     };
