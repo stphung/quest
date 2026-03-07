@@ -721,6 +721,91 @@ pub fn build_refinery(
     Ok(loom.persistent.refineries.len() - 1)
 }
 
+/// Tick construction for all refineries under construction.
+/// Returns indices of refineries that completed this tick.
+pub fn tick_refinery_construction(loom: &mut LoomState) -> Vec<usize> {
+    let mut completed = Vec::new();
+    for (i, r) in loom.persistent.refineries.iter_mut().enumerate() {
+        if !r.under_construction {
+            continue;
+        }
+        r.construction_ticks_remaining = r.construction_ticks_remaining.saturating_sub(1);
+        if r.construction_ticks_remaining == 0 {
+            r.under_construction = false;
+            completed.push(i);
+        }
+    }
+    completed
+}
+
+/// Process reactions at refineries from pipe deliveries.
+/// Unlike Extractor reactions (which use node nature from NodeId),
+/// Refineries have their recipe baked in — just check both inputs arrived.
+pub fn process_refinery_reactions(
+    loom: &mut LoomState,
+    deliveries: Vec<(LoomNodeRef, Resource, f64)>,
+) -> Vec<(usize, Resource, f64)> {
+    let mut results = Vec::new();
+
+    // Group deliveries by refinery index.
+    let mut refinery_inputs: std::collections::HashMap<usize, Vec<(Resource, f64)>> =
+        std::collections::HashMap::new();
+    for (node_ref, resource, amount) in deliveries {
+        if let LoomNodeRef::Refinery(idx) = node_ref {
+            refinery_inputs
+                .entry(idx)
+                .or_default()
+                .push((resource, amount));
+        }
+    }
+
+    for (idx, inputs) in refinery_inputs {
+        let Some(r) = loom.persistent.refineries.get(idx) else {
+            continue;
+        };
+        if r.under_construction {
+            continue;
+        }
+
+        // Find amounts for each required input.
+        let amt_a: f64 = inputs
+            .iter()
+            .filter(|(res, _)| *res == r.input_a)
+            .map(|(_, a)| a)
+            .sum();
+        let amt_b: f64 = inputs
+            .iter()
+            .filter(|(res, _)| *res == r.input_b)
+            .map(|(_, a)| a)
+            .sum();
+
+        if amt_a > 0.0 && amt_b > 0.0 {
+            let output_amount = amt_a.min(amt_b) * r.amount;
+            let cap = r.buffer_capacity;
+            let r = &mut loom.persistent.refineries[idx];
+            let space = (cap - r.buffer).max(0.0);
+            let actual = output_amount.min(space);
+            r.buffer += actual;
+            r.stalled = false;
+            results.push((idx, r.output, actual));
+        }
+    }
+
+    results
+}
+
+/// Update stall flags for all refineries.
+pub fn tick_refinery_stall_detection(loom: &mut LoomState) {
+    for r in &mut loom.persistent.refineries {
+        if r.under_construction {
+            continue;
+        }
+        if r.buffer >= r.buffer_capacity {
+            r.stalled = true;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2232,6 +2317,72 @@ mod tests {
             cost_l2,
             cost_l3
         );
+    }
+
+    // ── Refinery Ticking ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_refinery_construction_completes() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        loom.persistent.refineries.push({
+            let mut r = Refinery::new(
+                Resource::Ember,
+                Resource::VoidEssence,
+                NodeNature::Heat,
+                Resource::ForgedLight,
+                1.0,
+                1,
+            );
+            r.under_construction = true;
+            r.construction_ticks_remaining = 1;
+            r
+        });
+
+        let completed = tick_refinery_construction(&mut loom);
+        assert_eq!(completed.len(), 1);
+        assert!(!loom.persistent.refineries[0].under_construction);
+    }
+
+    #[test]
+    fn test_refinery_processing_produces_output() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        loom.persistent.refineries.push(Refinery::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+        ));
+        let deliveries = vec![
+            (LoomNodeRef::Refinery(0), Resource::Ember, 5.0),
+            (LoomNodeRef::Refinery(0), Resource::VoidEssence, 3.0),
+        ];
+
+        let reactions = process_refinery_reactions(&mut loom, deliveries);
+        assert!(!reactions.is_empty());
+        assert!((loom.persistent.refineries[0].buffer - 3.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_refinery_stall_when_buffer_full() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        let mut r = Refinery::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+        );
+        r.buffer = r.buffer_capacity;
+        loom.persistent.refineries.push(r);
+
+        tick_refinery_stall_detection(&mut loom);
+        assert!(loom.persistent.refineries[0].stalled);
     }
 }
 

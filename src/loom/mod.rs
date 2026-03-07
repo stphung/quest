@@ -14,10 +14,11 @@ pub use logic::{
     loom_external_bonuses, loom_production_bonus, node_conversion_multiplier, node_effective_rate,
     node_level_multiplier, node_native_resource, node_neighbor_unlock_count,
     node_neighbor_unlock_speed_multiplier, node_neighbors, node_throughput_multiplier,
-    node_upgrade_cost, node_upgrade_cost_multiplier, process_reactions,
+    node_upgrade_cost, node_upgrade_cost_multiplier, process_reactions, process_refinery_reactions,
     resonance_early_feedback_active, select_archetype, tick_base_production,
-    tick_loom_staggered_unlock, tick_neighbor_unlocking, tick_stall_detection, try_upgrade_node,
-    LoomExternalBonuses, RefineryError, SECOND_NODE_UNLOCK_SECONDS,
+    tick_loom_staggered_unlock, tick_neighbor_unlocking, tick_refinery_construction,
+    tick_refinery_stall_detection, tick_stall_detection, try_upgrade_node, LoomExternalBonuses,
+    RefineryError, SECOND_NODE_UNLOCK_SECONDS,
 };
 #[allow(unused_imports)]
 pub use patterns::{
