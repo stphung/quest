@@ -228,8 +228,8 @@ impl PipeTier {
 /// A directional pipe between two nodes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Pipe {
-    pub from: NodeId,
-    pub to: NodeId,
+    pub from: LoomNodeRef,
+    pub to: LoomNodeRef,
     pub tier: PipeTier,
     /// What fraction of the source node's output goes through this pipe (0.0-1.0).
     pub split_ratio: f64,

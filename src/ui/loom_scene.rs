@@ -55,6 +55,38 @@ fn node_letter(id: crate::loom::types::NodeId) -> char {
     }
 }
 
+/// Extract NodeId from a LoomNodeRef, returning None for Refineries.
+fn noderef_to_id(r: crate::loom::types::LoomNodeRef) -> Option<crate::loom::types::NodeId> {
+    match r {
+        crate::loom::types::LoomNodeRef::Extractor(id) => Some(id),
+        crate::loom::types::LoomNodeRef::Refinery(_) => None,
+    }
+}
+
+/// Color for a LoomNodeRef (gray fallback for refineries).
+fn noderef_color(r: crate::loom::types::LoomNodeRef) -> Color {
+    match noderef_to_id(r) {
+        Some(id) => node_color(id),
+        None => Color::Rgb(120, 100, 140),
+    }
+}
+
+/// Letter for a LoomNodeRef ('?' fallback for refineries).
+fn noderef_letter(r: crate::loom::types::LoomNodeRef) -> char {
+    match noderef_to_id(r) {
+        Some(id) => node_letter(id),
+        None => '?',
+    }
+}
+
+/// Name for a LoomNodeRef.
+fn noderef_name(r: crate::loom::types::LoomNodeRef) -> &'static str {
+    match noderef_to_id(r) {
+        Some(id) => id.name(),
+        None => "Refinery",
+    }
+}
+
 /// Short resource name for recipe slot display inside node boxes.
 fn resource_short(resource: &crate::loom::types::Resource) -> &'static str {
     use crate::loom::types::Resource;
@@ -333,8 +365,10 @@ fn render_recipe_slots(
         .persistent
         .pipes
         .iter()
-        .filter(|p| p.to == node.id && !p.under_construction)
-        .map(|p| crate::loom::node_native_resource(p.from))
+        .filter(|p| {
+            p.to == crate::loom::types::LoomNodeRef::Extractor(node.id) && !p.under_construction
+        })
+        .filter_map(|p| noderef_to_id(p.from).map(crate::loom::node_native_resource))
         .collect();
 
     // Find the best recipe: prefer one with both inputs filled, then one with most.
@@ -537,17 +571,20 @@ fn render_port_labels(
     selected: bool,
     selected_node_id: crate::loom::types::NodeId,
 ) {
+    use crate::loom::types::LoomNodeRef;
+    let node_ref = LoomNodeRef::Extractor(node_id);
+    let selected_ref = LoomNodeRef::Extractor(selected_node_id);
     let millis = current_millis();
     let mut pos = left + 1;
 
     // Outgoing pipes.
     for pipe in &loom_state.persistent.pipes {
-        if pipe.from != node_id {
+        if pipe.from != node_ref {
             continue;
         }
-        let is_highlighted = selected || selected_node_id == pipe.to;
+        let is_highlighted = selected || selected_ref == pipe.to;
         let color = if is_highlighted {
-            node_color(pipe.to)
+            noderef_color(pipe.to)
         } else {
             Color::Rgb(60, 50, 70)
         };
@@ -559,7 +596,7 @@ fn render_port_labels(
                 Color::Rgb(45, 38, 55)
             };
             put_cell(buffer, row, pos, '\u{2192}', arrow_color);
-            put_cell(buffer, row, pos + 1, node_letter(pipe.to), color);
+            put_cell(buffer, row, pos + 1, noderef_letter(pipe.to), color);
             put_cell(buffer, row, pos + 2, ' ', LOOM_BG);
         }
         pos += 3;
@@ -569,12 +606,12 @@ fn render_port_labels(
 
     // Incoming pipes.
     for pipe in &loom_state.persistent.pipes {
-        if pipe.to != node_id || pipe.under_construction {
+        if pipe.to != node_ref || pipe.under_construction {
             continue;
         }
-        let is_highlighted = selected || selected_node_id == pipe.from;
+        let is_highlighted = selected || selected_ref == pipe.from;
         let color = if is_highlighted {
-            node_color(pipe.from)
+            noderef_color(pipe.from)
         } else {
             Color::Rgb(60, 50, 70)
         };
@@ -584,7 +621,7 @@ fn render_port_labels(
             Color::Rgb(45, 38, 55)
         };
         put_cell(buffer, row, pos, '\u{2190}', arrow_color);
-        put_cell(buffer, row, pos + 1, node_letter(pipe.from), color);
+        put_cell(buffer, row, pos + 1, noderef_letter(pipe.from), color);
         put_cell(buffer, row, pos + 2, ' ', LOOM_BG);
         pos += 3;
     }
@@ -701,8 +738,10 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
             .persistent
             .pipes
             .iter()
-            .filter(|p| p.to == node.id && !p.under_construction)
-            .map(|p| crate::loom::node_native_resource(p.from))
+            .filter(|p| {
+                p.to == crate::loom::types::LoomNodeRef::Extractor(node.id) && !p.under_construction
+            })
+            .filter_map(|p| noderef_to_id(p.from).map(crate::loom::node_native_resource))
             .collect();
 
         if recipes.is_empty() {
@@ -743,19 +782,20 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
         lines.push(Line::from(""));
 
         // Pipe list.
+        let selected_ref = crate::loom::types::LoomNodeRef::Extractor(selected_id);
         let outgoing: Vec<_> = loom_state
             .persistent
             .pipes
             .iter()
             .enumerate()
-            .filter(|(_, p)| p.from == selected_id && !p.under_construction)
+            .filter(|(_, p)| p.from == selected_ref && !p.under_construction)
             .collect();
         let incoming_pipes: Vec<_> = loom_state
             .persistent
             .pipes
             .iter()
             .enumerate()
-            .filter(|(_, p)| p.to == selected_id && !p.under_construction)
+            .filter(|(_, p)| p.to == selected_ref && !p.under_construction)
             .collect();
 
         if !outgoing.is_empty() {
@@ -768,11 +808,11 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
                 lines.push(Line::from(Span::styled(
                     format!(
                         "  \u{2192}{} {:.1} {:?}",
-                        node_letter(pipe.to),
+                        noderef_letter(pipe.to),
                         flow,
                         pipe.tier
                     ),
-                    Style::default().fg(node_color(pipe.to)),
+                    Style::default().fg(noderef_color(pipe.to)),
                 )));
             }
         }
@@ -786,11 +826,11 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
                 lines.push(Line::from(Span::styled(
                     format!(
                         "  \u{2190}{} {:.1} {:?}",
-                        node_letter(pipe.from),
+                        noderef_letter(pipe.from),
                         flow,
                         pipe.tier
                     ),
-                    Style::default().fg(node_color(pipe.from)),
+                    Style::default().fg(noderef_color(pipe.from)),
                 )));
             }
         }
@@ -1009,13 +1049,19 @@ fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui:
                 .persistent
                 .pipes
                 .iter()
-                .filter(|p| p.from == *node_id && !p.under_construction)
+                .filter(|p| {
+                    p.from == crate::loom::types::LoomNodeRef::Extractor(*node_id)
+                        && !p.under_construction
+                })
                 .collect();
             let construction_pipes: Vec<_> = loom_state
                 .persistent
                 .pipes
                 .iter()
-                .filter(|p| p.from == *node_id && p.under_construction)
+                .filter(|p| {
+                    p.from == crate::loom::types::LoomNodeRef::Extractor(*node_id)
+                        && p.under_construction
+                })
                 .collect();
 
             if outgoing_pipes.is_empty() && construction_pipes.is_empty() {
@@ -1041,7 +1087,7 @@ fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui:
                     lines.push(Line::from(vec![
                         Span::styled(pipe_prefix, Style::default().fg(pipe_color)),
                         Span::styled(
-                            format!("\u{2192} {:<14}", pipe.to.name()),
+                            format!("\u{2192} {:<14}", noderef_name(pipe.to)),
                             Style::default().fg(pipe_color),
                         ),
                         Span::styled(
@@ -1054,7 +1100,7 @@ fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui:
                     lines.push(Line::from(vec![
                         Span::styled("     ", Style::default()),
                         Span::styled(
-                            format!("\u{2508} {} ", pipe.to.name()),
+                            format!("\u{2508} {} ", noderef_name(pipe.to)),
                             Style::default().fg(Color::Rgb(80, 60, 110)),
                         ),
                         Span::styled("[building]", Style::default().fg(Color::Rgb(80, 60, 110))),
@@ -1238,13 +1284,19 @@ fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui:
             .persistent
             .pipes
             .iter()
-            .filter(|p| p.to == selected_node_id && !p.under_construction)
+            .filter(|p| {
+                p.to == crate::loom::types::LoomNodeRef::Extractor(selected_node_id)
+                    && !p.under_construction
+            })
             .count();
         let outgoing = loom_state
             .persistent
             .pipes
             .iter()
-            .filter(|p| p.from == selected_node_id && !p.under_construction)
+            .filter(|p| {
+                p.from == crate::loom::types::LoomNodeRef::Extractor(selected_node_id)
+                    && !p.under_construction
+            })
             .count();
         if incoming > 0 || outgoing > 0 {
             detail_lines.push(Line::from(""));

@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use super::types::{LoomArchetype, LoomNode, LoomState, NodeId, Pipe, Resource};
+use super::types::{LoomArchetype, LoomNode, LoomNodeRef, LoomState, NodeId, Pipe, Resource};
 
 /// Archetype-to-node mapping.
 /// Returns (first_node, second_node) for the archetype.
@@ -427,11 +427,12 @@ pub fn check_node_stall(node: &LoomNode, outgoing_pipes: &[&Pipe], all_nodes: &[
     }
 
     // Stalled only if every destination is also full.
-    active_pipes.iter().all(|pipe| {
-        match all_nodes.iter().find(|n| n.id == pipe.to) {
+    active_pipes.iter().all(|pipe| match pipe.to {
+        LoomNodeRef::Extractor(dest_id) => match all_nodes.iter().find(|n| n.id == dest_id) {
             Some(dst) => dst.buffer >= dst.buffer_capacity,
-            None => true, // Dangling pipe → treat as blocked.
-        }
+            None => true,
+        },
+        LoomNodeRef::Refinery(_) => true, // Treat refineries as blocked for now.
     })
 }
 
@@ -449,7 +450,7 @@ pub fn tick_stall_detection(loom: &mut LoomState) -> Vec<NodeId> {
             .persistent
             .pipes
             .iter()
-            .filter(|p| p.from == node_id)
+            .filter(|p| p.from == LoomNodeRef::Extractor(node_id))
             .collect();
 
         let should_stall = {
@@ -484,25 +485,31 @@ pub fn tick_stall_detection(loom: &mut LoomState) -> Vec<NodeId> {
 /// Returns a list of `(output_resource, amount_produced)` for this tick.
 pub fn process_reactions(
     loom: &mut LoomState,
-    deliveries: Vec<(NodeId, Resource, f64)>,
+    deliveries: Vec<(LoomNodeRef, Resource, f64)>,
 ) -> Vec<(Resource, f64)> {
     use crate::loom::recipes;
     use std::collections::HashMap;
 
     // Group deliveries by destination node.
-    let mut by_node: HashMap<NodeId, Vec<(Resource, f64)>> = HashMap::new();
-    for (node_id, resource, amount) in deliveries {
-        by_node.entry(node_id).or_default().push((resource, amount));
+    let mut by_node: HashMap<LoomNodeRef, Vec<(Resource, f64)>> = HashMap::new();
+    for (node_ref, resource, amount) in deliveries {
+        by_node
+            .entry(node_ref)
+            .or_default()
+            .push((resource, amount));
     }
 
     let mut outputs: Vec<(Resource, f64)> = Vec::new();
 
-    for (node_id, inputs) in &by_node {
+    for (node_ref, inputs) in &by_node {
         if inputs.len() < 2 {
             continue;
         }
 
-        let node_nature = node_id.nature();
+        let node_nature = match node_ref {
+            LoomNodeRef::Extractor(node_id) => node_id.nature(),
+            LoomNodeRef::Refinery(_) => continue, // Refineries don't do reactions.
+        };
 
         // Try each pair of distinct resources; take first match.
         'pair_search: for i in 0..inputs.len() {
@@ -1206,8 +1213,8 @@ mod tests {
         // Primary recipe: Ember + VoidEssence @ Heat (EmberSpindle) → ForgedLight (1.0x)
         // Deliver both to EmberSpindle (Heat nature).
         let deliveries = vec![
-            (NodeId::EmberSpindle, Resource::Ember, 2.0),
-            (NodeId::EmberSpindle, Resource::VoidEssence, 2.0),
+            (LoomNodeRef::Extractor(NodeId::EmberSpindle), Resource::Ember, 2.0),
+            (LoomNodeRef::Extractor(NodeId::EmberSpindle), Resource::VoidEssence, 2.0),
         ];
 
         let outputs = process_reactions(&mut loom, deliveries);
@@ -1234,8 +1241,8 @@ mod tests {
 
         // WovenReality + WovenReality has no recipe.
         let deliveries = vec![
-            (NodeId::EmberSpindle, Resource::WovenReality, 1.0),
-            (NodeId::EmberSpindle, Resource::WovenReality, 1.0),
+            (LoomNodeRef::Extractor(NodeId::EmberSpindle), Resource::WovenReality, 1.0),
+            (LoomNodeRef::Extractor(NodeId::EmberSpindle), Resource::WovenReality, 1.0),
         ];
 
         let outputs = process_reactions(&mut loom, deliveries);
@@ -1246,7 +1253,7 @@ mod tests {
     fn test_process_reactions_single_resource_no_reaction() {
         let mut loom = LoomState::new();
 
-        let deliveries = vec![(NodeId::EmberSpindle, Resource::Ember, 5.0)];
+        let deliveries = vec![(LoomNodeRef::Extractor(NodeId::EmberSpindle), Resource::Ember, 5.0)];
         let outputs = process_reactions(&mut loom, deliveries);
         assert!(outputs.is_empty());
     }
@@ -1258,8 +1265,8 @@ mod tests {
         // Ember + VoidEssence @ Heat → ForgedLight (amount 1.0).
         // Deliver 3.0 Ember but only 1.0 VoidEssence → min = 1.0 → output = 1.0.
         let deliveries = vec![
-            (NodeId::EmberSpindle, Resource::Ember, 3.0),
-            (NodeId::EmberSpindle, Resource::VoidEssence, 1.0),
+            (LoomNodeRef::Extractor(NodeId::EmberSpindle), Resource::Ember, 3.0),
+            (LoomNodeRef::Extractor(NodeId::EmberSpindle), Resource::VoidEssence, 1.0),
         ];
 
         let outputs = process_reactions(&mut loom, deliveries);
@@ -1277,14 +1284,14 @@ mod tests {
 
         // Run the same reaction twice.
         let deliveries1 = vec![
-            (NodeId::EmberSpindle, Resource::Ember, 1.0),
-            (NodeId::EmberSpindle, Resource::VoidEssence, 1.0),
+            (LoomNodeRef::Extractor(NodeId::EmberSpindle), Resource::Ember, 1.0),
+            (LoomNodeRef::Extractor(NodeId::EmberSpindle), Resource::VoidEssence, 1.0),
         ];
         process_reactions(&mut loom, deliveries1);
 
         let deliveries2 = vec![
-            (NodeId::EmberSpindle, Resource::Ember, 1.0),
-            (NodeId::EmberSpindle, Resource::VoidEssence, 1.0),
+            (LoomNodeRef::Extractor(NodeId::EmberSpindle), Resource::Ember, 1.0),
+            (LoomNodeRef::Extractor(NodeId::EmberSpindle), Resource::VoidEssence, 1.0),
         ];
         process_reactions(&mut loom, deliveries2);
 
@@ -1308,7 +1315,7 @@ mod tests {
         n
     }
 
-    fn make_pipe(from: NodeId, to: NodeId, under_construction: bool) -> Pipe {
+    fn make_pipe(from: LoomNodeRef, to: LoomNodeRef, under_construction: bool) -> Pipe {
         Pipe {
             from,
             to,
@@ -1337,7 +1344,7 @@ mod tests {
     fn test_check_node_stall_full_buffer_active_pipe_to_non_full_dest_not_stalled() {
         let src = make_node(NodeId::EmberSpindle, 20.0, 20.0); // full
         let dst = make_node(NodeId::VoidCondenser, 5.0, 20.0); // not full
-        let pipe = make_pipe(NodeId::EmberSpindle, NodeId::VoidCondenser, false);
+        let pipe = make_pipe(LoomNodeRef::Extractor(NodeId::EmberSpindle), LoomNodeRef::Extractor(NodeId::VoidCondenser), false);
         let all_nodes = vec![src.clone(), dst];
         assert!(!check_node_stall(&src, &[&pipe], &all_nodes));
     }
@@ -1346,7 +1353,7 @@ mod tests {
     fn test_check_node_stall_full_buffer_all_destinations_full_stalls() {
         let src = make_node(NodeId::EmberSpindle, 20.0, 20.0); // full
         let dst = make_node(NodeId::VoidCondenser, 20.0, 20.0); // also full
-        let pipe = make_pipe(NodeId::EmberSpindle, NodeId::VoidCondenser, false);
+        let pipe = make_pipe(LoomNodeRef::Extractor(NodeId::EmberSpindle), LoomNodeRef::Extractor(NodeId::VoidCondenser), false);
         let all_nodes = vec![src.clone(), dst];
         assert!(check_node_stall(&src, &[&pipe], &all_nodes));
     }
@@ -1355,7 +1362,7 @@ mod tests {
     fn test_check_node_stall_full_buffer_construction_pipe_treated_as_no_active_pipes() {
         let src = make_node(NodeId::EmberSpindle, 20.0, 20.0); // full
         let dst = make_node(NodeId::VoidCondenser, 0.0, 20.0); // empty — but pipe is under construction
-        let pipe = make_pipe(NodeId::EmberSpindle, NodeId::VoidCondenser, true);
+        let pipe = make_pipe(LoomNodeRef::Extractor(NodeId::EmberSpindle), LoomNodeRef::Extractor(NodeId::VoidCondenser), true);
         let all_nodes = vec![src.clone(), dst];
         // under_construction pipe is inactive → treated as no active pipes → stalled
         assert!(check_node_stall(&src, &[&pipe], &all_nodes));
@@ -1366,8 +1373,8 @@ mod tests {
         let src = make_node(NodeId::EmberSpindle, 20.0, 20.0); // full
         let dst1 = make_node(NodeId::VoidCondenser, 20.0, 20.0); // full
         let dst2 = make_node(NodeId::ReflectionLens, 5.0, 20.0); // not full
-        let pipe1 = make_pipe(NodeId::EmberSpindle, NodeId::VoidCondenser, false);
-        let pipe2 = make_pipe(NodeId::EmberSpindle, NodeId::ReflectionLens, false);
+        let pipe1 = make_pipe(LoomNodeRef::Extractor(NodeId::EmberSpindle), LoomNodeRef::Extractor(NodeId::VoidCondenser), false);
+        let pipe2 = make_pipe(LoomNodeRef::Extractor(NodeId::EmberSpindle), LoomNodeRef::Extractor(NodeId::ReflectionLens), false);
         let all_nodes = vec![src.clone(), dst1, dst2];
         // One destination still has room → not stalled
         assert!(!check_node_stall(&src, &[&pipe1, &pipe2], &all_nodes));
@@ -1377,7 +1384,7 @@ mod tests {
     fn test_check_node_stall_dangling_pipe_treated_as_blocked() {
         let src = make_node(NodeId::EmberSpindle, 20.0, 20.0); // full
                                                                // Pipe points to a node not in all_nodes → treated as full/blocked
-        let pipe = make_pipe(NodeId::EmberSpindle, NodeId::MemoryArchive, false);
+        let pipe = make_pipe(LoomNodeRef::Extractor(NodeId::EmberSpindle), LoomNodeRef::Extractor(NodeId::MemoryArchive), false);
         let all_nodes = vec![src.clone()]; // MemoryArchive absent
         assert!(check_node_stall(&src, &[&pipe], &all_nodes));
     }
@@ -1514,8 +1521,8 @@ mod tests {
 
         // Simulate Ember + Reflection arriving at ReflectionLens (nature=Form).
         let deliveries = vec![
-            (NodeId::ReflectionLens, Resource::Ember, 1.0),
-            (NodeId::ReflectionLens, Resource::Reflection, 1.0),
+            (LoomNodeRef::Extractor(NodeId::ReflectionLens), Resource::Ember, 1.0),
+            (LoomNodeRef::Extractor(NodeId::ReflectionLens), Resource::Reflection, 1.0),
         ];
         process_reactions(&mut loom, deliveries);
 
@@ -1893,8 +1900,8 @@ mod tests {
         let mut loom = LoomState::new();
         // MemoryArchive has Pattern nature — Memory + Silence + Pattern → EchoGlass (1.0x).
         let deliveries = vec![
-            (NodeId::MemoryArchive, Resource::Memory, 3.0),
-            (NodeId::MemoryArchive, Resource::Silence, 3.0),
+            (LoomNodeRef::Extractor(NodeId::MemoryArchive), Resource::Memory, 3.0),
+            (LoomNodeRef::Extractor(NodeId::MemoryArchive), Resource::Silence, 3.0),
         ];
         let outputs = process_reactions(&mut loom, deliveries);
 
@@ -1913,8 +1920,8 @@ mod tests {
         let mut loom = LoomState::new();
         // SilenceWell has Stillness nature — Silence + Resonance + Stillness → StillbornSong (1.0x).
         let deliveries = vec![
-            (NodeId::SilenceWell, Resource::Silence, 2.0),
-            (NodeId::SilenceWell, Resource::Resonance, 2.0),
+            (LoomNodeRef::Extractor(NodeId::SilenceWell), Resource::Silence, 2.0),
+            (LoomNodeRef::Extractor(NodeId::SilenceWell), Resource::Resonance, 2.0),
         ];
         let outputs = process_reactions(&mut loom, deliveries);
 

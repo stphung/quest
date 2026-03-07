@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 
 use super::types::InputResult;
-use crate::loom::types::{LoomState, LoomUiState, LoomView};
+use crate::loom::types::{LoomNodeRef, LoomState, LoomUiState, LoomView};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 /// Top-level dispatcher for the Loom of Worlds overlay input.
@@ -116,7 +116,7 @@ pub(super) fn handle_loom(
                 .persistent
                 .pipes
                 .iter()
-                .filter(|p| p.from == node_id && !p.under_construction)
+                .filter(|p| p.from == LoomNodeRef::Extractor(node_id) && !p.under_construction)
                 .count();
             if pipe_count > 0 {
                 loom_ui.selected_pipe = (loom_ui.selected_pipe + 1) % pipe_count;
@@ -158,7 +158,7 @@ fn adjust_selected_pipe(loom_state: &mut LoomState, loom_ui: &LoomUiState, delta
         .pipes
         .iter()
         .enumerate()
-        .filter(|(_, p)| p.from == node_id && !p.under_construction)
+        .filter(|(_, p)| p.from == LoomNodeRef::Extractor(node_id) && !p.under_construction)
         .map(|(i, _)| i)
         .collect();
 
@@ -335,8 +335,8 @@ mod tests {
             .unwrap()
             .unlocked = true;
         state.persistent.pipes.push(crate::loom::types::Pipe {
-            from: NodeId::EmberSpindle,
-            to: NodeId::VoidCondenser,
+            from: LoomNodeRef::Extractor(NodeId::EmberSpindle),
+            to: LoomNodeRef::Extractor(NodeId::VoidCondenser),
             tier: crate::loom::types::PipeTier::T1,
             split_ratio: 0.5,
             under_construction: false,
@@ -395,16 +395,16 @@ mod tests {
             node.unlocked = true;
         }
         state.persistent.pipes.push(crate::loom::types::Pipe {
-            from: NodeId::EmberSpindle,
-            to: NodeId::VoidCondenser,
+            from: LoomNodeRef::Extractor(NodeId::EmberSpindle),
+            to: LoomNodeRef::Extractor(NodeId::VoidCondenser),
             tier: crate::loom::types::PipeTier::T1,
             split_ratio: 0.5,
             under_construction: false,
             construction_ticks_remaining: 0,
         });
         state.persistent.pipes.push(crate::loom::types::Pipe {
-            from: NodeId::EmberSpindle,
-            to: NodeId::MemoryArchive,
+            from: LoomNodeRef::Extractor(NodeId::EmberSpindle),
+            to: LoomNodeRef::Extractor(NodeId::MemoryArchive),
             tier: crate::loom::types::PipeTier::T1,
             split_ratio: 0.5,
             under_construction: false,
