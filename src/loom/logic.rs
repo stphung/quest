@@ -2246,8 +2246,8 @@ mod tests {
 
 /// Pre-computed bonuses from existing game systems that boost Loom production.
 ///
-/// Breaks external bonuses into three separate axes so callers can apply them
-/// only where relevant (production rate, buffer capacity, pipe bandwidth).
+/// Breaks external bonuses into two separate axes so callers can apply them
+/// only where relevant (production rate, buffer capacity).
 /// Passed via explicit parameters following the Haven bonus injection pattern —
 /// Loom logic never imports Haven/Deep/Stormglass/Ascension directly.
 #[derive(Debug, Clone, Copy, Default)]
@@ -2256,8 +2256,6 @@ pub struct LoomExternalBonuses {
     pub production_rate_bonus: f64,
     /// Additive fraction bonus on buffer capacity for all nodes (e.g. 0.20 = +20%).
     pub buffer_capacity_bonus: f64,
-    /// Additive fraction bonus on all pipe bandwidth (e.g. 0.15 = +15%).
-    pub pipe_bandwidth_bonus: f64,
 }
 
 /// Compute granular Loom bonuses from the current state of existing game systems.
@@ -2267,8 +2265,7 @@ pub struct LoomExternalBonuses {
 ///   +1% production rate (max +5% at 25%).
 /// - `deep_guild_rank`: Deep guild rank 1-5. Each rank above 1 adds +5% buffer
 ///   capacity (max +20% at rank 5).
-/// - `ascension_level`: Current ascension level (0 = none). Each level adds +2%
-///   pipe bandwidth, capped at +12% (level 6).
+/// - `ascension_level`: Current ascension level (0 = none). Reserved for future use.
 /// - `stormglass_balance`: Current Stormglass balance. Every 100k SG adds +1%
 ///   production rate, capped at +5% (500k SG).
 ///
@@ -2277,7 +2274,7 @@ pub struct LoomExternalBonuses {
 pub fn loom_external_bonuses(
     haven_damage_percent: f64,
     deep_guild_rank: u8,
-    ascension_level: u32,
+    _ascension_level: u32,
     stormglass_balance: u64,
 ) -> LoomExternalBonuses {
     // Haven Armory: up to +25% damage maps linearly to up to +5% production rate.
@@ -2292,13 +2289,9 @@ pub fn loom_external_bonuses(
     let rank_above_one = deep_guild_rank.saturating_sub(1) as f64;
     let buffer_capacity_bonus = (rank_above_one * 5.0).min(20.0) / 100.0;
 
-    // Ascension: +2% pipe bandwidth per level, capped at +12% (level 6).
-    let pipe_bandwidth_bonus = (ascension_level as f64 * 2.0).min(12.0) / 100.0;
-
     LoomExternalBonuses {
         production_rate_bonus,
         buffer_capacity_bonus,
-        pipe_bandwidth_bonus,
     }
 }
 
@@ -2312,11 +2305,6 @@ pub fn effective_buffer_capacity(node: &LoomNode, bonuses: &LoomExternalBonuses)
     node.buffer_capacity * (1.0 + bonuses.buffer_capacity_bonus)
 }
 
-/// Apply external bonuses to a refinery's effective intake cap (units/hour per slot).
-pub fn effective_pipe_bandwidth(tier: u8, bonuses: &LoomExternalBonuses) -> f64 {
-    tier_intake_cap(tier) * (1.0 + bonuses.pipe_bandwidth_bonus)
-}
-
 #[cfg(test)]
 mod external_bonus_tests {
     use super::*;
@@ -2326,7 +2314,6 @@ mod external_bonus_tests {
         let b = loom_external_bonuses(0.0, 1, 0, 0);
         assert!((b.production_rate_bonus).abs() < 1e-9);
         assert!((b.buffer_capacity_bonus).abs() < 1e-9);
-        assert!((b.pipe_bandwidth_bonus).abs() < 1e-9);
     }
 
     #[test]
@@ -2360,24 +2347,6 @@ mod external_bonus_tests {
     }
 
     #[test]
-    fn test_ascension_level_1_gives_two_percent_bandwidth() {
-        let b = loom_external_bonuses(0.0, 1, 1, 0);
-        assert!((b.pipe_bandwidth_bonus - 0.02).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_ascension_level_6_gives_twelve_percent_bandwidth() {
-        let b = loom_external_bonuses(0.0, 1, 6, 0);
-        assert!((b.pipe_bandwidth_bonus - 0.12).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_ascension_capped_at_twelve_percent() {
-        let b = loom_external_bonuses(0.0, 1, 10, 0);
-        assert!((b.pipe_bandwidth_bonus - 0.12).abs() < 1e-9);
-    }
-
-    #[test]
     fn test_stormglass_100k_gives_one_percent_production() {
         let b = loom_external_bonuses(0.0, 1, 0, 100_000);
         assert!((b.production_rate_bonus - 0.01).abs() < 1e-9);
@@ -2407,7 +2376,6 @@ mod external_bonus_tests {
         let b = loom_external_bonuses(25.0, 5, 6, 500_000);
         assert!((b.production_rate_bonus - 0.10).abs() < 1e-9);
         assert!((b.buffer_capacity_bonus - 0.20).abs() < 1e-9);
-        assert!((b.pipe_bandwidth_bonus - 0.12).abs() < 1e-9);
     }
 
     #[test]
@@ -2430,26 +2398,6 @@ mod external_bonus_tests {
             ..Default::default()
         };
         assert!((effective_buffer_capacity(&node, &b) - 24.0).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_effective_pipe_bandwidth_applies_bandwidth_bonus() {
-        let b = LoomExternalBonuses {
-            pipe_bandwidth_bonus: 0.10,
-            ..Default::default()
-        };
-        // T1 intake cap = 2.0/hr, +10% = 2.2
-        assert!((effective_pipe_bandwidth(1, &b) - 2.2).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_effective_pipe_bandwidth_tier3_with_max_bonus() {
-        let b = LoomExternalBonuses {
-            pipe_bandwidth_bonus: 0.12,
-            ..Default::default()
-        };
-        // T3 intake cap = 4.0/hr, +12% = 4.48
-        assert!((effective_pipe_bandwidth(3, &b) - 4.48).abs() < 1e-9);
     }
 
     // Helper: populate patterns via complete_discovery and mark the first N as completed.

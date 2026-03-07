@@ -1780,7 +1780,7 @@ fn render_nav_hints(frame: &mut Frame, area: Rect, ui: &LoomUiState) {
     let hints = if ui.view == LoomView::ArchetypeSelection {
         " [Up/Down] Select  [Enter] Confirm  [Esc] Close "
     } else if ui.view == LoomView::ListDetail {
-        " [Tab] Switch View  [Up/Down] Node  [U] Upgrade  [P] Pipe  [\u{2190}/\u{2192}] Ratio  [Esc] Close "
+        " [Tab] Switch View  [Up/Down] Node  [U] Upgrade  [Esc] Close "
     } else {
         " [Tab] Switch View  [Up/Down] Navigate  [Esc] Close "
     };

@@ -144,7 +144,7 @@ pub fn lookup_recipe(a: Resource, b: Resource, nature: NodeNature) -> Option<Rec
 }
 
 /// Find and return the full recipe for two inputs and a node nature.
-/// Used by process_reactions to record codex discoveries.
+/// Used by the debug menu and refinery construction to look up recipes by example.
 pub fn find_recipe(a: Resource, b: Resource, nature: NodeNature) -> Option<Recipe> {
     all_recipes().into_iter().find(|r| r.matches(a, b, nature))
 }
