@@ -794,6 +794,39 @@ pub fn process_refinery_reactions(
     results
 }
 
+/// Demolish a refinery by index.
+/// Removes the refinery and all pipes connected to/from it.
+/// Also re-indexes any LoomNodeRef::Refinery references in remaining pipes
+/// that pointed to higher-indexed refineries.
+pub fn demolish_refinery(loom: &mut LoomState, idx: usize) {
+    if idx >= loom.persistent.refineries.len() {
+        return;
+    }
+
+    // Remove pipes connected to this refinery.
+    let ref_node = LoomNodeRef::Refinery(idx);
+    loom.persistent
+        .pipes
+        .retain(|p| p.from != ref_node && p.to != ref_node);
+
+    // Remove the refinery.
+    loom.persistent.refineries.remove(idx);
+
+    // Re-index pipe references for refineries above the removed index.
+    for pipe in &mut loom.persistent.pipes {
+        if let LoomNodeRef::Refinery(ref mut i) = pipe.from {
+            if *i > idx {
+                *i -= 1;
+            }
+        }
+        if let LoomNodeRef::Refinery(ref mut i) = pipe.to {
+            if *i > idx {
+                *i -= 1;
+            }
+        }
+    }
+}
+
 /// Update stall flags for all refineries.
 pub fn tick_refinery_stall_detection(loom: &mut LoomState) {
     for r in &mut loom.persistent.refineries {
@@ -2383,6 +2416,34 @@ mod tests {
 
         tick_refinery_stall_detection(&mut loom);
         assert!(loom.persistent.refineries[0].stalled);
+    }
+
+    #[test]
+    fn test_demolish_refinery() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        loom.persistent.refineries.push(Refinery::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+        ));
+        // Add a pipe pointing to this refinery.
+        loom.persistent.pipes.push(Pipe {
+            from: LoomNodeRef::Extractor(NodeId::EmberSpindle),
+            to: LoomNodeRef::Refinery(0),
+            tier: crate::loom::types::PipeTier::T1,
+            split_ratio: 1.0,
+            under_construction: false,
+            construction_ticks_remaining: 0,
+        });
+
+        demolish_refinery(&mut loom, 0);
+        assert!(loom.persistent.refineries.is_empty());
+        // Pipe should also be removed.
+        assert!(loom.persistent.pipes.is_empty());
     }
 }
 

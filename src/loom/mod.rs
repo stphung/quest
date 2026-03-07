@@ -9,7 +9,7 @@ pub mod types;
 pub use discovery::complete_discovery;
 #[allow(unused_imports)]
 pub use logic::{
-    archetype_nodes, build_refinery, check_node_stall, codex_hint_indices,
+    archetype_nodes, build_refinery, check_node_stall, codex_hint_indices, demolish_refinery,
     effective_buffer_capacity, effective_node_base_rate, effective_pipe_bandwidth,
     loom_external_bonuses, loom_production_bonus, node_conversion_multiplier, node_effective_rate,
     node_level_multiplier, node_native_resource, node_neighbor_unlock_count,
