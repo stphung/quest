@@ -7,7 +7,6 @@
 //!   - ListDetail:         node list + detail panel placeholder
 //!   - Codex:              recipe codex placeholder
 
-#[allow(unused_imports)]
 use crate::loom::patterns::{active_pattern_requirement_status, all_patterns_complete};
 use crate::loom::types::{LoomArchetype, LoomState, LoomUiState, LoomView};
 use ratatui::{

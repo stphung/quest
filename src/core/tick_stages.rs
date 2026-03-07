@@ -979,12 +979,11 @@ pub(super) fn tick_deep_missions(
     }
 }
 
-/// Stage 11e: Tick the Loom of Worlds — check for discovery trigger.
+/// Stage 11e: Tick the Loom of Worlds.
 ///
-/// The Loom is discovered when the Gateway Expedition at Deep Layer 30
-/// completes successfully. `tick_deep_missions()` sets `summary.gateway_opened`
-/// which is reflected in `deep.persistent.gateway_opened`. We check that flag
-/// here so discovery fires in the same tick the gateway opens.
+/// Discovery: fires when the Gateway Expedition at Deep Layer 30 completes.
+/// After discovery: ticks staggered unlock, base production, neighbor unlocking,
+/// and pattern sustain tracking every game tick.
 pub(super) fn tick_loom(
     deep: &crate::deep::DeepState,
     loom: &mut crate::loom::LoomState,
@@ -993,14 +992,57 @@ pub(super) fn tick_loom(
     if !deep.persistent.discovered {
         return;
     }
-    if loom.persistent.discovered {
+
+    // Discovery trigger.
+    if !loom.persistent.discovered {
+        if deep.persistent.gateway_opened {
+            crate::loom::complete_discovery(loom);
+            result.events.push(TickEvent::LoomDiscovered);
+            result.loom_changed = true;
+        }
         return;
     }
-    if deep.persistent.gateway_opened {
-        crate::loom::complete_discovery(loom);
-        result.events.push(TickEvent::LoomDiscovered);
+
+    const TICK_SECONDS: f64 = 0.1; // 100ms tick interval
+
+    // Tick staggered second-node unlock.
+    if loom.persistent.second_node_unlock_elapsed.is_some() {
+        let unlocked = crate::loom::tick_loom_staggered_unlock(loom, TICK_SECONDS);
+        if unlocked {
+            result.loom_changed = true;
+        }
+    }
+
+    // Tick base production for all unlocked nodes.
+    let _produced = crate::loom::tick_base_production(loom, TICK_SECONDS);
+
+    // Tick neighbor unlocking.
+    let newly_unlocked = crate::loom::tick_neighbor_unlocking(loom, TICK_SECONDS);
+    if !newly_unlocked.is_empty() {
         result.loom_changed = true;
     }
+
+    // Tick pattern sustain timer using per-node effective rates (units/hour).
+    let rates: std::collections::HashMap<crate::loom::Resource, f64> = loom
+        .persistent
+        .nodes
+        .iter()
+        .filter(|n| n.unlocked)
+        .map(|n| {
+            let resource = crate::loom::node_native_resource(n.id);
+            let rate = crate::loom::node_effective_rate(loom, n);
+            (resource, rate)
+        })
+        .collect();
+
+    let pattern_completed =
+        crate::loom::tick_pattern_sustain(&mut loom.persistent, &rates, TICK_SECONDS);
+    if pattern_completed {
+        result.loom_changed = true;
+    }
+
+    // Mark loom changed if any node's stall state changed (for UI refresh).
+    // Production stalls are transient — we mark changed conservatively when nodes are unlocked.
 }
 
 #[cfg(test)]
