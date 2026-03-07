@@ -371,79 +371,116 @@ impl Shape for SkyShape {
             }
         }
 
-        // 5. Mountain silhouettes — 3 depth layers with textured ridgelines
-        // Layers: far (tallest, most faded), mid, near (shortest, most saturated)
-        struct MountainLayer {
-            // sine wave components: (frequency, amplitude, phase_offset)
-            waves: [(f64, f64, f64); 3],
-            base_height: f64, // minimum height in pixels
-            color_day: (u8, u8, u8),
-            color_night: (u8, u8, u8),
-            peak_tint_day: (u8, u8, u8), // lighter color for peak pixels
-            peak_tint_night: (u8, u8, u8),
+        // 5. Mountain silhouettes — 2 layers with distinct asymmetric peak clusters
+        //
+        // Each layer defines discrete peaks at fixed positions. Between peaks the
+        // height drops to a valley floor. Each peak has a steep face (left) and a
+        // gentler slope (right), giving an organic asymmetric look.
+        //
+        // Height at a column is: max over all peaks of a triangular falloff from
+        // that peak's center, with different left/right slope widths.
+
+        // Peak definition: (center_ratio, height, left_width, right_width)
+        // center_ratio is 0.0..1.0 across the screen width
+        // left_width/right_width control asymmetry (smaller = steeper)
+        type Peak = (f64, f64, f64, f64);
+
+        let far_peaks: &[Peak] = &[
+            (0.12, 7.0, 5.0, 10.0),
+            (0.32, 9.0, 6.0, 14.0),
+            (0.55, 6.0, 4.0, 9.0),
+            (0.78, 8.0, 7.0, 12.0),
+            (0.95, 5.0, 5.0, 8.0),
+        ];
+        let near_peaks: &[Peak] = &[
+            (0.05, 4.0, 3.0, 7.0),
+            (0.22, 6.0, 4.0, 10.0),
+            (0.45, 5.0, 5.0, 8.0),
+            (0.68, 7.0, 4.0, 11.0),
+            (0.88, 4.5, 3.0, 7.0),
+        ];
+
+        // Colors: (base_day, base_night, peak_day, peak_night, valley_floor, has_tree_fringe)
+        let far_base_day = (100u8, 120, 145);
+        let far_base_night = (50u8, 60, 82);
+        let far_peak_day = (125u8, 145, 170);
+        let far_peak_night = (65u8, 75, 98);
+        let near_base_day = (60u8, 85, 95);
+        let near_base_night = (35u8, 48, 62);
+        let near_peak_day = (78u8, 103, 115);
+        let near_peak_night = (48u8, 62, 78);
+
+        // Compute height for a column given a set of peaks
+        let peak_height = |col: usize, peaks: &[Peak], w: usize, floor: f64| -> f64 {
+            let x = col as f64;
+            let mut best = floor;
+            for &(center_ratio, height, left_w, right_w) in peaks {
+                let cx = center_ratio * w as f64;
+                let dist = x - cx;
+                let slope_w = if dist < 0.0 { left_w } else { right_w };
+                let t = 1.0 - (dist.abs() / slope_w).min(1.0);
+                // Smooth the triangle with a power curve for rounder peaks
+                let h = floor + (height - floor) * t * t * (3.0 - 2.0 * t);
+                if h > best {
+                    best = h;
+                }
+            }
+            // Subtle per-column jitter
+            let jitter = (hash2d(col, (floor * 10.0) as usize) % 3) as f64 * 0.3;
+            (best + jitter).max(floor)
+        };
+
+        // Render layers: far first (taller, faded), then near (shorter, saturated)
+        struct LayerSpec<'a> {
+            peaks: &'a [Peak],
+            floor: f64,
+            base_day: (u8, u8, u8),
+            base_night: (u8, u8, u8),
+            peak_day: (u8, u8, u8),
+            peak_night: (u8, u8, u8),
             has_tree_fringe: bool,
         }
 
-        let layers = [
-            // Far range — gentle tall peaks, blue-grey, most faded
-            MountainLayer {
-                waves: [(0.08, 4.0, 0.0), (0.19, 2.0, 1.2), (0.37, 0.8, 3.7)],
-                base_height: 3.0,
-                color_day: (100, 120, 145),
-                color_night: (50, 60, 82),
-                peak_tint_day: (120, 140, 165),
-                peak_tint_night: (62, 72, 95),
+        let layer_specs = [
+            LayerSpec {
+                peaks: far_peaks,
+                floor: 1.5,
+                base_day: far_base_day,
+                base_night: far_base_night,
+                peak_day: far_peak_day,
+                peak_night: far_peak_night,
                 has_tree_fringe: false,
             },
-            // Mid range — moderate peaks, blue-green
-            MountainLayer {
-                waves: [(0.12, 3.0, 2.5), (0.26, 1.8, 0.8), (0.45, 0.6, 5.1)],
-                base_height: 2.0,
-                color_day: (78, 105, 120),
-                color_night: (42, 58, 72),
-                peak_tint_day: (95, 122, 138),
-                peak_tint_night: (54, 70, 85),
-                has_tree_fringe: false,
-            },
-            // Near range — sharp short peaks, dark green-grey, tree fringe
-            MountainLayer {
-                waves: [(0.15, 2.5, 1.0), (0.33, 1.5, 4.2), (0.52, 0.5, 2.3)],
-                base_height: 1.5,
-                color_day: (60, 85, 95),
-                color_night: (35, 48, 62),
-                peak_tint_day: (75, 100, 112),
-                peak_tint_night: (45, 58, 74),
+            LayerSpec {
+                peaks: near_peaks,
+                floor: 1.0,
+                base_day: near_base_day,
+                base_night: near_base_night,
+                peak_day: near_peak_day,
+                peak_night: near_peak_night,
                 has_tree_fringe: true,
             },
         ];
 
-        for layer in &layers {
-            let base_color = lerp_rgb(layer.color_day, layer.color_night, self.dusk);
-            let peak_color = lerp_rgb(layer.peak_tint_day, layer.peak_tint_night, self.dusk);
+        for spec in &layer_specs {
+            let base_color = lerp_rgb(spec.base_day, spec.base_night, self.dusk);
+            let peak_color_rgb = lerp_rgb(spec.peak_day, spec.peak_night, self.dusk);
 
             for col in 0..self.width {
-                // Sum sine waves + hash jitter for ridgeline height
-                let mut h = layer.base_height;
-                for &(freq, amp, phase) in &layer.waves {
-                    h += (col as f64 * freq + phase).sin() * amp;
-                }
-                // Per-column jitter from hash for irregularity
-                let jitter = (hash2d(42 + col, layer.base_height as usize) % 5) as f64 * 0.4 - 0.8;
-                h = (h + jitter).max(1.0);
-
+                let h = peak_height(col, spec.peaks, self.width, spec.floor);
                 let pixels = (h * 2.0).round() as i32;
+
                 for dy in 0..pixels {
                     let gy = sky_py as i32 - 1 - dy;
-                    // Vertical gradient: base at bottom, peak tint at top
                     let vert_t = if pixels <= 1 {
                         1.0
                     } else {
                         dy as f64 / (pixels - 1) as f64
                     };
-                    let mut color = lerp_rgb(base_color, peak_color, vert_t);
+                    let mut color = lerp_rgb(base_color, peak_color_rgb, vert_t);
 
-                    // Tree fringe: alternating hash-based texture on top 2 pixels
-                    if layer.has_tree_fringe && dy >= pixels - 2 {
+                    // Tree fringe on top 2 pixels of near layer
+                    if spec.has_tree_fringe && dy >= pixels - 2 {
                         let is_dark = hash2d(col, dy as usize).is_multiple_of(3);
                         if is_dark {
                             color = (
@@ -473,26 +510,19 @@ impl Shape for SkyShape {
                 (200u8, 215, 240) // cool white for moon
             };
 
-            // Recompute orb position (same as section 2)
             let orb_col_f = self.width as f64 * 0.78 + (self.wave_tick * 0.08).sin() * 3.0;
 
+            // Use the near layer for light bleed (it's the foreground silhouette)
+            let near_spec = &layer_specs[1];
             for col in 0..self.width {
                 let dist_to_orb = (col as f64 - orb_col_f).abs();
                 if dist_to_orb > 6.0 {
                     continue;
                 }
 
-                // Find top of tallest mountain at this column (recompute near layer height)
-                let near = &layers[2]; // near layer is tallest visually at horizon
-                let mut h = near.base_height;
-                for &(freq, amp, phase) in &near.waves {
-                    h += (col as f64 * freq + phase).sin() * amp;
-                }
-                let jitter = (hash2d(42 + col, near.base_height as usize) % 5) as f64 * 0.4 - 0.8;
-                h = (h + jitter).max(1.0);
+                let h = peak_height(col, near_spec.peaks, self.width, near_spec.floor);
                 let peak_gy = sky_py as i32 - (h * 2.0).round() as i32;
 
-                // Paint glow on 1-2 pixels above the mountain peak
                 let glow_strength = (1.0 - dist_to_orb / 6.0) * 0.20;
                 for dy in 0..2i32 {
                     let gy = peak_gy - 1 - dy;
