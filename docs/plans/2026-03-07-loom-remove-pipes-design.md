@@ -146,11 +146,25 @@ T3-A: sources_a=[T2-A], sources_b=[T1-C (StillbornSong)]
       output: min(0.9, 2.0) * 0.5 = 0.45/hr WovenReality (higher tier recipe)
 ```
 
+## Patterns as Raw Amounts
+
+Patterns require producing a **total amount** of each resource, not sustaining a rate for a duration. The accumulator increments each tick based on actual production rate. Players see a number climbing toward a goal.
+
+Example display:
+```
+─── Pattern: Thread of Dawn ────────── ██████░░░░░░░░░░ 37/60 ──────
+  ForgedLight: 37/60  (+2.0/hr)
+```
+
+`PatternRequirement` has `amount: f64` (total needed) instead of `rate_per_hour`. The tick adds `actual_rate * delta_hours` to `accumulated`. Pattern completes when all requirements reach their amount.
+
+Conversion from old rate×time model: `amount = rate_per_hour * sustain_seconds / 3600`.
+
 ## Optimization Loop
 
 The player's cycle:
-1. Check what the current pattern demands (resource rates)
-2. Work backwards — how many refineries at each tier?
+1. Check what the current pattern demands (total resource amounts)
+2. Work backwards — how many refineries at each tier to produce fast enough?
 3. Check if extractors can supply them all (contention math)
 4. Choose: upgrade extractors, build more refineries, or restructure the chain
 
