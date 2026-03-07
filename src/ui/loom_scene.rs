@@ -1415,15 +1415,14 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
             render_node_box(&mut buffer, top, right_col, right_node, loom_state, is_sel);
         }
 
-        // ── Inter-node horizontal arrows showing cycle direction ──
-        // Fill the gap between left and right boxes with ─ and an arrowhead.
+        // ── Horizontal arrow: only on rows 0 (ES→RL) and 2 (RF→SW) ──
         let gap_start = left_col + NODE_BOX_WIDTH as i32;
         let gap_end = right_col;
         let arrow_row = top + (NODE_BOX_HEIGHT as i32) / 2;
         if gap_end > gap_start + 1 {
             match row_idx {
-                0 | 2 => {
-                    // Left-to-right: ───→
+                0 => {
+                    // Top: ES ───▶ RL
                     for c in gap_start..(gap_end - 1) {
                         put_cell(&mut buffer, arrow_row, c, '\u{2500}', flow_color);
                         // ─
@@ -1434,41 +1433,41 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
                         gap_end - 1,
                         '\u{25b6}',
                         flow_arrow_color,
-                    );
-                    // ▶
+                    ); // ▶
                 }
-                1 => {
-                    // Right-to-left: ←───
+                2 => {
+                    // Bottom: SW ◀─── RF
                     put_cell(
                         &mut buffer,
                         arrow_row,
                         gap_start,
                         '\u{25c0}',
                         flow_arrow_color,
-                    );
-                    // ◀
+                    ); // ◀
                     for c in (gap_start + 1)..gap_end {
                         put_cell(&mut buffer, arrow_row, c, '\u{2500}', flow_color);
                         // ─
                     }
                 }
-                _ => {}
+                _ => {} // Row 1: no horizontal arrow (vertical flow only)
             }
         }
     }
 
-    // ── Vertical arrows between rows ──
+    // ── Vertical arrows forming the ring sides ──
+    // Right side goes DOWN: RL → VC → RF
+    // Left side goes UP: SW → MA → ES
     {
         let right_col = (col_spacing + NODE_BOX_WIDTH + col_spacing) as i32;
         let left_col = col_spacing as i32;
         let mid_right = right_col + NODE_BOX_WIDTH as i32 / 2;
         let mid_left = left_col + NODE_BOX_WIDTH as i32 / 2;
 
-        // Between row 0 and row 1: RL(top-right) ↓ VC(mid-right)
-        let gap_top_0 = NODE_BOX_HEIGHT as i32;
-        let gap_bot_0 = row_stride as i32;
-        for r in gap_top_0..gap_bot_0 {
-            if r == gap_bot_0 - 1 {
+        // Right side: RL ↓ VC (between row 0 and row 1)
+        let gap_top = NODE_BOX_HEIGHT as i32;
+        let gap_bot = row_stride as i32;
+        for r in gap_top..gap_bot {
+            if r == gap_bot - 1 {
                 put_cell(&mut buffer, r, mid_right, '\u{25bc}', flow_arrow_color);
             // ▼
             } else {
@@ -1476,92 +1475,39 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
             }
         }
 
-        // Between row 1 and row 2: MA(mid-left) ↓ SW(bottom-left)
-        let gap_top_1 = (row_stride + NODE_BOX_HEIGHT) as i32;
-        let gap_bot_1 = (2 * row_stride) as i32;
-        for r in gap_top_1..gap_bot_1 {
-            if r == gap_bot_1 - 1 {
-                put_cell(&mut buffer, r, mid_left, '\u{25bc}', flow_arrow_color);
+        // Right side: VC ↓ RF (between row 1 and row 2)
+        let gap_top = (row_stride + NODE_BOX_HEIGHT) as i32;
+        let gap_bot = (2 * row_stride) as i32;
+        for r in gap_top..gap_bot {
+            if r == gap_bot - 1 {
+                put_cell(&mut buffer, r, mid_right, '\u{25bc}', flow_arrow_color);
             // ▼
+            } else {
+                put_cell(&mut buffer, r, mid_right, '\u{2502}', flow_color); // │
+            }
+        }
+
+        // Left side: SW ↑ MA (between row 2 and row 1, going UP)
+        let gap_top = (row_stride + NODE_BOX_HEIGHT) as i32;
+        let gap_bot = (2 * row_stride) as i32;
+        for r in gap_top..gap_bot {
+            if r == gap_top {
+                put_cell(&mut buffer, r, mid_left, '\u{25b2}', flow_arrow_color);
+            // ▲
             } else {
                 put_cell(&mut buffer, r, mid_left, '\u{2502}', flow_color); // │
             }
         }
-    }
 
-    // ── Return path (RF → ES) completing the ring ──
-    // Draws along the outside: RF right edge → up → across top → down → ES left edge.
-    {
-        let left_col = col_spacing as i32;
-        let right_col = (col_spacing + NODE_BOX_WIDTH + col_spacing) as i32;
-
-        // RF box: bottom-right. Exit from its right edge at mid-height.
-        let rf_mid_row = (2 * row_stride) as i32 + NODE_BOX_HEIGHT as i32 / 2;
-        let rf_right = right_col + NODE_BOX_WIDTH as i32;
-
-        // ES box: top-left. Enter its left edge at mid-height.
-        let es_mid_row = NODE_BOX_HEIGHT as i32 / 2;
-        let es_left = left_col;
-
-        // The return path runs 1 col outside the grid on each side.
-        let path_right = rf_right + 1;
-        let path_left = (es_left - 1).max(0);
-        // Top row for the horizontal crossbar: 1 row above the grid.
-        // If no room above, use row 0 and overlap slightly.
-        let path_top = 0i32.max(es_mid_row - 2);
-
-        let return_color = Color::Rgb(80, 60, 110);
-
-        // Horizontal stub from RF right edge to path_right column.
-        if path_right < cols as i32 {
-            for c in rf_right..=path_right {
-                put_cell(&mut buffer, rf_mid_row, c, '\u{2500}', return_color); // ─
-            }
-        }
-
-        // Vertical: path_right column from rf_mid_row up to path_top.
-        if path_right < cols as i32 {
-            put_cell(
-                &mut buffer,
-                rf_mid_row,
-                path_right,
-                '\u{256f}',
-                return_color,
-            ); // ╯
-            for r in (path_top + 1)..rf_mid_row {
-                put_cell(&mut buffer, r, path_right, '\u{2502}', return_color); // │
-            }
-            put_cell(&mut buffer, path_top, path_right, '\u{256e}', return_color);
-            // ╮
-        }
-
-        // Horizontal: across the top from path_right to path_left.
-        for c in (path_left + 1)..path_right {
-            put_cell(&mut buffer, path_top, c, '\u{2500}', return_color); // ─
-        }
-
-        // Corner and vertical: path_left column from path_top down to es_mid_row.
-        if path_left >= 0 {
-            put_cell(&mut buffer, path_top, path_left, '\u{256d}', return_color); // ╭
-            for r in (path_top + 1)..es_mid_row {
-                put_cell(&mut buffer, r, path_left, '\u{2502}', return_color); // │
-            }
-        }
-
-        // Horizontal stub from path_left into ES left edge, with arrowhead.
-        if path_left < es_left {
-            put_cell(&mut buffer, es_mid_row, path_left, '\u{2570}', return_color); // ╰
-            for c in (path_left + 1)..(es_left - 1) {
-                put_cell(&mut buffer, es_mid_row, c, '\u{2500}', return_color); // ─
-            }
-            if es_left > path_left + 1 {
-                put_cell(
-                    &mut buffer,
-                    es_mid_row,
-                    es_left - 1,
-                    '\u{25b6}',
-                    flow_arrow_color,
-                ); // ▶
+        // Left side: MA ↑ ES (between row 1 and row 0, going UP)
+        let gap_top = NODE_BOX_HEIGHT as i32;
+        let gap_bot = row_stride as i32;
+        for r in gap_top..gap_bot {
+            if r == gap_top {
+                put_cell(&mut buffer, r, mid_left, '\u{25b2}', flow_arrow_color);
+            // ▲
+            } else {
+                put_cell(&mut buffer, r, mid_left, '\u{2502}', flow_color); // │
             }
         }
     }
