@@ -1,5 +1,4 @@
 //! Combinatorial recipe registry for the Loom of Worlds.
-#![allow(dead_code)]
 //!
 //! Each recipe maps (input_a, input_b, node_nature) → (output, amount_multiplier).
 //! Node nature acts as the hidden catalyst — the same two inputs piped into

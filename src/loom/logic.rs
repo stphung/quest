@@ -694,4 +694,269 @@ mod tests {
             1.0
         );
     }
+
+    // ── Phase 3: Node Base Production tests ───────────────────────────────────
+
+    #[test]
+    fn test_node_native_resource_mapping() {
+        assert_eq!(node_native_resource(NodeId::EmberSpindle), Resource::Ember);
+        assert_eq!(
+            node_native_resource(NodeId::ReflectionLens),
+            Resource::Reflection
+        );
+        assert_eq!(
+            node_native_resource(NodeId::VoidCondenser),
+            Resource::VoidEssence
+        );
+        assert_eq!(
+            node_native_resource(NodeId::MemoryArchive),
+            Resource::Memory
+        );
+        assert_eq!(node_native_resource(NodeId::SilenceWell), Resource::Silence);
+        assert_eq!(
+            node_native_resource(NodeId::ResonanceForge),
+            Resource::Resonance
+        );
+    }
+
+    #[test]
+    fn test_node_level_multiplier() {
+        assert_eq!(node_level_multiplier(1), 1.0);
+        assert_eq!(node_level_multiplier(2), 1.5);
+        assert_eq!(node_level_multiplier(3), 2.0);
+    }
+
+    #[test]
+    fn test_base_production_fills_buffer() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        // EmberSpindle is now unlocked.
+
+        tick_base_production(&mut loom, 3600.0);
+
+        let ember = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        // BurnBright: 5/hr base * 1.5x passive = 7.5/hr. After 1 hr: 7.5 units.
+        assert!(
+            (ember.buffer - 7.5).abs() < 0.001,
+            "buffer should be ~7.5, got {}",
+            ember.buffer
+        );
+    }
+
+    #[test]
+    fn test_base_production_locked_node_produces_nothing() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        // VoidCondenser is locked.
+
+        tick_base_production(&mut loom, 3600.0);
+
+        let void_n = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::VoidCondenser)
+            .unwrap();
+        assert_eq!(void_n.buffer, 0.0);
+    }
+
+    #[test]
+    fn test_base_production_stalls_at_capacity() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+
+        // Fill buffer to capacity.
+        let ember = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        ember.buffer = ember.buffer_capacity;
+
+        tick_base_production(&mut loom, 3600.0);
+
+        let ember = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        assert!(ember.stalled);
+        assert_eq!(ember.buffer, ember.buffer_capacity);
+    }
+
+    // ── Phase 3: Node Upgrading tests ─────────────────────────────────────────
+
+    #[test]
+    fn test_upgrade_cost_level1() {
+        let loom = LoomState::new();
+        let cost = node_upgrade_cost(&loom, NodeId::EmberSpindle);
+        assert_eq!(cost, 10.0); // 10 * 1^1.5 = 10
+    }
+
+    #[test]
+    fn test_upgrade_succeeds_with_sufficient_buffer() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+
+        let ember = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        ember.buffer = 50.0;
+
+        let result = try_upgrade_node(&mut loom, NodeId::EmberSpindle);
+        assert!(result);
+
+        let ember = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        assert_eq!(ember.level, 2);
+    }
+
+    #[test]
+    fn test_upgrade_fails_with_insufficient_buffer() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+
+        let result = try_upgrade_node(&mut loom, NodeId::EmberSpindle);
+        assert!(!result);
+
+        let ember = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        assert_eq!(ember.level, 1);
+    }
+
+    #[test]
+    fn test_upgrade_fails_for_locked_node() {
+        let mut loom = LoomState::new();
+        let void_n = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::VoidCondenser)
+            .unwrap();
+        void_n.buffer = 100.0;
+
+        let result = try_upgrade_node(&mut loom, NodeId::VoidCondenser);
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_silence_well_upgrade_discount_applied() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::RunDeep);
+
+        let base_cost = 10.0_f64 * 1.0_f64.powf(1.5);
+        let discounted = (base_cost * 0.75).round();
+        let cost = node_upgrade_cost(&loom, NodeId::SilenceWell);
+        assert_eq!(cost, discounted);
+    }
+
+    // ── Phase 3: Neighbor Unlocking tests ─────────────────────────────────────
+
+    #[test]
+    fn test_node_neighbors_are_symmetric() {
+        for &node in &NodeId::ALL {
+            for &nb in node_neighbors(node) {
+                assert!(
+                    node_neighbors(nb).contains(&node),
+                    "{:?} has {:?} as neighbor but not vice versa",
+                    node,
+                    nb
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_neighbor_unlocking_accumulates_progress() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+
+        let ember = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        ember.buffer = ember.buffer_capacity;
+
+        // Tick 1 hour — not enough to unlock (threshold = 2 hours).
+        tick_neighbor_unlocking(&mut loom, 3600.0);
+
+        for &nb in node_neighbors(NodeId::EmberSpindle) {
+            let n = loom.persistent.nodes.iter().find(|n| n.id == nb).unwrap();
+            assert!(!n.unlocked, "{:?} should not be unlocked yet", nb);
+            assert!(n.unlock_progress > 0.0, "{:?} should have progress", nb);
+        }
+    }
+
+    #[test]
+    fn test_neighbor_unlocks_after_threshold() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::ReachWide);
+        // ReflectionLens is unlocked.
+
+        let lens = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::ReflectionLens)
+            .unwrap();
+        lens.buffer = lens.buffer_capacity;
+
+        // Tick 2 hours — enough to unlock neighbors.
+        let unlocked = tick_neighbor_unlocking(&mut loom, 7200.0);
+        assert!(
+            !unlocked.is_empty(),
+            "Should have unlocked at least one neighbor"
+        );
+    }
+
+    #[test]
+    fn test_ember_spindle_unlock_speed_is_slower() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+
+        let ember = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        ember.buffer = ember.buffer_capacity;
+
+        // At 0.7x speed, 2hr tick = 1.4hr progress — not enough to unlock (threshold = 2hr).
+        tick_neighbor_unlocking(&mut loom, 7200.0);
+
+        for &nb in node_neighbors(NodeId::EmberSpindle) {
+            let n = loom.persistent.nodes.iter().find(|n| n.id == nb).unwrap();
+            assert!(
+                !n.unlocked,
+                "{:?} should not be unlocked with 0.7x speed in 2hr",
+                nb
+            );
+            assert!(
+                (n.unlock_progress - 1.4).abs() < 0.01,
+                "expected ~1.4hr progress, got {}",
+                n.unlock_progress
+            );
+        }
+    }
 }
