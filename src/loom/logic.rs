@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use super::types::{LoomArchetype, LoomNode, LoomState, NodeId, Resource};
+use super::types::{LoomArchetype, LoomNode, LoomState, NodeId, Pipe, Resource};
 
 /// Archetype-to-node mapping.
 /// Returns (first_node, second_node) for the archetype.
@@ -396,193 +396,137 @@ pub fn tick_neighbor_unlocking(loom: &mut LoomState, delta_seconds: f64) -> Vec<
     newly_unlocked
 }
 
-// ── Phase 4: Pipe Building ────────────────────────────────────────────────────
+// ── Phase 5: Buffer Stalling ──────────────────────────────────────────────────
 
-/// Maximum pipes allowed in or out of a single node.
-pub const MAX_PIPES_PER_DIRECTION: usize = 3;
+/// Determine whether a node should be stalled.
+///
+/// A node stalls when **both** conditions hold:
+/// 1. Its buffer is at or above capacity (full).
+/// 2. Every active outgoing pipe's destination buffer is also full,
+///    OR there are no active outgoing pipes.
+///
+/// When stalled, base production stops so resources are not wasted.
+/// `outgoing_pipes` must only contain pipes whose `from == node.id`.
+pub fn check_node_stall(node: &LoomNode, outgoing_pipes: &[&Pipe], all_nodes: &[LoomNode]) -> bool {
+    if node.buffer < node.buffer_capacity {
+        return false;
+    }
 
-/// Ticks of construction time for a new pipe (2 hours at 10 ticks/sec).
-pub const PIPE_CONSTRUCTION_TICKS: u32 = 72_000;
+    let active_pipes: Vec<&&Pipe> = outgoing_pipes
+        .iter()
+        .filter(|p| !p.under_construction)
+        .collect();
 
-/// Cost (in the source node's native resource) to build a new T1 pipe.
-pub const PIPE_BUILD_COST: f64 = 20.0;
+    // No active outgoing pipes → nowhere to drain → stalled.
+    if active_pipes.is_empty() {
+        return true;
+    }
 
-/// Reasons a pipe build can fail.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PipeBuildError {
-    /// Source node does not exist or is not yet unlocked.
-    SourceNotUnlocked,
-    /// Destination node does not exist or is not yet unlocked.
-    DestNotUnlocked,
-    /// Cannot build a pipe from a node to itself.
-    SameNode,
-    /// A pipe already exists between these two nodes in this direction.
-    AlreadyExists,
-    /// Source node already has the maximum number of outgoing pipes.
-    TooManyOutgoing,
-    /// Destination node already has the maximum number of incoming pipes.
-    TooManyIncoming,
-    /// Source node's buffer does not have enough resources to pay the build cost.
-    InsufficientResources,
+    // Stalled only if every destination is also full.
+    active_pipes.iter().all(|pipe| {
+        match all_nodes.iter().find(|n| n.id == pipe.to) {
+            Some(dst) => dst.buffer >= dst.buffer_capacity,
+            None => true, // Dangling pipe → treat as blocked.
+        }
+    })
 }
 
-/// Attempt to begin construction of a new T1 pipe from `from` to `to`.
+/// Update the `stalled` flag on every unlocked node.
 ///
-/// Deducts `PIPE_BUILD_COST` from the source node's buffer immediately.
-/// The pipe is placed in `loom.persistent.pipes` with `under_construction = true`
-/// and `construction_ticks_remaining = PIPE_CONSTRUCTION_TICKS`.
-///
-/// Returns `Ok(())` on success or a `PipeBuildError` describing why it failed.
-pub fn try_build_pipe(
-    loom: &mut LoomState,
-    from: NodeId,
-    to: NodeId,
-) -> Result<(), PipeBuildError> {
-    use super::types::{Pipe, PipeTier};
+/// Called after pipe flow simulation so buffer levels reflect the latest state.
+/// Returns node IDs whose stall state changed (useful for event emission).
+pub fn tick_stall_detection(loom: &mut LoomState) -> Vec<NodeId> {
+    let mut changed = Vec::new();
 
-    if from == to {
-        return Err(PipeBuildError::SameNode);
-    }
+    let node_ids: Vec<NodeId> = loom.persistent.nodes.iter().map(|n| n.id).collect();
 
-    // Validate source is unlocked.
-    let src_unlocked = loom
-        .persistent
-        .nodes
-        .iter()
-        .any(|n| n.id == from && n.unlocked);
-    if !src_unlocked {
-        return Err(PipeBuildError::SourceNotUnlocked);
-    }
+    for node_id in node_ids {
+        let outgoing: Vec<&Pipe> = loom
+            .persistent
+            .pipes
+            .iter()
+            .filter(|p| p.from == node_id)
+            .collect();
 
-    // Validate destination is unlocked.
-    let dst_unlocked = loom
-        .persistent
-        .nodes
-        .iter()
-        .any(|n| n.id == to && n.unlocked);
-    if !dst_unlocked {
-        return Err(PipeBuildError::DestNotUnlocked);
-    }
+        let should_stall = {
+            let node = loom.persistent.nodes.iter().find(|n| n.id == node_id);
+            match node {
+                Some(n) if n.unlocked => check_node_stall(n, &outgoing, &loom.persistent.nodes),
+                _ => false,
+            }
+        };
 
-    // Check for existing pipe in this direction.
-    if loom
-        .persistent
-        .pipes
-        .iter()
-        .any(|p| p.from == from && p.to == to)
-    {
-        return Err(PipeBuildError::AlreadyExists);
-    }
-
-    // Count outgoing pipes from source.
-    let outgoing = loom
-        .persistent
-        .pipes
-        .iter()
-        .filter(|p| p.from == from)
-        .count();
-    if outgoing >= MAX_PIPES_PER_DIRECTION {
-        return Err(PipeBuildError::TooManyOutgoing);
-    }
-
-    // Count incoming pipes to destination.
-    let incoming = loom.persistent.pipes.iter().filter(|p| p.to == to).count();
-    if incoming >= MAX_PIPES_PER_DIRECTION {
-        return Err(PipeBuildError::TooManyIncoming);
-    }
-
-    // Deduct build cost from source buffer.
-    let src_node = loom
-        .persistent
-        .nodes
-        .iter_mut()
-        .find(|n| n.id == from)
-        .unwrap(); // safe: we verified it exists above
-    if src_node.buffer < PIPE_BUILD_COST {
-        return Err(PipeBuildError::InsufficientResources);
-    }
-    src_node.buffer -= PIPE_BUILD_COST;
-
-    // Add the pipe in construction state.
-    loom.persistent.pipes.push(Pipe {
-        from,
-        to,
-        tier: PipeTier::T1,
-        split_ratio: 1.0,
-        under_construction: true,
-        construction_ticks_remaining: PIPE_CONSTRUCTION_TICKS,
-    });
-
-    // Rebalance split ratios for the source node's outgoing pipes equally.
-    rebalance_split_ratios(loom, from);
-
-    Ok(())
-}
-
-/// Rebalance split ratios for all outgoing pipes from `node_id` to divide 1.0 equally.
-pub fn rebalance_split_ratios(loom: &mut LoomState, node_id: NodeId) {
-    let count = loom
-        .persistent
-        .pipes
-        .iter()
-        .filter(|p| p.from == node_id)
-        .count();
-    if count == 0 {
-        return;
-    }
-    let equal_share = 1.0 / count as f64;
-    for pipe in loom.persistent.pipes.iter_mut() {
-        if pipe.from == node_id {
-            pipe.split_ratio = equal_share;
+        if let Some(node) = loom.persistent.nodes.iter_mut().find(|n| n.id == node_id) {
+            if node.stalled != should_stall {
+                node.stalled = should_stall;
+                changed.push(node_id);
+            }
         }
     }
+
+    changed
 }
 
-/// Tick construction progress for all pipes under construction.
-/// Each call advances them by one tick. When `construction_ticks_remaining`
-/// reaches zero the pipe becomes active.
+// ── Phase 6: Reaction Processing ───────────────────────────────────────────────
+
+/// Process combinatorial reactions at destination nodes.
 ///
-/// Returns the list of pipes (from, to) that just completed construction.
-pub fn tick_pipe_construction(loom: &mut LoomState) -> Vec<(NodeId, NodeId)> {
-    let mut completed = Vec::new();
-    for pipe in loom.persistent.pipes.iter_mut() {
-        if !pipe.under_construction {
+/// Takes the deliveries returned by `tick_pipe_flow`, groups them by destination
+/// node, then checks whether two different resources arrived at the same node this
+/// tick. If a recipe matches `(resource_a, resource_b, node.nature())`, the output
+/// is produced and added to the global stockpile.
+///
+/// Only the first matching recipe pair fires per node per tick.
+/// Returns a list of `(output_resource, amount_produced)` for this tick.
+pub fn process_reactions(
+    loom: &mut LoomState,
+    deliveries: Vec<(NodeId, Resource, f64)>,
+) -> Vec<(Resource, f64)> {
+    use crate::loom::recipes;
+    use std::collections::HashMap;
+
+    // Group deliveries by destination node.
+    let mut by_node: HashMap<NodeId, Vec<(Resource, f64)>> = HashMap::new();
+    for (node_id, resource, amount) in deliveries {
+        by_node.entry(node_id).or_default().push((resource, amount));
+    }
+
+    let mut outputs: Vec<(Resource, f64)> = Vec::new();
+
+    for (node_id, inputs) in &by_node {
+        if inputs.len() < 2 {
             continue;
         }
-        if pipe.construction_ticks_remaining > 0 {
-            pipe.construction_ticks_remaining -= 1;
-        }
-        if pipe.construction_ticks_remaining == 0 {
-            pipe.under_construction = false;
-            completed.push((pipe.from, pipe.to));
+
+        let node_nature = node_id.nature();
+
+        // Try each pair of distinct resources; take first match.
+        'pair_search: for i in 0..inputs.len() {
+            for j in (i + 1)..inputs.len() {
+                let (res_a, amt_a) = inputs[i];
+                let (res_b, amt_b) = inputs[j];
+
+                if let Some(recipe_out) = recipes::lookup_recipe(res_a, res_b, node_nature) {
+                    let min_input = amt_a.min(amt_b);
+                    let produced = min_input * recipe_out.amount;
+
+                    if produced > 0.0 {
+                        *loom
+                            .persistent
+                            .stockpiles
+                            .entry(recipe_out.resource)
+                            .or_insert(0.0) += produced;
+
+                        outputs.push((recipe_out.resource, produced));
+                    }
+
+                    break 'pair_search;
+                }
+            }
         }
     }
-    completed
-}
 
-/// Demolish an existing pipe (by from/to). Refunds 50% of build cost to source buffer.
-/// Returns true if the pipe was found and removed.
-pub fn demolish_pipe(loom: &mut LoomState, from: NodeId, to: NodeId) -> bool {
-    let idx = loom
-        .persistent
-        .pipes
-        .iter()
-        .position(|p| p.from == from && p.to == to);
-    let Some(idx) = idx else {
-        return false;
-    };
-
-    loom.persistent.pipes.remove(idx);
-
-    // Refund 50% of build cost to source node's buffer (no cap — refund bypasses normal limits).
-    if let Some(src) = loom.persistent.nodes.iter_mut().find(|n| n.id == from) {
-        src.buffer += PIPE_BUILD_COST * 0.5;
-    }
-
-    // Rebalance remaining outgoing pipes.
-    rebalance_split_ratios(loom, from);
-
-    true
+    outputs
 }
 
 #[cfg(test)]
@@ -1149,179 +1093,486 @@ mod tests {
         }
     }
 
-    // ── Phase 4: Pipe Building tests ──────────────────────────────────────────
+    // ── Phase 4: Pipe Flow Simulation tests ───────────────────────────────────
 
-    fn loom_with_two_unlocked_nodes() -> LoomState {
+    /// Build a minimal LoomState with two unlocked nodes and a T1 pipe between them.
+    fn loom_with_t1_pipe() -> LoomState {
         let mut loom = LoomState::new();
         select_archetype(&mut loom, LoomArchetype::BurnBright);
-        // Unlock VoidCondenser manually (second archetype node).
-        tick_loom_staggered_unlock(&mut loom, SECOND_NODE_UNLOCK_SECONDS);
-        // Give EmberSpindle enough buffer and capacity to pay build cost and receive refunds.
+        // EmberSpindle (from) is unlocked. Unlock VoidCondenser (to) manually.
+        let void_n = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::VoidCondenser)
+            .unwrap();
+        void_n.unlocked = true;
+
+        loom.persistent.pipes.push(crate::loom::types::Pipe {
+            from: NodeId::EmberSpindle,
+            to: NodeId::VoidCondenser,
+            tier: crate::loom::types::PipeTier::T1, // 5/hr
+            split_ratio: 1.0,
+            under_construction: false,
+            construction_ticks_remaining: 0,
+        });
+
+        loom
+    }
+
+    #[test]
+    fn test_pipe_flow_drains_source_and_fills_destination() {
+        let mut loom = loom_with_t1_pipe();
+
+        // Give EmberSpindle a buffer of 10 units.
         let ember = loom
             .persistent
             .nodes
             .iter_mut()
             .find(|n| n.id == NodeId::EmberSpindle)
             .unwrap();
-        ember.buffer_capacity = 200.0;
-        ember.buffer = 100.0;
-        loom
-    }
+        ember.buffer = 10.0;
 
-    #[test]
-    fn test_build_pipe_succeeds() {
-        let mut loom = loom_with_two_unlocked_nodes();
-        let result = try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser);
-        assert_eq!(result, Ok(()));
-        assert_eq!(loom.persistent.pipes.len(), 1);
-        assert!(loom.persistent.pipes[0].under_construction);
-    }
+        // 1 hour tick: T1 = 5/hr, split 1.0 → expect 5 units to flow.
+        let deliveries = tick_pipe_flow(&mut loom, 3600.0);
 
-    #[test]
-    fn test_build_pipe_deducts_cost() {
-        let mut loom = loom_with_two_unlocked_nodes();
-        let before = loom
+        let ember = loom
             .persistent
             .nodes
             .iter()
             .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap()
-            .buffer;
-        try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser).unwrap();
-        let after = loom
+            .unwrap();
+        assert!(
+            (ember.buffer - 5.0).abs() < 0.001,
+            "source should have 5 left, got {}",
+            ember.buffer
+        );
+
+        let void_n = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::VoidCondenser)
+            .unwrap();
+        assert!(
+            (void_n.buffer - 5.0).abs() < 0.001,
+            "destination should have 5, got {}",
+            void_n.buffer
+        );
+
+        assert_eq!(deliveries.len(), 1);
+        let (dst, res, amt) = deliveries[0];
+        assert_eq!(dst, NodeId::VoidCondenser);
+        assert_eq!(res, Resource::Ember);
+        assert!((amt - 5.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_pipe_flow_limited_by_source_buffer() {
+        let mut loom = loom_with_t1_pipe();
+
+        // Only 2 units available; T1 would allow 5/hr → capped at 2.
+        let ember = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        ember.buffer = 2.0;
+
+        let deliveries = tick_pipe_flow(&mut loom, 3600.0);
+
+        let ember = loom
             .persistent
             .nodes
             .iter()
             .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        assert!(
+            ember.buffer < 0.001,
+            "source should be drained, got {}",
+            ember.buffer
+        );
+        assert_eq!(deliveries.len(), 1);
+        assert!((deliveries[0].2 - 2.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_pipe_flow_capped_by_destination_capacity() {
+        let mut loom = loom_with_t1_pipe();
+
+        let ember = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        ember.buffer = 10.0;
+
+        // Fill destination to within 1 unit of capacity.
+        let void_n = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::VoidCondenser)
+            .unwrap();
+        void_n.buffer = void_n.buffer_capacity - 1.0;
+
+        let deliveries = tick_pipe_flow(&mut loom, 3600.0);
+
+        // Only 1 unit of space → at most 1 unit delivered.
+        assert_eq!(deliveries.len(), 1);
+        assert!(deliveries[0].2 <= 1.0 + 0.001);
+    }
+
+    #[test]
+    fn test_pipe_flow_skips_construction_pipes() {
+        let mut loom = loom_with_t1_pipe();
+
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
             .unwrap()
-            .buffer;
-        assert!((before - after - PIPE_BUILD_COST).abs() < 0.001);
+            .buffer = 10.0;
+
+        loom.persistent.pipes[0].under_construction = true;
+
+        let deliveries = tick_pipe_flow(&mut loom, 3600.0);
+        assert!(
+            deliveries.is_empty(),
+            "under-construction pipe should not flow"
+        );
     }
 
     #[test]
-    fn test_build_pipe_fails_same_node() {
-        let mut loom = loom_with_two_unlocked_nodes();
-        let result = try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::EmberSpindle);
-        assert_eq!(result, Err(PipeBuildError::SameNode));
+    fn test_pipe_flow_split_ratio_halves_flow() {
+        let mut loom = loom_with_t1_pipe();
+        loom.persistent.pipes[0].split_ratio = 0.5;
+
+        let ember = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        ember.buffer = 10.0;
+
+        let deliveries = tick_pipe_flow(&mut loom, 3600.0);
+
+        // T1 5/hr * 0.5 split = 2.5/hr → 2.5 units in 1 hour.
+        assert_eq!(deliveries.len(), 1);
+        assert!(
+            (deliveries[0].2 - 2.5).abs() < 0.001,
+            "expected 2.5 with 0.5 split, got {}",
+            deliveries[0].2
+        );
+    }
+
+    // ── Phase 6: Reaction Processing tests ────────────────────────────────────
+
+    #[test]
+    fn test_process_reactions_produces_forged_light() {
+        let mut loom = LoomState::new();
+
+        // Primary recipe: Ember + VoidEssence @ Heat (EmberSpindle) → ForgedLight (1.0x)
+        // Deliver both to EmberSpindle (Heat nature).
+        let deliveries = vec![
+            (NodeId::EmberSpindle, Resource::Ember, 2.0),
+            (NodeId::EmberSpindle, Resource::VoidEssence, 2.0),
+        ];
+
+        let outputs = process_reactions(&mut loom, deliveries);
+
+        assert_eq!(outputs.len(), 1);
+        let (resource, amount) = outputs[0];
+        assert_eq!(resource, Resource::ForgedLight);
+        // min(2.0, 2.0) * 1.0 = 2.0
+        assert!((amount - 2.0).abs() < 0.001, "expected 2.0, got {}", amount);
+
+        // ForgedLight should be in stockpile.
+        let stockpile = loom
+            .persistent
+            .stockpiles
+            .get(&Resource::ForgedLight)
+            .copied()
+            .unwrap_or(0.0);
+        assert!((stockpile - 2.0).abs() < 0.001);
     }
 
     #[test]
-    fn test_build_pipe_fails_locked_destination() {
+    fn test_process_reactions_no_recipe_produces_nothing() {
+        let mut loom = LoomState::new();
+
+        // WovenReality + WovenReality has no recipe.
+        let deliveries = vec![
+            (NodeId::EmberSpindle, Resource::WovenReality, 1.0),
+            (NodeId::EmberSpindle, Resource::WovenReality, 1.0),
+        ];
+
+        let outputs = process_reactions(&mut loom, deliveries);
+        assert!(outputs.is_empty());
+    }
+
+    #[test]
+    fn test_process_reactions_single_resource_no_reaction() {
+        let mut loom = LoomState::new();
+
+        let deliveries = vec![(NodeId::EmberSpindle, Resource::Ember, 5.0)];
+        let outputs = process_reactions(&mut loom, deliveries);
+        assert!(outputs.is_empty());
+    }
+
+    #[test]
+    fn test_process_reactions_output_scales_by_minimum_input() {
+        let mut loom = LoomState::new();
+
+        // Ember + VoidEssence @ Heat → ForgedLight (amount 1.0).
+        // Deliver 3.0 Ember but only 1.0 VoidEssence → min = 1.0 → output = 1.0.
+        let deliveries = vec![
+            (NodeId::EmberSpindle, Resource::Ember, 3.0),
+            (NodeId::EmberSpindle, Resource::VoidEssence, 1.0),
+        ];
+
+        let outputs = process_reactions(&mut loom, deliveries);
+        assert_eq!(outputs.len(), 1);
+        assert!(
+            (outputs[0].1 - 1.0).abs() < 0.001,
+            "expected 1.0, got {}",
+            outputs[0].1
+        );
+    }
+
+    #[test]
+    fn test_process_reactions_accumulates_to_stockpile() {
+        let mut loom = LoomState::new();
+
+        // Run the same reaction twice.
+        let deliveries1 = vec![
+            (NodeId::EmberSpindle, Resource::Ember, 1.0),
+            (NodeId::EmberSpindle, Resource::VoidEssence, 1.0),
+        ];
+        process_reactions(&mut loom, deliveries1);
+
+        let deliveries2 = vec![
+            (NodeId::EmberSpindle, Resource::Ember, 1.0),
+            (NodeId::EmberSpindle, Resource::VoidEssence, 1.0),
+        ];
+        process_reactions(&mut loom, deliveries2);
+
+        let stockpile = loom
+            .persistent
+            .stockpiles
+            .get(&Resource::ForgedLight)
+            .copied()
+            .unwrap_or(0.0);
+        // 1.0 * 1.0 + 1.0 * 1.0 = 2.0
+        assert!((stockpile - 2.0).abs() < 0.001);
+    }
+
+    // ── Phase 5: Buffer Stalling tests ────────────────────────────────────────
+
+    fn make_node(id: NodeId, buffer: f64, capacity: f64) -> LoomNode {
+        let mut n = LoomNode::new(id);
+        n.unlocked = true;
+        n.buffer = buffer;
+        n.buffer_capacity = capacity;
+        n
+    }
+
+    fn make_pipe(from: NodeId, to: NodeId, under_construction: bool) -> Pipe {
+        Pipe {
+            from,
+            to,
+            tier: crate::loom::types::PipeTier::T1,
+            split_ratio: 1.0,
+            under_construction,
+            construction_ticks_remaining: 0,
+        }
+    }
+
+    #[test]
+    fn test_check_node_stall_buffer_below_capacity_not_stalled() {
+        let node = make_node(NodeId::EmberSpindle, 10.0, 20.0); // half full
+        let all_nodes = vec![node.clone()];
+        assert!(!check_node_stall(&node, &[], &all_nodes));
+    }
+
+    #[test]
+    fn test_check_node_stall_full_buffer_no_outgoing_pipes_stalls() {
+        let node = make_node(NodeId::EmberSpindle, 20.0, 20.0); // full
+        let all_nodes = vec![node.clone()];
+        assert!(check_node_stall(&node, &[], &all_nodes));
+    }
+
+    #[test]
+    fn test_check_node_stall_full_buffer_active_pipe_to_non_full_dest_not_stalled() {
+        let src = make_node(NodeId::EmberSpindle, 20.0, 20.0); // full
+        let dst = make_node(NodeId::VoidCondenser, 5.0, 20.0); // not full
+        let pipe = make_pipe(NodeId::EmberSpindle, NodeId::VoidCondenser, false);
+        let all_nodes = vec![src.clone(), dst];
+        assert!(!check_node_stall(&src, &[&pipe], &all_nodes));
+    }
+
+    #[test]
+    fn test_check_node_stall_full_buffer_all_destinations_full_stalls() {
+        let src = make_node(NodeId::EmberSpindle, 20.0, 20.0); // full
+        let dst = make_node(NodeId::VoidCondenser, 20.0, 20.0); // also full
+        let pipe = make_pipe(NodeId::EmberSpindle, NodeId::VoidCondenser, false);
+        let all_nodes = vec![src.clone(), dst];
+        assert!(check_node_stall(&src, &[&pipe], &all_nodes));
+    }
+
+    #[test]
+    fn test_check_node_stall_full_buffer_construction_pipe_treated_as_no_active_pipes() {
+        let src = make_node(NodeId::EmberSpindle, 20.0, 20.0); // full
+        let dst = make_node(NodeId::VoidCondenser, 0.0, 20.0); // empty — but pipe is under construction
+        let pipe = make_pipe(NodeId::EmberSpindle, NodeId::VoidCondenser, true);
+        let all_nodes = vec![src.clone(), dst];
+        // under_construction pipe is inactive → treated as no active pipes → stalled
+        assert!(check_node_stall(&src, &[&pipe], &all_nodes));
+    }
+
+    #[test]
+    fn test_check_node_stall_two_pipes_one_destination_not_full_not_stalled() {
+        let src = make_node(NodeId::EmberSpindle, 20.0, 20.0); // full
+        let dst1 = make_node(NodeId::VoidCondenser, 20.0, 20.0); // full
+        let dst2 = make_node(NodeId::ReflectionLens, 5.0, 20.0); // not full
+        let pipe1 = make_pipe(NodeId::EmberSpindle, NodeId::VoidCondenser, false);
+        let pipe2 = make_pipe(NodeId::EmberSpindle, NodeId::ReflectionLens, false);
+        let all_nodes = vec![src.clone(), dst1, dst2];
+        // One destination still has room → not stalled
+        assert!(!check_node_stall(&src, &[&pipe1, &pipe2], &all_nodes));
+    }
+
+    #[test]
+    fn test_check_node_stall_dangling_pipe_treated_as_blocked() {
+        let src = make_node(NodeId::EmberSpindle, 20.0, 20.0); // full
+                                                               // Pipe points to a node not in all_nodes → treated as full/blocked
+        let pipe = make_pipe(NodeId::EmberSpindle, NodeId::MemoryArchive, false);
+        let all_nodes = vec![src.clone()]; // MemoryArchive absent
+        assert!(check_node_stall(&src, &[&pipe], &all_nodes));
+    }
+
+    #[test]
+    fn test_tick_stall_detection_marks_stalled_node() {
         let mut loom = LoomState::new();
         select_archetype(&mut loom, LoomArchetype::BurnBright);
-        // VoidCondenser still locked.
-        loom.persistent
+
+        // Fill EmberSpindle's buffer to capacity with no outgoing pipes.
+        let ember = loom
+            .persistent
             .nodes
             .iter_mut()
             .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap()
-            .buffer = 100.0;
-        let result = try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser);
-        assert_eq!(result, Err(PipeBuildError::DestNotUnlocked));
-    }
+            .unwrap();
+        ember.buffer = ember.buffer_capacity;
 
-    #[test]
-    fn test_build_pipe_fails_duplicate() {
-        let mut loom = loom_with_two_unlocked_nodes();
-        try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser).unwrap();
-        // Restore buffer.
-        loom.persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap()
-            .buffer = 100.0;
-        let result = try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser);
-        assert_eq!(result, Err(PipeBuildError::AlreadyExists));
-    }
+        let changed = tick_stall_detection(&mut loom);
 
-    #[test]
-    fn test_build_pipe_fails_insufficient_resources() {
-        let mut loom = loom_with_two_unlocked_nodes();
-        loom.persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap()
-            .buffer = 0.0;
-        let result = try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser);
-        assert_eq!(result, Err(PipeBuildError::InsufficientResources));
-    }
-
-    #[test]
-    fn test_pipe_construction_completes_after_ticks() {
-        let mut loom = loom_with_two_unlocked_nodes();
-        try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser).unwrap();
-        assert!(loom.persistent.pipes[0].under_construction);
-
-        // Run all construction ticks.
-        for _ in 0..PIPE_CONSTRUCTION_TICKS {
-            tick_pipe_construction(&mut loom);
-        }
-
-        assert!(!loom.persistent.pipes[0].under_construction);
-    }
-
-    #[test]
-    fn test_demolish_pipe_removes_and_refunds() {
-        let mut loom = loom_with_two_unlocked_nodes();
-        try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser).unwrap();
-        let buffer_after_build = loom
+        assert!(
+            changed.contains(&NodeId::EmberSpindle),
+            "EmberSpindle should have changed to stalled"
+        );
+        let ember = loom
             .persistent
             .nodes
             .iter()
             .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap()
-            .buffer;
-
-        let removed = demolish_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser);
-        assert!(removed);
-        assert!(loom.persistent.pipes.is_empty());
-
-        let buffer_after_demolish = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap()
-            .buffer;
-        let refund = PIPE_BUILD_COST * 0.5;
-        assert!((buffer_after_demolish - buffer_after_build - refund).abs() < 0.001);
+            .unwrap();
+        assert!(ember.stalled);
     }
 
     #[test]
-    fn test_split_ratios_rebalanced_on_build() {
-        let mut loom = loom_with_two_unlocked_nodes();
-        // Unlock a third node to pipe to two destinations.
-        loom.persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::ReflectionLens)
-            .unwrap()
-            .unlocked = true;
+    fn test_tick_stall_detection_clears_stall_when_buffer_drains() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
 
-        try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser).unwrap();
-        // Restore buffer.
-        loom.persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap()
-            .buffer = 100.0;
-        try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::ReflectionLens).unwrap();
-
-        // Both outgoing pipes should share 50% each.
-        for pipe in loom
-            .persistent
-            .pipes
-            .iter()
-            .filter(|p| p.from == NodeId::EmberSpindle)
+        // First: fill buffer → stall.
         {
-            assert!(
-                (pipe.split_ratio - 0.5).abs() < 0.001,
-                "expected 0.5 split, got {}",
-                pipe.split_ratio
-            );
+            let ember = loom
+                .persistent
+                .nodes
+                .iter_mut()
+                .find(|n| n.id == NodeId::EmberSpindle)
+                .unwrap();
+            ember.buffer = ember.buffer_capacity;
+            ember.stalled = true; // pre-mark so we test the transition back
         }
+
+        // Drain below capacity → should un-stall.
+        {
+            let ember = loom
+                .persistent
+                .nodes
+                .iter_mut()
+                .find(|n| n.id == NodeId::EmberSpindle)
+                .unwrap();
+            ember.buffer = ember.buffer_capacity - 1.0;
+        }
+
+        let changed = tick_stall_detection(&mut loom);
+        assert!(
+            changed.contains(&NodeId::EmberSpindle),
+            "EmberSpindle should have changed to un-stalled"
+        );
+        let ember = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        assert!(!ember.stalled);
+    }
+
+    #[test]
+    fn test_tick_stall_detection_locked_node_never_stalls() {
+        let mut loom = LoomState::new();
+        // No archetype selected → all nodes locked.
+
+        // Force a node's buffer to full.
+        let node = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        node.buffer = node.buffer_capacity;
+
+        let changed = tick_stall_detection(&mut loom);
+        assert!(
+            !changed.contains(&NodeId::EmberSpindle),
+            "Locked node should never stall"
+        );
+        let node = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        assert!(!node.stalled);
+    }
+
+    #[test]
+    fn test_tick_stall_detection_no_change_when_already_stalled() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+
+        // Pre-stall the node.
+        let ember = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        ember.buffer = ember.buffer_capacity;
+        ember.stalled = true;
+
+        let changed = tick_stall_detection(&mut loom);
+        // State didn't change — should not appear in changed list.
+        assert!(
+            !changed.contains(&NodeId::EmberSpindle),
+            "Already-stalled node with same stall state should not be in changed"
+        );
     }
 }
