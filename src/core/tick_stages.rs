@@ -989,13 +989,9 @@ pub(super) fn tick_loom(
     loom: &mut crate::loom::LoomState,
     result: &mut TickResult,
 ) {
-    if !deep.persistent.discovered {
-        return;
-    }
-
-    // Discovery trigger.
+    // Discovery trigger: requires Deep discovered + Gateway opened.
     if !loom.persistent.discovered {
-        if deep.persistent.gateway_opened {
+        if deep.persistent.discovered && deep.persistent.gateway_opened {
             crate::loom::complete_discovery(loom);
             result.events.push(TickEvent::LoomDiscovered);
             result.loom_changed = true;
