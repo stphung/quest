@@ -381,18 +381,14 @@ impl Shape for SkyShape {
         type Peak = (f64, f64, f64, f64);
 
         let far_peaks: &[Peak] = &[
-            (0.10, 8.0, 5.0, 11.0),
-            (0.30, 10.0, 6.0, 14.0),
-            (0.54, 7.0, 4.0, 9.0),
-            (0.76, 9.0, 7.0, 13.0),
-            (0.93, 5.5, 5.0, 8.0),
+            (0.18, 6.0, 6.0, 12.0),
+            (0.52, 5.0, 5.0, 10.0),
+            (0.82, 7.0, 7.0, 14.0),
         ];
         let near_peaks: &[Peak] = &[
-            (0.04, 4.5, 3.0, 7.0),
-            (0.20, 6.5, 4.0, 10.0),
-            (0.42, 5.5, 5.0, 8.0),
-            (0.65, 7.5, 4.0, 11.0),
-            (0.86, 5.0, 3.0, 7.0),
+            (0.08, 3.5, 3.0, 8.0),
+            (0.38, 4.5, 4.0, 9.0),
+            (0.72, 5.0, 4.0, 10.0),
         ];
 
         // Compute height for a column given a set of peaks
@@ -430,7 +426,7 @@ impl Shape for SkyShape {
             let highlight = lerp_rgb(highlight_day, highlight_night, self.dusk);
 
             for col in 0..self.width {
-                let h = peak_height(col, far_peaks, self.width, 1.5);
+                let h = peak_height(col, far_peaks, self.width, 0.8);
                 let pixels = (h * 2.0).round() as i32;
                 if pixels <= 0 {
                     continue;
@@ -490,7 +486,7 @@ impl Shape for SkyShape {
             let tree_light = lerp_rgb(tree_light_day, tree_light_night, self.dusk);
 
             for col in 0..self.width {
-                let h = peak_height(col, near_peaks, self.width, 1.0);
+                let h = peak_height(col, near_peaks, self.width, 0.5);
                 let pixels = (h * 2.0).round() as i32;
                 if pixels <= 0 {
                     continue;
@@ -559,7 +555,7 @@ impl Shape for SkyShape {
                     continue;
                 }
 
-                let h = peak_height(col, near_peaks, self.width, 1.0);
+                let h = peak_height(col, near_peaks, self.width, 0.5);
                 let peak_gy = sky_py as i32 - (h * 2.0).round() as i32;
 
                 let glow_strength = (1.0 - dist_to_orb / 6.0) * 0.20;
