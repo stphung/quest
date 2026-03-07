@@ -396,6 +396,195 @@ pub fn tick_neighbor_unlocking(loom: &mut LoomState, delta_seconds: f64) -> Vec<
     newly_unlocked
 }
 
+// ── Phase 4: Pipe Building ────────────────────────────────────────────────────
+
+/// Maximum pipes allowed in or out of a single node.
+pub const MAX_PIPES_PER_DIRECTION: usize = 3;
+
+/// Ticks of construction time for a new pipe (2 hours at 10 ticks/sec).
+pub const PIPE_CONSTRUCTION_TICKS: u32 = 72_000;
+
+/// Cost (in the source node's native resource) to build a new T1 pipe.
+pub const PIPE_BUILD_COST: f64 = 20.0;
+
+/// Reasons a pipe build can fail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PipeBuildError {
+    /// Source node does not exist or is not yet unlocked.
+    SourceNotUnlocked,
+    /// Destination node does not exist or is not yet unlocked.
+    DestNotUnlocked,
+    /// Cannot build a pipe from a node to itself.
+    SameNode,
+    /// A pipe already exists between these two nodes in this direction.
+    AlreadyExists,
+    /// Source node already has the maximum number of outgoing pipes.
+    TooManyOutgoing,
+    /// Destination node already has the maximum number of incoming pipes.
+    TooManyIncoming,
+    /// Source node's buffer does not have enough resources to pay the build cost.
+    InsufficientResources,
+}
+
+/// Attempt to begin construction of a new T1 pipe from `from` to `to`.
+///
+/// Deducts `PIPE_BUILD_COST` from the source node's buffer immediately.
+/// The pipe is placed in `loom.persistent.pipes` with `under_construction = true`
+/// and `construction_ticks_remaining = PIPE_CONSTRUCTION_TICKS`.
+///
+/// Returns `Ok(())` on success or a `PipeBuildError` describing why it failed.
+pub fn try_build_pipe(
+    loom: &mut LoomState,
+    from: NodeId,
+    to: NodeId,
+) -> Result<(), PipeBuildError> {
+    use super::types::{Pipe, PipeTier};
+
+    if from == to {
+        return Err(PipeBuildError::SameNode);
+    }
+
+    // Validate source is unlocked.
+    let src_unlocked = loom
+        .persistent
+        .nodes
+        .iter()
+        .any(|n| n.id == from && n.unlocked);
+    if !src_unlocked {
+        return Err(PipeBuildError::SourceNotUnlocked);
+    }
+
+    // Validate destination is unlocked.
+    let dst_unlocked = loom
+        .persistent
+        .nodes
+        .iter()
+        .any(|n| n.id == to && n.unlocked);
+    if !dst_unlocked {
+        return Err(PipeBuildError::DestNotUnlocked);
+    }
+
+    // Check for existing pipe in this direction.
+    if loom
+        .persistent
+        .pipes
+        .iter()
+        .any(|p| p.from == from && p.to == to)
+    {
+        return Err(PipeBuildError::AlreadyExists);
+    }
+
+    // Count outgoing pipes from source.
+    let outgoing = loom
+        .persistent
+        .pipes
+        .iter()
+        .filter(|p| p.from == from)
+        .count();
+    if outgoing >= MAX_PIPES_PER_DIRECTION {
+        return Err(PipeBuildError::TooManyOutgoing);
+    }
+
+    // Count incoming pipes to destination.
+    let incoming = loom.persistent.pipes.iter().filter(|p| p.to == to).count();
+    if incoming >= MAX_PIPES_PER_DIRECTION {
+        return Err(PipeBuildError::TooManyIncoming);
+    }
+
+    // Deduct build cost from source buffer.
+    let src_node = loom
+        .persistent
+        .nodes
+        .iter_mut()
+        .find(|n| n.id == from)
+        .unwrap(); // safe: we verified it exists above
+    if src_node.buffer < PIPE_BUILD_COST {
+        return Err(PipeBuildError::InsufficientResources);
+    }
+    src_node.buffer -= PIPE_BUILD_COST;
+
+    // Add the pipe in construction state.
+    loom.persistent.pipes.push(Pipe {
+        from,
+        to,
+        tier: PipeTier::T1,
+        split_ratio: 1.0,
+        under_construction: true,
+        construction_ticks_remaining: PIPE_CONSTRUCTION_TICKS,
+    });
+
+    // Rebalance split ratios for the source node's outgoing pipes equally.
+    rebalance_split_ratios(loom, from);
+
+    Ok(())
+}
+
+/// Rebalance split ratios for all outgoing pipes from `node_id` to divide 1.0 equally.
+pub fn rebalance_split_ratios(loom: &mut LoomState, node_id: NodeId) {
+    let count = loom
+        .persistent
+        .pipes
+        .iter()
+        .filter(|p| p.from == node_id)
+        .count();
+    if count == 0 {
+        return;
+    }
+    let equal_share = 1.0 / count as f64;
+    for pipe in loom.persistent.pipes.iter_mut() {
+        if pipe.from == node_id {
+            pipe.split_ratio = equal_share;
+        }
+    }
+}
+
+/// Tick construction progress for all pipes under construction.
+/// Each call advances them by one tick. When `construction_ticks_remaining`
+/// reaches zero the pipe becomes active.
+///
+/// Returns the list of pipes (from, to) that just completed construction.
+pub fn tick_pipe_construction(loom: &mut LoomState) -> Vec<(NodeId, NodeId)> {
+    let mut completed = Vec::new();
+    for pipe in loom.persistent.pipes.iter_mut() {
+        if !pipe.under_construction {
+            continue;
+        }
+        if pipe.construction_ticks_remaining > 0 {
+            pipe.construction_ticks_remaining -= 1;
+        }
+        if pipe.construction_ticks_remaining == 0 {
+            pipe.under_construction = false;
+            completed.push((pipe.from, pipe.to));
+        }
+    }
+    completed
+}
+
+/// Demolish an existing pipe (by from/to). Refunds 50% of build cost to source buffer.
+/// Returns true if the pipe was found and removed.
+pub fn demolish_pipe(loom: &mut LoomState, from: NodeId, to: NodeId) -> bool {
+    let idx = loom
+        .persistent
+        .pipes
+        .iter()
+        .position(|p| p.from == from && p.to == to);
+    let Some(idx) = idx else {
+        return false;
+    };
+
+    loom.persistent.pipes.remove(idx);
+
+    // Refund 50% of build cost to source node's buffer (no cap — refund bypasses normal limits).
+    if let Some(src) = loom.persistent.nodes.iter_mut().find(|n| n.id == from) {
+        src.buffer += PIPE_BUILD_COST * 0.5;
+    }
+
+    // Rebalance remaining outgoing pipes.
+    rebalance_split_ratios(loom, from);
+
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -956,6 +1145,182 @@ mod tests {
                 (n.unlock_progress - 1.4).abs() < 0.01,
                 "expected ~1.4hr progress, got {}",
                 n.unlock_progress
+            );
+        }
+    }
+
+    // ── Phase 4: Pipe Building tests ──────────────────────────────────────────
+
+    fn loom_with_two_unlocked_nodes() -> LoomState {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        // Unlock VoidCondenser manually (second archetype node).
+        tick_loom_staggered_unlock(&mut loom, SECOND_NODE_UNLOCK_SECONDS);
+        // Give EmberSpindle enough buffer and capacity to pay build cost and receive refunds.
+        let ember = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        ember.buffer_capacity = 200.0;
+        ember.buffer = 100.0;
+        loom
+    }
+
+    #[test]
+    fn test_build_pipe_succeeds() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        let result = try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser);
+        assert_eq!(result, Ok(()));
+        assert_eq!(loom.persistent.pipes.len(), 1);
+        assert!(loom.persistent.pipes[0].under_construction);
+    }
+
+    #[test]
+    fn test_build_pipe_deducts_cost() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        let before = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer;
+        try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser).unwrap();
+        let after = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer;
+        assert!((before - after - PIPE_BUILD_COST).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_build_pipe_fails_same_node() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        let result = try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::EmberSpindle);
+        assert_eq!(result, Err(PipeBuildError::SameNode));
+    }
+
+    #[test]
+    fn test_build_pipe_fails_locked_destination() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        // VoidCondenser still locked.
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer = 100.0;
+        let result = try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser);
+        assert_eq!(result, Err(PipeBuildError::DestNotUnlocked));
+    }
+
+    #[test]
+    fn test_build_pipe_fails_duplicate() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser).unwrap();
+        // Restore buffer.
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer = 100.0;
+        let result = try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser);
+        assert_eq!(result, Err(PipeBuildError::AlreadyExists));
+    }
+
+    #[test]
+    fn test_build_pipe_fails_insufficient_resources() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer = 0.0;
+        let result = try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser);
+        assert_eq!(result, Err(PipeBuildError::InsufficientResources));
+    }
+
+    #[test]
+    fn test_pipe_construction_completes_after_ticks() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser).unwrap();
+        assert!(loom.persistent.pipes[0].under_construction);
+
+        // Run all construction ticks.
+        for _ in 0..PIPE_CONSTRUCTION_TICKS {
+            tick_pipe_construction(&mut loom);
+        }
+
+        assert!(!loom.persistent.pipes[0].under_construction);
+    }
+
+    #[test]
+    fn test_demolish_pipe_removes_and_refunds() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser).unwrap();
+        let buffer_after_build = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer;
+
+        let removed = demolish_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser);
+        assert!(removed);
+        assert!(loom.persistent.pipes.is_empty());
+
+        let buffer_after_demolish = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer;
+        let refund = PIPE_BUILD_COST * 0.5;
+        assert!((buffer_after_demolish - buffer_after_build - refund).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_split_ratios_rebalanced_on_build() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        // Unlock a third node to pipe to two destinations.
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::ReflectionLens)
+            .unwrap()
+            .unlocked = true;
+
+        try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser).unwrap();
+        // Restore buffer.
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer = 100.0;
+        try_build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::ReflectionLens).unwrap();
+
+        // Both outgoing pipes should share 50% each.
+        for pipe in loom
+            .persistent
+            .pipes
+            .iter()
+            .filter(|p| p.from == NodeId::EmberSpindle)
+        {
+            assert!(
+                (pipe.split_ratio - 0.5).abs() < 0.001,
+                "expected 0.5 split, got {}",
+                pipe.split_ratio
             );
         }
     }
