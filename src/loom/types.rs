@@ -102,6 +102,10 @@ pub struct LoomNode {
     pub base_rate: f64,
     #[serde(default)]
     pub stalled: bool,
+    /// Accumulated unlock progress in hours (contributed by unlocked neighbors).
+    /// When this reaches the threshold (2.0 hours), the node unlocks.
+    #[serde(default)]
+    pub unlock_progress: f64,
 }
 
 fn default_node_level() -> u32 {
@@ -126,6 +130,7 @@ impl LoomNode {
             buffer_capacity: 20.0, // 4 hours at 5/hr base
             base_rate: 5.0,
             stalled: false,
+            unlock_progress: 0.0,
         }
     }
 }
@@ -184,6 +189,9 @@ pub struct WovenPattern {
     pub sustain_seconds: u32,
     #[serde(default)]
     pub sustained_seconds: u32,
+    /// Sub-second fractional carry so that 10 × 0.1s ticks accumulate to 1s.
+    #[serde(default)]
+    pub sustained_seconds_frac: f64,
     #[serde(default)]
     pub completed: bool,
 }

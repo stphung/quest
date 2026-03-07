@@ -59,7 +59,7 @@ pub(super) fn handle_loom(
                     1 => crate::loom::types::LoomArchetype::ReachWide,
                     _ => crate::loom::types::LoomArchetype::RunDeep,
                 };
-                loom_state.persistent.archetype = Some(archetype);
+                crate::loom::select_archetype(loom_state, archetype);
                 loom_ui.view = LoomView::FlowView;
                 return InputResult::NeedsSave;
             }

@@ -38,7 +38,6 @@ pub fn route_game_input(
     result: InputResult,
     ctx: &GameContext<'_>,
     character_manager: &CharacterManager,
-    loom_state: &LoomState,
     last_save_instant: &mut Option<Instant>,
     last_save_time: &mut Option<chrono::DateTime<Local>>,
 ) -> InputAction {
@@ -47,6 +46,7 @@ pub fn route_game_input(
     let haven = &*ctx.haven;
     let enhancement = &*ctx.enhancement;
     let deep = &*ctx.deep_state;
+    let loom_state = &*ctx.loom_state;
     let debug_mode = ctx.debug_mode;
 
     match result {

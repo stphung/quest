@@ -7,7 +7,7 @@ use crate::deep::types::{DeepState, DeepUiState};
 use crate::enhancement::EnhancementProgress;
 use crate::haven::Haven;
 use crate::input::{GameOverlay, HavenUiState, SoulforgeUiState};
-use crate::loom::LoomUiState;
+use crate::loom::{LoomState, LoomUiState};
 use crate::stormglass::types::{ChronoSurgeState, ChronoSurgeSummary, ExchangeUiState};
 use crate::ui::responsive::LayoutContext;
 use crate::utils::debug_menu::DebugMenu;
@@ -29,6 +29,7 @@ pub struct GameContext<'a> {
     pub debug_menu: &'a mut DebugMenu,
     pub debug_mode: bool,
     pub achievements: &'a mut Achievements,
+    pub loom_state: &'a mut LoomState,
     pub loom_ui: &'a mut LoomUiState,
 }
 

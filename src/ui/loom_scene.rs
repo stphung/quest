@@ -7,9 +7,11 @@
 //!   - ListDetail:         node list + detail panel placeholder
 //!   - Codex:              recipe codex placeholder
 
+#[allow(unused_imports)]
+use crate::loom::patterns::{active_pattern_requirement_status, all_patterns_complete};
 use crate::loom::types::{LoomArchetype, LoomState, LoomUiState, LoomView};
 use ratatui::{
-    layout::{Alignment, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
@@ -58,7 +60,7 @@ pub fn render_loom_overlay(
             render_archetype_selection(frame, inner, loom_state, ui);
         }
         LoomView::FlowView => {
-            render_flow_view(frame, inner);
+            render_flow_view(frame, inner, loom_state);
         }
         LoomView::ListDetail => {
             render_list_detail(frame, inner, ui);
@@ -167,7 +169,19 @@ fn render_archetype_selection(
     frame.render_widget(para, area);
 }
 
-fn render_flow_view(frame: &mut Frame, area: Rect) {
+fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
+    // Reserve 4 rows at the bottom for the pattern bar when patterns are initialized.
+    let has_patterns = !loom_state.persistent.patterns.is_empty();
+    let pattern_bar_height = if has_patterns { 4u16 } else { 0u16 };
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(pattern_bar_height)])
+        .split(area);
+
+    let diagram_area = chunks[0];
+    let pattern_area = chunks[1];
+
     let lines = vec![
         Line::from(""),
         Line::from(Span::styled(
@@ -197,7 +211,11 @@ fn render_flow_view(frame: &mut Frame, area: Rect) {
     let para = Paragraph::new(lines)
         .alignment(Alignment::Left)
         .style(Style::default().bg(Color::Rgb(10, 5, 18)));
-    frame.render_widget(para, area);
+    frame.render_widget(para, diagram_area);
+
+    if has_patterns {
+        render_pattern_bar(frame, pattern_area, loom_state);
+    }
 }
 
 fn render_list_detail(frame: &mut Frame, area: Rect, ui: &LoomUiState) {
@@ -288,6 +306,144 @@ fn render_codex(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
         .alignment(Alignment::Left)
         .style(Style::default().bg(Color::Rgb(10, 5, 18)));
     frame.render_widget(para, area);
+}
+
+// ── Pattern bar ───────────────────────────────────────────────────────────────
+
+/// Render the always-visible pattern progress bar at the bottom of Flow View.
+///
+/// Shows: pattern name + index, per-requirement checkmarks, sustain progress bar.
+/// When all patterns are complete, shows a completion message.
+fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
+    if area.height == 0 {
+        return;
+    }
+
+    let empty_rates = std::collections::HashMap::new();
+    let req_status = active_pattern_requirement_status(&loom_state.persistent, &empty_rates);
+    let all_done = all_patterns_complete(&loom_state.persistent);
+
+    let block = Block::default()
+        .borders(Borders::TOP)
+        .border_style(Style::default().fg(Color::Rgb(100, 60, 140)));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if inner.height == 0 {
+        return;
+    }
+
+    if all_done {
+        let line = Line::from(Span::styled(
+            " \u{2728} Loom Mended \u{2014} All 18 Patterns Complete",
+            Style::default().fg(Color::Rgb(255, 215, 0)),
+        ));
+        frame.render_widget(
+            Paragraph::new(line).style(Style::default().bg(Color::Rgb(10, 5, 18))),
+            inner,
+        );
+        return;
+    }
+
+    let Some(pattern) = loom_state
+        .persistent
+        .patterns
+        .get(loom_state.persistent.active_pattern)
+    else {
+        return;
+    };
+
+    let pattern_count = loom_state.persistent.patterns.len();
+    let active_idx = loom_state.persistent.active_pattern;
+
+    // Line 1: pattern name and index.
+    let pattern_title = format!(
+        " PATTERN {}/{}: \"{}\"",
+        active_idx + 1,
+        pattern_count,
+        pattern.name
+    );
+
+    // Line 2: per-requirement status chips (check/cross + resource + rate).
+    let mut req_spans: Vec<Span> = vec![Span::raw(" ")];
+    for (i, req) in pattern.requirements.iter().enumerate() {
+        let met = req_status.get(i).copied().unwrap_or(false);
+        let check = if met { "\u{2713}" } else { "\u{2717}" };
+        let color = if met {
+            Color::Rgb(80, 200, 120)
+        } else {
+            Color::Rgb(200, 80, 80)
+        };
+        let res_name = resource_name(&req.resource);
+        req_spans.push(Span::styled(
+            format!("{} {} {:.0}/hr ", check, res_name, req.rate_per_hour),
+            Style::default().fg(color),
+        ));
+        if i + 1 < pattern.requirements.len() {
+            req_spans.push(Span::styled(
+                "\u{2502} ",
+                Style::default().fg(Color::DarkGray),
+            ));
+        }
+    }
+
+    // Line 3: progress bar.
+    let progress_line = build_progress_line(
+        pattern.sustained_seconds,
+        pattern.sustain_seconds,
+        inner.width,
+    );
+
+    let mut lines: Vec<Line> = vec![
+        Line::from(Span::styled(
+            pattern_title,
+            Style::default().fg(Color::Rgb(200, 160, 240)),
+        )),
+        Line::from(req_spans),
+        progress_line,
+    ];
+    lines.truncate(inner.height as usize);
+
+    frame.render_widget(
+        Paragraph::new(lines).style(Style::default().bg(Color::Rgb(10, 5, 18))),
+        inner,
+    );
+}
+
+/// Build the sustain progress bar line.
+fn build_progress_line(sustained: u32, total: u32, width: u16) -> Line<'static> {
+    if total == 0 {
+        return Line::from("");
+    }
+
+    let elapsed_str = format_mmss(sustained);
+    let total_str = format_mmss(total);
+
+    let label_prefix = " Weaving: ";
+    let time_suffix = format!("  {}/{}", elapsed_str, total_str);
+    let bar_width = (width as usize)
+        .saturating_sub(label_prefix.len() + time_suffix.len() + 2)
+        .min(40);
+
+    let filled = ((sustained as usize * bar_width) / (total as usize)).min(bar_width);
+    let empty = bar_width.saturating_sub(filled);
+
+    let bar = format!(
+        "{}{}{}{}",
+        label_prefix,
+        "\u{2588}".repeat(filled),
+        "\u{2591}".repeat(empty),
+        time_suffix,
+    );
+
+    Line::from(Span::styled(
+        bar,
+        Style::default().fg(Color::Rgb(160, 100, 220)),
+    ))
+}
+
+fn format_mmss(seconds: u32) -> String {
+    format!("{}:{:02}", seconds / 60, seconds % 60)
 }
 
 // ── Navigation hints ──────────────────────────────────────────────────────────

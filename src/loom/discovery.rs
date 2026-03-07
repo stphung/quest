@@ -177,6 +177,7 @@ fn pattern(
             .collect(),
         sustain_seconds,
         sustained_seconds: 0,
+        sustained_seconds_frac: 0.0,
         completed: false,
     }
 }

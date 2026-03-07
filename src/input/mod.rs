@@ -51,6 +51,8 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
     let debug_menu = &mut *ctx.debug_menu;
     let debug_mode = ctx.debug_mode;
     let achievements = &mut *ctx.achievements;
+    let loom_state = &mut *ctx.loom_state;
+    let loom_ui = &mut *ctx.loom_ui;
 
     // 0. Offline welcome overlay (any key dismisses)
     if matches!(overlay, GameOverlay::OfflineWelcome { .. }) {
@@ -255,6 +257,11 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
         return handle_deep(key, deep_state, deep_ui, state, achievements);
     }
 
+    // 2.9. The Loom of Worlds overlay
+    if loom_ui.open {
+        return loom_input::handle_loom(key, loom_state, loom_ui);
+    }
+
     // 3. Vault item selection
     if matches!(overlay, GameOverlay::VaultSelection { .. }) {
         return handle_vault_selection(
@@ -325,6 +332,18 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
     // 8. Tab to open challenge menu
     if key.code == KeyCode::Tab && !state.challenge_menu.challenges.is_empty() {
         state.challenge_menu.open();
+        return InputResult::Continue;
+    }
+
+    // 8.5. Loom of Worlds toggle (L key)
+    if matches!(key.code, KeyCode::Char('l') | KeyCode::Char('L'))
+        && loom_state.persistent.discovered
+    {
+        // If no archetype chosen yet, show archetype selection.
+        if loom_state.persistent.archetype.is_none() {
+            loom_ui.view = crate::loom::LoomView::ArchetypeSelection;
+        }
+        loom_ui.open = true;
         return InputResult::Continue;
     }
 

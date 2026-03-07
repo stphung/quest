@@ -617,6 +617,7 @@ fn main() -> io::Result<()> {
                                     debug_menu: &mut debug_menu,
                                     debug_mode,
                                     achievements: &mut global_achievements,
+                                    loom_state: &mut loom_state,
                                     loom_ui: &mut loom_ui,
                                 };
                                 let extras = main_helpers::game_context::OverlayExtras {
@@ -754,6 +755,7 @@ fn main() -> io::Result<()> {
                                         debug_menu: &mut debug_menu,
                                         debug_mode,
                                         achievements: &mut global_achievements,
+                                        loom_state: &mut loom_state,
                                         loom_ui: &mut loom_ui,
                                     };
                                     input::handle_game_input(key_event, &mut ctx)
@@ -867,13 +869,13 @@ fn main() -> io::Result<()> {
                                         debug_menu: &mut debug_menu,
                                         debug_mode,
                                         achievements: &mut global_achievements,
+                                        loom_state: &mut loom_state,
                                         loom_ui: &mut loom_ui,
                                     };
                                     route_game_input(
                                         result,
                                         &route_ctx,
                                         &character_manager,
-                                        &loom_state,
                                         &mut last_save_instant,
                                         &mut last_save_time,
                                     )
