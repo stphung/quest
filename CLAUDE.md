@@ -87,7 +87,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 | Input | `src/input/` | [CLAUDE.md](src/input/CLAUDE.md) | Keyboard input routing |
 | UI | `src/ui/` | [CLAUDE.md](src/ui/CLAUDE.md) | Terminal UI components (Ratatui) |
 | Utils | `src/utils/` | [CLAUDE.md](src/utils/CLAUDE.md) | Build info, updater, debug menu |
-| Loom | `src/loom/` | [CLAUDE.md](src/loom/CLAUDE.md) | Resource production chains, refineries, pipes |
+| Loom | `src/loom/` | [CLAUDE.md](src/loom/CLAUDE.md) | Resource production chains, direct-pull refineries |
 | Main Helpers | `src/main_helpers/` | [CLAUDE.md](src/main_helpers/CLAUDE.md) | Orchestration between main.rs and domain modules |
 
 ### Simulators
