@@ -479,6 +479,14 @@ pub fn tick_refinery_pull(
     let delta_hours = delta_seconds / 3600.0;
     let mut produced: std::collections::HashMap<Resource, f64> = std::collections::HashMap::new();
 
+    // ── Pre-compute per-node throughput multipliers before mutable borrow ──
+    let node_multipliers: std::collections::HashMap<NodeId, f64> = loom
+        .persistent
+        .nodes
+        .iter()
+        .map(|n| (n.id, node_throughput_multiplier(loom, n.id)))
+        .collect();
+
     // ── Step 1: Count consumers per source across all non-construction refineries ──
     let mut consumer_count: std::collections::HashMap<LoomNodeRef, usize> =
         std::collections::HashMap::new();
@@ -514,8 +522,12 @@ pub fn tick_refinery_pull(
                 .sources_a
                 .iter()
                 .map(|&src| {
-                    let available =
-                        source_available_rate(src, &loom.persistent, &refinery_output_rates);
+                    let available = source_available_rate(
+                        src,
+                        &loom.persistent,
+                        &refinery_output_rates,
+                        &node_multipliers,
+                    );
                     let consumers = consumer_count.get(&src).copied().unwrap_or(1).max(1);
                     let share = available / consumers as f64;
                     share.min(cap)
@@ -528,8 +540,12 @@ pub fn tick_refinery_pull(
                 .sources_b
                 .iter()
                 .map(|&src| {
-                    let available =
-                        source_available_rate(src, &loom.persistent, &refinery_output_rates);
+                    let available = source_available_rate(
+                        src,
+                        &loom.persistent,
+                        &refinery_output_rates,
+                        &node_multipliers,
+                    );
                     let consumers = consumer_count.get(&src).copied().unwrap_or(1).max(1);
                     let share = available / consumers as f64;
                     share.min(cap)
@@ -564,11 +580,13 @@ fn source_available_rate(
     src: LoomNodeRef,
     persistent: &super::types::LoomPersistent,
     refinery_rates: &[f64],
+    node_multipliers: &std::collections::HashMap<NodeId, f64>,
 ) -> f64 {
     match src {
         LoomNodeRef::Extractor(node_id) => {
             if let Some(node) = persistent.nodes.iter().find(|n| n.id == node_id) {
-                node_effective_rate_from_node(node)
+                let throughput_mult = node_multipliers.get(&node_id).copied().unwrap_or(1.0);
+                node_effective_rate_from_node(node, throughput_mult)
             } else {
                 0.0
             }
@@ -578,11 +596,11 @@ fn source_available_rate(
 }
 
 /// Compute a node's effective rate without needing the full LoomState borrow.
-fn node_effective_rate_from_node(node: &LoomNode) -> f64 {
+fn node_effective_rate_from_node(node: &LoomNode, throughput_multiplier: f64) -> f64 {
     if !node.unlocked {
         return 0.0;
     }
-    node.base_rate * node_level_multiplier(node.level)
+    node.base_rate * node_level_multiplier(node.level) * throughput_multiplier
 }
 
 /// Record a recipe discovery in the codex.
@@ -2515,5 +2533,97 @@ mod external_bonus_tests {
             vec![],
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_tick_refinery_pull_applies_throughput_multiplier() {
+        // BurnBright gives EmberSpindle 1.5x throughput.
+        // Base rate at level 1 = 5.0, so effective = 7.5/hr.
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+
+        // Unlock both sources.
+        let ember = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        assert!(ember.unlocked); // BurnBright starts with EmberSpindle unlocked
+        let void_node = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::VoidCondenser)
+            .unwrap();
+        void_node.unlocked = true;
+
+        let mut r = Refinery::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        r.under_construction = false;
+        loom.persistent.refineries.push(r);
+
+        // Run for exactly 1 hour.
+        let produced = tick_refinery_pull(&mut loom, 3600.0);
+        let forged = produced.get(&Resource::ForgedLight).copied().unwrap_or(0.0);
+
+        // T1 intake cap = 2.0/hr. VoidCondenser base rate = 5.0/hr (no multiplier).
+        // EmberSpindle effective = 5.0 * 1.5 = 7.5/hr (with BurnBright).
+        // pull_a = min(7.5, 2.0 cap) = 2.0; pull_b = min(5.0, 2.0 cap) = 2.0
+        // output = min(2.0, 2.0) * 1.0 = 2.0/hr => 2.0 in 1 hour.
+        assert!(
+            (forged - 2.0).abs() < 0.01,
+            "expected ~2.0 ForgedLight, got {forged}"
+        );
+    }
+
+    #[test]
+    fn test_tick_refinery_pull_contention_splits_evenly() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+
+        // Unlock sources.
+        let void_node = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::VoidCondenser)
+            .unwrap();
+        void_node.unlocked = true;
+
+        // Two T1 refineries both pulling from EmberSpindle (and VoidCondenser).
+        for _ in 0..2 {
+            let mut r = Refinery::new(
+                Resource::Ember,
+                Resource::VoidEssence,
+                NodeNature::Heat,
+                Resource::ForgedLight,
+                1.0,
+                1,
+                vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+                vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+            );
+            r.under_construction = false;
+            loom.persistent.refineries.push(r);
+        }
+
+        let produced = tick_refinery_pull(&mut loom, 3600.0);
+        let forged = produced.get(&Resource::ForgedLight).copied().unwrap_or(0.0);
+
+        // EmberSpindle effective = 7.5/hr (BurnBright), split 2 ways = 3.75 each, capped at 2.0.
+        // VoidCondenser = 5.0/hr, split 2 ways = 2.5 each, capped at 2.0.
+        // Each refinery: min(2.0, 2.0) * 1.0 = 2.0/hr. Total = 4.0/hr => 4.0 in 1 hour.
+        assert!(
+            (forged - 4.0).abs() < 0.01,
+            "expected ~4.0 ForgedLight from two refineries, got {forged}"
+        );
     }
 }
