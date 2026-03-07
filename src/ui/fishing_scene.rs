@@ -261,6 +261,46 @@ impl Shape for SkyShape {
             }
         }
 
+        // 1d. High-altitude wisps — faint diagonal streaks in upper sky
+        {
+            let wisps: [(f64, f64, f64, i32, f64); 4] = [
+                // (base_x, y_ratio, drift_speed, length, brightness_boost)
+                (8.0, 0.15, 0.012, 5, 0.04),
+                (22.0, 0.22, 0.010, 4, 0.03),
+                (38.0, 0.12, 0.014, 6, 0.05),
+                (52.0, 0.20, 0.009, 3, 0.03),
+            ];
+
+            for &(base_x, y_ratio, drift_speed, length, boost) in &wisps {
+                let drift = (self.wave_tick * drift_speed) % self.width as f64;
+                let start_x = (base_x + drift).rem_euclid(self.width as f64) as i32;
+                let row = (sky_py as f64 * y_ratio).round() as usize;
+                if row >= sky_py.saturating_sub(2) {
+                    continue;
+                }
+
+                for dx in 0..length {
+                    let gx = ((start_x + dx) as usize % self.width) as i32;
+                    // Slight diagonal: every 2 pixels, shift down 1
+                    let dy = dx / 2;
+                    let gy = row + dy as usize;
+                    if gy >= sky_py {
+                        continue;
+                    }
+
+                    let py_t = gy as f64 / (sky_py - 1).max(1) as f64;
+                    let base = lerp_rgb(top, low, py_t);
+                    // Brighten slightly
+                    let wisp_color = (
+                        base.0.saturating_add((boost * 255.0) as u8),
+                        base.1.saturating_add((boost * 255.0) as u8),
+                        base.2.saturating_add((boost * 240.0) as u8),
+                    );
+                    self.paint_px(painter, gx, gy as i32, wisp_color);
+                }
+            }
+        }
+
         // 2. Celestial body — pixel circle with halo
         let orb_col =
             (self.width as f64 * 0.78 + (self.wave_tick * 0.08).sin() * 3.0).round() as i32;
