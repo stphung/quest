@@ -794,8 +794,22 @@ impl Shape for WaterSurface {
             return;
         }
 
-        let near = lerp_rgb((48, 136, 192), (30, 70, 112), self.dusk);
-        let deep = lerp_rgb((10, 60, 112), (5, 22, 52), self.dusk);
+        // Tidal pulse — overall luminosity breathes in/out over ~10 seconds
+        let tidal = (self.wave_tick * 0.01).sin() * 0.5 + 0.5; // 0..1
+        let tidal_shift = ((tidal - 0.5) * 0.06 * 255.0).round() as i8;
+
+        let near_base = lerp_rgb((48, 136, 192), (30, 70, 112), self.dusk);
+        let deep_base = lerp_rgb((10, 60, 112), (5, 22, 52), self.dusk);
+        // Apply tidal pulse to the base palette
+        let apply_tidal = |c: (u8, u8, u8)| -> (u8, u8, u8) {
+            (
+                (c.0 as i16 + tidal_shift as i16).clamp(0, 255) as u8,
+                (c.1 as i16 + tidal_shift as i16).clamp(0, 255) as u8,
+                (c.2 as i16 + (tidal_shift as i16 / 2)).clamp(0, 255) as u8,
+            )
+        };
+        let near = apply_tidal(near_base);
+        let deep = apply_tidal(deep_base);
         let sky_low = lerp_rgb((210, 232, 252), (116, 96, 132), self.dusk);
 
         for gy in 0..total_py {
@@ -935,6 +949,51 @@ impl Shape for WaterSurface {
                         let fade = (1.0 - (wake_depth - 4.0) / 20.0) * 0.25;
                         let sharpness = 1.0 - dist_to_arm / 1.5;
                         color = lerp_rgb(color, (200, 240, 255), fade * sharpness);
+                    }
+                }
+
+                // Depth ripples — expanding dark rings in deeper water
+                if depth_t > 0.4 {
+                    // Two ripple sources at fixed positions, staggered timing
+                    for &(cx_ratio, cy_ratio, phase) in
+                        &[(0.3f64, 0.65f64, 0.0f64), (0.7, 0.75, 5.0)]
+                    {
+                        let rcx = (self.width as f64 * cx_ratio).round();
+                        let rcy = total_py as f64 * cy_ratio;
+                        let dx = gx as f64 - rcx;
+                        let dy = gy as f64 - rcy;
+                        let dist = (dx * dx + dy * dy).sqrt();
+
+                        // Ring expands over ~8 seconds then resets
+                        let ring_time = (self.wave_tick * 0.02 + phase) % 6.0;
+                        let ring_radius = ring_time * 4.0;
+                        let ring_width = 1.5;
+                        let ring_dist = (dist - ring_radius).abs();
+
+                        if ring_dist < ring_width && ring_time < 5.0 {
+                            let fade = (1.0 - ring_time / 5.0) * (1.0 - ring_dist / ring_width);
+                            let darken = (fade * 0.12 * 255.0).round() as u8;
+                            color = (
+                                color.0.saturating_sub(darken),
+                                color.1.saturating_sub(darken / 2),
+                                color.2.saturating_sub(darken / 3),
+                            );
+                        }
+                    }
+                }
+
+                // Wave spray — bright pixels above waterline on rogue crests
+                if gy == 0 && wave > 0.85 {
+                    let spray_strength = ((wave - 0.85) / 0.15).min(1.0);
+                    // Paint a spray pixel into the sky zone (1px above water)
+                    let spray_gy = self.sky_pixels.saturating_sub(1);
+                    if spray_gy > 0 {
+                        let spray_color = lerp_rgb(color, (240, 248, 255), spray_strength * 0.6);
+                        painter.paint(
+                            gx,
+                            spray_gy,
+                            Color::Rgb(spray_color.0, spray_color.1, spray_color.2),
+                        );
                     }
                 }
 
