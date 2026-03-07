@@ -86,6 +86,76 @@ pub enum Resource {
     WovenReality,
 }
 
+/// Unified address for any node in the Loom — either a fixed Extractor or a built Refinery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum LoomNodeRef {
+    /// One of the 6 fixed extractor nodes.
+    Extractor(NodeId),
+    /// A player-built refinery, identified by index in `LoomPersistent::refineries`.
+    Refinery(usize),
+}
+
+/// A player-built processing node that runs a single locked recipe.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Refinery {
+    /// First input resource for this refinery's locked recipe.
+    pub input_a: Resource,
+    /// Second input resource for this refinery's locked recipe.
+    pub input_b: Resource,
+    /// The nature catalyst for this refinery's recipe.
+    pub nature: NodeNature,
+    /// Output resource produced.
+    pub output: Resource,
+    /// Output amount multiplier from the recipe.
+    pub amount: f64,
+    /// Recipe tier (1, 2, or 3).
+    pub tier: u8,
+    /// Current buffer level (holds output resource).
+    #[serde(default)]
+    pub buffer: f64,
+    /// Buffer capacity.
+    #[serde(default = "default_buffer_capacity")]
+    pub buffer_capacity: f64,
+    /// Refinery level (for future upgrades).
+    #[serde(default = "default_node_level")]
+    pub level: u32,
+    /// Whether this refinery is stalled (missing inputs or buffer full).
+    #[serde(default)]
+    pub stalled: bool,
+    /// Whether currently under construction.
+    #[serde(default)]
+    pub under_construction: bool,
+    /// Ticks remaining for construction.
+    #[serde(default)]
+    pub construction_ticks_remaining: u32,
+}
+
+impl Refinery {
+    pub fn new(
+        input_a: Resource,
+        input_b: Resource,
+        nature: NodeNature,
+        output: Resource,
+        amount: f64,
+        tier: u8,
+    ) -> Self {
+        Self {
+            input_a,
+            input_b,
+            nature,
+            output,
+            amount,
+            tier,
+            buffer: 0.0,
+            buffer_capacity: 20.0,
+            level: 1,
+            stalled: false,
+            under_construction: false,
+            construction_ticks_remaining: 0,
+        }
+    }
+}
+
 /// A single processing node in the Loom.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoomNode {
@@ -224,6 +294,17 @@ pub struct LoomPersistent {
     pub stockpiles: HashMap<Resource, f64>,
     #[serde(default)]
     pub second_node_unlock_elapsed: Option<f64>,
+    /// Player-built refineries (recipe-locked processing nodes).
+    #[serde(default)]
+    pub refineries: Vec<Refinery>,
+}
+
+impl LoomPersistent {
+    /// Maximum number of Refineries the player can build.
+    /// Equal to the number of completed Woven Patterns.
+    pub fn max_refineries(&self) -> usize {
+        self.patterns.iter().filter(|p| p.completed).count()
+    }
 }
 
 fn default_nodes() -> Vec<LoomNode> {
@@ -242,6 +323,7 @@ impl Default for LoomPersistent {
             patterns: Vec::new(),
             stockpiles: HashMap::new(),
             second_node_unlock_elapsed: None,
+            refineries: Vec::new(),
         }
     }
 }
@@ -322,5 +404,52 @@ mod tests {
         assert!(state.persistent.pipes.is_empty());
         assert!(state.persistent.codex.is_empty());
         assert_eq!(state.persistent.active_pattern, 0);
+    }
+
+    #[test]
+    fn test_loom_node_ref_equality() {
+        let ext_a = LoomNodeRef::Extractor(NodeId::EmberSpindle);
+        let ext_b = LoomNodeRef::Extractor(NodeId::EmberSpindle);
+        let ref_a = LoomNodeRef::Refinery(0);
+        let ref_b = LoomNodeRef::Refinery(0);
+        let ref_c = LoomNodeRef::Refinery(1);
+        assert_eq!(ext_a, ext_b);
+        assert_eq!(ref_a, ref_b);
+        assert_ne!(ext_a, ref_a);
+        assert_ne!(ref_a, ref_c);
+    }
+
+    #[test]
+    fn test_refinery_new() {
+        let r = Refinery::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+        );
+        assert_eq!(r.input_a, Resource::Ember);
+        assert_eq!(r.input_b, Resource::VoidEssence);
+        assert_eq!(r.nature, NodeNature::Heat);
+        assert_eq!(r.output, Resource::ForgedLight);
+        assert!((r.amount - 1.0).abs() < 0.001);
+        assert_eq!(r.tier, 1);
+        assert!(!r.stalled);
+        assert!((r.buffer - 0.0).abs() < 0.001);
+        assert!((r.buffer_capacity - 20.0).abs() < 0.001);
+        assert_eq!(r.level, 1);
+    }
+
+    #[test]
+    fn test_loom_state_default_has_empty_refineries() {
+        let state = LoomState::new();
+        assert!(state.persistent.refineries.is_empty());
+    }
+
+    #[test]
+    fn test_refinery_limit_zero_with_no_patterns() {
+        let state = LoomState::new();
+        assert_eq!(state.persistent.max_refineries(), 0);
     }
 }

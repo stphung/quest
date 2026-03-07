@@ -34,6 +34,7 @@ pub use pipes::{
 };
 #[allow(unused_imports)]
 pub use types::{
-    CodexEntry, LoomArchetype, LoomNode, LoomPersistent, LoomState, LoomUiState, LoomView, NodeId,
-    NodeNature, PatternRequirement, Pipe, PipeTier, Resource, WovenPattern,
+    CodexEntry, LoomArchetype, LoomNode, LoomNodeRef, LoomPersistent, LoomState, LoomUiState,
+    LoomView, NodeId, NodeNature, PatternRequirement, Pipe, PipeTier, Refinery, Resource,
+    WovenPattern,
 };
