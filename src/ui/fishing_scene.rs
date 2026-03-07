@@ -371,6 +371,75 @@ impl Shape for SkyShape {
             }
         }
 
+        // 4b. Birds — small V-shapes drifting across the sky with wing flap
+        {
+            let birds: [(f64, f64, f64); 3] = [
+                // (base_x, y_ratio, speed)
+                (5.0, 0.22, 0.035),
+                (25.0, 0.14, 0.028),
+                (42.0, 0.30, 0.042),
+            ];
+            // Wing flap: alternate every ~2 seconds
+            let flap_phase = ((self.wave_tick * 0.08) as usize).is_multiple_of(2);
+
+            for &(base_x, y_ratio, speed) in &birds {
+                let drift = (self.wave_tick * speed) % self.width as f64;
+                let cx = (base_x + drift).rem_euclid(self.width as f64).round() as i32;
+                let row = (self.horizon as f64 * y_ratio).round() as usize;
+                let gy = (row * 2) as i32;
+
+                // Bird color: dark silhouette, slightly lighter at dusk
+                let bird_color = lerp_rgb((40, 40, 50), (70, 65, 80), self.dusk);
+
+                if flap_phase {
+                    // Wings up: v shape
+                    self.paint_px(painter, cx - 1, gy - 1, bird_color);
+                    self.paint_px(painter, cx, gy, bird_color);
+                    self.paint_px(painter, cx + 1, gy - 1, bird_color);
+                } else {
+                    // Wings down: ^ shape
+                    self.paint_px(painter, cx - 1, gy + 1, bird_color);
+                    self.paint_px(painter, cx, gy, bird_color);
+                    self.paint_px(painter, cx + 1, gy + 1, bird_color);
+                }
+            }
+        }
+
+        // 4c. Wind streaks — faint diagonal lines drifting across upper sky
+        {
+            let streaks: [(f64, f64, f64, i32); 4] = [
+                // (base_x, y_ratio, speed, length)
+                (3.0, 0.08, 0.07, 4),
+                (19.0, 0.18, 0.06, 3),
+                (35.0, 0.10, 0.08, 5),
+                (50.0, 0.24, 0.055, 3),
+            ];
+
+            for &(base_x, y_ratio, speed, length) in &streaks {
+                let drift = (self.wave_tick * speed) % self.width as f64;
+                let start_x = (base_x + drift).rem_euclid(self.width as f64).round() as i32;
+                let row = (sky_py as f64 * y_ratio).round() as usize;
+
+                for dx in 0..length {
+                    let gx = ((start_x + dx) as usize % self.width) as i32;
+                    // Very slight diagonal: 1px down every 3px across
+                    let gy = row as i32 + dx / 3;
+                    if gy < 0 || gy as usize >= sky_py {
+                        continue;
+                    }
+                    // Barely visible — just a few points brighter than sky
+                    let py_t = gy as f64 / (sky_py - 1).max(1) as f64;
+                    let base = lerp_rgb(top, low, py_t);
+                    let streak_color = (
+                        base.0.saturating_add(8),
+                        base.1.saturating_add(8),
+                        base.2.saturating_add(6),
+                    );
+                    self.paint_px(painter, gx, gy, streak_color);
+                }
+            }
+        }
+
         // 5. Bob Ross mountains — snow-capped peaks, rocky faces, evergreen tree line
         //
         // Two layers of asymmetric peaks. Each column is divided into vertical
