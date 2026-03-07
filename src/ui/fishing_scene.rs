@@ -508,6 +508,35 @@ impl Shape for SkyShape {
             }
         }
 
+        // 5c. Horizon mist — semi-transparent fog patches at mountain base
+        {
+            let mist_color_day = (180u8, 200, 215);
+            let mist_color_night = (100u8, 110, 130);
+            let mist_tint = lerp_rgb(mist_color_day, mist_color_night, self.dusk);
+            let mist_drift = (self.wave_tick * 0.024) % self.width as f64;
+            let mist_band = 4.min(sky_py); // 4 pixels tall max
+
+            for gy in (sky_py - mist_band)..sky_py {
+                let band_t = (sky_py - gy) as f64 / mist_band.max(1) as f64; // 1.0 at top, 0.0 at bottom
+                let base_opacity = 0.28 * band_t; // stronger at top, fading toward water
+
+                for gx in 0..self.width {
+                    // Patchy sine coverage with drift
+                    let patch = ((gx as f64 + mist_drift) * 0.09).sin()
+                        * ((gx as f64 + mist_drift * 1.3) * 0.17).cos();
+                    if patch < 0.1 {
+                        continue;
+                    }
+                    let opacity = base_opacity * ((patch - 0.1) / 0.9).min(1.0);
+
+                    let py_t = gy as f64 / (sky_py - 1).max(1) as f64;
+                    let base = lerp_rgb(top, low, py_t);
+                    let blended = lerp_rgb(base, mist_tint, opacity);
+                    painter.paint(gx, gy, Color::Rgb(blended.0, blended.1, blended.2));
+                }
+            }
+        }
+
         // 6. Sailboat sky — pixel art for pennant, sail, mast, rigging
         let mx = self.mast_x;
         let mt = self.mast_top * 2; // pixel y of mast_top row
