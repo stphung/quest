@@ -259,6 +259,7 @@ fn render_archetype_selection(
 // ── Factory floor rendering (Tasks 2-7) ──────────────────────────────────────
 
 /// Render the animated 2-row texture interior for a node.
+#[allow(clippy::too_many_arguments)]
 fn render_node_texture(
     buffer: &mut [Vec<SceneCell>],
     row: i32,
@@ -267,14 +268,51 @@ fn render_node_texture(
     node_id: crate::loom::types::NodeId,
     stalled: bool,
     unlocked: bool,
+    unlock_progress: f64,
 ) {
     use crate::loom::types::NodeId;
 
     if !unlocked {
-        let lock_text = "locked";
-        let start = col + (width as i32 - lock_text.len() as i32) / 2;
-        let dim = Color::Rgb(40, 30, 55);
-        put_text(buffer, row, start, lock_text, dim);
+        let dim = Color::Rgb(60, 45, 80);
+        if unlock_progress > 0.0 {
+            // Row 1: progress bar
+            let pct = (unlock_progress / 2.0).min(1.0);
+            let bar_w = width.min(10);
+            let filled = ((pct * bar_w as f64) as usize).min(bar_w);
+            let empty = bar_w.saturating_sub(filled);
+            let bar = format!("{}{}", "\u{2593}".repeat(filled), "\u{2591}".repeat(empty),);
+            let start = col + (width as i32 - bar.chars().count() as i32) / 2;
+            let progress_color = Color::Rgb(100, 80, 160);
+            for (i, ch) in bar.chars().enumerate() {
+                let fg = if i < filled {
+                    progress_color
+                } else {
+                    Color::Rgb(40, 30, 55)
+                };
+                put_cell(buffer, row, start + i as i32, ch, fg);
+            }
+            // Row 2: percentage
+            let pct_text = format!("{:.0}%", pct * 100.0);
+            let pct_start = col + (width as i32 - pct_text.len() as i32) / 2;
+            put_text(buffer, row + 1, pct_start, &pct_text, progress_color);
+        } else {
+            // Row 1: "locked"
+            let lock_text = "locked";
+            let start = col + (width as i32 - lock_text.len() as i32) / 2;
+            put_text(buffer, row, start, lock_text, dim);
+            // Row 2: "needs neighbor"
+            let hint = "needs neighbor";
+            let hint_w = hint.len().min(width);
+            let hint_text = &hint[..hint_w];
+            let hint_start = col + (width as i32 - hint_w as i32) / 2;
+            put_text(
+                buffer,
+                row + 1,
+                hint_start,
+                hint_text,
+                Color::Rgb(40, 30, 55),
+            );
+        }
         return;
     }
 
@@ -500,6 +538,7 @@ fn render_node_box(
         node.id,
         node.stalled,
         node.unlocked,
+        node.unlock_progress,
     );
 
     // Row 3: buffer bar.
@@ -538,6 +577,16 @@ fn render_node_box(
             };
             put_cell(buffer, top + 3, c + i as i32, ch, fg);
         }
+    } else {
+        // Locked node: show unlock progress as text
+        let progress_text = format!("{:.1}/2.0h", node.unlock_progress);
+        let start = left + 1 + (inner_w as i32 - progress_text.len() as i32) / 2;
+        let fg = if node.unlock_progress > 0.0 {
+            Color::Rgb(100, 80, 160)
+        } else {
+            Color::Rgb(60, 45, 80)
+        };
+        put_text(buffer, top + 3, start, &progress_text, fg);
     }
     put_cell(buffer, top + 3, left + w - 1, v, border_color);
 
@@ -892,10 +941,51 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
                 ),
                 Span::styled("] ", Style::default().fg(Color::DarkGray)),
                 Span::styled(
-                    format!("{:.1}h", node.unlock_progress),
+                    format!("{:.1}/2.0h", node.unlock_progress),
                     Style::default().fg(Color::Rgb(100, 80, 160)),
                 ),
             ]));
+        }
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            " Unlocks when a neighbor's",
+            Style::default().fg(Color::Rgb(60, 45, 80)),
+        )));
+        lines.push(Line::from(Span::styled(
+            " buffer reaches 50%",
+            Style::default().fg(Color::Rgb(60, 45, 80)),
+        )));
+        // Show which neighbors are unlocked
+        let neighbors = crate::loom::node_neighbors(node.id);
+        let unlocked_neighbors: Vec<&str> = neighbors
+            .iter()
+            .filter(|nid| {
+                loom_state
+                    .persistent
+                    .nodes
+                    .iter()
+                    .any(|n| n.id == **nid && n.unlocked)
+            })
+            .map(|nid| nid.name())
+            .collect();
+        if !unlocked_neighbors.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                " Active neighbors:",
+                Style::default().fg(Color::Rgb(80, 60, 110)),
+            )));
+            for name in &unlocked_neighbors {
+                lines.push(Line::from(Span::styled(
+                    format!("  \u{2022} {name}"),
+                    Style::default().fg(Color::Rgb(100, 80, 160)),
+                )));
+            }
+        } else {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                " No active neighbors yet",
+                Style::default().fg(Color::Rgb(60, 45, 80)),
+            )));
         }
     } else {
         lines.push(Line::from(""));
@@ -1976,10 +2066,14 @@ fn render_nav_hints(frame: &mut Frame, area: Rect, ui: &LoomUiState) {
         return;
     }
 
-    let hints = if ui.view == LoomView::ArchetypeSelection {
+    let hints = if ui.build.is_some() {
+        " [Up/Down] Select  [Space] Toggle  [Enter] Confirm  [Esc] Cancel "
+    } else if ui.view == LoomView::ArchetypeSelection {
         " [Up/Down] Select  [Enter] Confirm  [Esc] Close "
     } else if ui.view == LoomView::ListDetail {
-        " [Tab] Switch View  [Up/Down] Node  [U] Upgrade  [Esc] Close "
+        " [Tab] Switch View  [Up/Down] Node  [U] Upgrade  [B] Build  [Esc] Close "
+    } else if ui.view == LoomView::FlowView {
+        " [Tab] Switch View  [Arrows] Navigate  [U] Upgrade  [B] Build  [D] Demolish  [Esc] Close "
     } else {
         " [Tab] Switch View  [Up/Down] Navigate  [Esc] Close "
     };
