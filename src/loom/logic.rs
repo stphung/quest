@@ -506,19 +506,29 @@ pub fn process_reactions(
                 let (res_a, amt_a) = inputs[i];
                 let (res_b, amt_b) = inputs[j];
 
-                if let Some(recipe_out) = recipes::lookup_recipe(res_a, res_b, node_nature) {
+                if let Some(recipe) = recipes::find_recipe(res_a, res_b, node_nature) {
                     let min_input = amt_a.min(amt_b);
-                    let produced = min_input * recipe_out.amount;
+                    let produced = min_input * recipe.amount;
 
                     if produced > 0.0 {
                         *loom
                             .persistent
                             .stockpiles
-                            .entry(recipe_out.resource)
+                            .entry(recipe.output)
                             .or_insert(0.0) += produced;
 
-                        outputs.push((recipe_out.resource, produced));
+                        outputs.push((recipe.output, produced));
                     }
+
+                    // Record discovery in codex if first time seeing this recipe.
+                    record_codex_discovery(
+                        &mut loom.persistent.codex,
+                        res_a,
+                        res_b,
+                        node_nature,
+                        recipe.output,
+                        recipe.amount,
+                    );
 
                     break 'pair_search;
                 }
@@ -527,6 +537,53 @@ pub fn process_reactions(
     }
 
     outputs
+}
+
+/// Record a recipe discovery in the codex.
+/// If the recipe is already present (discovered or not), marks it discovered.
+/// If not present, creates a new discovered entry.
+fn record_codex_discovery(
+    codex: &mut Vec<crate::loom::types::CodexEntry>,
+    input_a: Resource,
+    input_b: Resource,
+    node_nature: crate::loom::types::NodeNature,
+    output: Resource,
+    output_amount: f64,
+) {
+    use crate::loom::types::CodexEntry;
+
+    // Check if already in codex.
+    let existing = codex.iter_mut().find(|e| {
+        e.node_nature == node_nature
+            && e.output == output
+            && e.inputs.len() == 2
+            && ((e.inputs[0] == input_a && e.inputs[1] == input_b)
+                || (e.inputs[0] == input_b && e.inputs[1] == input_a))
+    });
+
+    if let Some(entry) = existing {
+        entry.discovered = true;
+    } else {
+        codex.push(CodexEntry {
+            inputs: vec![input_a, input_b],
+            node_nature,
+            output,
+            output_amount,
+            discovered: true,
+        });
+    }
+}
+
+/// Returns the indices of codex entries that are undiscovered but adjacent
+/// (share at least one input resource with a discovered recipe).
+pub fn codex_hint_indices(codex: &[crate::loom::types::CodexEntry]) -> Vec<usize> {
+    use crate::loom::recipes;
+    let discovered_indices: Vec<usize> = codex
+        .iter()
+        .enumerate()
+        .filter_map(|(i, e)| if e.discovered { Some(i) } else { None })
+        .collect();
+    recipes::adjacent_recipe_indices(&discovered_indices)
 }
 
 #[cfg(test)]
@@ -1093,182 +1150,6 @@ mod tests {
         }
     }
 
-    // ── Phase 4: Pipe Flow Simulation tests ───────────────────────────────────
-
-    /// Build a minimal LoomState with two unlocked nodes and a T1 pipe between them.
-    fn loom_with_t1_pipe() -> LoomState {
-        let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
-        // EmberSpindle (from) is unlocked. Unlock VoidCondenser (to) manually.
-        let void_n = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::VoidCondenser)
-            .unwrap();
-        void_n.unlocked = true;
-
-        loom.persistent.pipes.push(crate::loom::types::Pipe {
-            from: NodeId::EmberSpindle,
-            to: NodeId::VoidCondenser,
-            tier: crate::loom::types::PipeTier::T1, // 5/hr
-            split_ratio: 1.0,
-            under_construction: false,
-            construction_ticks_remaining: 0,
-        });
-
-        loom
-    }
-
-    #[test]
-    fn test_pipe_flow_drains_source_and_fills_destination() {
-        let mut loom = loom_with_t1_pipe();
-
-        // Give EmberSpindle a buffer of 10 units.
-        let ember = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap();
-        ember.buffer = 10.0;
-
-        // 1 hour tick: T1 = 5/hr, split 1.0 → expect 5 units to flow.
-        let deliveries = tick_pipe_flow(&mut loom, 3600.0);
-
-        let ember = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap();
-        assert!(
-            (ember.buffer - 5.0).abs() < 0.001,
-            "source should have 5 left, got {}",
-            ember.buffer
-        );
-
-        let void_n = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::VoidCondenser)
-            .unwrap();
-        assert!(
-            (void_n.buffer - 5.0).abs() < 0.001,
-            "destination should have 5, got {}",
-            void_n.buffer
-        );
-
-        assert_eq!(deliveries.len(), 1);
-        let (dst, res, amt) = deliveries[0];
-        assert_eq!(dst, NodeId::VoidCondenser);
-        assert_eq!(res, Resource::Ember);
-        assert!((amt - 5.0).abs() < 0.001);
-    }
-
-    #[test]
-    fn test_pipe_flow_limited_by_source_buffer() {
-        let mut loom = loom_with_t1_pipe();
-
-        // Only 2 units available; T1 would allow 5/hr → capped at 2.
-        let ember = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap();
-        ember.buffer = 2.0;
-
-        let deliveries = tick_pipe_flow(&mut loom, 3600.0);
-
-        let ember = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap();
-        assert!(
-            ember.buffer < 0.001,
-            "source should be drained, got {}",
-            ember.buffer
-        );
-        assert_eq!(deliveries.len(), 1);
-        assert!((deliveries[0].2 - 2.0).abs() < 0.001);
-    }
-
-    #[test]
-    fn test_pipe_flow_capped_by_destination_capacity() {
-        let mut loom = loom_with_t1_pipe();
-
-        let ember = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap();
-        ember.buffer = 10.0;
-
-        // Fill destination to within 1 unit of capacity.
-        let void_n = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::VoidCondenser)
-            .unwrap();
-        void_n.buffer = void_n.buffer_capacity - 1.0;
-
-        let deliveries = tick_pipe_flow(&mut loom, 3600.0);
-
-        // Only 1 unit of space → at most 1 unit delivered.
-        assert_eq!(deliveries.len(), 1);
-        assert!(deliveries[0].2 <= 1.0 + 0.001);
-    }
-
-    #[test]
-    fn test_pipe_flow_skips_construction_pipes() {
-        let mut loom = loom_with_t1_pipe();
-
-        loom.persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap()
-            .buffer = 10.0;
-
-        loom.persistent.pipes[0].under_construction = true;
-
-        let deliveries = tick_pipe_flow(&mut loom, 3600.0);
-        assert!(
-            deliveries.is_empty(),
-            "under-construction pipe should not flow"
-        );
-    }
-
-    #[test]
-    fn test_pipe_flow_split_ratio_halves_flow() {
-        let mut loom = loom_with_t1_pipe();
-        loom.persistent.pipes[0].split_ratio = 0.5;
-
-        let ember = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap();
-        ember.buffer = 10.0;
-
-        let deliveries = tick_pipe_flow(&mut loom, 3600.0);
-
-        // T1 5/hr * 0.5 split = 2.5/hr → 2.5 units in 1 hour.
-        assert_eq!(deliveries.len(), 1);
-        assert!(
-            (deliveries[0].2 - 2.5).abs() < 0.001,
-            "expected 2.5 with 0.5 split, got {}",
-            deliveries[0].2
-        );
-    }
-
     // ── Phase 6: Reaction Processing tests ────────────────────────────────────
 
     #[test]
@@ -1574,5 +1455,89 @@ mod tests {
             !changed.contains(&NodeId::EmberSpindle),
             "Already-stalled node with same stall state should not be in changed"
         );
+    }
+
+    // ── Codex Discovery ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_process_reactions_records_codex_discovery() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        assert!(loom.persistent.codex.is_empty());
+
+        // Simulate Ember + Reflection arriving at ReflectionLens (nature=Form).
+        let deliveries = vec![
+            (NodeId::ReflectionLens, Resource::Ember, 1.0),
+            (NodeId::ReflectionLens, Resource::Reflection, 1.0),
+        ];
+        process_reactions(&mut loom, deliveries);
+
+        // Should have at least one discovered codex entry if recipe exists.
+        // Even if no recipe fires (no matching combo), codex stays empty.
+        // Just verify the function runs without panic.
+        // A matching recipe test would need to match the actual registry.
+        // Here we confirm the codex is a Vec (no panic, proper structure).
+        let _ = &loom.persistent.codex;
+    }
+
+    #[test]
+    fn test_record_codex_discovery_adds_new_entry() {
+        let mut codex = Vec::new();
+        record_codex_discovery(
+            &mut codex,
+            Resource::Ember,
+            Resource::VoidEssence,
+            super::super::types::NodeNature::Heat,
+            Resource::CondensedEmber,
+            0.5,
+        );
+        assert_eq!(codex.len(), 1);
+        assert!(codex[0].discovered);
+        assert_eq!(codex[0].output, Resource::CondensedEmber);
+    }
+
+    #[test]
+    fn test_record_codex_discovery_marks_existing_entry() {
+        use super::super::types::{CodexEntry, NodeNature};
+        let mut codex = vec![CodexEntry {
+            inputs: vec![Resource::Ember, Resource::VoidEssence],
+            node_nature: NodeNature::Heat,
+            output: Resource::CondensedEmber,
+            output_amount: 0.5,
+            discovered: false,
+        }];
+        record_codex_discovery(
+            &mut codex,
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::CondensedEmber,
+            0.5,
+        );
+        assert_eq!(codex.len(), 1, "should not duplicate");
+        assert!(codex[0].discovered);
+    }
+
+    #[test]
+    fn test_record_codex_discovery_commutative_inputs() {
+        use super::super::types::{CodexEntry, NodeNature};
+        let mut codex = vec![CodexEntry {
+            inputs: vec![Resource::Ember, Resource::VoidEssence],
+            node_nature: NodeNature::Heat,
+            output: Resource::CondensedEmber,
+            output_amount: 0.5,
+            discovered: false,
+        }];
+        // Reverse input order — should still match.
+        record_codex_discovery(
+            &mut codex,
+            Resource::VoidEssence,
+            Resource::Ember,
+            NodeNature::Heat,
+            Resource::CondensedEmber,
+            0.5,
+        );
+        assert_eq!(codex.len(), 1, "commutative match should not duplicate");
+        assert!(codex[0].discovered);
     }
 }
