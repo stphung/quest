@@ -197,3 +197,53 @@ Sources can be edited after building without demolishing.
 - Buffer system and stall detection
 - Woven Pattern sustain and completion
 - Construction delays
+
+## Visual Design
+
+### Throbber System
+
+Braille spinner characters (⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏) animate at tier-proportional speeds:
+- **T1**: 500ms per frame (slow, steady)
+- **T2**: 300ms per frame (moderate)
+- **T3**: 150ms per frame (fast, intense)
+- **Stalled**: Frozen spinner + `[■]` badge
+- **Starved**: Stuttering animation (skips frames)
+
+### Node Rendering
+
+Compact row format for refineries in the processing area below extractors:
+
+```
+⠹ T1 ForgedLight    Emb←[ES] Voi←[VC]  2.0/hr  ████░░
+```
+
+Format: `[throbber] [tier] [output] [source badges] [rate] [buffer bar]`
+
+### Bottleneck Indicators
+
+- `[!!]` — Root bottleneck (source can't keep up with demand)
+- `[↓]` — Downstream symptom (starved because upstream is bottlenecked)
+- `[■]` — Stalled (output buffer full, no consumers)
+
+### Extractors
+
+Top 3×2 grid with animated node boxes (existing style). Each shows:
+- Name, level, native resource
+- Production rate
+- Consumer count and contention status (e.g., "3 consumers, 1.33/hr each")
+
+### Sidebar Detail Panel
+
+Selected node shows full detail:
+- All sources with individual pull rates
+- Contention breakdown per source
+- Buffer levels and capacity
+- Expected vs actual throughput
+- Bottleneck diagnosis
+
+### Pattern Info
+
+Three-layer hierarchy:
+1. **Compact bar** (always visible) — pattern name, progress bar, time remaining
+2. **Detail panel** (on select) — resource requirements with met/unmet status
+3. **Progression overview** (dedicated view) — all 18 patterns with completion state
