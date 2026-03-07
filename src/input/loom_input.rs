@@ -60,8 +60,9 @@ pub(super) fn handle_loom(
                     loom_ui.codex_scroll = loom_ui.codex_scroll.saturating_add(1);
                 }
                 LoomView::FlowView => {
-                    // 3x2 grid: Down moves down one row (add 2).
-                    if loom_ui.selected_node + 2 < 6 {
+                    // Grid: Down moves down one row (add 2). Extends into refinery rows.
+                    let total_nodes = 6 + loom_state.persistent.refineries.len();
+                    if loom_ui.selected_node + 2 < total_nodes {
                         loom_ui.selected_node += 2;
                     }
                     loom_ui.selected_pipe = 0;
@@ -84,8 +85,9 @@ pub(super) fn handle_loom(
             InputResult::Continue
         }
         KeyCode::Right if loom_ui.view == LoomView::FlowView => {
-            // 3x2 grid: Right moves to the right column (odd index).
-            if loom_ui.selected_node.is_multiple_of(2) && loom_ui.selected_node + 1 < 6 {
+            // Grid: Right moves to the right column (odd index). Extends into refinery rows.
+            let total_nodes = 6 + loom_state.persistent.refineries.len();
+            if loom_ui.selected_node.is_multiple_of(2) && loom_ui.selected_node + 1 < total_nodes {
                 loom_ui.selected_node += 1;
                 loom_ui.selected_pipe = 0;
             }
@@ -137,6 +139,22 @@ pub(super) fn handle_loom(
                 return InputResult::NeedsSave;
             }
             InputResult::Continue
+        }
+        KeyCode::Char('d') | KeyCode::Char('D')
+            if loom_ui.view == LoomView::FlowView && loom_ui.selected_node >= 6 =>
+        {
+            let refinery_idx = loom_ui.selected_node - 6;
+            if refinery_idx < loom_state.persistent.refineries.len() {
+                crate::loom::demolish_refinery(loom_state, refinery_idx);
+                // Clamp selection if we deleted the last item.
+                let total = 6 + loom_state.persistent.refineries.len();
+                if loom_ui.selected_node >= total && total > 0 {
+                    loom_ui.selected_node = total - 1;
+                }
+                InputResult::NeedsSave
+            } else {
+                InputResult::Continue
+            }
         }
         _ => InputResult::Continue,
     }
@@ -381,6 +399,33 @@ mod tests {
         let result = handle_loom(key(KeyCode::Right), &mut state, &mut ui);
         assert!(matches!(result, InputResult::NeedsSave));
         assert!(state.persistent.pipes.is_empty());
+    }
+
+    #[test]
+    fn test_navigation_extends_to_refineries() {
+        use crate::loom::{logic::select_archetype, types::LoomArchetype};
+
+        let mut state = LoomState::new();
+        select_archetype(&mut state, LoomArchetype::BurnBright);
+        state
+            .persistent
+            .refineries
+            .push(crate::loom::types::Refinery::new(
+                crate::loom::types::Resource::Ember,
+                crate::loom::types::Resource::VoidEssence,
+                crate::loom::types::NodeNature::Heat,
+                crate::loom::types::Resource::ForgedLight,
+                1.0,
+                1,
+            ));
+        let mut ui = make_ui(LoomView::FlowView);
+        ui.selected_node = 4; // Bottom-left extractor.
+
+        handle_loom(key(KeyCode::Down), &mut state, &mut ui);
+        assert_eq!(ui.selected_node, 6, "should enter refinery area");
+
+        handle_loom(key(KeyCode::Up), &mut state, &mut ui);
+        assert_eq!(ui.selected_node, 4, "should return to extractors");
     }
 
     #[test]
