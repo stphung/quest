@@ -872,31 +872,30 @@ impl Shape for WaterSurface {
                     base
                 };
 
-                // Noise ripples — high-frequency per-pixel brightness jitter
+                // Small cross-waves — short wavelength perpendicular to main waves
                 {
-                    let tick_hash = (self.wave_tick * 3.0) as usize;
-                    let noise = hash2d(gx + tick_hash, gy + tick_hash * 7);
-                    let jitter = (noise % 9) as i8 - 4; // -4 to +4
-                    color = (
-                        (color.0 as i16 + jitter as i16).clamp(0, 255) as u8,
-                        (color.1 as i16 + jitter as i16).clamp(0, 255) as u8,
-                        (color.2 as i16 + jitter as i16 / 2).clamp(0, 255) as u8,
-                    );
+                    let cross = (gy as f64 * 0.38 + gx as f64 * 0.05 + self.wave_tick * 0.07).sin();
+                    let cross2 =
+                        (gy as f64 * 0.52 - gx as f64 * 0.08 + self.wave_tick * 0.09).cos();
+                    let cross_val = cross * 0.6 + cross2 * 0.4;
+                    if cross_val > 0.4 {
+                        let intensity =
+                            ((cross_val - 0.4) / 0.6).min(1.0) * (1.0 - depth_t * 0.7) * 0.08;
+                        color = (
+                            color.0.saturating_add((intensity * 255.0) as u8),
+                            color.1.saturating_add((intensity * 200.0) as u8),
+                            color.2.saturating_add((intensity * 160.0) as u8),
+                        );
+                    }
                 }
 
-                // Micro whitecaps — flickering bright spots scattered across surface
+                // Micro whitecaps — flickering tiny bright spots across the surface
                 {
-                    let tick_hash = (self.wave_tick * 1.5) as usize;
-                    let sparkle = hash2d(gx + tick_hash, gy + tick_hash * 3);
-                    // Rarer in deeper water, more frequent near surface
-                    let threshold = 140 + (depth_t * 80.0) as u32;
-                    if sparkle.is_multiple_of(threshold.max(1)) {
-                        let bright = (sparkle % 3) as u8;
-                        color = (
-                            color.0.saturating_add(25 + bright * 10),
-                            color.1.saturating_add(30 + bright * 8),
-                            color.2.saturating_add(35 + bright * 6),
-                        );
+                    let tick_hash = (self.wave_tick * 3.7) as usize;
+                    let flicker = hash2d(gx + tick_hash, gy + tick_hash * 3);
+                    if flicker.is_multiple_of(67) && depth_t < 0.6 {
+                        let sparkle = (1.0 - depth_t) * 0.35;
+                        color = lerp_rgb(color, (235, 245, 255), sparkle);
                     }
                 }
 
