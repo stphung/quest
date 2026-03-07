@@ -1064,13 +1064,13 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
             Span::styled("]", Style::default().fg(Color::DarkGray)),
         ]));
         lines.push(Line::from(Span::styled(
-            format!(" {:.1}/{:.0}", node.buffer, node.buffer_capacity),
+            format!(" {:.0}/{:.0}", node.buffer, node.buffer_capacity),
             Style::default().fg(bar_color),
         )));
 
         let rate = node_effective_rate(loom_state, node);
         lines.push(Line::from(Span::styled(
-            format!(" +{:.1}/hr", rate),
+            format!(" +{:.0}/hr", rate),
             Style::default().fg(Color::Rgb(100, 200, 120)),
         )));
         lines.push(Line::from(""));
@@ -1262,7 +1262,7 @@ fn render_flow_sidebar_refinery(
         ]));
         lines.push(Line::from(vec![
             Span::styled(
-                format!(" {:.1}/{:.0}", refinery.buffer, refinery.buffer_capacity),
+                format!(" {:.0}/{:.0}", refinery.buffer, refinery.buffer_capacity),
                 Style::default().fg(bar_color),
             ),
             if refinery.stalled {
@@ -1818,7 +1818,7 @@ fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui:
         detail_lines.push(Line::from(vec![
             Span::styled(
                 format!(
-                    " {:.1}/{:.1}",
+                    " {:.0}/{:.0}",
                     selected_node.buffer, selected_node.buffer_capacity
                 ),
                 Style::default().fg(bar_color),
@@ -1839,7 +1839,7 @@ fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui:
         detail_lines.push(Line::from(vec![
             Span::styled(" Rate: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
-                format!("{:.1}/hr", rate),
+                format!("{:.0}/hr", rate),
                 Style::default().fg(Color::Rgb(100, 200, 120)),
             ),
             Span::styled(
@@ -2149,7 +2149,7 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
         };
         let res_name = resource_name(&req.resource);
         req_spans.push(Span::styled(
-            format!("{} {} {:.1}/{:.1} ", check, res_name, accumulated, amount),
+            format!("{} {} {:.0}/{:.0} ", check, res_name, accumulated, amount),
             Style::default().fg(color),
         ));
         if i + 1 < pattern.requirements.len() {
@@ -2398,7 +2398,7 @@ fn render_build_overlay(frame: &mut Frame, area: Rect, loom_state: &LoomState, u
             };
             lines.push(Line::from(Span::styled(
                 format!(
-                    " Cost: {:.0} {} (have {:.1})",
+                    " Cost: {:.0} {} (have {:.0})",
                     cost,
                     resource_name(&r.input_a),
                     stockpile
@@ -2456,7 +2456,7 @@ fn source_display_name(src: &crate::loom::types::LoomNodeRef, loom_state: &LoomS
                 .find(|n| n.id == *node_id)
                 .map(|n| crate::loom::node_effective_rate(loom_state, n))
                 .unwrap_or(0.0);
-            format!("{} ({:.1}/hr)", node_id.name(), rate)
+            format!("{} ({:.0}/hr)", node_id.name(), rate)
         }
         crate::loom::types::LoomNodeRef::Refinery(idx) => {
             if let Some(r) = loom_state.persistent.refineries.get(*idx) {

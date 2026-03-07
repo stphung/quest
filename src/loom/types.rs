@@ -156,7 +156,7 @@ impl Refinery {
             amount,
             tier,
             buffer: 0.0,
-            buffer_capacity: 20.0,
+            buffer_capacity: 200.0,
             level: 1,
             stalled: false,
             under_construction: false,
@@ -194,11 +194,11 @@ fn default_node_level() -> u32 {
 }
 
 fn default_buffer_capacity() -> f64 {
-    20.0
+    200.0
 }
 
 fn default_base_rate() -> f64 {
-    5.0
+    50.0
 }
 
 impl LoomNode {
@@ -208,8 +208,8 @@ impl LoomNode {
             level: 1,
             unlocked: false,
             buffer: 0.0,
-            buffer_capacity: 20.0, // 4 hours at 5/hr base
-            base_rate: 5.0,
+            buffer_capacity: 200.0, // 4 hours at 50/hr base
+            base_rate: 50.0,
             stalled: false,
             unlock_progress: 0.0,
         }
@@ -449,7 +449,7 @@ mod tests {
         assert_eq!(r.tier, 1);
         assert!(!r.stalled);
         assert!((r.buffer - 0.0).abs() < 0.001);
-        assert!((r.buffer_capacity - 20.0).abs() < 0.001);
+        assert!((r.buffer_capacity - 200.0).abs() < 0.001);
         assert_eq!(r.level, 1);
         assert_eq!(r.sources_a.len(), 1);
         assert_eq!(r.sources_b.len(), 1);

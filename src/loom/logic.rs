@@ -62,7 +62,7 @@ fn apply_node_passive_on_unlock(node_id: NodeId, loom: &mut LoomState) {
             // Memory's neighbors in the cycle: VoidEssence (input) and Silence (output).
             let adjacent = [Resource::VoidEssence, Resource::Silence];
             for resource in adjacent {
-                *loom.persistent.stockpiles.entry(resource).or_insert(0.0) += 3.0;
+                *loom.persistent.stockpiles.entry(resource).or_insert(0.0) += 30.0;
             }
         }
         NodeId::SilenceWell => {
@@ -285,7 +285,7 @@ pub fn tick_base_production(
 /// Base cost: 10 * level^1.5, rounded. Silence Well gets 25% discount at levels 1-5.
 pub fn node_upgrade_cost(loom: &LoomState, node_id: NodeId) -> f64 {
     if let Some(node) = loom.persistent.nodes.iter().find(|n| n.id == node_id) {
-        let base_cost = 10.0 * (node.level as f64).powf(1.5);
+        let base_cost = 100.0 * (node.level as f64).powf(1.5);
         let multiplier = node_upgrade_cost_multiplier(loom, node_id);
         (base_cost * multiplier).round()
     } else {
@@ -433,10 +433,10 @@ pub fn tick_stall_detection(loom: &mut LoomState) -> Vec<NodeId> {
 /// Max intake rate per input slot, by refinery tier (units/hour).
 pub fn tier_intake_cap(tier: u8) -> f64 {
     match tier {
-        1 => 2.0,
-        2 => 3.0,
-        3 => 4.0,
-        _ => 2.0,
+        1 => 20.0,
+        2 => 30.0,
+        3 => 40.0,
+        _ => 20.0,
     }
 }
 
@@ -708,9 +708,9 @@ pub enum RefineryError {
 
 fn refinery_build_cost(tier: u8) -> f64 {
     match tier {
-        1 => 25.0,
-        2 => 15.0,
-        _ => 10.0,
+        1 => 250.0,
+        2 => 150.0,
+        _ => 100.0,
     }
 }
 
@@ -984,14 +984,14 @@ mod tests {
         // Manually unlock MemoryArchive and apply passive.
         apply_node_passive_on_unlock(NodeId::MemoryArchive, &mut loom);
 
-        // Adjacent resources: VoidEssence and Silence should each have 3 stockpiled.
+        // Adjacent resources: VoidEssence and Silence should each have 30 stockpiled.
         assert_eq!(
             *loom
                 .persistent
                 .stockpiles
                 .get(&Resource::VoidEssence)
                 .unwrap_or(&0.0),
-            3.0
+            30.0
         );
         assert_eq!(
             *loom
@@ -999,7 +999,7 @@ mod tests {
                 .stockpiles
                 .get(&Resource::Silence)
                 .unwrap_or(&0.0),
-            3.0
+            30.0
         );
     }
 
@@ -1235,10 +1235,10 @@ mod tests {
             .iter()
             .find(|n| n.id == NodeId::EmberSpindle)
             .unwrap();
-        // BurnBright: 5/hr base * 1.5x passive = 7.5/hr. After 1 hr: 7.5 units.
+        // BurnBright: 50/hr base * 1.5x passive = 75.0/hr. After 1 hr: 75.0 units.
         assert!(
-            (ember.buffer - 7.5).abs() < 0.001,
-            "buffer should be ~7.5, got {}",
+            (ember.buffer - 75.0).abs() < 0.001,
+            "buffer should be ~75.0, got {}",
             ember.buffer
         );
     }
@@ -1292,7 +1292,7 @@ mod tests {
     fn test_upgrade_cost_level1() {
         let loom = LoomState::new();
         let cost = node_upgrade_cost(&loom, NodeId::EmberSpindle);
-        assert_eq!(cost, 10.0); // 10 * 1^1.5 = 10
+        assert_eq!(cost, 100.0); // 100 * 1^1.5 = 100
     }
 
     #[test]
@@ -1306,7 +1306,7 @@ mod tests {
             .iter_mut()
             .find(|n| n.id == NodeId::EmberSpindle)
             .unwrap();
-        ember.buffer = 50.0;
+        ember.buffer = 500.0;
 
         let result = try_upgrade_node(&mut loom, NodeId::EmberSpindle);
         assert!(result);
@@ -1357,7 +1357,7 @@ mod tests {
         let mut loom = LoomState::new();
         select_archetype(&mut loom, LoomArchetype::RunDeep);
 
-        let base_cost = 10.0_f64 * 1.0_f64.powf(1.5);
+        let base_cost = 100.0_f64 * 1.0_f64.powf(1.5);
         let discounted = (base_cost * 0.75).round();
         let cost = node_upgrade_cost(&loom, NodeId::SilenceWell);
         assert_eq!(cost, discounted);
@@ -1874,8 +1874,12 @@ mod tests {
             .find(|n| n.id == NodeId::SilenceWell)
             .unwrap();
         let rate = node_effective_rate(&loom, well);
-        // base_rate 5.0 * level_mult(2) 1.5 * throughput_mult 1.0 = 7.5
-        assert!((rate - 7.5).abs() < 0.001, "expected 7.5/hr, got {}", rate);
+        // base_rate 50.0 * level_mult(2) 1.5 * throughput_mult 1.0 = 75.0
+        assert!(
+            (rate - 75.0).abs() < 0.001,
+            "expected 75.0/hr, got {}",
+            rate
+        );
     }
 
     #[test]
@@ -1897,10 +1901,10 @@ mod tests {
             .find(|n| n.id == NodeId::EmberSpindle)
             .unwrap();
         let rate = node_effective_rate(&loom, ember);
-        // base_rate 5.0 * level_mult(3) 2.0 * throughput_mult 1.5 = 15.0
+        // base_rate 50.0 * level_mult(3) 2.0 * throughput_mult 1.5 = 150.0
         assert!(
-            (rate - 15.0).abs() < 0.001,
-            "expected 15.0/hr, got {}",
+            (rate - 150.0).abs() < 0.001,
+            "expected 150.0/hr, got {}",
             rate
         );
     }
@@ -1925,7 +1929,7 @@ mod tests {
             .iter_mut()
             .find(|n| n.id == NodeId::EmberSpindle)
             .unwrap();
-        ember.buffer = 50.0;
+        ember.buffer = 500.0;
         try_upgrade_node(&mut loom, NodeId::EmberSpindle);
 
         let new_capacity = loom
@@ -1987,10 +1991,10 @@ mod tests {
             "produced map should include Ember"
         );
         let ember_amount = produced[&Resource::Ember];
-        // BurnBright EmberSpindle: 5/hr * 1.5 = 7.5/hr; after 1hr = 7.5 units
+        // BurnBright EmberSpindle: 50/hr * 1.5 = 75.0/hr; after 1hr = 75.0 units
         assert!(
-            (ember_amount - 7.5).abs() < 0.001,
-            "expected 7.5 Ember produced, got {}",
+            (ember_amount - 75.0).abs() < 0.001,
+            "expected 75.0 Ember produced, got {}",
             ember_amount
         );
     }
@@ -2481,7 +2485,7 @@ mod external_bonus_tests {
             .persistent
             .stockpiles
             .entry(Resource::Ember)
-            .or_insert(0.0) += 50.0;
+            .or_insert(0.0) += 500.0;
 
         let result = build_refinery(
             &mut loom,
@@ -2621,13 +2625,13 @@ mod external_bonus_tests {
         let produced = tick_refinery_pull(&mut loom, 3600.0);
         let forged = produced.get(&Resource::ForgedLight).copied().unwrap_or(0.0);
 
-        // T1 intake cap = 2.0/hr. VoidCondenser base rate = 5.0/hr (no multiplier).
-        // EmberSpindle effective = 5.0 * 1.5 = 7.5/hr (with BurnBright).
-        // pull_a = min(7.5, 2.0 cap) = 2.0; pull_b = min(5.0, 2.0 cap) = 2.0
-        // output = min(2.0, 2.0) * 1.0 = 2.0/hr => 2.0 in 1 hour.
+        // T1 intake cap = 20.0/hr. VoidCondenser base rate = 50.0/hr (no multiplier).
+        // EmberSpindle effective = 50.0 * 1.5 = 75.0/hr (with BurnBright).
+        // pull_a = min(75.0, 20.0 cap) = 20.0; pull_b = min(50.0, 20.0 cap) = 20.0
+        // output = min(20.0, 20.0) * 1.0 = 20.0/hr => 20.0 in 1 hour.
         assert!(
-            (forged - 2.0).abs() < 0.01,
-            "expected ~2.0 ForgedLight, got {forged}"
+            (forged - 20.0).abs() < 0.01,
+            "expected ~20.0 ForgedLight, got {forged}"
         );
     }
 
@@ -2664,12 +2668,12 @@ mod external_bonus_tests {
         let produced = tick_refinery_pull(&mut loom, 3600.0);
         let forged = produced.get(&Resource::ForgedLight).copied().unwrap_or(0.0);
 
-        // EmberSpindle effective = 7.5/hr (BurnBright), split 2 ways = 3.75 each, capped at 2.0.
-        // VoidCondenser = 5.0/hr, split 2 ways = 2.5 each, capped at 2.0.
-        // Each refinery: min(2.0, 2.0) * 1.0 = 2.0/hr. Total = 4.0/hr => 4.0 in 1 hour.
+        // EmberSpindle effective = 75.0/hr (BurnBright), split 2 ways = 37.5 each, capped at 20.0.
+        // VoidCondenser = 50.0/hr, split 2 ways = 25.0 each, capped at 20.0.
+        // Each refinery: min(20.0, 20.0) * 1.0 = 20.0/hr. Total = 40.0/hr => 40.0 in 1 hour.
         assert!(
-            (forged - 4.0).abs() < 0.01,
-            "expected ~4.0 ForgedLight from two refineries, got {forged}"
+            (forged - 40.0).abs() < 0.01,
+            "expected ~40.0 ForgedLight from two refineries, got {forged}"
         );
     }
 }
