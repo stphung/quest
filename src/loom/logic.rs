@@ -582,12 +582,21 @@ fn record_codex_discovery(
 /// (share at least one input resource with a discovered recipe).
 pub fn codex_hint_indices(codex: &[crate::loom::types::CodexEntry]) -> Vec<usize> {
     use crate::loom::recipes;
-    let discovered_indices: Vec<usize> = codex
+    let registry = recipes::all_recipes();
+    // Map discovered codex entries back to their position in the recipe registry.
+    let discovered_registry_indices: Vec<usize> = codex
         .iter()
-        .enumerate()
-        .filter_map(|(i, e)| if e.discovered { Some(i) } else { None })
+        .filter(|e| e.discovered)
+        .filter_map(|e| {
+            let (a, b) = if e.inputs.len() >= 2 {
+                (e.inputs[0], e.inputs[1])
+            } else {
+                return None;
+            };
+            registry.iter().position(|r| r.matches(a, b, e.node_nature))
+        })
         .collect();
-    recipes::adjacent_recipe_indices(&discovered_indices)
+    recipes::adjacent_recipe_indices(&discovered_registry_indices)
 }
 
 /// Compute a Loom production multiplier from external systems.

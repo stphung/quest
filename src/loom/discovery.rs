@@ -245,4 +245,152 @@ mod tests {
             "pattern progress must be preserved on re-call"
         );
     }
+
+    // ── pattern initial state ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_all_patterns_start_uncompleted() {
+        let mut loom = LoomState::new();
+        complete_discovery(&mut loom);
+
+        for pattern in &loom.persistent.patterns {
+            assert!(
+                !pattern.completed,
+                "pattern '{}' should start uncompleted",
+                pattern.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_all_patterns_start_with_zero_sustained_seconds() {
+        let mut loom = LoomState::new();
+        complete_discovery(&mut loom);
+
+        for pattern in &loom.persistent.patterns {
+            assert_eq!(
+                pattern.sustained_seconds, 0,
+                "pattern '{}' should start with 0 sustained_seconds",
+                pattern.name
+            );
+        }
+    }
+
+    // ── pattern sustain durations ─────────────────────────────────────────────
+
+    #[test]
+    fn test_first_pattern_sustain_is_30_minutes() {
+        let mut loom = LoomState::new();
+        complete_discovery(&mut loom);
+        // Pattern 0 "First Thread" — 1800 seconds = 30 minutes.
+        assert_eq!(
+            loom.persistent.patterns[0].sustain_seconds, 1800,
+            "First Thread should require 1800s sustain"
+        );
+    }
+
+    #[test]
+    fn test_all_pattern_sustain_seconds_are_positive() {
+        let mut loom = LoomState::new();
+        complete_discovery(&mut loom);
+
+        for pattern in &loom.persistent.patterns {
+            assert!(
+                pattern.sustain_seconds > 0,
+                "pattern '{}' sustain_seconds must be > 0",
+                pattern.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_final_pattern_has_longest_sustain() {
+        let mut loom = LoomState::new();
+        complete_discovery(&mut loom);
+
+        // "Mended Loom" (index 17) is the capstone and must have the longest
+        // sustain duration of any pattern in the sequence.
+        let max_sustain = loom
+            .persistent
+            .patterns
+            .iter()
+            .map(|p| p.sustain_seconds)
+            .max()
+            .unwrap();
+        let last = loom.persistent.patterns.last().unwrap();
+        assert_eq!(
+            last.sustain_seconds, max_sustain,
+            "Mended Loom should have the longest sustain ({} vs max {})",
+            last.sustain_seconds, max_sustain
+        );
+    }
+
+    // ── pattern name spot checks ──────────────────────────────────────────────
+
+    #[test]
+    fn test_first_pattern_name_is_first_thread() {
+        let mut loom = LoomState::new();
+        complete_discovery(&mut loom);
+        assert_eq!(loom.persistent.patterns[0].name, "First Thread");
+    }
+
+    #[test]
+    fn test_last_pattern_name_is_mended_loom() {
+        let mut loom = LoomState::new();
+        complete_discovery(&mut loom);
+        let last = loom.persistent.patterns.last().unwrap();
+        assert_eq!(last.name, "Mended Loom");
+    }
+
+    #[test]
+    fn test_all_pattern_names_are_non_empty() {
+        let mut loom = LoomState::new();
+        complete_discovery(&mut loom);
+
+        for pattern in &loom.persistent.patterns {
+            assert!(
+                !pattern.name.is_empty(),
+                "pattern at index {} has an empty name",
+                pattern.index
+            );
+        }
+    }
+
+    // ── pattern requirements spot checks ─────────────────────────────────────
+
+    #[test]
+    fn test_first_pattern_requires_ember() {
+        let mut loom = LoomState::new();
+        complete_discovery(&mut loom);
+        let first = &loom.persistent.patterns[0];
+        assert_eq!(first.requirements.len(), 1);
+        assert_eq!(first.requirements[0].resource, Resource::Ember);
+    }
+
+    #[test]
+    fn test_all_requirement_rates_are_positive() {
+        let mut loom = LoomState::new();
+        complete_discovery(&mut loom);
+
+        for pattern in &loom.persistent.patterns {
+            for req in &pattern.requirements {
+                assert!(
+                    req.rate_per_hour > 0.0,
+                    "pattern '{}' has a non-positive rate for {:?}: {}",
+                    pattern.name,
+                    req.resource,
+                    req.rate_per_hour
+                );
+            }
+        }
+    }
+
+    // ── active_pattern initial value ─────────────────────────────────────────
+
+    #[test]
+    fn test_active_pattern_starts_at_zero_after_discovery() {
+        let mut loom = LoomState::new();
+        complete_discovery(&mut loom);
+        assert_eq!(loom.persistent.active_pattern, 0);
+    }
 }

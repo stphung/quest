@@ -375,4 +375,167 @@ mod tests {
             "ForgedLight should be producible via multiple routes"
         );
     }
+
+    // ── find_recipe vs lookup_recipe ──────────────────────────────────────────
+
+    #[test]
+    fn test_find_recipe_returns_full_recipe_struct() {
+        let recipe = find_recipe(Ember, VoidEssence, Heat);
+        assert!(
+            recipe.is_some(),
+            "primary ForgedLight recipe should be found"
+        );
+        let r = recipe.unwrap();
+        assert_eq!(r.output, ForgedLight);
+        assert_eq!(r.tier, 1);
+        assert!((r.amount - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_find_recipe_commutative() {
+        let ab = find_recipe(Ember, VoidEssence, Heat);
+        let ba = find_recipe(VoidEssence, Ember, Heat);
+        assert!(ab.is_some());
+        assert!(ba.is_some());
+        assert_eq!(ab.unwrap().output, ba.unwrap().output);
+    }
+
+    #[test]
+    fn test_find_recipe_returns_none_for_no_match() {
+        let result = find_recipe(WovenReality, WovenReality, Heat);
+        assert!(result.is_none());
+    }
+
+    // ── recipes_by_tier ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_recipes_by_tier_returns_only_matching_tier() {
+        let t1 = recipes_by_tier(1);
+        for r in &t1 {
+            assert_eq!(r.tier, 1, "expected tier 1, got tier {}", r.tier);
+        }
+    }
+
+    #[test]
+    fn test_recipes_by_tier_zero_returns_empty() {
+        let t0 = recipes_by_tier(0);
+        assert!(t0.is_empty(), "no tier-0 recipes should exist");
+    }
+
+    // ── recipes_using ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_recipes_using_void_essence() {
+        let using = recipes_using(VoidEssence);
+        assert!(
+            !using.is_empty(),
+            "VoidEssence should appear in multiple recipes"
+        );
+        // Every returned recipe must use VoidEssence as an input.
+        for r in &using {
+            assert!(
+                r.input_a == VoidEssence || r.input_b == VoidEssence,
+                "recipe output {:?} doesn't use VoidEssence",
+                r.output
+            );
+        }
+    }
+
+    #[test]
+    fn test_recipes_using_forged_light_non_empty() {
+        let using = recipes_using(ForgedLight);
+        assert!(
+            !using.is_empty(),
+            "ForgedLight should be usable as input in tier 2+ recipes"
+        );
+    }
+
+    #[test]
+    fn test_recipes_using_woven_reality_as_input_empty() {
+        // WovenReality is a terminal product — it should not appear as an input.
+        let using = recipes_using(WovenReality);
+        assert!(
+            using.is_empty(),
+            "WovenReality should not be used as input in any recipe"
+        );
+    }
+
+    // ── adjacent_recipe_indices ───────────────────────────────────────────────
+
+    #[test]
+    fn test_adjacent_recipe_indices_empty_for_empty_discovered() {
+        let adjacent = adjacent_recipe_indices(&[]);
+        // No discovered recipes → nothing is adjacent.
+        assert!(
+            adjacent.is_empty(),
+            "no discovered recipes → adjacent should be empty"
+        );
+    }
+
+    #[test]
+    fn test_adjacent_recipe_indices_does_not_include_discovered() {
+        let registry = all_recipes();
+        let idx = registry
+            .iter()
+            .position(|r| r.matches(Ember, VoidEssence, Heat))
+            .unwrap();
+
+        let adjacent = adjacent_recipe_indices(&[idx]);
+        assert!(
+            !adjacent.contains(&idx),
+            "adjacent list must not include the already-discovered recipe"
+        );
+    }
+
+    // ── tier 3 recipe presence ────────────────────────────────────────────────
+
+    #[test]
+    fn test_tier3_recipes_produce_woven_reality() {
+        let t3 = recipes_by_tier(3);
+        let woven: Vec<_> = t3.iter().filter(|r| r.output == WovenReality).collect();
+        assert!(
+            !woven.is_empty(),
+            "tier 3 recipes should include WovenReality producers"
+        );
+    }
+
+    #[test]
+    fn test_tier3_recipes_have_confluence_inputs() {
+        let confluence = [ForgedLight, EchoGlass, StillbornSong, PurifiedVoid];
+        for r in recipes_by_tier(3) {
+            assert!(
+                confluence.contains(&r.input_a) || confluence.contains(&r.input_b),
+                "tier 3 recipe ({:?}+{:?}->{:?}) should have at least one confluence input",
+                r.input_a,
+                r.input_b,
+                r.output
+            );
+        }
+    }
+
+    // ── recipe amounts ────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_primary_confluence_amounts_are_at_least_point_five() {
+        // The three primary confluence recipes are the main progression drivers.
+        let fl = lookup_recipe(Ember, VoidEssence, Heat).unwrap();
+        let eg = lookup_recipe(Memory, Silence, Pattern).unwrap();
+        let ss = lookup_recipe(Silence, Resonance, Stillness).unwrap();
+
+        assert!(
+            fl.amount >= 0.5,
+            "ForgedLight recipe amount too low: {}",
+            fl.amount
+        );
+        assert!(
+            eg.amount >= 0.5,
+            "EchoGlass recipe amount too low: {}",
+            eg.amount
+        );
+        assert!(
+            ss.amount >= 0.5,
+            "StillbornSong recipe amount too low: {}",
+            ss.amount
+        );
+    }
 }
