@@ -26,8 +26,8 @@ const LOOM_BG: Color = Color::Rgb(10, 5, 18);
 
 /// Width of a single node box in columns (including borders).
 const NODE_BOX_WIDTH: usize = 28;
-/// Height of a node box in rows (including borders, excluding port label row).
-const NODE_BOX_HEIGHT: usize = 6;
+/// Height of a node box in rows (including borders).
+const NODE_BOX_HEIGHT: usize = 4;
 
 /// Per-node identity colors used for port labels and highlighting.
 fn node_color(id: crate::loom::types::NodeId) -> Color {
@@ -278,45 +278,35 @@ fn render_node_texture(
     use crate::loom::types::NodeId;
 
     if !unlocked {
-        let dim = Color::Rgb(60, 45, 80);
         if unlock_progress > 0.0 {
-            // Row 1: progress bar
+            // Single row: progress bar with percentage
             let pct = (unlock_progress / 2.0).min(1.0);
             let bar_w = width.min(10);
             let filled = ((pct * bar_w as f64) as usize).min(bar_w);
             let empty = bar_w.saturating_sub(filled);
-            let bar = format!("{}{}", "\u{2593}".repeat(filled), "\u{2591}".repeat(empty),);
+            let bar = format!(
+                "{}{} {:.0}%",
+                "\u{2593}".repeat(filled),
+                "\u{2591}".repeat(empty),
+                pct * 100.0
+            );
             let start = col + (width as i32 - bar.chars().count() as i32) / 2;
             let progress_color = Color::Rgb(100, 80, 160);
             for (i, ch) in bar.chars().enumerate() {
                 let fg = if i < filled {
                     progress_color
                 } else {
-                    Color::Rgb(40, 30, 55)
+                    Color::Rgb(60, 45, 80)
                 };
                 put_cell(buffer, row, start + i as i32, ch, fg);
             }
-            // Row 2: percentage
-            let pct_text = format!("{:.0}%", pct * 100.0);
-            let pct_start = col + (width as i32 - pct_text.len() as i32) / 2;
-            put_text(buffer, row + 1, pct_start, &pct_text, progress_color);
         } else {
-            // Row 1: "locked"
-            let lock_text = "locked";
-            let start = col + (width as i32 - lock_text.len() as i32) / 2;
-            put_text(buffer, row, start, lock_text, dim);
-            // Row 2: "needs neighbor"
-            let hint = "needs neighbor";
-            let hint_w = hint.len().min(width);
-            let hint_text = &hint[..hint_w];
-            let hint_start = col + (width as i32 - hint_w as i32) / 2;
-            put_text(
-                buffer,
-                row + 1,
-                hint_start,
-                hint_text,
-                Color::Rgb(40, 30, 55),
-            );
+            // Single row: "locked · needs neighbor"
+            let lock_text = "locked \u{b7} needs neighbor";
+            let lock_w = lock_text.len().min(width);
+            let lock_str = &lock_text[..lock_w];
+            let start = col + (width as i32 - lock_w as i32) / 2;
+            put_text(buffer, row, start, lock_str, Color::Rgb(60, 45, 80));
         }
         return;
     }
@@ -329,57 +319,56 @@ fn render_node_texture(
         node_color(node_id)
     };
 
-    for r in 0..2i32 {
-        for c in 0..width as i32 {
-            let ch = match node_id {
-                NodeId::EmberSpindle => {
-                    let offset = (frame_idx + c as usize + r as usize) % 4;
-                    match offset {
-                        0 | 2 => '~',
-                        _ => ' ',
-                    }
+    // Single texture row.
+    for c in 0..width as i32 {
+        let ch = match node_id {
+            NodeId::EmberSpindle => {
+                let offset = (frame_idx + c as usize) % 4;
+                match offset {
+                    0 | 2 => '~',
+                    _ => ' ',
                 }
-                NodeId::ReflectionLens => {
-                    let offset = (frame_idx + c as usize * 3 + r as usize * 7) % 6;
-                    match offset {
-                        0 | 4 => '.',
-                        1 | 3 => '\u{b7}',
-                        2 => '*',
-                        _ => ' ',
-                    }
+            }
+            NodeId::ReflectionLens => {
+                let offset = (frame_idx + c as usize * 3) % 6;
+                match offset {
+                    0 | 4 => '.',
+                    1 | 3 => '\u{b7}',
+                    2 => '*',
+                    _ => ' ',
                 }
-                NodeId::VoidCondenser => {
-                    let offset = (frame_idx + c as usize * 2 + r as usize) % 4;
-                    match offset {
-                        0 => ':',
-                        2 => '\u{b7}',
-                        _ => ' ',
-                    }
+            }
+            NodeId::VoidCondenser => {
+                let offset = (frame_idx + c as usize * 2) % 4;
+                match offset {
+                    0 => ':',
+                    2 => '\u{b7}',
+                    _ => ' ',
                 }
-                NodeId::MemoryArchive => {
-                    let offset = (frame_idx + c as usize + r as usize) % 4;
-                    match offset {
-                        0 | 2 => '\u{2573}',
-                        _ => ' ',
-                    }
+            }
+            NodeId::MemoryArchive => {
+                let offset = (frame_idx + c as usize) % 4;
+                match offset {
+                    0 | 2 => '\u{2573}',
+                    _ => ' ',
                 }
-                NodeId::SilenceWell => {
-                    let offset = (frame_idx + c as usize) % 6;
-                    match offset {
-                        0 | 2 | 4 => '_',
-                        _ => ' ',
-                    }
+            }
+            NodeId::SilenceWell => {
+                let offset = (frame_idx + c as usize) % 6;
+                match offset {
+                    0 | 2 | 4 => '_',
+                    _ => ' ',
                 }
-                NodeId::ResonanceForge => {
-                    let offset = (frame_idx + c as usize + r as usize * 3) % 4;
-                    match offset {
-                        0 | 2 => '\u{2248}',
-                        _ => ' ',
-                    }
+            }
+            NodeId::ResonanceForge => {
+                let offset = (frame_idx + c as usize) % 4;
+                match offset {
+                    0 | 2 => '\u{2248}',
+                    _ => ' ',
                 }
-            };
-            put_cell(buffer, row + r, col + c, ch, color);
-        }
+            }
+        };
+        put_cell(buffer, row, col + c, ch, color);
     }
 }
 
@@ -530,11 +519,9 @@ fn render_node_box(
         put_cell(buffer, top, title_start + i as i32, ch, title_color);
     }
 
-    // Rows 1-2: animated texture.
-    for r in 1..=2 {
-        put_cell(buffer, top + r, left, v, border_color);
-        put_cell(buffer, top + r, left + w - 1, v, border_color);
-    }
+    // Row 1: animated texture (1 row).
+    put_cell(buffer, top + 1, left, v, border_color);
+    put_cell(buffer, top + 1, left + w - 1, v, border_color);
     render_node_texture(
         buffer,
         top + 1,
@@ -546,8 +533,8 @@ fn render_node_box(
         node.unlock_progress,
     );
 
-    // Row 3: buffer bar.
-    put_cell(buffer, top + 3, left, v, border_color);
+    // Row 2: combined data row — "████░░ 62% 5/hr x2" or unlock info.
+    put_cell(buffer, top + 2, left, v, border_color);
     if node.unlocked {
         let fill = if node.buffer_capacity > 0.0 {
             (node.buffer / node.buffer_capacity).min(1.0)
@@ -561,43 +548,12 @@ fn render_node_box(
         } else {
             Color::Rgb(60, 200, 100)
         };
-        let bar_w = 10usize.min(inner_w.saturating_sub(8));
+        let bar_w = 8usize.min(inner_w.saturating_sub(14));
         let filled = ((fill * bar_w as f64) as usize).min(bar_w);
         let empty = bar_w.saturating_sub(filled);
-        let bar_str = format!(
-            " {}{} {:>4.1}/{:.0}",
-            "\u{2588}".repeat(filled),
-            "\u{2591}".repeat(empty),
-            node.buffer,
-            node.buffer_capacity
-        );
-        let c = left + 1;
-        for (i, ch) in bar_str.chars().enumerate().take(inner_w) {
-            let fg = if i == 0 || i > filled + empty {
-                Color::Rgb(120, 100, 140)
-            } else if i <= filled {
-                bar_color
-            } else {
-                Color::Rgb(40, 30, 55)
-            };
-            put_cell(buffer, top + 3, c + i as i32, ch, fg);
-        }
-    } else {
-        // Locked node: show unlock progress as text
-        let progress_text = format!("{:.1}/2.0h", node.unlock_progress);
-        let start = left + 1 + (inner_w as i32 - progress_text.len() as i32) / 2;
-        let fg = if node.unlock_progress > 0.0 {
-            Color::Rgb(100, 80, 160)
-        } else {
-            Color::Rgb(60, 45, 80)
-        };
-        put_text(buffer, top + 3, start, &progress_text, fg);
-    }
-    put_cell(buffer, top + 3, left + w - 1, v, border_color);
 
-    // Row 4: consumer count (how many refineries pull from this extractor).
-    put_cell(buffer, top + 4, left, v, border_color);
-    if node.unlocked {
+        // Rate and consumer count.
+        let rate = node.base_rate * crate::loom::logic::node_level_multiplier(node.level);
         let node_ref = crate::loom::types::LoomNodeRef::Extractor(node.id);
         let consumer_count = loom_state
             .persistent
@@ -605,32 +561,66 @@ fn render_node_box(
             .iter()
             .filter(|r| r.sources_a.contains(&node_ref) || r.sources_b.contains(&node_ref))
             .count();
-        let consumer_text = if consumer_count == 0 {
-            "no consumers".to_string()
-        } else {
-            format!(
-                "{} consumer{}",
-                consumer_count,
-                if consumer_count == 1 { "" } else { "s" }
-            )
-        };
-        let consumer_color = if consumer_count == 0 {
-            Color::Rgb(60, 45, 80)
-        } else {
-            Color::Rgb(100, 160, 120)
-        };
-        for (i, ch) in consumer_text.chars().enumerate().take(inner_w) {
-            put_cell(buffer, top + 4, left + 1 + i as i32, ch, consumer_color);
-        }
-    }
-    put_cell(buffer, top + 4, left + w - 1, v, border_color);
 
-    // Row 5: bottom border.
-    put_cell(buffer, top + 5, left, bl, border_color);
-    for c in 1..w - 1 {
-        put_cell(buffer, top + 5, left + c, h, border_color);
+        let consumer_str = if consumer_count > 0 {
+            format!("x{}", consumer_count)
+        } else {
+            String::new()
+        };
+        let data_str = format!(
+            " {}{} {:>2.0}% {:.0}/hr {}",
+            "\u{2588}".repeat(filled),
+            "\u{2591}".repeat(empty),
+            fill * 100.0,
+            rate,
+            consumer_str,
+        );
+
+        let c = left + 1;
+        // Render bar portion with bar colors, rest with text colors.
+        let bar_end = 1 + filled + empty; // index after the bar chars (space prefix = idx 0)
+        let consumer_start = if consumer_count > 0 {
+            data_str.len().saturating_sub(consumer_str.len())
+        } else {
+            usize::MAX
+        };
+        for (i, ch) in data_str.chars().enumerate().take(inner_w) {
+            let fg = if i == 0 {
+                Color::Rgb(120, 100, 140)
+            } else if i <= filled {
+                bar_color
+            } else if i <= bar_end {
+                Color::Rgb(40, 30, 55)
+            } else if i >= consumer_start {
+                Color::Rgb(100, 160, 120)
+            } else {
+                Color::Rgb(120, 100, 140)
+            };
+            put_cell(buffer, top + 2, c + i as i32, ch, fg);
+        }
+    } else {
+        // Locked node: show unlock progress inline.
+        let progress_text = if node.unlock_progress > 0.0 {
+            format!("{:.1}/2.0h unlocking", node.unlock_progress)
+        } else {
+            "locked".to_string()
+        };
+        let fg = if node.unlock_progress > 0.0 {
+            Color::Rgb(100, 80, 160)
+        } else {
+            Color::Rgb(60, 45, 80)
+        };
+        let start = left + 1 + (inner_w as i32 - progress_text.len() as i32) / 2;
+        put_text(buffer, top + 2, start, &progress_text, fg);
     }
-    put_cell(buffer, top + 5, left + w - 1, br, border_color);
+    put_cell(buffer, top + 2, left + w - 1, v, border_color);
+
+    // Row 3: bottom border.
+    put_cell(buffer, top + 3, left, bl, border_color);
+    for c in 1..w - 1 {
+        put_cell(buffer, top + 3, left + c, h, border_color);
+    }
+    put_cell(buffer, top + 3, left + w - 1, br, border_color);
 
     top + NODE_BOX_HEIGHT as i32
 }
@@ -1371,8 +1361,8 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
     } else {
         1
     };
-    // Each node row = NODE_BOX_HEIGHT (6) + 1 (port labels) + 1 (gap) = 8 rows.
-    let row_stride = NODE_BOX_HEIGHT + 2;
+    // Each node row = NODE_BOX_HEIGHT (4) + 1 (gap for arrows) = 5 rows.
+    let row_stride = NODE_BOX_HEIGHT + 1;
 
     // Grid-position-to-NodeId mapping for selection (matches input navigation: ±2 for up/down, ±1 for left/right).
     let grid_ids = [
