@@ -15,6 +15,7 @@ mod haven;
 mod history;
 mod input;
 mod items;
+mod loom;
 mod main_helpers;
 mod power_cores;
 mod stormglass;
@@ -234,6 +235,10 @@ fn main() -> io::Result<()> {
 
     // Load account-level Deep state (mercenary expedition system)
     let mut deep_state = deep::load_deep();
+
+    // Load account-level Loom of Worlds state
+    let mut loom_state = loom::load_loom();
+    let mut loom_ui = loom::LoomUiState::new();
 
     // Load account-level God Item progress
 
@@ -612,6 +617,7 @@ fn main() -> io::Result<()> {
                                     debug_menu: &mut debug_menu,
                                     debug_mode,
                                     achievements: &mut global_achievements,
+                                    loom_ui: &mut loom_ui,
                                 };
                                 let extras = main_helpers::game_context::OverlayExtras {
                                     last_save_instant,
@@ -684,6 +690,7 @@ fn main() -> io::Result<()> {
                                                 enhancement: &mut enhancement,
                                                 deep: &mut deep_state,
                                                 achievements: &mut global_achievements,
+                                                loom: &mut loom_state,
                                                 debug_mode,
                                             };
                                             let tick_result = core::tick::game_tick_with_context(
@@ -719,6 +726,7 @@ fn main() -> io::Result<()> {
                                                 &haven,
                                                 &enhancement,
                                                 &deep_state,
+                                                &loom_state,
                                             );
                                             last_save_instant = Some(Instant::now());
                                             last_save_time = Some(Local::now());
@@ -746,6 +754,7 @@ fn main() -> io::Result<()> {
                                         debug_menu: &mut debug_menu,
                                         debug_mode,
                                         achievements: &mut global_achievements,
+                                        loom_ui: &mut loom_ui,
                                     };
                                     input::handle_game_input(key_event, &mut ctx)
                                 };
@@ -783,6 +792,7 @@ fn main() -> io::Result<()> {
                                     &haven,
                                     &enhancement,
                                     &deep_state,
+                                    &loom_state,
                                     debug_mode,
                                     &mut last_save_instant,
                                     &mut last_save_time,
@@ -857,11 +867,13 @@ fn main() -> io::Result<()> {
                                         debug_menu: &mut debug_menu,
                                         debug_mode,
                                         achievements: &mut global_achievements,
+                                        loom_ui: &mut loom_ui,
                                     };
                                     route_game_input(
                                         result,
                                         &route_ctx,
                                         &character_manager,
+                                        &loom_state,
                                         &mut last_save_instant,
                                         &mut last_save_time,
                                     )
@@ -953,6 +965,7 @@ fn main() -> io::Result<()> {
                                         &haven,
                                         &enhancement,
                                         &deep_state,
+                                        &loom_state,
                                     );
                                     last_save_instant = Some(Instant::now());
                                     last_save_time = Some(Local::now());
@@ -983,6 +996,7 @@ fn main() -> io::Result<()> {
                                     &haven,
                                     &enhancement,
                                     &deep_state,
+                                    &loom_state,
                                 );
                             }
 
@@ -998,6 +1012,7 @@ fn main() -> io::Result<()> {
                                         &haven,
                                         &enhancement,
                                         &deep_state,
+                                        &loom_state,
                                     );
                                     last_save_instant = Some(Instant::now());
                                     last_save_time = Some(Local::now());
@@ -1025,6 +1040,7 @@ fn main() -> io::Result<()> {
                                     enhancement: &mut enhancement,
                                     deep: &mut deep_state,
                                     achievements: &mut global_achievements,
+                                    loom: &mut loom_state,
                                     debug_mode,
                                 };
                                 let tick_result =
@@ -1054,6 +1070,7 @@ fn main() -> io::Result<()> {
                                     || tick_result.enhancement_changed
                                     || tick_result.god_items_changed
                                     || tick_result.deep_changed
+                                    || tick_result.loom_changed
                                     || save_event.is_some())
                                     && !debug_mode
                                 {
@@ -1064,6 +1081,7 @@ fn main() -> io::Result<()> {
                                         &haven,
                                         &enhancement,
                                         &deep_state,
+                                        &loom_state,
                                     );
                                     last_save_instant = Some(Instant::now());
                                     last_save_time = Some(Local::now());
@@ -1096,6 +1114,9 @@ fn main() -> io::Result<()> {
                                 }
                                 if tick_flags.deep_discovered {
                                     pending_overlays.push_back(GameOverlay::DeepDiscovery);
+                                }
+                                if tick_flags.loom_discovered {
+                                    pending_overlays.push_back(GameOverlay::LoomDiscovery);
                                 }
                                 if let Some(region) = tick_flags.fracture_region_unlocked {
                                     pending_overlays
@@ -1224,6 +1245,7 @@ fn main() -> io::Result<()> {
                                                         &haven,
                                                         &enhancement,
                                                         &deep_state,
+                                                        &loom_state,
                                                     );
                                                     last_save_instant = Some(Instant::now());
                                                     last_save_time = Some(Local::now());
@@ -1265,6 +1287,7 @@ fn main() -> io::Result<()> {
                                     &haven,
                                     &enhancement,
                                     &deep_state,
+                                    &loom_state,
                                 );
                                 last_save_instant = Some(Instant::now());
                             }

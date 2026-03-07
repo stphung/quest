@@ -51,6 +51,7 @@ pub fn run_chrono_surge_batch(
     let sg_before_batch = state.stormglass;
 
     for _ in 0..batch {
+        let mut loom_state = crate::loom::LoomState::new();
         let mut ctx = TickContext {
             state,
             tick_counter,
@@ -58,6 +59,7 @@ pub fn run_chrono_surge_batch(
             enhancement,
             deep: deep_state,
             achievements: global_achievements,
+            loom: &mut loom_state,
             debug_mode,
         };
         let tick_result = crate::core::tick::game_tick_with_context(&mut ctx, &mut rng);

@@ -133,6 +133,9 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
         rng,
     );
 
+    // ── 11e. Loom of Worlds discovery check ───────────────────────
+    tick_stages::tick_loom(ctx.deep, ctx.loom, &mut result);
+
     // ── 11d. Fracture region unlock consumption ──────────────────
     if let Some(region) = ctx.deep.persistent.pending_fracture_region_unlock.take() {
         crate::zones::sync_account_zone_unlocks(
@@ -194,6 +197,7 @@ pub fn game_tick<R: Rng>(
     debug_mode: bool,
     rng: &mut R,
 ) -> TickResult {
+    let mut loom = crate::loom::LoomState::new();
     let mut ctx = TickContext {
         state,
         tick_counter,
@@ -201,6 +205,7 @@ pub fn game_tick<R: Rng>(
         enhancement,
         deep,
         achievements,
+        loom: &mut loom,
         debug_mode,
     };
     game_tick_with_context(&mut ctx, rng)
@@ -338,6 +343,7 @@ mod tests {
             &mut rng1,
         );
 
+        let mut loom2 = crate::loom::LoomState::new();
         let mut ctx = TickContext {
             state: &mut state2,
             tick_counter: &mut tc2,
@@ -345,6 +351,7 @@ mod tests {
             enhancement: &mut enh2,
             deep: &mut deep2,
             achievements: &mut ach2,
+            loom: &mut loom2,
             debug_mode: false,
         };
         let result2 = game_tick_with_context(&mut ctx, &mut rng2);

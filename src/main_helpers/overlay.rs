@@ -232,6 +232,9 @@ pub fn draw_game_overlays(
                 frame, area, state, deep_state, layout_ctx,
             );
         }
+        GameOverlay::LoomDiscovery => {
+            // Placeholder: Loom discovery modal rendering handled by wiring agent.
+        }
         GameOverlay::None => {}
     }
 

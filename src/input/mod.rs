@@ -4,6 +4,7 @@
 
 mod deep_input;
 mod haven_input;
+mod loom_input;
 mod minigame_input;
 mod prestige_input;
 mod soulforge_input;
@@ -218,6 +219,7 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
             | GameOverlay::SoulforgeDiscovery
             | GameOverlay::StormglassDiscovery
             | GameOverlay::DeepDiscovery
+            | GameOverlay::LoomDiscovery
             | GameOverlay::FractureRegionUnlock { .. }
     ) {
         return handle_dismiss_overlay(key, overlay);

@@ -35,6 +35,7 @@ mod haven_details;
 pub mod haven_scene;
 mod haven_tree;
 pub mod jezzball_scene;
+pub mod loom_scene;
 pub mod minesweeper_scene;
 pub mod morris_scene;
 pub mod overlay_layout;
