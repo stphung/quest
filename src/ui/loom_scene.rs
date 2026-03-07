@@ -18,6 +18,19 @@ use ratatui::{
     Frame,
 };
 
+/// Set a cell with explicit foreground and background colors.
+fn put_cell_bg(buffer: &mut [Vec<SceneCell>], row: i32, col: i32, ch: char, fg: Color, bg: Color) {
+    if row < 0 || col < 0 {
+        return;
+    }
+    let row = row as usize;
+    let col = col as usize;
+    if row >= buffer.len() || col >= buffer[row].len() {
+        return;
+    }
+    buffer[row][col] = SceneCell::new(ch, fg, bg);
+}
+
 /// Border color for the Loom overlay.
 const LOOM_BORDER_COLOR: Color = Color::Rgb(180, 120, 220);
 
@@ -472,7 +485,7 @@ fn render_node_box(
     top: i32,
     left: i32,
     node: &crate::loom::types::LoomNode,
-    loom_state: &LoomState,
+    _loom_state: &LoomState,
     selected: bool,
 ) -> i32 {
     let w = NODE_BOX_WIDTH as i32;
@@ -533,7 +546,7 @@ fn render_node_box(
         node.unlock_progress,
     );
 
-    // Row 2: combined data row — "████░░ 62% 5/hr x2" or unlock info.
+    // Row 2: "Ember 5/hr [gauge 0/20]" or unlock info.
     put_cell(buffer, top + 2, left, v, border_color);
     if node.unlocked {
         let fill = if node.buffer_capacity > 0.0 {
@@ -541,62 +554,55 @@ fn render_node_box(
         } else {
             0.0
         };
-        let bar_color = if node.stalled || fill >= 0.90 {
-            Color::Rgb(220, 60, 60)
-        } else if fill >= 0.75 {
-            Color::Rgb(220, 180, 60)
-        } else {
-            Color::Rgb(60, 200, 100)
-        };
-        let bar_w = 8usize.min(inner_w.saturating_sub(14));
-        let filled = ((fill * bar_w as f64) as usize).min(bar_w);
-        let empty = bar_w.saturating_sub(filled);
 
-        // Rate and consumer count.
+        // Text prefix: "Ember 5/hr "
+        let resource = crate::loom::logic::node_native_resource(node.id);
+        let res_name = resource_name(&resource);
         let rate = node.base_rate * crate::loom::logic::node_level_multiplier(node.level);
-        let node_ref = crate::loom::types::LoomNodeRef::Extractor(node.id);
-        let consumer_count = loom_state
-            .persistent
-            .refineries
-            .iter()
-            .filter(|r| r.sources_a.contains(&node_ref) || r.sources_b.contains(&node_ref))
-            .count();
+        let prefix = format!("{} {:.0}/hr ", res_name, rate);
+        let prefix_len = prefix.len();
 
-        let consumer_str = if consumer_count > 0 {
-            format!("x{}", consumer_count)
-        } else {
-            String::new()
-        };
-        let data_str = format!(
-            " {}{} {:>2.0}% {:.0}/hr {}",
-            "\u{2588}".repeat(filled),
-            "\u{2591}".repeat(empty),
-            fill * 100.0,
-            rate,
-            consumer_str,
-        );
-
+        // Render prefix text.
         let c = left + 1;
-        // Render bar portion with bar colors, rest with text colors.
-        let bar_end = 1 + filled + empty; // index after the bar chars (space prefix = idx 0)
-        let consumer_start = if consumer_count > 0 {
-            data_str.len().saturating_sub(consumer_str.len())
-        } else {
-            usize::MAX
-        };
-        for (i, ch) in data_str.chars().enumerate().take(inner_w) {
-            let fg = if i == 0 {
-                Color::Rgb(120, 100, 140)
-            } else if i <= filled {
-                bar_color
-            } else if i <= bar_end {
-                Color::Rgb(40, 30, 55)
-            } else if i >= consumer_start {
-                Color::Rgb(100, 160, 120)
+        for (i, ch) in prefix.chars().enumerate().take(inner_w) {
+            put_cell(buffer, top + 2, c + i as i32, ch, Color::Rgb(140, 120, 170));
+        }
+
+        // Gauge fills the remaining space with "0/20" label centered.
+        let gauge_w = inner_w.saturating_sub(prefix_len);
+        if gauge_w >= 4 {
+            let gauge_label = format!("{:.0}/{:.0}", node.buffer, node.buffer_capacity);
+            let label_start = (gauge_w.saturating_sub(gauge_label.len())) / 2;
+            let filled_cells = ((fill * gauge_w as f64) as usize).min(gauge_w);
+
+            let bar_bg = if node.stalled || fill >= 0.90 {
+                Color::Rgb(220, 60, 60)
+            } else if fill >= 0.75 {
+                Color::Rgb(220, 180, 60)
             } else {
-                Color::Rgb(120, 100, 140)
+                Color::Rgb(60, 200, 100)
             };
-            put_cell(buffer, top + 2, c + i as i32, ch, fg);
+            let empty_bg = Color::Rgb(30, 20, 40);
+
+            let gauge_col = c + prefix_len as i32;
+            for i in 0..gauge_w {
+                let is_filled = i < filled_cells;
+                let bg = if is_filled { bar_bg } else { empty_bg };
+
+                // Overlay the label text if we're in the label range.
+                let label_idx = i.wrapping_sub(label_start);
+                let ch = if label_idx < gauge_label.len() {
+                    gauge_label.as_bytes()[label_idx] as char
+                } else {
+                    ' '
+                };
+                let fg = if is_filled {
+                    Color::Rgb(10, 5, 18)
+                } else {
+                    Color::Rgb(160, 140, 190)
+                };
+                put_cell_bg(buffer, top + 2, gauge_col + i as i32, ch, fg, bg);
+            }
         }
     } else {
         // Locked node: show unlock progress inline.
