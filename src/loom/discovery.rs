@@ -1,6 +1,9 @@
 use super::types::{LoomState, PatternRequirement, Resource, WovenPattern};
 
 pub fn complete_discovery(loom: &mut LoomState) {
+    if loom.persistent.discovered {
+        return;
+    }
     loom.persistent.discovered = true;
     loom.persistent.patterns = create_pattern_sequence();
 }
@@ -231,11 +234,15 @@ mod tests {
         assert!(loom.persistent.discovered);
         assert_eq!(loom.persistent.patterns.len(), 18);
 
-        // Calling again should not duplicate patterns — caller is responsible
-        // for guarding, but the function itself is idempotent in terms of
-        // setting discovered = true.
+        // Mark first pattern as having progress.
+        loom.persistent.patterns[0].sustained_seconds = 100;
+
+        // Calling again should be a no-op (re-entry guard).
         complete_discovery(&mut loom);
-        // patterns will be reset to 18 (idempotent replacement)
         assert_eq!(loom.persistent.patterns.len(), 18);
+        assert_eq!(
+            loom.persistent.patterns[0].sustained_seconds, 100,
+            "pattern progress must be preserved on re-call"
+        );
     }
 }

@@ -10,7 +10,7 @@
 /// - Split ratios sum to ≤ 1.0 per source node; remainder goes to the node's own buffer.
 /// - Construction costs are resource-based; demolishing refunds 50%.
 /// - Bandwidth upgrade is instant; pipe building takes 2 hours construction.
-use super::types::{LoomState, NodeId, Pipe, PipeTier};
+use super::types::{LoomState, NodeId, Pipe, PipeTier, Resource};
 
 // ── Construction constants ────────────────────────────────────────────────────
 
@@ -222,7 +222,7 @@ fn auto_balance_split_ratio(loom: &mut LoomState, from: NodeId, new_pipe_idx: us
 /// 3. Available space in the destination buffer
 ///
 /// `delta_seconds` is the wall-clock elapsed time (typically 0.1s per tick).
-pub fn tick_pipe_flow(loom: &mut LoomState, delta_seconds: f64) {
+pub fn tick_pipe_flow(loom: &mut LoomState, delta_seconds: f64) -> Vec<(NodeId, Resource, f64)> {
     let delta_hours = delta_seconds / 3600.0;
 
     // Snapshot source rates and buffer states to avoid borrow conflicts.
@@ -275,9 +275,9 @@ pub fn tick_pipe_flow(loom: &mut LoomState, delta_seconds: f64) {
         }
     }
 
-    // Apply transfers.
+    // Apply transfers and collect deliveries for reaction processing.
+    let mut deliveries: Vec<(NodeId, Resource, f64)> = Vec::new();
     for (_, from_idx, to_idx, amount) in transfers {
-        // Find node ids by index.
         let from_id = node_states[from_idx].0;
         let to_id = node_states[to_idx].0;
 
@@ -287,7 +287,10 @@ pub fn tick_pipe_flow(loom: &mut LoomState, delta_seconds: f64) {
         if let Some(to_node) = loom.persistent.nodes.iter_mut().find(|n| n.id == to_id) {
             to_node.buffer = (to_node.buffer + amount).min(to_node.buffer_capacity);
         }
+        let resource = crate::loom::logic::node_native_resource(from_id);
+        deliveries.push((to_id, resource, amount));
     }
+    deliveries
 }
 
 // ── Split ratio adjustment ────────────────────────────────────────────────────
@@ -941,5 +944,417 @@ mod tests {
         // T2 bandwidth = 12/hr. So effective = min(3.75, 12) = 3.75/hr.
         let rate = pipe_flow_rate(&loom, 0);
         assert!((rate - 3.75).abs() < 0.01, "expected 3.75/hr, got {}", rate);
+    }
+
+    // ── too_many_incoming ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_build_pipe_fails_too_many_incoming() {
+        let mut loom = LoomState::new();
+        // Unlock all nodes.
+        for node in &mut loom.persistent.nodes {
+            node.unlocked = true;
+            node.buffer = 1000.0;
+        }
+
+        // Build 3 incoming pipes to EmberSpindle from three distinct sources.
+        build_pipe(&mut loom, NodeId::VoidCondenser, NodeId::EmberSpindle).unwrap();
+        build_pipe(&mut loom, NodeId::MemoryArchive, NodeId::EmberSpindle).unwrap();
+        build_pipe(&mut loom, NodeId::SilenceWell, NodeId::EmberSpindle).unwrap();
+
+        // A 4th incoming pipe to EmberSpindle should be rejected.
+        let result = build_pipe(&mut loom, NodeId::ResonanceForge, NodeId::EmberSpindle);
+        assert_eq!(result, Err(PipeError::TooManyIncoming));
+    }
+
+    // ── pipe_exists helper ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_pipe_exists_returns_true_when_pipe_present() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        loom.persistent.pipes.push(Pipe {
+            from: NodeId::EmberSpindle,
+            to: NodeId::VoidCondenser,
+            tier: PipeTier::T1,
+            split_ratio: 1.0,
+            under_construction: false,
+            construction_ticks_remaining: 0,
+        });
+        assert!(pipe_exists(
+            &loom,
+            NodeId::EmberSpindle,
+            NodeId::VoidCondenser
+        ));
+    }
+
+    #[test]
+    fn test_pipe_exists_returns_false_when_pipe_absent() {
+        let loom = loom_with_two_unlocked_nodes();
+        assert!(!pipe_exists(
+            &loom,
+            NodeId::EmberSpindle,
+            NodeId::VoidCondenser
+        ));
+    }
+
+    #[test]
+    fn test_pipe_exists_is_directional() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        loom.persistent.pipes.push(Pipe {
+            from: NodeId::EmberSpindle,
+            to: NodeId::VoidCondenser,
+            tier: PipeTier::T1,
+            split_ratio: 1.0,
+            under_construction: false,
+            construction_ticks_remaining: 0,
+        });
+        // Reverse direction should not be found.
+        assert!(!pipe_exists(
+            &loom,
+            NodeId::VoidCondenser,
+            NodeId::EmberSpindle
+        ));
+    }
+
+    // ── total_split_ratio helper ──────────────────────────────────────────────
+
+    #[test]
+    fn test_total_split_ratio_sums_active_pipes_only() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        // One active pipe with ratio 0.6.
+        loom.persistent.pipes.push(Pipe {
+            from: NodeId::EmberSpindle,
+            to: NodeId::VoidCondenser,
+            tier: PipeTier::T1,
+            split_ratio: 0.6,
+            under_construction: false,
+            construction_ticks_remaining: 0,
+        });
+        // One under-construction pipe — should be excluded from the sum.
+        loom.persistent.pipes.push(Pipe {
+            from: NodeId::EmberSpindle,
+            to: NodeId::ReflectionLens,
+            tier: PipeTier::T1,
+            split_ratio: 0.4,
+            under_construction: true,
+            construction_ticks_remaining: 100,
+        });
+
+        let total = total_split_ratio(&loom, NodeId::EmberSpindle);
+        assert!(
+            (total - 0.6).abs() < 0.001,
+            "expected 0.6 (under-construction pipe excluded), got {}",
+            total
+        );
+    }
+
+    #[test]
+    fn test_total_split_ratio_zero_when_no_pipes() {
+        let loom = loom_with_two_unlocked_nodes();
+        assert_eq!(total_split_ratio(&loom, NodeId::EmberSpindle), 0.0);
+    }
+
+    // ── normalize_split_ratios ────────────────────────────────────────────────
+
+    #[test]
+    fn test_normalize_split_ratios_equal_distribution_when_all_zero() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        // Two pipes, both with ratio 0.
+        loom.persistent.pipes.push(Pipe {
+            from: NodeId::EmberSpindle,
+            to: NodeId::VoidCondenser,
+            tier: PipeTier::T1,
+            split_ratio: 0.0,
+            under_construction: false,
+            construction_ticks_remaining: 0,
+        });
+        loom.persistent.pipes.push(Pipe {
+            from: NodeId::EmberSpindle,
+            to: NodeId::ReflectionLens,
+            tier: PipeTier::T1,
+            split_ratio: 0.0,
+            under_construction: false,
+            construction_ticks_remaining: 0,
+        });
+
+        normalize_split_ratios(&mut loom, NodeId::EmberSpindle);
+
+        for pipe in loom
+            .persistent
+            .pipes
+            .iter()
+            .filter(|p| p.from == NodeId::EmberSpindle)
+        {
+            assert!(
+                (pipe.split_ratio - 0.5).abs() < 0.001,
+                "each of 2 pipes should get 0.5, got {}",
+                pipe.split_ratio
+            );
+        }
+    }
+
+    #[test]
+    fn test_normalize_split_ratios_scales_down_when_over_one() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        // Two pipes with ratios that sum to 2.0 — should be scaled to sum to 1.0.
+        loom.persistent.pipes.push(Pipe {
+            from: NodeId::EmberSpindle,
+            to: NodeId::VoidCondenser,
+            tier: PipeTier::T1,
+            split_ratio: 1.0,
+            under_construction: false,
+            construction_ticks_remaining: 0,
+        });
+        loom.persistent.pipes.push(Pipe {
+            from: NodeId::EmberSpindle,
+            to: NodeId::ReflectionLens,
+            tier: PipeTier::T1,
+            split_ratio: 1.0,
+            under_construction: false,
+            construction_ticks_remaining: 0,
+        });
+
+        normalize_split_ratios(&mut loom, NodeId::EmberSpindle);
+
+        let total: f64 = loom
+            .persistent
+            .pipes
+            .iter()
+            .filter(|p| p.from == NodeId::EmberSpindle && !p.under_construction)
+            .map(|p| p.split_ratio)
+            .sum();
+        assert!(
+            (total - 1.0).abs() < 0.001,
+            "normalized ratios should sum to 1.0, got {}",
+            total
+        );
+    }
+
+    #[test]
+    fn test_normalize_split_ratios_noop_when_no_pipes() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        // Should not panic on a node with no outgoing pipes.
+        normalize_split_ratios(&mut loom, NodeId::EmberSpindle);
+        assert!(loom.persistent.pipes.is_empty());
+    }
+
+    // ── upgrade_pipe full chain ───────────────────────────────────────────────
+
+    #[test]
+    fn test_upgrade_pipe_t2_to_t3() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        loom.persistent.pipes.push(Pipe {
+            from: NodeId::EmberSpindle,
+            to: NodeId::VoidCondenser,
+            tier: PipeTier::T2,
+            split_ratio: 1.0,
+            under_construction: false,
+            construction_ticks_remaining: 0,
+        });
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer = 1000.0;
+
+        upgrade_pipe(&mut loom, 0).unwrap();
+        assert_eq!(loom.persistent.pipes[0].tier, PipeTier::T3);
+    }
+
+    #[test]
+    fn test_upgrade_pipe_t3_to_t4() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        loom.persistent.pipes.push(Pipe {
+            from: NodeId::EmberSpindle,
+            to: NodeId::VoidCondenser,
+            tier: PipeTier::T3,
+            split_ratio: 1.0,
+            under_construction: false,
+            construction_ticks_remaining: 0,
+        });
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer = 1000.0;
+
+        upgrade_pipe(&mut loom, 0).unwrap();
+        assert_eq!(loom.persistent.pipes[0].tier, PipeTier::T4);
+    }
+
+    #[test]
+    fn test_upgrade_pipe_deducts_cost_from_source_buffer() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        loom.persistent.pipes.push(Pipe {
+            from: NodeId::EmberSpindle,
+            to: NodeId::VoidCondenser,
+            tier: PipeTier::T1,
+            split_ratio: 1.0,
+            under_construction: false,
+            construction_ticks_remaining: 0,
+        });
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer = 100.0;
+
+        upgrade_pipe(&mut loom, 0).unwrap();
+
+        let ember_buffer = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer;
+        // T1→T2 cost = PIPE_UPGRADE_COSTS[0] = 15.0; 100.0 - 15.0 = 85.0
+        assert!(
+            (ember_buffer - (100.0 - PIPE_UPGRADE_COSTS[0])).abs() < 0.001,
+            "expected buffer 85.0 after upgrade, got {}",
+            ember_buffer
+        );
+    }
+
+    #[test]
+    fn test_upgrade_pipe_under_construction_fails() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        loom.persistent.pipes.push(Pipe {
+            from: NodeId::EmberSpindle,
+            to: NodeId::VoidCondenser,
+            tier: PipeTier::T1,
+            split_ratio: 1.0,
+            under_construction: true,
+            construction_ticks_remaining: 100,
+        });
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer = 1000.0;
+
+        let result = upgrade_pipe(&mut loom, 0);
+        assert_eq!(result, Err(PipeError::PipeNotFound));
+    }
+
+    // ── demolish_pipe tier-based refunds ─────────────────────────────────────
+
+    #[test]
+    fn test_demolish_pipe_t2_refunds_correct_amount() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        loom.persistent.pipes.push(Pipe {
+            from: NodeId::EmberSpindle,
+            to: NodeId::VoidCondenser,
+            tier: PipeTier::T2,
+            split_ratio: 1.0,
+            under_construction: false,
+            construction_ticks_remaining: 0,
+        });
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer = 0.0;
+
+        let refund = demolish_pipe(&mut loom, 0).unwrap();
+        let expected = (PIPE_BUILD_COST_T1 + PIPE_UPGRADE_COSTS[0]) * 0.5;
+        assert!(
+            (refund - expected).abs() < 0.001,
+            "T2 refund expected {}, got {}",
+            expected,
+            refund
+        );
+    }
+
+    #[test]
+    fn test_demolish_pipe_t4_refunds_correct_amount() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        loom.persistent.pipes.push(Pipe {
+            from: NodeId::EmberSpindle,
+            to: NodeId::VoidCondenser,
+            tier: PipeTier::T4,
+            split_ratio: 1.0,
+            under_construction: false,
+            construction_ticks_remaining: 0,
+        });
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer = 0.0;
+
+        let refund = demolish_pipe(&mut loom, 0).unwrap();
+        let expected = (PIPE_BUILD_COST_T1
+            + PIPE_UPGRADE_COSTS[0]
+            + PIPE_UPGRADE_COSTS[1]
+            + PIPE_UPGRADE_COSTS[2])
+            * 0.5;
+        assert!(
+            (refund - expected).abs() < 0.001,
+            "T4 refund expected {}, got {}",
+            expected,
+            refund
+        );
+    }
+
+    // ── outgoing_pipe_count and incoming_pipe_count ───────────────────────────
+
+    #[test]
+    fn test_outgoing_pipe_count_counts_all_including_construction() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        loom.persistent.pipes.push(Pipe {
+            from: NodeId::EmberSpindle,
+            to: NodeId::VoidCondenser,
+            tier: PipeTier::T1,
+            split_ratio: 1.0,
+            under_construction: true,
+            construction_ticks_remaining: 100,
+        });
+        assert_eq!(outgoing_pipe_count(&loom, NodeId::EmberSpindle), 1);
+    }
+
+    #[test]
+    fn test_incoming_pipe_count_zero_when_no_pipes() {
+        let loom = loom_with_two_unlocked_nodes();
+        assert_eq!(incoming_pipe_count(&loom, NodeId::VoidCondenser), 0);
+    }
+
+    // ── pipe_flow_rate for invalid index ─────────────────────────────────────
+
+    #[test]
+    fn test_pipe_flow_rate_invalid_index_returns_zero() {
+        let loom = LoomState::new();
+        assert_eq!(pipe_flow_rate(&loom, 999), 0.0);
+    }
+
+    // ── auto_balance_split_ratio on pipe completion ───────────────────────────
+
+    #[test]
+    fn test_pipe_completion_assigns_nonzero_split_ratio() {
+        let mut loom = loom_with_two_unlocked_nodes();
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer = 50.0;
+
+        build_pipe(&mut loom, NodeId::EmberSpindle, NodeId::VoidCondenser).unwrap();
+        // Drive ticks_remaining to 1 so the next tick completes it.
+        loom.persistent.pipes[0].construction_ticks_remaining = 1;
+        tick_pipe_construction(&mut loom);
+
+        let ratio = loom.persistent.pipes[0].split_ratio;
+        assert!(
+            ratio > 0.0,
+            "completed pipe should receive a nonzero split ratio, got {}",
+            ratio
+        );
     }
 }

@@ -206,18 +206,22 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
     let mut lines: Vec<Line> = vec![Line::from("")];
 
     for (left_id, right_id) in &pairs {
-        let left_node = loom_state
+        let Some(left_node) = loom_state
             .persistent
             .nodes
             .iter()
             .find(|n| n.id == *left_id)
-            .unwrap();
-        let right_node = loom_state
+        else {
+            continue;
+        };
+        let Some(right_node) = loom_state
             .persistent
             .nodes
             .iter()
             .find(|n| n.id == *right_id)
-            .unwrap();
+        else {
+            continue;
+        };
 
         let left_rate = node_effective_rate(loom_state, left_node);
         let right_rate = node_effective_rate(loom_state, right_node);
@@ -629,12 +633,14 @@ fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui:
     ];
 
     for (i, node_id) in nodes.iter().enumerate() {
-        let node = loom_state
+        let Some(node) = loom_state
             .persistent
             .nodes
             .iter()
             .find(|n| n.id == *node_id)
-            .unwrap();
+        else {
+            continue;
+        };
         let is_selected = ui.selected_node == i;
         let prefix = if is_selected { "\u{25b6} " } else { "  " };
 
@@ -757,12 +763,14 @@ fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui:
     let detail_inner = detail_block.inner(detail_area);
     frame.render_widget(detail_block, detail_area);
 
-    let selected_node = loom_state
+    let Some(selected_node) = loom_state
         .persistent
         .nodes
         .iter()
         .find(|n| n.id == selected_node_id)
-        .unwrap();
+    else {
+        return;
+    };
 
     let mut detail_lines: Vec<Line> = vec![Line::from("")];
 

@@ -65,7 +65,7 @@ pub fn tick_pattern_sustain(
     pattern.sustained_seconds_frac += delta_seconds;
     let carry = (pattern.sustained_seconds_frac + EPSILON).floor() as u32;
     if carry > 0 {
-        pattern.sustained_seconds_frac -= carry as f64;
+        pattern.sustained_seconds_frac = (pattern.sustained_seconds_frac - carry as f64).max(0.0);
         pattern.sustained_seconds =
             (pattern.sustained_seconds + carry).min(pattern.sustain_seconds);
     }

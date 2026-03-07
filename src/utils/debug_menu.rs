@@ -567,15 +567,16 @@ impl DebugAction {
             Self::SetEnhancement(level) => trigger_set_enhancement(state, enhancement, level),
             Self::TriggerLoomDiscovery => {
                 crate::loom::complete_discovery(loom);
-                loom_ui.open = true;
                 "Loom discovered."
             }
             Self::LoomSelectArchetype(archetype) => {
                 if loom.persistent.archetype.is_none() {
                     crate::loom::select_archetype(loom, archetype);
+                    loom_ui.open = true;
+                    "Archetype selected."
+                } else {
+                    "Archetype already set."
                 }
-                loom_ui.open = true;
-                "Archetype selected."
             }
             Self::LoomUnlockAllNodes => {
                 for node in &mut loom.persistent.nodes {

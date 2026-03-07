@@ -1020,7 +1020,13 @@ pub(super) fn tick_loom(
     }
 
     // Tick pipe flow (transfer resources through active pipes).
-    crate::loom::tick_pipe_flow(loom, TICK_SECONDS);
+    let deliveries = crate::loom::tick_pipe_flow(loom, TICK_SECONDS);
+
+    // Process reactions from pipe deliveries (combinatorial recipes).
+    let _reactions = crate::loom::process_reactions(loom, deliveries);
+
+    // Update stall flags for UI display.
+    crate::loom::tick_stall_detection(loom);
 
     // Tick base production for all unlocked nodes.
     let _produced = crate::loom::tick_base_production(loom, TICK_SECONDS);

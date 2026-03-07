@@ -42,6 +42,7 @@ pub fn run_chrono_surge_batch(
     enhancement: &mut EnhancementProgress,
     deep_state: &mut DeepState,
     global_achievements: &mut Achievements,
+    loom_state: &mut crate::loom::LoomState,
     debug_mode: bool,
 ) -> ChronoSurgeBatchResult {
     let batch = surge.current_batch_size().min(surge.ticks_remaining);
@@ -51,7 +52,6 @@ pub fn run_chrono_surge_batch(
     let sg_before_batch = state.stormglass;
 
     for _ in 0..batch {
-        let mut loom_state = crate::loom::LoomState::new();
         let mut ctx = TickContext {
             state,
             tick_counter,
@@ -59,7 +59,7 @@ pub fn run_chrono_surge_batch(
             enhancement,
             deep: deep_state,
             achievements: global_achievements,
-            loom: &mut loom_state,
+            loom: loom_state,
             debug_mode,
         };
         let tick_result = crate::core::tick::game_tick_with_context(&mut ctx, &mut rng);
@@ -73,6 +73,7 @@ pub fn run_chrono_surge_batch(
             || tick_result.enhancement_changed
             || tick_result.god_items_changed
             || tick_result.deep_changed
+            || tick_result.loom_changed
         {
             needs_save = true;
         }

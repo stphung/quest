@@ -18,15 +18,19 @@ pub fn archetype_nodes(archetype: LoomArchetype) -> (NodeId, NodeId) {
 /// - Applies the first node's passive bonuses.
 /// - Starts the staggered unlock timer for the second node.
 pub fn select_archetype(loom: &mut LoomState, archetype: LoomArchetype) {
+    if loom.persistent.archetype.is_some() {
+        return; // Archetype already chosen — cannot re-select.
+    }
     loom.persistent.archetype = Some(archetype);
 
     let (first, _second) = archetype_nodes(archetype);
 
-    // Unlock and apply passives to the first node.
+    // Unlock the first node in a scoped borrow.
     if let Some(node) = loom.persistent.nodes.iter_mut().find(|n| n.id == first) {
         node.unlocked = true;
-        apply_node_passive_on_unlock(node.id, loom);
     }
+    // Apply passives with full access to loom.
+    apply_node_passive_on_unlock(first, loom);
 
     // Staggered unlock: start timer at 0 seconds elapsed.
     loom.persistent.second_node_unlock_elapsed = Some(0.0);
@@ -1665,6 +1669,380 @@ mod tests {
     fn test_loom_production_bonus_always_at_least_one() {
         assert!(loom_production_bonus(0, 0, 0, 0) >= 1.0);
         assert!(loom_production_bonus(1, 1, 1, 1) >= 1.0);
+    }
+
+    // ── node_effective_rate ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_node_effective_rate_locked_node_is_zero() {
+        let loom = LoomState::new();
+        let node = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        assert_eq!(node_effective_rate(&loom, node), 0.0);
+    }
+
+    #[test]
+    fn test_node_effective_rate_level2_scales_correctly() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::RunDeep);
+        // SilenceWell is unlocked by RunDeep (no throughput multiplier for RunDeep on SilenceWell).
+        let well = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::SilenceWell)
+            .unwrap();
+        well.level = 2;
+
+        let well = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::SilenceWell)
+            .unwrap();
+        let rate = node_effective_rate(&loom, well);
+        // base_rate 5.0 * level_mult(2) 1.5 * throughput_mult 1.0 = 7.5
+        assert!((rate - 7.5).abs() < 0.001, "expected 7.5/hr, got {}", rate);
+    }
+
+    #[test]
+    fn test_node_effective_rate_burn_bright_ember_spindle_with_level() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        let ember = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        ember.level = 3;
+
+        let ember = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        let rate = node_effective_rate(&loom, ember);
+        // base_rate 5.0 * level_mult(3) 2.0 * throughput_mult 1.5 = 15.0
+        assert!(
+            (rate - 15.0).abs() < 0.001,
+            "expected 15.0/hr, got {}",
+            rate
+        );
+    }
+
+    // ── try_upgrade_node buffer capacity ──────────────────────────────────────
+
+    #[test]
+    fn test_upgrade_node_increases_buffer_capacity() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        let old_capacity = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer_capacity;
+
+        let ember = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        ember.buffer = 50.0;
+        try_upgrade_node(&mut loom, NodeId::EmberSpindle);
+
+        let new_capacity = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer_capacity;
+        assert!(
+            new_capacity > old_capacity,
+            "buffer_capacity should grow after upgrade: {} -> {}",
+            old_capacity,
+            new_capacity
+        );
+    }
+
+    #[test]
+    fn test_upgrade_node_deducts_cost_from_buffer() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        let cost = node_upgrade_cost(&loom, NodeId::EmberSpindle);
+        let starting_buffer = cost + 5.0;
+
+        let ember = loom
+            .persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap();
+        ember.buffer = starting_buffer;
+        try_upgrade_node(&mut loom, NodeId::EmberSpindle);
+
+        let remaining = loom
+            .persistent
+            .nodes
+            .iter()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .buffer;
+        assert!(
+            (remaining - 5.0).abs() < 0.001,
+            "expected 5.0 remaining, got {}",
+            remaining
+        );
+    }
+
+    // ── tick_base_production return value ─────────────────────────────────────
+
+    #[test]
+    fn test_tick_base_production_returns_produced_map() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+
+        let produced = tick_base_production(&mut loom, 3600.0);
+
+        assert!(
+            produced.contains_key(&Resource::Ember),
+            "produced map should include Ember"
+        );
+        let ember_amount = produced[&Resource::Ember];
+        // BurnBright EmberSpindle: 5/hr * 1.5 = 7.5/hr; after 1hr = 7.5 units
+        assert!(
+            (ember_amount - 7.5).abs() < 0.001,
+            "expected 7.5 Ember produced, got {}",
+            ember_amount
+        );
+    }
+
+    #[test]
+    fn test_tick_base_production_locked_nodes_absent_from_produced_map() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+
+        let produced = tick_base_production(&mut loom, 3600.0);
+
+        // VoidCondenser is locked — must not appear in map.
+        assert!(
+            !produced.contains_key(&Resource::VoidEssence),
+            "locked VoidCondenser should produce nothing"
+        );
+    }
+
+    // ── tick_neighbor_unlocking with buffer below threshold ───────────────────
+
+    #[test]
+    fn test_neighbor_unlocking_no_progress_when_buffer_below_threshold() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+
+        // EmberSpindle buffer at 0 — well below the 50% threshold.
+        tick_neighbor_unlocking(&mut loom, 7200.0);
+
+        for &nb in node_neighbors(NodeId::EmberSpindle) {
+            let n = loom.persistent.nodes.iter().find(|n| n.id == nb).unwrap();
+            assert!(
+                !n.unlocked,
+                "{:?} should not be unlocked when buffer is empty",
+                nb
+            );
+            assert_eq!(
+                n.unlock_progress, 0.0,
+                "{:?} should have zero progress when source buffer is empty",
+                nb
+            );
+        }
+    }
+
+    #[test]
+    fn test_neighbor_unlocking_returns_empty_when_no_unlock_occurs() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        // Buffer is empty — nothing should unlock.
+        let unlocked = tick_neighbor_unlocking(&mut loom, 3600.0);
+        assert!(
+            unlocked.is_empty(),
+            "should return empty vec when nothing unlocks"
+        );
+    }
+
+    // ── process_reactions with non-Heat node natures ──────────────────────────
+
+    #[test]
+    fn test_process_reactions_memory_silence_at_pattern_node_produces_echo_glass() {
+        let mut loom = LoomState::new();
+        // MemoryArchive has Pattern nature — Memory + Silence + Pattern → EchoGlass (1.0x).
+        let deliveries = vec![
+            (NodeId::MemoryArchive, Resource::Memory, 3.0),
+            (NodeId::MemoryArchive, Resource::Silence, 3.0),
+        ];
+        let outputs = process_reactions(&mut loom, deliveries);
+
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(outputs[0].0, Resource::EchoGlass);
+        // min(3.0, 3.0) * 1.0 = 3.0
+        assert!(
+            (outputs[0].1 - 3.0).abs() < 0.001,
+            "expected 3.0 EchoGlass, got {}",
+            outputs[0].1
+        );
+    }
+
+    #[test]
+    fn test_process_reactions_silence_resonance_at_stillness_node_produces_stillborn_song() {
+        let mut loom = LoomState::new();
+        // SilenceWell has Stillness nature — Silence + Resonance + Stillness → StillbornSong (1.0x).
+        let deliveries = vec![
+            (NodeId::SilenceWell, Resource::Silence, 2.0),
+            (NodeId::SilenceWell, Resource::Resonance, 2.0),
+        ];
+        let outputs = process_reactions(&mut loom, deliveries);
+
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(outputs[0].0, Resource::StillbornSong);
+        assert!(
+            (outputs[0].1 - 2.0).abs() < 0.001,
+            "expected 2.0 StillbornSong, got {}",
+            outputs[0].1
+        );
+    }
+
+    // ── codex_hint_indices ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_codex_hint_indices_empty_codex_returns_empty() {
+        let codex: Vec<crate::loom::types::CodexEntry> = Vec::new();
+        let hints = codex_hint_indices(&codex);
+        // No discovered recipes → no adjacent undiscovered recipes to hint at.
+        assert!(
+            hints.is_empty(),
+            "empty codex should yield no hints, got {} hints",
+            hints.len()
+        );
+    }
+
+    #[test]
+    fn test_codex_hint_indices_after_first_discovery_reveals_adjacent() {
+        use crate::loom::types::{CodexEntry, NodeNature};
+        // Discover the primary ForgedLight recipe: Ember + VoidEssence + Heat.
+        let codex = vec![CodexEntry {
+            inputs: vec![Resource::Ember, Resource::VoidEssence],
+            node_nature: NodeNature::Heat,
+            output: Resource::ForgedLight,
+            output_amount: 1.0,
+            discovered: true,
+        }];
+        let hints = codex_hint_indices(&codex);
+        assert!(
+            !hints.is_empty(),
+            "discovering first recipe should hint at adjacent undiscovered recipes"
+        );
+    }
+
+    // ── node_level_multiplier edge cases ──────────────────────────────────────
+
+    #[test]
+    fn test_node_level_multiplier_level_zero_treated_as_one() {
+        // saturating_sub(1) on 0 gives 0, so multiplier is 1.0.
+        assert_eq!(node_level_multiplier(0), 1.0);
+    }
+
+    #[test]
+    fn test_node_level_multiplier_level_10() {
+        // 1.0 + (10-1)*0.5 = 1.0 + 4.5 = 5.5
+        assert!((node_level_multiplier(10) - 5.5).abs() < 0.001);
+    }
+
+    // ── archetype_nodes mapping ───────────────────────────────────────────────
+
+    #[test]
+    fn test_archetype_nodes_burn_bright() {
+        let (first, second) = archetype_nodes(LoomArchetype::BurnBright);
+        assert_eq!(first, NodeId::EmberSpindle);
+        assert_eq!(second, NodeId::VoidCondenser);
+    }
+
+    #[test]
+    fn test_archetype_nodes_reach_wide() {
+        let (first, second) = archetype_nodes(LoomArchetype::ReachWide);
+        assert_eq!(first, NodeId::ReflectionLens);
+        assert_eq!(second, NodeId::MemoryArchive);
+    }
+
+    #[test]
+    fn test_archetype_nodes_run_deep() {
+        let (first, second) = archetype_nodes(LoomArchetype::RunDeep);
+        assert_eq!(first, NodeId::SilenceWell);
+        assert_eq!(second, NodeId::ResonanceForge);
+    }
+
+    // ── node_neighbor_unlock_speed_multiplier ─────────────────────────────────
+
+    #[test]
+    fn test_ember_spindle_unlock_speed_burn_bright_is_point_seven() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        assert!(
+            (node_neighbor_unlock_speed_multiplier(&loom, NodeId::EmberSpindle) - 0.7).abs()
+                < 0.001
+        );
+    }
+
+    #[test]
+    fn test_other_nodes_unlock_speed_is_one() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        assert_eq!(
+            node_neighbor_unlock_speed_multiplier(&loom, NodeId::VoidCondenser),
+            1.0
+        );
+        assert_eq!(
+            node_neighbor_unlock_speed_multiplier(&loom, NodeId::SilenceWell),
+            1.0
+        );
+    }
+
+    // ── upgrade_cost scaling ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_upgrade_cost_increases_with_level() {
+        let mut loom = LoomState::new();
+        select_archetype(&mut loom, LoomArchetype::BurnBright);
+
+        let cost_l1 = node_upgrade_cost(&loom, NodeId::EmberSpindle);
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .level = 2;
+        let cost_l2 = node_upgrade_cost(&loom, NodeId::EmberSpindle);
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .level = 3;
+        let cost_l3 = node_upgrade_cost(&loom, NodeId::EmberSpindle);
+
+        assert!(
+            cost_l1 < cost_l2 && cost_l2 < cost_l3,
+            "upgrade cost should increase: {} < {} < {}",
+            cost_l1,
+            cost_l2,
+            cost_l3
+        );
     }
 }
 

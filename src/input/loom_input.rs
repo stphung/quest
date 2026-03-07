@@ -18,7 +18,11 @@ pub(super) fn handle_loom(
         }
         KeyCode::Tab => {
             // Tab cycles views, but ArchetypeSelection is sticky until an archetype is chosen.
-            if loom_ui.view != LoomView::ArchetypeSelection {
+            if loom_ui.view == LoomView::ArchetypeSelection
+                && loom_state.persistent.archetype.is_none()
+            {
+                // Stay on ArchetypeSelection until archetype is picked.
+            } else {
                 loom_ui.view = cycle_view(loom_ui.view);
                 loom_ui.selected_node = 0;
                 loom_ui.codex_scroll = 0;

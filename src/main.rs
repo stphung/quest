@@ -988,6 +988,7 @@ fn main() -> io::Result<()> {
                                 &mut enhancement,
                                 &mut deep_state,
                                 &mut global_achievements,
+                                &mut loom_state,
                                 debug_mode,
                             );
 
