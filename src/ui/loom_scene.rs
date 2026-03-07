@@ -1080,11 +1080,30 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
             }
         }
 
+        // Upgrade cost and affordability.
         lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            " [U]pgrade",
-            Style::default().fg(Color::DarkGray),
-        )));
+        let cost = crate::loom::node_upgrade_cost(loom_state, node.id);
+        let can_afford = node.buffer >= cost;
+        let cost_color = if can_afford {
+            Color::Rgb(100, 200, 120)
+        } else {
+            Color::Rgb(80, 60, 100)
+        };
+        let resource = crate::loom::logic::node_native_resource(node.id);
+        lines.push(Line::from(vec![
+            Span::styled(
+                " [U]pgrade ",
+                Style::default().fg(if can_afford {
+                    Color::Rgb(200, 180, 240)
+                } else {
+                    Color::DarkGray
+                }),
+            ),
+            Span::styled(
+                format!("{:.0} {}", cost, resource_name(&resource)),
+                Style::default().fg(cost_color),
+            ),
+        ]));
     }
 
     lines.truncate(inner.height as usize);
