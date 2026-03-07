@@ -145,9 +145,32 @@ pub(super) fn handle_loom(
 
 /// Start the build refinery flow.
 fn start_build(loom_state: &LoomState, loom_ui: &mut LoomUiState) {
+    use crate::loom::types::BuildStep;
     let tiers = crate::loom::unlocked_tiers(loom_state);
     if tiers.is_empty() {
-        return; // No tiers unlocked yet.
+        // Show a message explaining why building is locked.
+        let completed = loom_state
+            .persistent
+            .patterns
+            .iter()
+            .filter(|p| p.completed)
+            .count();
+        loom_ui.build = Some(BuildState {
+            step: BuildStep::Blocked {
+                message: format!(
+                    "Complete 1 pattern to unlock T1 refineries ({}/1 done)",
+                    completed
+                ),
+            },
+            tier: 1,
+            recipe_index: 0,
+            available_recipes: Vec::new(),
+            eligible_sources_a: Vec::new(),
+            eligible_sources_b: Vec::new(),
+            selected_sources_a: Vec::new(),
+            selected_sources_b: Vec::new(),
+        });
+        return;
     }
     // Default to lowest unlocked tier.
     let tier = tiers[0];
@@ -187,6 +210,11 @@ fn handle_build_input(
     let build = loom_ui.build.as_mut().unwrap();
 
     match &mut build.step {
+        BuildStep::Blocked { .. } => {
+            // Any key dismisses the blocked message.
+            loom_ui.build = None;
+            InputResult::Continue
+        }
         BuildStep::SelectRecipe { cursor } => {
             let recipes = crate::loom::recipes::all_recipes();
             match key.code {

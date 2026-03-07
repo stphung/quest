@@ -2263,6 +2263,20 @@ fn render_build_overlay(frame: &mut Frame, area: Rect, loom_state: &LoomState, u
             }
             (" Confirm Build ", lines)
         }
+        crate::loom::BuildStep::Blocked { message } => {
+            let mut lines = Vec::new();
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                format!(" {}", message),
+                Style::default().fg(Color::Rgb(180, 120, 80)),
+            )));
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                " Press any key to dismiss",
+                Style::default().fg(Color::DarkGray),
+            )));
+            (" Cannot Build ", lines)
+        }
     };
 
     let block = Block::default()

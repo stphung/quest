@@ -341,6 +341,8 @@ pub enum BuildStep {
     SelectSourcesB { cursor: usize, toggle: Vec<bool> },
     /// Confirm build — shows summary and expected throughput.
     Confirm,
+    /// Build is blocked — shows why (e.g., need more patterns).
+    Blocked { message: String },
 }
 
 /// State for the multi-step refinery build flow.
