@@ -371,36 +371,52 @@ impl Shape for SkyShape {
             }
         }
 
-        // 4b. Birds — small V-shapes drifting across the sky with wing flap
+        // 4b. Birds — 5px wide soaring silhouettes with 4-phase wing cycle
         {
-            let birds: [(f64, f64, f64); 3] = [
-                // (base_x, y_ratio, speed)
-                (5.0, 0.22, 0.035),
-                (25.0, 0.14, 0.028),
-                (42.0, 0.30, 0.042),
+            let birds: [(f64, f64, f64, f64); 3] = [
+                // (base_x, y_ratio, speed, flap_offset)
+                (5.0, 0.22, 0.035, 0.0),
+                (25.0, 0.14, 0.028, 1.7),
+                (42.0, 0.30, 0.042, 3.4),
             ];
-            // Wing flap: alternate every ~2 seconds
-            let flap_phase = ((self.wave_tick * 0.08) as usize).is_multiple_of(2);
 
-            for &(base_x, y_ratio, speed) in &birds {
+            // Dark brown-black silhouette during day, slightly lighter at dusk
+            let bird_color = lerp_rgb((25, 22, 18), (65, 58, 55), self.dusk);
+
+            for &(base_x, y_ratio, speed, flap_offset) in &birds {
                 let drift = (self.wave_tick * speed) % self.width as f64;
                 let cx = (base_x + drift).rem_euclid(self.width as f64).round() as i32;
                 let row = (self.horizon as f64 * y_ratio).round() as usize;
                 let gy = (row * 2) as i32;
 
-                // Bird color: dark silhouette, slightly lighter at dusk
-                let bird_color = lerp_rgb((40, 40, 50), (70, 65, 80), self.dusk);
+                // 4-phase cycle: up, glide, down, glide (each ~1.5s)
+                let phase = ((self.wave_tick * 0.11 + flap_offset) as usize) % 4;
 
-                if flap_phase {
-                    // Wings up: v shape
-                    self.paint_px(painter, cx - 1, gy - 1, bird_color);
-                    self.paint_px(painter, cx, gy, bird_color);
-                    self.paint_px(painter, cx + 1, gy - 1, bird_color);
-                } else {
-                    // Wings down: ^ shape
-                    self.paint_px(painter, cx - 1, gy + 1, bird_color);
-                    self.paint_px(painter, cx, gy, bird_color);
-                    self.paint_px(painter, cx + 1, gy + 1, bird_color);
+                // Body pixel always at center
+                self.paint_px(painter, cx, gy, bird_color);
+
+                match phase {
+                    0 => {
+                        // Wings up
+                        self.paint_px(painter, cx - 1, gy - 1, bird_color);
+                        self.paint_px(painter, cx - 2, gy - 2, bird_color);
+                        self.paint_px(painter, cx + 1, gy - 1, bird_color);
+                        self.paint_px(painter, cx + 2, gy - 2, bird_color);
+                    }
+                    2 => {
+                        // Wings down
+                        self.paint_px(painter, cx - 1, gy + 1, bird_color);
+                        self.paint_px(painter, cx - 2, gy + 2, bird_color);
+                        self.paint_px(painter, cx + 1, gy + 1, bird_color);
+                        self.paint_px(painter, cx + 2, gy + 2, bird_color);
+                    }
+                    _ => {
+                        // Glide — wings flat
+                        self.paint_px(painter, cx - 1, gy, bird_color);
+                        self.paint_px(painter, cx - 2, gy, bird_color);
+                        self.paint_px(painter, cx + 1, gy, bird_color);
+                        self.paint_px(painter, cx + 2, gy, bird_color);
+                    }
                 }
             }
         }
