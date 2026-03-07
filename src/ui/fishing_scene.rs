@@ -494,21 +494,18 @@ impl Shape for SkyShape {
             (best + jitter).max(floor)
         };
 
-        // --- Far layer (taller, hazier, snow + rock only) ---
+        // --- Far layer (taller, hazier, snow cap + smooth rock gradient) ---
         {
             let snow_day = (235u8, 240, 245);
             let snow_night = (140u8, 150, 170);
-            let rock_day = (105u8, 115, 135);
-            let rock_night = (50u8, 55, 72);
-            let rock_shadow_day = (80u8, 88, 108);
-            let rock_shadow_night = (38u8, 42, 58);
-            let highlight_day = (145u8, 155, 175);
-            let highlight_night = (75u8, 82, 100);
+            let rock_base_day = (80u8, 90, 115);
+            let rock_base_night = (38u8, 42, 58);
+            let rock_top_day = (130u8, 140, 165);
+            let rock_top_night = (65u8, 72, 92);
 
             let snow = lerp_rgb(snow_day, snow_night, self.dusk);
-            let rock = lerp_rgb(rock_day, rock_night, self.dusk);
-            let rock_shadow = lerp_rgb(rock_shadow_day, rock_shadow_night, self.dusk);
-            let highlight = lerp_rgb(highlight_day, highlight_night, self.dusk);
+            let rock_base = lerp_rgb(rock_base_day, rock_base_night, self.dusk);
+            let rock_top = lerp_rgb(rock_top_day, rock_top_night, self.dusk);
 
             for col in 0..self.width {
                 let h = peak_height(col, far_peaks, self.width, 0.8);
@@ -517,58 +514,38 @@ impl Shape for SkyShape {
                     continue;
                 }
 
-                // Snow zone: top 30% of each column
-                let snow_line = (pixels as f64 * 0.70).round() as i32;
+                let snow_line = (pixels as f64 * 0.72).round() as i32;
 
                 for dy in 0..pixels {
                     let gy = sky_py as i32 - 1 - dy;
                     let color = if dy >= snow_line {
-                        // Snow cap — slight sparkle from hash
-                        let sparkle = hash2d(col, dy as usize).is_multiple_of(7);
-                        if sparkle {
-                            (snow.0, snow.1, snow.2.saturating_add(10))
-                        } else {
-                            snow
-                        }
+                        snow
                     } else {
-                        // Rocky face — diagonal highlight streaks
-                        let diag = ((col as i32 + dy) % 5) as u32;
-                        let hash_val = hash2d(col, dy as usize);
-                        if diag == 0 && !hash_val.is_multiple_of(3) {
-                            highlight // bright streak
-                        } else if hash_val.is_multiple_of(4) {
-                            rock_shadow // dark crevice
+                        // Smooth gradient: dark at base, lighter toward snow line
+                        let rock_t = if snow_line <= 0 {
+                            0.0
                         } else {
-                            rock
-                        }
+                            dy as f64 / snow_line as f64
+                        };
+                        lerp_rgb(rock_base, rock_top, rock_t)
                     };
-
                     self.paint_px(painter, col as i32, gy, color);
                 }
             }
         }
 
-        // --- Near layer (shorter, darker, snow + rock + tree line) ---
+        // --- Near layer (shorter, darker, snow cap + smooth rock gradient) ---
         {
             let snow_day = (225u8, 230, 235);
             let snow_night = (120u8, 130, 150);
-            let rock_day = (85u8, 90, 100);
-            let rock_night = (40u8, 44, 55);
-            let rock_shadow_day = (62u8, 68, 78);
-            let rock_shadow_night = (28u8, 32, 42);
-            let highlight_day = (120u8, 128, 140);
-            let highlight_night = (58u8, 64, 78);
-            let tree_dark_day = (28u8, 58, 32);
-            let tree_dark_night = (12u8, 28, 18);
-            let tree_light_day = (42u8, 78, 48);
-            let tree_light_night = (18u8, 40, 24);
+            let rock_base_day = (55u8, 62, 75);
+            let rock_base_night = (28u8, 32, 42);
+            let rock_top_day = (100u8, 110, 125);
+            let rock_top_night = (52u8, 58, 72);
 
             let snow = lerp_rgb(snow_day, snow_night, self.dusk);
-            let rock = lerp_rgb(rock_day, rock_night, self.dusk);
-            let rock_shadow = lerp_rgb(rock_shadow_day, rock_shadow_night, self.dusk);
-            let highlight = lerp_rgb(highlight_day, highlight_night, self.dusk);
-            let tree_dark = lerp_rgb(tree_dark_day, tree_dark_night, self.dusk);
-            let tree_light = lerp_rgb(tree_light_day, tree_light_night, self.dusk);
+            let rock_base = lerp_rgb(rock_base_day, rock_base_night, self.dusk);
+            let rock_top = lerp_rgb(rock_top_day, rock_top_night, self.dusk);
 
             for col in 0..self.width {
                 let h = peak_height(col, near_peaks, self.width, 0.5);
@@ -577,48 +554,20 @@ impl Shape for SkyShape {
                     continue;
                 }
 
-                // Zone boundaries: tree line bottom 25%, snow top 25%, rock middle
-                let tree_top = (pixels as f64 * 0.25).round() as i32;
                 let snow_line = (pixels as f64 * 0.75).round() as i32;
 
                 for dy in 0..pixels {
                     let gy = sky_py as i32 - 1 - dy;
                     let color = if dy >= snow_line {
-                        // Snow cap
-                        let sparkle = hash2d(col + 17, dy as usize).is_multiple_of(6);
-                        if sparkle {
-                            (snow.0, snow.1, snow.2.saturating_add(10))
-                        } else {
-                            snow
-                        }
-                    } else if dy < tree_top {
-                        // Evergreen tree line — triangular tree shapes via hash
-                        let tree_phase = (hash2d(col / 2, 99) % 3) as usize;
-                        let in_tree = (col % 3) != tree_phase;
-                        if in_tree {
-                            // Alternating light/dark for tree texture
-                            if hash2d(col, dy as usize).is_multiple_of(3) {
-                                tree_dark
-                            } else {
-                                tree_light
-                            }
-                        } else {
-                            // Gap between trees — show rock
-                            rock_shadow
-                        }
+                        snow
                     } else {
-                        // Rocky face with diagonal highlights
-                        let diag = ((col as i32 + dy * 2) % 7) as u32;
-                        let hash_val = hash2d(col, dy as usize);
-                        if diag == 0 && !hash_val.is_multiple_of(3) {
-                            highlight
-                        } else if hash_val.is_multiple_of(4) {
-                            rock_shadow
+                        let rock_t = if snow_line <= 0 {
+                            0.0
                         } else {
-                            rock
-                        }
+                            dy as f64 / snow_line as f64
+                        };
+                        lerp_rgb(rock_base, rock_top, rock_t)
                     };
-
                     self.paint_px(painter, col as i32, gy, color);
                 }
             }
