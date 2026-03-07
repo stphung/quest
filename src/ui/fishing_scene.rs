@@ -371,44 +371,29 @@ impl Shape for SkyShape {
             }
         }
 
-        // 5. Mountain silhouettes — 2 layers with distinct asymmetric peak clusters
+        // 5. Bob Ross mountains — snow-capped peaks, rocky faces, evergreen tree line
         //
-        // Each layer defines discrete peaks at fixed positions. Between peaks the
-        // height drops to a valley floor. Each peak has a steep face (left) and a
-        // gentler slope (right), giving an organic asymmetric look.
-        //
-        // Height at a column is: max over all peaks of a triangular falloff from
-        // that peak's center, with different left/right slope widths.
+        // Two layers of asymmetric peaks. Each column is divided into vertical
+        // zones: snow cap (top), rocky face with highlight streaks (middle),
+        // evergreen tree line (bottom, near layer only).
 
-        // Peak definition: (center_ratio, height, left_width, right_width)
-        // center_ratio is 0.0..1.0 across the screen width
-        // left_width/right_width control asymmetry (smaller = steeper)
+        // Peak: (center_ratio, height, left_width, right_width)
         type Peak = (f64, f64, f64, f64);
 
         let far_peaks: &[Peak] = &[
-            (0.12, 7.0, 5.0, 10.0),
-            (0.32, 9.0, 6.0, 14.0),
-            (0.55, 6.0, 4.0, 9.0),
-            (0.78, 8.0, 7.0, 12.0),
-            (0.95, 5.0, 5.0, 8.0),
+            (0.10, 8.0, 5.0, 11.0),
+            (0.30, 10.0, 6.0, 14.0),
+            (0.54, 7.0, 4.0, 9.0),
+            (0.76, 9.0, 7.0, 13.0),
+            (0.93, 5.5, 5.0, 8.0),
         ];
         let near_peaks: &[Peak] = &[
-            (0.05, 4.0, 3.0, 7.0),
-            (0.22, 6.0, 4.0, 10.0),
-            (0.45, 5.0, 5.0, 8.0),
-            (0.68, 7.0, 4.0, 11.0),
-            (0.88, 4.5, 3.0, 7.0),
+            (0.04, 4.5, 3.0, 7.0),
+            (0.20, 6.5, 4.0, 10.0),
+            (0.42, 5.5, 5.0, 8.0),
+            (0.65, 7.5, 4.0, 11.0),
+            (0.86, 5.0, 3.0, 7.0),
         ];
-
-        // Colors: (base_day, base_night, peak_day, peak_night, valley_floor, has_tree_fringe)
-        let far_base_day = (100u8, 120, 145);
-        let far_base_night = (50u8, 60, 82);
-        let far_peak_day = (125u8, 145, 170);
-        let far_peak_night = (65u8, 75, 98);
-        let near_base_day = (60u8, 85, 95);
-        let near_base_night = (35u8, 48, 62);
-        let near_peak_day = (78u8, 103, 115);
-        let near_peak_night = (48u8, 62, 78);
 
         // Compute height for a column given a set of peaks
         let peak_height = |col: usize, peaks: &[Peak], w: usize, floor: f64| -> f64 {
@@ -419,83 +404,139 @@ impl Shape for SkyShape {
                 let dist = x - cx;
                 let slope_w = if dist < 0.0 { left_w } else { right_w };
                 let t = 1.0 - (dist.abs() / slope_w).min(1.0);
-                // Smooth the triangle with a power curve for rounder peaks
                 let h = floor + (height - floor) * t * t * (3.0 - 2.0 * t);
                 if h > best {
                     best = h;
                 }
             }
-            // Subtle per-column jitter
             let jitter = (hash2d(col, (floor * 10.0) as usize) % 3) as f64 * 0.3;
             (best + jitter).max(floor)
         };
 
-        // Render layers: far first (taller, faded), then near (shorter, saturated)
-        struct LayerSpec<'a> {
-            peaks: &'a [Peak],
-            floor: f64,
-            base_day: (u8, u8, u8),
-            base_night: (u8, u8, u8),
-            peak_day: (u8, u8, u8),
-            peak_night: (u8, u8, u8),
-            has_tree_fringe: bool,
-        }
+        // --- Far layer (taller, hazier, snow + rock only) ---
+        {
+            let snow_day = (235u8, 240, 245);
+            let snow_night = (140u8, 150, 170);
+            let rock_day = (105u8, 115, 135);
+            let rock_night = (50u8, 55, 72);
+            let rock_shadow_day = (80u8, 88, 108);
+            let rock_shadow_night = (38u8, 42, 58);
+            let highlight_day = (145u8, 155, 175);
+            let highlight_night = (75u8, 82, 100);
 
-        let layer_specs = [
-            LayerSpec {
-                peaks: far_peaks,
-                floor: 1.5,
-                base_day: far_base_day,
-                base_night: far_base_night,
-                peak_day: far_peak_day,
-                peak_night: far_peak_night,
-                has_tree_fringe: false,
-            },
-            LayerSpec {
-                peaks: near_peaks,
-                floor: 1.0,
-                base_day: near_base_day,
-                base_night: near_base_night,
-                peak_day: near_peak_day,
-                peak_night: near_peak_night,
-                has_tree_fringe: true,
-            },
-        ];
-
-        for spec in &layer_specs {
-            let base_color = lerp_rgb(spec.base_day, spec.base_night, self.dusk);
-            let peak_color_rgb = lerp_rgb(spec.peak_day, spec.peak_night, self.dusk);
+            let snow = lerp_rgb(snow_day, snow_night, self.dusk);
+            let rock = lerp_rgb(rock_day, rock_night, self.dusk);
+            let rock_shadow = lerp_rgb(rock_shadow_day, rock_shadow_night, self.dusk);
+            let highlight = lerp_rgb(highlight_day, highlight_night, self.dusk);
 
             for col in 0..self.width {
-                let h = peak_height(col, spec.peaks, self.width, spec.floor);
+                let h = peak_height(col, far_peaks, self.width, 1.5);
                 let pixels = (h * 2.0).round() as i32;
+                if pixels <= 0 {
+                    continue;
+                }
+
+                // Snow zone: top 30% of each column
+                let snow_line = (pixels as f64 * 0.70).round() as i32;
 
                 for dy in 0..pixels {
                     let gy = sky_py as i32 - 1 - dy;
-                    let vert_t = if pixels <= 1 {
-                        1.0
-                    } else {
-                        dy as f64 / (pixels - 1) as f64
-                    };
-                    let mut color = lerp_rgb(base_color, peak_color_rgb, vert_t);
-
-                    // Tree fringe on top 2 pixels of near layer
-                    if spec.has_tree_fringe && dy >= pixels - 2 {
-                        let is_dark = hash2d(col, dy as usize).is_multiple_of(3);
-                        if is_dark {
-                            color = (
-                                color.0.saturating_sub(12),
-                                color.1.saturating_sub(8),
-                                color.2.saturating_sub(10),
-                            );
+                    let color = if dy >= snow_line {
+                        // Snow cap — slight sparkle from hash
+                        let sparkle = hash2d(col, dy as usize).is_multiple_of(7);
+                        if sparkle {
+                            (snow.0, snow.1, snow.2.saturating_add(10))
                         } else {
-                            color = (
-                                color.0.saturating_add(6),
-                                color.1.saturating_add(10),
-                                color.2.saturating_add(4),
-                            );
+                            snow
                         }
-                    }
+                    } else {
+                        // Rocky face — diagonal highlight streaks
+                        let diag = ((col as i32 + dy) % 5) as u32;
+                        let hash_val = hash2d(col, dy as usize);
+                        if diag == 0 && !hash_val.is_multiple_of(3) {
+                            highlight // bright streak
+                        } else if hash_val.is_multiple_of(4) {
+                            rock_shadow // dark crevice
+                        } else {
+                            rock
+                        }
+                    };
+
+                    self.paint_px(painter, col as i32, gy, color);
+                }
+            }
+        }
+
+        // --- Near layer (shorter, darker, snow + rock + tree line) ---
+        {
+            let snow_day = (225u8, 230, 235);
+            let snow_night = (120u8, 130, 150);
+            let rock_day = (85u8, 90, 100);
+            let rock_night = (40u8, 44, 55);
+            let rock_shadow_day = (62u8, 68, 78);
+            let rock_shadow_night = (28u8, 32, 42);
+            let highlight_day = (120u8, 128, 140);
+            let highlight_night = (58u8, 64, 78);
+            let tree_dark_day = (28u8, 58, 32);
+            let tree_dark_night = (12u8, 28, 18);
+            let tree_light_day = (42u8, 78, 48);
+            let tree_light_night = (18u8, 40, 24);
+
+            let snow = lerp_rgb(snow_day, snow_night, self.dusk);
+            let rock = lerp_rgb(rock_day, rock_night, self.dusk);
+            let rock_shadow = lerp_rgb(rock_shadow_day, rock_shadow_night, self.dusk);
+            let highlight = lerp_rgb(highlight_day, highlight_night, self.dusk);
+            let tree_dark = lerp_rgb(tree_dark_day, tree_dark_night, self.dusk);
+            let tree_light = lerp_rgb(tree_light_day, tree_light_night, self.dusk);
+
+            for col in 0..self.width {
+                let h = peak_height(col, near_peaks, self.width, 1.0);
+                let pixels = (h * 2.0).round() as i32;
+                if pixels <= 0 {
+                    continue;
+                }
+
+                // Zone boundaries: tree line bottom 25%, snow top 25%, rock middle
+                let tree_top = (pixels as f64 * 0.25).round() as i32;
+                let snow_line = (pixels as f64 * 0.75).round() as i32;
+
+                for dy in 0..pixels {
+                    let gy = sky_py as i32 - 1 - dy;
+                    let color = if dy >= snow_line {
+                        // Snow cap
+                        let sparkle = hash2d(col + 17, dy as usize).is_multiple_of(6);
+                        if sparkle {
+                            (snow.0, snow.1, snow.2.saturating_add(10))
+                        } else {
+                            snow
+                        }
+                    } else if dy < tree_top {
+                        // Evergreen tree line — triangular tree shapes via hash
+                        let tree_phase = (hash2d(col / 2, 99) % 3) as usize;
+                        let in_tree = (col % 3) != tree_phase;
+                        if in_tree {
+                            // Alternating light/dark for tree texture
+                            if hash2d(col, dy as usize).is_multiple_of(3) {
+                                tree_dark
+                            } else {
+                                tree_light
+                            }
+                        } else {
+                            // Gap between trees — show rock
+                            rock_shadow
+                        }
+                    } else {
+                        // Rocky face with diagonal highlights
+                        let diag = ((col as i32 + dy * 2) % 7) as u32;
+                        let hash_val = hash2d(col, dy as usize);
+                        if diag == 0 && !hash_val.is_multiple_of(3) {
+                            highlight
+                        } else if hash_val.is_multiple_of(4) {
+                            rock_shadow
+                        } else {
+                            rock
+                        }
+                    };
 
                     self.paint_px(painter, col as i32, gy, color);
                 }
@@ -512,15 +553,13 @@ impl Shape for SkyShape {
 
             let orb_col_f = self.width as f64 * 0.78 + (self.wave_tick * 0.08).sin() * 3.0;
 
-            // Use the near layer for light bleed (it's the foreground silhouette)
-            let near_spec = &layer_specs[1];
             for col in 0..self.width {
                 let dist_to_orb = (col as f64 - orb_col_f).abs();
                 if dist_to_orb > 6.0 {
                     continue;
                 }
 
-                let h = peak_height(col, near_spec.peaks, self.width, near_spec.floor);
+                let h = peak_height(col, near_peaks, self.width, 1.0);
                 let peak_gy = sky_py as i32 - (h * 2.0).round() as i32;
 
                 let glow_strength = (1.0 - dist_to_orb / 6.0) * 0.20;
