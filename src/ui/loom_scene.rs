@@ -627,11 +627,151 @@ fn render_port_labels(
     }
 }
 
+/// Render a single refinery node box into the cell buffer.
+fn render_refinery_box(
+    buffer: &mut [Vec<SceneCell>],
+    top: i32,
+    left: i32,
+    refinery: &crate::loom::types::Refinery,
+    selected: bool,
+    index: usize,
+) {
+    let w = NODE_BOX_WIDTH as i32;
+    let h = NODE_BOX_HEIGHT as i32;
+
+    let (tl, tr, bl, br, horiz, vert) = if selected {
+        (
+            '\u{250f}', '\u{2513}', '\u{2517}', '\u{251b}', '\u{2501}', '\u{2503}',
+        )
+    } else {
+        (
+            '\u{250c}', '\u{2510}', '\u{2514}', '\u{2518}', '\u{2500}', '\u{2502}',
+        )
+    };
+    let border_color = if selected {
+        Color::Rgb(200, 170, 240)
+    } else {
+        Color::Rgb(50, 35, 65)
+    };
+
+    // Top border.
+    put_cell(buffer, top, left, tl, border_color);
+    for c in 1..w - 1 {
+        put_cell(buffer, top, left + c, horiz, border_color);
+    }
+    put_cell(buffer, top, left + w - 1, tr, border_color);
+
+    // Side borders for interior rows.
+    for r in 1..h - 1 {
+        put_cell(buffer, top + r, left, vert, border_color);
+        put_cell(buffer, top + r, left + w - 1, vert, border_color);
+    }
+
+    // Bottom border.
+    put_cell(buffer, top + h - 1, left, bl, border_color);
+    for c in 1..w - 1 {
+        put_cell(buffer, top + h - 1, left + c, horiz, border_color);
+    }
+    put_cell(buffer, top + h - 1, left + w - 1, br, border_color);
+
+    // Row 0 (top+1): Title — "R{i} T{tier}→{output}" or building status.
+    let title = if refinery.under_construction {
+        format!("R{} [Building...]", index)
+    } else {
+        format!(
+            "R{} T{}\u{2192}{}",
+            index,
+            refinery.tier,
+            resource_short(&refinery.output)
+        )
+    };
+    let title_color = if selected {
+        Color::White
+    } else {
+        Color::Rgb(160, 130, 190)
+    };
+    let inner_w = (w - 2) as usize;
+    for (i, ch) in title.chars().enumerate().take(inner_w) {
+        put_cell(buffer, top + 1, left + 1 + i as i32, ch, title_color);
+    }
+
+    // Row 1 (top+2): Gear animation texture.
+    let millis = current_millis();
+    let frame = (millis / 400) % 2;
+    let gear_color = if refinery.stalled {
+        Color::Rgb(100, 40, 40)
+    } else if refinery.under_construction {
+        Color::Rgb(60, 50, 70)
+    } else {
+        Color::Rgb(120, 90, 160)
+    };
+    for x in 0..inner_w as i32 {
+        let ch = if (x as u128 + frame).is_multiple_of(2) {
+            '\u{2699}'
+        } else {
+            '\u{b7}'
+        };
+        put_cell(buffer, top + 2, left + 1 + x, ch, gear_color);
+    }
+
+    // Row 2 (top+3): Buffer bar.
+    let fill_pct = if refinery.buffer_capacity > 0.0 {
+        (refinery.buffer / refinery.buffer_capacity).min(1.0)
+    } else {
+        0.0
+    };
+    let bar_color = if refinery.stalled || fill_pct >= 0.90 {
+        Color::Rgb(220, 60, 60)
+    } else if fill_pct >= 0.75 {
+        Color::Rgb(220, 180, 60)
+    } else {
+        Color::Rgb(60, 200, 100)
+    };
+    let bar_w = 10usize.min(inner_w.saturating_sub(8));
+    let filled = ((fill_pct * bar_w as f64) as usize).min(bar_w);
+    let empty = bar_w.saturating_sub(filled);
+    let bar_str = format!(
+        " {}{} {:>4.1}/{:.0}",
+        "\u{2588}".repeat(filled),
+        "\u{2591}".repeat(empty),
+        refinery.buffer,
+        refinery.buffer_capacity
+    );
+    for (i, ch) in bar_str.chars().enumerate().take(inner_w) {
+        let fg = if i == 0 || i > filled + empty {
+            Color::Rgb(120, 100, 140)
+        } else if i <= filled {
+            bar_color
+        } else {
+            Color::Rgb(40, 30, 55)
+        };
+        put_cell(buffer, top + 3, left + 1 + i as i32, ch, fg);
+    }
+
+    // Row 3 (top+4): Recipe summary — "{input_a}+{input_b}▶{output}".
+    let recipe_text = format!(
+        "{}+{}\u{25b6}{}",
+        resource_short(&refinery.input_a),
+        resource_short(&refinery.input_b),
+        resource_short(&refinery.output)
+    );
+    let recipe_color = Color::Rgb(100, 80, 130);
+    for (i, ch) in recipe_text.chars().enumerate().take(inner_w) {
+        put_cell(buffer, top + 4, left + 1 + i as i32, ch, recipe_color);
+    }
+}
+
 /// Render the sidebar detail panel for the selected node.
 fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &LoomUiState) {
     use crate::loom::recipes::recipes_by_nature;
     use crate::loom::types::NodeId;
     use crate::loom::{node_effective_rate, pipe_flow_rate};
+
+    // If selected_node >= 6, show refinery detail instead of extractor detail.
+    if ui.selected_node >= 6 {
+        render_flow_sidebar_refinery(frame, area, loom_state, ui);
+        return;
+    }
 
     let nodes = NodeId::ALL;
     let selected_id = nodes[ui.selected_node.min(nodes.len() - 1)];
@@ -853,6 +993,174 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
     );
 }
 
+/// Render sidebar when a refinery (selected_node >= 6) is selected.
+fn render_flow_sidebar_refinery(
+    frame: &mut Frame,
+    area: Rect,
+    loom_state: &LoomState,
+    ui: &LoomUiState,
+) {
+    let refinery_idx = ui.selected_node - 6;
+    let refineries = &loom_state.persistent.refineries;
+
+    let title = if refinery_idx < refineries.len() {
+        format!(" Refinery {} ", refinery_idx)
+    } else {
+        " Refinery ".to_string()
+    };
+
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::LEFT)
+        .border_style(Style::default().fg(Color::Rgb(80, 60, 110)));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    if refinery_idx >= refineries.len() {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            " [No refinery]",
+            Style::default().fg(Color::Rgb(80, 60, 110)),
+        )));
+        lines.truncate(inner.height as usize);
+        frame.render_widget(
+            Paragraph::new(lines).style(Style::default().bg(LOOM_BG)),
+            inner,
+        );
+        return;
+    }
+
+    let refinery = &refineries[refinery_idx];
+
+    lines.push(Line::from(""));
+
+    if refinery.under_construction {
+        lines.push(Line::from(Span::styled(
+            " [Under Construction]",
+            Style::default().fg(Color::Rgb(160, 120, 200)),
+        )));
+        let ticks = refinery.construction_ticks_remaining;
+        let secs = ticks / 10;
+        lines.push(Line::from(Span::styled(
+            format!(" ~{}s remaining", secs),
+            Style::default().fg(Color::Rgb(100, 80, 130)),
+        )));
+    } else {
+        // Tier and output.
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!(" Tier {}", refinery.tier),
+                Style::default().fg(Color::Rgb(180, 140, 220)),
+            ),
+            Span::styled(
+                format!("  \u{2192} {}", resource_name(&refinery.output)),
+                Style::default().fg(Color::Rgb(220, 180, 255)),
+            ),
+        ]));
+
+        // Recipe.
+        lines.push(Line::from(vec![
+            Span::styled(" Recipe: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(
+                    "{} + {} \u{25b6} {}",
+                    resource_name(&refinery.input_a),
+                    resource_name(&refinery.input_b),
+                    resource_name(&refinery.output)
+                ),
+                Style::default().fg(Color::Rgb(160, 120, 200)),
+            ),
+        ]));
+
+        // Buffer bar.
+        let fill = if refinery.buffer_capacity > 0.0 {
+            (refinery.buffer / refinery.buffer_capacity).min(1.0)
+        } else {
+            0.0
+        };
+        let bar_color = if refinery.stalled || fill >= 0.90 {
+            Color::Rgb(220, 60, 60)
+        } else if fill >= 0.75 {
+            Color::Rgb(220, 180, 60)
+        } else {
+            Color::Rgb(60, 200, 100)
+        };
+        let filled_cells = ((fill * 10.0) as usize).min(10);
+        let empty_cells = 10usize.saturating_sub(filled_cells);
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![
+            Span::styled(" [", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "\u{2588}".repeat(filled_cells),
+                Style::default().fg(bar_color),
+            ),
+            Span::styled(
+                "\u{2591}".repeat(empty_cells),
+                Style::default().fg(Color::Rgb(40, 30, 55)),
+            ),
+            Span::styled("]", Style::default().fg(Color::DarkGray)),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!(" {:.1}/{:.0}", refinery.buffer, refinery.buffer_capacity),
+                Style::default().fg(bar_color),
+            ),
+            if refinery.stalled {
+                Span::styled(
+                    " \u{26a0} STALLED",
+                    Style::default().fg(Color::Rgb(220, 60, 60)),
+                )
+            } else {
+                Span::raw("")
+            },
+        ]));
+
+        // Amount multiplier.
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![
+            Span::styled(" Yield: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("x{:.1}/cycle", refinery.amount),
+                Style::default().fg(Color::Rgb(100, 200, 120)),
+            ),
+        ]));
+
+        // Pipe connections.
+        let ref_ref = crate::loom::types::LoomNodeRef::Refinery(refinery_idx);
+        let incoming: Vec<_> = loom_state
+            .persistent
+            .pipes
+            .iter()
+            .filter(|p| p.to == ref_ref && !p.under_construction)
+            .collect();
+        let outgoing: Vec<_> = loom_state
+            .persistent
+            .pipes
+            .iter()
+            .filter(|p| p.from == ref_ref && !p.under_construction)
+            .collect();
+
+        if !incoming.is_empty() || !outgoing.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::styled(" Pipes: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!("\u{2190}{} \u{2192}{}", incoming.len(), outgoing.len()),
+                    Style::default().fg(Color::Rgb(140, 100, 180)),
+                ),
+            ]));
+        }
+    }
+
+    lines.truncate(inner.height as usize);
+    frame.render_widget(
+        Paragraph::new(lines).style(Style::default().bg(LOOM_BG)),
+        inner,
+    );
+}
+
 fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &LoomUiState) {
     use crate::loom::types::NodeId;
 
@@ -922,7 +1230,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
             .iter()
             .find(|n| n.id == *left_id)
         {
-            let is_sel = *left_id == selected_id;
+            let is_sel = ui.selected_node < 6 && *left_id == selected_id;
             let port_row =
                 render_node_box(&mut buffer, top, left_col, left_node, loom_state, is_sel);
             render_port_labels(
@@ -943,7 +1251,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
             .iter()
             .find(|n| n.id == *right_id)
         {
-            let is_sel = *right_id == selected_id;
+            let is_sel = ui.selected_node < 6 && *right_id == selected_id;
             let port_row =
                 render_node_box(&mut buffer, top, right_col, right_node, loom_state, is_sel);
             render_port_labels(
@@ -955,6 +1263,36 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
                 is_sel,
                 selected_id,
             );
+        }
+    }
+
+    // ── Refineries: render below the 3-row extractor grid ────────────────────
+    let refineries = &loom_state.persistent.refineries;
+    if !refineries.is_empty() {
+        // Separator label just above the first refinery row.
+        let sep_row = (3 * row_stride) as i32 - 1;
+        put_text(
+            &mut buffer,
+            sep_row,
+            col_spacing as i32,
+            "\u{2500}\u{2500} Processing \u{2500}\u{2500}",
+            Color::Rgb(80, 60, 100),
+        );
+
+        let refinery_row_start = 3 * row_stride;
+        let refinery_cols = 2usize;
+
+        for (i, refinery) in refineries.iter().enumerate() {
+            let grid_row = i / refinery_cols;
+            let grid_col = i % refinery_cols;
+            let top = (refinery_row_start + grid_row * row_stride) as i32;
+            let left_col = if grid_col == 0 {
+                col_spacing as i32
+            } else {
+                (col_spacing + NODE_BOX_WIDTH + col_spacing) as i32
+            };
+            let is_sel = ui.selected_node >= 6 && (ui.selected_node - 6) == i;
+            render_refinery_box(&mut buffer, top, left_col, refinery, is_sel, i);
         }
     }
 
