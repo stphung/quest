@@ -62,10 +62,10 @@ pub fn render_loom_overlay(
             render_flow_view(frame, inner, loom_state);
         }
         LoomView::ListDetail => {
-            render_list_detail(frame, inner, ui);
+            render_list_detail(frame, inner, loom_state, ui);
         }
         LoomView::Codex => {
-            render_codex(frame, inner, loom_state);
+            render_codex(frame, inner, loom_state, ui);
         }
     }
 
@@ -181,31 +181,18 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
     let diagram_area = chunks[0];
     let pattern_area = chunks[1];
 
-    let lines = vec![
+    let mut lines = vec![
         Line::from(""),
         Line::from(Span::styled(
-            "Flow View \u{2014} Pipeline Diagram",
+            " Nodes \u{2014} Buffer Status",
             Style::default().fg(Color::Rgb(180, 120, 220)),
         )),
         Line::from(""),
-        Line::from(Span::styled(
-            "Node pipeline visualization coming soon.",
-            Style::default().fg(Color::DarkGray),
-        )),
-        Line::from(""),
-        Line::from(Span::styled(
-            "EmberSpindle  \u{2192}  VoidCondenser  \u{2192}  [output]",
-            Style::default().fg(Color::Rgb(120, 80, 160)),
-        )),
-        Line::from(Span::styled(
-            "ReflectionLens  \u{2192}  MemoryArchive  \u{2192}  [output]",
-            Style::default().fg(Color::Rgb(120, 80, 160)),
-        )),
-        Line::from(Span::styled(
-            "SilenceWell  \u{2192}  ResonanceForge  \u{2192}  [output]",
-            Style::default().fg(Color::Rgb(120, 80, 160)),
-        )),
     ];
+
+    for node in &loom_state.persistent.nodes {
+        lines.push(build_node_buffer_line(node, diagram_area.width));
+    }
 
     let para = Paragraph::new(lines)
         .alignment(Alignment::Left)
@@ -217,7 +204,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
     }
 }
 
-fn render_list_detail(frame: &mut Frame, area: Rect, ui: &LoomUiState) {
+fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &LoomUiState) {
     use crate::loom::types::NodeId;
 
     let nodes = NodeId::ALL;
@@ -230,7 +217,7 @@ fn render_list_detail(frame: &mut Frame, area: Rect, ui: &LoomUiState) {
         Line::from(""),
     ];
 
-    for (i, node) in nodes.iter().enumerate() {
+    for (i, node_id) in nodes.iter().enumerate() {
         let is_selected = ui.selected_node == i;
         let prefix = if is_selected { "\u{25b6} " } else { "  " };
         let color = if is_selected {
@@ -240,12 +227,64 @@ fn render_list_detail(frame: &mut Frame, area: Rect, ui: &LoomUiState) {
         };
         lines.push(Line::from(vec![
             Span::styled(prefix, Style::default().fg(color)),
-            Span::styled(node.name(), Style::default().fg(color)),
+            Span::styled(node_id.name(), Style::default().fg(color)),
             Span::styled(
-                format!(" \u{2014} {:?}", node.nature()),
+                format!(" \u{2014} {:?}", node_id.nature()),
                 Style::default().fg(Color::DarkGray),
             ),
         ]));
+
+        // Show outgoing pipes for the selected node.
+        if is_selected {
+            let outgoing_pipes: Vec<_> = loom_state
+                .persistent
+                .pipes
+                .iter()
+                .filter(|p| p.from == *node_id && !p.under_construction)
+                .collect();
+
+            if outgoing_pipes.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    "     no outgoing pipes",
+                    Style::default().fg(Color::Rgb(60, 45, 80)),
+                )));
+            } else {
+                for (pipe_i, pipe) in outgoing_pipes.iter().enumerate() {
+                    let is_pipe_selected = ui.selected_pipe == pipe_i;
+                    let pipe_prefix = if is_pipe_selected {
+                        "   \u{25b8} "
+                    } else {
+                        "     "
+                    };
+                    let pipe_color = if is_pipe_selected {
+                        Color::Rgb(220, 190, 255)
+                    } else {
+                        Color::Rgb(100, 70, 130)
+                    };
+                    let ratio_pct = (pipe.split_ratio * 100.0).round() as u32;
+                    let bar = build_ratio_bar(pipe.split_ratio, 10);
+                    lines.push(Line::from(vec![
+                        Span::styled(pipe_prefix, Style::default().fg(pipe_color)),
+                        Span::styled(
+                            format!("\u{2192} {}", pipe.to.name()),
+                            Style::default().fg(pipe_color),
+                        ),
+                        Span::styled(
+                            format!("  [{:>3}%] {}", ratio_pct, bar),
+                            Style::default().fg(pipe_color),
+                        ),
+                        Span::styled(
+                            format!("  {:?}", pipe.tier),
+                            Style::default().fg(Color::DarkGray),
+                        ),
+                    ]));
+                }
+                lines.push(Line::from(Span::styled(
+                    "   [P] Select pipe  [\u{2190}/\u{2192}] Adjust ratio",
+                    Style::default().fg(Color::DarkGray),
+                )));
+            }
+        }
     }
 
     let para = Paragraph::new(lines)
@@ -254,24 +293,41 @@ fn render_list_detail(frame: &mut Frame, area: Rect, ui: &LoomUiState) {
     frame.render_widget(para, area);
 }
 
-fn render_codex(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
-    let discovered: Vec<_> = loom_state
+/// Build a compact inline ratio bar (e.g. "████░░░░░░" for 40%).
+fn build_ratio_bar(ratio: f64, width: usize) -> String {
+    let filled = ((ratio.clamp(0.0, 1.0) * width as f64) as usize).min(width);
+    let empty = width.saturating_sub(filled);
+    format!("{}{}", "\u{2588}".repeat(filled), "\u{2591}".repeat(empty))
+}
+
+fn render_codex(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &LoomUiState) {
+    use crate::loom::recipes::all_recipes;
+
+    let discovered_count = loom_state
         .persistent
         .codex
         .iter()
         .filter(|e| e.discovered)
-        .collect();
+        .count();
+    let total_recipes = all_recipes().len();
+    let hint_indices = crate::loom::logic::codex_hint_indices(&loom_state.persistent.codex);
+    let hint_count = hint_indices.len();
+
+    let count_label = format!("  {}/{} Discovered", discovered_count, total_recipes);
 
     let mut lines = vec![
         Line::from(""),
-        Line::from(Span::styled(
-            "Recipe Codex",
-            Style::default().fg(Color::Rgb(180, 120, 220)),
-        )),
+        Line::from(vec![
+            Span::styled(
+                "Recipe Codex",
+                Style::default().fg(Color::Rgb(180, 120, 220)),
+            ),
+            Span::styled(count_label, Style::default().fg(Color::DarkGray)),
+        ]),
         Line::from(""),
     ];
 
-    if discovered.is_empty() {
+    if discovered_count == 0 && hint_count == 0 {
         lines.push(Line::from(Span::styled(
             "No recipes discovered yet.",
             Style::default().fg(Color::DarkGray),
@@ -281,30 +337,134 @@ fn render_codex(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
             Style::default().fg(Color::Rgb(80, 60, 100)),
         )));
     } else {
-        for entry in &discovered {
+        // Discovered recipes with proper nature names and output multiplier.
+        for entry in loom_state.persistent.codex.iter().filter(|e| e.discovered) {
             let inputs: Vec<&str> = entry.inputs.iter().map(|r| resource_name(r)).collect();
+            let nature = node_nature_name(entry.node_nature);
             lines.push(Line::from(vec![
                 Span::styled(
-                    format!("{} + {:?}", inputs.join(" + "), entry.node_nature),
+                    format!(" {} @ {}", inputs.join(" + "), nature),
                     Style::default().fg(Color::Rgb(160, 100, 200)),
                 ),
                 Span::styled(" \u{2192} ", Style::default().fg(Color::DarkGray)),
                 Span::styled(
-                    format!(
-                        "{} (x{:.1})",
-                        resource_name(&entry.output),
-                        entry.output_amount
-                    ),
+                    resource_name(&entry.output),
                     Style::default().fg(Color::Rgb(220, 180, 255)),
+                ),
+                Span::styled(
+                    format!(" (x{:.1})", entry.output_amount),
+                    Style::default().fg(Color::Rgb(130, 90, 170)),
                 ),
             ]));
         }
+
+        // "???" hints for adjacent undiscovered recipes — show all of them (scrollable).
+        if hint_count > 0 {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                format!(
+                    " {} adjacent reaction{} hinted:",
+                    hint_count,
+                    if hint_count == 1 { "" } else { "s" }
+                ),
+                Style::default().fg(Color::DarkGray),
+            )));
+            for _ in 0..hint_count {
+                lines.push(Line::from(Span::styled(
+                    " ??? + ??? @ ??? \u{2192} ???",
+                    Style::default().fg(Color::Rgb(60, 45, 80)),
+                )));
+            }
+        }
     }
+
+    // Clamp scroll so it can't scroll past the last line.
+    let total_lines = lines.len();
+    let visible_rows = area.height as usize;
+    let scroll = ui
+        .codex_scroll
+        .min(total_lines.saturating_sub(visible_rows));
 
     let para = Paragraph::new(lines)
         .alignment(Alignment::Left)
-        .style(Style::default().bg(Color::Rgb(10, 5, 18)));
+        .style(Style::default().bg(Color::Rgb(10, 5, 18)))
+        .scroll((scroll as u16, 0));
     frame.render_widget(para, area);
+}
+
+/// Returns the display name for a NodeNature.
+fn node_nature_name(nature: crate::loom::types::NodeNature) -> &'static str {
+    use crate::loom::types::NodeNature;
+    match nature {
+        NodeNature::Heat => "Heat",
+        NodeNature::Form => "Form",
+        NodeNature::Void => "Void",
+        NodeNature::Pattern => "Pattern",
+        NodeNature::Stillness => "Stillness",
+        NodeNature::Vibration => "Vibration",
+    }
+}
+
+// ── Buffer bar helpers ────────────────────────────────────────────────────────
+
+/// Build a single line showing a node's name, lock status, buffer bar, and stall warning.
+fn build_node_buffer_line(node: &crate::loom::types::LoomNode, width: u16) -> Line<'static> {
+    if !node.unlocked {
+        return Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled(
+                format!("{:<18}", node.id.name()),
+                Style::default().fg(Color::Rgb(60, 45, 80)),
+            ),
+            Span::styled("[locked]", Style::default().fg(Color::Rgb(60, 45, 80))),
+        ]);
+    }
+
+    let fill_ratio = if node.buffer_capacity > 0.0 {
+        (node.buffer / node.buffer_capacity).min(1.0)
+    } else {
+        0.0
+    };
+
+    // Color: green normal, yellow >75%, red >90% or stalled.
+    let bar_color = if node.stalled || fill_ratio >= 0.90 {
+        Color::Rgb(220, 60, 60)
+    } else if fill_ratio >= 0.75 {
+        Color::Rgb(220, 180, 60)
+    } else {
+        Color::Rgb(60, 200, 100)
+    };
+
+    // Bar width: total width minus name(18) minus brackets(2) minus spacing(4) minus stock text(12).
+    let bar_width = (width as usize)
+        .saturating_sub(18 + 2 + 4 + 12)
+        .clamp(4, 20);
+    let filled = ((fill_ratio * bar_width as f64) as usize).min(bar_width);
+    let empty = bar_width - filled;
+
+    let stall_marker = if node.stalled { " \u{26a0}STALL" } else { "" };
+
+    Line::from(vec![
+        Span::styled("  ", Style::default()),
+        Span::styled(
+            format!("{:<18}", node.id.name()),
+            Style::default().fg(Color::Rgb(180, 140, 220)),
+        ),
+        Span::styled("[", Style::default().fg(Color::DarkGray)),
+        Span::styled("\u{2588}".repeat(filled), Style::default().fg(bar_color)),
+        Span::styled(
+            "\u{2591}".repeat(empty),
+            Style::default().fg(Color::Rgb(40, 30, 55)),
+        ),
+        Span::styled("]", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            format!(
+                " {:>5.1}/{:<5.1}{}",
+                node.buffer, node.buffer_capacity, stall_marker
+            ),
+            Style::default().fg(bar_color),
+        ),
+    ])
 }
 
 // ── Pattern bar ───────────────────────────────────────────────────────────────
@@ -454,6 +614,8 @@ fn render_nav_hints(frame: &mut Frame, area: Rect, ui: &LoomUiState) {
 
     let hints = if ui.view == LoomView::ArchetypeSelection {
         " [Up/Down] Select  [Enter] Confirm  [Esc] Close "
+    } else if ui.view == LoomView::ListDetail {
+        " [Tab] Switch View  [Up/Down] Node  [P] Pipe  [\u{2190}/\u{2192}] Ratio  [Esc] Close "
     } else {
         " [Tab] Switch View  [Up/Down] Navigate  [Esc] Close "
     };

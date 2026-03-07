@@ -283,6 +283,8 @@ pub struct LoomUiState {
     pub selected_node: usize,
     pub selected_pipe: usize,
     pub selected_archetype: usize,
+    /// Scroll offset for the Codex view (number of lines scrolled down).
+    pub codex_scroll: usize,
 }
 
 impl LoomUiState {
@@ -293,6 +295,7 @@ impl LoomUiState {
             selected_node: 0,
             selected_pipe: 0,
             selected_archetype: 0,
+            codex_scroll: 0,
         }
     }
 

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// Phase 4: Pipe Data Model, Flow Simulation, Split Ratio UI, Upgrading & Demolishing.
 ///
 /// Pipes are directional connections between nodes. Each pipe has a bandwidth tier,

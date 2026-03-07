@@ -1013,6 +1013,15 @@ pub(super) fn tick_loom(
         }
     }
 
+    // Tick pipe construction (decrement timers, complete when done).
+    let completed_pipes = crate::loom::tick_pipe_construction(loom);
+    if !completed_pipes.is_empty() {
+        result.loom_changed = true;
+    }
+
+    // Tick pipe flow (transfer resources through active pipes).
+    crate::loom::tick_pipe_flow(loom, TICK_SECONDS);
+
     // Tick base production for all unlocked nodes.
     let _produced = crate::loom::tick_base_production(loom, TICK_SECONDS);
 
@@ -1040,9 +1049,6 @@ pub(super) fn tick_loom(
     if pattern_completed {
         result.loom_changed = true;
     }
-
-    // Mark loom changed if any node's stall state changed (for UI refresh).
-    // Production stalls are transient — we mark changed conservatively when nodes are unlocked.
 }
 
 #[cfg(test)]
