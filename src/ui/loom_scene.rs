@@ -1489,14 +1489,80 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         }
     }
 
-    // ── Return-path label (RF ↻ ES) ──
-    // A subtle label below the grid showing the cycle closes.
+    // ── Return path (RF → ES) completing the ring ──
+    // Draws along the outside: RF right edge → up → across top → down → ES left edge.
     {
-        let label = "\u{21bb} RF \u{2500}\u{2500} ES"; // ↻ RF ── ES
-        let label_row = (3 * row_stride) as i32 - 2;
-        let label_col = col_spacing as i32;
-        if label_row > 0 && label_row < rows as i32 {
-            put_text(&mut buffer, label_row, label_col, label, flow_color);
+        let left_col = col_spacing as i32;
+        let right_col = (col_spacing + NODE_BOX_WIDTH + col_spacing) as i32;
+
+        // RF box: bottom-right. Exit from its right edge at mid-height.
+        let rf_mid_row = (2 * row_stride) as i32 + NODE_BOX_HEIGHT as i32 / 2;
+        let rf_right = right_col + NODE_BOX_WIDTH as i32;
+
+        // ES box: top-left. Enter its left edge at mid-height.
+        let es_mid_row = NODE_BOX_HEIGHT as i32 / 2;
+        let es_left = left_col;
+
+        // The return path runs 1 col outside the grid on each side.
+        let path_right = rf_right + 1;
+        let path_left = (es_left - 1).max(0);
+        // Top row for the horizontal crossbar: 1 row above the grid.
+        // If no room above, use row 0 and overlap slightly.
+        let path_top = 0i32.max(es_mid_row - 2);
+
+        let return_color = Color::Rgb(80, 60, 110);
+
+        // Horizontal stub from RF right edge to path_right column.
+        if path_right < cols as i32 {
+            for c in rf_right..=path_right {
+                put_cell(&mut buffer, rf_mid_row, c, '\u{2500}', return_color); // ─
+            }
+        }
+
+        // Vertical: path_right column from rf_mid_row up to path_top.
+        if path_right < cols as i32 {
+            put_cell(
+                &mut buffer,
+                rf_mid_row,
+                path_right,
+                '\u{256f}',
+                return_color,
+            ); // ╯
+            for r in (path_top + 1)..rf_mid_row {
+                put_cell(&mut buffer, r, path_right, '\u{2502}', return_color); // │
+            }
+            put_cell(&mut buffer, path_top, path_right, '\u{256e}', return_color);
+            // ╮
+        }
+
+        // Horizontal: across the top from path_right to path_left.
+        for c in (path_left + 1)..path_right {
+            put_cell(&mut buffer, path_top, c, '\u{2500}', return_color); // ─
+        }
+
+        // Corner and vertical: path_left column from path_top down to es_mid_row.
+        if path_left >= 0 {
+            put_cell(&mut buffer, path_top, path_left, '\u{256d}', return_color); // ╭
+            for r in (path_top + 1)..es_mid_row {
+                put_cell(&mut buffer, r, path_left, '\u{2502}', return_color); // │
+            }
+        }
+
+        // Horizontal stub from path_left into ES left edge, with arrowhead.
+        if path_left < es_left {
+            put_cell(&mut buffer, es_mid_row, path_left, '\u{2570}', return_color); // ╰
+            for c in (path_left + 1)..(es_left - 1) {
+                put_cell(&mut buffer, es_mid_row, c, '\u{2500}', return_color); // ─
+            }
+            if es_left > path_left + 1 {
+                put_cell(
+                    &mut buffer,
+                    es_mid_row,
+                    es_left - 1,
+                    '\u{25b6}',
+                    flow_arrow_color,
+                ); // ▶
+            }
         }
     }
 
