@@ -173,6 +173,14 @@ pub fn recipes_using(input: Resource) -> Vec<Recipe> {
         .collect()
 }
 
+/// Returns all recipes that use a given node nature as catalyst.
+pub fn recipes_by_nature(nature: NodeNature) -> Vec<Recipe> {
+    all_recipes()
+        .into_iter()
+        .filter(|r| r.node_nature == nature)
+        .collect()
+}
+
 /// Returns all recipes "adjacent" to a set of discovered recipe indices.
 /// Adjacent means they share at least one input with a known recipe.
 /// Used to generate "???" codex hints.
@@ -537,5 +545,26 @@ mod tests {
             "StillbornSong recipe amount too low: {}",
             ss.amount
         );
+    }
+
+    #[test]
+    fn test_recipes_by_nature_heat() {
+        let heat_recipes = recipes_by_nature(Heat);
+        assert!(!heat_recipes.is_empty(), "Heat should have recipes");
+        for r in &heat_recipes {
+            assert_eq!(r.node_nature, Heat);
+        }
+    }
+
+    #[test]
+    fn test_recipes_by_nature_returns_all_natures() {
+        for nature in [Heat, Form, Void, Pattern, Stillness, Vibration] {
+            let recipes = recipes_by_nature(nature);
+            assert!(
+                !recipes.is_empty(),
+                "{:?} should have at least one recipe",
+                nature
+            );
+        }
     }
 }
