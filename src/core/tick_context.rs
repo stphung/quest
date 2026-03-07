@@ -3,6 +3,7 @@ use crate::core::game_state::GameState;
 use crate::deep::DeepState;
 use crate::enhancement::types::EnhancementProgress;
 use crate::haven::types::Haven;
+use crate::loom::LoomState;
 
 /// Bundles all mutable references needed by game_tick() into one parameter.
 pub struct TickContext<'a> {
@@ -12,5 +13,6 @@ pub struct TickContext<'a> {
     pub enhancement: &'a mut EnhancementProgress,
     pub deep: &'a mut DeepState,
     pub achievements: &'a mut Achievements,
+    pub loom: &'a mut LoomState,
     pub debug_mode: bool,
 }

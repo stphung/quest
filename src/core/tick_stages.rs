@@ -934,6 +934,9 @@ pub(super) fn tick_deep_missions(
         achievements.on_deep_gateway_opened(Some(&state.character_name));
     }
 
+    // Loom of Worlds discovery: triggers when Gateway at Layer 30 completes.
+    // Handled in tick_loom() which runs after this stage.
+
     if (summary.missions_completed > 0 || summary.mercs_lost > 0) && !debug_mode {
         result.achievements_changed = true;
     }
@@ -973,6 +976,30 @@ pub(super) fn tick_deep_missions(
         rng,
     ) {
         result.deep_changed = true;
+    }
+}
+
+/// Stage 11e: Tick the Loom of Worlds — check for discovery trigger.
+///
+/// The Loom is discovered when the Gateway Expedition at Deep Layer 30
+/// completes successfully. `tick_deep_missions()` sets `summary.gateway_opened`
+/// which is reflected in `deep.persistent.gateway_opened`. We check that flag
+/// here so discovery fires in the same tick the gateway opens.
+pub(super) fn tick_loom(
+    deep: &crate::deep::DeepState,
+    loom: &mut crate::loom::LoomState,
+    result: &mut TickResult,
+) {
+    if !deep.persistent.discovered {
+        return;
+    }
+    if loom.persistent.discovered {
+        return;
+    }
+    if deep.persistent.gateway_opened {
+        crate::loom::complete_discovery(loom);
+        result.events.push(TickEvent::LoomDiscovered);
+        result.loom_changed = true;
     }
 }
 

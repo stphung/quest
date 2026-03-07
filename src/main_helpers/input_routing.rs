@@ -12,6 +12,7 @@ use crate::enhancement::EnhancementProgress;
 use crate::haven::Haven;
 use crate::history::{self, HistoryRepo, SaveEvent};
 use crate::input::{GameOverlay, InputResult};
+use crate::loom::LoomState;
 use crate::main_helpers::cloud_sync::CloudSyncState;
 use crate::main_helpers::game_context::GameContext;
 use crate::stormglass::types::ChronoSurgeState;
@@ -37,6 +38,7 @@ pub fn route_game_input(
     result: InputResult,
     ctx: &GameContext<'_>,
     character_manager: &CharacterManager,
+    loom_state: &LoomState,
     last_save_instant: &mut Option<Instant>,
     last_save_time: &mut Option<chrono::DateTime<Local>>,
 ) -> InputAction {
@@ -58,6 +60,7 @@ pub fn route_game_input(
                     haven,
                     enhancement,
                     deep,
+                    loom_state,
                     None,
                     None,
                 );
@@ -73,6 +76,7 @@ pub fn route_game_input(
                     haven,
                     enhancement,
                     deep,
+                    loom_state,
                 );
                 *last_save_instant = Some(Instant::now());
                 *last_save_time = Some(Local::now());
@@ -88,6 +92,7 @@ pub fn route_game_input(
                     haven,
                     enhancement,
                     deep,
+                    loom_state,
                 );
                 *last_save_instant = Some(Instant::now());
                 *last_save_time = Some(Local::now());
@@ -194,6 +199,7 @@ pub fn dispatch_time_vault_action(
     haven: &Haven,
     enhancement: &EnhancementProgress,
     deep: &DeepState,
+    loom_state: &LoomState,
     debug_mode: bool,
     last_save_instant: &mut Option<Instant>,
     last_save_time: &mut Option<chrono::DateTime<Local>>,
@@ -252,6 +258,7 @@ pub fn dispatch_time_vault_action(
                     haven,
                     enhancement,
                     deep,
+                    loom_state,
                     repo,
                     cloud,
                     quest_dir,
@@ -291,6 +298,7 @@ pub fn dispatch_time_vault_action(
                     haven,
                     enhancement,
                     deep,
+                    loom_state,
                     repo,
                     cloud,
                     quest_dir,
@@ -327,6 +335,7 @@ pub fn dispatch_time_vault_action(
                     haven,
                     enhancement,
                     deep,
+                    loom_state,
                     repo,
                     cloud,
                     quest_dir,
@@ -377,6 +386,7 @@ fn save_and_commit(
     haven: &Haven,
     enhancement: &EnhancementProgress,
     deep: &DeepState,
+    loom_state: &crate::loom::LoomState,
     repo: &HistoryRepo,
     cloud: &mut CloudSyncState,
     quest_dir: &Path,
@@ -391,6 +401,7 @@ fn save_and_commit(
         haven,
         enhancement,
         deep,
+        loom_state,
     );
     *last_save_time = Some(Local::now());
     if commit_save(state, &SaveEvent::AutoSave, repo) {

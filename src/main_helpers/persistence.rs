@@ -7,10 +7,11 @@ use crate::deep;
 use crate::enhancement;
 use crate::haven;
 use crate::history::{CommitMetadata, HistoryRepo, SaveEvent};
+use crate::loom;
 
 /// Save all game state files to disk (JSON only, no git commit).
 ///
-/// Writes character, achievements, haven, enhancement, and deep state.
+/// Writes character, achievements, haven, enhancement, deep, and loom state.
 /// Call [`commit_save`] separately to create a git commit.
 #[allow(clippy::too_many_arguments)]
 pub fn save_files(
@@ -20,6 +21,7 @@ pub fn save_files(
     haven: &haven::Haven,
     enhancement: &enhancement::EnhancementProgress,
     deep: &deep::DeepState,
+    loom_state: &loom::LoomState,
 ) {
     let _ = character_manager.save_character(state);
     achievements::save_achievements(global_achievements).ok();
@@ -31,6 +33,9 @@ pub fn save_files(
     }
     if deep.persistent.discovered {
         deep::save_deep(deep).ok();
+    }
+    if loom_state.persistent.discovered {
+        loom::save_loom(loom_state).ok();
     }
 }
 
@@ -61,6 +66,7 @@ pub fn save_all(
     haven: &haven::Haven,
     enhancement: &enhancement::EnhancementProgress,
     deep: &deep::DeepState,
+    loom_state: &loom::LoomState,
     save_event: Option<&SaveEvent>,
     history_repo: Option<&HistoryRepo>,
 ) -> bool {
@@ -71,6 +77,7 @@ pub fn save_all(
         haven,
         enhancement,
         deep,
+        loom_state,
     );
 
     if let (Some(event), Some(repo)) = (save_event, history_repo) {
