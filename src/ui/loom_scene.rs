@@ -1366,11 +1366,8 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
     let mut buffer = vec![vec![SceneCell::new(' ', LOOM_BG, LOOM_BG); cols]; rows];
 
     // Calculate grid positions: 3 rows, 2 columns of node boxes.
-    // Reserve 2 cols on each side for the outer flow border.
-    let flow_margin = 2usize;
-    let inner_cols = cols.saturating_sub(flow_margin * 2);
-    let col_spacing = if inner_cols > (NODE_BOX_WIDTH * 2 + 4) {
-        (inner_cols - NODE_BOX_WIDTH * 2) / 3
+    let col_spacing = if cols > (NODE_BOX_WIDTH * 2 + 4) {
+        (cols - NODE_BOX_WIDTH * 2) / 3
     } else {
         1
     };
@@ -1393,8 +1390,8 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
 
     for (row_idx, (left_id, right_id)) in grid.iter().enumerate() {
         let top = (row_idx * row_stride) as i32;
-        let left_col = (flow_margin + col_spacing) as i32;
-        let right_col = (flow_margin + col_spacing + NODE_BOX_WIDTH + col_spacing) as i32;
+        let left_col = col_spacing as i32;
+        let right_col = (col_spacing + NODE_BOX_WIDTH + col_spacing) as i32;
 
         // Render left node.
         if let Some(left_node) = loom_state
@@ -1418,141 +1415,88 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
             render_node_box(&mut buffer, top, right_col, right_node, loom_state, is_sel);
         }
 
-        // ── Inter-node arrows showing cycle direction ──
-        let arrow_col = (left_col + NODE_BOX_WIDTH as i32 + right_col) / 2;
+        // ── Inter-node horizontal arrows showing cycle direction ──
+        // Fill the gap between left and right boxes with ─ and an arrowhead.
+        let gap_start = left_col + NODE_BOX_WIDTH as i32;
+        let gap_end = right_col;
         let arrow_row = top + (NODE_BOX_HEIGHT as i32) / 2;
-        match row_idx {
-            0 => put_cell(
-                &mut buffer,
-                arrow_row,
-                arrow_col,
-                '\u{2192}',
-                flow_arrow_color,
-            ), // →
-            1 => put_cell(
-                &mut buffer,
-                arrow_row,
-                arrow_col,
-                '\u{2190}',
-                flow_arrow_color,
-            ), // ←
-            2 => put_cell(
-                &mut buffer,
-                arrow_row,
-                arrow_col,
-                '\u{2192}',
-                flow_arrow_color,
-            ), // →
-            _ => {}
+        if gap_end > gap_start + 1 {
+            match row_idx {
+                0 | 2 => {
+                    // Left-to-right: ───→
+                    for c in gap_start..(gap_end - 1) {
+                        put_cell(&mut buffer, arrow_row, c, '\u{2500}', flow_color);
+                        // ─
+                    }
+                    put_cell(
+                        &mut buffer,
+                        arrow_row,
+                        gap_end - 1,
+                        '\u{25b6}',
+                        flow_arrow_color,
+                    );
+                    // ▶
+                }
+                1 => {
+                    // Right-to-left: ←───
+                    put_cell(
+                        &mut buffer,
+                        arrow_row,
+                        gap_start,
+                        '\u{25c0}',
+                        flow_arrow_color,
+                    );
+                    // ◀
+                    for c in (gap_start + 1)..gap_end {
+                        put_cell(&mut buffer, arrow_row, c, '\u{2500}', flow_color);
+                        // ─
+                    }
+                }
+                _ => {}
+            }
         }
     }
 
     // ── Vertical arrows between rows ──
     {
-        let left_col = (flow_margin + col_spacing) as i32;
-        let right_col = (flow_margin + col_spacing + NODE_BOX_WIDTH + col_spacing) as i32;
-        let mid_left = left_col + NODE_BOX_WIDTH as i32 / 2;
+        let right_col = (col_spacing + NODE_BOX_WIDTH + col_spacing) as i32;
+        let left_col = col_spacing as i32;
         let mid_right = right_col + NODE_BOX_WIDTH as i32 / 2;
+        let mid_left = left_col + NODE_BOX_WIDTH as i32 / 2;
 
-        // Between row 0 and row 1: RL(top-right) → VC(mid-right), arrow on right side
-        let gap_row_0 = NODE_BOX_HEIGHT as i32;
-        put_cell(
-            &mut buffer,
-            gap_row_0,
-            mid_right,
-            '\u{2193}',
-            flow_arrow_color,
-        ); // ↓
-        put_cell(
-            &mut buffer,
-            gap_row_0 + 1,
-            mid_right,
-            '\u{2502}',
-            flow_color,
-        ); // │
+        // Between row 0 and row 1: RL(top-right) ↓ VC(mid-right)
+        let gap_top_0 = NODE_BOX_HEIGHT as i32;
+        let gap_bot_0 = row_stride as i32;
+        for r in gap_top_0..gap_bot_0 {
+            if r == gap_bot_0 - 1 {
+                put_cell(&mut buffer, r, mid_right, '\u{25bc}', flow_arrow_color);
+            // ▼
+            } else {
+                put_cell(&mut buffer, r, mid_right, '\u{2502}', flow_color); // │
+            }
+        }
 
-        // Between row 1 and row 2: MA(mid-left) → SW(bottom-left), arrow on left side
-        let gap_row_1 = (row_stride + NODE_BOX_HEIGHT) as i32;
-        put_cell(
-            &mut buffer,
-            gap_row_1,
-            mid_left,
-            '\u{2193}',
-            flow_arrow_color,
-        ); // ↓
-        put_cell(&mut buffer, gap_row_1 + 1, mid_left, '\u{2502}', flow_color); // │
+        // Between row 1 and row 2: MA(mid-left) ↓ SW(bottom-left)
+        let gap_top_1 = (row_stride + NODE_BOX_HEIGHT) as i32;
+        let gap_bot_1 = (2 * row_stride) as i32;
+        for r in gap_top_1..gap_bot_1 {
+            if r == gap_bot_1 - 1 {
+                put_cell(&mut buffer, r, mid_left, '\u{25bc}', flow_arrow_color);
+            // ▼
+            } else {
+                put_cell(&mut buffer, r, mid_left, '\u{2502}', flow_color); // │
+            }
+        }
     }
 
-    // ── Outer flow border (RF → ES return path) ──
+    // ── Return-path label (RF ↻ ES) ──
+    // A subtle label below the grid showing the cycle closes.
     {
-        let left_edge = 0i32;
-        let right_edge = (cols.saturating_sub(1)) as i32;
-        let top_edge = 0i32;
-        let bottom_edge = (3 * row_stride).saturating_sub(1) as i32;
-        let bottom_edge = bottom_edge.min(rows.saturating_sub(1) as i32);
-
-        // Right side: from RF (bottom-right) going up
-        let right_col = (flow_margin + col_spacing + NODE_BOX_WIDTH + col_spacing) as i32;
-        let rf_right = right_col + NODE_BOX_WIDTH as i32;
-        for r in (top_edge + 1)..bottom_edge {
-            put_cell(&mut buffer, r, right_edge, '\u{2502}', flow_color); // │
-        }
-        // Connect RF to right edge
-        let rf_mid_row = (2 * row_stride + NODE_BOX_HEIGHT / 2) as i32;
-        for c in rf_right..right_edge {
-            put_cell(&mut buffer, rf_mid_row, c, '\u{2500}', flow_color); // ─
-        }
-
-        // Left side: from top going down to ES
-        let left_col = (flow_margin + col_spacing) as i32;
-        for r in (top_edge + 1)..bottom_edge {
-            put_cell(&mut buffer, r, left_edge, '\u{2502}', flow_color); // │
-        }
-        // Connect left edge to ES
-        let es_mid_row = (NODE_BOX_HEIGHT / 2) as i32;
-        for c in (left_edge + 1)..left_col {
-            put_cell(&mut buffer, es_mid_row, c, '\u{2500}', flow_color); // ─
-        }
-
-        // Top bar
-        put_cell(&mut buffer, top_edge, left_edge, '\u{256d}', flow_color); // ╭
-        for c in (left_edge + 1)..right_edge {
-            put_cell(&mut buffer, top_edge, c, '\u{2500}', flow_color); // ─
-        }
-        put_cell(&mut buffer, top_edge, right_edge, '\u{256e}', flow_color); // ╮
-
-        // Bottom bar
-        put_cell(&mut buffer, bottom_edge, left_edge, '\u{2570}', flow_color); // ╰
-        for c in (left_edge + 1)..right_edge {
-            put_cell(&mut buffer, bottom_edge, c, '\u{2500}', flow_color); // ─
-        }
-        put_cell(&mut buffer, bottom_edge, right_edge, '\u{256f}', flow_color); // ╯
-
-        // Animated arrow on the return path (left side, going up)
-        let anim_frame = (ui.throbber_frame / 3) as i32;
-        let path_len = bottom_edge - top_edge - 1;
-        if path_len > 0 {
-            let arrow_pos = top_edge + 1 + ((path_len - 1) - (anim_frame % path_len));
-            put_cell(
-                &mut buffer,
-                arrow_pos,
-                left_edge,
-                '\u{25b2}',
-                flow_arrow_color,
-            ); // ▲
-        }
-
-        // Animated arrow on right side (going up too, RF output flows up to top)
-        if path_len > 0 {
-            let arrow_pos =
-                top_edge + 1 + ((path_len - 1) - ((anim_frame + path_len / 2) % path_len));
-            put_cell(
-                &mut buffer,
-                arrow_pos,
-                right_edge,
-                '\u{25b2}',
-                flow_arrow_color,
-            ); // ▲
+        let label = "\u{21bb} RF \u{2500}\u{2500} ES"; // ↻ RF ── ES
+        let label_row = (3 * row_stride) as i32 - 2;
+        let label_col = col_spacing as i32;
+        if label_row > 0 && label_row < rows as i32 {
+            put_text(&mut buffer, label_row, label_col, label, flow_color);
         }
     }
 
@@ -1564,7 +1508,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         put_text(
             &mut buffer,
             sep_row,
-            (flow_margin + col_spacing) as i32,
+            col_spacing as i32,
             "\u{2500}\u{2500} Processing \u{2500}\u{2500}",
             Color::Rgb(80, 60, 100),
         );
@@ -1577,9 +1521,9 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
             let grid_col = i % refinery_cols;
             let top = (refinery_row_start + grid_row * row_stride) as i32;
             let left_col = if grid_col == 0 {
-                (flow_margin + col_spacing) as i32
+                col_spacing as i32
             } else {
-                (flow_margin + col_spacing + NODE_BOX_WIDTH + col_spacing) as i32
+                (col_spacing + NODE_BOX_WIDTH + col_spacing) as i32
             };
             let is_sel = ui.selected_node >= 6 && (ui.selected_node - 6) == i;
             render_refinery_box(
