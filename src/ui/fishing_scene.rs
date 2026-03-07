@@ -573,6 +573,74 @@ impl Shape for SkyShape {
             }
         }
 
+        // 5c. Rocky shoreline with vegetation — breaks up the hard horizon edge
+        {
+            let rock_dark_day = (72u8, 68, 62);
+            let rock_dark_night = (32u8, 30, 28);
+            let rock_mid_day = (95u8, 88, 78);
+            let rock_mid_night = (45u8, 42, 38);
+            let rock_light_day = (115u8, 108, 95);
+            let rock_light_night = (55u8, 52, 48);
+            let bush_dark_day = (32u8, 62, 28);
+            let bush_dark_night = (14u8, 30, 14);
+            let bush_light_day = (48u8, 82, 38);
+            let bush_light_night = (22u8, 42, 20);
+
+            let rock_dark = lerp_rgb(rock_dark_day, rock_dark_night, self.dusk);
+            let rock_mid = lerp_rgb(rock_mid_day, rock_mid_night, self.dusk);
+            let rock_light = lerp_rgb(rock_light_day, rock_light_night, self.dusk);
+            let bush_dark = lerp_rgb(bush_dark_day, bush_dark_night, self.dusk);
+            let bush_light = lerp_rgb(bush_light_day, bush_light_night, self.dusk);
+
+            for col in 0..self.width {
+                let h = hash2d(col, 77);
+
+                // Rocky clusters: ~40% of columns get rocks extending above horizon
+                if h.is_multiple_of(5) || h.is_multiple_of(7) {
+                    // Rock height: 1-3 pixels above horizon
+                    let rock_h = (h % 3 + 1) as i32;
+                    for dy in 0..rock_h {
+                        let gy = sky_py as i32 - 1 - dy;
+                        let shade = hash2d(col, dy as usize + 200);
+                        let color = if shade.is_multiple_of(3) {
+                            rock_light
+                        } else if shade.is_multiple_of(2) {
+                            rock_dark
+                        } else {
+                            rock_mid
+                        };
+                        self.paint_px(painter, col as i32, gy, color);
+                    }
+                }
+
+                // Vegetation: ~25% of columns get bush pixels on top of rocks/horizon
+                let veg = hash2d(col + 31, 88);
+                if veg.is_multiple_of(4) {
+                    let bush_h = (veg % 2 + 1) as i32;
+                    for dy in 0..bush_h {
+                        let gy = sky_py as i32 - 2 - dy; // sit above rocks
+                        let shade = hash2d(col + 50, dy as usize);
+                        let color = if shade.is_multiple_of(3) {
+                            bush_dark
+                        } else {
+                            bush_light
+                        };
+                        self.paint_px(painter, col as i32, gy, color);
+                    }
+                    // Neighboring pixel for bush width
+                    if col + 1 < self.width {
+                        let gy = sky_py as i32 - 2;
+                        let color = if hash2d(col + 51, 0).is_multiple_of(2) {
+                            bush_dark
+                        } else {
+                            bush_light
+                        };
+                        self.paint_px(painter, col as i32 + 1, gy, color);
+                    }
+                }
+            }
+        }
+
         // 6. Sailboat sky — pixel art for pennant, sail, mast, rigging
         let mx = self.mast_x;
         let mt = self.mast_top * 2; // pixel y of mast_top row
