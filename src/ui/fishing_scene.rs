@@ -807,6 +807,15 @@ impl Shape for WaterSurface {
 
             let mut base = lerp_rgb(near, deep, depth_t.powf(0.85));
 
+            // Swell waves — slow large-scale dark/light bands rolling through
+            let swell = (gy as f64 * 0.08 + self.wave_tick * 0.018).sin() * 0.5 + 0.5;
+            let swell_shift = ((swell - 0.5) * 0.08 * 255.0).round() as i8;
+            base = (
+                (base.0 as i16 + swell_shift as i16).clamp(0, 255) as u8,
+                (base.1 as i16 + swell_shift as i16).clamp(0, 255) as u8,
+                (base.2 as i16 + (swell_shift as i16 / 2)).clamp(0, 255) as u8,
+            );
+
             // Soften horizon seam: blend top 3 pixels toward sky horizon color
             if gy < 3 {
                 let blend_t = (gy as f64 + 1.0) / 4.0;
@@ -822,7 +831,10 @@ impl Shape for WaterSurface {
                     .sin();
                 let secondary =
                     (gx as f64 * 0.11 - self.wave_tick * 0.043 + row_equiv * 0.92).cos();
-                let wave = primary * 0.72 + secondary * 0.28;
+
+                // Wave interference — third sine at different frequency for rogue crests
+                let tertiary = (gx as f64 * 0.17 + self.wave_tick * 0.031 + gy as f64 * 0.14).sin();
+                let wave = primary * 0.60 + secondary * 0.25 + tertiary * 0.15;
 
                 let mut color = if wave > 0.74 {
                     // Foam/whitecaps on wave crests
@@ -857,6 +869,21 @@ impl Shape for WaterSurface {
                         color.1.saturating_add(boost),
                         color.2.saturating_add(boost / 2),
                     );
+                }
+
+                // Foam patches — drifting clusters of persistent surface foam
+                {
+                    let foam_drift = self.wave_tick * 0.025;
+                    // Two overlapping sine fields create patchy blobs
+                    let fx = ((gx as f64 + foam_drift) * 0.13).sin();
+                    let fy = ((gy as f64 - foam_drift * 0.7) * 0.19).cos();
+                    let patch = fx * fy;
+                    // Only show in upper half of water (foam stays on surface)
+                    if patch > 0.55 && depth_t < 0.5 {
+                        let foam_strength =
+                            ((patch - 0.55) / 0.45).min(1.0) * (1.0 - depth_t * 2.0) * 0.4;
+                        color = lerp_rgb(color, (225, 238, 248), foam_strength);
+                    }
                 }
 
                 // Horizon foam line — animated bright strip at water's edge
