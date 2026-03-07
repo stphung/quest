@@ -485,7 +485,7 @@ fn render_node_box(
     top: i32,
     left: i32,
     node: &crate::loom::types::LoomNode,
-    _loom_state: &LoomState,
+    loom_state: &LoomState,
     selected: bool,
 ) -> i32 {
     let w = NODE_BOX_WIDTH as i32;
@@ -532,23 +532,75 @@ fn render_node_box(
         put_cell(buffer, top, title_start + i as i32, ch, title_color);
     }
 
-    // Row 1: animated texture (1 row).
+    // Rows 1-2: side borders.
     put_cell(buffer, top + 1, left, v, border_color);
     put_cell(buffer, top + 1, left + w - 1, v, border_color);
-    render_node_texture(
-        buffer,
-        top + 1,
-        left + 1,
-        inner_w,
-        node.id,
-        node.stalled,
-        node.unlocked,
-        node.unlock_progress,
-    );
-
-    // Row 2: "Ember 5/hr [gauge 0/20]" or unlock info.
     put_cell(buffer, top + 2, left, v, border_color);
-    if node.unlocked {
+    put_cell(buffer, top + 2, left + w - 1, v, border_color);
+
+    if !node.unlocked {
+        // Locked node: Row 1 shows source hint, Row 2 shows progress.
+        let neighbors = crate::loom::node_neighbors(node.id);
+        // Find unlocked neighbors that could feed this node.
+        let feeding: Vec<&crate::loom::types::NodeId> = neighbors
+            .iter()
+            .filter(|nid| {
+                loom_state
+                    .persistent
+                    .nodes
+                    .iter()
+                    .any(|n| n.id == **nid && n.unlocked)
+            })
+            .collect();
+
+        // Row 1: source hint.
+        let hint = if !feeding.is_empty() {
+            let name = feeding[0].name();
+            format!("\u{2190} {} (50%)", name) // ← Ember Spindle (50%)
+        } else {
+            "dormant".to_string()
+        };
+        let hint_w = hint.len().min(inner_w);
+        let hint_str = &hint[..hint_w];
+        let hint_start = left + 1 + (inner_w as i32 - hint_w as i32) / 2;
+        let hint_color = if !feeding.is_empty() {
+            Color::Rgb(80, 60, 120)
+        } else {
+            Color::Rgb(50, 38, 65)
+        };
+        put_text(buffer, top + 1, hint_start, hint_str, hint_color);
+
+        // Row 2: unlock progress or "dormant".
+        let progress_text = if node.unlock_progress > 0.0 {
+            format!("{:.1}/2.0h unlocking", node.unlock_progress)
+        } else if feeding.is_empty() {
+            "no active neighbors".to_string()
+        } else {
+            "waiting for 50% buffer".to_string()
+        };
+        let fg = if node.unlock_progress > 0.0 {
+            Color::Rgb(100, 80, 160)
+        } else {
+            Color::Rgb(50, 38, 65)
+        };
+        let prog_w = progress_text.len().min(inner_w);
+        let prog_str = &progress_text[..prog_w];
+        let start = left + 1 + (inner_w as i32 - prog_w as i32) / 2;
+        put_text(buffer, top + 2, start, prog_str, fg);
+    } else {
+        // Row 1: animated texture.
+        render_node_texture(
+            buffer,
+            top + 1,
+            left + 1,
+            inner_w,
+            node.id,
+            node.stalled,
+            node.unlocked,
+            node.unlock_progress,
+        );
+
+        // Row 2: "Ember 5/hr [gauge 0/20]"
         let fill = if node.buffer_capacity > 0.0 {
             (node.buffer / node.buffer_capacity).min(1.0)
         } else {
@@ -604,20 +656,6 @@ fn render_node_box(
                 put_cell_bg(buffer, top + 2, gauge_col + i as i32, ch, fg, bg);
             }
         }
-    } else {
-        // Locked node: show unlock progress inline.
-        let progress_text = if node.unlock_progress > 0.0 {
-            format!("{:.1}/2.0h unlocking", node.unlock_progress)
-        } else {
-            "locked".to_string()
-        };
-        let fg = if node.unlock_progress > 0.0 {
-            Color::Rgb(100, 80, 160)
-        } else {
-            Color::Rgb(60, 45, 80)
-        };
-        let start = left + 1 + (inner_w as i32 - progress_text.len() as i32) / 2;
-        put_text(buffer, top + 2, start, &progress_text, fg);
     }
     put_cell(buffer, top + 2, left + w - 1, v, border_color);
 
