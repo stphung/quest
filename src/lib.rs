@@ -19,6 +19,7 @@ pub mod god_items;
 pub mod haven;
 pub mod history;
 pub mod items;
+pub mod loom;
 pub mod power_cores;
 pub mod stormglass;
 pub mod utils;

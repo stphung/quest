@@ -884,6 +884,7 @@ pub(super) fn draw_footer_compact(
     soulforge_discovered: bool,
     stormglass_discovered: bool,
     deep_indicator: DeepIndicatorStatus,
+    loom_discovered: bool,
     pending_achievements: usize,
 ) {
     use crate::character::prestige::can_prestige;
@@ -936,6 +937,12 @@ pub(super) fn draw_footer_compact(
         }
     };
 
+    let loom_span = if loom_discovered {
+        Span::styled(" [L]Loom", Style::default().fg(Color::Rgb(180, 120, 220)))
+    } else {
+        Span::raw("")
+    };
+
     let ach_span = if pending_achievements > 0 {
         Span::styled(
             format!(" [A]Ach({})", pending_achievements),
@@ -953,6 +960,7 @@ pub(super) fn draw_footer_compact(
         soulforge_span,
         stormglass_span,
         deep_span,
+        loom_span,
         ach_span,
         Span::styled(" [T]Vault", Style::default().fg(Color::Cyan)),
         Span::styled(" [W]Wiki", Style::default().fg(Color::DarkGray)),
@@ -1058,6 +1066,7 @@ pub fn draw_footer(
     soulforge_discovered: bool,
     stormglass_discovered: bool,
     deep_indicator: DeepIndicatorStatus,
+    loom_discovered: bool,
     show_ascend: bool,
     pending_achievements: usize,
     _ctx: &LayoutContext,
@@ -1158,6 +1167,15 @@ pub fn draw_footer(
         ),
     };
 
+    let loom_text = if loom_discovered {
+        Span::styled(
+            "    [L] Loom",
+            Style::default().fg(Color::Rgb(180, 120, 220)),
+        )
+    } else {
+        Span::raw("")
+    };
+
     let achievements_text = if pending_achievements > 0 {
         Span::styled(
             format!("[A] Achievements (\u{1f3c6} {} new!)", pending_achievements),
@@ -1185,6 +1203,7 @@ pub fn draw_footer(
             soulforge_text,
             stormglass_text,
             deep_text,
+            loom_text,
             update_status_text,
         ]),
         Line::from(vec![

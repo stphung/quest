@@ -221,6 +221,86 @@ impl Shape for SkyShape {
             }
         }
 
+        // 1c. Haze bands — thin warm-tinted bands in lower sky, slow drift
+        {
+            let haze_bands: [(f64, f64, f64); 3] = [
+                // (y_ratio in sky, drift_speed, opacity)
+                (0.68, 0.020, 0.18),
+                (0.76, 0.015, 0.15),
+                (0.84, 0.022, 0.12),
+            ];
+            let haze_warm_day = (220u8, 210, 195);
+            let haze_warm_dusk = (240u8, 170, 120);
+            let haze_tint = lerp_rgb(haze_warm_day, haze_warm_dusk, self.dusk);
+
+            for &(y_ratio, drift_speed, opacity) in &haze_bands {
+                let row = (sky_py as f64 * y_ratio).round() as usize;
+                if row >= sky_py {
+                    continue;
+                }
+                let drift = (self.wave_tick * drift_speed) % self.width as f64;
+                for gx in 0..self.width {
+                    // Patchy coverage via sine modulation
+                    let coverage = ((gx as f64 + drift) * 0.12).sin() * 0.5 + 0.5;
+                    if coverage < 0.3 {
+                        continue;
+                    }
+                    let blend = opacity * coverage;
+                    let py_t = row as f64 / (sky_py - 1).max(1) as f64;
+                    let base = lerp_rgb(top, low, py_t);
+                    let blended = lerp_rgb(base, haze_tint, blend);
+                    painter.paint(gx, row, Color::Rgb(blended.0, blended.1, blended.2));
+                    // Paint second pixel row for 2px tall band
+                    if row + 1 < sky_py {
+                        let base2 =
+                            lerp_rgb(top, low, (row + 1) as f64 / (sky_py - 1).max(1) as f64);
+                        let blended2 = lerp_rgb(base2, haze_tint, blend * 0.7);
+                        painter.paint(gx, row + 1, Color::Rgb(blended2.0, blended2.1, blended2.2));
+                    }
+                }
+            }
+        }
+
+        // 1d. High-altitude wisps — faint diagonal streaks in upper sky
+        {
+            let wisps: [(f64, f64, f64, i32, f64); 4] = [
+                // (base_x, y_ratio, drift_speed, length, brightness_boost)
+                (8.0, 0.15, 0.012, 5, 0.04),
+                (22.0, 0.22, 0.010, 4, 0.03),
+                (38.0, 0.12, 0.014, 6, 0.05),
+                (52.0, 0.20, 0.009, 3, 0.03),
+            ];
+
+            for &(base_x, y_ratio, drift_speed, length, boost) in &wisps {
+                let drift = (self.wave_tick * drift_speed) % self.width as f64;
+                let start_x = (base_x + drift).rem_euclid(self.width as f64) as i32;
+                let row = (sky_py as f64 * y_ratio).round() as usize;
+                if row >= sky_py.saturating_sub(2) {
+                    continue;
+                }
+
+                for dx in 0..length {
+                    let gx = ((start_x + dx) as usize % self.width) as i32;
+                    // Slight diagonal: every 2 pixels, shift down 1
+                    let dy = dx / 2;
+                    let gy = row + dy as usize;
+                    if gy >= sky_py {
+                        continue;
+                    }
+
+                    let py_t = gy as f64 / (sky_py - 1).max(1) as f64;
+                    let base = lerp_rgb(top, low, py_t);
+                    // Brighten slightly
+                    let wisp_color = (
+                        base.0.saturating_add((boost * 255.0) as u8),
+                        base.1.saturating_add((boost * 255.0) as u8),
+                        base.2.saturating_add((boost * 240.0) as u8),
+                    );
+                    self.paint_px(painter, gx, gy as i32, wisp_color);
+                }
+            }
+        }
+
         // 2. Celestial body — pixel circle with halo
         let orb_col =
             (self.width as f64 * 0.78 + (self.wave_tick * 0.08).sin() * 3.0).round() as i32;
@@ -291,30 +371,263 @@ impl Shape for SkyShape {
             }
         }
 
-        // 5. Shoreline silhouettes — pixel columns at horizon edge
-        for col in 0..self.width {
-            let far_h =
-                (1.0 + ((col as f64 * 0.24 + self.wave_tick * 0.012).sin() + 1.0) * 1.1) * 2.0;
-            let near_h = (1.0
-                + ((col as f64 * 0.15 + self.wave_tick * 0.020 + 1.5).sin() + 1.0) * 1.5)
-                * 2.0;
+        // 4b. Birds — depth-varied soaring silhouettes with altitude bob
+        //
+        // One close bird (5px, darker, more bob) and two distant birds
+        // (3px, fainter, less bob). All have 4-phase wing cycle.
+        {
+            // (base_x, y_ratio, speed, flap_offset, is_close)
+            let birds: [(f64, f64, f64, f64, bool); 3] = [
+                (5.0, 0.22, 0.035, 0.0, true),   // close
+                (25.0, 0.14, 0.028, 1.7, false), // distant
+                (42.0, 0.30, 0.042, 3.4, false), // distant
+            ];
 
-            let far_color = (
-                lerp_channel(84, 62, self.dusk),
-                lerp_channel(110, 90, self.dusk),
-                lerp_channel(126, 114, self.dusk),
-            );
-            let near_color = (
-                lerp_channel(70, 52, self.dusk),
-                lerp_channel(96, 74, self.dusk),
-                lerp_channel(110, 98, self.dusk),
-            );
+            for &(base_x, y_ratio, speed, flap_offset, is_close) in &birds {
+                // Color: close bird is dark silhouette, distant birds are fainter
+                let bird_color = if is_close {
+                    lerp_rgb((25, 22, 18), (60, 55, 50), self.dusk)
+                } else {
+                    lerp_rgb((65, 62, 58), (90, 85, 80), self.dusk)
+                };
 
-            for (h, color) in [(far_h, far_color), (near_h, near_color)] {
-                let pixels = h.round() as i32;
+                let drift = (self.wave_tick * speed) % self.width as f64;
+                let cx = (base_x + drift).rem_euclid(self.width as f64).round() as i32;
+                let row = (self.horizon as f64 * y_ratio).round() as usize;
+
+                // Altitude bob: close bird bobs more (2px), distant birds less (1px)
+                let bob_amp = if is_close { 2.0 } else { 1.0 };
+                let bob = (self.wave_tick * 0.04 + flap_offset).sin() * bob_amp;
+                let gy = (row * 2) as i32 + bob.round() as i32;
+
+                let phase = ((self.wave_tick * 0.11 + flap_offset) as usize) % 4;
+
+                self.paint_px(painter, cx, gy, bird_color);
+
+                if is_close {
+                    // 5px wide: body + 2 wing segments each side
+                    match phase {
+                        0 => {
+                            self.paint_px(painter, cx - 1, gy - 1, bird_color);
+                            self.paint_px(painter, cx - 2, gy - 2, bird_color);
+                            self.paint_px(painter, cx + 1, gy - 1, bird_color);
+                            self.paint_px(painter, cx + 2, gy - 2, bird_color);
+                        }
+                        2 => {
+                            self.paint_px(painter, cx - 1, gy + 1, bird_color);
+                            self.paint_px(painter, cx - 2, gy + 2, bird_color);
+                            self.paint_px(painter, cx + 1, gy + 1, bird_color);
+                            self.paint_px(painter, cx + 2, gy + 2, bird_color);
+                        }
+                        _ => {
+                            self.paint_px(painter, cx - 1, gy, bird_color);
+                            self.paint_px(painter, cx - 2, gy, bird_color);
+                            self.paint_px(painter, cx + 1, gy, bird_color);
+                            self.paint_px(painter, cx + 2, gy, bird_color);
+                        }
+                    }
+                } else {
+                    // 3px wide: body + 1 wingtip each side
+                    match phase {
+                        0 => {
+                            self.paint_px(painter, cx - 1, gy - 1, bird_color);
+                            self.paint_px(painter, cx + 1, gy - 1, bird_color);
+                        }
+                        2 => {
+                            self.paint_px(painter, cx - 1, gy + 1, bird_color);
+                            self.paint_px(painter, cx + 1, gy + 1, bird_color);
+                        }
+                        _ => {
+                            self.paint_px(painter, cx - 1, gy, bird_color);
+                            self.paint_px(painter, cx + 1, gy, bird_color);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4c. Wind streaks — faint diagonal lines drifting across upper sky
+        {
+            let streaks: [(f64, f64, f64, i32); 4] = [
+                // (base_x, y_ratio, speed, length)
+                (3.0, 0.08, 0.07, 4),
+                (19.0, 0.18, 0.06, 3),
+                (35.0, 0.10, 0.08, 5),
+                (50.0, 0.24, 0.055, 3),
+            ];
+
+            for &(base_x, y_ratio, speed, length) in &streaks {
+                let drift = (self.wave_tick * speed) % self.width as f64;
+                let start_x = (base_x + drift).rem_euclid(self.width as f64).round() as i32;
+                let row = (sky_py as f64 * y_ratio).round() as usize;
+
+                for dx in 0..length {
+                    let gx = ((start_x + dx) as usize % self.width) as i32;
+                    // Very slight diagonal: 1px down every 3px across
+                    let gy = row as i32 + dx / 3;
+                    if gy < 0 || gy as usize >= sky_py {
+                        continue;
+                    }
+                    // Barely visible — just a few points brighter than sky
+                    let py_t = gy as f64 / (sky_py - 1).max(1) as f64;
+                    let base = lerp_rgb(top, low, py_t);
+                    let streak_color = (
+                        base.0.saturating_add(8),
+                        base.1.saturating_add(8),
+                        base.2.saturating_add(6),
+                    );
+                    self.paint_px(painter, gx, gy, streak_color);
+                }
+            }
+        }
+
+        // 5. Bob Ross mountains — snow-capped peaks, rocky faces, evergreen tree line
+        //
+        // Two layers of asymmetric peaks. Each column is divided into vertical
+        // zones: snow cap (top), rocky face with highlight streaks (middle),
+        // evergreen tree line (bottom, near layer only).
+
+        // Peak: (center_ratio, height, left_width, right_width)
+        type Peak = (f64, f64, f64, f64);
+
+        let far_peaks: &[Peak] = &[
+            (0.18, 6.0, 6.0, 12.0),
+            (0.52, 5.0, 5.0, 10.0),
+            (0.82, 7.0, 7.0, 14.0),
+        ];
+        let near_peaks: &[Peak] = &[
+            (0.08, 3.5, 3.0, 8.0),
+            (0.38, 4.5, 4.0, 9.0),
+            (0.72, 5.0, 4.0, 10.0),
+        ];
+
+        // Compute height for a column given a set of peaks
+        let peak_height = |col: usize, peaks: &[Peak], w: usize, floor: f64| -> f64 {
+            let x = col as f64;
+            let mut best = floor;
+            for &(center_ratio, height, left_w, right_w) in peaks {
+                let cx = center_ratio * w as f64;
+                let dist = x - cx;
+                let slope_w = if dist < 0.0 { left_w } else { right_w };
+                let t = 1.0 - (dist.abs() / slope_w).min(1.0);
+                let h = floor + (height - floor) * t * t * (3.0 - 2.0 * t);
+                if h > best {
+                    best = h;
+                }
+            }
+            let jitter = (hash2d(col, (floor * 10.0) as usize) % 3) as f64 * 0.3;
+            (best + jitter).max(floor)
+        };
+
+        // --- Far layer (taller, hazier, snow cap + smooth rock gradient) ---
+        {
+            let snow_day = (235u8, 240, 245);
+            let snow_night = (140u8, 150, 170);
+            let rock_base_day = (80u8, 90, 115);
+            let rock_base_night = (38u8, 42, 58);
+            let rock_top_day = (130u8, 140, 165);
+            let rock_top_night = (65u8, 72, 92);
+
+            let snow = lerp_rgb(snow_day, snow_night, self.dusk);
+            let rock_base = lerp_rgb(rock_base_day, rock_base_night, self.dusk);
+            let rock_top = lerp_rgb(rock_top_day, rock_top_night, self.dusk);
+
+            for col in 0..self.width {
+                let h = peak_height(col, far_peaks, self.width, 0.8);
+                let pixels = (h * 2.0).round() as i32;
+                if pixels <= 0 {
+                    continue;
+                }
+
+                let snow_line = (pixels as f64 * 0.72).round() as i32;
+
                 for dy in 0..pixels {
                     let gy = sky_py as i32 - 1 - dy;
+                    let color = if dy >= snow_line {
+                        snow
+                    } else {
+                        // Smooth gradient: dark at base, lighter toward snow line
+                        let rock_t = if snow_line <= 0 {
+                            0.0
+                        } else {
+                            dy as f64 / snow_line as f64
+                        };
+                        lerp_rgb(rock_base, rock_top, rock_t)
+                    };
                     self.paint_px(painter, col as i32, gy, color);
+                }
+            }
+        }
+
+        // --- Near layer (shorter, darker, snow cap + smooth rock gradient) ---
+        {
+            let snow_day = (225u8, 230, 235);
+            let snow_night = (120u8, 130, 150);
+            let rock_base_day = (55u8, 62, 75);
+            let rock_base_night = (28u8, 32, 42);
+            let rock_top_day = (100u8, 110, 125);
+            let rock_top_night = (52u8, 58, 72);
+
+            let snow = lerp_rgb(snow_day, snow_night, self.dusk);
+            let rock_base = lerp_rgb(rock_base_day, rock_base_night, self.dusk);
+            let rock_top = lerp_rgb(rock_top_day, rock_top_night, self.dusk);
+
+            for col in 0..self.width {
+                let h = peak_height(col, near_peaks, self.width, 0.5);
+                let pixels = (h * 2.0).round() as i32;
+                if pixels <= 0 {
+                    continue;
+                }
+
+                let snow_line = (pixels as f64 * 0.75).round() as i32;
+
+                for dy in 0..pixels {
+                    let gy = sky_py as i32 - 1 - dy;
+                    let color = if dy >= snow_line {
+                        snow
+                    } else {
+                        let rock_t = if snow_line <= 0 {
+                            0.0
+                        } else {
+                            dy as f64 / snow_line as f64
+                        };
+                        lerp_rgb(rock_base, rock_top, rock_t)
+                    };
+                    self.paint_px(painter, col as i32, gy, color);
+                }
+            }
+        }
+
+        // 5b. Mountain light bleed — backlit glow where orb meets mountain edge
+        {
+            let orb_glow_color = if self.dusk < 0.56 {
+                (255u8, 220, 140) // warm gold for sun
+            } else {
+                (200u8, 215, 240) // cool white for moon
+            };
+
+            let orb_col_f = self.width as f64 * 0.78 + (self.wave_tick * 0.08).sin() * 3.0;
+
+            for col in 0..self.width {
+                let dist_to_orb = (col as f64 - orb_col_f).abs();
+                if dist_to_orb > 6.0 {
+                    continue;
+                }
+
+                let h = peak_height(col, near_peaks, self.width, 0.5);
+                let peak_gy = sky_py as i32 - (h * 2.0).round() as i32;
+
+                let glow_strength = (1.0 - dist_to_orb / 6.0) * 0.20;
+                for dy in 0..2i32 {
+                    let gy = peak_gy - 1 - dy;
+                    if gy < 0 || gy as usize >= sky_py {
+                        continue;
+                    }
+                    let fade = glow_strength * (1.0 - dy as f64 * 0.5);
+                    let py_t = gy as f64 / (sky_py - 1).max(1) as f64;
+                    let base = lerp_rgb(top, low, py_t);
+                    let blended = lerp_rgb(base, orb_glow_color, fade);
+                    self.paint_px(painter, col as i32, gy, blended);
                 }
             }
         }

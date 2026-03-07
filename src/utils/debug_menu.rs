@@ -12,6 +12,7 @@ use crate::fishing::generation::generate_fishing_session;
 use crate::god_items;
 use crate::haven::Haven;
 use crate::items;
+use crate::loom::{LoomArchetype, LoomState, LoomUiState};
 use crate::zones::get_all_zones;
 use chrono::{Duration, Utc};
 
@@ -53,6 +54,16 @@ enum DebugAction {
     SetLevel(u32),
     MaxAttributes,
     SetEnhancement(u8),
+    // Loom of Worlds debug actions
+    TriggerLoomDiscovery,
+    LoomSelectArchetype(LoomArchetype),
+    LoomUnlockAllNodes,
+    LoomGrantResources,
+    LoomCompletePattern,
+    LoomAdvanceToPattern(usize),
+    LoomBuildTestRefineryT1,
+    LoomBuildTestRefineryT2,
+    LoomClearRefineries,
 }
 
 const DEBUG_ACTIONS: &[DebugAction] = &[
@@ -157,6 +168,21 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::SetEnhancement(8),
     DebugAction::SetEnhancement(9),
     DebugAction::SetEnhancement(10),
+    // Loom of Worlds debug actions (indices 98–111)
+    DebugAction::TriggerLoomDiscovery,
+    DebugAction::LoomSelectArchetype(LoomArchetype::BurnBright),
+    DebugAction::LoomSelectArchetype(LoomArchetype::ReachWide),
+    DebugAction::LoomSelectArchetype(LoomArchetype::RunDeep),
+    DebugAction::LoomUnlockAllNodes,
+    DebugAction::LoomGrantResources,
+    DebugAction::LoomCompletePattern,
+    DebugAction::LoomAdvanceToPattern(0),
+    DebugAction::LoomAdvanceToPattern(5),
+    DebugAction::LoomAdvanceToPattern(10),
+    DebugAction::LoomAdvanceToPattern(17),
+    DebugAction::LoomBuildTestRefineryT1,
+    DebugAction::LoomBuildTestRefineryT2,
+    DebugAction::LoomClearRefineries,
 ];
 
 const CHALLENGE_ACTIONS: &[DebugAction] = &[
@@ -273,6 +299,22 @@ const SOULFORGE_ACTIONS: &[DebugAction] = &[
     DebugAction::SetEnhancement(9),
     DebugAction::SetEnhancement(10),
 ];
+const LOOM_ACTIONS: &[DebugAction] = &[
+    DebugAction::TriggerLoomDiscovery,
+    DebugAction::LoomSelectArchetype(LoomArchetype::BurnBright),
+    DebugAction::LoomSelectArchetype(LoomArchetype::ReachWide),
+    DebugAction::LoomSelectArchetype(LoomArchetype::RunDeep),
+    DebugAction::LoomUnlockAllNodes,
+    DebugAction::LoomGrantResources,
+    DebugAction::LoomCompletePattern,
+    DebugAction::LoomAdvanceToPattern(0),
+    DebugAction::LoomAdvanceToPattern(5),
+    DebugAction::LoomAdvanceToPattern(10),
+    DebugAction::LoomAdvanceToPattern(17),
+    DebugAction::LoomBuildTestRefineryT1,
+    DebugAction::LoomBuildTestRefineryT2,
+    DebugAction::LoomClearRefineries,
+];
 const BORDER_OPTION_START_INDEX: usize = DEBUG_ACTIONS.len();
 
 const SET_VALUES: &[u32] = &[1, 5, 25, 50, 100, 250, 500, 1000, 2500, 5000];
@@ -334,6 +376,25 @@ impl DebugAction {
             Self::SetLevel(amount) => 76 + set_value_index(amount),
             Self::MaxAttributes => 86,
             Self::SetEnhancement(level) => 87 + level as usize,
+            // Loom actions: 98–108
+            Self::TriggerLoomDiscovery => 98,
+            Self::LoomSelectArchetype(a) => match a {
+                LoomArchetype::BurnBright => 99,
+                LoomArchetype::ReachWide => 100,
+                LoomArchetype::RunDeep => 101,
+            },
+            Self::LoomUnlockAllNodes => 102,
+            Self::LoomGrantResources => 103,
+            Self::LoomCompletePattern => 104,
+            Self::LoomAdvanceToPattern(n) => match n {
+                0 => 105,
+                5 => 106,
+                10 => 107,
+                _ => 108, // 17
+            },
+            Self::LoomBuildTestRefineryT1 => 109,
+            Self::LoomBuildTestRefineryT2 => 110,
+            Self::LoomClearRefineries => 111,
         }
     }
 
@@ -448,9 +509,26 @@ impl DebugAction {
                 9 => "Set All Enhancement +9",
                 _ => "Set All Enhancement +10",
             },
+            Self::TriggerLoomDiscovery => "Trigger Loom Discovery",
+            Self::LoomSelectArchetype(a) => match a {
+                LoomArchetype::BurnBright => "Loom: Select Burn Bright",
+                LoomArchetype::ReachWide => "Loom: Select Reach Wide",
+                LoomArchetype::RunDeep => "Loom: Select Run Deep",
+            },
+            Self::LoomUnlockAllNodes => "Loom: Unlock All Nodes",
+            Self::LoomGrantResources => "Loom: Grant 100 to All Buffers",
+            Self::LoomCompletePattern => "Loom: Complete Current Pattern",
+            Self::LoomAdvanceToPattern(0) => "Loom: Reset to Pattern 1",
+            Self::LoomAdvanceToPattern(5) => "Loom: Jump to Pattern 6",
+            Self::LoomAdvanceToPattern(10) => "Loom: Jump to Pattern 11",
+            Self::LoomAdvanceToPattern(_) => "Loom: Jump to Final Pattern",
+            Self::LoomBuildTestRefineryT1 => "Build T1 Refinery (Ember+Void\u{2192}ForgedLight)",
+            Self::LoomBuildTestRefineryT2 => "Build T2 Refinery (FrgLt+Refl\u{2192}EchoGlass)",
+            Self::LoomClearRefineries => "Clear All Refineries",
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn run(
         self,
         state: &mut GameState,
@@ -458,6 +536,8 @@ impl DebugAction {
         enhancement: &mut EnhancementProgress,
         deep: &mut DeepState,
         achievements: &mut crate::achievements::Achievements,
+        loom: &mut LoomState,
+        loom_ui: &mut LoomUiState,
     ) -> &'static str {
         match self {
             Self::TriggerDungeon => trigger_dungeon(state),
@@ -500,6 +580,113 @@ impl DebugAction {
             Self::SetLevel(amount) => trigger_set_level(state, enhancement, amount),
             Self::MaxAttributes => trigger_max_attributes(state, enhancement),
             Self::SetEnhancement(level) => trigger_set_enhancement(state, enhancement, level),
+            Self::TriggerLoomDiscovery => {
+                crate::loom::complete_discovery(loom);
+                "Loom discovered."
+            }
+            Self::LoomSelectArchetype(archetype) => {
+                if loom.persistent.archetype.is_none() {
+                    crate::loom::select_archetype(loom, archetype);
+                    loom_ui.open = true;
+                    "Archetype selected."
+                } else {
+                    "Archetype already set."
+                }
+            }
+            Self::LoomUnlockAllNodes => {
+                for node in &mut loom.persistent.nodes {
+                    node.unlocked = true;
+                }
+                "All nodes unlocked."
+            }
+            Self::LoomGrantResources => {
+                for node in &mut loom.persistent.nodes {
+                    node.buffer = (node.buffer + 100.0).min(node.buffer_capacity);
+                }
+                "Granted 100 to all node buffers."
+            }
+            Self::LoomCompletePattern => {
+                let idx = loom.persistent.active_pattern;
+                if let Some(p) = loom.persistent.patterns.get_mut(idx) {
+                    for req in &mut p.requirements {
+                        req.accumulated = req.amount;
+                    }
+                    p.completed = true;
+                }
+                if loom.persistent.active_pattern + 1 < loom.persistent.patterns.len() {
+                    loom.persistent.active_pattern += 1;
+                }
+                "Current pattern completed."
+            }
+            Self::LoomAdvanceToPattern(n) => {
+                let target = n.min(loom.persistent.patterns.len().saturating_sub(1));
+                for i in 0..target {
+                    if let Some(p) = loom.persistent.patterns.get_mut(i) {
+                        for req in &mut p.requirements {
+                            req.accumulated = req.amount;
+                        }
+                        p.completed = true;
+                    }
+                }
+                loom.persistent.active_pattern = target;
+                "Advanced to pattern."
+            }
+            Self::LoomBuildTestRefineryT1 => {
+                let (a, b, nature) = (
+                    crate::loom::types::Resource::Ember,
+                    crate::loom::types::Resource::VoidEssence,
+                    crate::loom::types::NodeNature::Heat,
+                );
+                if let Some(recipe) = crate::loom::recipes::find_recipe(a, b, nature) {
+                    let r = crate::loom::types::Refinery::new(
+                        recipe.input_a,
+                        recipe.input_b,
+                        recipe.node_nature,
+                        recipe.output,
+                        recipe.amount,
+                        recipe.tier,
+                        vec![crate::loom::types::LoomNodeRef::Extractor(
+                            crate::loom::types::NodeId::EmberSpindle,
+                        )],
+                        vec![crate::loom::types::LoomNodeRef::Extractor(
+                            crate::loom::types::NodeId::VoidCondenser,
+                        )],
+                    );
+                    loom.persistent.refineries.push(r);
+                    "T1 Refinery built (debug)."
+                } else {
+                    "No T1 recipe found."
+                }
+            }
+            Self::LoomBuildTestRefineryT2 => {
+                let (a, b, nature) = (
+                    crate::loom::types::Resource::ForgedLight,
+                    crate::loom::types::Resource::Reflection,
+                    crate::loom::types::NodeNature::Form,
+                );
+                if let Some(recipe) = crate::loom::recipes::find_recipe(a, b, nature) {
+                    let r = crate::loom::types::Refinery::new(
+                        recipe.input_a,
+                        recipe.input_b,
+                        recipe.node_nature,
+                        recipe.output,
+                        recipe.amount,
+                        recipe.tier,
+                        vec![crate::loom::types::LoomNodeRef::Refinery(0)],
+                        vec![crate::loom::types::LoomNodeRef::Extractor(
+                            crate::loom::types::NodeId::ReflectionLens,
+                        )],
+                    );
+                    loom.persistent.refineries.push(r);
+                    "T2 Refinery built (debug)."
+                } else {
+                    "No T2 recipe found."
+                }
+            }
+            Self::LoomClearRefineries => {
+                loom.persistent.refineries.clear();
+                "All refineries cleared."
+            }
         }
     }
 }
@@ -540,6 +727,7 @@ pub fn option_count_for_category(category: DebugCategory) -> usize {
         DebugCategory::Zones => ZONE_ACTIONS.len(),
         DebugCategory::Character => CHARACTER_ACTIONS.len(),
         DebugCategory::Soulforge => SOULFORGE_ACTIONS.len(),
+        DebugCategory::Loom => LOOM_ACTIONS.len(),
         DebugCategory::Borders => SELECTABLE_UI_BORDER_STYLES.len(),
     }
 }
@@ -554,6 +742,7 @@ pub enum DebugCategory {
     Zones,
     Character,
     Soulforge,
+    Loom,
     Borders,
 }
 
@@ -568,6 +757,7 @@ impl DebugCategory {
             Self::Zones => "Zones",
             Self::Character => "Character",
             Self::Soulforge => "Soulforge",
+            Self::Loom => "Loom",
             Self::Borders => "Borders",
         }
     }
@@ -582,6 +772,7 @@ pub const DEBUG_CATEGORIES: &[DebugCategory] = &[
     DebugCategory::Zones,
     DebugCategory::Character,
     DebugCategory::Soulforge,
+    DebugCategory::Loom,
     DebugCategory::Borders,
 ];
 
@@ -667,6 +858,7 @@ impl DebugMenu {
             DebugCategory::Zones => ZONE_ACTIONS[visible_index].option_index(),
             DebugCategory::Character => CHARACTER_ACTIONS[visible_index].option_index(),
             DebugCategory::Soulforge => SOULFORGE_ACTIONS[visible_index].option_index(),
+            DebugCategory::Loom => LOOM_ACTIONS[visible_index].option_index(),
             DebugCategory::Borders => BORDER_OPTION_START_INDEX + visible_index,
         }
     }
@@ -676,6 +868,7 @@ impl DebugMenu {
     }
 
     /// Trigger the selected debug action. Returns a message describing what happened.
+    #[allow(clippy::too_many_arguments)]
     pub fn trigger_selected(
         &mut self,
         state: &mut GameState,
@@ -683,6 +876,8 @@ impl DebugMenu {
         enhancement: &mut EnhancementProgress,
         deep: &mut DeepState,
         achievements: &mut crate::achievements::Achievements,
+        loom: &mut LoomState,
+        loom_ui: &mut LoomUiState,
     ) -> &'static str {
         let selected_option = self.selected_option_global_index();
         if is_border_preview_option(selected_option) {
@@ -694,7 +889,7 @@ impl DebugMenu {
         }
 
         let msg = action_for_option_index(selected_option)
-            .map(|action| action.run(state, haven, enhancement, deep, achievements))
+            .map(|action| action.run(state, haven, enhancement, deep, achievements, loom, loom_ui))
             .unwrap_or("Unknown option");
 
         // Re-sync zone unlocks after every action — any action may change
@@ -1384,6 +1579,9 @@ mod tests {
         assert_eq!(menu.current_category(), DebugCategory::Borders);
 
         menu.navigate_prev_category();
+        assert_eq!(menu.current_category(), DebugCategory::Loom);
+
+        menu.navigate_prev_category();
         assert_eq!(menu.current_category(), DebugCategory::Soulforge);
 
         menu.navigate_prev_category();
@@ -1400,7 +1598,7 @@ mod tests {
     fn test_border_preview_does_not_close_menu() {
         let mut menu = DebugMenu::new();
         menu.open();
-        for _ in 0..8 {
+        for _ in 0..9 {
             menu.navigate_next_category();
         }
         assert_eq!(menu.current_category(), DebugCategory::Borders);
@@ -1410,12 +1608,16 @@ mod tests {
         let mut enhancement = EnhancementProgress::new();
         let mut deep = DeepState::new();
         let mut achievements = crate::achievements::Achievements::default();
+        let mut loom = LoomState::new();
+        let mut loom_ui = LoomUiState::new();
         let msg = menu.trigger_selected(
             &mut state,
             &mut haven,
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
 
         assert_eq!(msg, "Border style set: Classic");
@@ -1934,6 +2136,8 @@ mod tests {
         EnhancementProgress,
         DeepState,
         crate::achievements::Achievements,
+        LoomState,
+        LoomUiState,
     ) {
         (
             GameState::new("Test".to_string(), 0),
@@ -1941,6 +2145,8 @@ mod tests {
             EnhancementProgress::new(),
             DeepState::new(),
             crate::achievements::Achievements::default(),
+            LoomState::new(),
+            LoomUiState::new(),
         )
     }
 
@@ -1976,8 +2182,15 @@ mod tests {
     // 1. Set P100 → Unlock L3 → verify zones 12-14 are unlocked
     #[test]
     fn test_set_p100_then_unlock_l3_unlocks_zones_12_to_14() {
-        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
-            make_test_fixtures();
+        let (
+            mut state,
+            mut haven,
+            mut enhancement,
+            mut deep,
+            mut achievements,
+            mut loom,
+            mut loom_ui,
+        ) = make_test_fixtures();
         let mut menu = DebugMenu::new();
 
         // Set prestige to P100
@@ -1999,6 +2212,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
 
         // Zones 12-14 should now be unlocked (prestige=100 >= 50 requirement)
@@ -2018,8 +2233,15 @@ mod tests {
     // 2. Unlock L3 → Set P100 (reverse order) → verify zones 12-14 are unlocked
     #[test]
     fn test_unlock_l3_then_set_p100_unlocks_zones_12_to_14() {
-        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
-            make_test_fixtures();
+        let (
+            mut state,
+            mut haven,
+            mut enhancement,
+            mut deep,
+            mut achievements,
+            mut loom,
+            mut loom_ui,
+        ) = make_test_fixtures();
         let mut menu = DebugMenu::new();
 
         // First unlock L3 (Deep auto-discovered, but prestige=0 won't unlock zones yet)
@@ -2030,6 +2252,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
 
         // Zones 12-14 should NOT be unlocked yet (prestige=0 < 50 requirement)
@@ -2048,6 +2272,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
 
         // After sync (called inside trigger_selected), zones 12-14 should be unlocked
@@ -2062,8 +2288,15 @@ mod tests {
     // 3. Forge Stormbreaker → verify both TheStormbreaker AND StormsEnd are unlocked
     #[test]
     fn test_forge_stormbreaker_unlocks_both_achievements() {
-        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
-            make_test_fixtures();
+        let (
+            mut state,
+            mut haven,
+            mut enhancement,
+            mut deep,
+            mut achievements,
+            mut loom,
+            mut loom_ui,
+        ) = make_test_fixtures();
         let mut menu = DebugMenu::new();
 
         assert!(!achievements.is_unlocked(crate::achievements::AchievementId::TheStormbreaker));
@@ -2076,6 +2309,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
 
         assert!(
@@ -2091,8 +2326,15 @@ mod tests {
     // 4. Forge Stormbreaker at P25 → verify zone 11 is unlocked
     #[test]
     fn test_forge_stormbreaker_at_p25_unlocks_zone_11() {
-        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
-            make_test_fixtures();
+        let (
+            mut state,
+            mut haven,
+            mut enhancement,
+            mut deep,
+            mut achievements,
+            mut loom,
+            mut loom_ui,
+        ) = make_test_fixtures();
         let mut menu = DebugMenu::new();
 
         // Set prestige to P25
@@ -2106,6 +2348,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
 
         assert!(
@@ -2122,8 +2366,15 @@ mod tests {
     // 5. Forge Stormbreaker at P0 → verify zone 11 is NOT unlocked (needs P25)
     #[test]
     fn test_forge_stormbreaker_at_p0_does_not_unlock_zone_11() {
-        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
-            make_test_fixtures();
+        let (
+            mut state,
+            mut haven,
+            mut enhancement,
+            mut deep,
+            mut achievements,
+            mut loom,
+            mut loom_ui,
+        ) = make_test_fixtures();
         let mut menu = DebugMenu::new();
 
         // prestige_rank starts at 0
@@ -2136,6 +2387,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
 
         assert!(
@@ -2152,8 +2405,15 @@ mod tests {
     // 6. Set P100 → Unlock L3 → Forge Stormbreaker → verify full zone track accessible
     #[test]
     fn test_set_p100_unlock_l3_forge_stormbreaker_full_zone_track() {
-        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
-            make_test_fixtures();
+        let (
+            mut state,
+            mut haven,
+            mut enhancement,
+            mut deep,
+            mut achievements,
+            mut loom,
+            mut loom_ui,
+        ) = make_test_fixtures();
         let mut menu = DebugMenu::new();
 
         // Step 1: Set prestige P100
@@ -2164,6 +2424,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
 
         // Step 2: Unlock Deep L3
@@ -2174,6 +2436,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
 
         // Step 3: Forge Stormbreaker
@@ -2184,6 +2448,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
 
         // Zone 11 unlocked (StormsEnd + P100 >= P25)
@@ -2208,8 +2474,15 @@ mod tests {
     // 7. Unlock L30 at P300 → verify all zones 12-30 are unlocked
     #[test]
     fn test_unlock_l30_at_p300_unlocks_all_fracture_zones() {
-        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
-            make_test_fixtures();
+        let (
+            mut state,
+            mut haven,
+            mut enhancement,
+            mut deep,
+            mut achievements,
+            mut loom,
+            mut loom_ui,
+        ) = make_test_fixtures();
         let mut menu = DebugMenu::new();
 
         // Set prestige to P300 first
@@ -2223,6 +2496,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
 
         // All zones 12-30 should be unlocked (P300 meets all prestige requirements)
@@ -2238,8 +2513,15 @@ mod tests {
     // 8. Unlock L30 at P100 → verify only zones 12-20 unlocked (P100 < P150 for Z21+)
     #[test]
     fn test_unlock_l30_at_p100_only_unlocks_zones_up_to_20() {
-        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
-            make_test_fixtures();
+        let (
+            mut state,
+            mut haven,
+            mut enhancement,
+            mut deep,
+            mut achievements,
+            mut loom,
+            mut loom_ui,
+        ) = make_test_fixtures();
         let mut menu = DebugMenu::new();
 
         // Set prestige to P100
@@ -2253,6 +2535,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
 
         // cap is 30 but prestige=100 only meets requirements up to Z20 (P100)
@@ -2274,8 +2558,15 @@ mod tests {
     // 9. Verify cached_fracture_zone_cap is updated after unlock deep layer action
     #[test]
     fn test_cached_fracture_zone_cap_updated_after_unlock_deep_layer() {
-        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
-            make_test_fixtures();
+        let (
+            mut state,
+            mut haven,
+            mut enhancement,
+            mut deep,
+            mut achievements,
+            mut loom,
+            mut loom_ui,
+        ) = make_test_fixtures();
         let mut menu = DebugMenu::new();
 
         assert_eq!(state.cached_fracture_zone_cap, 0);
@@ -2288,6 +2579,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
 
         assert_eq!(
@@ -2303,6 +2596,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
 
         assert_eq!(
@@ -2318,6 +2613,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
 
         assert_eq!(
@@ -2329,7 +2626,8 @@ mod tests {
     // 10. Forge Stormbreaker twice → second time returns "already forged" message
     #[test]
     fn test_forge_stormbreaker_twice_returns_already_forged() {
-        let (_state, _haven, _enhancement, _deep, mut achievements) = make_test_fixtures();
+        let (_state, _haven, _enhancement, _deep, mut achievements, _loom, _loom_ui) =
+            make_test_fixtures();
 
         // First forge
         let msg = trigger_forge_stormbreaker(&mut achievements);
@@ -2343,8 +2641,15 @@ mod tests {
     // Bonus: verify trigger_selected version also returns "already forged" on second call
     #[test]
     fn test_trigger_selected_forge_stormbreaker_twice() {
-        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
-            make_test_fixtures();
+        let (
+            mut state,
+            mut haven,
+            mut enhancement,
+            mut deep,
+            mut achievements,
+            mut loom,
+            mut loom_ui,
+        ) = make_test_fixtures();
         let mut menu = DebugMenu::new();
 
         // First forge via trigger_selected
@@ -2355,6 +2660,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
         assert_eq!(msg, "Forged Stormbreaker!");
 
@@ -2366,6 +2673,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
         assert_eq!(msg2, "Stormbreaker already forged!");
     }
@@ -2374,8 +2683,15 @@ mod tests {
     // when fracture cap was previously set
     #[test]
     fn test_zone_sync_happens_after_set_prestige_with_existing_fracture_cap() {
-        let (mut state, mut haven, mut enhancement, mut deep, mut achievements) =
-            make_test_fixtures();
+        let (
+            mut state,
+            mut haven,
+            mut enhancement,
+            mut deep,
+            mut achievements,
+            mut loom,
+            mut loom_ui,
+        ) = make_test_fixtures();
         let mut menu = DebugMenu::new();
 
         // First unlock L3 (cap=14, but prestige=0 won't unlock zones)
@@ -2386,6 +2702,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
         assert!(!state.zone_progression.is_zone_unlocked(12));
 
@@ -2397,6 +2715,8 @@ mod tests {
             &mut enhancement,
             &mut deep,
             &mut achievements,
+            &mut loom,
+            &mut loom_ui,
         );
 
         for zone_id in 12..=14 {

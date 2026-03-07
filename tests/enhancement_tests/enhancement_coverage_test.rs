@@ -847,6 +847,7 @@ mod soulforge_tick_integration {
         // Use a fixed seed that hits discovery quickly at P15+
         let mut rng = make_rng(1);
 
+        let mut loom = quest::loom::LoomState::new();
         for tick in 0..max_ticks {
             let mut ctx = TickContext {
                 state,
@@ -855,6 +856,7 @@ mod soulforge_tick_integration {
                 enhancement,
                 deep: &mut deep,
                 achievements: &mut achievements,
+                loom: &mut loom,
                 debug_mode: false,
             };
             let result = game_tick_with_context(&mut ctx, &mut rng);
@@ -906,6 +908,7 @@ mod soulforge_tick_integration {
 
         // Run until discovery fires and capture that specific TickResult.
         // At P100, discovery chance is ~0.000609/tick, so expected within ~1,640 ticks.
+        let mut loom = quest::loom::LoomState::new();
         for _ in 0..50_000 {
             let mut ctx = TickContext {
                 state: &mut state,
@@ -914,6 +917,7 @@ mod soulforge_tick_integration {
                 enhancement: &mut enhancement,
                 deep: &mut deep,
                 achievements: &mut achievements,
+                loom: &mut loom,
                 debug_mode: false,
             };
             let result = game_tick_with_context(&mut ctx, &mut rng);
@@ -950,6 +954,7 @@ mod soulforge_tick_integration {
 
         // Run a large number of ticks; dungeon blocks Soulforge discovery.
         // Re-set the dungeon each tick to ensure it stays active (dungeons can complete/fail).
+        let mut loom = quest::loom::LoomState::new();
         for _ in 0..1_000 {
             state.active_dungeon = Some(generate_dungeon(1, 0, 1));
             let mut ctx = TickContext {
@@ -959,6 +964,7 @@ mod soulforge_tick_integration {
                 enhancement: &mut enhancement,
                 deep: &mut deep,
                 achievements: &mut achievements,
+                loom: &mut loom,
                 debug_mode: false,
             };
             let result = game_tick_with_context(&mut ctx, &mut rng);
@@ -989,6 +995,7 @@ mod soulforge_tick_integration {
         let mut deep = DeepState::new();
         let mut rng = make_rng(42);
 
+        let mut loom = quest::loom::LoomState::new();
         for _ in 0..500 {
             let mut ctx = TickContext {
                 state: &mut state,
@@ -997,6 +1004,7 @@ mod soulforge_tick_integration {
                 enhancement: &mut enhancement,
                 deep: &mut deep,
                 achievements: &mut achievements,
+                loom: &mut loom,
                 debug_mode: false,
             };
             let result = game_tick_with_context(&mut ctx, &mut rng);

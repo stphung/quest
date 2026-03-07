@@ -21,6 +21,7 @@ pub struct TickEventFlags {
     pub soulforge_discovered: bool,
     pub stormglass_discovered: bool,
     pub deep_discovered: bool,
+    pub loom_discovered: bool,
     pub fracture_region_unlocked: Option<crate::zones::FractureRegion>,
 }
 
@@ -31,6 +32,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
     let mut soulforge_discovered = false;
     let mut stormglass_discovered = false;
     let mut deep_discovered = false;
+    let mut loom_discovered = false;
     let mut fracture_region_unlocked = None;
     for event in events {
         match event {
@@ -740,6 +742,14 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     segments: None,
                 });
             }
+            TickEvent::LoomDiscovered => {
+                loom_discovered = true;
+                game_state.combat_state.add_log_entry(
+                    "\u{29BF} The Gateway opens. Beyond it, threads of reality stretch into the void. The Loom of Worlds awaits...".to_string(),
+                    false,
+                    true,
+                );
+            }
         }
     }
     TickEventFlags {
@@ -747,6 +757,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
         soulforge_discovered,
         stormglass_discovered,
         deep_discovered,
+        loom_discovered,
         fracture_region_unlocked,
     }
 }

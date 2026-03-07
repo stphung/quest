@@ -213,6 +213,10 @@ pub enum TickEvent {
         /// Display name of the core that fired (e.g. "Red Fault").
         core_name: &'static str,
     },
+
+    // ── Loom of Worlds ──────────────────────────────────────────
+    /// The Loom of Worlds was discovered (Gateway at Layer 30 completed).
+    LoomDiscovered,
 }
 
 /// Result of processing a single game tick.
@@ -247,6 +251,9 @@ pub struct TickResult {
 
     /// True if Deep state was modified (discovery, power cores) and should be persisted.
     pub deep_changed: bool,
+
+    /// True if Loom state was modified (discovery) and should be persisted.
+    pub loom_changed: bool,
 
     /// Achievement IDs ready to be shown in a modal overlay.
     /// Populated when the 500ms accumulation window has elapsed.

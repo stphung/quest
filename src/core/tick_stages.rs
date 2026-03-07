@@ -934,6 +934,9 @@ pub(super) fn tick_deep_missions(
         achievements.on_deep_gateway_opened(Some(&state.character_name));
     }
 
+    // Loom of Worlds discovery: triggers when Gateway at Layer 30 completes.
+    // Handled in tick_loom() which runs after this stage.
+
     if (summary.missions_completed > 0 || summary.mercs_lost > 0) && !debug_mode {
         result.achievements_changed = true;
     }
@@ -973,6 +976,85 @@ pub(super) fn tick_deep_missions(
         rng,
     ) {
         result.deep_changed = true;
+    }
+}
+
+/// Stage 11e: Tick the Loom of Worlds.
+///
+/// Discovery: fires when the Gateway Expedition at Deep Layer 30 completes.
+/// After discovery: ticks staggered unlock, base production, neighbor unlocking,
+/// and pattern sustain tracking every game tick.
+pub(super) fn tick_loom(
+    deep: &crate::deep::DeepState,
+    loom: &mut crate::loom::LoomState,
+    result: &mut TickResult,
+) {
+    // Discovery trigger: requires Deep discovered + Gateway opened.
+    if !loom.persistent.discovered {
+        if deep.persistent.discovered && deep.persistent.gateway_opened {
+            crate::loom::complete_discovery(loom);
+            result.events.push(TickEvent::LoomDiscovered);
+            result.loom_changed = true;
+        }
+        return;
+    }
+
+    const TICK_SECONDS: f64 = 0.1; // 100ms tick interval
+
+    // Tick staggered second-node unlock.
+    if loom.persistent.second_node_unlock_elapsed.is_some() {
+        let unlocked = crate::loom::tick_loom_staggered_unlock(loom, TICK_SECONDS);
+        if unlocked {
+            result.loom_changed = true;
+        }
+    }
+
+    // Tick refinery construction (decrement timers, complete when done).
+    let completed_refineries = crate::loom::tick_refinery_construction(loom);
+    if !completed_refineries.is_empty() {
+        result.loom_changed = true;
+    }
+
+    // Tick direct-pull refinery processing.
+    let refinery_produced = crate::loom::tick_refinery_pull(loom, TICK_SECONDS);
+
+    // Update stall flags for UI display.
+    crate::loom::tick_stall_detection(loom);
+
+    // Update refinery stall flags.
+    crate::loom::tick_refinery_stall_detection(loom);
+
+    // Tick base production for all unlocked nodes.
+    let mut produced = crate::loom::tick_base_production(loom, TICK_SECONDS);
+
+    // Merge refinery production into base production map for pattern sustain.
+    for (resource, amount) in refinery_produced {
+        *produced.entry(resource).or_insert(0.0) += amount;
+    }
+
+    // Tick neighbor unlocking.
+    let newly_unlocked = crate::loom::tick_neighbor_unlocking(loom, TICK_SECONDS);
+    if !newly_unlocked.is_empty() {
+        result.loom_changed = true;
+    }
+
+    // Tick pattern sustain timer using per-node effective rates (units/hour).
+    let rates: std::collections::HashMap<crate::loom::Resource, f64> = loom
+        .persistent
+        .nodes
+        .iter()
+        .filter(|n| n.unlocked)
+        .map(|n| {
+            let resource = crate::loom::node_native_resource(n.id);
+            let rate = crate::loom::node_effective_rate(loom, n);
+            (resource, rate)
+        })
+        .collect();
+
+    let pattern_completed =
+        crate::loom::tick_pattern_sustain(&mut loom.persistent, &rates, TICK_SECONDS);
+    if pattern_completed {
+        result.loom_changed = true;
     }
 }
 

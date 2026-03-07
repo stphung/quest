@@ -4,6 +4,7 @@
 
 mod deep_input;
 mod haven_input;
+mod loom_input;
 mod minigame_input;
 mod prestige_input;
 mod soulforge_input;
@@ -50,6 +51,8 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
     let debug_menu = &mut *ctx.debug_menu;
     let debug_mode = ctx.debug_mode;
     let achievements = &mut *ctx.achievements;
+    let loom_state = &mut *ctx.loom_state;
+    let loom_ui = &mut *ctx.loom_ui;
 
     // 0. Offline welcome overlay (any key dismisses)
     if matches!(overlay, GameOverlay::OfflineWelcome { .. }) {
@@ -218,6 +221,7 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
             | GameOverlay::SoulforgeDiscovery
             | GameOverlay::StormglassDiscovery
             | GameOverlay::DeepDiscovery
+            | GameOverlay::LoomDiscovery
             | GameOverlay::FractureRegionUnlock { .. }
     ) {
         return handle_dismiss_overlay(key, overlay);
@@ -251,6 +255,11 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
     // 2.8. The Deep overlay
     if deep_ui.open {
         return handle_deep(key, deep_state, deep_ui, state, achievements);
+    }
+
+    // 2.9. The Loom of Worlds overlay
+    if loom_ui.open {
+        return loom_input::handle_loom(key, loom_state, loom_ui);
     }
 
     // 3. Vault item selection
@@ -306,6 +315,8 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
                 achievements,
                 overlay,
                 debug_menu,
+                loom_state,
+                loom_ui,
             );
         }
     }
@@ -323,6 +334,18 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
     // 8. Tab to open challenge menu
     if key.code == KeyCode::Tab && !state.challenge_menu.challenges.is_empty() {
         state.challenge_menu.open();
+        return InputResult::Continue;
+    }
+
+    // 8.5. Loom of Worlds toggle (L key)
+    if matches!(key.code, KeyCode::Char('l') | KeyCode::Char('L'))
+        && loom_state.persistent.discovered
+    {
+        // If no archetype chosen yet, show archetype selection.
+        if loom_state.persistent.archetype.is_none() {
+            loom_ui.view = crate::loom::LoomView::ArchetypeSelection;
+        }
+        loom_ui.open = true;
         return InputResult::Continue;
     }
 
@@ -435,6 +458,8 @@ fn handle_debug_menu(
     achievements: &mut crate::achievements::Achievements,
     overlay: &mut GameOverlay,
     debug_menu: &mut DebugMenu,
+    loom_state: &mut crate::loom::LoomState,
+    loom_ui: &mut crate::loom::LoomUiState,
 ) -> InputResult {
     match key.code {
         KeyCode::Tab | KeyCode::Right => debug_menu.navigate_next_category(),
@@ -442,7 +467,15 @@ fn handle_debug_menu(
         KeyCode::Up => debug_menu.navigate_up(),
         KeyCode::Down => debug_menu.navigate_down(),
         KeyCode::Enter => {
-            let msg = debug_menu.trigger_selected(state, haven, enhancement, deep, achievements);
+            let msg = debug_menu.trigger_selected(
+                state,
+                haven,
+                enhancement,
+                deep,
+                achievements,
+                loom_state,
+                loom_ui,
+            );
             state
                 .combat_state
                 .add_log_entry(format!("[DEBUG] {}", msg), false, true);
@@ -455,6 +488,8 @@ fn handle_debug_menu(
                 *overlay = GameOverlay::StormglassDiscovery;
             } else if msg == "The Deep discovered!" {
                 *overlay = GameOverlay::DeepDiscovery;
+            } else if msg == "Loom discovered." {
+                *overlay = GameOverlay::LoomDiscovery;
             } else if msg.contains("Red Fault unlocked") {
                 *overlay = GameOverlay::FractureRegionUnlock {
                     region: crate::zones::FractureRegion::RedFault,

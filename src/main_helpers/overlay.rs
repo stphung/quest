@@ -232,6 +232,9 @@ pub fn draw_game_overlays(
                 frame, area, state, deep_state, layout_ctx,
             );
         }
+        GameOverlay::LoomDiscovery => {
+            ui::loom_scene::render_loom_discovery_modal(frame, area, layout_ctx);
+        }
         GameOverlay::None => {}
     }
 
@@ -298,6 +301,11 @@ pub fn draw_game_overlays(
     // The Deep overlay
     if deep_ui.open {
         ui::deep_scene::render_deep_overlay(frame, area, deep_state, deep_ui, None, layout_ctx);
+    }
+
+    // Loom of Worlds overlay
+    if ctx.loom_ui.open {
+        ui::loom_scene::render_loom_overlay(frame, area, ctx.loom_state, ctx.loom_ui);
     }
 
     // Chrono Surge active: status banner at bottom

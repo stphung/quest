@@ -113,6 +113,8 @@ pub enum GameOverlay {
     TimeVault {
         browser: Box<crate::ui::time_vault_scene::TimeVaultState>,
     },
+    /// Loom of Worlds discovery celebration modal
+    LoomDiscovery,
 }
 
 /// Result of handling a game input event.
