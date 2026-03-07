@@ -658,74 +658,6 @@ impl Shape for SkyShape {
             }
         }
 
-        // 5c. Rocky shoreline with vegetation — breaks up the hard horizon edge
-        {
-            let rock_dark_day = (72u8, 68, 62);
-            let rock_dark_night = (32u8, 30, 28);
-            let rock_mid_day = (95u8, 88, 78);
-            let rock_mid_night = (45u8, 42, 38);
-            let rock_light_day = (115u8, 108, 95);
-            let rock_light_night = (55u8, 52, 48);
-            let bush_dark_day = (32u8, 62, 28);
-            let bush_dark_night = (14u8, 30, 14);
-            let bush_light_day = (48u8, 82, 38);
-            let bush_light_night = (22u8, 42, 20);
-
-            let rock_dark = lerp_rgb(rock_dark_day, rock_dark_night, self.dusk);
-            let rock_mid = lerp_rgb(rock_mid_day, rock_mid_night, self.dusk);
-            let rock_light = lerp_rgb(rock_light_day, rock_light_night, self.dusk);
-            let bush_dark = lerp_rgb(bush_dark_day, bush_dark_night, self.dusk);
-            let bush_light = lerp_rgb(bush_light_day, bush_light_night, self.dusk);
-
-            for col in 0..self.width {
-                let h = hash2d(col, 77);
-
-                // Rocky clusters: ~40% of columns get rocks extending above horizon
-                if h.is_multiple_of(5) || h.is_multiple_of(7) {
-                    // Rock height: 1-3 pixels above horizon
-                    let rock_h = (h % 3 + 1) as i32;
-                    for dy in 0..rock_h {
-                        let gy = sky_py as i32 - 1 - dy;
-                        let shade = hash2d(col, dy as usize + 200);
-                        let color = if shade.is_multiple_of(3) {
-                            rock_light
-                        } else if shade.is_multiple_of(2) {
-                            rock_dark
-                        } else {
-                            rock_mid
-                        };
-                        self.paint_px(painter, col as i32, gy, color);
-                    }
-                }
-
-                // Vegetation: ~25% of columns get bush pixels on top of rocks/horizon
-                let veg = hash2d(col + 31, 88);
-                if veg.is_multiple_of(4) {
-                    let bush_h = (veg % 2 + 1) as i32;
-                    for dy in 0..bush_h {
-                        let gy = sky_py as i32 - 2 - dy; // sit above rocks
-                        let shade = hash2d(col + 50, dy as usize);
-                        let color = if shade.is_multiple_of(3) {
-                            bush_dark
-                        } else {
-                            bush_light
-                        };
-                        self.paint_px(painter, col as i32, gy, color);
-                    }
-                    // Neighboring pixel for bush width
-                    if col + 1 < self.width {
-                        let gy = sky_py as i32 - 2;
-                        let color = if hash2d(col + 51, 0).is_multiple_of(2) {
-                            bush_dark
-                        } else {
-                            bush_light
-                        };
-                        self.paint_px(painter, col as i32 + 1, gy, color);
-                    }
-                }
-            }
-        }
-
         // 6. Sailboat sky — pixel art for pennant, sail, mast, rigging
         let mx = self.mast_x;
         let mt = self.mast_top * 2; // pixel y of mast_top row
@@ -794,22 +726,8 @@ impl Shape for WaterSurface {
             return;
         }
 
-        // Tidal pulse — overall luminosity breathes in/out over ~10 seconds
-        let tidal = (self.wave_tick * 0.01).sin() * 0.5 + 0.5; // 0..1
-        let tidal_shift = ((tidal - 0.5) * 0.06 * 255.0).round() as i8;
-
-        let near_base = lerp_rgb((48, 136, 192), (30, 70, 112), self.dusk);
-        let deep_base = lerp_rgb((10, 60, 112), (5, 22, 52), self.dusk);
-        // Apply tidal pulse to the base palette
-        let apply_tidal = |c: (u8, u8, u8)| -> (u8, u8, u8) {
-            (
-                (c.0 as i16 + tidal_shift as i16).clamp(0, 255) as u8,
-                (c.1 as i16 + tidal_shift as i16).clamp(0, 255) as u8,
-                (c.2 as i16 + (tidal_shift as i16 / 2)).clamp(0, 255) as u8,
-            )
-        };
-        let near = apply_tidal(near_base);
-        let deep = apply_tidal(deep_base);
+        let near = lerp_rgb((48, 136, 192), (30, 70, 112), self.dusk);
+        let deep = lerp_rgb((10, 60, 112), (5, 22, 52), self.dusk);
         let sky_low = lerp_rgb((210, 232, 252), (116, 96, 132), self.dusk);
 
         for gy in 0..total_py {
@@ -820,15 +738,6 @@ impl Shape for WaterSurface {
             };
 
             let mut base = lerp_rgb(near, deep, depth_t.powf(0.85));
-
-            // Swell waves — slow large-scale dark/light bands rolling through
-            let swell = (gy as f64 * 0.08 + self.wave_tick * 0.018).sin() * 0.5 + 0.5;
-            let swell_shift = ((swell - 0.5) * 0.08 * 255.0).round() as i8;
-            base = (
-                (base.0 as i16 + swell_shift as i16).clamp(0, 255) as u8,
-                (base.1 as i16 + swell_shift as i16).clamp(0, 255) as u8,
-                (base.2 as i16 + (swell_shift as i16 / 2)).clamp(0, 255) as u8,
-            );
 
             // Soften horizon seam: blend top 3 pixels toward sky horizon color
             if gy < 3 {
@@ -845,10 +754,7 @@ impl Shape for WaterSurface {
                     .sin();
                 let secondary =
                     (gx as f64 * 0.11 - self.wave_tick * 0.043 + row_equiv * 0.92).cos();
-
-                // Wave interference — third sine at different frequency for rogue crests
-                let tertiary = (gx as f64 * 0.17 + self.wave_tick * 0.031 + gy as f64 * 0.14).sin();
-                let wave = primary * 0.60 + secondary * 0.25 + tertiary * 0.15;
+                let wave = primary * 0.72 + secondary * 0.28;
 
                 let mut color = if wave > 0.74 {
                     // Foam/whitecaps on wave crests
@@ -872,33 +778,6 @@ impl Shape for WaterSurface {
                     base
                 };
 
-                // Small cross-waves — short wavelength perpendicular to main waves
-                {
-                    let cross = (gy as f64 * 0.38 + gx as f64 * 0.05 + self.wave_tick * 0.07).sin();
-                    let cross2 =
-                        (gy as f64 * 0.52 - gx as f64 * 0.08 + self.wave_tick * 0.09).cos();
-                    let cross_val = cross * 0.6 + cross2 * 0.4;
-                    if cross_val > 0.4 {
-                        let intensity =
-                            ((cross_val - 0.4) / 0.6).min(1.0) * (1.0 - depth_t * 0.7) * 0.08;
-                        color = (
-                            color.0.saturating_add((intensity * 255.0) as u8),
-                            color.1.saturating_add((intensity * 200.0) as u8),
-                            color.2.saturating_add((intensity * 160.0) as u8),
-                        );
-                    }
-                }
-
-                // Micro whitecaps — flickering tiny bright spots across the surface
-                {
-                    let tick_hash = (self.wave_tick * 3.7) as usize;
-                    let flicker = hash2d(gx + tick_hash, gy + tick_hash * 3);
-                    if flicker.is_multiple_of(67) && depth_t < 0.6 {
-                        let sparkle = (1.0 - depth_t) * 0.35;
-                        color = lerp_rgb(color, (235, 245, 255), sparkle);
-                    }
-                }
-
                 // Caustic light patterns — dancing bright spots near the surface
                 let caustic_x = (gx as f64 * 0.31 + self.wave_tick * 0.17).sin();
                 let caustic_y = (gy as f64 * 0.43 + self.wave_tick * 0.13).cos();
@@ -910,21 +789,6 @@ impl Shape for WaterSurface {
                         color.1.saturating_add(boost),
                         color.2.saturating_add(boost / 2),
                     );
-                }
-
-                // Foam patches — drifting clusters of persistent surface foam
-                {
-                    let foam_drift = self.wave_tick * 0.025;
-                    // Two overlapping sine fields create patchy blobs
-                    let fx = ((gx as f64 + foam_drift) * 0.13).sin();
-                    let fy = ((gy as f64 - foam_drift * 0.7) * 0.19).cos();
-                    let patch = fx * fy;
-                    // Only show in upper half of water (foam stays on surface)
-                    if patch > 0.55 && depth_t < 0.5 {
-                        let foam_strength =
-                            ((patch - 0.55) / 0.45).min(1.0) * (1.0 - depth_t * 2.0) * 0.4;
-                        color = lerp_rgb(color, (225, 238, 248), foam_strength);
-                    }
                 }
 
                 // Horizon foam line — animated bright strip at water's edge
@@ -976,51 +840,6 @@ impl Shape for WaterSurface {
                         let fade = (1.0 - (wake_depth - 4.0) / 20.0) * 0.25;
                         let sharpness = 1.0 - dist_to_arm / 1.5;
                         color = lerp_rgb(color, (200, 240, 255), fade * sharpness);
-                    }
-                }
-
-                // Depth ripples — expanding dark rings in deeper water
-                if depth_t > 0.4 {
-                    // Two ripple sources at fixed positions, staggered timing
-                    for &(cx_ratio, cy_ratio, phase) in
-                        &[(0.3f64, 0.65f64, 0.0f64), (0.7, 0.75, 5.0)]
-                    {
-                        let rcx = (self.width as f64 * cx_ratio).round();
-                        let rcy = total_py as f64 * cy_ratio;
-                        let dx = gx as f64 - rcx;
-                        let dy = gy as f64 - rcy;
-                        let dist = (dx * dx + dy * dy).sqrt();
-
-                        // Ring expands over ~8 seconds then resets
-                        let ring_time = (self.wave_tick * 0.02 + phase) % 6.0;
-                        let ring_radius = ring_time * 4.0;
-                        let ring_width = 1.5;
-                        let ring_dist = (dist - ring_radius).abs();
-
-                        if ring_dist < ring_width && ring_time < 5.0 {
-                            let fade = (1.0 - ring_time / 5.0) * (1.0 - ring_dist / ring_width);
-                            let darken = (fade * 0.12 * 255.0).round() as u8;
-                            color = (
-                                color.0.saturating_sub(darken),
-                                color.1.saturating_sub(darken / 2),
-                                color.2.saturating_sub(darken / 3),
-                            );
-                        }
-                    }
-                }
-
-                // Wave spray — bright pixels above waterline on rogue crests
-                if gy == 0 && wave > 0.85 {
-                    let spray_strength = ((wave - 0.85) / 0.15).min(1.0);
-                    // Paint a spray pixel into the sky zone (1px above water)
-                    let spray_gy = self.sky_pixels.saturating_sub(1);
-                    if spray_gy > 0 {
-                        let spray_color = lerp_rgb(color, (240, 248, 255), spray_strength * 0.6);
-                        painter.paint(
-                            gx,
-                            spray_gy,
-                            Color::Rgb(spray_color.0, spray_color.1, spray_color.2),
-                        );
                     }
                 }
 
