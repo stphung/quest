@@ -5,22 +5,26 @@ use super::progression::ZoneProgression;
 use crate::achievements::{AchievementId, Achievements};
 use crate::core::constants::{EXPANSE_ZONE_ID, FINAL_ZONE_ID};
 
-/// Result of defeating a boss
+/// Result of defeating a boss.
+/// Uses `&'static str` for zone/weapon names since they come from static zone data (zero allocation).
 #[derive(Debug, Clone, PartialEq)]
 pub enum BossDefeatResult {
     /// Moved to next subzone within same zone
     SubzoneComplete { new_subzone_id: u32 },
     /// Completed zone and moved to next zone
-    ZoneComplete { old_zone: String, new_zone_id: u32 },
+    ZoneComplete {
+        old_zone: &'static str,
+        new_zone_id: u32,
+    },
     /// Completed zone but next zone requires higher prestige
     ZoneCompleteButGated {
-        zone_name: String,
+        zone_name: &'static str,
         required_prestige: u32,
     },
     /// Completed the final zone (Zone 10)
     StormsEnd,
     /// Boss requires a legendary weapon to defeat (Zone 10)
-    WeaponRequired { weapon_name: String },
+    WeaponRequired { weapon_name: &'static str },
     /// Completed a cycle of The Expanse (Zone 11) - returns to subzone 1
     ExpanseCycle,
     /// Completed a fracture cycle (cap zone loops) — returns to subzone 1
@@ -59,7 +63,7 @@ impl ZoneProgression {
             self.fighting_boss = false;
             self.kills_in_subzone = 0;
             return BossDefeatResult::WeaponRequired {
-                weapon_name: zone.weapon_name.unwrap_or("legendary weapon").to_string(),
+                weapon_name: zone.weapon_name.unwrap_or("legendary weapon"),
             };
         }
 
@@ -88,7 +92,7 @@ impl ZoneProgression {
             // Try to advance to next zone
             if self.advance_to_next_zone(prestige_rank) {
                 return BossDefeatResult::ZoneComplete {
-                    old_zone: zone.name.to_string(),
+                    old_zone: zone.name,
                     new_zone_id: self.current_zone_id,
                 };
             }
@@ -97,7 +101,7 @@ impl ZoneProgression {
             let next_zone = get_zone(zone_id + 1);
             if let Some(next) = next_zone {
                 return BossDefeatResult::ZoneCompleteButGated {
-                    zone_name: zone.name.to_string(),
+                    zone_name: zone.name,
                     required_prestige: next.prestige_requirement,
                 };
             }
@@ -140,7 +144,7 @@ impl ZoneProgression {
             self.fighting_boss = false;
             self.kills_in_subzone = 0;
             return BossDefeatResult::WeaponRequired {
-                weapon_name: zone.weapon_name.unwrap_or("legendary weapon").to_string(),
+                weapon_name: zone.weapon_name.unwrap_or("legendary weapon"),
             };
         }
 
@@ -178,7 +182,7 @@ impl ZoneProgression {
                 self.current_zone_id = next;
                 self.current_subzone_id = 1;
                 return BossDefeatResult::ZoneComplete {
-                    old_zone: zone.name.to_string(),
+                    old_zone: zone.name,
                     new_zone_id: next,
                 };
             }
@@ -197,7 +201,7 @@ impl ZoneProgression {
                 self.current_subzone_id = 1;
                 self.kills_in_subzone = 0;
                 return BossDefeatResult::ZoneComplete {
-                    old_zone: zone.name.to_string(),
+                    old_zone: zone.name,
                     new_zone_id: next,
                 };
             }
@@ -217,7 +221,7 @@ impl ZoneProgression {
         // Try to advance to next zone (works for both pre-game and fracture zones)
         if self.advance_to_next_zone(prestige_rank) {
             return BossDefeatResult::ZoneComplete {
-                old_zone: zone.name.to_string(),
+                old_zone: zone.name,
                 new_zone_id: self.current_zone_id,
             };
         }
@@ -227,7 +231,7 @@ impl ZoneProgression {
             let next_zone = get_zone(zone_id + 1);
             if let Some(next) = next_zone {
                 return BossDefeatResult::ZoneCompleteButGated {
-                    zone_name: zone.name.to_string(),
+                    zone_name: zone.name,
                     required_prestige: next.prestige_requirement,
                 };
             }
