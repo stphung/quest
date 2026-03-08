@@ -650,8 +650,17 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
         return;
     }
 
-    let nodes = NodeId::ALL;
-    let selected_id = nodes[ui.selected_node.min(nodes.len() - 1)];
+    // Must match grid_ids order in render_flow_grid() so the detail panel
+    // shows the correct node for the cursor position.
+    let grid_order = [
+        NodeId::EmberSpindle,
+        NodeId::ReflectionLens,
+        NodeId::ResonanceForge,
+        NodeId::VoidCondenser,
+        NodeId::SilenceWell,
+        NodeId::MemoryArchive,
+    ];
+    let selected_id = grid_order[ui.selected_node.min(grid_order.len() - 1)];
     let node = match loom_state
         .persistent
         .nodes
