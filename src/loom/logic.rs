@@ -314,6 +314,59 @@ pub fn tier_intake_cap(tier: u8) -> f64 {
     }
 }
 
+/// Effective intake cap for a shuttle, applying the level multiplier.
+pub fn shuttle_effective_intake_cap(tier: u8, level: u32) -> f64 {
+    tier_intake_cap(tier) * node_level_multiplier(level)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ShuttleUpgradeError {
+    InvalidIndex,
+    UnderConstruction,
+    AscensionTooLow,
+    AtMaxLevel,
+    InsufficientBuffer { needed: f64, have: f64 },
+}
+
+/// Upgrade a shuttle's level. Cost: 100 × level^1.5 from shuttle buffer.
+/// Max level capped by Ascension level via max_shuttle_level().
+pub fn upgrade_shuttle(
+    loom: &mut LoomState,
+    shuttle_idx: usize,
+    ascension_level: u32,
+) -> Result<(), ShuttleUpgradeError> {
+    let max_level = crate::ascension::types::max_shuttle_level(ascension_level);
+    if max_level <= 1 {
+        return Err(ShuttleUpgradeError::AscensionTooLow);
+    }
+
+    let shuttle = loom
+        .persistent
+        .shuttles
+        .get(shuttle_idx)
+        .ok_or(ShuttleUpgradeError::InvalidIndex)?;
+
+    if shuttle.under_construction {
+        return Err(ShuttleUpgradeError::UnderConstruction);
+    }
+    if shuttle.level >= max_level {
+        return Err(ShuttleUpgradeError::AtMaxLevel);
+    }
+
+    let cost = 100.0 * (shuttle.level as f64).powf(1.5);
+    if shuttle.buffer < cost {
+        return Err(ShuttleUpgradeError::InsufficientBuffer {
+            needed: cost,
+            have: shuttle.buffer,
+        });
+    }
+
+    let shuttle = loom.persistent.shuttles.get_mut(shuttle_idx).unwrap();
+    shuttle.buffer -= cost;
+    shuttle.level += 1;
+    Ok(())
+}
+
 /// Check whether a source node reference is valid for a given shuttle tier.
 /// Extractors are always valid. Shuttles are valid only if their tier is
 /// strictly less than the consuming shuttle's tier.
@@ -385,7 +438,7 @@ pub fn tick_shuttle_pull(
 
         for idx in indices {
             let r = &loom.persistent.shuttles[idx];
-            let cap = tier_intake_cap(r.tier);
+            let cap = shuttle_effective_intake_cap(r.tier, r.level);
 
             // Calculate available pull for input A.
             let pull_a: f64 = r
@@ -2361,5 +2414,98 @@ mod external_bonus_tests {
         assert_eq!(unlocked_tiers(&loom), vec![1, 2]);
         loom.persistent.patterns[14].completed = true;
         assert_eq!(unlocked_tiers(&loom), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_shuttle_effective_intake_cap() {
+        assert!((shuttle_effective_intake_cap(1, 1) - 20.0).abs() < 0.001);
+        assert!((shuttle_effective_intake_cap(1, 3) - 40.0).abs() < 0.001);
+        assert!((shuttle_effective_intake_cap(3, 5) - 120.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_upgrade_shuttle_success() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        setup_patterns(&mut loom, 8);
+        for node in loom.persistent.nodes.iter_mut() {
+            node.unlocked = true;
+        }
+        *loom
+            .persistent
+            .stockpiles
+            .entry(Resource::Ember)
+            .or_insert(0.0) += 500.0;
+        let _ = build_shuttle(
+            &mut loom,
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        loom.persistent.shuttles[0].buffer = 500.0;
+        loom.persistent.shuttles[0].under_construction = false;
+
+        let result = upgrade_shuttle(&mut loom, 0, 7);
+        assert!(result.is_ok());
+        assert_eq!(loom.persistent.shuttles[0].level, 2);
+    }
+
+    #[test]
+    fn test_upgrade_shuttle_blocked_by_ascension_cap() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        setup_patterns(&mut loom, 8);
+        for node in loom.persistent.nodes.iter_mut() {
+            node.unlocked = true;
+        }
+        *loom
+            .persistent
+            .stockpiles
+            .entry(Resource::Ember)
+            .or_insert(0.0) += 500.0;
+        let _ = build_shuttle(
+            &mut loom,
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        loom.persistent.shuttles[0].buffer = 5000.0;
+        loom.persistent.shuttles[0].under_construction = false;
+        loom.persistent.shuttles[0].level = 3;
+
+        let result = upgrade_shuttle(&mut loom, 0, 7); // max for Asc VII is 3
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_upgrade_shuttle_blocked_without_ascension_vii() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        setup_patterns(&mut loom, 1);
+        for node in loom.persistent.nodes.iter_mut() {
+            node.unlocked = true;
+        }
+        *loom
+            .persistent
+            .stockpiles
+            .entry(Resource::Ember)
+            .or_insert(0.0) += 500.0;
+        let _ = build_shuttle(
+            &mut loom,
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        loom.persistent.shuttles[0].buffer = 5000.0;
+        loom.persistent.shuttles[0].under_construction = false;
+
+        let result = upgrade_shuttle(&mut loom, 0, 6); // Asc VI, no shuttle upgrades
+        assert!(result.is_err());
     }
 }
