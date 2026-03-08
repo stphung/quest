@@ -236,6 +236,15 @@ pub fn draw_game_overlays(
         GameOverlay::LoomDiscovery => {
             ui::loom_scene::render_loom_discovery_modal(frame, area, layout_ctx);
         }
+        GameOverlay::PatternMilestoneUnlock { milestone } => {
+            ui::combat_scene::render_pattern_milestone_modal(
+                frame,
+                area,
+                *milestone,
+                state.ascension_level,
+                layout_ctx,
+            );
+        }
         GameOverlay::None => {}
     }
 

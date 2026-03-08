@@ -1166,6 +1166,11 @@ fn main() -> io::Result<()> {
                                     pending_overlays
                                         .push_back(GameOverlay::FractureRegionUnlock { region });
                                 }
+                                if let Some(milestone) = tick_flags.pattern_milestone_reached {
+                                    pending_overlays.push_back(
+                                        GameOverlay::PatternMilestoneUnlock { milestone },
+                                    );
+                                }
                                 if !tick_result.achievement_modal_ready.is_empty() {
                                     pending_overlays.push_back(GameOverlay::AchievementUnlocked {
                                         achievements: tick_result.achievement_modal_ready,

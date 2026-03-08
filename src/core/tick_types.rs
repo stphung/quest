@@ -220,6 +220,12 @@ pub enum TickEvent {
 
     /// Woven Reality production granted prestige ranks.
     WovenRealityPRGranted { pr_amount: u32, wr_rate: f64 },
+
+    /// A key pattern milestone was reached (unlocks Loom zones).
+    PatternMilestoneReached {
+        milestone: crate::loom::PatternMilestone,
+        message: String,
+    },
 }
 
 /// Result of processing a single game tick.
