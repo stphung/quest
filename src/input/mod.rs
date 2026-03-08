@@ -341,10 +341,6 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
     if matches!(key.code, KeyCode::Char('l') | KeyCode::Char('L'))
         && loom_state.persistent.discovered
     {
-        // If no archetype chosen yet, show archetype selection.
-        if loom_state.persistent.archetype.is_none() {
-            loom_ui.view = crate::loom::LoomView::ArchetypeSelection;
-        }
         loom_ui.open = true;
         return InputResult::Continue;
     }

@@ -2,13 +2,12 @@
 #![allow(dead_code)]
 //!
 //! Dispatches to different view renderers based on `LoomUiState::view`:
-//!   - ArchetypeSelection: choose your archetype at unlock
-//!   - FlowView:           pipeline diagram placeholder
-//!   - ListDetail:         node list + detail panel placeholder
-//!   - Codex:              recipe codex placeholder
+//!   - FlowView:           pipeline diagram with extractors and refineries
+//!   - ListDetail:         node list + detail panel
+//!   - Codex:              recipe codex
 
 use crate::loom::patterns::all_patterns_complete;
-use crate::loom::types::{LoomArchetype, LoomState, LoomUiState, LoomView};
+use crate::loom::types::{LoomState, LoomUiState, LoomView};
 use crate::ui::scene_fx::current_millis;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -164,7 +163,6 @@ pub fn render_loom_overlay(
     frame.render_widget(Clear, area);
 
     let view_name = match ui.view {
-        LoomView::ArchetypeSelection => "Archetype Selection",
         LoomView::FlowView => "Flow View",
         LoomView::ListDetail => "Nodes",
         LoomView::Codex => "Recipe Codex",
@@ -187,9 +185,6 @@ pub fn render_loom_overlay(
     }
 
     match ui.view {
-        LoomView::ArchetypeSelection => {
-            render_archetype_selection(frame, inner, loom_state, ui);
-        }
         LoomView::FlowView => {
             render_flow_view(frame, inner, loom_state, ui);
         }
@@ -210,100 +205,6 @@ pub fn render_loom_overlay(
 }
 
 // ── View renderers ────────────────────────────────────────────────────────────
-
-fn render_archetype_selection(
-    frame: &mut Frame,
-    area: Rect,
-    loom_state: &LoomState,
-    ui: &LoomUiState,
-) {
-    let archetypes = [
-        (
-            LoomArchetype::BurnBright,
-            "Burn Bright",
-            "Ember Spindle + Void Condenser",
-            "High throughput, volatile output",
-        ),
-        (
-            LoomArchetype::ReachWide,
-            "Reach Wide",
-            "Reflection Lens + Memory Archive",
-            "Broad coverage, pattern synergies",
-        ),
-        (
-            LoomArchetype::RunDeep,
-            "Run Deep",
-            "Silence Well + Resonance Forge",
-            "Efficient conversion, deep reactions",
-        ),
-    ];
-
-    let already_chosen = loom_state.persistent.archetype;
-
-    let mut lines = vec![
-        Line::from(""),
-        Line::from(Span::styled(
-            "Choose your archetype to unlock the Loom:",
-            Style::default().fg(Color::Rgb(200, 170, 240)),
-        )),
-        Line::from(""),
-    ];
-
-    for (i, (archetype, name, nodes, desc)) in archetypes.iter().enumerate() {
-        let is_selected = ui.selected_archetype == i;
-        let is_chosen = already_chosen == Some(*archetype);
-
-        let prefix = if is_chosen {
-            "\u{2713} "
-        } else if is_selected {
-            "\u{25b6} "
-        } else {
-            "  "
-        };
-
-        let name_color = if is_chosen {
-            Color::Rgb(255, 215, 0)
-        } else if is_selected {
-            Color::White
-        } else {
-            Color::Rgb(140, 110, 180)
-        };
-
-        lines.push(Line::from(vec![
-            Span::styled(prefix, Style::default().fg(name_color)),
-            Span::styled(
-                format!("[{}] {}", i + 1, name),
-                Style::default().fg(name_color),
-            ),
-        ]));
-        lines.push(Line::from(Span::styled(
-            format!("     Nodes: {}", nodes),
-            Style::default().fg(Color::DarkGray),
-        )));
-        lines.push(Line::from(Span::styled(
-            format!("     {}", desc),
-            Style::default().fg(Color::Rgb(100, 80, 140)),
-        )));
-        lines.push(Line::from(""));
-    }
-
-    if already_chosen.is_none() {
-        lines.push(Line::from(Span::styled(
-            "[Enter] Confirm selection",
-            Style::default().fg(Color::DarkGray),
-        )));
-    } else {
-        lines.push(Line::from(Span::styled(
-            "Archetype chosen. Use [Tab] to explore the Loom.",
-            Style::default().fg(Color::DarkGray),
-        )));
-    }
-
-    let para = Paragraph::new(lines)
-        .alignment(Alignment::Left)
-        .style(Style::default().bg(Color::Rgb(10, 5, 18)));
-    frame.render_widget(para, area);
-}
 
 // ── Factory floor rendering ──────────────────────────────────────────────────
 
@@ -2471,8 +2372,6 @@ fn render_nav_hints(frame: &mut Frame, area: Rect, ui: &LoomUiState) {
 
     let hints = if ui.build.is_some() {
         " [Up/Down] Select  [Space] Toggle  [Enter] Confirm  [Esc] Cancel "
-    } else if ui.view == LoomView::ArchetypeSelection {
-        " [Up/Down] Select  [Enter] Confirm  [Esc] Close "
     } else if ui.view == LoomView::ListDetail {
         " [Tab] Switch View  [Up/Down] Node  [U] Upgrade  [B] Build  [Esc] Close "
     } else if ui.view == LoomView::FlowView {

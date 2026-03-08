@@ -341,7 +341,6 @@ impl Default for LoomState {
 /// Which view the Loom UI is showing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LoomView {
-    ArchetypeSelection,
     FlowView,
     ListDetail,
     Codex,
@@ -387,7 +386,6 @@ pub struct LoomUiState {
     pub open: bool,
     pub view: LoomView,
     pub selected_node: usize,
-    pub selected_archetype: usize,
     /// Scroll offset for the Codex view (number of lines scrolled down).
     pub codex_scroll: usize,
     /// Frame counter for throbber animation (incremented each render call).
@@ -402,7 +400,6 @@ impl LoomUiState {
             open: false,
             view: LoomView::FlowView,
             selected_node: 0,
-            selected_archetype: 0,
             codex_scroll: 0,
             throbber_frame: 0,
             build: None,

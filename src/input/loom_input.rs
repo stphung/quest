@@ -22,23 +22,13 @@ pub(super) fn handle_loom(
             InputResult::Continue
         }
         KeyCode::Tab => {
-            // Tab cycles views, but ArchetypeSelection is sticky until an archetype is chosen.
-            if loom_ui.view == LoomView::ArchetypeSelection
-                && loom_state.persistent.archetype.is_none()
-            {
-                // Stay on ArchetypeSelection until archetype is picked.
-            } else {
-                loom_ui.view = cycle_view(loom_ui.view);
-                loom_ui.selected_node = 0;
-                loom_ui.codex_scroll = 0;
-            }
+            loom_ui.view = cycle_view(loom_ui.view);
+            loom_ui.selected_node = 0;
+            loom_ui.codex_scroll = 0;
             InputResult::Continue
         }
         KeyCode::Up => {
             match loom_ui.view {
-                LoomView::ArchetypeSelection => {
-                    loom_ui.selected_archetype = loom_ui.selected_archetype.saturating_sub(1);
-                }
                 LoomView::Codex => {
                     loom_ui.codex_scroll = loom_ui.codex_scroll.saturating_sub(1);
                 }
@@ -54,11 +44,6 @@ pub(super) fn handle_loom(
         }
         KeyCode::Down => {
             match loom_ui.view {
-                LoomView::ArchetypeSelection => {
-                    if loom_ui.selected_archetype + 1 < 3 {
-                        loom_ui.selected_archetype += 1;
-                    }
-                }
                 LoomView::Codex => {
                     loom_ui.codex_scroll = loom_ui.codex_scroll.saturating_add(1);
                 }
@@ -102,21 +87,7 @@ pub(super) fn handle_loom(
                 InputResult::Continue
             }
         }
-        KeyCode::Enter => {
-            if loom_ui.view == LoomView::ArchetypeSelection
-                && loom_state.persistent.archetype.is_none()
-            {
-                let archetype = match loom_ui.selected_archetype {
-                    0 => crate::loom::types::LoomArchetype::BurnBright,
-                    1 => crate::loom::types::LoomArchetype::ReachWide,
-                    _ => crate::loom::types::LoomArchetype::RunDeep,
-                };
-                crate::loom::select_archetype(loom_state, archetype);
-                loom_ui.view = LoomView::FlowView;
-                return InputResult::NeedsSave;
-            }
-            InputResult::Continue
-        }
+        KeyCode::Enter => InputResult::Continue,
         KeyCode::Char('b') | KeyCode::Char('B')
             if loom_ui.view == LoomView::FlowView || loom_ui.view == LoomView::ListDetail =>
         {
@@ -350,13 +321,12 @@ fn handle_build_input(
     }
 }
 
-/// Cycle through the non-ArchetypeSelection views.
+/// Cycle through views.
 fn cycle_view(current: LoomView) -> LoomView {
     match current {
         LoomView::FlowView => LoomView::ListDetail,
         LoomView::ListDetail => LoomView::Codex,
         LoomView::Codex => LoomView::FlowView,
-        LoomView::ArchetypeSelection => LoomView::FlowView,
     }
 }
 
@@ -401,55 +371,6 @@ mod tests {
     }
 
     #[test]
-    fn tab_does_not_leave_archetype_selection() {
-        let mut state = LoomState::new();
-        let mut ui = make_ui(LoomView::ArchetypeSelection);
-
-        handle_loom(key(KeyCode::Tab), &mut state, &mut ui);
-        assert_eq!(ui.view, LoomView::ArchetypeSelection);
-    }
-
-    #[test]
-    fn up_down_archetype_selection_clamps() {
-        let mut state = LoomState::new();
-        let mut ui = make_ui(LoomView::ArchetypeSelection);
-        assert_eq!(ui.selected_archetype, 0);
-
-        handle_loom(key(KeyCode::Up), &mut state, &mut ui);
-        assert_eq!(ui.selected_archetype, 0, "should not go below 0");
-
-        handle_loom(key(KeyCode::Down), &mut state, &mut ui);
-        handle_loom(key(KeyCode::Down), &mut state, &mut ui);
-        handle_loom(key(KeyCode::Down), &mut state, &mut ui);
-        assert_eq!(ui.selected_archetype, 2, "should cap at 2");
-    }
-
-    #[test]
-    fn enter_confirms_archetype_and_transitions_to_flow_view() {
-        let mut state = LoomState::new();
-        let mut ui = make_ui(LoomView::ArchetypeSelection);
-        ui.selected_archetype = 1;
-
-        let result = handle_loom(key(KeyCode::Enter), &mut state, &mut ui);
-        assert!(matches!(result, InputResult::NeedsSave));
-        assert_eq!(
-            state.persistent.archetype,
-            Some(crate::loom::types::LoomArchetype::ReachWide)
-        );
-        assert_eq!(ui.view, LoomView::FlowView);
-    }
-
-    #[test]
-    fn enter_after_archetype_chosen_is_noop() {
-        let mut state = LoomState::new();
-        state.persistent.archetype = Some(crate::loom::types::LoomArchetype::BurnBright);
-        let mut ui = make_ui(LoomView::ArchetypeSelection);
-
-        let result = handle_loom(key(KeyCode::Enter), &mut state, &mut ui);
-        assert!(matches!(result, InputResult::Continue));
-    }
-
-    #[test]
     fn up_down_node_selection_in_list_detail() {
         let mut state = LoomState::new();
         let mut ui = make_ui(LoomView::ListDetail);
@@ -480,10 +401,8 @@ mod tests {
 
     #[test]
     fn test_navigation_extends_to_refineries() {
-        use crate::loom::{logic::select_archetype, types::LoomArchetype};
-
         let mut state = LoomState::new();
-        select_archetype(&mut state, LoomArchetype::BurnBright);
+        crate::loom::logic::initialize_loom(&mut state);
         state
             .persistent
             .refineries

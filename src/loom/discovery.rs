@@ -6,6 +6,8 @@ pub fn complete_discovery(loom: &mut LoomState) {
     }
     loom.persistent.discovered = true;
     loom.persistent.patterns = create_pattern_sequence();
+    // Unlock all 6 extractors immediately (no archetype selection needed).
+    super::logic::initialize_loom(loom);
 }
 
 fn create_pattern_sequence() -> Vec<WovenPattern> {
