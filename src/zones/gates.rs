@@ -2,7 +2,7 @@
 
 #![allow(dead_code)]
 
-use super::data::{get_all_zones, Zone};
+use super::data::Zone;
 use super::progression::ZoneProgression;
 use crate::achievements::{AchievementId, Achievements};
 
@@ -16,8 +16,7 @@ impl ZoneProgression {
             return None;
         }
 
-        let zones = get_all_zones();
-        let zone = zones.iter().find(|z| z.id == self.current_zone_id)?;
+        let zone = super::data::get_zone(self.current_zone_id)?;
 
         // Only the zone's final boss requires the weapon
         let is_zone_boss = self.current_subzone_id == zone.subzones.len() as u32;
@@ -52,7 +51,7 @@ impl ZoneProgression {
         // Check if previous zone's final boss is defeated (if not first zone)
         if zone.id > 1 {
             let prev_zone_id = zone.id - 1;
-            if let Some(prev_zone) = get_all_zones().iter().find(|z| z.id == prev_zone_id) {
+            if let Some(prev_zone) = super::data::get_zone(prev_zone_id) {
                 let last_subzone_id = prev_zone.subzones.len() as u32;
                 if !self.is_boss_defeated(prev_zone_id, last_subzone_id) {
                     return false;

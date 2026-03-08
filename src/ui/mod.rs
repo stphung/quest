@@ -817,10 +817,8 @@ fn draw_right_panel(
     }
 
     // Get zone name and color for the border
-    use crate::zones::get_all_zones;
-    let zones = get_all_zones();
     let prog = &game_state.zone_progression;
-    let zone = zones.iter().find(|z| z.id == prog.current_zone_id);
+    let zone = crate::zones::get_zone(prog.current_zone_id);
     let zone_name = zone.map(|z| z.name).unwrap_or("Unknown");
     let zone_color = stats_panel::zone_color_for_id(prog.current_zone_id);
 

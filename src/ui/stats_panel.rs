@@ -501,13 +501,11 @@ pub(super) fn draw_zone_info(
     _ctx: &LayoutContext,
 ) {
     use super::scene_fx::{put_text_centered, render_buffer, SceneCell};
-    use crate::zones::get_all_zones;
-
-    let zones = get_all_zones();
     let prog = &game_state.zone_progression;
 
-    let zone = zones.iter().find(|z| z.id == prog.current_zone_id);
-    let subzone = zone.and_then(|z| z.subzones.iter().find(|s| s.id == prog.current_subzone_id));
+    let zone = crate::zones::get_zone(prog.current_zone_id);
+    let subzone =
+        crate::zones::get_subzone(prog.current_zone_id, prog.current_subzone_id).map(|(_, s)| s);
 
     let subzone_name = subzone.map(|s| s.name).unwrap_or("Unknown");
     let boss_name = subzone.map(|s| s.boss.name).unwrap_or("Unknown Boss");
@@ -594,7 +592,7 @@ pub(super) fn draw_zone_info(
         // Count completed zones (all subzone bosses defeated)
         let mut completed_zones: u32 = 0;
         for zid in 1..=max_zone {
-            if let Some(z) = zones.iter().find(|z| z.id == zid) {
+            if let Some(z) = crate::zones::get_zone(zid) {
                 if z.subzones.iter().all(|s| prog.is_boss_defeated(zid, s.id)) {
                     completed_zones += 1;
                 }
@@ -637,7 +635,6 @@ pub(super) fn draw_zone_info(
             let first_gated = highest_accessible + 1;
             let gate_hint = zone_gate_hint(
                 first_gated,
-                zones,
                 game_state.prestige_rank,
                 game_state.ascension_level,
             );
@@ -660,13 +657,8 @@ pub(super) fn draw_zone_info(
 }
 
 /// Build a gate hint string for the first zone the player can't enter.
-fn zone_gate_hint(
-    zone_id: u32,
-    zones: &[crate::zones::Zone],
-    prestige_rank: u32,
-    ascension_level: u32,
-) -> Option<String> {
-    let zone = zones.iter().find(|z| z.id == zone_id)?;
+fn zone_gate_hint(zone_id: u32, prestige_rank: u32, ascension_level: u32) -> Option<String> {
+    let zone = crate::zones::get_zone(zone_id)?;
     let mut reasons: Vec<String> = Vec::new();
 
     if prestige_rank < zone.prestige_requirement {
@@ -775,24 +767,14 @@ pub(super) fn draw_compact_stats_bar(
     _ctx: &LayoutContext,
     achievements: &crate::achievements::Achievements,
 ) {
-    use crate::zones::get_all_zones;
-
     let tier = get_prestige_tier(game_state.prestige_rank);
     let effective_multiplier =
         DerivedStats::prestige_multiplier(tier.multiplier, &game_state.attributes);
 
-    let zones = get_all_zones();
     let prog = &game_state.zone_progression;
-    let zone_name = zones
-        .iter()
-        .find(|z| z.id == prog.current_zone_id)
-        .map(|z| z.name)
-        .unwrap_or("???");
-    let total_subzones = zones
-        .iter()
-        .find(|z| z.id == prog.current_zone_id)
-        .map(|z| z.subzones.len())
-        .unwrap_or(0);
+    let current_zone = crate::zones::get_zone(prog.current_zone_id);
+    let zone_name = current_zone.map(|z| z.name).unwrap_or("???");
+    let total_subzones = current_zone.map(|z| z.subzones.len()).unwrap_or(0);
 
     let compact_name = match achievements.selected_title.and_then(|id| {
         if achievements.is_unlocked(id) {
