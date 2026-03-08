@@ -78,18 +78,105 @@ pub fn render_debug_menu(
     let help_area = sections[2];
     let is_border_category = menu.current_category() == DebugCategory::Borders;
 
-    // Tab bar using Ratatui Tabs widget.
-    let tab_titles: Vec<&str> = DEBUG_CATEGORIES.iter().map(|c| c.label()).collect();
-    let tabs = Tabs::new(tab_titles)
-        .select(menu.selected_category)
-        .style(Style::default().fg(Color::DarkGray))
-        .highlight_style(
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )
-        .divider(" ");
-    frame.render_widget(tabs, tabs_area);
+    // Scrollable tab bar: compute a visible window, render with Ratatui Tabs.
+    let available_width = tabs_area.width as usize;
+    let tab_labels: Vec<&str> = DEBUG_CATEGORIES.iter().map(|c| c.label()).collect();
+    let total_tabs = tab_labels.len();
+
+    // Each tab label width + divider (" ─ " = 3 chars between tabs by default, we use " " = 1).
+    // Tabs widget adds divider between each pair, so total = sum(labels) + (n-1)*divider_width.
+    let total_width: usize =
+        tab_labels.iter().map(|l| l.len()).sum::<usize>() + total_tabs.saturating_sub(1);
+
+    let (tab_start, tab_end) = if total_width <= available_width {
+        (0, total_tabs)
+    } else {
+        // Expand a window around the selected tab to fit available width.
+        let mut start = menu.selected_category;
+        let mut end = menu.selected_category + 1;
+        let mut width = tab_labels[start].len();
+
+        loop {
+            let mut expanded = false;
+            if start > 0 {
+                let new_width = width + 1 + tab_labels[start - 1].len();
+                let needed = new_width + if start > 1 { 2 } else { 0 }; // reserve for "◂ "
+                if needed <= available_width {
+                    start -= 1;
+                    width = new_width;
+                    expanded = true;
+                }
+            }
+            if end < total_tabs {
+                let new_width = width + 1 + tab_labels[end].len();
+                let needed = new_width + if end + 1 < total_tabs { 2 } else { 0 }; // reserve for " ▸"
+                if needed <= available_width {
+                    width = new_width;
+                    end += 1;
+                    expanded = true;
+                }
+            }
+            if !expanded {
+                break;
+            }
+        }
+        (start, end)
+    };
+
+    // Build arrow + tabs layout when scrolling is needed.
+    let has_left_arrow = tab_start > 0;
+    let has_right_arrow = tab_end < total_tabs;
+
+    if has_left_arrow || has_right_arrow {
+        // Split tabs_area into: [left_arrow] [tabs] [right_arrow]
+        let left_w = if has_left_arrow { 2 } else { 0 };
+        let right_w = if has_right_arrow { 2 } else { 0 };
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(left_w),
+                Constraint::Min(1),
+                Constraint::Length(right_w),
+            ])
+            .split(tabs_area);
+
+        if has_left_arrow {
+            frame.render_widget(
+                Paragraph::new("\u{25c2} ").style(Style::default().fg(Color::DarkGray)),
+                chunks[0],
+            );
+        }
+
+        let visible_titles: Vec<&str> = tab_labels[tab_start..tab_end].to_vec();
+        let tabs = Tabs::new(visible_titles)
+            .select(menu.selected_category - tab_start)
+            .style(Style::default().fg(Color::DarkGray))
+            .highlight_style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .divider(" ");
+        frame.render_widget(tabs, chunks[1]);
+
+        if has_right_arrow {
+            frame.render_widget(
+                Paragraph::new(" \u{25b8}").style(Style::default().fg(Color::DarkGray)),
+                chunks[2],
+            );
+        }
+    } else {
+        let tabs = Tabs::new(tab_labels)
+            .select(menu.selected_category)
+            .style(Style::default().fg(Color::DarkGray))
+            .highlight_style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .divider(" ");
+        frame.render_widget(tabs, tabs_area);
+    }
 
     let (options_area, preview_area) = if is_border_category && list_area.height >= 10 {
         let option_rows = (visible_options.len() as u16 + 1)
