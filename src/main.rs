@@ -424,6 +424,9 @@ fn main() -> io::Result<()> {
                     &state.character_name,
                 );
 
+                // Track milestones from offline Loom to queue after pending_overlays is created
+                let mut offline_pattern_milestones: Vec<crate::loom::PatternMilestone> = Vec::new();
+
                 // Resolve Loom production that occurred while offline
                 if let Some(ref report) = offline_report {
                     if let Some(loom_report) = main_helpers::offline::resolve_loom_offline(
@@ -449,7 +452,25 @@ fn main() -> io::Result<()> {
                                 false,
                                 true,
                             );
+                            // Sync Loom zone unlocks for offline pattern completions
+                            let count = loom_state.persistent.completed_pattern_count();
+                            let loom_cap = crate::loom::loom_zone_cap_for_patterns(count);
+                            state.cached_loom_zone_cap = loom_cap;
+                            let fracture_cap = state.cached_fracture_zone_cap;
+                            let storms_end = state
+                                .zone_progression
+                                .is_zone_unlocked(crate::core::constants::EXPANSE_ZONE_ID);
+                            crate::zones::sync_account_zone_unlocks(
+                                &mut state.zone_progression,
+                                storms_end,
+                                fracture_cap,
+                                state.prestige_rank,
+                                loom_cap,
+                                state.ascension_level,
+                            );
                         }
+                        // Stash milestones to queue after pending_overlays is created
+                        offline_pattern_milestones = loom_report.milestones.clone();
                     }
                 }
 
@@ -486,6 +507,11 @@ fn main() -> io::Result<()> {
                     let mut debug_menu = utils::debug_menu::DebugMenu::new();
                     let mut pending_overlays: std::collections::VecDeque<GameOverlay> =
                         std::collections::VecDeque::new();
+                    // Queue pattern milestone modals from offline completions
+                    for milestone in offline_pattern_milestones.drain(..) {
+                        pending_overlays
+                            .push_back(GameOverlay::PatternMilestoneUnlock { milestone });
+                    }
                     let mut chrono_surge: Option<ChronoSurgeState> = None;
                     let mut chrono_summary: Option<ChronoSurgeSummary> = None;
                     let mut last_flappy_frame = Instant::now();
