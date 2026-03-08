@@ -318,12 +318,16 @@ impl Default for LoomPersistent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoomState {
     pub persistent: LoomPersistent,
+    /// Per-resource rolling rate trackers (transient, not serialized).
+    #[serde(skip)]
+    pub rate_trackers: HashMap<Resource, RateTracker>,
 }
 
 impl LoomState {
     pub fn new() -> Self {
         Self {
             persistent: LoomPersistent::default(),
+            rate_trackers: HashMap::new(),
         }
     }
 }

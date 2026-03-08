@@ -30,6 +30,6 @@ pub use persistence::{load_loom, loom_save_path, save_loom};
 #[allow(unused_imports)]
 pub use types::{
     BuildState, BuildStep, CodexEntry, LoomArchetype, LoomNode, LoomNodeRef, LoomPersistent,
-    LoomState, LoomUiState, LoomView, NodeId, NodeNature, PatternRequirement, Refinery, Resource,
-    WovenPattern,
+    LoomState, LoomUiState, LoomView, NodeId, NodeNature, PatternRequirement, RateTracker,
+    Refinery, Resource, WovenPattern,
 };

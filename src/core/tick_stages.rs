@@ -1038,17 +1038,40 @@ pub(super) fn tick_loom(
         result.loom_changed = true;
     }
 
-    // Tick pattern sustain timer using per-node effective rates (units/hour).
+    // Push per-tick production amounts into rate trackers.
+    for (resource, &amount) in &produced {
+        loom.rate_trackers
+            .entry(*resource)
+            .or_default()
+            .push(amount);
+    }
+    // Push 0.0 for resources not produced this tick (so their rate decays naturally).
+    let all_resources = [
+        crate::loom::Resource::Ember,
+        crate::loom::Resource::Reflection,
+        crate::loom::Resource::VoidEssence,
+        crate::loom::Resource::Memory,
+        crate::loom::Resource::Silence,
+        crate::loom::Resource::Resonance,
+        crate::loom::Resource::ForgedLight,
+        crate::loom::Resource::EchoGlass,
+        crate::loom::Resource::StillbornSong,
+        crate::loom::Resource::CondensedEmber,
+        crate::loom::Resource::EmberEcho,
+        crate::loom::Resource::PurifiedVoid,
+        crate::loom::Resource::WovenReality,
+    ];
+    for resource in &all_resources {
+        if !produced.contains_key(resource) {
+            loom.rate_trackers.entry(*resource).or_default().push(0.0);
+        }
+    }
+
+    // Read measured rates from trackers for pattern sustain.
     let rates: std::collections::HashMap<crate::loom::Resource, f64> = loom
-        .persistent
-        .nodes
+        .rate_trackers
         .iter()
-        .filter(|n| n.unlocked)
-        .map(|n| {
-            let resource = crate::loom::node_native_resource(n.id);
-            let rate = crate::loom::node_effective_rate(loom, n);
-            (resource, rate)
-        })
+        .map(|(resource, tracker)| (*resource, tracker.rate_per_hour()))
         .collect();
 
     let pattern_completed =
