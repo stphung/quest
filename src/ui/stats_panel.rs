@@ -580,6 +580,18 @@ pub(super) fn draw_zone_info(
             }
         }
 
+        // Loom zones 31-50
+        let loom_cap = crate::loom::loom_zone_cap_for_ascension(game_state.ascension_level);
+        if loom_cap >= 31 {
+            let loom_starts: &[u32] = &[31, 35, 39, 43, 47];
+            let loom_ends: &[u32] = &[34, 38, 42, 46, 50];
+            for (&start, &end) in loom_starts.iter().zip(loom_ends.iter()) {
+                if loom_cap >= start {
+                    groups.push((start, end.min(loom_cap)));
+                }
+            }
+        }
+
         let mut dot_chars: Vec<(char, Color)> = Vec::new();
         let mut label_parts: Vec<(usize, String)> = Vec::new();
         let mut char_pos: usize = 0;
@@ -736,6 +748,11 @@ fn zone_description_tint(zone_id: u32) -> Color {
         21..=23 => (85, 90, 100),  // Hollow Throne: faded blue
         24..=26 => (100, 90, 100), // Wailing Reach: static haze
         27..=30 => (90, 75, 95),   // Origin Wound: deep wound purple
+        31..=34 => (95, 110, 85),  // Thread Wilds: mossy green
+        35..=38 => (110, 100, 80), // Woven Frontier: warm tan
+        39..=42 => (115, 80, 90),  // The Unraveling: frayed crimson
+        43..=46 => (90, 95, 110),  // Grand Design: blueprint blue
+        47..=50 => (110, 95, 110), // Final Weave: cosmic purple
         _ => (100, 100, 100),      // fallback: neutral grey
     };
     Color::Rgb(r, g, b)

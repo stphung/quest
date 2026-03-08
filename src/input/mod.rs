@@ -234,7 +234,7 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
 
     // 1f. Ascension confirmation modal (blocks all other input)
     if matches!(overlay, GameOverlay::AscensionConfirm) {
-        return handle_ascension_confirm(key, state, deep_state, loom_state, overlay);
+        return handle_ascension_confirm(key, state, deep_state, loom_state, achievements, overlay);
     }
 
     // 2. Haven screen (blocks other input when open)
@@ -373,6 +373,7 @@ fn handle_ascension_confirm(
     state: &mut GameState,
     deep_state: &mut crate::deep::DeepState,
     loom_state: &crate::loom::LoomState,
+    achievements: &mut crate::achievements::Achievements,
     overlay: &mut GameOverlay,
 ) -> InputResult {
     match key.code {
@@ -399,6 +400,23 @@ fn handle_ascension_confirm(
                         bold: true,
                         segments: None,
                     });
+                    // Wire ascension achievement
+                    achievements.on_ascended(new_level, Some(&state.character_name));
+
+                    // Sync zone unlocks (loom zones may have new access)
+                    let storms_end = state
+                        .zone_progression
+                        .is_zone_unlocked(crate::core::constants::EXPANSE_ZONE_ID);
+                    let fracture_cap = deep_state.persistent.fracture_zone_cap;
+                    let loom_cap = crate::loom::loom_zone_cap_for_ascension(state.ascension_level);
+                    crate::zones::sync_account_zone_unlocks(
+                        &mut state.zone_progression,
+                        storms_end,
+                        fracture_cap,
+                        state.prestige_rank,
+                        loom_cap,
+                        state.ascension_level,
+                    );
                     *overlay = GameOverlay::None;
                     InputResult::NeedsSaveWithEvent(crate::history::SaveEvent::AchievementUnlocked(
                         format!("Ascension {roman}"),

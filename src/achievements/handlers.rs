@@ -157,7 +157,6 @@ impl Achievements {
     }
 
     /// Called when the character Ascends to a new level.
-    #[allow(dead_code)] // Will be called by tick pipeline once ascension input is wired
     pub fn on_ascended(&mut self, new_level: u32, character_name: Option<&str>) {
         let id = match new_level {
             1 => Some(AchievementId::AscensionI),

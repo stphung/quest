@@ -67,11 +67,13 @@ impl ZoneProgression {
         // Clear defeated bosses
         self.defeated_bosses.clear();
 
-        // Recalculate unlocked zones based on new prestige rank
+        // Recalculate unlocked zones based on new prestige rank.
+        // Exclude Loom zones (31+) — those are dual-gated by ascension and
+        // will be handled by sync_account_zone_unlocks() after prestige reset.
         let zones = get_all_zones();
         self.unlocked_zones = zones
             .iter()
-            .filter(|z| z.prestige_requirement <= new_prestige_rank)
+            .filter(|z| z.id <= 30 && z.prestige_requirement <= new_prestige_rank)
             .map(|z| z.id)
             .collect();
         self.unlocked_zones.sort();

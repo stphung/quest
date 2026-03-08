@@ -1102,7 +1102,8 @@ pub(super) fn tick_loom(
     // Tick WR→PR conversion (active after all 28 patterns complete).
     if crate::loom::all_patterns_complete(&loom.persistent) {
         let now = chrono::Utc::now().timestamp();
-        if loom.persistent.wr_pr_last_granted_at == 0 {
+        if loom.persistent.wr_pr_last_granted_at == 0 || loom.persistent.wr_pr_last_granted_at > now
+        {
             loom.persistent.wr_pr_last_granted_at = now;
             result.loom_changed = true;
         } else {
@@ -1115,7 +1116,8 @@ pub(super) fn tick_loom(
             if pr_per_day > 0 {
                 let fill_secs = 86400i64 / pr_per_day as i64;
                 let last = loom.persistent.wr_pr_last_granted_at;
-                let elapsed = now - last;
+                // Cap elapsed to 7 days to prevent exploits from bogus timestamps
+                let elapsed = (now - last).min(604800);
                 if elapsed >= fill_secs {
                     let completed_cycles = (elapsed / fill_secs) as u32;
                     state.prestige_rank = state.prestige_rank.saturating_add(completed_cycles);
@@ -1123,12 +1125,11 @@ pub(super) fn tick_loom(
                     state.derived_stats_dirty = true;
                     loom.persistent.wr_pr_last_granted_at =
                         last + fill_secs * completed_cycles as i64;
-                    for _ in 0..completed_cycles {
-                        result.events.push(TickEvent::WovenRealityPRGranted {
-                            pr_amount: 1,
-                            wr_rate,
-                        });
-                    }
+                    // Coalesce into a single event with total PR
+                    result.events.push(TickEvent::WovenRealityPRGranted {
+                        pr_amount: completed_cycles,
+                        wr_rate,
+                    });
                     result.loom_changed = true;
                 }
             }

@@ -121,7 +121,7 @@ fn get_zone_enemy_prefixes(zone_id: u32) -> &'static [&'static str] {
         31..=34 => &["Threadbare", "Woven", "Spindle", "Weft", "Loom"],
         35..=38 => &["Shuttle", "Pattern", "Weave", "Fabric", "Tapestry"],
         39..=42 => &["Frayed", "Unraveled", "Tangled", "Knotted", "Snarled"],
-        43..=46 => &["Grand", "Architect", "Blueprint", "Design", "Schema"],
+        43..=46 => &["Grand", "Master", "Blueprint", "Forged", "Gilded"],
         47..=50 => &["Final", "Origin", "Reality", "World", "Infinite"],
         _ => &["Wild", "Fierce", "Dark", "Savage", "Grim"],
     }

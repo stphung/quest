@@ -190,8 +190,19 @@ impl ZoneProgression {
             return BossDefeatResult::ExpanseCycle;
         }
 
-        // Current zone is the cap zone (fracture) — cycle
+        // Current zone is the cap zone (fracture) — cycle unless loom zones are open
         if zone_id == fracture_zone_cap && zone_id > EXPANSE_ZONE_ID {
+            // If loom zones are unlocked beyond fracture cap, advance instead of cycling
+            let next = zone_id + 1;
+            if (31..=50).contains(&next) && self.is_zone_unlocked(next) {
+                self.current_zone_id = next;
+                self.current_subzone_id = 1;
+                self.kills_in_subzone = 0;
+                return BossDefeatResult::ZoneComplete {
+                    old_zone: zone.name.to_string(),
+                    new_zone_id: next,
+                };
+            }
             self.current_subzone_id = 1;
             self.kills_in_subzone = 0;
             return BossDefeatResult::FractureCycle { zone_id };
@@ -611,6 +622,36 @@ mod tests {
         // fracture_zone_cap=30 means fracture cycling at 30
         let result = prog.on_boss_defeated_with_cap(300, &mut achievements, 30, 30);
         assert_eq!(result, BossDefeatResult::FractureCycle { zone_id: 30 });
+    }
+
+    #[test]
+    fn test_fracture_cap_30_advances_to_loom_zone_31_when_unlocked() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // Set up at zone 30 (fracture cap), final subzone, fighting boss
+        prog.current_zone_id = 30;
+        prog.current_subzone_id = 5;
+        prog.unlock_zone(30);
+        prog.unlock_zone(31); // Loom zone 31 is unlocked
+        prog.fighting_boss = true;
+
+        // fracture_zone_cap=30, loom_zone_cap=34
+        let result = prog.on_boss_defeated_with_cap(2000, &mut achievements, 30, 34);
+        assert!(
+            matches!(
+                result,
+                BossDefeatResult::ZoneComplete {
+                    new_zone_id: 31,
+                    ..
+                }
+            ),
+            "Expected ZoneComplete advancing to 31, got {:?}",
+            result
+        );
+        assert_eq!(prog.current_zone_id, 31);
+        assert_eq!(prog.current_subzone_id, 1);
+        assert_eq!(prog.kills_in_subzone, 0);
     }
 
     #[test]
