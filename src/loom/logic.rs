@@ -158,13 +158,10 @@ pub fn tick_base_production(
 /// Returns the upgrade cost (in the node's native resource) for going from current level to next.
 /// Base cost: 10 * level^1.5, rounded. Silence Well gets 25% discount at levels 1-5.
 pub fn node_upgrade_cost(loom: &LoomState, node_id: NodeId) -> f64 {
-    if let Some(node) = loom.persistent.nodes.iter().find(|n| n.id == node_id) {
-        let base_cost = 100.0 * (node.level as f64).powf(1.5);
-        let multiplier = node_upgrade_cost_multiplier(loom, node_id);
-        (base_cost * multiplier).round()
-    } else {
-        f64::MAX
-    }
+    let node = &loom.persistent.nodes[node_id.index()];
+    let base_cost = 100.0 * (node.level as f64).powf(1.5);
+    let multiplier = node_upgrade_cost_multiplier(loom, node_id);
+    (base_cost * multiplier).round()
 }
 
 /// Attempt to upgrade a node's level.
@@ -173,10 +170,7 @@ pub fn node_upgrade_cost(loom: &LoomState, node_id: NodeId) -> f64 {
 pub fn try_upgrade_node(loom: &mut LoomState, node_id: NodeId) -> bool {
     let cost = node_upgrade_cost(loom, node_id);
 
-    let node = match loom.persistent.nodes.iter_mut().find(|n| n.id == node_id) {
-        Some(n) => n,
-        None => return false,
-    };
+    let node = &mut loom.persistent.nodes[node_id.index()];
 
     if !node.unlocked || node.buffer < cost {
         return false;
@@ -507,12 +501,9 @@ fn source_available_rate(
 ) -> f64 {
     match src {
         LoomNodeRef::Extractor(node_id) => {
-            if let Some(node) = persistent.nodes.iter().find(|n| n.id == node_id) {
-                let throughput_mult = node_multipliers.get(&node_id).copied().unwrap_or(1.0);
-                node_effective_rate_from_node(node, throughput_mult)
-            } else {
-                0.0
-            }
+            let node = &persistent.nodes[node_id.index()];
+            let throughput_mult = node_multipliers.get(&node_id).copied().unwrap_or(1.0);
+            node_effective_rate_from_node(node, throughput_mult)
         }
         LoomNodeRef::Shuttle(idx) => shuttle_rates.get(idx).copied().unwrap_or(0.0),
     }

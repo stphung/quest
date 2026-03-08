@@ -1,6 +1,24 @@
 //! Static achievement definitions.
 
+use std::collections::HashMap;
+use std::sync::LazyLock;
+
 use super::types::{AchievementCategory, AchievementDef, AchievementId};
+
+/// O(1) lookup cache: AchievementId -> &AchievementDef
+static ACHIEVEMENT_BY_ID: LazyLock<HashMap<AchievementId, &'static AchievementDef>> =
+    LazyLock::new(|| ALL_ACHIEVEMENTS.iter().map(|a| (a.id, a)).collect());
+
+/// O(1) lookup cache: AchievementCategory -> Vec<&AchievementDef>
+static ACHIEVEMENTS_BY_CATEGORY: LazyLock<
+    HashMap<AchievementCategory, Vec<&'static AchievementDef>>,
+> = LazyLock::new(|| {
+    let mut map: HashMap<AchievementCategory, Vec<&'static AchievementDef>> = HashMap::new();
+    for a in ALL_ACHIEVEMENTS {
+        map.entry(a.category).or_default().push(a);
+    }
+    map
+});
 
 /// All achievement definitions in display order.
 pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
@@ -1878,17 +1896,17 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     },
 ];
 
-/// Get the definition for a specific achievement.
+/// Get the definition for a specific achievement (O(1) HashMap lookup).
 pub fn get_achievement_def(id: AchievementId) -> Option<&'static AchievementDef> {
-    ALL_ACHIEVEMENTS.iter().find(|a| a.id == id)
+    ACHIEVEMENT_BY_ID.get(&id).copied()
 }
 
-/// Get achievements filtered by category.
+/// Get achievements filtered by category (O(1) HashMap lookup).
 pub fn get_achievements_by_category(category: AchievementCategory) -> Vec<&'static AchievementDef> {
-    ALL_ACHIEVEMENTS
-        .iter()
-        .filter(|a| a.category == category)
-        .collect()
+    ACHIEVEMENTS_BY_CATEGORY
+        .get(&category)
+        .cloned()
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

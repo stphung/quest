@@ -587,7 +587,7 @@ fn test_zone_achievements_zone_complete_but_gated() {
     let events = vec![CombatEvent::SubzoneBossDefeated {
         xp_gained: 1500,
         result: BossDefeatResult::ZoneCompleteButGated {
-            zone_name: "Dark Forest".to_string(),
+            zone_name: "Dark Forest",
             required_prestige: 5,
         },
     }];

@@ -715,7 +715,7 @@ fn test_subzone_boss_defeated_zone_complete() {
     let events = vec![CombatEvent::SubzoneBossDefeated {
         xp_gained: 1200,
         result: BossDefeatResult::ZoneComplete {
-            old_zone: "Meadow".to_string(),
+            old_zone: "Meadow",
             new_zone_id: 2,
         },
     }];
@@ -761,7 +761,7 @@ fn test_subzone_boss_defeated_zone_gated() {
     let events = vec![CombatEvent::SubzoneBossDefeated {
         xp_gained: 1500,
         result: BossDefeatResult::ZoneCompleteButGated {
-            zone_name: "Dark Forest".to_string(),
+            zone_name: "Dark Forest",
             required_prestige: 5,
         },
     }];
@@ -884,7 +884,7 @@ fn test_subzone_boss_weapon_required_skipped() {
     let events = vec![CombatEvent::SubzoneBossDefeated {
         xp_gained: 0,
         result: BossDefeatResult::WeaponRequired {
-            weapon_name: "Stormbreaker".to_string(),
+            weapon_name: "Stormbreaker",
         },
     }];
 
@@ -1265,7 +1265,7 @@ fn test_zone_complete_triggers_zone_achievement() {
     let events = vec![CombatEvent::SubzoneBossDefeated {
         xp_gained: 1200,
         result: BossDefeatResult::ZoneComplete {
-            old_zone: "Meadow".to_string(),
+            old_zone: "Meadow",
             new_zone_id: 2,
         },
     }];

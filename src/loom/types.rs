@@ -43,6 +43,18 @@ impl NodeId {
         }
     }
 
+    /// Returns the fixed index (0-5) for direct array access.
+    pub fn index(self) -> usize {
+        match self {
+            NodeId::EmberSpindle => 0,
+            NodeId::ReflectionLens => 1,
+            NodeId::VoidCondenser => 2,
+            NodeId::MemoryArchive => 3,
+            NodeId::SilenceWell => 4,
+            NodeId::ResonanceForge => 5,
+        }
+    }
+
     pub fn nature(&self) -> NodeNature {
         match self {
             NodeId::EmberSpindle => NodeNature::Heat,
