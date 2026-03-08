@@ -1492,6 +1492,70 @@ mod tests {
         );
     }
 
+    // =========================================================================
+    // Ascension Achievement Tests
+    // =========================================================================
+
+    #[test]
+    fn test_on_ascended_unlocks_correct_achievement() {
+        let mut achievements = Achievements::default();
+
+        achievements.on_ascended(1, Some("Hero"));
+        assert!(achievements.is_unlocked(AchievementId::AscensionI));
+        assert!(!achievements.is_unlocked(AchievementId::AscensionII));
+
+        achievements.on_ascended(2, Some("Hero"));
+        assert!(achievements.is_unlocked(AchievementId::AscensionII));
+        assert!(!achievements.is_unlocked(AchievementId::AscensionIII));
+    }
+
+    #[test]
+    fn test_on_ascended_all_levels() {
+        let mut achievements = Achievements::default();
+
+        for level in 1..=6 {
+            achievements.on_ascended(level, Some("Hero"));
+        }
+
+        assert!(achievements.is_unlocked(AchievementId::AscensionI));
+        assert!(achievements.is_unlocked(AchievementId::AscensionII));
+        assert!(achievements.is_unlocked(AchievementId::AscensionIII));
+        assert!(achievements.is_unlocked(AchievementId::AscensionIV));
+        assert!(achievements.is_unlocked(AchievementId::AscensionV));
+        assert!(achievements.is_unlocked(AchievementId::AscensionVI));
+    }
+
+    #[test]
+    fn test_on_ascended_beyond_vi_does_not_panic() {
+        let mut achievements = Achievements::default();
+        // Level 7+ should be a no-op, not panic
+        achievements.on_ascended(7, Some("Hero"));
+        achievements.on_ascended(100, Some("Hero"));
+        assert!(!achievements.is_unlocked(AchievementId::AscensionVI));
+    }
+
+    #[test]
+    fn test_sync_from_ascension_retroactive() {
+        let mut achievements = Achievements::default();
+
+        // Simulate loading a character at ascension level 3
+        achievements.sync_from_ascension(3, Some("Hero"));
+
+        assert!(achievements.is_unlocked(AchievementId::AscensionI));
+        assert!(achievements.is_unlocked(AchievementId::AscensionII));
+        assert!(achievements.is_unlocked(AchievementId::AscensionIII));
+        assert!(!achievements.is_unlocked(AchievementId::AscensionIV));
+    }
+
+    #[test]
+    fn test_sync_from_ascension_zero_unlocks_nothing() {
+        let mut achievements = Achievements::default();
+
+        achievements.sync_from_ascension(0, Some("Hero"));
+
+        assert!(!achievements.is_unlocked(AchievementId::AscensionI));
+    }
+
     #[test]
     fn test_recently_unlocked_not_serialized() {
         let mut achievements = Achievements::default();
