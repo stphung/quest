@@ -894,8 +894,7 @@ impl DebugMenu {
 
         // Re-sync zone unlocks after every action — any action may change
         // prestige, achievements, or Deep state that affects zone access.
-        let loom_cap =
-            crate::loom::loom_zone_cap_for_patterns(loom.persistent.completed_pattern_count());
+        let loom_cap = crate::loom::loom_zone_cap_for_ascension(state.ascension_level);
         crate::zones::access::sync_account_zone_unlocks(
             &mut state.zone_progression,
             achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),

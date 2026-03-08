@@ -753,7 +753,7 @@ pub(super) fn run_combat<R: Rng>(
     sigil_bonuses: &SigilBonuses,
     achievements: &mut Achievements,
     deep: &mut crate::deep::DeepState,
-    loom: &crate::loom::LoomState,
+    _loom: &crate::loom::LoomState,
     debug_mode: bool,
     result: &mut TickResult,
     rng: &mut R,
@@ -798,8 +798,7 @@ pub(super) fn run_combat<R: Rng>(
         state.combat_state.player_max_hp,
     );
 
-    let loom_zone_cap =
-        crate::loom::loom_zone_cap_for_patterns(loom.persistent.completed_pattern_count());
+    let loom_zone_cap = crate::loom::loom_zone_cap_for_ascension(state.ascension_level);
     let combat_events = update_combat(
         rng,
         state,
@@ -1085,8 +1084,7 @@ pub(super) fn tick_loom(
     if pattern_completed {
         result.loom_changed = true;
         // Sync Loom zone unlocks on pattern completion
-        let loom_cap =
-            crate::loom::loom_zone_cap_for_patterns(loom.persistent.completed_pattern_count());
+        let loom_cap = crate::loom::loom_zone_cap_for_ascension(state.ascension_level);
         let fracture_cap = state.cached_fracture_zone_cap;
         let storms_end = state
             .zone_progression

@@ -8,7 +8,6 @@ use crate::haven::Haven;
 use crate::items;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn handle_vault_selection(
     key: KeyEvent,
     state: &mut GameState,
@@ -17,7 +16,6 @@ pub(super) fn handle_vault_selection(
     deep_ui: &mut crate::deep::DeepUiState,
     overlay: &mut GameOverlay,
     achievements: &crate::achievements::Achievements,
-    loom_state: &crate::loom::LoomState,
 ) -> InputResult {
     if let GameOverlay::VaultSelection {
         ref mut selected_index,
@@ -76,9 +74,7 @@ pub(super) fn handle_vault_selection(
                     // layer progression, and infrastructure.
                     deep.on_prestige();
                     // Re-sync zone unlocks after prestige reset
-                    let loom_cap = crate::loom::loom_zone_cap_for_patterns(
-                        loom_state.persistent.completed_pattern_count(),
-                    );
+                    let loom_cap = crate::loom::loom_zone_cap_for_ascension(state.ascension_level);
                     crate::zones::sync_account_zone_unlocks(
                         &mut state.zone_progression,
                         achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
@@ -119,7 +115,6 @@ pub(super) fn handle_vault_selection(
     InputResult::Continue
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn handle_prestige_confirm(
     key: KeyEvent,
     state: &mut GameState,
@@ -128,7 +123,6 @@ pub(super) fn handle_prestige_confirm(
     deep_ui: &mut crate::deep::DeepUiState,
     overlay: &mut GameOverlay,
     achievements: &crate::achievements::Achievements,
-    loom_state: &crate::loom::LoomState,
 ) -> InputResult {
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
@@ -163,9 +157,7 @@ pub(super) fn handle_prestige_confirm(
                 // layer progression, and infrastructure.
                 deep.on_prestige();
                 // Re-sync zone unlocks after prestige reset
-                let loom_cap = crate::loom::loom_zone_cap_for_patterns(
-                    loom_state.persistent.completed_pattern_count(),
-                );
+                let loom_cap = crate::loom::loom_zone_cap_for_ascension(state.ascension_level);
                 crate::zones::sync_account_zone_unlocks(
                     &mut state.zone_progression,
                     achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),

@@ -10,7 +10,7 @@ pub use discovery::complete_discovery;
 pub use logic::{
     archetype_nodes, build_shuttle, check_node_stall, codex_hint_indices, demolish_shuttle,
     effective_buffer_capacity, effective_node_base_rate, eligible_sources_for_tier,
-    initialize_loom, loom_external_bonuses, loom_production_bonus, loom_zone_cap_for_patterns,
+    initialize_loom, loom_external_bonuses, loom_production_bonus, loom_zone_cap_for_ascension,
     node_conversion_multiplier, node_effective_rate, node_level_multiplier, node_native_resource,
     node_neighbor_unlock_count, node_neighbor_unlock_speed_multiplier, node_neighbors,
     node_throughput_multiplier, node_upgrade_cost, node_upgrade_cost_multiplier,

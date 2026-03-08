@@ -171,7 +171,7 @@ When all 28 Woven Patterns are complete, the Loom converts Weave Rate (WR) into 
 ## Key Functions (Power Integration)
 
 - `completed_pattern_count() -> usize` — count of fully completed Woven Patterns
-- `loom_zone_cap_for_patterns(patterns) -> u32` — returns max zone ID unlocked by pattern count (Z31-50)
+- `loom_zone_cap_for_ascension(patterns) -> u32` — returns max zone ID unlocked by pattern count (Z31-50)
 - `wr_to_pr_per_day(wr_per_hour) -> f64` — tiered WR to PR/day conversion
 - `upgrade_shuttle(loom, idx)` — upgrade shuttle level, increasing effective intake cap
 - `shuttle_effective_intake_cap(tier, level) -> f64` — intake cap adjusted for shuttle level
@@ -184,4 +184,4 @@ When all 28 Woven Patterns are complete, the Loom converts Weave Rate (WR) into 
 - **Persisted to**: `~/.quest/loom.json` via `persistence.rs`
 - **Discovery**: Triggered by pattern completion milestones
 - **Ascension** (`ascension/types.rs`): `ascension_pattern_gate()` checks pattern count for VII-X eligibility; `max_shuttle_level()` gates shuttle upgrades by Ascension tier
-- **Zones** (`zones/`): `loom_zone_cap_for_patterns()` unlocks Loom Zones 31-50 based on completed pattern count
+- **Zones** (`zones/`): `loom_zone_cap_for_ascension()` unlocks Loom Zones 31-50 based on completed pattern count

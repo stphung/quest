@@ -272,7 +272,6 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
             deep_ui,
             overlay,
             achievements,
-            loom_state,
         );
     }
 
@@ -286,7 +285,6 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
             deep_ui,
             overlay,
             achievements,
-            loom_state,
         );
     }
 
