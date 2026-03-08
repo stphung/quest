@@ -10,137 +10,215 @@ pub fn complete_discovery(loom: &mut LoomState) {
 
 fn create_pattern_sequence() -> Vec<WovenPattern> {
     vec![
-        // Teaching Arc (1-6)
-        pattern(0, "First Thread", vec![(Resource::Ember, 10.0)]),
-        pattern(
-            1,
-            "The Bridge",
-            vec![(Resource::Ember, 30.0), (Resource::Reflection, 10.0)],
-        ),
-        pattern(
-            2,
-            "Long Road",
-            vec![(Resource::Ember, 20.0), (Resource::Memory, 10.0)],
-        ),
-        pattern(
-            3,
-            "Balancing Act",
-            vec![
-                (Resource::Ember, 30.0),
-                (Resource::Reflection, 30.0),
-                (Resource::VoidEssence, 30.0),
-            ],
-        ),
+        // ── Teaching Arc (1-8) ── ~3 days (72 hours) ──
+        pattern(0, "First Thread", vec![(Resource::Ember, 25.0, 2.0)]),
+        pattern(1, "Still Waters", vec![(Resource::Silence, 25.0, 2.0)]),
+        pattern(2, "Echoing Halls", vec![(Resource::Memory, 25.0, 4.0)]),
+        pattern(3, "Harmonic Pulse", vec![(Resource::Resonance, 25.0, 4.0)]),
         pattern(
             4,
+            "Mirror and Void",
+            vec![
+                (Resource::Reflection, 30.0, 6.0),
+                (Resource::VoidEssence, 30.0, 6.0),
+            ],
+        ),
+        pattern(
+            5,
             "Full Circle",
             vec![
-                (Resource::Ember, 20.0),
-                (Resource::Reflection, 20.0),
-                (Resource::VoidEssence, 20.0),
-                (Resource::Memory, 20.0),
-                (Resource::Silence, 20.0),
-                (Resource::Resonance, 20.0),
+                (Resource::Ember, 20.0, 10.0),
+                (Resource::Reflection, 20.0, 10.0),
+                (Resource::VoidEssence, 20.0, 10.0),
+                (Resource::Memory, 20.0, 10.0),
+                (Resource::Silence, 20.0, 10.0),
+                (Resource::Resonance, 20.0, 10.0),
             ],
         ),
-        pattern(5, "The Catalyst", vec![(Resource::CondensedEmber, 20.0)]),
-        // Mastery Arc (7-12)
         pattern(
             6,
-            "Crossed Streams",
-            vec![
-                (Resource::CondensedEmber, 20.0),
-                (Resource::EmberEcho, 20.0),
-            ],
+            "The Catalyst",
+            vec![(Resource::CondensedEmber, 8.0, 16.0)],
         ),
-        pattern(
-            7,
-            "The Diversion",
-            vec![(Resource::ForgedLight, 25.0), (Resource::Ember, 75.0)],
-        ),
+        pattern(7, "Echo of Flame", vec![(Resource::EmberEcho, 8.0, 28.0)]),
+        // ── Mastery Arc (9-16) ── ~10 days (236 hours) ──
         pattern(
             8,
-            "Three Confluences",
-            vec![
-                (Resource::ForgedLight, 30.0),
-                (Resource::EchoGlass, 30.0),
-                (Resource::StillbornSong, 30.0),
-            ],
+            "Forged in Fire",
+            vec![(Resource::ForgedLight, 15.0, 16.0)],
         ),
         pattern(
             9,
-            "Pressure Test",
-            vec![(Resource::ForgedLight, 60.0), (Resource::EchoGlass, 60.0)],
+            "Glass Resonance",
+            vec![(Resource::EchoGlass, 15.0, 16.0)],
         ),
-        pattern(10, "The Bottleneck", vec![(Resource::StillbornSong, 90.0)]),
-        pattern(11, "Shifting Gears", vec![(Resource::ForgedLight, 60.0)]),
-        // Endgame Arc (13-18)
+        pattern(
+            10,
+            "The Unsung",
+            vec![(Resource::StillbornSong, 15.0, 24.0)],
+        ),
+        pattern(
+            11,
+            "Void Distillation",
+            vec![(Resource::PurifiedVoid, 10.0, 24.0)],
+        ),
         pattern(
             12,
-            "Harmony",
+            "Crossed Streams",
             vec![
-                (Resource::Ember, 200.0),
-                (Resource::Reflection, 200.0),
-                (Resource::VoidEssence, 200.0),
-                (Resource::Memory, 200.0),
-                (Resource::Silence, 200.0),
-                (Resource::Resonance, 200.0),
+                (Resource::ForgedLight, 12.0, 24.0),
+                (Resource::EchoGlass, 12.0, 24.0),
             ],
         ),
         pattern(
             13,
-            "The Triad",
+            "The Asymmetry",
             vec![
-                (Resource::Ember, 120.0),
-                (Resource::Reflection, 120.0),
-                (Resource::VoidEssence, 120.0),
-                (Resource::Memory, 120.0),
-                (Resource::Silence, 120.0),
-                (Resource::Resonance, 120.0),
-                (Resource::ForgedLight, 120.0),
-                (Resource::EchoGlass, 120.0),
-                (Resource::StillbornSong, 120.0),
+                (Resource::ForgedLight, 25.0, 36.0),
+                (Resource::StillbornSong, 8.0, 36.0),
             ],
         ),
         pattern(
             14,
-            "Razor's Edge",
-            vec![(Resource::ForgedLight, 160.0), (Resource::EchoGlass, 160.0)],
+            "Pressure Test",
+            vec![
+                (Resource::CondensedEmber, 15.0, 36.0),
+                (Resource::EmberEcho, 10.0, 36.0),
+                (Resource::PurifiedVoid, 10.0, 36.0),
+            ],
         ),
-        pattern(15, "Resonance Cascade", vec![(Resource::Resonance, 400.0)]),
-        pattern(16, "The Unraveling", vec![(Resource::WovenReality, 60.0)]),
+        pattern(
+            15,
+            "Three Confluences",
+            vec![
+                (Resource::ForgedLight, 18.0, 60.0),
+                (Resource::EchoGlass, 18.0, 60.0),
+                (Resource::StillbornSong, 18.0, 60.0),
+            ],
+        ),
+        // ── Endgame Arc (17-28) ── ~22 days (534 hours) ──
+        pattern(
+            16,
+            "The Amplifier",
+            vec![(Resource::ForgedLight, 35.0, 18.0)],
+        ),
         pattern(
             17,
+            "Purified Cascade",
+            vec![
+                (Resource::PurifiedVoid, 20.0, 24.0),
+                (Resource::ForgedLight, 20.0, 24.0),
+            ],
+        ),
+        pattern(
+            18,
+            "Resonance Cascade",
+            vec![
+                (Resource::Resonance, 150.0, 24.0),
+                (Resource::StillbornSong, 25.0, 24.0),
+            ],
+        ),
+        pattern(19, "First Weave", vec![(Resource::WovenReality, 5.0, 30.0)]),
+        pattern(
+            20,
+            "The Unraveling",
+            vec![
+                (Resource::WovenReality, 15.0, 36.0),
+                (Resource::PurifiedVoid, 15.0, 36.0),
+            ],
+        ),
+        pattern(
+            21,
+            "Grand Harmony",
+            vec![
+                (Resource::Ember, 100.0, 36.0),
+                (Resource::Reflection, 100.0, 36.0),
+                (Resource::VoidEssence, 100.0, 36.0),
+                (Resource::Memory, 100.0, 36.0),
+                (Resource::Silence, 100.0, 36.0),
+                (Resource::Resonance, 100.0, 36.0),
+                (Resource::ForgedLight, 30.0, 36.0),
+                (Resource::EchoGlass, 30.0, 36.0),
+                (Resource::StillbornSong, 30.0, 36.0),
+            ],
+        ),
+        pattern(
+            22,
+            "The Knot",
+            vec![
+                (Resource::ForgedLight, 25.0, 36.0),
+                (Resource::PurifiedVoid, 15.0, 36.0),
+                (Resource::CondensedEmber, 12.0, 36.0),
+            ],
+        ),
+        pattern(
+            23,
+            "Strange Alchemy",
+            vec![
+                (Resource::ForgedLight, 30.0, 42.0),
+                (Resource::EchoGlass, 30.0, 42.0),
+                (Resource::StillbornSong, 30.0, 42.0),
+                (Resource::Ember, 80.0, 42.0),
+                (Resource::VoidEssence, 80.0, 42.0),
+            ],
+        ),
+        pattern(
+            24,
+            "Refined Purpose",
+            vec![
+                (Resource::PurifiedVoid, 30.0, 48.0),
+                (Resource::ForgedLight, 25.0, 48.0),
+            ],
+        ),
+        pattern(25, "The Flood", vec![(Resource::WovenReality, 35.0, 48.0)]),
+        pattern(
+            26,
+            "Everything Flows",
+            vec![
+                (Resource::Ember, 50.0, 72.0),
+                (Resource::Reflection, 50.0, 72.0),
+                (Resource::VoidEssence, 50.0, 72.0),
+                (Resource::Memory, 50.0, 72.0),
+                (Resource::Silence, 50.0, 72.0),
+                (Resource::Resonance, 50.0, 72.0),
+                (Resource::ForgedLight, 20.0, 72.0),
+                (Resource::EchoGlass, 20.0, 72.0),
+                (Resource::StillbornSong, 20.0, 72.0),
+                (Resource::CondensedEmber, 10.0, 72.0),
+                (Resource::EmberEcho, 10.0, 72.0),
+                (Resource::PurifiedVoid, 10.0, 72.0),
+                (Resource::WovenReality, 5.0, 72.0),
+            ],
+        ),
+        pattern(
+            27,
             "Mended Loom",
             vec![
-                (Resource::WovenReality, 240.0),
-                (Resource::Ember, 400.0),
-                (Resource::Reflection, 400.0),
-                (Resource::VoidEssence, 400.0),
-                (Resource::Memory, 400.0),
-                (Resource::Silence, 400.0),
-                (Resource::Resonance, 400.0),
-                (Resource::ForgedLight, 240.0),
-                (Resource::EchoGlass, 240.0),
-                (Resource::StillbornSong, 240.0),
+                (Resource::WovenReality, 20.0, 120.0),
+                (Resource::ForgedLight, 40.0, 120.0),
+                (Resource::EchoGlass, 40.0, 120.0),
+                (Resource::StillbornSong, 40.0, 120.0),
+                (Resource::Ember, 80.0, 120.0),
+                (Resource::Silence, 80.0, 120.0),
+                (Resource::Resonance, 80.0, 120.0),
             ],
         ),
     ]
 }
 
-fn pattern(index: u32, name: &str, reqs: Vec<(Resource, f64)>) -> WovenPattern {
+fn pattern(index: u32, name: &str, reqs: Vec<(Resource, f64, f64)>) -> WovenPattern {
     WovenPattern {
         index,
         name: name.to_string(),
         requirements: reqs
             .into_iter()
-            .map(|(resource, amount)| PatternRequirement {
+            .map(|(resource, rate, duration_hours)| PatternRequirement {
                 resource,
-                required_rate: 0.0,
-                sustain_duration_secs: 0.0,
+                required_rate: rate,
+                sustain_duration_secs: duration_hours * 3600.0,
                 sustained_secs: 0.0,
                 completed: false,
-                amount,
+                amount: 0.0,
                 accumulated: 0.0,
             })
             .collect(),
@@ -160,7 +238,7 @@ mod tests {
         complete_discovery(&mut loom);
 
         assert!(loom.persistent.discovered);
-        assert_eq!(loom.persistent.patterns.len(), 18);
+        assert_eq!(loom.persistent.patterns.len(), 28);
     }
 
     #[test]
@@ -195,16 +273,16 @@ mod tests {
         let mut loom = LoomState::new();
         complete_discovery(&mut loom);
         assert!(loom.persistent.discovered);
-        assert_eq!(loom.persistent.patterns.len(), 18);
+        assert_eq!(loom.persistent.patterns.len(), 28);
 
-        // Mark first pattern as having accumulated progress.
-        loom.persistent.patterns[0].requirements[0].accumulated = 0.5;
+        // Mark first pattern as having sustain progress.
+        loom.persistent.patterns[0].requirements[0].sustained_secs = 0.5;
 
         // Calling again should be a no-op (re-entry guard).
         complete_discovery(&mut loom);
-        assert_eq!(loom.persistent.patterns.len(), 18);
+        assert_eq!(loom.persistent.patterns.len(), 28);
         assert!(
-            (loom.persistent.patterns[0].requirements[0].accumulated - 0.5).abs() < 1e-9,
+            (loom.persistent.patterns[0].requirements[0].sustained_secs - 0.5).abs() < 1e-9,
             "pattern progress must be preserved on re-call"
         );
     }
@@ -226,15 +304,15 @@ mod tests {
     }
 
     #[test]
-    fn test_all_patterns_start_with_zero_accumulated() {
+    fn test_all_patterns_start_with_zero_sustained() {
         let mut loom = LoomState::new();
         complete_discovery(&mut loom);
 
         for pattern in &loom.persistent.patterns {
             for req in &pattern.requirements {
                 assert!(
-                    req.accumulated.abs() < 1e-9,
-                    "pattern '{}' req {:?} should start with 0 accumulated",
+                    req.sustained_secs.abs() < 1e-9,
+                    "pattern '{}' req {:?} should start with 0 sustained_secs",
                     pattern.name,
                     req.resource
                 );
@@ -242,63 +320,44 @@ mod tests {
         }
     }
 
-    // ── pattern amounts ───────────────────────────────────────────────────────
+    // ── pattern rate and duration checks ─────────────────────────────────────
 
     #[test]
-    fn test_first_pattern_amount_is_ten() {
+    fn test_first_pattern_requires_ember_at_25_per_hour() {
         let mut loom = LoomState::new();
         complete_discovery(&mut loom);
         let first = &loom.persistent.patterns[0];
         assert_eq!(first.requirements.len(), 1);
-        assert!(
-            (first.requirements[0].amount - 10.0).abs() < 1e-9,
-            "First Thread Ember amount should be 10.0, got {}",
-            first.requirements[0].amount
-        );
+        assert_eq!(first.requirements[0].resource, Resource::Ember);
+        assert!((first.requirements[0].required_rate - 25.0).abs() < 1e-9);
+        assert!((first.requirements[0].sustain_duration_secs - 7200.0).abs() < 1e-9);
     }
 
     #[test]
-    fn test_all_pattern_amounts_are_positive() {
+    fn test_all_required_rates_are_positive() {
         let mut loom = LoomState::new();
         complete_discovery(&mut loom);
 
         for pattern in &loom.persistent.patterns {
             for req in &pattern.requirements {
                 assert!(
-                    req.amount > 0.0,
-                    "pattern '{}' has non-positive amount for {:?}: {}",
+                    req.required_rate > 0.0,
+                    "pattern '{}' has non-positive required_rate for {:?}: {}",
                     pattern.name,
                     req.resource,
-                    req.amount
+                    req.required_rate
                 );
             }
         }
     }
 
     #[test]
-    fn test_final_pattern_has_largest_total_amount() {
+    fn test_final_pattern_has_longest_duration() {
         let mut loom = LoomState::new();
         complete_discovery(&mut loom);
-
-        // "Mended Loom" (index 17) is the capstone and should have the largest
-        // total amount (sum of all requirements) of any pattern in the sequence.
-        let total_amounts: Vec<f64> = loom
-            .persistent
-            .patterns
-            .iter()
-            .map(|p| p.requirements.iter().map(|r| r.amount).sum::<f64>())
-            .collect();
-        let max_total = total_amounts
-            .iter()
-            .cloned()
-            .fold(f64::NEG_INFINITY, f64::max);
-        let last_total = *total_amounts.last().unwrap();
-        assert!(
-            (last_total - max_total).abs() < 1e-9,
-            "Mended Loom should have the largest total amount ({} vs max {})",
-            last_total,
-            max_total
-        );
+        let last = loom.persistent.patterns.last().unwrap();
+        let last_duration = last.requirements[0].sustain_duration_secs;
+        assert!((last_duration - 432_000.0).abs() < 1e-9); // 120 hours
     }
 
     // ── pattern name spot checks ──────────────────────────────────────────────
@@ -341,6 +400,7 @@ mod tests {
         let first = &loom.persistent.patterns[0];
         assert_eq!(first.requirements.len(), 1);
         assert_eq!(first.requirements[0].resource, Resource::Ember);
+        assert!(first.requirements[0].required_rate > 0.0);
     }
 
     // ── active_pattern initial value ─────────────────────────────────────────

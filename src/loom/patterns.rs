@@ -108,7 +108,7 @@ fn advance_to_next_pattern(persistent: &mut LoomPersistent) {
 
 // ── Query helpers ──────────────────────────────────────────────────────────────
 
-/// Returns `true` if all 18 patterns have been completed.
+/// Returns `true` if all 28 patterns have been completed.
 pub fn all_patterns_complete(persistent: &LoomPersistent) -> bool {
     !persistent.patterns.is_empty() && persistent.patterns.iter().all(|p| p.completed)
 }
@@ -137,19 +137,6 @@ mod tests {
     fn state_with_patterns() -> LoomState {
         let mut state = LoomState::new();
         complete_discovery(&mut state);
-        // Set non-zero rate thresholds and durations for testing.
-        // (Discovery patterns currently use legacy amount-based values;
-        // Task 5 will replace them with proper rate-based definitions.)
-        for pattern in &mut state.persistent.patterns {
-            for req in &mut pattern.requirements {
-                if req.required_rate == 0.0 {
-                    req.required_rate = 10.0; // 10 units/hr threshold
-                }
-                if req.sustain_duration_secs == 0.0 {
-                    req.sustain_duration_secs = 3600.0; // 1 hour sustain
-                }
-            }
-        }
         state
     }
 
