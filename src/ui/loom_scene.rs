@@ -334,9 +334,9 @@ fn render_node_widget(
             .collect();
 
         let hint = if !feeding.is_empty() {
-            format!("\u{25bc} threaded from {}", feeding[0].name())
+            format!("woven from {}", feeding[0].name())
         } else {
-            "unthreaded".to_string()
+            "unwoven".to_string()
         };
         let hint_color = if !feeding.is_empty() {
             Color::Rgb(80, 60, 120)
@@ -345,11 +345,11 @@ fn render_node_widget(
         };
 
         let progress_text = if node.unlock_progress > 0.0 {
-            format!("{:.1}/2.0h threading", node.unlock_progress)
+            format!("{:.1}/2.0h weaving", node.unlock_progress)
         } else if feeding.is_empty() {
-            "unthreaded".to_string()
+            "unwoven".to_string()
         } else {
-            "thread forming...".to_string()
+            "weaving...".to_string()
         };
         let progress_color = if node.unlock_progress > 0.0 {
             Color::Rgb(100, 80, 160)
@@ -760,7 +760,7 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
         lines.push(Line::from(""));
         if !unlocked_neighbors.is_empty() {
             lines.push(Line::from(Span::styled(
-                " Threaded from:",
+                " Woven from:",
                 Style::default().fg(Color::Rgb(80, 60, 110)),
             )));
             for nid in &unlocked_neighbors {
@@ -771,7 +771,7 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
             }
         } else {
             lines.push(Line::from(Span::styled(
-                " Unthreaded",
+                " Unwoven",
                 Style::default().fg(Color::Rgb(60, 45, 80)),
             )));
         }
@@ -1147,10 +1147,10 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         1 + (shuttle_grid_rows as u16) * (NODE_BOX_HEIGHT as u16 + 2)
     };
 
-    // Layout: 4 extractor rows (single, pair, pair, single) + 3 arrow gaps + shuttles.
+    // Layout: 4 extractor rows (single, pair, pair, single) + shuttles.
     let box_h = NODE_BOX_HEIGHT as u16;
     let gap_h = 1u16;
-    let extractor_total_h = 4 * box_h + 3 * gap_h;
+    let extractor_total_h = 4 * box_h + 3 * gap_h; // gaps used for vertical spacing only
     let content_h = extractor_total_h + shuttle_row_count;
 
     let v_pad = grid_area.height.saturating_sub(content_h) / 2;
@@ -1177,8 +1177,6 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
     // Then 8=shuttle section (if present), last=spacer
     let node_row_rects = [row_rects[1], row_rects[3], row_rects[5], row_rects[7]];
     let gap_rects = [row_rects[2], row_rects[4], row_rects[6]];
-
-    let _flow_color = Color::Rgb(60, 45, 80);
     let flow_arrow_color = Color::Rgb(120, 80, 180);
 
     let node_w = NODE_BOX_WIDTH as u16;
@@ -1313,49 +1311,40 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
 
     // ── Arrows between rows ─────────────────────────────────────────────────
 
-    // Gap 0 (ES → RL, ES → RF): up-arrows showing thread source.
+    // Gap 0 (ES → RL, ES → RF).
     if gap_rects[0].height > 0 {
-        let es_center_x = es_rect.x + es_rect.width / 2;
         let rl_center_x = rl_rect.x + rl_rect.width / 2;
         let rf_center_x = rf_rect.x + rf_rect.width / 2;
         let gy = gap_rects[0].y;
-        // Left diagonal: ╲
-        let diag_left_x = (es_center_x + rl_center_x) / 2;
-        if diag_left_x >= gap_rects[0].x && diag_left_x < gap_rects[0].x + gap_rects[0].width {
-            frame.render_widget(
-                Paragraph::new(Span::styled(
-                    "\u{25bc}",
-                    Style::default().fg(flow_arrow_color),
-                ))
-                .style(Style::default().bg(LOOM_BG)),
-                Rect {
-                    x: rl_center_x,
-                    y: gy,
-                    width: 1,
-                    height: 1,
-                },
-            );
-        }
-        // Right diagonal: ╱
-        let diag_right_x = (es_center_x + rf_center_x) / 2;
-        if diag_right_x >= gap_rects[0].x && diag_right_x < gap_rects[0].x + gap_rects[0].width {
-            frame.render_widget(
-                Paragraph::new(Span::styled(
-                    "\u{25bc}",
-                    Style::default().fg(flow_arrow_color),
-                ))
-                .style(Style::default().bg(LOOM_BG)),
-                Rect {
-                    x: rf_center_x,
-                    y: gy,
-                    width: 1,
-                    height: 1,
-                },
-            );
-        }
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                "\u{25bc}",
+                Style::default().fg(flow_arrow_color),
+            ))
+            .style(Style::default().bg(LOOM_BG)),
+            Rect {
+                x: rl_center_x,
+                y: gy,
+                width: 1,
+                height: 1,
+            },
+        );
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                "\u{25bc}",
+                Style::default().fg(flow_arrow_color),
+            ))
+            .style(Style::default().bg(LOOM_BG)),
+            Rect {
+                x: rf_center_x,
+                y: gy,
+                width: 1,
+                height: 1,
+            },
+        );
     }
 
-    // Gap 1 (RL → VC, RF → SW): up-arrows showing thread source.
+    // Gap 1 (RL → VC, RF → SW).
     if gap_rects[1].height > 0 {
         let rl_center_x = rl_rect.x + rl_rect.width / 2;
         let rf_center_x = rf_rect.x + rf_rect.width / 2;
@@ -1388,44 +1377,36 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         );
     }
 
-    // Gap 2 (VC → MA, SW → MA): up-arrows showing thread source.
+    // Gap 2 (VC → MA, SW → MA).
     if gap_rects[2].height > 0 {
         let ma_center_x = ma_rect.x + ma_rect.width / 2;
-        let vc_center_x = vc_rect.x + vc_rect.width / 2;
-        let sw_center_x = sw_rect.x + sw_rect.width / 2;
         let gy = gap_rects[2].y;
-        let diag_left_x = (vc_center_x + ma_center_x) / 2;
-        if diag_left_x >= gap_rects[2].x && diag_left_x < gap_rects[2].x + gap_rects[2].width {
-            frame.render_widget(
-                Paragraph::new(Span::styled(
-                    "\u{25bc}",
-                    Style::default().fg(flow_arrow_color),
-                ))
-                .style(Style::default().bg(LOOM_BG)),
-                Rect {
-                    x: ma_center_x.saturating_sub(2),
-                    y: gy,
-                    width: 1,
-                    height: 1,
-                },
-            );
-        }
-        let diag_right_x = (sw_center_x + ma_center_x) / 2;
-        if diag_right_x >= gap_rects[2].x && diag_right_x < gap_rects[2].x + gap_rects[2].width {
-            frame.render_widget(
-                Paragraph::new(Span::styled(
-                    "\u{25bc}",
-                    Style::default().fg(flow_arrow_color),
-                ))
-                .style(Style::default().bg(LOOM_BG)),
-                Rect {
-                    x: ma_center_x + 2,
-                    y: gy,
-                    width: 1,
-                    height: 1,
-                },
-            );
-        }
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                "\u{25bc}",
+                Style::default().fg(flow_arrow_color),
+            ))
+            .style(Style::default().bg(LOOM_BG)),
+            Rect {
+                x: ma_center_x.saturating_sub(2),
+                y: gy,
+                width: 1,
+                height: 1,
+            },
+        );
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                "\u{25bc}",
+                Style::default().fg(flow_arrow_color),
+            ))
+            .style(Style::default().bg(LOOM_BG)),
+            Rect {
+                x: ma_center_x + 2,
+                y: gy,
+                width: 1,
+                height: 1,
+            },
+        );
     }
 
     // ── Shuttles: render below the extractor grid ──────────────────────────
