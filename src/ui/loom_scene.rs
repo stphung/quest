@@ -9,7 +9,7 @@
 
 use crate::loom::patterns::all_patterns_complete;
 use crate::loom::types::{LoomArchetype, LoomState, LoomUiState, LoomView};
-use crate::ui::scene_fx::{current_millis, put_cell, put_text, render_buffer, SceneCell};
+use crate::ui::scene_fx::current_millis;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
@@ -17,19 +17,6 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Gauge, Paragraph},
     Frame,
 };
-
-/// Set a cell with explicit foreground and background colors.
-fn put_cell_bg(buffer: &mut [Vec<SceneCell>], row: i32, col: i32, ch: char, fg: Color, bg: Color) {
-    if row < 0 || col < 0 {
-        return;
-    }
-    let row = row as usize;
-    let col = col as usize;
-    if row >= buffer.len() || col >= buffer[row].len() {
-        return;
-    }
-    buffer[row][col] = SceneCell::new(ch, fg, bg);
-}
 
 /// Border color for the Loom overlay.
 const LOOM_BORDER_COLOR: Color = Color::Rgb(180, 120, 220);
@@ -318,252 +305,86 @@ fn render_archetype_selection(
     frame.render_widget(para, area);
 }
 
-// ── Factory floor rendering (Tasks 2-7) ──────────────────────────────────────
+// ── Factory floor rendering ──────────────────────────────────────────────────
 
-/// Render the animated 2-row texture interior for a node.
-#[allow(clippy::too_many_arguments)]
-fn render_node_texture(
-    buffer: &mut [Vec<SceneCell>],
-    row: i32,
-    col: i32,
-    width: usize,
-    node_id: crate::loom::types::NodeId,
-    stalled: bool,
-    unlocked: bool,
-    unlock_progress: f64,
-) {
+/// Build the animated texture string for an extractor node.
+fn node_texture_string(node_id: crate::loom::types::NodeId, width: usize, stalled: bool) -> String {
     use crate::loom::types::NodeId;
-
-    if !unlocked {
-        if unlock_progress > 0.0 {
-            // Single row: progress bar with percentage
-            let pct = (unlock_progress / 2.0).min(1.0);
-            let bar_w = width.min(10);
-            let filled = ((pct * bar_w as f64) as usize).min(bar_w);
-            let empty = bar_w.saturating_sub(filled);
-            let bar = format!(
-                "{}{} {:.0}%",
-                "\u{2593}".repeat(filled),
-                "\u{2591}".repeat(empty),
-                pct * 100.0
-            );
-            let start = col + (width as i32 - bar.chars().count() as i32) / 2;
-            let progress_color = Color::Rgb(100, 80, 160);
-            for (i, ch) in bar.chars().enumerate() {
-                let fg = if i < filled {
-                    progress_color
-                } else {
-                    Color::Rgb(60, 45, 80)
-                };
-                put_cell(buffer, row, start + i as i32, ch, fg);
-            }
-        } else {
-            // Single row: "locked · needs neighbor"
-            let lock_text = "locked \u{b7} needs neighbor";
-            let lock_w = lock_text.len().min(width);
-            let lock_str = &lock_text[..lock_w];
-            let start = col + (width as i32 - lock_w as i32) / 2;
-            put_text(buffer, row, start, lock_str, Color::Rgb(60, 45, 80));
-        }
-        return;
-    }
-
     let millis = current_millis();
     let frame_idx = if stalled { 0 } else { (millis / 300) as usize };
-    let color = if stalled {
-        Color::Rgb(40, 30, 55)
-    } else {
-        node_color(node_id)
-    };
-
-    // Single texture row.
-    for c in 0..width as i32 {
+    let mut s = String::with_capacity(width);
+    for c in 0..width {
         let ch = match node_id {
             NodeId::EmberSpindle => {
-                let offset = (frame_idx + c as usize) % 4;
-                match offset {
-                    0 | 2 => '~',
-                    _ => ' ',
+                if (frame_idx + c) % 4 == 0 || (frame_idx + c) % 4 == 2 {
+                    '~'
+                } else {
+                    ' '
                 }
             }
-            NodeId::ReflectionLens => {
-                let offset = (frame_idx + c as usize * 3) % 6;
-                match offset {
-                    0 | 4 => '.',
-                    1 | 3 => '\u{b7}',
-                    2 => '*',
-                    _ => ' ',
-                }
-            }
-            NodeId::VoidCondenser => {
-                let offset = (frame_idx + c as usize * 2) % 4;
-                match offset {
-                    0 => ':',
-                    2 => '\u{b7}',
-                    _ => ' ',
-                }
-            }
+            NodeId::ReflectionLens => match (frame_idx + c * 3) % 6 {
+                0 | 4 => '.',
+                1 | 3 => '\u{b7}',
+                2 => '*',
+                _ => ' ',
+            },
+            NodeId::VoidCondenser => match (frame_idx + c * 2) % 4 {
+                0 => ':',
+                2 => '\u{b7}',
+                _ => ' ',
+            },
             NodeId::MemoryArchive => {
-                let offset = (frame_idx + c as usize) % 4;
-                match offset {
-                    0 | 2 => '\u{2573}',
-                    _ => ' ',
+                if (frame_idx + c) % 4 == 0 || (frame_idx + c) % 4 == 2 {
+                    '\u{2573}'
+                } else {
+                    ' '
                 }
             }
             NodeId::SilenceWell => {
-                let offset = (frame_idx + c as usize) % 6;
-                match offset {
-                    0 | 2 | 4 => '_',
-                    _ => ' ',
+                let m = (frame_idx + c) % 6;
+                if m == 0 || m == 2 || m == 4 {
+                    '_'
+                } else {
+                    ' '
                 }
             }
             NodeId::ResonanceForge => {
-                let offset = (frame_idx + c as usize) % 4;
-                match offset {
-                    0 | 2 => '\u{2248}',
-                    _ => ' ',
+                if (frame_idx + c) % 4 == 0 || (frame_idx + c) % 4 == 2 {
+                    '\u{2248}'
+                } else {
+                    ' '
                 }
             }
         };
-        put_cell(buffer, row, col + c, ch, color);
+        s.push(ch);
     }
+    s
 }
 
-/// Render recipe input slots inside a node box row.
-fn render_recipe_slots(
-    buffer: &mut [Vec<SceneCell>],
-    row: i32,
-    col: i32,
-    _width: usize,
-    node: &crate::loom::types::LoomNode,
-    _loom_state: &LoomState,
-) {
-    use crate::loom::recipes::recipes_by_nature;
-
-    if !node.unlocked {
-        return;
-    }
-
-    let nature = node.id.nature();
-    let recipes = recipes_by_nature(nature);
-    if recipes.is_empty() {
-        return;
-    }
-
-    // In the direct-pull model, incoming resources are determined by refinery sources.
-    // For extractor nodes, we show all possible recipes without pipe-based highlighting.
-    let incoming_resources: std::collections::HashSet<crate::loom::types::Resource> =
-        std::collections::HashSet::new();
-
-    // Find the best recipe: prefer one with both inputs filled, then one with most.
-    let best = recipes.iter().max_by_key(|r| {
-        let has_a = incoming_resources.contains(&r.input_a) as u8;
-        let has_b = incoming_resources.contains(&r.input_b) as u8;
-        (has_a + has_b, (r.amount * 100.0) as u32)
-    });
-
-    if let Some(recipe) = best {
-        let has_a = incoming_resources.contains(&recipe.input_a);
-        let has_b = incoming_resources.contains(&recipe.input_b);
-        let producing = has_a && has_b;
-
-        let millis = current_millis();
-        let pulse_bright = producing && (millis / 500).is_multiple_of(2);
-
-        let filled_color = Color::Rgb(180, 220, 180);
-        let empty_color = Color::Rgb(120, 50, 50);
-        let output_color = if producing {
-            Color::Rgb(220, 200, 255)
-        } else {
-            Color::Rgb(80, 60, 100)
-        };
-
-        let dot_a = if has_a { '\u{25cf}' } else { '\u{25cb}' };
-        let dot_b = if has_b { '\u{25cf}' } else { '\u{25cb}' };
-        let arrow = if pulse_bright { '\u{25b6}' } else { '>' };
-
-        let slot_a = format!("[{}{}]", dot_a, resource_short(&recipe.input_a));
-        let slot_b = format!("[{}{}]", dot_b, resource_short(&recipe.input_b));
-        let output = resource_short(&recipe.output);
-
-        let mut pos = 0i32;
-        for ch in slot_a.chars() {
-            put_cell(
-                buffer,
-                row,
-                col + pos,
-                ch,
-                if has_a { filled_color } else { empty_color },
-            );
-            pos += 1;
-        }
-        put_cell(buffer, row, col + pos, ' ', LOOM_BG);
-        pos += 1;
-        for ch in slot_b.chars() {
-            put_cell(
-                buffer,
-                row,
-                col + pos,
-                ch,
-                if has_b { filled_color } else { empty_color },
-            );
-            pos += 1;
-        }
-        put_cell(buffer, row, col + pos, ' ', LOOM_BG);
-        pos += 1;
-        put_cell(buffer, row, col + pos, arrow, output_color);
-        pos += 1;
-        put_cell(buffer, row, col + pos, ' ', LOOM_BG);
-        pos += 1;
-        for ch in output.chars() {
-            put_cell(buffer, row, col + pos, ch, output_color);
-            pos += 1;
-        }
-    }
-}
-
-/// Render a single machine node box into the cell buffer.
-/// Returns the row just below the box.
-fn render_node_box(
-    buffer: &mut [Vec<SceneCell>],
-    top: i32,
-    left: i32,
+/// Render a single extractor node as ratatui widgets into a given Rect.
+///
+/// Layout (4 rows):
+///   Row 0: border + title (handled by Block)
+///   Row 1: animated texture line
+///   Row 2: resource + gauge bar (or locked-node info)
+///   Row 3: bottom border (handled by Block)
+fn render_node_widget(
+    frame: &mut Frame,
+    area: Rect,
     node: &crate::loom::types::LoomNode,
     loom_state: &LoomState,
     selected: bool,
-) -> i32 {
-    let w = NODE_BOX_WIDTH as i32;
-    let inner_w = (w - 2) as usize;
+) {
+    if area.height < 3 || area.width < 6 {
+        return;
+    }
 
-    let (tl, tr, bl, br, h, v) = if selected {
-        (
-            '\u{250f}', '\u{2513}', '\u{2517}', '\u{251b}', '\u{2501}', '\u{2503}',
-        )
-    } else {
-        (
-            '\u{250c}', '\u{2510}', '\u{2514}', '\u{2518}', '\u{2500}', '\u{2502}',
-        )
-    };
     let border_color = if selected {
         Color::Rgb(220, 180, 255)
     } else if !node.unlocked {
         Color::Rgb(40, 30, 55)
     } else {
         Color::Rgb(80, 60, 110)
-    };
-
-    // Row 0: top border with title.
-    put_cell(buffer, top, left, tl, border_color);
-    for c in 1..w - 1 {
-        put_cell(buffer, top, left + c, h, border_color);
-    }
-    put_cell(buffer, top, left + w - 1, tr, border_color);
-
-    let emoji = node_emoji(node.id);
-    let title = if node.unlocked {
-        format!(" {} {} Lv.{} ", emoji, node.id.name(), node.level)
-    } else {
-        format!(" {} {} ", emoji, node.id.name())
     };
     let title_color = if selected {
         Color::White
@@ -572,21 +393,39 @@ fn render_node_box(
     } else {
         node_color(node.id)
     };
-    let title_start = left + 1;
-    for (i, ch) in title.chars().enumerate().take(inner_w) {
-        put_cell(buffer, top, title_start + i as i32, ch, title_color);
+
+    let emoji = node_emoji(node.id);
+    let title = if node.unlocked {
+        format!(" {} {} Lv.{} ", emoji, node.id.name(), node.level)
+    } else {
+        format!(" {} {} ", emoji, node.id.name())
+    };
+
+    let border_type = if selected {
+        ratatui::widgets::BorderType::Thick
+    } else {
+        ratatui::widgets::BorderType::Rounded
+    };
+
+    let block = Block::default()
+        .title(Span::styled(title, Style::default().fg(title_color)))
+        .borders(Borders::ALL)
+        .border_type(border_type)
+        .border_style(Style::default().fg(border_color))
+        .style(Style::default().bg(LOOM_BG));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if inner.height == 0 || inner.width == 0 {
+        return;
     }
 
-    // Rows 1-2: side borders.
-    put_cell(buffer, top + 1, left, v, border_color);
-    put_cell(buffer, top + 1, left + w - 1, v, border_color);
-    put_cell(buffer, top + 2, left, v, border_color);
-    put_cell(buffer, top + 2, left + w - 1, v, border_color);
+    let inner_w = inner.width as usize;
 
     if !node.unlocked {
-        // Locked node: Row 1 shows source hint, Row 2 shows progress.
+        // Locked node: line 1 = source hint, line 2 = progress.
         let neighbors = crate::loom::node_neighbors(node.id);
-        // Find unlocked neighbors that could feed this node.
         let feeding: Vec<&crate::loom::types::NodeId> = neighbors
             .iter()
             .filter(|nid| {
@@ -598,24 +437,17 @@ fn render_node_box(
             })
             .collect();
 
-        // Row 1: source hint.
         let hint = if !feeding.is_empty() {
-            let name = feeding[0].name();
-            format!("\u{2190} {} (50%)", name) // ← Ember Spindle (50%)
+            format!("\u{2190} {} (50%)", feeding[0].name())
         } else {
             "dormant".to_string()
         };
-        let hint_w = hint.len().min(inner_w);
-        let hint_str = &hint[..hint_w];
-        let hint_start = left + 1 + (inner_w as i32 - hint_w as i32) / 2;
         let hint_color = if !feeding.is_empty() {
             Color::Rgb(80, 60, 120)
         } else {
             Color::Rgb(50, 38, 65)
         };
-        put_text(buffer, top + 1, hint_start, hint_str, hint_color);
 
-        // Row 2: unlock progress or "dormant".
         let progress_text = if node.unlock_progress > 0.0 {
             format!("{:.1}/2.0h unlocking", node.unlock_progress)
         } else if feeding.is_empty() {
@@ -623,95 +455,86 @@ fn render_node_box(
         } else {
             "waiting for 50% buffer".to_string()
         };
-        let fg = if node.unlock_progress > 0.0 {
+        let progress_color = if node.unlock_progress > 0.0 {
             Color::Rgb(100, 80, 160)
         } else {
             Color::Rgb(50, 38, 65)
         };
-        let prog_w = progress_text.len().min(inner_w);
-        let prog_str = &progress_text[..prog_w];
-        let start = left + 1 + (inner_w as i32 - prog_w as i32) / 2;
-        put_text(buffer, top + 2, start, prog_str, fg);
-    } else {
-        // Row 1: animated texture.
-        render_node_texture(
-            buffer,
-            top + 1,
-            left + 1,
-            inner_w,
-            node.id,
-            node.stalled,
-            node.unlocked,
-            node.unlock_progress,
-        );
 
-        // Row 2: "Ember 5/hr [gauge 0/20]"
+        let lines = vec![
+            Line::from(Span::styled(hint, Style::default().fg(hint_color))),
+            Line::from(Span::styled(
+                progress_text,
+                Style::default().fg(progress_color),
+            )),
+        ];
+        let para = Paragraph::new(lines)
+            .alignment(Alignment::Center)
+            .style(Style::default().bg(LOOM_BG));
+        frame.render_widget(para, inner);
+    } else {
+        // Unlocked node: line 1 = texture, line 2 = resource + gauge.
+        let texture_color = if node.stalled {
+            Color::Rgb(40, 30, 55)
+        } else {
+            node_color(node.id)
+        };
+        let texture = node_texture_string(node.id, inner_w, node.stalled);
+
+        // Split inner into texture row (1) and data row (rest).
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Min(1)])
+            .split(inner);
+
+        let texture_para = Paragraph::new(Line::from(Span::styled(
+            texture,
+            Style::default().fg(texture_color),
+        )))
+        .style(Style::default().bg(LOOM_BG));
+        frame.render_widget(texture_para, rows[0]);
+
+        // Data row: "Ember 50/hr" label + Gauge for buffer.
+        let resource = crate::loom::logic::node_native_resource(node.id);
+        let res_name = resource_name(&resource);
+        let rate = node.base_rate * crate::loom::logic::node_level_multiplier(node.level);
+        let label = format!("{} {:.0}/hr", res_name, rate);
+        let label_len = (label.len() + 1) as u16;
+
+        let data_cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Length(label_len), Constraint::Min(4)])
+            .split(rows[1]);
+
+        let label_para = Paragraph::new(Span::styled(
+            label,
+            Style::default().fg(Color::Rgb(140, 120, 170)),
+        ))
+        .style(Style::default().bg(LOOM_BG));
+        frame.render_widget(label_para, data_cols[0]);
+
         let fill = if node.buffer_capacity > 0.0 {
             (node.buffer / node.buffer_capacity).min(1.0)
         } else {
             0.0
         };
-
-        // Text prefix: "Ember 5/hr "
-        let resource = crate::loom::logic::node_native_resource(node.id);
-        let res_name = resource_name(&resource);
-        let rate = node.base_rate * crate::loom::logic::node_level_multiplier(node.level);
-        let prefix = format!("{} {:.0}/hr ", res_name, rate);
-        let prefix_len = prefix.len();
-
-        // Render prefix text.
-        let c = left + 1;
-        for (i, ch) in prefix.chars().enumerate().take(inner_w) {
-            put_cell(buffer, top + 2, c + i as i32, ch, Color::Rgb(140, 120, 170));
-        }
-
-        // Gauge fills the remaining space with "0/20" label centered.
-        let gauge_w = inner_w.saturating_sub(prefix_len);
-        if gauge_w >= 4 {
-            let gauge_label = format!("{:.0}/{:.0}", node.buffer, node.buffer_capacity);
-            let label_start = (gauge_w.saturating_sub(gauge_label.len())) / 2;
-            let filled_cells = ((fill * gauge_w as f64) as usize).min(gauge_w);
-
-            let bar_bg = if node.stalled || fill >= 0.90 {
-                Color::Rgb(220, 60, 60)
-            } else if fill >= 0.75 {
-                Color::Rgb(220, 180, 60)
-            } else {
-                Color::Rgb(60, 200, 100)
-            };
-            let empty_bg = Color::Rgb(30, 20, 40);
-
-            let gauge_col = c + prefix_len as i32;
-            for i in 0..gauge_w {
-                let is_filled = i < filled_cells;
-                let bg = if is_filled { bar_bg } else { empty_bg };
-
-                // Overlay the label text if we're in the label range.
-                let label_idx = i.wrapping_sub(label_start);
-                let ch = if label_idx < gauge_label.len() {
-                    gauge_label.as_bytes()[label_idx] as char
-                } else {
-                    ' '
-                };
-                let fg = if is_filled {
-                    Color::Rgb(10, 5, 18)
-                } else {
-                    Color::Rgb(160, 140, 190)
-                };
-                put_cell_bg(buffer, top + 2, gauge_col + i as i32, ch, fg, bg);
-            }
-        }
+        let bar_color = if node.stalled || fill >= 0.90 {
+            Color::Rgb(220, 60, 60)
+        } else if fill >= 0.75 {
+            Color::Rgb(220, 180, 60)
+        } else {
+            Color::Rgb(60, 200, 100)
+        };
+        let gauge_label = format!("{:.0}/{:.0}", node.buffer, node.buffer_capacity);
+        let gauge = Gauge::default()
+            .gauge_style(Style::default().fg(bar_color).bg(Color::Rgb(30, 20, 40)))
+            .label(Span::styled(
+                gauge_label,
+                Style::default().fg(Color::Rgb(200, 180, 220)),
+            ))
+            .ratio(fill);
+        frame.render_widget(gauge, data_cols[1]);
     }
-    put_cell(buffer, top + 2, left + w - 1, v, border_color);
-
-    // Row 3: bottom border.
-    put_cell(buffer, top + 3, left, bl, border_color);
-    for c in 1..w - 1 {
-        put_cell(buffer, top + 3, left + c, h, border_color);
-    }
-    put_cell(buffer, top + 3, left + w - 1, br, border_color);
-
-    top + NODE_BOX_HEIGHT as i32
 }
 
 /// Two-letter abbreviation for a LoomNodeRef used in source badges.
@@ -747,226 +570,175 @@ fn throbber_char(throbber_frame: u32, tier: u8, stalled: bool) -> char {
     FRAMES[idx]
 }
 
-/// Render a single refinery node box into the cell buffer.
-///
-/// Compact row format:
-///   ⠹ T1 ForgedLight    Emb←[ES] Voi←[VC]  2.0/hr  ████░░░░░░
-fn render_refinery_box(
-    buffer: &mut [Vec<SceneCell>],
-    top: i32,
-    left: i32,
+/// Render a single refinery node as ratatui widgets into a given Rect.
+fn render_refinery_widget(
+    frame: &mut Frame,
+    area: Rect,
     refinery: &crate::loom::types::Refinery,
     selected: bool,
     index: usize,
     throbber_frame: u32,
 ) {
-    let w = NODE_BOX_WIDTH as i32;
-    let h = NODE_BOX_HEIGHT as i32;
+    if area.height < 3 || area.width < 6 {
+        return;
+    }
 
-    let (tl, tr, bl, br, horiz, vert) = if selected {
-        (
-            '\u{250f}', '\u{2513}', '\u{2517}', '\u{251b}', '\u{2501}', '\u{2503}',
-        )
-    } else {
-        (
-            '\u{250c}', '\u{2510}', '\u{2514}', '\u{2518}', '\u{2500}', '\u{2502}',
-        )
-    };
     let border_color = if selected {
         Color::Rgb(200, 170, 240)
     } else {
         Color::Rgb(50, 35, 65)
     };
+    let border_type = if selected {
+        ratatui::widgets::BorderType::Thick
+    } else {
+        ratatui::widgets::BorderType::Rounded
+    };
 
-    // Top border.
-    put_cell(buffer, top, left, tl, border_color);
-    for c in 1..w - 1 {
-        put_cell(buffer, top, left + c, horiz, border_color);
-    }
-    put_cell(buffer, top, left + w - 1, tr, border_color);
+    // Title: "R0 T1 ForgedLight" or "R0 [Building... 3s]"
+    let title = if refinery.under_construction {
+        let secs = refinery.construction_ticks_remaining / 10;
+        format!(" R{} [Building... {}s] ", index, secs)
+    } else {
+        let out_name = resource_name(&refinery.output);
+        format!(" R{} T{} {} ", index, refinery.tier, out_name)
+    };
 
-    // Side borders for interior rows.
-    for r in 1..h - 1 {
-        put_cell(buffer, top + r, left, vert, border_color);
-        put_cell(buffer, top + r, left + w - 1, vert, border_color);
-    }
-
-    // Bottom border.
-    put_cell(buffer, top + h - 1, left, bl, border_color);
-    for c in 1..w - 1 {
-        put_cell(buffer, top + h - 1, left + c, horiz, border_color);
-    }
-    put_cell(buffer, top + h - 1, left + w - 1, br, border_color);
-
-    let inner_w = (w - 2) as usize;
-    let title_color = if selected {
+    let title_color = if refinery.under_construction {
+        Color::Rgb(100, 80, 130)
+    } else if selected {
         Color::White
     } else {
         Color::Rgb(160, 130, 190)
     };
+    let tier_color = match refinery.tier {
+        1 => Color::Rgb(100, 160, 100),
+        2 => Color::Rgb(160, 140, 80),
+        _ => Color::Rgb(180, 100, 200),
+    };
 
-    if refinery.under_construction {
-        // Row 1: "R{i} [Building...]" with construction ticks.
-        let ticks = refinery.construction_ticks_remaining;
-        let secs = ticks / 10;
-        let title = format!("R{} [Building... {}s]", index, secs);
-        for (i, ch) in title.chars().enumerate().take(inner_w) {
-            put_cell(
-                buffer,
-                top + 1,
-                left + 1 + i as i32,
-                ch,
-                Color::Rgb(100, 80, 130),
-            );
-        }
-        // Rows 2-4: empty interior during construction.
+    let block = Block::default()
+        .title(Span::styled(title, Style::default().fg(title_color)))
+        .borders(Borders::ALL)
+        .border_type(border_type)
+        .border_style(Style::default().fg(border_color))
+        .style(Style::default().bg(LOOM_BG));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if inner.height == 0 || inner.width == 0 || refinery.under_construction {
         return;
     }
 
-    // Row 1 (top+1): "⠹ T{tier} {output_name}" — throbber + tier badge + output.
+    // Build content lines for the inner area.
+    let mut content_lines: Vec<Line> = Vec::new();
+
+    // Line 1: throbber + recipe summary
     let throb = throbber_char(throbber_frame, refinery.tier, refinery.stalled);
     let throb_color = if refinery.stalled {
         Color::Rgb(160, 60, 60)
     } else {
         Color::Rgb(140, 100, 200)
     };
-    put_cell(buffer, top + 1, left + 1, throb, throb_color);
-    put_cell(buffer, top + 1, left + 2, ' ', LOOM_BG);
-    let tier_str = format!("T{}", refinery.tier);
-    let tier_color = match refinery.tier {
-        1 => Color::Rgb(100, 160, 100),
-        2 => Color::Rgb(160, 140, 80),
-        _ => Color::Rgb(180, 100, 200),
-    };
-    let mut col = left + 3;
-    for ch in tier_str.chars() {
-        put_cell(buffer, top + 1, col, ch, tier_color);
-        col += 1;
-    }
-    put_cell(buffer, top + 1, col, ' ', LOOM_BG);
-    col += 1;
-    let out_name = resource_short(&refinery.output);
-    for ch in out_name.chars() {
-        if col >= left + w - 1 {
-            break;
-        }
-        put_cell(buffer, top + 1, col, ch, title_color);
-        col += 1;
-    }
-
-    // Row 2 (top+2): Source badges — "{ResourceShort}←[SourceShort]" for each source.
-    col = left + 1;
-    let source_label_color = Color::Rgb(100, 80, 140);
-    let arrow_color = Color::Rgb(80, 60, 100);
-
-    // sources_a first, then sources_b.
-    let all_sources: Vec<(
-        crate::loom::types::Resource,
-        &crate::loom::types::LoomNodeRef,
-    )> = {
-        let mut v: Vec<(
-            crate::loom::types::Resource,
-            &crate::loom::types::LoomNodeRef,
-        )> = Vec::new();
-        for src in &refinery.sources_a {
-            v.push((refinery.input_a, src));
-        }
-        for src in &refinery.sources_b {
-            v.push((refinery.input_b, src));
-        }
-        v
-    };
-
-    for (res, src) in &all_sources {
-        let short_src = match src {
-            crate::loom::types::LoomNodeRef::Extractor(_) => noderef_short(**src, 0),
-            crate::loom::types::LoomNodeRef::Refinery(ri) => format!("R{}", ri),
-        };
-        let res_short = resource_short(res);
-        // Format: "Emb←[ES] "
-        let badge = format!("{}←[{}] ", res_short, short_src);
-        for ch in badge.chars() {
-            if col >= left + w - 1 {
-                break;
-            }
-            let fg = if ch == '[' || ch == ']' || ch == '\u{2190}' {
-                arrow_color
-            } else {
-                source_label_color
-            };
-            put_cell(buffer, top + 2, col, ch, fg);
-            col += 1;
-        }
-    }
-
-    if all_sources.is_empty() {
-        // Show "no sources" hint.
-        let hint = "no sources";
-        for (i, ch) in hint.chars().enumerate().take(inner_w) {
-            put_cell(
-                buffer,
-                top + 2,
-                left + 1 + i as i32,
-                ch,
-                Color::Rgb(60, 45, 80),
-            );
-        }
-    }
-
-    // Row 3 (top+3): Buffer bar.
-    let fill_pct = if refinery.buffer_capacity > 0.0 {
-        (refinery.buffer / refinery.buffer_capacity).min(1.0)
-    } else {
-        0.0
-    };
-    let bar_color = if refinery.stalled || fill_pct >= 0.90 {
-        Color::Rgb(220, 60, 60)
-    } else if fill_pct >= 0.75 {
-        Color::Rgb(220, 180, 60)
-    } else {
-        Color::Rgb(60, 200, 100)
-    };
-    let bar_w = 10usize.min(inner_w.saturating_sub(8));
-    let filled = ((fill_pct * bar_w as f64) as usize).min(bar_w);
-    let empty = bar_w.saturating_sub(filled);
-    let bar_str = format!(
-        " {}{} {:>4.1}/{:.0}",
-        "\u{2588}".repeat(filled),
-        "\u{2591}".repeat(empty),
-        refinery.buffer,
-        refinery.buffer_capacity
+    let recipe_emoji = format!(
+        "{}+{}\u{25b6}{}",
+        resource_emoji(&refinery.input_a),
+        resource_emoji(&refinery.input_b),
+        resource_emoji(&refinery.output),
     );
-    for (i, ch) in bar_str.chars().enumerate().take(inner_w) {
-        let fg = if i == 0 || i > filled + empty {
-            Color::Rgb(120, 100, 140)
-        } else if i <= filled {
-            bar_color
-        } else {
-            Color::Rgb(40, 30, 55)
-        };
-        put_cell(buffer, top + 3, left + 1 + i as i32, ch, fg);
-    }
-
-    // Row 4 (top+4): Recipe summary — "{input_a}+{input_b}▶{output}" with stall warning.
     let stall_suffix = if refinery.stalled {
         " \u{26a0}STALL"
     } else {
         ""
     };
-    let recipe_text = format!(
-        "{}+{}\u{25b6}{}{}",
-        resource_short(&refinery.input_a),
-        resource_short(&refinery.input_b),
-        resource_short(&refinery.output),
-        stall_suffix,
-    );
-    let recipe_color = if refinery.stalled {
-        Color::Rgb(180, 80, 80)
-    } else {
-        Color::Rgb(100, 80, 130)
-    };
-    for (i, ch) in recipe_text.chars().enumerate().take(inner_w) {
-        put_cell(buffer, top + 4, left + 1 + i as i32, ch, recipe_color);
+    content_lines.push(Line::from(vec![
+        Span::styled(format!("{} ", throb), Style::default().fg(throb_color)),
+        Span::styled(
+            format!("T{} ", refinery.tier),
+            Style::default().fg(tier_color),
+        ),
+        Span::styled(recipe_emoji, Style::default().fg(Color::Rgb(160, 130, 190))),
+        Span::styled(
+            stall_suffix.to_string(),
+            Style::default().fg(Color::Rgb(180, 80, 80)),
+        ),
+    ]));
+
+    // Line 2: source badges
+    let source_label_color = Color::Rgb(100, 80, 140);
+    let mut source_spans: Vec<Span> = Vec::new();
+    for src in &refinery.sources_a {
+        let short_src = match src {
+            crate::loom::types::LoomNodeRef::Extractor(_) => noderef_short(*src, 0),
+            crate::loom::types::LoomNodeRef::Refinery(ri) => format!("R{}", ri),
+        };
+        let res_short = resource_short(&refinery.input_a);
+        source_spans.push(Span::styled(
+            format!("{}\u{2190}[{}] ", res_short, short_src),
+            Style::default().fg(source_label_color),
+        ));
+    }
+    for src in &refinery.sources_b {
+        let short_src = match src {
+            crate::loom::types::LoomNodeRef::Extractor(_) => noderef_short(*src, 0),
+            crate::loom::types::LoomNodeRef::Refinery(ri) => format!("R{}", ri),
+        };
+        let res_short = resource_short(&refinery.input_b);
+        source_spans.push(Span::styled(
+            format!("{}\u{2190}[{}] ", res_short, short_src),
+            Style::default().fg(source_label_color),
+        ));
+    }
+    if source_spans.is_empty() {
+        source_spans.push(Span::styled(
+            "no sources".to_string(),
+            Style::default().fg(Color::Rgb(60, 45, 80)),
+        ));
+    }
+    content_lines.push(Line::from(source_spans));
+
+    // Render text content (lines 1-2).
+    let text_h = content_lines.len() as u16;
+    if inner.height > 1 {
+        let content_area = Rect {
+            x: inner.x,
+            y: inner.y,
+            width: inner.width,
+            height: inner.height.saturating_sub(1).min(text_h),
+        };
+        let para = Paragraph::new(content_lines).style(Style::default().bg(LOOM_BG));
+        frame.render_widget(para, content_area);
+    }
+
+    // Last row: buffer gauge.
+    if inner.height >= 2 {
+        let gauge_area = Rect {
+            x: inner.x,
+            y: inner.y + inner.height - 1,
+            width: inner.width,
+            height: 1,
+        };
+        let fill_pct = if refinery.buffer_capacity > 0.0 {
+            (refinery.buffer / refinery.buffer_capacity).min(1.0)
+        } else {
+            0.0
+        };
+        let bar_color = if refinery.stalled || fill_pct >= 0.90 {
+            Color::Rgb(220, 60, 60)
+        } else if fill_pct >= 0.75 {
+            Color::Rgb(220, 180, 60)
+        } else {
+            Color::Rgb(60, 200, 100)
+        };
+        let gauge_label = format!("{:.0}/{:.0}", refinery.buffer, refinery.buffer_capacity);
+        let gauge = Gauge::default()
+            .gauge_style(Style::default().fg(bar_color).bg(Color::Rgb(30, 20, 40)))
+            .label(Span::styled(
+                gauge_label,
+                Style::default().fg(Color::Rgb(200, 180, 220)),
+            ))
+            .ratio(fill_pct);
+        frame.render_widget(gauge, gauge_area);
     }
 }
 
@@ -1418,7 +1190,6 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
     let sidebar_area = h_chunks[1];
 
     // Split factory floor: node grid (top) | pattern bar (bottom).
-    // Height = 2 (title + border) + 1 per requirement + 1 overall, capped to avoid squishing grid.
     let has_patterns = !loom_state.persistent.patterns.is_empty();
     let req_count = loom_state
         .persistent
@@ -1439,6 +1210,12 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
     let grid_area = v_chunks[0];
     let pattern_area = v_chunks[1];
 
+    // Fill grid background.
+    frame.render_widget(
+        Paragraph::new("").style(Style::default().bg(LOOM_BG)),
+        grid_area,
+    );
+
     // ── Factory floor: 3x2 grid of machine nodes ─────────────────────────────
     // Laid out as a snake following the cycle:
     //   Row 0: ES  →  RL        (cycle: ES→RL)
@@ -1453,21 +1230,6 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         (NodeId::SilenceWell, NodeId::ResonanceForge),
     ];
 
-    // ── Render factory floor using cell buffer ────────────────────────────────
-    let rows = grid_area.height as usize;
-    let cols = grid_area.width as usize;
-    let mut buffer = vec![vec![SceneCell::new(' ', LOOM_BG, LOOM_BG); cols]; rows];
-
-    // Calculate grid positions: 3 rows, 2 columns of node boxes.
-    let col_spacing = if cols > (NODE_BOX_WIDTH * 2 + 4) {
-        (cols - NODE_BOX_WIDTH * 2) / 3
-    } else {
-        1
-    };
-    // Each node row = NODE_BOX_HEIGHT (4) + 1 (gap for arrows) = 5 rows.
-    let row_stride = NODE_BOX_HEIGHT + 1;
-
-    // Grid-position-to-NodeId mapping for selection (matches input navigation: ±2 for up/down, ±1 for left/right).
     let grid_ids = [
         NodeId::EmberSpindle,   // 0: top-left
         NodeId::ReflectionLens, // 1: top-right
@@ -1478,13 +1240,62 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
     ];
     let selected_id = grid_ids[ui.selected_node.min(5)];
 
+    // Determine refinery section height.
+    let refineries = &loom_state.persistent.refineries;
+    let refinery_row_count = if refineries.is_empty() {
+        0u16
+    } else {
+        let refinery_grid_rows = refineries.len().div_ceil(2);
+        // 1 for separator + rows * (NODE_BOX_HEIGHT+2) for refinery boxes
+        1 + (refinery_grid_rows as u16) * (NODE_BOX_HEIGHT as u16 + 2)
+    };
+
+    // Split grid_area into 3 extractor rows + arrow gaps + refinery section.
+    // Each extractor row = NODE_BOX_HEIGHT, each arrow gap = 1 row.
+    // Total extractor section = 3 * NODE_BOX_HEIGHT + 2 * 1 (gaps between rows).
+    let box_h = NODE_BOX_HEIGHT as u16;
+    let mut row_constraints: Vec<Constraint> = Vec::new();
+    for i in 0..3 {
+        row_constraints.push(Constraint::Length(box_h)); // node row
+        if i < 2 {
+            row_constraints.push(Constraint::Length(1)); // arrow gap
+        }
+    }
+    if refinery_row_count > 0 {
+        row_constraints.push(Constraint::Length(refinery_row_count));
+    }
+    row_constraints.push(Constraint::Min(0)); // absorb remaining space
+
+    let row_rects = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(row_constraints)
+        .split(grid_area);
+
+    // Indices into row_rects: 0=extractor row 0, 1=gap, 2=extractor row 1, 3=gap, 4=extractor row 2
+    // Then 5=refinery section (if present), last=spacer
+    let extractor_row_rects = [row_rects[0], row_rects[2], row_rects[4]];
+    let gap_rects = [row_rects[1], row_rects[3]];
+
     let flow_color = Color::Rgb(60, 45, 80);
     let flow_arrow_color = Color::Rgb(120, 80, 180);
 
+    // Render each extractor row (2 nodes + horizontal arrow gap).
     for (row_idx, (left_id, right_id)) in grid.iter().enumerate() {
-        let top = (row_idx * row_stride) as i32;
-        let left_col = col_spacing as i32;
-        let right_col = (col_spacing + NODE_BOX_WIDTH + col_spacing) as i32;
+        let row_area = extractor_row_rects[row_idx];
+
+        // Split row into: left_node | h_gap | right_node
+        let node_w = NODE_BOX_WIDTH as u16;
+        let row_cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(node_w),
+                Constraint::Min(1),
+                Constraint::Length(node_w),
+            ])
+            .split(row_area);
+        let left_rect = row_cols[0];
+        let h_gap_rect = row_cols[1];
+        let right_rect = row_cols[2];
 
         // Render left node.
         if let Some(left_node) = loom_state
@@ -1494,7 +1305,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
             .find(|n| n.id == *left_id)
         {
             let is_sel = ui.selected_node < 6 && *left_id == selected_id;
-            render_node_box(&mut buffer, top, left_col, left_node, loom_state, is_sel);
+            render_node_widget(frame, left_rect, left_node, loom_state, is_sel);
         }
 
         // Render right node.
@@ -1505,145 +1316,154 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
             .find(|n| n.id == *right_id)
         {
             let is_sel = ui.selected_node < 6 && *right_id == selected_id;
-            render_node_box(&mut buffer, top, right_col, right_node, loom_state, is_sel);
+            render_node_widget(frame, right_rect, right_node, loom_state, is_sel);
         }
 
-        // ── Horizontal arrow: only on rows 0 (ES→RL) and 2 (RF→SW) ──
-        let gap_start = left_col + NODE_BOX_WIDTH as i32;
-        let gap_end = right_col;
-        let arrow_row = top + (NODE_BOX_HEIGHT as i32) / 2;
-        if gap_end > gap_start + 1 {
-            match row_idx {
+        // Horizontal arrow in gap (only rows 0 and 2).
+        if h_gap_rect.width > 0 && h_gap_rect.height > 0 {
+            // Place arrow at vertical center of the gap.
+            let arrow_y = h_gap_rect.y + h_gap_rect.height / 2;
+            let arrow_area = Rect {
+                x: h_gap_rect.x,
+                y: arrow_y,
+                width: h_gap_rect.width,
+                height: 1,
+            };
+            let arrow_text = match row_idx {
                 0 => {
-                    // Top: ES ───▶ RL
-                    for c in gap_start..(gap_end - 1) {
-                        put_cell(&mut buffer, arrow_row, c, '\u{2500}', flow_color);
-                        // ─
-                    }
-                    put_cell(
-                        &mut buffer,
-                        arrow_row,
-                        gap_end - 1,
-                        '\u{25b6}',
-                        flow_arrow_color,
-                    ); // ▶
+                    // ES ──▶ RL
+                    let w = arrow_area.width as usize;
+                    let mut s = "\u{2500}".repeat(w.saturating_sub(1));
+                    s.push('\u{25b6}');
+                    Line::from(vec![
+                        Span::styled(
+                            s[..s.len().saturating_sub(3)].to_string(),
+                            Style::default().fg(flow_color),
+                        ),
+                        Span::styled(
+                            "\u{25b6}".to_string(),
+                            Style::default().fg(flow_arrow_color),
+                        ),
+                    ])
                 }
                 2 => {
-                    // Bottom: SW ◀─── RF
-                    put_cell(
-                        &mut buffer,
-                        arrow_row,
-                        gap_start,
-                        '\u{25c0}',
-                        flow_arrow_color,
-                    ); // ◀
-                    for c in (gap_start + 1)..gap_end {
-                        put_cell(&mut buffer, arrow_row, c, '\u{2500}', flow_color);
-                        // ─
-                    }
+                    // SW ◀── RF
+                    let w = arrow_area.width as usize;
+                    let dashes = "\u{2500}".repeat(w.saturating_sub(1));
+                    Line::from(vec![
+                        Span::styled(
+                            "\u{25c0}".to_string(),
+                            Style::default().fg(flow_arrow_color),
+                        ),
+                        Span::styled(dashes, Style::default().fg(flow_color)),
+                    ])
                 }
-                _ => {} // Row 1: no horizontal arrow (vertical flow only)
-            }
+                _ => Line::from(""),
+            };
+            let para = Paragraph::new(arrow_text).style(Style::default().bg(LOOM_BG));
+            frame.render_widget(para, arrow_area);
         }
     }
 
-    // ── Vertical arrows forming the ring sides ──
-    // Right side goes DOWN: RL → VC → RF
-    // Left side goes UP: SW → MA → ES
-    {
-        let right_col = (col_spacing + NODE_BOX_WIDTH + col_spacing) as i32;
-        let left_col = col_spacing as i32;
-        let mid_right = right_col + NODE_BOX_WIDTH as i32 / 2;
-        let mid_left = left_col + NODE_BOX_WIDTH as i32 / 2;
+    // Vertical arrows in the gap rows between extractor rows.
+    for gap_rect in &gap_rects {
+        if gap_rect.width == 0 || gap_rect.height == 0 {
+            continue;
+        }
+        // Split gap the same way as node rows to find node centers.
+        let node_w = NODE_BOX_WIDTH as u16;
+        let gap_cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(node_w),
+                Constraint::Min(1),
+                Constraint::Length(node_w),
+            ])
+            .split(*gap_rect);
 
-        // Right side: RL ↓ VC (between row 0 and row 1)
-        let gap_top = NODE_BOX_HEIGHT as i32;
-        let gap_bot = row_stride as i32;
-        for r in gap_top..gap_bot {
-            if r == gap_bot - 1 {
-                put_cell(&mut buffer, r, mid_right, '\u{25bc}', flow_arrow_color);
-            // ▼
-            } else {
-                put_cell(&mut buffer, r, mid_right, '\u{2502}', flow_color); // │
-            }
+        // Right side: down arrows (RL→VC, VC→RF).
+        let right_center_x = gap_cols[2].x + gap_cols[2].width / 2;
+        if right_center_x >= gap_rect.x && right_center_x < gap_rect.x + gap_rect.width {
+            let arrow_rect = Rect {
+                x: right_center_x,
+                y: gap_rect.y,
+                width: 1,
+                height: 1,
+            };
+            let para = Paragraph::new(Span::styled(
+                "\u{25bc}",
+                Style::default().fg(flow_arrow_color),
+            ))
+            .style(Style::default().bg(LOOM_BG));
+            frame.render_widget(para, arrow_rect);
         }
 
-        // Right side: VC ↓ RF (between row 1 and row 2)
-        let gap_top = (row_stride + NODE_BOX_HEIGHT) as i32;
-        let gap_bot = (2 * row_stride) as i32;
-        for r in gap_top..gap_bot {
-            if r == gap_bot - 1 {
-                put_cell(&mut buffer, r, mid_right, '\u{25bc}', flow_arrow_color);
-            // ▼
-            } else {
-                put_cell(&mut buffer, r, mid_right, '\u{2502}', flow_color); // │
-            }
-        }
-
-        // Left side: SW ↑ MA (between row 2 and row 1, going UP)
-        let gap_top = (row_stride + NODE_BOX_HEIGHT) as i32;
-        let gap_bot = (2 * row_stride) as i32;
-        for r in gap_top..gap_bot {
-            if r == gap_top {
-                put_cell(&mut buffer, r, mid_left, '\u{25b2}', flow_arrow_color);
-            // ▲
-            } else {
-                put_cell(&mut buffer, r, mid_left, '\u{2502}', flow_color); // │
-            }
-        }
-
-        // Left side: MA ↑ ES (between row 1 and row 0, going UP)
-        let gap_top = NODE_BOX_HEIGHT as i32;
-        let gap_bot = row_stride as i32;
-        for r in gap_top..gap_bot {
-            if r == gap_top {
-                put_cell(&mut buffer, r, mid_left, '\u{25b2}', flow_arrow_color);
-            // ▲
-            } else {
-                put_cell(&mut buffer, r, mid_left, '\u{2502}', flow_color); // │
-            }
+        // Left side: up arrows (SW→MA, MA→ES).
+        let left_center_x = gap_cols[0].x + gap_cols[0].width / 2;
+        if left_center_x >= gap_rect.x && left_center_x < gap_rect.x + gap_rect.width {
+            let arrow_rect = Rect {
+                x: left_center_x,
+                y: gap_rect.y,
+                width: 1,
+                height: 1,
+            };
+            let para = Paragraph::new(Span::styled(
+                "\u{25b2}",
+                Style::default().fg(flow_arrow_color),
+            ))
+            .style(Style::default().bg(LOOM_BG));
+            frame.render_widget(para, arrow_rect);
         }
     }
 
-    // ── Refineries: render below the 3-row extractor grid ────────────────────
-    let refineries = &loom_state.persistent.refineries;
+    // ── Refineries: render below the extractor grid ──────────────────────────
     if !refineries.is_empty() {
-        // Separator label just above the first refinery row.
-        let sep_row = (3 * row_stride) as i32 - 1;
-        put_text(
-            &mut buffer,
-            sep_row,
-            col_spacing as i32,
-            "\u{2500}\u{2500} Processing \u{2500}\u{2500}",
-            Color::Rgb(80, 60, 100),
-        );
+        let refinery_section = row_rects[5]; // index 5 = after 3 extractor rows + 2 gaps
 
-        let refinery_row_start = 3 * row_stride;
-        let refinery_cols = 2usize;
+        // Separator label.
+        let sep_rect = Rect {
+            x: refinery_section.x,
+            y: refinery_section.y,
+            width: refinery_section.width,
+            height: 1,
+        };
+        let sep = Paragraph::new(Line::from(Span::styled(
+            "\u{2500}\u{2500} Processing \u{2500}\u{2500}",
+            Style::default().fg(Color::Rgb(80, 60, 100)),
+        )))
+        .style(Style::default().bg(LOOM_BG));
+        frame.render_widget(sep, sep_rect);
+
+        // Refinery boxes in 2-column grid below separator.
+        let ref_box_h = NODE_BOX_HEIGHT as u16 + 2; // slightly taller for content
+        let node_w = NODE_BOX_WIDTH as u16;
 
         for (i, refinery) in refineries.iter().enumerate() {
-            let grid_row = i / refinery_cols;
-            let grid_col = i % refinery_cols;
-            let top = (refinery_row_start + grid_row * row_stride) as i32;
-            let left_col = if grid_col == 0 {
-                col_spacing as i32
+            let grid_row = i / 2;
+            let grid_col = i % 2;
+
+            let ref_y = refinery_section.y + 1 + (grid_row as u16) * ref_box_h;
+            if ref_y + ref_box_h > refinery_section.y + refinery_section.height {
+                break; // out of visible area
+            }
+
+            let ref_x = if grid_col == 0 {
+                refinery_section.x
             } else {
-                (col_spacing + NODE_BOX_WIDTH + col_spacing) as i32
+                refinery_section.x + refinery_section.width.saturating_sub(node_w)
             };
+
+            let ref_rect = Rect {
+                x: ref_x,
+                y: ref_y,
+                width: node_w.min(refinery_section.width),
+                height: ref_box_h,
+            };
+
             let is_sel = ui.selected_node >= 6 && (ui.selected_node - 6) == i;
-            render_refinery_box(
-                &mut buffer,
-                top,
-                left_col,
-                refinery,
-                is_sel,
-                i,
-                ui.throbber_frame,
-            );
+            render_refinery_widget(frame, ref_rect, refinery, is_sel, i, ui.throbber_frame);
         }
     }
-
-    render_buffer(frame, grid_area, &buffer);
 
     // ── Sidebar ─────────────────────────────────────────────────────────────
     render_flow_sidebar(frame, sidebar_area, loom_state, ui);
