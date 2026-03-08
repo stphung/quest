@@ -847,18 +847,20 @@ pub fn wr_to_pr_per_day(wr_per_hour: f64) -> u32 {
     pr.round() as u32
 }
 
-/// Returns the highest zone ID unlocked by the given ascension level.
-pub fn loom_zone_cap_for_ascension(ascension_level: u32) -> u32 {
-    if ascension_level >= 10 {
+/// Returns the highest zone ID unlocked by the given number of completed Woven Patterns.
+pub fn loom_zone_cap_for_patterns(completed_patterns: usize) -> u32 {
+    if completed_patterns >= 28 {
         50
-    } else if ascension_level >= 9 {
+    } else if completed_patterns >= 22 {
         46
-    } else if ascension_level >= 8 {
+    } else if completed_patterns >= 16 {
         42
-    } else if ascension_level >= 7 {
+    } else if completed_patterns >= 8 {
         38
+    } else if completed_patterns >= 4 {
+        34
     } else {
-        34 // Ch.7 has no ascension requirement
+        0 // No Loom zones unlocked yet
     }
 }
 
@@ -867,13 +869,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_loom_zone_cap_for_ascension() {
-        assert_eq!(loom_zone_cap_for_ascension(0), 34);
-        assert_eq!(loom_zone_cap_for_ascension(6), 34);
-        assert_eq!(loom_zone_cap_for_ascension(7), 38);
-        assert_eq!(loom_zone_cap_for_ascension(8), 42);
-        assert_eq!(loom_zone_cap_for_ascension(9), 46);
-        assert_eq!(loom_zone_cap_for_ascension(10), 50);
+    fn test_loom_zone_cap_for_patterns() {
+        assert_eq!(loom_zone_cap_for_patterns(0), 0);
+        assert_eq!(loom_zone_cap_for_patterns(3), 0);
+        assert_eq!(loom_zone_cap_for_patterns(4), 34);
+        assert_eq!(loom_zone_cap_for_patterns(7), 34);
+        assert_eq!(loom_zone_cap_for_patterns(8), 38);
+        assert_eq!(loom_zone_cap_for_patterns(16), 42);
+        assert_eq!(loom_zone_cap_for_patterns(22), 46);
+        assert_eq!(loom_zone_cap_for_patterns(28), 50);
     }
 
     #[test]

@@ -500,7 +500,7 @@ pub(super) fn draw_zone_info(
     achievements: &crate::achievements::Achievements,
     _ctx: &LayoutContext,
 ) {
-    use super::scene_fx::{put_cell, put_text, put_text_centered, render_buffer, SceneCell};
+    use super::scene_fx::{put_text_centered, render_buffer, SceneCell};
     use crate::zones::get_all_zones;
 
     let zones = get_all_zones();
@@ -566,127 +566,137 @@ pub(super) fn draw_zone_info(
 
     // --- Row 3: Empty (weather particles visible) ---
 
-    // --- Row 4: Dot track ---
+    render_buffer(frame, area, &buffer);
+
+    // --- Rows 4-5: Zone progress gauge + gate hint ---
     if height > 4 {
         let fracture_cap = game_state.cached_fracture_zone_cap;
-        let mut groups: Vec<(u32, u32)> = vec![(1, 11)];
-        if fracture_cap >= 12 {
-            let chapter_starts: &[u32] = &[12, 15, 18, 21, 24, 27];
-            let chapter_ends: &[u32] = &[14, 17, 20, 23, 26, 30];
-            for (&start, &end) in chapter_starts.iter().zip(chapter_ends.iter()) {
-                if fracture_cap >= start {
-                    groups.push((start, end.min(fracture_cap)));
+        let loom_cap = game_state.cached_loom_zone_cap;
+
+        // Determine the highest visible zone ID (pattern/deep cap)
+        let max_zone = if loom_cap >= 31 {
+            loom_cap
+        } else if fracture_cap >= 12 {
+            fracture_cap
+        } else {
+            11
+        };
+
+        // Find the highest zone the player can actually enter
+        // (meets prestige + ascension requirements)
+        let mut highest_accessible: u32 = 0;
+        for zid in 1..=max_zone {
+            if prog.is_zone_unlocked(zid) {
+                highest_accessible = zid;
+            }
+        }
+
+        // Count completed zones (all subzone bosses defeated)
+        let mut completed_zones: u32 = 0;
+        for zid in 1..=max_zone {
+            if let Some(z) = zones.iter().find(|z| z.id == zid) {
+                if z.subzones.iter().all(|s| prog.is_boss_defeated(zid, s.id)) {
+                    completed_zones += 1;
                 }
             }
         }
 
-        // Loom zones 31-50
-        let loom_cap = crate::loom::loom_zone_cap_for_ascension(game_state.ascension_level);
-        if loom_cap >= 31 {
-            let loom_starts: &[u32] = &[31, 35, 39, 43, 47];
-            let loom_ends: &[u32] = &[34, 38, 42, 46, 50];
-            for (&start, &end) in loom_starts.iter().zip(loom_ends.iter()) {
-                if loom_cap >= start {
-                    groups.push((start, end.min(loom_cap)));
-                }
-            }
-        }
+        let ratio = if max_zone > 0 {
+            (completed_zones as f64 / max_zone as f64).min(1.0)
+        } else {
+            0.0
+        };
 
-        let mut dot_chars: Vec<(char, Color)> = Vec::new();
-        let mut label_parts: Vec<(usize, String)> = Vec::new();
-        let mut char_pos: usize = 0;
+        // Color based on current era
+        let gauge_fg = if prog.current_zone_id >= 31 {
+            Color::Magenta // Loom zones
+        } else if prog.current_zone_id >= 12 {
+            Color::Cyan // Fracture zones
+        } else {
+            Color::Green // Expanse
+        };
+        let gauge_bg = Color::Rgb(30, 30, 30);
 
-        for (gi, &(g_start, g_end)) in groups.iter().enumerate() {
-            if gi > 0 {
-                dot_chars.push((' ', Color::DarkGray));
-                dot_chars.push(('\u{2502}', Color::DarkGray));
-                dot_chars.push((' ', Color::DarkGray));
-                char_pos += 3;
-            }
+        let label = format!("Zone {} / {}", prog.current_zone_id, max_zone);
 
-            let group_start_pos = char_pos;
+        let gauge_area = Rect {
+            x: area.x + 1,
+            y: area.y + 4,
+            width: area.width.saturating_sub(2),
+            height: 1,
+        };
 
-            for zid in g_start..=g_end {
-                if zid > g_start {
-                    dot_chars.push((' ', Color::Reset));
-                    char_pos += 1;
-                }
+        let gauge = Gauge::default()
+            .gauge_style(Style::default().fg(gauge_fg).bg(gauge_bg))
+            .label(label)
+            .ratio(ratio);
+        frame.render_widget(gauge, gauge_area);
 
-                let zone_data = zones.iter().find(|z| z.id == zid);
-                let num_subzones = zone_data.map(|z| z.subzones.len()).unwrap_or(3);
-                let defeated_count = zone_data
-                    .map(|z| {
-                        z.subzones
-                            .iter()
-                            .filter(|s| prog.is_boss_defeated(zid, s.id))
-                            .count()
-                    })
-                    .unwrap_or(0);
-
-                let is_current = zid == prog.current_zone_id;
-                let is_completed = defeated_count == num_subzones;
-                let is_unlocked = if zid == 11 {
-                    achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd)
-                } else {
-                    prog.is_zone_unlocked(zid)
+        // --- Row 5: Gate hint (show first unmet requirement) ---
+        if height > 5 && highest_accessible < max_zone {
+            let first_gated = highest_accessible + 1;
+            let gate_hint = zone_gate_hint(
+                first_gated,
+                &zones,
+                game_state.prestige_rank,
+                game_state.ascension_level,
+            );
+            if let Some(hint) = gate_hint {
+                let hint_area = Rect {
+                    x: area.x + 1,
+                    y: area.y + 5,
+                    width: area.width.saturating_sub(2),
+                    height: 1,
                 };
-
-                let (dot_ch, fg) = if is_current {
-                    ('\u{25cb}', current_zone_dot_color()) // ○
-                } else if is_completed {
-                    ('\u{25cf}', Color::Green) // ●
-                } else if is_unlocked {
-                    ('\u{00b7}', Color::White) // ·
-                } else {
-                    ('\u{00d7}', Color::DarkGray) // ×
-                };
-
-                dot_chars.push((dot_ch, fg));
-                char_pos += 1;
+                let hint_paragraph = Paragraph::new(Line::from(Span::styled(
+                    hint,
+                    Style::default().fg(Color::DarkGray),
+                )))
+                .alignment(Alignment::Center);
+                frame.render_widget(hint_paragraph, hint_area);
             }
-
-            let label = if g_start == g_end {
-                format!("{}", g_start)
-            } else {
-                format!("{}-{}", g_start, g_end)
-            };
-            let group_width = char_pos - group_start_pos;
-            label_parts.push((group_start_pos, center_label(&label, group_width)));
-        }
-
-        let total_track_width = char_pos;
-        let track_start = ((width as i32 - total_track_width as i32) / 2).max(0);
-
-        for (i, &(ch, fg)) in dot_chars.iter().enumerate() {
-            put_cell(&mut buffer, 4, track_start + i as i32, ch, fg);
-        }
-
-        // --- Row 5: Label line ---
-        if height > 5 {
-            let mut label_bytes: Vec<u8> = vec![b' '; total_track_width];
-            for (offset, label) in &label_parts {
-                for (i, ch) in label.bytes().enumerate() {
-                    let pos = offset + i;
-                    if pos < total_track_width {
-                        label_bytes[pos] = ch;
-                    }
-                }
-            }
-            let label_str = String::from_utf8(label_bytes).unwrap_or_default();
-            put_text(&mut buffer, 5, track_start, &label_str, Color::DarkGray);
         }
     }
-
-    render_buffer(frame, area, &buffer);
 }
 
-/// Center a label within a given width, padding with spaces.
-fn center_label(label: &str, width: usize) -> String {
-    if label.len() >= width {
-        return label[..width].to_string();
+/// Build a gate hint string for the first zone the player can't enter.
+fn zone_gate_hint(
+    zone_id: u32,
+    zones: &[crate::zones::Zone],
+    prestige_rank: u32,
+    ascension_level: u32,
+) -> Option<String> {
+    let zone = zones.iter().find(|z| z.id == zone_id)?;
+    let mut reasons: Vec<String> = Vec::new();
+
+    if prestige_rank < zone.prestige_requirement {
+        reasons.push(format!("P{}", zone.prestige_requirement));
     }
-    let pad = (width - label.len()) / 2;
-    format!("{:>width$}", label, width = pad + label.len())
+
+    // Ascension gate for Loom zones
+    let required_ascension = match zone_id {
+        35..=38 => 7,
+        39..=42 => 8,
+        43..=46 => 9,
+        47..=50 => 10,
+        _ => 0,
+    };
+    if required_ascension > 0 && ascension_level < required_ascension {
+        reasons.push(format!(
+            "Asc {}",
+            crate::ui::stats_prestige::to_roman(required_ascension)
+        ));
+    }
+
+    if reasons.is_empty() {
+        None
+    } else {
+        Some(format!(
+            "Z{} locked \u{2014} need {}",
+            zone_id,
+            reasons.join(", ")
+        ))
+    }
 }
 
 /// Returns the icon of the highest unlocked zone completion achievement, if any.
@@ -713,18 +723,6 @@ fn highest_zone_badge(achievements: &crate::achievements::Achievements) -> Optio
         }
     }
     None
-}
-
-/// Slow-breathing color for the current zone dot (○).
-/// Cycles between warm yellow and bright gold over ~3 seconds.
-fn current_zone_dot_color() -> Color {
-    let t = super::scene_fx::current_millis() as f64;
-    // Slow sine wave: ~3s period
-    let phase = ((t / 3000.0) * std::f64::consts::TAU).sin();
-    // Map -1..1 to 0..1
-    let blend = (phase + 1.0) * 0.5;
-    let (r, g, b) = super::scene_fx::lerp_rgb((200, 180, 60), (255, 220, 100), blend);
-    Color::Rgb(r, g, b)
 }
 
 /// Returns a dim zone-themed tint for the subzone description text.

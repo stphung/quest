@@ -74,7 +74,7 @@ pub(super) fn handle_vault_selection(
                     // layer progression, and infrastructure.
                     deep.on_prestige();
                     // Re-sync zone unlocks after prestige reset
-                    let loom_cap = crate::loom::loom_zone_cap_for_ascension(state.ascension_level);
+                    let loom_cap = state.cached_loom_zone_cap;
                     crate::zones::sync_account_zone_unlocks(
                         &mut state.zone_progression,
                         achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
@@ -157,7 +157,7 @@ pub(super) fn handle_prestige_confirm(
                 // layer progression, and infrastructure.
                 deep.on_prestige();
                 // Re-sync zone unlocks after prestige reset
-                let loom_cap = crate::loom::loom_zone_cap_for_ascension(state.ascension_level);
+                let loom_cap = state.cached_loom_zone_cap;
                 crate::zones::sync_account_zone_unlocks(
                     &mut state.zone_progression,
                     achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),

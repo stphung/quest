@@ -409,7 +409,10 @@ fn handle_ascension_confirm(
                         .zone_progression
                         .is_zone_unlocked(crate::core::constants::EXPANSE_ZONE_ID);
                     let fracture_cap = deep_state.persistent.fracture_zone_cap;
-                    let loom_cap = crate::loom::loom_zone_cap_for_ascension(state.ascension_level);
+                    let loom_cap = crate::loom::loom_zone_cap_for_patterns(
+                        loom_state.persistent.completed_pattern_count(),
+                    );
+                    state.cached_loom_zone_cap = loom_cap;
                     crate::zones::sync_account_zone_unlocks(
                         &mut state.zone_progression,
                         storms_end,
