@@ -234,7 +234,7 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
 
     // 1f. Ascension confirmation modal (blocks all other input)
     if matches!(overlay, GameOverlay::AscensionConfirm) {
-        return handle_ascension_confirm(key, state, deep_state, overlay);
+        return handle_ascension_confirm(key, state, deep_state, overlay, achievements);
     }
 
     // 2. Haven screen (blocks other input when open)
@@ -377,6 +377,7 @@ fn handle_ascension_confirm(
     state: &mut GameState,
     deep_state: &mut crate::deep::DeepState,
     overlay: &mut GameOverlay,
+    achievements: &mut crate::achievements::Achievements,
 ) -> InputResult {
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
@@ -386,6 +387,7 @@ fn handle_ascension_confirm(
                     new_level,
                     multiplier,
                 } => {
+                    achievements.on_ascended(new_level, Some(&state.character_name));
                     let roman = crate::ui::stats_prestige::to_roman(new_level);
                     state.combat_state.add_log_entry(
                         format!(

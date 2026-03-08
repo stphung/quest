@@ -157,7 +157,6 @@ impl Achievements {
     }
 
     /// Called when the character Ascends to a new level.
-    #[allow(dead_code)] // Will be called by tick pipeline once ascension input is wired
     pub fn on_ascended(&mut self, new_level: u32, character_name: Option<&str>) {
         let id = match new_level {
             1 => Some(AchievementId::AscensionI),
@@ -491,6 +490,15 @@ impl Achievements {
 
         // Refresh progress bars from current counters
         self.refresh_progress();
+    }
+
+    /// Syncs ascension achievements based on current ascension level.
+    /// Call this when loading a character to retroactively unlock achievements
+    /// for ascension levels already reached.
+    pub fn sync_from_ascension(&mut self, ascension_level: u32, character_name: Option<&str>) {
+        for level in 1..=ascension_level {
+            self.on_ascended(level, character_name);
+        }
     }
 
     /// Syncs zone completion achievements based on defeated bosses.
