@@ -17,8 +17,9 @@ pub use logic::{
     select_archetype, shuttle_build_cost_public, shuttle_effective_intake_cap,
     tick_base_production, tick_loom_staggered_unlock, tick_neighbor_unlocking,
     tick_shuttle_construction, tick_shuttle_pull, tick_shuttle_stall_detection,
-    tick_stall_detection, try_upgrade_node, unlocked_tiers, upgrade_shuttle, LoomExternalBonuses,
-    ShuttleError, ShuttleUpgradeError, SECOND_NODE_UNLOCK_SECONDS, SHUTTLE_CONSTRUCTION_TICKS,
+    tick_stall_detection, try_upgrade_node, unlocked_tiers, upgrade_shuttle, wr_to_pr_per_day,
+    LoomExternalBonuses, ShuttleError, ShuttleUpgradeError, SECOND_NODE_UNLOCK_SECONDS,
+    SHUTTLE_CONSTRUCTION_TICKS,
 };
 #[allow(unused_imports)]
 pub use patterns::{

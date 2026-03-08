@@ -814,9 +814,68 @@ pub fn tick_shuttle_stall_detection(loom: &mut LoomState) {
     }
 }
 
+/// Calculate PR generated per day from a given WR production rate (units/hr).
+///
+/// Tiered brackets:
+/// - 0–10 WR/hr: 5 PR per WR/hr per day
+/// - 10–25 WR/hr: 10 PR per WR/hr per day
+/// - 25+ WR/hr: 15 PR per WR/hr per day
+pub fn wr_to_pr_per_day(wr_per_hour: f64) -> u32 {
+    if wr_per_hour <= 0.0 {
+        return 0;
+    }
+    let mut pr = 0.0;
+    let mut remaining = wr_per_hour;
+
+    // Bracket 1: 0–10 at 5 PR per WR/hr
+    let b1 = remaining.min(10.0);
+    pr += b1 * 5.0;
+    remaining -= b1;
+
+    // Bracket 2: 10–25 at 10 PR per WR/hr
+    if remaining > 0.0 {
+        let b2 = remaining.min(15.0);
+        pr += b2 * 10.0;
+        remaining -= b2;
+    }
+
+    // Bracket 3: 25+ at 15 PR per WR/hr
+    if remaining > 0.0 {
+        pr += remaining * 15.0;
+    }
+
+    pr.round() as u32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_wr_to_pr_per_day_zero_rate() {
+        assert_eq!(wr_to_pr_per_day(0.0), 0);
+    }
+
+    #[test]
+    fn test_wr_to_pr_per_day_low_bracket() {
+        assert_eq!(wr_to_pr_per_day(5.0), 25);
+    }
+
+    #[test]
+    fn test_wr_to_pr_per_day_mid_bracket() {
+        assert_eq!(wr_to_pr_per_day(20.0), 150);
+    }
+
+    #[test]
+    fn test_wr_to_pr_per_day_high_bracket() {
+        assert_eq!(wr_to_pr_per_day(60.0), 725);
+    }
+
+    #[test]
+    fn test_wr_to_pr_per_day_exact_bracket_boundary() {
+        assert_eq!(wr_to_pr_per_day(10.0), 50);
+        assert_eq!(wr_to_pr_per_day(25.0), 200);
+    }
 
     #[test]
     fn test_initialize_loom_unlocks_only_ember_spindle() {

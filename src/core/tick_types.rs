@@ -217,6 +217,9 @@ pub enum TickEvent {
     // ── Loom of Worlds ──────────────────────────────────────────
     /// The Loom of Worlds was discovered (Gateway at Layer 30 completed).
     LoomDiscovered,
+
+    /// Woven Reality production granted prestige ranks.
+    WovenRealityPRGranted { pr_amount: u32, wr_rate: f64 },
 }
 
 /// Result of processing a single game tick.

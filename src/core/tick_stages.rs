@@ -987,6 +987,7 @@ pub(super) fn tick_deep_missions(
 pub(super) fn tick_loom(
     deep: &crate::deep::DeepState,
     loom: &mut crate::loom::LoomState,
+    state: &mut crate::core::game_state::GameState,
     result: &mut TickResult,
 ) {
     // Discovery trigger: requires Deep discovered + Gateway opened.
@@ -1078,6 +1079,42 @@ pub(super) fn tick_loom(
         crate::loom::tick_pattern_sustain(&mut loom.persistent, &rates, TICK_SECONDS);
     if pattern_completed {
         result.loom_changed = true;
+    }
+
+    // Tick WR→PR conversion (active after all 28 patterns complete).
+    if crate::loom::all_patterns_complete(&loom.persistent) {
+        let now = chrono::Utc::now().timestamp();
+        if loom.persistent.wr_pr_last_granted_at == 0 {
+            loom.persistent.wr_pr_last_granted_at = now;
+            result.loom_changed = true;
+        } else {
+            let wr_rate = loom
+                .rate_trackers
+                .get(&crate::loom::Resource::WovenReality)
+                .map(|t| t.rate_per_hour())
+                .unwrap_or(0.0);
+            let pr_per_day = crate::loom::wr_to_pr_per_day(wr_rate);
+            if pr_per_day > 0 {
+                let fill_secs = 86400i64 / pr_per_day as i64;
+                let last = loom.persistent.wr_pr_last_granted_at;
+                let elapsed = now - last;
+                if elapsed >= fill_secs {
+                    let completed_cycles = (elapsed / fill_secs) as u32;
+                    state.prestige_rank = state.prestige_rank.saturating_add(completed_cycles);
+                    state.recalculate_prestige_bonuses();
+                    state.derived_stats_dirty = true;
+                    loom.persistent.wr_pr_last_granted_at =
+                        last + fill_secs * completed_cycles as i64;
+                    for _ in 0..completed_cycles {
+                        result.events.push(TickEvent::WovenRealityPRGranted {
+                            pr_amount: 1,
+                            wr_rate,
+                        });
+                    }
+                    result.loom_changed = true;
+                }
+            }
+        }
     }
 }
 

@@ -284,6 +284,9 @@ pub struct LoomPersistent {
     /// Player-built shuttles (recipe-locked processing nodes).
     #[serde(default)]
     pub shuttles: Vec<Shuttle>,
+    /// Unix timestamp of last WR→PR grant (wall-clock, like Power Cores).
+    #[serde(default)]
+    pub wr_pr_last_granted_at: i64,
 }
 
 impl LoomPersistent {
@@ -315,6 +318,7 @@ impl Default for LoomPersistent {
             stockpiles: HashMap::new(),
             second_node_unlock_elapsed: None,
             shuttles: Vec::new(),
+            wr_pr_last_granted_at: 0,
         }
     }
 }

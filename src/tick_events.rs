@@ -750,6 +750,18 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     true,
                 );
             }
+            TickEvent::WovenRealityPRGranted { pr_amount, wr_rate } => {
+                game_state.combat_state.add_log_entry(
+                    format!(
+                        "\u{29BF} Woven Reality grants +{} Prestige Rank{} ({:.1} WR/hr)",
+                        pr_amount,
+                        if *pr_amount == 1 { "" } else { "s" },
+                        wr_rate,
+                    ),
+                    false,
+                    true,
+                );
+            }
         }
     }
     TickEventFlags {
