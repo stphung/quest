@@ -7,14 +7,14 @@
 //!   - ListDetail:         node list + detail panel placeholder
 //!   - Codex:              recipe codex placeholder
 
-use crate::loom::patterns::{active_pattern_requirement_status, all_patterns_complete};
+use crate::loom::patterns::all_patterns_complete;
 use crate::loom::types::{LoomArchetype, LoomState, LoomUiState, LoomView};
 use crate::ui::scene_fx::{current_millis, put_cell, put_text, render_buffer, SceneCell};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Block, Borders, Clear, Gauge, Paragraph},
     Frame,
 };
 
@@ -117,6 +117,50 @@ fn resource_short(resource: &crate::loom::types::Resource) -> &'static str {
         Resource::EmberEcho => "EmbEc",
         Resource::PurifiedVoid => "PrVod",
         Resource::WovenReality => "WovRl",
+    }
+}
+
+/// Emoji icon for each resource, used as visual shorthand in sidebar and recipes.
+fn resource_emoji(resource: &crate::loom::types::Resource) -> &'static str {
+    use crate::loom::types::Resource;
+    match resource {
+        Resource::Ember => "\u{1f525}",          // 🔥
+        Resource::Reflection => "\u{1f48e}",     // 💎
+        Resource::VoidEssence => "\u{1f300}",    // 🌀
+        Resource::Memory => "\u{1f4dc}",         // 📜
+        Resource::Silence => "\u{1f311}",        // 🌑
+        Resource::Resonance => "\u{1f514}",      // 🔔
+        Resource::ForgedLight => "\u{2728}",     // ✨
+        Resource::EchoGlass => "\u{1fa9e}",      // 🪞
+        Resource::StillbornSong => "\u{1f3b5}",  // 🎵
+        Resource::CondensedEmber => "\u{1f536}", // 🔶
+        Resource::EmberEcho => "\u{1f538}",      // 🔸
+        Resource::PurifiedVoid => "\u{1f49c}",   // 💜
+        Resource::WovenReality => "\u{1f310}",   // 🌐
+    }
+}
+
+/// Emoji icon for a node identity.
+fn node_emoji(id: crate::loom::types::NodeId) -> &'static str {
+    use crate::loom::types::NodeId;
+    match id {
+        NodeId::EmberSpindle => "\u{1f525}",   // 🔥
+        NodeId::ReflectionLens => "\u{1f48e}", // 💎
+        NodeId::VoidCondenser => "\u{1f300}",  // 🌀
+        NodeId::MemoryArchive => "\u{1f4dc}",  // 📜
+        NodeId::SilenceWell => "\u{1f311}",    // 🌑
+        NodeId::ResonanceForge => "\u{1f514}", // 🔔
+    }
+}
+
+/// Number of completed patterns determines which recipe tiers are visible.
+fn visible_recipe_tier(completed_patterns: usize) -> u8 {
+    if completed_patterns >= 12 {
+        3
+    } else if completed_patterns >= 6 {
+        2
+    } else {
+        1
     }
 }
 
@@ -515,10 +559,11 @@ fn render_node_box(
     }
     put_cell(buffer, top, left + w - 1, tr, border_color);
 
+    let emoji = node_emoji(node.id);
     let title = if node.unlocked {
-        format!(" {} Lv.{} ", node.id.name(), node.level)
+        format!(" {} {} Lv.{} ", emoji, node.id.name(), node.level)
     } else {
-        format!(" {} ", node.id.name())
+        format!(" {} {} ", emoji, node.id.name())
     };
     let title_color = if selected {
         Color::White
@@ -925,7 +970,7 @@ fn render_refinery_box(
     }
 }
 
-/// Render the sidebar detail panel for the selected node.
+/// Render the sidebar detail panel for the selected node (Option H layout).
 fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &LoomUiState) {
     use crate::loom::node_effective_rate;
     use crate::loom::recipes::recipes_by_nature;
@@ -950,96 +995,64 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
     };
 
     let block = Block::default()
-        .title(format!(" {} ", selected_id.name()))
         .borders(Borders::LEFT)
         .border_style(Style::default().fg(Color::Rgb(80, 60, 110)));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let mut lines: Vec<Line> = Vec::new();
+    if inner.height < 4 || inner.width < 8 {
+        return;
+    }
+
+    // Split: header (3 lines) | gauge (1 line) | body (rest).
+    let gauge_row_count = if node.unlocked { 1u16 } else { 0 };
+    let v_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),               // header: emoji+name, rate/level
+            Constraint::Length(gauge_row_count), // gauge bar
+            Constraint::Min(0),                  // recipes + upgrade
+        ])
+        .split(inner);
+    let header_area = v_chunks[0];
+    let gauge_area = v_chunks[1];
+    let body_area = v_chunks[2];
+
+    // ── Header ──
+    let emoji = node_emoji(selected_id);
+    let mut header_lines = vec![Line::from(Span::styled(
+        format!("{} {}", emoji, selected_id.name()),
+        Style::default().fg(node_color(selected_id)),
+    ))];
 
     if !node.unlocked {
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
+        header_lines.push(Line::from(Span::styled(
             " [Locked]",
             Style::default().fg(Color::Rgb(80, 60, 110)),
         )));
         if node.unlock_progress > 0.0 {
-            let pct = (node.unlock_progress / 2.0).min(1.0);
-            let filled = ((pct * 10.0) as usize).min(10);
-            let empty = 10usize.saturating_sub(filled);
-            lines.push(Line::from(vec![
-                Span::styled(" [", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    "\u{2588}".repeat(filled),
-                    Style::default().fg(Color::Rgb(100, 80, 160)),
-                ),
-                Span::styled(
-                    "\u{2591}".repeat(empty),
-                    Style::default().fg(Color::Rgb(40, 30, 55)),
-                ),
-                Span::styled("] ", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    format!("{:.1}/2.0h", node.unlock_progress),
-                    Style::default().fg(Color::Rgb(100, 80, 160)),
-                ),
-            ]));
-        }
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            " Unlocks when a neighbor's",
-            Style::default().fg(Color::Rgb(60, 45, 80)),
-        )));
-        lines.push(Line::from(Span::styled(
-            " buffer reaches 50%",
-            Style::default().fg(Color::Rgb(60, 45, 80)),
-        )));
-        // Show which neighbors are unlocked
-        let neighbors = crate::loom::node_neighbors(node.id);
-        let unlocked_neighbors: Vec<&str> = neighbors
-            .iter()
-            .filter(|nid| {
-                loom_state
-                    .persistent
-                    .nodes
-                    .iter()
-                    .any(|n| n.id == **nid && n.unlocked)
-            })
-            .map(|nid| nid.name())
-            .collect();
-        if !unlocked_neighbors.is_empty() {
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                " Active neighbors:",
-                Style::default().fg(Color::Rgb(80, 60, 110)),
+            header_lines.push(Line::from(Span::styled(
+                format!(" {:.1}/2.0h unlocking", node.unlock_progress),
+                Style::default().fg(Color::Rgb(100, 80, 160)),
             )));
-            for name in &unlocked_neighbors {
-                lines.push(Line::from(Span::styled(
-                    format!("  \u{2022} {name}"),
-                    Style::default().fg(Color::Rgb(100, 80, 160)),
-                )));
-            }
         } else {
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                " No active neighbors yet",
-                Style::default().fg(Color::Rgb(60, 45, 80)),
-            )));
+            header_lines.push(Line::from(""));
         }
     } else {
-        lines.push(Line::from(""));
-        lines.push(Line::from(vec![
-            Span::styled(
-                format!(" Lv.{}", node.level),
-                Style::default().fg(Color::Rgb(120, 90, 160)),
-            ),
-            Span::styled(
-                format!("  {}", node_nature_name(node.id.nature())),
-                Style::default().fg(Color::Rgb(140, 100, 180)),
-            ),
-        ]));
+        let rate = node_effective_rate(loom_state, node);
+        header_lines.push(Line::from(Span::styled(
+            format!(" +{:.0}/hr", rate),
+            Style::default().fg(Color::Rgb(100, 200, 120)),
+        )));
+        header_lines.push(Line::from(""));
+    }
+    frame.render_widget(
+        Paragraph::new(header_lines).style(Style::default().bg(LOOM_BG)),
+        header_area,
+    );
 
-        // Buffer bar.
+    // ── Gauge (unlocked only) ──
+    if node.unlocked && gauge_area.height > 0 {
         let fill = if node.buffer_capacity > 0.0 {
             (node.buffer / node.buffer_capacity).min(1.0)
         } else {
@@ -1052,85 +1065,101 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
         } else {
             Color::Rgb(60, 200, 100)
         };
-        let filled = ((fill * 10.0) as usize).min(10);
-        let empty = 10usize.saturating_sub(filled);
-        lines.push(Line::from(vec![
-            Span::styled(" [", Style::default().fg(Color::DarkGray)),
-            Span::styled("\u{2588}".repeat(filled), Style::default().fg(bar_color)),
-            Span::styled(
-                "\u{2591}".repeat(empty),
-                Style::default().fg(Color::Rgb(40, 30, 55)),
-            ),
-            Span::styled("]", Style::default().fg(Color::DarkGray)),
-        ]));
-        lines.push(Line::from(Span::styled(
-            format!(" {:.0}/{:.0}", node.buffer, node.buffer_capacity),
-            Style::default().fg(bar_color),
-        )));
+        let label = format!("{:.0}/{:.0}", node.buffer, node.buffer_capacity);
+        let gauge = Gauge::default()
+            .ratio(fill)
+            .label(label)
+            .gauge_style(Style::default().fg(bar_color).bg(Color::Rgb(30, 20, 40)));
+        frame.render_widget(gauge, gauge_area);
+    }
 
-        let rate = node_effective_rate(loom_state, node);
-        lines.push(Line::from(Span::styled(
-            format!(" +{:.0}/hr", rate),
-            Style::default().fg(Color::Rgb(100, 200, 120)),
-        )));
+    // ── Body ──
+    let mut lines: Vec<Line> = Vec::new();
+
+    if !node.unlocked {
+        // Locked node body: neighbor info.
+        let neighbors = crate::loom::node_neighbors(node.id);
+        let unlocked_neighbors: Vec<&crate::loom::types::NodeId> = neighbors
+            .iter()
+            .filter(|nid| {
+                loom_state
+                    .persistent
+                    .nodes
+                    .iter()
+                    .any(|n| n.id == **nid && n.unlocked)
+            })
+            .collect();
         lines.push(Line::from(""));
-
-        // Recipe list.
+        if !unlocked_neighbors.is_empty() {
+            lines.push(Line::from(Span::styled(
+                " Active neighbors:",
+                Style::default().fg(Color::Rgb(80, 60, 110)),
+            )));
+            for nid in &unlocked_neighbors {
+                lines.push(Line::from(Span::styled(
+                    format!("  {} {}", node_emoji(**nid), nid.name()),
+                    Style::default().fg(Color::Rgb(100, 80, 160)),
+                )));
+            }
+        } else {
+            lines.push(Line::from(Span::styled(
+                " No active neighbors",
+                Style::default().fg(Color::Rgb(60, 45, 80)),
+            )));
+        }
+    } else {
+        // Unlocked node body: recipes + upgrade.
         let nature = node.id.nature();
-        let recipes = recipes_by_nature(nature);
+        let max_tier = visible_recipe_tier(
+            loom_state
+                .persistent
+                .patterns
+                .iter()
+                .filter(|p| p.completed)
+                .count(),
+        );
+        let recipes: Vec<_> = recipes_by_nature(nature)
+            .into_iter()
+            .filter(|r| r.tier <= max_tier)
+            .collect();
 
-        // In the direct-pull model, no pipe-based incoming tracking for extractors.
-        let incoming: std::collections::HashSet<crate::loom::types::Resource> =
-            std::collections::HashSet::new();
-
+        lines.push(Line::from(""));
         if recipes.is_empty() {
             lines.push(Line::from(Span::styled(
-                " No recipes",
+                " No recipes yet",
                 Style::default().fg(Color::DarkGray),
             )));
         } else {
             lines.push(Line::from(Span::styled(
-                format!(" Recipes ({}):", node_nature_name(nature)),
+                format!(" {} recipes:", node_nature_name(nature)),
                 Style::default().fg(Color::Rgb(140, 100, 180)),
             )));
             for r in &recipes {
-                let has_a = incoming.contains(&r.input_a);
-                let has_b = incoming.contains(&r.input_b);
-                let active = has_a && has_b;
-                let dot_a = if has_a { "\u{25cf}" } else { "\u{25cb}" };
-                let dot_b = if has_b { "\u{25cf}" } else { "\u{25cb}" };
-                let color = if active {
-                    Color::Rgb(200, 180, 240)
-                } else {
-                    Color::Rgb(70, 55, 90)
-                };
+                let ea = resource_emoji(&r.input_a);
+                let eb = resource_emoji(&r.input_b);
+                let eo = resource_emoji(&r.output);
+                let out_name = resource_name(&r.output);
                 lines.push(Line::from(Span::styled(
-                    format!(
-                        " {}{} {}{}\u{25b6}{}",
-                        dot_a,
-                        resource_short(&r.input_a),
-                        dot_b,
-                        resource_short(&r.input_b),
-                        resource_short(&r.output)
-                    ),
-                    Style::default().fg(color),
+                    format!(" {}+{}\u{2192}{} {}", ea, eb, eo, out_name),
+                    Style::default().fg(Color::Rgb(120, 100, 160)),
                 )));
             }
         }
 
-        // Upgrade cost and affordability.
+        // Upgrade.
         lines.push(Line::from(""));
         let cost = crate::loom::node_upgrade_cost(loom_state, node.id);
         let can_afford = node.buffer >= cost;
+        let resource = crate::loom::logic::node_native_resource(node.id);
+        let re = resource_emoji(&resource);
         let cost_color = if can_afford {
             Color::Rgb(100, 200, 120)
         } else {
             Color::Rgb(80, 60, 100)
         };
-        let resource = crate::loom::logic::node_native_resource(node.id);
         lines.push(Line::from(vec![
             Span::styled(
-                " [U]pgrade ",
+                " [U] ",
                 Style::default().fg(if can_afford {
                     Color::Rgb(200, 180, 240)
                 } else {
@@ -1138,16 +1167,16 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
                 }),
             ),
             Span::styled(
-                format!("{:.0} {}", cost, resource_name(&resource)),
+                format!("{:.0}{} to Lv{}", cost, re, node.level + 1),
                 Style::default().fg(cost_color),
             ),
         ]));
     }
 
-    lines.truncate(inner.height as usize);
+    lines.truncate(body_area.height as usize);
     frame.render_widget(
         Paragraph::new(lines).style(Style::default().bg(LOOM_BG)),
-        inner,
+        body_area,
     );
 }
 
@@ -1380,17 +1409,28 @@ fn render_flow_sidebar_refinery(
 fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &LoomUiState) {
     use crate::loom::types::NodeId;
 
-    // Split: factory floor (left) | sidebar (right, 22 cols).
+    // Split: factory floor (left) | sidebar (right, 28 cols).
     let h_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Min(0), Constraint::Length(22)])
+        .constraints([Constraint::Min(0), Constraint::Length(28)])
         .split(area);
     let floor_area = h_chunks[0];
     let sidebar_area = h_chunks[1];
 
-    // Split factory floor: node grid (top) | pattern bar (bottom, 4 rows).
+    // Split factory floor: node grid (top) | pattern bar (bottom).
+    // Height = 2 (title + border) + 1 per requirement + 1 overall, capped to avoid squishing grid.
     let has_patterns = !loom_state.persistent.patterns.is_empty();
-    let pattern_h = if has_patterns { 4u16 } else { 0u16 };
+    let req_count = loom_state
+        .persistent
+        .patterns
+        .get(loom_state.persistent.active_pattern)
+        .map(|p| p.requirements.len())
+        .unwrap_or(0);
+    let pattern_h = if has_patterns {
+        (3 + req_count as u16).min(12)
+    } else {
+        0u16
+    };
     let v_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(pattern_h)])
@@ -2092,7 +2132,6 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
         return;
     }
 
-    let req_status = active_pattern_requirement_status(&loom_state.persistent);
     let all_done = all_patterns_complete(&loom_state.persistent);
 
     let block = Block::default()
@@ -2111,7 +2150,7 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
             Style::default().fg(Color::Rgb(255, 215, 0)),
         ));
         frame.render_widget(
-            Paragraph::new(line).style(Style::default().bg(Color::Rgb(10, 5, 18))),
+            Paragraph::new(line).style(Style::default().bg(LOOM_BG)),
             inner,
         );
         return;
@@ -2128,96 +2167,151 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
     let pattern_count = loom_state.persistent.patterns.len();
     let active_idx = loom_state.persistent.active_pattern;
 
-    // Line 1: pattern name and index.
-    let pattern_title = format!(
-        " PATTERN {}/{}: \"{}\"",
+    // Title row (1 line) + per-requirement gauge rows + overall row.
+    let req_count = pattern.requirements.len();
+    let total_rows = 2 + req_count; // title + reqs + overall
+    let mut constraints: Vec<Constraint> = Vec::with_capacity(total_rows);
+    constraints.push(Constraint::Length(1)); // title
+    for _ in 0..req_count {
+        constraints.push(Constraint::Length(1)); // per-resource gauge
+    }
+    constraints.push(Constraint::Length(1)); // overall gauge
+
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(inner);
+
+    // Row 0: title.
+    let title = format!(
+        " Pattern {}/{}: \"{}\"",
         active_idx + 1,
         pattern_count,
         pattern.name
     );
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            title,
+            Style::default().fg(Color::Rgb(200, 160, 240)),
+        )))
+        .style(Style::default().bg(LOOM_BG)),
+        rows[0],
+    );
 
-    // Line 2: per-requirement status chips (accumulated/amount + resource name).
-    let mut req_spans: Vec<Span> = vec![Span::raw(" ")];
+    // Rows 1..=N: per-resource Gauge.
+    let label_w = 13usize; // width for "emoji+name" column
     for (i, req) in pattern.requirements.iter().enumerate() {
-        let (accumulated, amount) = req_status.get(i).copied().unwrap_or((0.0, 0.0));
-        let met = accumulated >= amount;
-        let check = if met { "\u{2713}" } else { "\u{2717}" };
-        let color = if met {
+        let row_area = rows[1 + i];
+        if row_area.height == 0 {
+            continue;
+        }
+
+        let ratio = if req.amount > 0.0 {
+            (req.accumulated / req.amount).min(1.0)
+        } else {
+            1.0
+        };
+        let met = req.accumulated >= req.amount;
+
+        // Split: label | gauge | count.
+        let count_label = format!("{:.0}/{:.0}", req.accumulated, req.amount);
+        let count_w = count_label.len() as u16 + 2;
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(label_w as u16),
+                Constraint::Min(6),
+                Constraint::Length(count_w),
+            ])
+            .split(row_area);
+
+        // Label: emoji + resource name.
+        let emoji = resource_emoji(&req.resource);
+        let res_name = resource_name(&req.resource);
+        let label_text = format!(" {} {}", emoji, res_name);
+        let label_color = if met {
             Color::Rgb(80, 200, 120)
         } else {
-            Color::Rgb(200, 80, 80)
+            Color::Rgb(180, 150, 210)
         };
-        let res_name = resource_name(&req.resource);
-        req_spans.push(Span::styled(
-            format!("{} {} {:.0}/{:.0} ", check, res_name, accumulated, amount),
-            Style::default().fg(color),
-        ));
-        if i + 1 < pattern.requirements.len() {
-            req_spans.push(Span::styled(
-                "\u{2502} ",
-                Style::default().fg(Color::DarkGray),
-            ));
-        }
+        frame.render_widget(
+            Paragraph::new(Span::styled(label_text, Style::default().fg(label_color)))
+                .style(Style::default().bg(LOOM_BG)),
+            cols[0],
+        );
+
+        // Gauge.
+        let gauge_color = if met {
+            Color::Rgb(80, 200, 120)
+        } else {
+            Color::Rgb(160, 100, 220)
+        };
+        let gauge = Gauge::default()
+            .ratio(ratio)
+            .gauge_style(Style::default().fg(gauge_color).bg(Color::Rgb(30, 20, 40)));
+        frame.render_widget(gauge, cols[1]);
+
+        // Count + check mark.
+        let check = if met { " \u{2713}" } else { "" };
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                format!(" {}{}", count_label, check),
+                Style::default().fg(label_color),
+            ))
+            .style(Style::default().bg(LOOM_BG)),
+            cols[2],
+        );
     }
 
-    // Line 3: progress bar — use the minimum completion ratio across all requirements.
-    let min_ratio = if pattern.requirements.is_empty() {
-        0.0
-    } else {
-        pattern
-            .requirements
-            .iter()
-            .map(|req| {
-                if req.amount > 0.0 {
-                    req.accumulated / req.amount
-                } else {
-                    1.0
-                }
-            })
-            .fold(f64::INFINITY, f64::min)
-            .min(1.0)
-    };
-    let progress_line = build_progress_line_ratio(min_ratio, inner.width);
+    // Last row: overall progress.
+    let overall_row = rows[1 + req_count];
+    if overall_row.height > 0 {
+        let overall_ratio = if pattern.requirements.is_empty() {
+            0.0
+        } else {
+            pattern
+                .requirements
+                .iter()
+                .map(|req| {
+                    if req.amount > 0.0 {
+                        req.accumulated / req.amount
+                    } else {
+                        1.0
+                    }
+                })
+                .sum::<f64>()
+                / pattern.requirements.len() as f64
+        };
 
-    let mut lines: Vec<Line> = vec![
-        Line::from(Span::styled(
-            pattern_title,
-            Style::default().fg(Color::Rgb(200, 160, 240)),
-        )),
-        Line::from(req_spans),
-        progress_line,
-    ];
-    lines.truncate(inner.height as usize);
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(label_w as u16),
+                Constraint::Min(6),
+                Constraint::Length(6),
+            ])
+            .split(overall_row);
 
-    frame.render_widget(
-        Paragraph::new(lines).style(Style::default().bg(Color::Rgb(10, 5, 18))),
-        inner,
-    );
-}
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                " Overall",
+                Style::default().fg(Color::Rgb(200, 160, 240)),
+            ))
+            .style(Style::default().bg(LOOM_BG)),
+            cols[0],
+        );
 
-/// Build the pattern progress bar line from a completion ratio in [0.0, 1.0].
-fn build_progress_line_ratio(ratio: f64, width: u16) -> Line<'static> {
-    let label_prefix = " Weaving: ";
-    let pct_suffix = format!("  {:.0}%", (ratio * 100.0).min(100.0));
-    let bar_width = (width as usize)
-        .saturating_sub(label_prefix.len() + pct_suffix.len() + 2)
-        .min(40);
-
-    let filled = ((ratio * bar_width as f64) as usize).min(bar_width);
-    let empty = bar_width.saturating_sub(filled);
-
-    let bar = format!(
-        "{}{}{}{}",
-        label_prefix,
-        "\u{2588}".repeat(filled),
-        "\u{2591}".repeat(empty),
-        pct_suffix,
-    );
-
-    Line::from(Span::styled(
-        bar,
-        Style::default().fg(Color::Rgb(160, 100, 220)),
-    ))
+        let label = format!("{:.0}%", overall_ratio * 100.0);
+        let gauge = Gauge::default()
+            .ratio(overall_ratio.min(1.0))
+            .label(label)
+            .gauge_style(
+                Style::default()
+                    .fg(Color::Rgb(200, 160, 240))
+                    .bg(Color::Rgb(30, 20, 40)),
+            );
+        frame.render_widget(gauge, cols[1]);
+    }
 }
 
 // ── Build Refinery Overlay ────────────────────────────────────────────────────
