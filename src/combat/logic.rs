@@ -42,7 +42,7 @@ mod tests {
         let derived = default_derived(state);
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         state.combat_state.enemy_attack_timer = 0.0;
-        update_combat(rng, state, 0.1, bonuses, achievements, &derived, 11)
+        update_combat(rng, state, 0.1, bonuses, achievements, &derived, 11, 30)
     }
 
     /// Forces an enemy attack by setting the enemy timer, suppressing player attack.
@@ -55,7 +55,7 @@ mod tests {
         let derived = default_derived(state);
         state.combat_state.player_attack_timer = 0.0;
         state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
-        update_combat(rng, state, 0.1, bonuses, achievements, &derived, 11)
+        update_combat(rng, state, 0.1, bonuses, achievements, &derived, 11, 30)
     }
 
     /// Forces both player and enemy to attack in the same tick.
@@ -68,7 +68,7 @@ mod tests {
         let derived = default_derived(state);
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
         state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
-        update_combat(rng, state, 0.1, bonuses, achievements, &derived, 11)
+        update_combat(rng, state, 0.1, bonuses, achievements, &derived, 11, 30)
     }
 
     /// Asserts that at least one event matching the predicate exists.
@@ -114,6 +114,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
         assert_eq!(events.len(), 0);
     }
@@ -135,6 +136,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
         assert_eq!(events.len(), 0);
 
@@ -147,6 +149,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
         assert!(!events.is_empty()); // Player attack (enemy not yet at 2.0s)
     }
@@ -218,6 +221,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
         assert_eq!(
             state.combat_state.player_current_hp,
@@ -513,6 +517,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         // No combat events during regen
@@ -543,6 +548,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         // HP should be partially restored (roughly halfway)
@@ -617,6 +623,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         // Find the PlayerAttack event
@@ -664,6 +671,7 @@ mod tests {
                 &mut achievements,
                 &d,
                 11,
+                30,
             );
 
             for e in &events {
@@ -708,6 +716,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         let attack_event = events
@@ -819,6 +828,7 @@ mod tests {
                     &mut achievements,
                     &d,
                     11,
+                    30,
                 );
             }
         }
@@ -953,6 +963,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         let xp_event = events.iter().find_map(|e| match e {
@@ -1151,6 +1162,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         let attack = events
@@ -1206,6 +1218,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         let attacked = events
@@ -1232,6 +1245,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         let attacked = events
@@ -1283,6 +1297,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         assert_eq!(state.combat_state.player_current_hp, 100);
@@ -1310,6 +1325,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         // Should still be regenerating, not fully healed
@@ -1343,6 +1359,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         assert_eq!(state.combat_state.player_current_hp, 100);
@@ -1397,6 +1414,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         assert_eq!(state.combat_state.player_current_hp, 100);
@@ -1599,6 +1617,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
         let damage_no_bonus = events_no_bonus
             .iter()
@@ -1628,6 +1647,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
         let damage_with_bonus = events_with_bonus
             .iter()
@@ -1675,6 +1695,7 @@ mod tests {
                 &mut achievements,
                 &d,
                 11,
+                30,
             );
             if events
                 .iter()
@@ -1696,8 +1717,16 @@ mod tests {
                 ..Default::default()
             };
             let d = default_derived(&state);
-            let events =
-                update_combat(&mut rng, &mut state, 0.1, &haven, &mut achievements, &d, 11);
+            let events = update_combat(
+                &mut rng,
+                &mut state,
+                0.1,
+                &haven,
+                &mut achievements,
+                &d,
+                11,
+                30,
+            );
             if events
                 .iter()
                 .any(|e| matches!(e, CombatEvent::PlayerAttack { was_crit: true, .. }))
@@ -1737,8 +1766,16 @@ mod tests {
                 ..Default::default()
             };
             let d = default_derived(&state);
-            let events =
-                update_combat(&mut rng, &mut state, 0.1, &haven, &mut achievements, &d, 11);
+            let events = update_combat(
+                &mut rng,
+                &mut state,
+                0.1,
+                &haven,
+                &mut achievements,
+                &d,
+                11,
+                30,
+            );
 
             // Count PlayerAttack events (should be 2 if double strike procs)
             let attack_count = events
@@ -1784,6 +1821,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         assert_eq!(state.combat_state.player_current_hp, 100);
@@ -1821,6 +1859,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         // Should have at least one attack
@@ -2455,6 +2494,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
         assert!(!state.combat_state.is_regenerating);
 
@@ -2519,6 +2559,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         // Timers should NOT have advanced (regen blocks combat)
@@ -2589,6 +2630,7 @@ mod tests {
             &mut achievements,
             &derived, // no DR
             11,
+            30,
         );
         let hp_lost_no_dr = initial_hp - state.combat_state.player_current_hp;
         assert_eq!(
@@ -2619,6 +2661,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
         let hp_lost_with_dr = initial_hp - state.combat_state.player_current_hp;
         let expected_dr_damage = ((post_defense_damage as f64) * 0.70) as u32;
@@ -2672,6 +2715,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
         let hp_lost = initial_hp - state.combat_state.player_current_hp;
         assert_eq!(
@@ -2711,6 +2755,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
         let hp_lost = initial_hp - state.combat_state.player_current_hp;
         assert_eq!(hp_lost, expected_damage, "Zero DR should not change damage");
@@ -2741,6 +2786,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         assert!(
@@ -2769,6 +2815,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         assert_eq!(
@@ -2801,6 +2848,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         // Should trigger enrage
@@ -2851,6 +2899,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         // Should be weapon-blocked enrage
@@ -2896,6 +2945,7 @@ mod tests {
             &mut achievements2,
             &derived2,
             11,
+            30,
         );
 
         let enrage2 = events2
@@ -2934,6 +2984,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
 
         assert!(

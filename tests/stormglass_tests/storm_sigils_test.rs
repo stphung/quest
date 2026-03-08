@@ -627,7 +627,7 @@ fn force_player_attack_damage(
     state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
     state.combat_state.enemy_attack_timer = 0.0;
     let mut ach = Achievements::default();
-    let events = update_combat(rng, state, 0.0, bonuses, &mut ach, &d, 11);
+    let events = update_combat(rng, state, 0.0, bonuses, &mut ach, &d, 11, 30);
     events
         .iter()
         .filter_map(|e| match e {
@@ -718,6 +718,7 @@ fn test_sigil_dr_bonus_reduces_enemy_damage() {
         &mut ach,
         &d,
         11,
+        30,
     );
     let damage_base: u32 = events_base
         .iter()
@@ -745,6 +746,7 @@ fn test_sigil_dr_bonus_reduces_enemy_damage() {
         &mut ach,
         &d,
         11,
+        30,
     );
     let damage_with: u32 = events_with
         .iter()

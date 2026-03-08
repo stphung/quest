@@ -627,7 +627,8 @@ pub(super) fn process_zone_achievements(
         BossDefeatResult::ExpanseCycle => {
             achievements.on_zone_fully_cleared(11, Some(character_name));
         }
-        BossDefeatResult::FractureCycle { zone_id } => {
+        BossDefeatResult::FractureCycle { zone_id }
+        | BossDefeatResult::LoomZoneCycle { zone_id } => {
             achievements.on_zone_fully_cleared(*zone_id, Some(character_name));
         }
         _ => {}
@@ -752,6 +753,7 @@ pub(super) fn run_combat<R: Rng>(
     sigil_bonuses: &SigilBonuses,
     achievements: &mut Achievements,
     deep: &mut crate::deep::DeepState,
+    loom: &crate::loom::LoomState,
     debug_mode: bool,
     result: &mut TickResult,
     rng: &mut R,
@@ -796,6 +798,8 @@ pub(super) fn run_combat<R: Rng>(
         state.combat_state.player_max_hp,
     );
 
+    let loom_zone_cap =
+        crate::loom::loom_zone_cap_for_patterns(loom.persistent.completed_pattern_count());
     let combat_events = update_combat(
         rng,
         state,
@@ -804,6 +808,7 @@ pub(super) fn run_combat<R: Rng>(
         achievements,
         &derived,
         deep.persistent.fracture_zone_cap,
+        loom_zone_cap,
     );
 
     process_combat_events(

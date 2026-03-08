@@ -82,6 +82,7 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
         &sigil_bonuses,
         ctx.achievements,
         ctx.deep,
+        ctx.loom,
         ctx.debug_mode,
         &mut result,
         rng,

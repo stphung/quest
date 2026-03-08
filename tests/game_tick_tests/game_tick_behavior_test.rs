@@ -78,6 +78,7 @@ fn simulate_combat_tick(
         achievements,
         &derived,
         11,
+        30,
     )
 }
 
@@ -912,6 +913,7 @@ fn test_haven_combat_bonuses_passed_to_update_combat() {
         &mut achievements,
         &derived,
         11,
+        30,
     );
 
     // Verify combat ran (may or may not produce events depending on timer)

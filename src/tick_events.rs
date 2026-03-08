@@ -256,7 +256,8 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                             xp_gained
                         )
                     }
-                    BossDefeatResult::FractureCycle { zone_id } => {
+                    BossDefeatResult::FractureCycle { zone_id }
+                    | BossDefeatResult::LoomZoneCycle { zone_id } => {
                         let zone_name = crate::zones::get_zone(*zone_id)
                             .map(|z| z.name)
                             .unwrap_or("Unknown");

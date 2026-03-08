@@ -25,6 +25,8 @@ pub enum BossDefeatResult {
     ExpanseCycle,
     /// Completed a fracture cycle (cap zone loops) — returns to subzone 1
     FractureCycle { zone_id: u32 },
+    /// Completed a loom cap zone cycle, loops back to subzone 1.
+    LoomZoneCycle { zone_id: u32 },
 }
 
 impl ZoneProgression {
@@ -120,6 +122,7 @@ impl ZoneProgression {
         prestige_rank: u32,
         achievements: &mut Achievements,
         fracture_zone_cap: u32,
+        loom_zone_cap: u32,
     ) -> BossDefeatResult {
         let zone_id = self.current_zone_id;
         let subzone_id = self.current_subzone_id;
@@ -194,6 +197,14 @@ impl ZoneProgression {
             return BossDefeatResult::FractureCycle { zone_id };
         }
 
+        // Current zone is the loom cap zone — cycle
+        if zone_id >= 31 && zone_id == loom_zone_cap && zone_id <= 50 {
+            self.current_subzone_id = 1;
+            self.kills_in_subzone = 0;
+            self.fighting_boss = false;
+            return BossDefeatResult::LoomZoneCycle { zone_id };
+        }
+
         // Try to advance to next zone (works for both pre-game and fracture zones)
         if self.advance_to_next_zone(prestige_rank) {
             return BossDefeatResult::ZoneComplete {
@@ -216,7 +227,9 @@ impl ZoneProgression {
         // Fallback: cycle in place
         self.current_subzone_id = 1;
         self.kills_in_subzone = 0;
-        if zone_id > EXPANSE_ZONE_ID {
+        if zone_id >= 31 {
+            BossDefeatResult::LoomZoneCycle { zone_id }
+        } else if zone_id > EXPANSE_ZONE_ID {
             BossDefeatResult::FractureCycle { zone_id }
         } else {
             BossDefeatResult::ExpanseCycle
@@ -528,6 +541,76 @@ mod tests {
             "Non-final subzone boss in Zone 10 should not require Stormbreaker, got {:?}",
             result
         );
+    }
+
+    // =========================================================================
+    // LOOM ZONE CYCLING TESTS
+    // =========================================================================
+
+    #[test]
+    fn test_loom_zone_cap_cycles() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // Set up at zone 34 (a loom zone), final subzone (5), fighting boss
+        prog.current_zone_id = 34;
+        prog.current_subzone_id = 5;
+        prog.unlock_zone(34);
+        prog.fighting_boss = true;
+
+        // Call with loom_zone_cap = 34
+        let result = prog.on_boss_defeated_with_cap(500, &mut achievements, 30, 34);
+        assert_eq!(result, BossDefeatResult::LoomZoneCycle { zone_id: 34 });
+        assert_eq!(prog.current_zone_id, 34);
+        assert_eq!(prog.current_subzone_id, 1);
+        assert_eq!(prog.kills_in_subzone, 0);
+        assert!(!prog.fighting_boss);
+    }
+
+    #[test]
+    fn test_loom_zone_advances_when_not_at_cap() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // Set up at zone 33, final subzone (5), fighting boss
+        prog.current_zone_id = 33;
+        prog.current_subzone_id = 5;
+        prog.unlock_zone(33);
+        prog.unlock_zone(34);
+        prog.fighting_boss = true;
+
+        // Call with loom_zone_cap = 34 — zone 33 is NOT the cap, so should advance
+        let result = prog.on_boss_defeated_with_cap(500, &mut achievements, 30, 34);
+        assert!(
+            matches!(
+                result,
+                BossDefeatResult::ZoneComplete {
+                    new_zone_id: 34,
+                    ..
+                }
+            ),
+            "Expected ZoneComplete advancing to 34, got {:?}",
+            result
+        );
+        assert_eq!(prog.current_zone_id, 34);
+        assert_eq!(prog.current_subzone_id, 1);
+    }
+
+    #[test]
+    fn test_loom_zone_cap_30_no_loom_cycling() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // Zone 30 is the fracture cap, not a loom zone
+        prog.current_zone_id = 30;
+        prog.current_subzone_id = 5;
+        prog.unlock_zone(30);
+        prog.fighting_boss = true;
+
+        // loom_zone_cap=30 means no loom zones unlocked
+        // fracture_zone_cap=30 means fracture cycling at 30
+        let result = prog.on_boss_defeated_with_cap(300, &mut achievements, 30, 30);
+        assert_eq!(result, BossDefeatResult::FractureCycle { zone_id: 30 });
     }
 
     #[test]
