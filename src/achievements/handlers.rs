@@ -165,6 +165,10 @@ impl Achievements {
             4 => Some(AchievementId::AscensionIV),
             5 => Some(AchievementId::AscensionV),
             6 => Some(AchievementId::AscensionVI),
+            7 => Some(AchievementId::AscensionVII),
+            8 => Some(AchievementId::AscensionVIII),
+            9 => Some(AchievementId::AscensionIX),
+            10 => Some(AchievementId::AscensionX),
             _ => None,
         };
         if let Some(id) = id {

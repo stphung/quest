@@ -157,12 +157,16 @@ pub enum AchievementId {
     FractureZone29, // Last Listener
     FractureZone30, // Scar Mender
     // Ascension milestone achievements (one per level, I-VI)
-    AscensionI,   // First Ascension
-    AscensionII,  // Twice Risen
-    AscensionIII, // Deepborn
-    AscensionIV,  // Fourfold
-    AscensionV,   // Quintessence
-    AscensionVI,  // Transcendent
+    AscensionI,    // First Ascension
+    AscensionII,   // Twice Risen
+    AscensionIII,  // Deepborn
+    AscensionIV,   // Fourfold
+    AscensionV,    // Quintessence
+    AscensionVI,   // Transcendent
+    AscensionVII,  // Loombound
+    AscensionVIII, // Threadwarden
+    AscensionIX,   // Worldweaver
+    AscensionX,    // The Absolute
 
     // Challenge achievements - Chess
     ChessNovice,
@@ -309,7 +313,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 213;
+    pub const VARIANT_COUNT: usize = 217;
 }
 
 /// Static definition of an achievement.
