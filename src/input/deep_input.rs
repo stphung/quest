@@ -678,10 +678,11 @@ fn handle_infrastructure(
 /// Switch to a new view, resetting selection and incrementing the visit counter.
 fn switch_view_with_deep(ui: &mut DeepUiState, target: DeepView, deep: &DeepState) {
     ui.view = target;
-    // Default to frontier layer in the Layers tab so players don't scroll from Layer 1
     if target == DeepView::Infrastructure {
-        let frontier = deep.persistent.frontier_layer();
-        ui.selected_index = (frontier as usize).saturating_sub(1);
+        let frontier = deep.persistent.frontier_layer() as usize;
+        ui.selected_index = frontier
+            .saturating_sub(1)
+            .min(deep.persistent.layers.len().saturating_sub(1));
     } else {
         ui.selected_index = 0;
     }

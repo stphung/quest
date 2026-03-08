@@ -586,7 +586,7 @@ fn handle_base_game(
         }
         KeyCode::Char('d') | KeyCode::Char('D') => {
             if deep_state.persistent.discovered {
-                deep_ui.open();
+                deep_ui.open_at_frontier(&deep_state.persistent);
             }
             InputResult::Continue
         }
