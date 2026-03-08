@@ -202,19 +202,19 @@ pub(super) fn render_mission_results(
     let ready_count = deep
         .prestige
         .roster
-        .iter()
+        .values()
         .filter(|m| matches!(m.status, MercStatus::Available))
         .count();
     let injured_count = deep
         .prestige
         .roster
-        .iter()
+        .values()
         .filter(|m| matches!(m.status, MercStatus::Injured { .. }))
         .count();
     let lost_count = deep
         .prestige
         .roster
-        .iter()
+        .values()
         .filter(|m| matches!(m.status, MercStatus::Lost))
         .count();
 

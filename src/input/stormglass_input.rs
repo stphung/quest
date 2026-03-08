@@ -371,6 +371,7 @@ fn handle_sigil_reroll_confirm(
                 // Destroy current sigil
                 let slot = exchange_ui.sigil_target_slot;
                 state.storm_sigils.sigils[slot] = None;
+                state.invalidate_bonuses();
                 let mut rng = rand::rng();
                 let pool = crate::stormglass::sigils::daily_sigil_pool();
                 let choices = crate::stormglass::sigils::generate_sigil_choices(&mut rng, &pool);
@@ -414,6 +415,7 @@ fn handle_sigil_pick(
                 let slot = exchange_ui.sigil_target_slot;
                 exchange_ui.sigil_result = Some(sigil.clone());
                 state.storm_sigils.sigils[slot] = Some(sigil);
+                state.invalidate_bonuses();
                 exchange_ui.set_phase(ExchangePhase::SigilResult);
             }
             InputResult::Continue

@@ -501,6 +501,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
             if let Some((room, new_tier, cost)) =
                 auto_build_haven(&mut haven, &mut state.prestige_rank, priority)
             {
+                state.invalidate_bonuses();
                 stats.haven_rooms_built += 1;
                 stats.haven_prestige_spent += cost;
                 if config.verbose {

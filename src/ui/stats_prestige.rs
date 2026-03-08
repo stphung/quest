@@ -383,7 +383,7 @@ pub(super) fn draw_deep_panel(
         let mut on_mission_count: usize = 0;
         let mut injured_count: usize = 0;
 
-        for merc in &deep.prestige.roster {
+        for merc in deep.prestige.roster.values() {
             match merc.status {
                 crate::deep::MercStatus::Available => available_count += 1,
                 crate::deep::MercStatus::OnMission(_) => on_mission_count += 1,

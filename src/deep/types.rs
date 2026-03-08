@@ -10,6 +10,29 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Serde helper: serialize `HashMap<u64, Mercenary>` as `Vec<Mercenary>` for
+/// backward-compatible JSON saves.
+mod roster_serde {
+    use super::Mercenary;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::collections::HashMap;
+
+    pub fn serialize<S: Serializer>(
+        map: &HashMap<u64, Mercenary>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        let vec: Vec<&Mercenary> = map.values().collect();
+        vec.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<HashMap<u64, Mercenary>, D::Error> {
+        let vec = Vec::<Mercenary>::deserialize(deserializer)?;
+        Ok(vec.into_iter().map(|m| (m.id, m)).collect())
+    }
+}
+
 // ── Discovery & Gate ─────────────────────────────────────────────────────────
 
 /// Minimum prestige rank required to discover The Deep.
@@ -798,7 +821,8 @@ pub struct DeepPrestige {
     /// Current Warband Marks balance.
     pub warband_marks: u32,
     /// The mercenary roster for this prestige cycle.
-    pub roster: Vec<Mercenary>,
+    #[serde(with = "roster_serde")]
+    pub roster: HashMap<u64, Mercenary>,
     /// Active and recently completed missions.
     pub active_missions: Vec<Mission>,
     /// Missions available to start (mission pool).
@@ -835,7 +859,7 @@ impl Default for DeepPrestige {
         let now = Utc::now();
         Self {
             warband_marks: 0,
-            roster: Vec::new(),
+            roster: HashMap::new(),
             active_missions: Vec::new(),
             available_missions: Vec::new(),
             recruit_pool: RecruitPool {
@@ -861,12 +885,12 @@ impl DeepPrestige {
 
     /// Look up a mutable mercenary by id.
     pub fn find_merc_mut(&mut self, id: u64) -> Option<&mut Mercenary> {
-        self.roster.iter_mut().find(|m| m.id == id)
+        self.roster.get_mut(&id)
     }
 
     /// Look up a mercenary by id.
     pub fn find_merc(&self, id: u64) -> Option<&Mercenary> {
-        self.roster.iter().find(|m| m.id == id)
+        self.roster.get(&id)
     }
 
     /// Look up a mutable active mission by id.
@@ -876,7 +900,7 @@ impl DeepPrestige {
 
     /// Count of mercs currently available for assignment.
     pub fn available_merc_count(&self) -> usize {
-        self.roster.iter().filter(|m| m.is_available()).count()
+        self.roster.values().filter(|m| m.is_available()).count()
     }
 
     /// Count of active (in-progress) missions.

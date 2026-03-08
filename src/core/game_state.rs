@@ -8,9 +8,10 @@ use crate::character::prestige::PrestigeCombatBonuses;
 use crate::combat::types::CombatState;
 use crate::dungeon::types::Dungeon;
 use crate::fishing::types::{FishingSession, FishingState};
+use crate::haven::HavenBonuses;
 use crate::items::equipment::Equipment;
 use crate::items::types::Rarity;
-use crate::stormglass::sigils::StormSigils;
+use crate::stormglass::sigils::{SigilBonuses, StormSigils};
 use crate::zones::ZoneProgression;
 use std::collections::VecDeque;
 
@@ -112,6 +113,12 @@ pub struct GameState {
     pub cached_power_rating: f64,
     /// Cached fracture zone cap from Deep — used by UI for zone track rendering
     pub cached_fracture_zone_cap: u32,
+    /// Cached merged Haven bonuses — recomputed only when bonuses_dirty is true
+    pub cached_haven_bonuses: HavenBonuses,
+    /// Cached merged Sigil bonuses — recomputed only when bonuses_dirty is true
+    pub cached_sigil_bonuses: SigilBonuses,
+    /// Dirty flag: set when Haven rooms, Storm Sigils, or prestige rank change
+    pub bonuses_dirty: bool,
 }
 
 impl GameState {
@@ -161,6 +168,9 @@ impl GameState {
             game_over_shown_at: None,
             cached_power_rating: 0.0,
             cached_fracture_zone_cap: 0,
+            cached_haven_bonuses: HavenBonuses::default(),
+            cached_sigil_bonuses: SigilBonuses::default(),
+            bonuses_dirty: true,
             chrono_surge_active: false,
             debug_force_overcharge: false,
         }
@@ -199,6 +209,11 @@ impl GameState {
     /// Mark derived stats as needing recalculation (e.g., after equipment or attribute change).
     pub fn invalidate_derived_stats(&mut self) {
         self.derived_stats_dirty = true;
+    }
+
+    /// Mark Haven/Sigil bonuses as needing recalculation.
+    pub fn invalidate_bonuses(&mut self) {
+        self.bonuses_dirty = true;
     }
 
     /// Recalculate and cache prestige combat bonuses from current prestige rank.

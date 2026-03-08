@@ -394,7 +394,7 @@ pub fn daily_sigil_pool() -> Vec<SigilEffectType> {
 // ── Bonus Aggregation ───────────────────────────────────────────────────
 
 /// Aggregated bonuses from all etched sigils, for parameter injection.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct SigilBonuses {
     pub xp_percent: f64,
     pub damage_percent: f64,

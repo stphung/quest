@@ -375,7 +375,7 @@ fn render_hub_roster(
         put_text(buffer, row, col_status, "Status", Color::DarkGray);
         row += 1;
 
-        for (i, merc) in roster.iter().enumerate() {
+        for (i, merc) in roster.values().enumerate() {
             if row >= roster_bottom - 6 {
                 break;
             }
@@ -1047,7 +1047,7 @@ fn render_new_mission_compact(
             if row < content_bottom {
                 let mut detail = format!("Pwr: {}  ", m.min_squad_power);
                 if let Some(req) = m.required_archetype {
-                    let in_roster = deep.prestige.roster.iter().any(|r| r.archetype == req);
+                    let in_roster = deep.prestige.roster.values().any(|r| r.archetype == req);
                     if in_roster {
                         detail.push_str(&format!("\u{2713} {} req  ", req.display_name()));
                     } else {
@@ -1065,7 +1065,7 @@ fn render_new_mission_compact(
                 put_text(buffer, row, 1, &detail, Color::DarkGray);
                 // Color archetype warning
                 if let Some(req) = m.required_archetype {
-                    let in_roster = deep.prestige.roster.iter().any(|r| r.archetype == req);
+                    let in_roster = deep.prestige.roster.values().any(|r| r.archetype == req);
                     if !in_roster {
                         if let Some(pos) = detail.find('\u{26a0}') {
                             put_text(
@@ -1116,7 +1116,7 @@ fn render_new_mission_compact(
 
                 // Available mercs (selectable)
                 let mut avail_idx = 0usize;
-                for merc in deep.prestige.roster.iter() {
+                for merc in deep.prestige.roster.values() {
                     if !merc.is_available() {
                         continue;
                     }
@@ -1152,13 +1152,13 @@ fn render_new_mission_compact(
                 }
 
                 // Unavailable mercs (dimmed, not selectable)
-                let has_unavailable = deep.prestige.roster.iter().any(|m| !m.is_available());
+                let has_unavailable = deep.prestige.roster.values().any(|m| !m.is_available());
                 if has_unavailable && row < content_bottom - 2 {
                     let sep_str: String = "\u{2500} ".repeat((width / 2).max(4));
                     let sep_display = truncate_text(&sep_str, width.saturating_sub(2));
                     put_text(buffer, row, 1, &sep_display, Color::Rgb(40, 60, 80));
                     row += 1;
-                    for merc in deep.prestige.roster.iter() {
+                    for merc in deep.prestige.roster.values() {
                         if merc.is_available() {
                             continue;
                         }
@@ -1476,7 +1476,7 @@ fn render_squad_assembly_left(
 
     // Available mercs (selectable)
     let mut avail_idx = 0usize;
-    for merc in deep.prestige.roster.iter() {
+    for merc in deep.prestige.roster.values() {
         if !merc.is_available() {
             continue;
         }
@@ -1522,14 +1522,14 @@ fn render_squad_assembly_left(
     }
 
     // Separator and unavailable mercs
-    let has_unavailable = deep.prestige.roster.iter().any(|m| !m.is_available());
+    let has_unavailable = deep.prestige.roster.values().any(|m| !m.is_available());
     if has_unavailable && row < content_bottom - 1 {
         let sep_str: String = "\u{2500} ".repeat((list_width / 2).max(4));
         let sep_display = truncate_text(&sep_str, list_width);
         put_text(buffer, row, 1, &sep_display, Color::Rgb(40, 60, 80));
         row += 1;
 
-        for merc in deep.prestige.roster.iter() {
+        for merc in deep.prestige.roster.values() {
             if merc.is_available() {
                 continue;
             }
@@ -1734,7 +1734,11 @@ fn render_mission_detail_phase1(
     // Required archetype
     if let Some(req_arch) = mission.required_archetype {
         if row < content_bottom {
-            let in_roster = deep.prestige.roster.iter().any(|m| m.archetype == req_arch);
+            let in_roster = deep
+                .prestige
+                .roster
+                .values()
+                .any(|m| m.archetype == req_arch);
             let (prefix, label_color) = if in_roster {
                 ("\u{2713} ", Color::Green)
             } else {
@@ -1759,7 +1763,11 @@ fn render_mission_detail_phase1(
     // Recommended archetype
     if let Some(rec_arch) = mission.recommended_archetype {
         if row < content_bottom {
-            let in_roster = deep.prestige.roster.iter().any(|m| m.archetype == rec_arch);
+            let in_roster = deep
+                .prestige
+                .roster
+                .values()
+                .any(|m| m.archetype == rec_arch);
             let (prefix, color) = if in_roster {
                 ("\u{2605} ", Color::Cyan)
             } else {

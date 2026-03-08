@@ -1,5 +1,7 @@
 //! Game state persistence (save files & commit).
 
+use std::thread::JoinHandle;
+
 use crate::achievements;
 use crate::character::manager::CharacterManager;
 use crate::core::game_state::GameState;
@@ -85,4 +87,32 @@ pub fn save_all(
     } else {
         false
     }
+}
+
+/// Spawn a background thread to save all game state files to disk.
+///
+/// Clones all state up front so the main game loop is not blocked by file I/O.
+/// Returns a [`JoinHandle`] that the caller should track to avoid spawning
+/// concurrent saves (check with `is_finished()` before spawning another).
+#[allow(clippy::too_many_arguments)]
+pub fn spawn_background_save(
+    character_manager: &CharacterManager,
+    state: &GameState,
+    global_achievements: &achievements::Achievements,
+    haven: &haven::Haven,
+    enhancement: &enhancement::EnhancementProgress,
+    deep: &deep::DeepState,
+    loom_state: &loom::LoomState,
+) -> JoinHandle<()> {
+    let cm = character_manager.clone();
+    let st = state.clone();
+    let ach = global_achievements.clone();
+    let hv = haven.clone();
+    let enh = enhancement.clone();
+    let dp = deep.clone();
+    let lm = loom_state.clone();
+
+    std::thread::spawn(move || {
+        save_files(&cm, &st, &ach, &hv, &enh, &dp, &lm);
+    })
 }

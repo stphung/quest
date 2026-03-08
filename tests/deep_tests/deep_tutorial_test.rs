@@ -116,17 +116,20 @@ fn test_deep_prestige_preserves_operational_state() {
 
     // Set up some operational state
     deep.prestige.warband_marks = 9999;
-    deep.prestige.roster.push(Mercenary {
-        id: 1,
-        name: "TestMerc".to_string(),
-        archetype: MercArchetype::Vanguard,
-        power: 14,
-        resilience: 12,
-        expertise: 4,
-        level: 5,
-        missions_completed: 10,
-        status: MercStatus::Available,
-    });
+    deep.prestige.roster.insert(
+        1,
+        Mercenary {
+            id: 1,
+            name: "TestMerc".to_string(),
+            archetype: MercArchetype::Vanguard,
+            power: 14,
+            resilience: 12,
+            expertise: 4,
+            level: 5,
+            missions_completed: 10,
+            status: MercStatus::Available,
+        },
+    );
 
     deep.on_prestige();
 
@@ -613,17 +616,20 @@ fn test_prestige_spend_marks_insufficient() {
 #[test]
 fn test_prestige_find_merc() {
     let mut dp = DeepPrestige::new();
-    dp.roster.push(Mercenary {
-        id: 42,
-        name: "FindMe".to_string(),
-        archetype: MercArchetype::Scout,
-        power: 10,
-        resilience: 10,
-        expertise: 10,
-        level: 1,
-        missions_completed: 0,
-        status: MercStatus::Available,
-    });
+    dp.roster.insert(
+        42,
+        Mercenary {
+            id: 42,
+            name: "FindMe".to_string(),
+            archetype: MercArchetype::Scout,
+            power: 10,
+            resilience: 10,
+            expertise: 10,
+            level: 1,
+            missions_completed: 0,
+            status: MercStatus::Available,
+        },
+    );
 
     assert!(dp.find_merc(42).is_some());
     assert_eq!(dp.find_merc(42).unwrap().name, "FindMe");
@@ -646,28 +652,40 @@ fn test_prestige_available_merc_count() {
         status: MercStatus::Available,
     };
 
-    dp.roster.push(Mercenary {
-        id: 1,
-        status: MercStatus::Available,
-        ..base.clone()
-    });
-    dp.roster.push(Mercenary {
-        id: 2,
-        status: MercStatus::OnMission(1),
-        ..base.clone()
-    });
-    dp.roster.push(Mercenary {
-        id: 3,
-        status: MercStatus::Injured {
-            missions_remaining: 1,
+    dp.roster.insert(
+        1,
+        Mercenary {
+            id: 1,
+            status: MercStatus::Available,
+            ..base.clone()
         },
-        ..base.clone()
-    });
-    dp.roster.push(Mercenary {
-        id: 4,
-        status: MercStatus::Available,
-        ..base
-    });
+    );
+    dp.roster.insert(
+        2,
+        Mercenary {
+            id: 2,
+            status: MercStatus::OnMission(1),
+            ..base.clone()
+        },
+    );
+    dp.roster.insert(
+        3,
+        Mercenary {
+            id: 3,
+            status: MercStatus::Injured {
+                missions_remaining: 1,
+            },
+            ..base.clone()
+        },
+    );
+    dp.roster.insert(
+        4,
+        Mercenary {
+            id: 4,
+            status: MercStatus::Available,
+            ..base
+        },
+    );
 
     assert_eq!(dp.available_merc_count(), 2);
 }
@@ -889,7 +907,7 @@ fn test_deep_discovery_on_endless_kill() {
     assert!(deep.prestige.active_missions.is_empty());
 
     // Verify starter archetypes
-    let archetypes: Vec<_> = deep.prestige.roster.iter().map(|m| m.archetype).collect();
+    let archetypes: Vec<_> = deep.prestige.roster.values().map(|m| m.archetype).collect();
     assert!(archetypes.contains(&quest::deep::MercArchetype::Vanguard));
     assert!(archetypes.contains(&quest::deep::MercArchetype::Scout));
     assert!(archetypes.contains(&quest::deep::MercArchetype::Medic));
@@ -957,7 +975,7 @@ fn test_initial_descent_is_first_mission() {
         &mut || deep.persistent.next_merc_id(),
         &mut rng,
     );
-    deep.prestige.roster = starter;
+    deep.prestige.roster = starter.into_iter().map(|m| (m.id, m)).collect();
 
     let pool = quest::deep::generate_mission_pool(&deep.persistent, &mut rng);
     assert!(!pool.is_empty(), "Mission pool should not be empty");
@@ -1007,7 +1025,7 @@ fn test_supply_runs_are_always_safe() {
             &mut || deep.persistent.next_merc_id(),
             &mut rng,
         );
-        deep.prestige.roster = starter;
+        deep.prestige.roster = starter.into_iter().map(|m| (m.id, m)).collect();
         deep.prestige.warband_marks = 1000;
 
         let pool = generate_mission_pool(&deep.persistent, &mut rng);
@@ -1016,7 +1034,7 @@ fn test_supply_runs_are_always_safe() {
             .find(|m| m.mission_type == MissionType::SupplyRun)
             .expect("Should have a supply run");
 
-        let merc_id = deep.prestige.roster[0].id;
+        let merc_id = deep.prestige.roster.values().next().unwrap().id;
         let mut mission = start_mission(
             supply_run,
             &[merc_id],
@@ -1065,7 +1083,7 @@ fn test_squad_assignment_validation() {
         &mut || deep.persistent.next_merc_id(),
         &mut rng,
     );
-    deep.prestige.roster = starter;
+    deep.prestige.roster = starter.into_iter().map(|m| (m.id, m)).collect();
 
     let pool = generate_mission_pool(&deep.persistent, &mut rng);
     let mission = &pool[0];
@@ -1096,14 +1114,16 @@ fn test_concurrent_mission_cap() {
         &mut || deep.persistent.next_merc_id(),
         &mut rng,
     );
-    deep.prestige.roster = starter;
+    deep.prestige.roster = starter.into_iter().map(|m| (m.id, m)).collect();
     deep.prestige.warband_marks = 5000;
 
     let pool = generate_mission_pool(&deep.persistent, &mut rng);
     let first_mission = &pool[0];
 
     // Start first mission (use first merc) and push to active list
-    let merc1_id = deep.prestige.roster[0].id;
+    let mut roster_ids: Vec<u64> = deep.prestige.roster.keys().copied().collect();
+    roster_ids.sort();
+    let merc1_id = roster_ids[0];
     let mission = start_mission(
         first_mission,
         &[merc1_id],
@@ -1122,7 +1142,7 @@ fn test_concurrent_mission_cap() {
     // Try to start second mission — should hit concurrent limit
     let pool2 = generate_mission_pool(&deep.persistent, &mut rng);
     assert!(!pool2.is_empty(), "Pool should have missions");
-    let merc2_id = deep.prestige.roster[1].id;
+    let merc2_id = roster_ids[1];
     let result = validate_squad_assignment(
         &pool2[0],
         &[merc2_id],

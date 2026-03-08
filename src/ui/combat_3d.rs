@@ -10,7 +10,7 @@ use super::enemy_sprites::{
     detect_enemy_tier, get_archetype_for_enemy, sprite_color_palette, EnemyTier, PixelSprite,
     SpriteColorPalette, BOSS_CROWN, ZONE_BOSS_CROWN,
 };
-use super::scene_fx::{render_buffer, SceneCell};
+use super::scene_fx::{render_buffer, with_scene_buffer, SceneCell};
 
 /// Returns the effective zone_id for the current combat context.
 fn effective_zone_id(game_state: &GameState) -> u32 {
@@ -39,72 +39,73 @@ fn render_simple_sprite(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let width = area.width as usize;
     let height = area.height as usize;
     let zone_id = effective_zone_id(game_state);
-    let mut buffer = vec![vec![SceneCell::default(); width]; height];
 
-    super::zone_bg::paint_zone_scene(&mut buffer, zone_id);
+    with_scene_buffer(width, height, |buffer| {
+        super::zone_bg::paint_zone_scene(buffer, zone_id);
 
-    if let Some(enemy) = &game_state.combat_state.current_enemy {
-        let tier = detect_enemy_tier(game_state);
-        let archetype = get_archetype_for_enemy(&enemy.name, zone_id);
-        let pixel_sprite = archetype.pixel_sprite();
-        let palette = sprite_color_palette(zone_id, tier);
+        if let Some(enemy) = &game_state.combat_state.current_enemy {
+            let tier = detect_enemy_tier(game_state);
+            let archetype = get_archetype_for_enemy(&enemy.name, zone_id);
+            let pixel_sprite = archetype.pixel_sprite();
+            let palette = sprite_color_palette(zone_id, tier);
 
-        // Each pair of pixel rows renders to one cell row.
-        let pixel_row_count = pixel_sprite.rows.len();
-        let cell_rows = pixel_row_count.div_ceil(2);
+            // Each pair of pixel rows renders to one cell row.
+            let pixel_row_count = pixel_sprite.rows.len();
+            let cell_rows = pixel_row_count.div_ceil(2);
 
-        let has_crown = matches!(
-            tier,
-            EnemyTier::SubzoneBoss | EnemyTier::DungeonBoss | EnemyTier::ZoneBoss
-        );
-        // crown (1) + sprite_cell_rows + blank (1) + name (1)
-        let extra_lines = if has_crown { 3 } else { 2 };
-        let total_content = cell_rows + extra_lines;
-        let top_padding = (height.saturating_sub(total_content)) / 2;
-        let mut row_cursor = top_padding as i32;
+            let has_crown = matches!(
+                tier,
+                EnemyTier::SubzoneBoss | EnemyTier::DungeonBoss | EnemyTier::ZoneBoss
+            );
+            // crown (1) + sprite_cell_rows + blank (1) + name (1)
+            let extra_lines = if has_crown { 3 } else { 2 };
+            let total_content = cell_rows + extra_lines;
+            let top_padding = (height.saturating_sub(total_content)) / 2;
+            let mut row_cursor = top_padding as i32;
 
-        if has_crown {
-            let crown_text = if tier == EnemyTier::ZoneBoss {
-                ZONE_BOSS_CROWN
-            } else {
-                BOSS_CROWN
-            };
-            write_centered_colored(&mut buffer, row_cursor, crown_text, |ch| {
-                if ch == '\u{2605}' {
-                    Color::Yellow
+            if has_crown {
+                let crown_text = if tier == EnemyTier::ZoneBoss {
+                    ZONE_BOSS_CROWN
                 } else {
-                    Color::DarkGray
-                }
-            });
+                    BOSS_CROWN
+                };
+                write_centered_colored(buffer, row_cursor, crown_text, |ch| {
+                    if ch == '\u{2605}' {
+                        Color::Yellow
+                    } else {
+                        Color::DarkGray
+                    }
+                });
+                row_cursor += 1;
+            }
+
+            render_pixel_sprite(buffer, row_cursor, pixel_sprite, &palette);
+            row_cursor += cell_rows as i32;
+
             row_cursor += 1;
+            let name_style = match tier {
+                EnemyTier::Normal => Color::Yellow,
+                EnemyTier::DungeonElite => Color::LightRed,
+                EnemyTier::SubzoneBoss | EnemyTier::DungeonBoss => Color::White,
+                EnemyTier::ZoneBoss => Color::LightRed,
+            };
+            write_centered_text(buffer, row_cursor, &enemy.name, name_style);
+        } else {
+            use super::throbber::{spinner_char, waiting_message};
+
+            let spinner = spinner_char();
+            let message = waiting_message(game_state.character_xp);
+            let text = format!("{} {}", spinner, message);
+            write_centered_text(
+                buffer,
+                (height / 2) as i32,
+                &text,
+                Color::Rgb(140, 146, 168),
+            );
         }
 
-        render_pixel_sprite(&mut buffer, row_cursor, pixel_sprite, &palette);
-        row_cursor += cell_rows as i32;
-
-        row_cursor += 1;
-        let name_style = match tier {
-            EnemyTier::Normal => Color::Yellow,
-            EnemyTier::DungeonElite => Color::LightRed,
-            EnemyTier::SubzoneBoss | EnemyTier::DungeonBoss => Color::White,
-            EnemyTier::ZoneBoss => Color::LightRed,
-        };
-        write_centered_text(&mut buffer, row_cursor, &enemy.name, name_style);
-    } else {
-        use super::throbber::{spinner_char, waiting_message};
-
-        let spinner = spinner_char();
-        let message = waiting_message(game_state.character_xp);
-        let text = format!("{} {}", spinner, message);
-        write_centered_text(
-            &mut buffer,
-            (height / 2) as i32,
-            &text,
-            Color::Rgb(140, 146, 168),
-        );
-    }
-
-    render_buffer(frame, area, &buffer);
+        render_buffer(frame, area, buffer);
+    });
 }
 
 /// Maps a pixel format character to the corresponding `SpriteColorPalette` color.
