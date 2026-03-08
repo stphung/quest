@@ -138,12 +138,15 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
 
     // ── 11d. Fracture region unlock consumption ──────────────────
     if let Some(region) = ctx.deep.persistent.pending_fracture_region_unlock.take() {
+        let loom_cap =
+            crate::loom::loom_zone_cap_for_patterns(ctx.loom.persistent.completed_pattern_count());
         crate::zones::sync_account_zone_unlocks(
             &mut ctx.state.zone_progression,
             ctx.achievements
                 .is_unlocked(crate::achievements::AchievementId::StormsEnd),
             ctx.deep.persistent.fracture_zone_cap,
             ctx.state.prestige_rank,
+            loom_cap,
         );
         result.events.push(TickEvent::FractureRegionUnlocked {
             region,

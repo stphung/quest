@@ -847,9 +847,41 @@ pub fn wr_to_pr_per_day(wr_per_hour: f64) -> u32 {
     pr.round() as u32
 }
 
+/// Returns the highest zone ID unlocked by the given completed pattern count.
+pub fn loom_zone_cap_for_patterns(completed_patterns: usize) -> u32 {
+    if completed_patterns >= 28 {
+        50
+    } else if completed_patterns >= 22 {
+        46
+    } else if completed_patterns >= 16 {
+        42
+    } else if completed_patterns >= 8 {
+        38
+    } else if completed_patterns >= 4 {
+        34
+    } else {
+        30
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_loom_zone_cap_for_patterns() {
+        assert_eq!(loom_zone_cap_for_patterns(0), 30);
+        assert_eq!(loom_zone_cap_for_patterns(3), 30);
+        assert_eq!(loom_zone_cap_for_patterns(4), 34);
+        assert_eq!(loom_zone_cap_for_patterns(7), 34);
+        assert_eq!(loom_zone_cap_for_patterns(8), 38);
+        assert_eq!(loom_zone_cap_for_patterns(15), 38);
+        assert_eq!(loom_zone_cap_for_patterns(16), 42);
+        assert_eq!(loom_zone_cap_for_patterns(21), 42);
+        assert_eq!(loom_zone_cap_for_patterns(22), 46);
+        assert_eq!(loom_zone_cap_for_patterns(27), 46);
+        assert_eq!(loom_zone_cap_for_patterns(28), 50);
+    }
 
     #[test]
     fn test_wr_to_pr_per_day_zero_rate() {

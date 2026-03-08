@@ -74,11 +74,14 @@ pub(super) fn handle_vault_selection(
                     // layer progression, and infrastructure.
                     deep.on_prestige();
                     // Re-sync fracture zone unlocks after prestige reset
+                    // (loom_zone_cap=30: no loom context in prestige input;
+                    // tick_loom re-syncs on next pattern completion)
                     crate::zones::sync_account_zone_unlocks(
                         &mut state.zone_progression,
                         achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
                         deep.persistent.fracture_zone_cap,
                         state.prestige_rank,
+                        30,
                     );
                     *overlay = GameOverlay::None;
                     let new_rank = state.prestige_rank;
@@ -154,11 +157,14 @@ pub(super) fn handle_prestige_confirm(
                 // layer progression, and infrastructure.
                 deep.on_prestige();
                 // Re-sync fracture zone unlocks after prestige reset
+                // (loom_zone_cap=30: no loom context in prestige input;
+                // tick_loom re-syncs on next pattern completion)
                 crate::zones::sync_account_zone_unlocks(
                     &mut state.zone_progression,
                     achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
                     deep.persistent.fracture_zone_cap,
                     state.prestige_rank,
+                    30,
                 );
                 *overlay = GameOverlay::None;
                 let new_rank = state.prestige_rank;

@@ -1079,6 +1079,20 @@ pub(super) fn tick_loom(
         crate::loom::tick_pattern_sustain(&mut loom.persistent, &rates, TICK_SECONDS);
     if pattern_completed {
         result.loom_changed = true;
+        // Sync Loom zone unlocks on pattern completion
+        let loom_cap =
+            crate::loom::loom_zone_cap_for_patterns(loom.persistent.completed_pattern_count());
+        let fracture_cap = state.cached_fracture_zone_cap;
+        let storms_end = state
+            .zone_progression
+            .is_zone_unlocked(crate::core::constants::EXPANSE_ZONE_ID);
+        crate::zones::sync_account_zone_unlocks(
+            &mut state.zone_progression,
+            storms_end,
+            fracture_cap,
+            state.prestige_rank,
+            loom_cap,
+        );
     }
 
     // Tick WR→PR conversion (active after all 28 patterns complete).

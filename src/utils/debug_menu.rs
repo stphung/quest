@@ -894,11 +894,14 @@ impl DebugMenu {
 
         // Re-sync zone unlocks after every action — any action may change
         // prestige, achievements, or Deep state that affects zone access.
+        let loom_cap =
+            crate::loom::loom_zone_cap_for_patterns(loom.persistent.completed_pattern_count());
         crate::zones::access::sync_account_zone_unlocks(
             &mut state.zone_progression,
             achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
             deep.persistent.fracture_zone_cap,
             state.prestige_rank,
+            loom_cap,
         );
         state.cached_fracture_zone_cap = deep.persistent.fracture_zone_cap;
 
@@ -1269,12 +1272,14 @@ fn trigger_unlock_deep_layer(
         if deep.persistent.fracture_zone_cap < cap {
             deep.persistent.fracture_zone_cap = cap;
         }
-        // Unlock the zones
+        // Unlock the zones (loom_zone_cap=30: no loom context here;
+        // trigger_selected re-syncs with full loom cap after action runs)
         crate::zones::access::sync_account_zone_unlocks(
             &mut state.zone_progression,
             true,
             deep.persistent.fracture_zone_cap,
             state.prestige_rank,
+            30,
         );
     }
 
@@ -1370,12 +1375,14 @@ fn trigger_travel_to_zone(
         }
     }
 
-    // Unlock fracture zones up to the cap
+    // Unlock fracture zones up to the cap (loom_zone_cap=30: no loom context;
+    // trigger_selected re-syncs with full loom cap after action runs)
     crate::zones::access::sync_account_zone_unlocks(
         &mut state.zone_progression,
         true,
         deep.persistent.fracture_zone_cap,
         state.prestige_rank,
+        30,
     );
 
     // Travel to subzone 1
@@ -2200,6 +2207,7 @@ mod tests {
             achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
             deep.persistent.fracture_zone_cap,
             state.prestige_rank,
+            30,
         );
         state.cached_fracture_zone_cap = deep.persistent.fracture_zone_cap;
         assert_eq!(state.prestige_rank, 100);
