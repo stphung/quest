@@ -33,8 +33,20 @@ pub(super) fn handle_loom(
                     loom_ui.codex_scroll = loom_ui.codex_scroll.saturating_sub(1);
                 }
                 LoomView::FlowView => {
-                    // 3x2 grid: Up moves up one row (subtract 2).
-                    loom_ui.selected_node = loom_ui.selected_node.saturating_sub(2);
+                    // Diamond layout: 0=ES, 1=RL, 2=RF, 3=VC, 4=SW, 5=MA, 6+=refineries
+                    // Up moves to the previous row, preserving left/right position.
+                    loom_ui.selected_node = match loom_ui.selected_node {
+                        0 => 0,     // ES: stay
+                        1 | 2 => 0, // RL/RF → ES
+                        3 => 1,     // VC → RL
+                        4 => 2,     // SW → RF
+                        5 => 3,     // MA → VC (default left)
+                        n if n >= 6 => {
+                            // Refineries → MA
+                            5
+                        }
+                        n => n,
+                    };
                 }
                 LoomView::ListDetail => {
                     loom_ui.selected_node = loom_ui.selected_node.saturating_sub(1);
@@ -48,11 +60,31 @@ pub(super) fn handle_loom(
                     loom_ui.codex_scroll = loom_ui.codex_scroll.saturating_add(1);
                 }
                 LoomView::FlowView => {
-                    // Grid: Down moves down one row (add 2). Extends into refinery rows.
+                    // Diamond layout: down moves to the next row.
                     let total_nodes = 6 + loom_state.persistent.refineries.len();
-                    if loom_ui.selected_node + 2 < total_nodes {
-                        loom_ui.selected_node += 2;
-                    }
+                    loom_ui.selected_node = match loom_ui.selected_node {
+                        0 => 1,     // ES → RL (default left)
+                        1 => 3,     // RL → VC
+                        2 => 4,     // RF → SW
+                        3 | 4 => 5, // VC/SW → MA
+                        5 => {
+                            // MA → first refinery (if any)
+                            if total_nodes > 6 {
+                                6
+                            } else {
+                                5
+                            }
+                        }
+                        n if n >= 6 => {
+                            // Navigate within refineries (2-col grid)
+                            if n + 2 < total_nodes {
+                                n + 2
+                            } else {
+                                n
+                            }
+                        }
+                        n => n,
+                    };
                 }
                 LoomView::ListDetail => {
                     if loom_ui.selected_node + 1 < 6 {
@@ -63,24 +95,41 @@ pub(super) fn handle_loom(
             InputResult::Continue
         }
         KeyCode::Left if loom_ui.view == LoomView::FlowView => {
-            // 3x2 grid: Left moves to the left column (even index).
-            if loom_ui.selected_node % 2 == 1 {
-                loom_ui.selected_node -= 1;
+            // Diamond layout: left toggles to left node on pair rows, or moves in refinery grid.
+            match loom_ui.selected_node {
+                2 => loom_ui.selected_node = 1,                          // RF → RL
+                4 => loom_ui.selected_node = 3,                          // SW → VC
+                n if n >= 6 && n % 2 == 1 => loom_ui.selected_node -= 1, // refinery right → left
+                _ => {}
             }
             InputResult::Continue
         }
         KeyCode::Right if loom_ui.view == LoomView::FlowView => {
-            // Grid: Right moves to the right column (odd index). Extends into refinery rows.
+            // Diamond layout: right toggles to right node on pair rows.
             let total_nodes = 6 + loom_state.persistent.refineries.len();
-            if loom_ui.selected_node.is_multiple_of(2) && loom_ui.selected_node + 1 < total_nodes {
-                loom_ui.selected_node += 1;
+            match loom_ui.selected_node {
+                1 => loom_ui.selected_node = 2, // RL → RF
+                3 => loom_ui.selected_node = 4, // VC → SW
+                n if n >= 6 && n % 2 == 0 && n + 1 < total_nodes => {
+                    loom_ui.selected_node += 1; // refinery left → right
+                }
+                _ => {}
             }
             InputResult::Continue
         }
         KeyCode::Char('u') | KeyCode::Char('U')
             if loom_ui.view == LoomView::ListDetail || loom_ui.view == LoomView::FlowView =>
         {
-            let node_id = crate::loom::types::NodeId::ALL[loom_ui.selected_node.min(5)];
+            // Diamond layout grid_ids: 0=ES, 1=RL, 2=RF, 3=VC, 4=SW, 5=MA
+            let grid_ids = [
+                crate::loom::types::NodeId::EmberSpindle,
+                crate::loom::types::NodeId::ReflectionLens,
+                crate::loom::types::NodeId::ResonanceForge,
+                crate::loom::types::NodeId::VoidCondenser,
+                crate::loom::types::NodeId::SilenceWell,
+                crate::loom::types::NodeId::MemoryArchive,
+            ];
+            let node_id = grid_ids[loom_ui.selected_node.min(5)];
             if crate::loom::try_upgrade_node(loom_state, node_id) {
                 InputResult::NeedsSave
             } else {
@@ -421,12 +470,15 @@ mod tests {
                 )],
             ));
         let mut ui = make_ui(LoomView::FlowView);
-        ui.selected_node = 4; // Bottom-left extractor.
+        ui.selected_node = 4; // SW in diamond layout
 
         handle_loom(key(KeyCode::Down), &mut state, &mut ui);
-        assert_eq!(ui.selected_node, 6, "should enter refinery area");
+        assert_eq!(ui.selected_node, 5, "SW → MA");
+
+        handle_loom(key(KeyCode::Down), &mut state, &mut ui);
+        assert_eq!(ui.selected_node, 6, "MA → refinery area");
 
         handle_loom(key(KeyCode::Up), &mut state, &mut ui);
-        assert_eq!(ui.selected_node, 4, "should return to extractors");
+        assert_eq!(ui.selected_node, 5, "refinery → MA");
     }
 }

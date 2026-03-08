@@ -21,9 +21,15 @@ pub fn select_archetype(loom: &mut LoomState, archetype: LoomArchetype) {
 /// No-op: archetype passives removed for rebalancing.
 fn apply_node_passive_on_unlock(_node_id: NodeId, _loom: &mut LoomState) {}
 
-/// Initialize the Loom on discovery: unlock all 6 extractor nodes.
+/// Initialize the Loom on discovery: unlock only Ember Spindle.
+/// Other nodes unlock via the neighbor unlock system as the player progresses.
 pub fn initialize_loom(loom: &mut LoomState) {
-    for node in &mut loom.persistent.nodes {
+    if let Some(node) = loom
+        .persistent
+        .nodes
+        .iter_mut()
+        .find(|n| n.id == NodeId::EmberSpindle)
+    {
         node.unlocked = true;
     }
     loom.persistent.second_node_unlock_elapsed = None;
@@ -764,14 +770,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_initialize_loom_unlocks_all_nodes() {
+    fn test_initialize_loom_unlocks_only_ember_spindle() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
 
         for node in &loom.persistent.nodes {
-            assert!(node.unlocked, "node {:?} should be unlocked", node.id);
+            if node.id == NodeId::EmberSpindle {
+                assert!(node.unlocked, "EmberSpindle should be unlocked");
+            } else {
+                assert!(!node.unlocked, "node {:?} should be locked", node.id);
+            }
         }
-        // Staggered unlock timer cleared
         assert_eq!(loom.persistent.second_node_unlock_elapsed, None);
     }
 
@@ -1523,8 +1532,13 @@ mod tests {
     #[test]
     fn test_node_effective_rate_level2_scales_correctly() {
         let mut loom = LoomState::new();
-        initialize_loom(&mut loom);
-        // SilenceWell is unlocked by RunDeep (no throughput multiplier for RunDeep on SilenceWell).
+        // Manually unlock SilenceWell for this test
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::SilenceWell)
+            .unwrap()
+            .unlocked = true;
         let well = loom
             .persistent
             .nodes
@@ -2267,7 +2281,9 @@ mod external_bonus_tests {
     #[test]
     fn test_tick_refinery_pull_basic() {
         let mut loom = LoomState::new();
-        initialize_loom(&mut loom);
+        for node in loom.persistent.nodes.iter_mut() {
+            node.unlocked = true;
+        }
 
         let mut r = Refinery::new(
             Resource::Ember,
@@ -2298,7 +2314,9 @@ mod external_bonus_tests {
     #[test]
     fn test_tick_refinery_pull_contention_splits_evenly() {
         let mut loom = LoomState::new();
-        initialize_loom(&mut loom);
+        for node in loom.persistent.nodes.iter_mut() {
+            node.unlocked = true;
+        }
 
         // Two T1 refineries both pulling from EmberSpindle (and VoidCondenser).
         for _ in 0..2 {

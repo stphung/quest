@@ -1118,27 +1118,28 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         grid_area,
     );
 
-    // ── Factory floor: 3x2 grid of machine nodes ─────────────────────────────
-    // Laid out as a snake following the cycle:
-    //   Row 0: ES  →  RL        (cycle: ES→RL)
-    //                  ↓         (cycle: RL→VC)
-    //   Row 1: MA  ←  VC        (cycle: VC→MA)
-    //          ↓                 (cycle: MA→SW)
-    //   Row 2: SW  →  RF        (cycle: SW→RF, RF→ES via outer loop)
+    // ── Factory floor: branching tree layout ─────────────────────────────────
+    // Diamond shape showing the two unlock paths from Ember Spindle:
+    //   Row 0:       ES            (start node, centered)
+    //              ╱    ╲
+    //   Row 1:   RL      RF       (first neighbors)
+    //            │        │
+    //   Row 2:   VC      SW       (second neighbors)
+    //              ╲    ╱
+    //   Row 3:       MA            (final node, centered)
 
-    let grid: [(NodeId, NodeId); 3] = [
-        (NodeId::EmberSpindle, NodeId::ReflectionLens),
-        (NodeId::MemoryArchive, NodeId::VoidCondenser),
-        (NodeId::SilenceWell, NodeId::ResonanceForge),
-    ];
-
+    // Grid index mapping for cursor navigation:
+    //   0 = ES (row 0, center)
+    //   1 = RL (row 1, left),  2 = RF (row 1, right)
+    //   3 = VC (row 2, left),  4 = SW (row 2, right)
+    //   5 = MA (row 3, center)
     let grid_ids = [
-        NodeId::EmberSpindle,   // 0: top-left
-        NodeId::ReflectionLens, // 1: top-right
-        NodeId::MemoryArchive,  // 2: mid-left
-        NodeId::VoidCondenser,  // 3: mid-right
-        NodeId::SilenceWell,    // 4: bottom-left
-        NodeId::ResonanceForge, // 5: bottom-right
+        NodeId::EmberSpindle,   // 0: top center
+        NodeId::ReflectionLens, // 1: left branch tier 1
+        NodeId::ResonanceForge, // 2: right branch tier 1
+        NodeId::VoidCondenser,  // 3: left branch tier 2
+        NodeId::SilenceWell,    // 4: right branch tier 2
+        NodeId::MemoryArchive,  // 5: bottom center
     ];
     let selected_id = grid_ids[ui.selected_node.min(5)];
 
@@ -1148,58 +1149,51 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         0u16
     } else {
         let refinery_grid_rows = refineries.len().div_ceil(2);
-        // 1 for separator + rows * (NODE_BOX_HEIGHT+2) for refinery boxes
         1 + (refinery_grid_rows as u16) * (NODE_BOX_HEIGHT as u16 + 2)
     };
 
-    // Split grid_area into 3 extractor rows + arrow gaps + refinery section.
-    // Each extractor row = NODE_BOX_HEIGHT, each arrow gap = 2 rows (│ + ▼/▲).
+    // Layout: 4 extractor rows (single, pair, pair, single) + 3 arrow gaps + refineries.
     let box_h = NODE_BOX_HEIGHT as u16;
-    let gap_h = 2u16;
-    let extractor_total_h = 3 * box_h + 2 * gap_h;
+    let gap_h = 1u16;
+    let extractor_total_h = 4 * box_h + 3 * gap_h;
     let content_h = extractor_total_h + refinery_row_count;
 
-    // Vertical centering: split remaining space equally above and below.
     let v_pad = grid_area.height.saturating_sub(content_h) / 2;
 
     let mut row_constraints: Vec<Constraint> = Vec::new();
-    row_constraints.push(Constraint::Length(v_pad)); // top padding
-    for i in 0..3 {
-        row_constraints.push(Constraint::Length(box_h)); // node row
-        if i < 2 {
-            row_constraints.push(Constraint::Length(gap_h)); // arrow gap
+    row_constraints.push(Constraint::Length(v_pad));
+    for i in 0..4 {
+        row_constraints.push(Constraint::Length(box_h));
+        if i < 3 {
+            row_constraints.push(Constraint::Length(gap_h));
         }
     }
     if refinery_row_count > 0 {
         row_constraints.push(Constraint::Length(refinery_row_count));
     }
-    row_constraints.push(Constraint::Min(0)); // absorb remaining space (bottom padding)
+    row_constraints.push(Constraint::Min(0));
 
     let row_rects = Layout::default()
         .direction(Direction::Vertical)
         .constraints(row_constraints)
         .split(grid_area);
 
-    // Indices into row_rects: 0=top pad, 1=extractor row 0, 2=gap, 3=extractor row 1, 4=gap, 5=extractor row 2
-    // Then 6=refinery section (if present), last=spacer
-    let extractor_row_rects = [row_rects[1], row_rects[3], row_rects[5]];
-    let gap_rects = [row_rects[2], row_rects[4]];
+    // Indices: 0=pad, 1=row0(ES), 2=gap, 3=row1(RL,RF), 4=gap, 5=row2(VC,SW), 6=gap, 7=row3(MA)
+    // Then 8=refinery section (if present), last=spacer
+    let node_row_rects = [row_rects[1], row_rects[3], row_rects[5], row_rects[7]];
+    let gap_rects = [row_rects[2], row_rects[4], row_rects[6]];
 
-    let flow_color = Color::Rgb(60, 45, 80);
+    let _flow_color = Color::Rgb(60, 45, 80);
     let flow_arrow_color = Color::Rgb(120, 80, 180);
 
-    // Horizontal centering: compute padding to center the 2-column grid.
     let node_w = NODE_BOX_WIDTH as u16;
-    let h_gap_w = 4u16.min(grid_area.width.saturating_sub(node_w * 2)); // 4-col gap between nodes
+    let h_gap_w = 4u16.min(grid_area.width.saturating_sub(node_w * 2));
     let grid_total_w = node_w * 2 + h_gap_w;
     let h_pad = grid_area.width.saturating_sub(grid_total_w) / 2;
 
-    // Render each extractor row (2 nodes + horizontal arrow gap).
-    for (row_idx, (left_id, right_id)) in grid.iter().enumerate() {
-        let row_area = extractor_row_rects[row_idx];
-
-        // Split row into: pad | left_node | h_gap | right_node | pad
-        let row_cols = Layout::default()
+    // Helper: split a row into left/right columns with centering.
+    let split_pair_row = |row_area: Rect| -> (Rect, Rect) {
+        let cols = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Length(h_pad),
@@ -1209,162 +1203,239 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
                 Constraint::Min(0),
             ])
             .split(row_area);
-        let left_rect = row_cols[1];
-        let h_gap_rect = row_cols[2];
-        let right_rect = row_cols[3];
+        (cols[1], cols[3])
+    };
 
-        // Render left node.
-        if let Some(left_node) = loom_state
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == *left_id)
-        {
-            let is_sel = ui.selected_node < 6 && *left_id == selected_id;
-            render_node_widget(frame, left_rect, left_node, loom_state, is_sel);
-        }
-
-        // Render right node.
-        if let Some(right_node) = loom_state
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == *right_id)
-        {
-            let is_sel = ui.selected_node < 6 && *right_id == selected_id;
-            render_node_widget(frame, right_rect, right_node, loom_state, is_sel);
-        }
-
-        // Horizontal arrow in gap (only rows 0 and 2).
-        if h_gap_rect.width > 0 && h_gap_rect.height > 0 {
-            // Place arrow at vertical center of the gap.
-            let arrow_y = h_gap_rect.y + h_gap_rect.height / 2;
-            let arrow_area = Rect {
-                x: h_gap_rect.x,
-                y: arrow_y,
-                width: h_gap_rect.width,
-                height: 1,
-            };
-            let arrow_text = match row_idx {
-                0 => {
-                    // ES ──▶ RL
-                    let w = arrow_area.width as usize;
-                    let mut s = "\u{2500}".repeat(w.saturating_sub(1));
-                    s.push('\u{25b6}');
-                    Line::from(vec![
-                        Span::styled(
-                            s[..s.len().saturating_sub(3)].to_string(),
-                            Style::default().fg(flow_color),
-                        ),
-                        Span::styled(
-                            "\u{25b6}".to_string(),
-                            Style::default().fg(flow_arrow_color),
-                        ),
-                    ])
-                }
-                2 => {
-                    // SW ◀── RF
-                    let w = arrow_area.width as usize;
-                    let dashes = "\u{2500}".repeat(w.saturating_sub(1));
-                    Line::from(vec![
-                        Span::styled(
-                            "\u{25c0}".to_string(),
-                            Style::default().fg(flow_arrow_color),
-                        ),
-                        Span::styled(dashes, Style::default().fg(flow_color)),
-                    ])
-                }
-                _ => Line::from(""),
-            };
-            let para = Paragraph::new(arrow_text).style(Style::default().bg(LOOM_BG));
-            frame.render_widget(para, arrow_area);
-        }
-    }
-
-    // Vertical arrows in the gap rows between extractor rows.
-    // With gap_h=2, we render: row 0 = │ (pipe), row 1 = ▼ or ▲ (arrowhead).
-    for gap_rect in &gap_rects {
-        if gap_rect.width == 0 || gap_rect.height == 0 {
-            continue;
-        }
-        // Split gap the same way as node rows to find node centers.
-        let gap_cols = Layout::default()
+    // Helper: center a single node in a row.
+    let center_single_row = |row_area: Rect| -> Rect {
+        let center_pad = row_area.width.saturating_sub(node_w) / 2;
+        let cols = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(h_pad),
-                Constraint::Length(node_w),
-                Constraint::Length(h_gap_w),
+                Constraint::Length(center_pad),
                 Constraint::Length(node_w),
                 Constraint::Min(0),
             ])
-            .split(*gap_rect);
+            .split(row_area);
+        cols[1]
+    };
 
-        // Right side: down arrows (RL→VC, VC→RF).
-        let right_center_x = gap_cols[3].x + gap_cols[3].width / 2;
-        if right_center_x >= gap_rect.x && right_center_x < gap_rect.x + gap_rect.width {
-            // Pipe character on first row of gap.
-            if gap_rect.height >= 2 {
-                let pipe_rect = Rect {
-                    x: right_center_x,
-                    y: gap_rect.y,
+    // Row 0: Ember Spindle (centered).
+    let es_rect = center_single_row(node_row_rects[0]);
+    if let Some(node) = loom_state
+        .persistent
+        .nodes
+        .iter()
+        .find(|n| n.id == NodeId::EmberSpindle)
+    {
+        render_node_widget(
+            frame,
+            es_rect,
+            node,
+            loom_state,
+            ui.selected_node < 6 && selected_id == NodeId::EmberSpindle,
+        );
+    }
+
+    // Row 1: Reflection Lens (left) + Resonance Forge (right).
+    let (rl_rect, rf_rect) = split_pair_row(node_row_rects[1]);
+    if let Some(node) = loom_state
+        .persistent
+        .nodes
+        .iter()
+        .find(|n| n.id == NodeId::ReflectionLens)
+    {
+        render_node_widget(
+            frame,
+            rl_rect,
+            node,
+            loom_state,
+            ui.selected_node < 6 && selected_id == NodeId::ReflectionLens,
+        );
+    }
+    if let Some(node) = loom_state
+        .persistent
+        .nodes
+        .iter()
+        .find(|n| n.id == NodeId::ResonanceForge)
+    {
+        render_node_widget(
+            frame,
+            rf_rect,
+            node,
+            loom_state,
+            ui.selected_node < 6 && selected_id == NodeId::ResonanceForge,
+        );
+    }
+
+    // Row 2: Void Condenser (left) + Silence Well (right).
+    let (vc_rect, sw_rect) = split_pair_row(node_row_rects[2]);
+    if let Some(node) = loom_state
+        .persistent
+        .nodes
+        .iter()
+        .find(|n| n.id == NodeId::VoidCondenser)
+    {
+        render_node_widget(
+            frame,
+            vc_rect,
+            node,
+            loom_state,
+            ui.selected_node < 6 && selected_id == NodeId::VoidCondenser,
+        );
+    }
+    if let Some(node) = loom_state
+        .persistent
+        .nodes
+        .iter()
+        .find(|n| n.id == NodeId::SilenceWell)
+    {
+        render_node_widget(
+            frame,
+            sw_rect,
+            node,
+            loom_state,
+            ui.selected_node < 6 && selected_id == NodeId::SilenceWell,
+        );
+    }
+
+    // Row 3: Memory Archive (centered).
+    let ma_rect = center_single_row(node_row_rects[3]);
+    if let Some(node) = loom_state
+        .persistent
+        .nodes
+        .iter()
+        .find(|n| n.id == NodeId::MemoryArchive)
+    {
+        render_node_widget(
+            frame,
+            ma_rect,
+            node,
+            loom_state,
+            ui.selected_node < 6 && selected_id == NodeId::MemoryArchive,
+        );
+    }
+
+    // ── Arrows between rows ─────────────────────────────────────────────────
+
+    // Gap 0 (ES → RL, ES → RF): diagonal arrows from center down to left and right.
+    if gap_rects[0].height > 0 {
+        let es_center_x = es_rect.x + es_rect.width / 2;
+        let rl_center_x = rl_rect.x + rl_rect.width / 2;
+        let rf_center_x = rf_rect.x + rf_rect.width / 2;
+        let gy = gap_rects[0].y;
+        // Left diagonal: ╲
+        let diag_left_x = (es_center_x + rl_center_x) / 2;
+        if diag_left_x >= gap_rects[0].x && diag_left_x < gap_rects[0].x + gap_rects[0].width {
+            frame.render_widget(
+                Paragraph::new(Span::styled(
+                    "\u{25bc}",
+                    Style::default().fg(flow_arrow_color),
+                ))
+                .style(Style::default().bg(LOOM_BG)),
+                Rect {
+                    x: rl_center_x,
+                    y: gy,
                     width: 1,
                     height: 1,
-                };
-                let pipe =
-                    Paragraph::new(Span::styled("\u{2502}", Style::default().fg(flow_color)))
-                        .style(Style::default().bg(LOOM_BG));
-                frame.render_widget(pipe, pipe_rect);
-            }
-            // Arrowhead on last row of gap.
-            let arrow_rect = Rect {
-                x: right_center_x,
-                y: gap_rect.y + gap_rect.height - 1,
-                width: 1,
-                height: 1,
-            };
-            let para = Paragraph::new(Span::styled(
+                },
+            );
+        }
+        // Right diagonal: ╱
+        let diag_right_x = (es_center_x + rf_center_x) / 2;
+        if diag_right_x >= gap_rects[0].x && diag_right_x < gap_rects[0].x + gap_rects[0].width {
+            frame.render_widget(
+                Paragraph::new(Span::styled(
+                    "\u{25bc}",
+                    Style::default().fg(flow_arrow_color),
+                ))
+                .style(Style::default().bg(LOOM_BG)),
+                Rect {
+                    x: rf_center_x,
+                    y: gy,
+                    width: 1,
+                    height: 1,
+                },
+            );
+        }
+    }
+
+    // Gap 1 (RL → VC, RF → SW): straight down arrows.
+    if gap_rects[1].height > 0 {
+        let rl_center_x = rl_rect.x + rl_rect.width / 2;
+        let rf_center_x = rf_rect.x + rf_rect.width / 2;
+        let gy = gap_rects[1].y;
+        frame.render_widget(
+            Paragraph::new(Span::styled(
                 "\u{25bc}",
                 Style::default().fg(flow_arrow_color),
             ))
-            .style(Style::default().bg(LOOM_BG));
-            frame.render_widget(para, arrow_rect);
-        }
-
-        // Left side: up arrows (SW→MA, MA→ES).
-        let left_center_x = gap_cols[1].x + gap_cols[1].width / 2;
-        if left_center_x >= gap_rect.x && left_center_x < gap_rect.x + gap_rect.width {
-            // Arrowhead on first row of gap.
-            let arrow_rect = Rect {
-                x: left_center_x,
-                y: gap_rect.y,
+            .style(Style::default().bg(LOOM_BG)),
+            Rect {
+                x: rl_center_x,
+                y: gy,
                 width: 1,
                 height: 1,
-            };
-            let para = Paragraph::new(Span::styled(
-                "\u{25b2}",
+            },
+        );
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                "\u{25bc}",
                 Style::default().fg(flow_arrow_color),
             ))
-            .style(Style::default().bg(LOOM_BG));
-            frame.render_widget(para, arrow_rect);
-            // Pipe character on second row of gap.
-            if gap_rect.height >= 2 {
-                let pipe_rect = Rect {
-                    x: left_center_x,
-                    y: gap_rect.y + gap_rect.height - 1,
+            .style(Style::default().bg(LOOM_BG)),
+            Rect {
+                x: rf_center_x,
+                y: gy,
+                width: 1,
+                height: 1,
+            },
+        );
+    }
+
+    // Gap 2 (VC → MA, SW → MA): converging arrows to center.
+    if gap_rects[2].height > 0 {
+        let ma_center_x = ma_rect.x + ma_rect.width / 2;
+        let vc_center_x = vc_rect.x + vc_rect.width / 2;
+        let sw_center_x = sw_rect.x + sw_rect.width / 2;
+        let gy = gap_rects[2].y;
+        let diag_left_x = (vc_center_x + ma_center_x) / 2;
+        if diag_left_x >= gap_rects[2].x && diag_left_x < gap_rects[2].x + gap_rects[2].width {
+            frame.render_widget(
+                Paragraph::new(Span::styled(
+                    "\u{25bc}",
+                    Style::default().fg(flow_arrow_color),
+                ))
+                .style(Style::default().bg(LOOM_BG)),
+                Rect {
+                    x: ma_center_x.saturating_sub(2),
+                    y: gy,
                     width: 1,
                     height: 1,
-                };
-                let pipe =
-                    Paragraph::new(Span::styled("\u{2502}", Style::default().fg(flow_color)))
-                        .style(Style::default().bg(LOOM_BG));
-                frame.render_widget(pipe, pipe_rect);
-            }
+                },
+            );
+        }
+        let diag_right_x = (sw_center_x + ma_center_x) / 2;
+        if diag_right_x >= gap_rects[2].x && diag_right_x < gap_rects[2].x + gap_rects[2].width {
+            frame.render_widget(
+                Paragraph::new(Span::styled(
+                    "\u{25bc}",
+                    Style::default().fg(flow_arrow_color),
+                ))
+                .style(Style::default().bg(LOOM_BG)),
+                Rect {
+                    x: ma_center_x + 2,
+                    y: gy,
+                    width: 1,
+                    height: 1,
+                },
+            );
         }
     }
 
     // ── Refineries: render below the extractor grid ──────────────────────────
     if !refineries.is_empty() {
-        let refinery_section = row_rects[6]; // index 6 = after top pad + 3 extractor rows + 2 gaps
+        let refinery_section = row_rects[8]; // index 8 = after top pad + 4 extractor rows + 3 gaps
 
         // Separator label.
         let sep_rect = Rect {
