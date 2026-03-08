@@ -14,6 +14,6 @@ mod progression;
 #[allow(unused_imports)]
 pub use access::sync_account_zone_unlocks;
 pub use boss_defeat::BossDefeatResult;
-pub use data::{get_all_zones, get_zone, Subzone, Zone};
+pub use data::{get_all_zones, get_subzone, get_zone, Subzone, Zone};
 pub use fracture::FractureRegion;
 pub use progression::ZoneProgression;

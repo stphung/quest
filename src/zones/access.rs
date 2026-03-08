@@ -27,9 +27,8 @@ pub fn sync_account_zone_unlocks(
             }
         }
     }
-    let zones = crate::zones::data::get_all_zones();
     for zone_id in 12..=fracture_zone_cap {
-        if let Some(zone) = zones.iter().find(|z| z.id == zone_id) {
+        if let Some(zone) = crate::zones::data::get_zone(zone_id) {
             if prestige_rank >= zone.prestige_requirement {
                 prog.unlock_zone(zone_id);
             }
@@ -49,7 +48,7 @@ pub fn sync_account_zone_unlocks(
         if ascension_level < required_ascension {
             continue;
         }
-        if let Some(zone) = zones.iter().find(|z| z.id == zone_id) {
+        if let Some(zone) = crate::zones::data::get_zone(zone_id) {
             if prestige_rank >= zone.prestige_requirement {
                 prog.unlock_zone(zone_id);
             }

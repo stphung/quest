@@ -9,8 +9,7 @@ impl ZoneProgression {
     /// Advances to the next subzone within the current zone.
     /// Returns true if successful.
     pub fn advance_to_next_subzone(&mut self) -> bool {
-        let zones = get_all_zones();
-        let zone = zones.iter().find(|z| z.id == self.current_zone_id);
+        let zone = super::data::get_zone(self.current_zone_id);
 
         if let Some(zone) = zone {
             let max_subzone = zone.subzones.len() as u32;
@@ -28,10 +27,9 @@ impl ZoneProgression {
     /// Advances to the next zone.
     /// Returns true if successful.
     pub fn advance_to_next_zone(&mut self, prestige_rank: u32) -> bool {
-        let zones = get_all_zones();
         let next_zone_id = self.current_zone_id + 1;
 
-        if let Some(next_zone) = zones.iter().find(|z| z.id == next_zone_id) {
+        if let Some(next_zone) = super::data::get_zone(next_zone_id) {
             if self.can_unlock_zone(next_zone, prestige_rank) {
                 self.unlock_zone(next_zone_id);
                 self.current_zone_id = next_zone_id;

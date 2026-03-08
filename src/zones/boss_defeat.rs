@@ -1,6 +1,6 @@
 //! Boss defeat handling and result types.
 
-use super::data::get_all_zones;
+use super::data::get_zone;
 use super::progression::ZoneProgression;
 use crate::achievements::{AchievementId, Achievements};
 use crate::core::constants::{EXPANSE_ZONE_ID, FINAL_ZONE_ID};
@@ -43,8 +43,7 @@ impl ZoneProgression {
         let zone_id = self.current_zone_id;
         let subzone_id = self.current_subzone_id;
 
-        let zones = get_all_zones();
-        let Some(zone) = zones.iter().find(|z| z.id == zone_id) else {
+        let Some(zone) = get_zone(zone_id) else {
             return BossDefeatResult::SubzoneComplete {
                 new_subzone_id: self.current_subzone_id,
             };
@@ -95,7 +94,7 @@ impl ZoneProgression {
             }
 
             // Can't advance - either no more zones or prestige-gated
-            let next_zone = zones.iter().find(|z| z.id == zone_id + 1);
+            let next_zone = get_zone(zone_id + 1);
             if let Some(next) = next_zone {
                 return BossDefeatResult::ZoneCompleteButGated {
                     zone_name: zone.name.to_string(),
@@ -127,8 +126,7 @@ impl ZoneProgression {
         let zone_id = self.current_zone_id;
         let subzone_id = self.current_subzone_id;
 
-        let zones = get_all_zones();
-        let Some(zone) = zones.iter().find(|z| z.id == zone_id) else {
+        let Some(zone) = get_zone(zone_id) else {
             return BossDefeatResult::SubzoneComplete {
                 new_subzone_id: self.current_subzone_id,
             };
@@ -226,7 +224,7 @@ impl ZoneProgression {
 
         // Fallback for pre-game zones: prestige-gated
         if zone_id < EXPANSE_ZONE_ID {
-            let next_zone = zones.iter().find(|z| z.id == zone_id + 1);
+            let next_zone = get_zone(zone_id + 1);
             if let Some(next) = next_zone {
                 return BossDefeatResult::ZoneCompleteButGated {
                     zone_name: zone.name.to_string(),
