@@ -385,8 +385,10 @@ pub struct LoomUiState {
     pub open: bool,
     pub view: LoomView,
     pub selected_node: usize,
-    /// Scroll offset for the Codex view (number of lines scrolled down).
-    pub codex_scroll: usize,
+    /// Codex graph cursor: column (0=Base, 1=Confluence, 2=Terminal).
+    pub codex_column: usize,
+    /// Codex graph cursor: row within current column.
+    pub codex_row: usize,
     /// Frame counter for throbber animation (incremented each render call).
     pub throbber_frame: u32,
     /// Active build flow state, if any.
@@ -399,7 +401,8 @@ impl LoomUiState {
             open: false,
             view: LoomView::FlowView,
             selected_node: 0,
-            codex_scroll: 0,
+            codex_column: 0,
+            codex_row: 0,
             throbber_frame: 0,
             build: None,
         }

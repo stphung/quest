@@ -1492,8 +1492,89 @@ fn build_ratio_bar(ratio: f64, width: usize) -> String {
     format!("{}{}", "\u{2588}".repeat(filled), "\u{2591}".repeat(empty))
 }
 
+/// Resource lists for each codex column.
+const CODEX_BASE: [crate::loom::types::Resource; 6] = {
+    use crate::loom::types::Resource;
+    [
+        Resource::Ember,
+        Resource::VoidEssence,
+        Resource::Reflection,
+        Resource::Memory,
+        Resource::Silence,
+        Resource::Resonance,
+    ]
+};
+
+const CODEX_CONFLUENCE: [crate::loom::types::Resource; 6] = {
+    use crate::loom::types::Resource;
+    [
+        Resource::ForgedLight,
+        Resource::CondensedEmber,
+        Resource::EmberEcho,
+        Resource::PurifiedVoid,
+        Resource::EchoGlass,
+        Resource::StillbornSong,
+    ]
+};
+
+const CODEX_TERMINAL: [crate::loom::types::Resource; 1] =
+    [crate::loom::types::Resource::WovenReality];
+
+/// Get the resource at a given (column, row) in the codex graph.
+fn codex_resource_at(col: usize, row: usize) -> Option<crate::loom::types::Resource> {
+    match col {
+        0 => CODEX_BASE.get(row).copied(),
+        1 => CODEX_CONFLUENCE.get(row).copied(),
+        2 => CODEX_TERMINAL.get(row).copied(),
+        _ => None,
+    }
+}
+
+/// Number of resources in a codex column.
+fn codex_column_len(col: usize) -> usize {
+    match col {
+        0 => 6,
+        1 => 6,
+        2 => 1,
+        _ => 0,
+    }
+}
+
+/// Check if a recipe is discovered in the codex.
+fn is_recipe_discovered(
+    codex: &[crate::loom::types::CodexEntry],
+    recipe: &crate::loom::recipes::Recipe,
+) -> bool {
+    codex.iter().any(|e| {
+        e.discovered
+            && e.output == recipe.output
+            && e.node_nature == recipe.node_nature
+            && e.inputs.len() == 2
+            && ((e.inputs[0] == recipe.input_a && e.inputs[1] == recipe.input_b)
+                || (e.inputs[0] == recipe.input_b && e.inputs[1] == recipe.input_a))
+    })
+}
+
+/// Check if a confluence resource has been discovered (at least one recipe producing it is known).
+fn is_resource_discovered(
+    codex: &[crate::loom::types::CodexEntry],
+    resource: crate::loom::types::Resource,
+) -> bool {
+    use crate::loom::types::Resource;
+    // Base resources are always discovered.
+    matches!(
+        resource,
+        Resource::Ember
+            | Resource::Reflection
+            | Resource::VoidEssence
+            | Resource::Memory
+            | Resource::Silence
+            | Resource::Resonance
+    ) || codex.iter().any(|e| e.discovered && e.output == resource)
+}
+
 fn render_codex(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &LoomUiState) {
-    use crate::loom::recipes::all_recipes;
+    use crate::loom::recipes::{all_recipes, recipes_producing, recipes_using};
 
     let discovered_count = loom_state
         .persistent
@@ -1502,86 +1583,345 @@ fn render_codex(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &Loom
         .filter(|e| e.discovered)
         .count();
     let total_recipes = all_recipes().len();
-    let hint_indices = crate::loom::logic::codex_hint_indices(&loom_state.persistent.codex);
-    let hint_count = hint_indices.len();
 
-    let count_label = format!("  {}/{} Discovered", discovered_count, total_recipes);
+    // Split area into top (topology graph ~60%) and bottom (detail panel ~40%).
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(58),
+            Constraint::Percentage(38),
+            Constraint::Length(1), // footer
+        ])
+        .split(area);
+    let graph_area = chunks[0];
+    let detail_area = chunks[1];
+    let footer_area = chunks[2];
 
-    let mut lines = vec![
-        Line::from(""),
-        Line::from(vec![
-            Span::styled(
-                "Recipe Codex",
-                Style::default().fg(Color::Rgb(180, 120, 220)),
-            ),
-            Span::styled(count_label, Style::default().fg(Color::DarkGray)),
-        ]),
-        Line::from(""),
+    // ── Top half: Topology graph ──────────────────────────────────────────────
+    let mut graph_lines: Vec<Line<'static>> = Vec::new();
+
+    graph_lines.push(Line::from(""));
+
+    // Build header line with column labels.
+    {
+        let mut spans = vec![Span::raw("  ")];
+        let header_style = Style::default().fg(Color::Rgb(140, 100, 180));
+        spans.push(Span::styled(format!("{:<24}", "BASE"), header_style));
+        spans.push(Span::styled(format!("{:<26}", "CONFLUENCE"), header_style));
+        spans.push(Span::styled("TERMINAL", header_style));
+        graph_lines.push(Line::from(spans));
+    }
+    graph_lines.push(Line::from(""));
+
+    // Build the graph rows. We'll render the maximum column length (6 rows).
+    let max_rows = 6usize;
+    let codex = &loom_state.persistent.codex;
+
+    // Primary connection map: base resources → their primary confluence target.
+    // Used for rendering connection indicators.
+    let connections: &[(usize, usize)] = &[
+        (0, 0), // Ember → ForgedLight
+        (1, 0), // VoidEssence → ForgedLight
+        (3, 4), // Memory → EchoGlass
+        (4, 4), // Silence → EchoGlass
+        (5, 5), // Resonance → StillbornSong
     ];
+    // Confluence → Terminal connections.
+    let conf_to_term: &[usize] = &[0, 4]; // ForgedLight, EchoGlass → WovenReality
 
-    if discovered_count == 0 && hint_count == 0 {
-        lines.push(Line::from(Span::styled(
-            "No recipes discovered yet.",
-            Style::default().fg(Color::DarkGray),
-        )));
-        lines.push(Line::from(Span::styled(
-            "Process resources through nodes to reveal reactions.",
-            Style::default().fg(Color::Rgb(80, 60, 100)),
-        )));
-    } else {
-        // Discovered recipes with proper nature names and output multiplier.
-        for entry in loom_state.persistent.codex.iter().filter(|e| e.discovered) {
-            let inputs: Vec<&str> = entry.inputs.iter().map(|r| resource_name(r)).collect();
-            let nature = node_nature_name(entry.node_nature);
-            lines.push(Line::from(vec![
-                Span::styled(
-                    format!(" {} @ {}", inputs.join(" + "), nature),
-                    Style::default().fg(Color::Rgb(160, 100, 200)),
-                ),
-                Span::styled(" \u{2192} ", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    resource_name(&entry.output),
-                    Style::default().fg(Color::Rgb(220, 180, 255)),
-                ),
-                Span::styled(
-                    format!(" (x{:.1})", entry.output_amount),
-                    Style::default().fg(Color::Rgb(130, 90, 170)),
-                ),
-            ]));
+    for row in 0..max_rows {
+        let mut spans: Vec<Span<'static>> = Vec::new();
+        spans.push(Span::raw("  "));
+
+        // ── Base column ──
+        if let Some(res) = codex_resource_at(0, row) {
+            let is_selected = ui.codex_column == 0 && ui.codex_row == row;
+            let name = resource_name(&res);
+            let emoji = resource_emoji(&res);
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 200))
+                    .bg(Color::Rgb(60, 40, 80))
+            } else {
+                Style::default().fg(Color::Rgb(180, 140, 220))
+            };
+            let cursor = if is_selected { "\u{25b6} " } else { "  " };
+            spans.push(Span::styled(format!("{}{} {}", cursor, emoji, name), style));
+            // Pad to column width.
+            let label_len = 2 + 2 + 1 + name.len(); // cursor(2) + emoji(2) + space(1) + name
+            let pad = 22usize.saturating_sub(label_len);
+
+            // Connection indicator: check if this base resource connects to a confluence.
+            let has_connection = connections.iter().any(|(b, _)| *b == row);
+            if has_connection {
+                let pad_str = " ".repeat(pad.saturating_sub(3));
+                spans.push(Span::styled(
+                    format!("{}\u{2500}\u{2500}\u{25b6}", pad_str),
+                    Style::default().fg(Color::Rgb(80, 60, 120)),
+                ));
+            } else {
+                spans.push(Span::raw(" ".repeat(pad)));
+            }
+        } else {
+            spans.push(Span::raw("                        "));
         }
 
-        // "???" hints for adjacent undiscovered recipes — show all of them (scrollable).
-        if hint_count > 0 {
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                format!(
-                    " {} adjacent reaction{} hinted:",
-                    hint_count,
-                    if hint_count == 1 { "" } else { "s" }
-                ),
-                Style::default().fg(Color::DarkGray),
-            )));
-            for _ in 0..hint_count {
-                lines.push(Line::from(Span::styled(
-                    " ??? + ??? @ ??? \u{2192} ???",
-                    Style::default().fg(Color::Rgb(60, 45, 80)),
-                )));
+        // ── Confluence column ──
+        if let Some(res) = codex_resource_at(1, row) {
+            let is_selected = ui.codex_column == 1 && ui.codex_row == row;
+            let discovered = is_resource_discovered(codex, res);
+            let name = if discovered {
+                resource_name(&res)
+            } else {
+                "???"
+            };
+            let emoji = if discovered {
+                resource_emoji(&res)
+            } else {
+                "\u{2753}"
+            }; // ❓
+            let tier_mark = if discovered { "\u{2726} " } else { "  " }; // ✦
+
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 200))
+                    .bg(Color::Rgb(60, 40, 80))
+            } else if discovered {
+                Style::default().fg(Color::Rgb(200, 160, 240))
+            } else {
+                Style::default().fg(Color::Rgb(60, 45, 80))
+            };
+
+            let cursor = if is_selected { "\u{25b6} " } else { "  " };
+            spans.push(Span::styled(
+                format!("{}{}{} {}", cursor, tier_mark, emoji, name),
+                style,
+            ));
+            // Pad and add terminal connection if applicable.
+            let label_len = 2 + 2 + 2 + 1 + name.len();
+            let pad = 24usize.saturating_sub(label_len);
+
+            let has_term_conn = conf_to_term.contains(&row);
+            if has_term_conn {
+                let pad_str = " ".repeat(pad.saturating_sub(3));
+                spans.push(Span::styled(
+                    format!("{}\u{2500}\u{2500}\u{25b6}", pad_str),
+                    Style::default().fg(Color::Rgb(80, 60, 120)),
+                ));
+            } else {
+                spans.push(Span::raw(" ".repeat(pad)));
             }
+        } else {
+            spans.push(Span::raw("                          "));
+        }
+
+        // ── Terminal column ──
+        if let Some(res) = codex_resource_at(2, row) {
+            let is_selected = ui.codex_column == 2 && ui.codex_row == row;
+            let discovered = is_resource_discovered(codex, res);
+            let name = if discovered {
+                resource_name(&res)
+            } else {
+                "???"
+            };
+            let emoji = if discovered {
+                resource_emoji(&res)
+            } else {
+                "\u{2753}"
+            };
+            let star = if discovered { "\u{2605} " } else { "  " }; // ★
+
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 200))
+                    .bg(Color::Rgb(60, 40, 80))
+            } else if discovered {
+                Style::default().fg(Color::Rgb(255, 215, 0))
+            } else {
+                Style::default().fg(Color::Rgb(60, 45, 80))
+            };
+
+            let cursor = if is_selected { "\u{25b6} " } else { "  " };
+            spans.push(Span::styled(
+                format!("{}{}{} {}", cursor, star, emoji, name),
+                style,
+            ));
+        }
+
+        graph_lines.push(Line::from(spans));
+    }
+
+    let graph_para = Paragraph::new(graph_lines)
+        .alignment(Alignment::Left)
+        .style(Style::default().bg(LOOM_BG));
+    frame.render_widget(graph_para, graph_area);
+
+    // ── Bottom half: Detail panel ─────────────────────────────────────────────
+    let selected_resource = codex_resource_at(ui.codex_column, ui.codex_row);
+    let mut detail_lines: Vec<Line<'static>> = Vec::new();
+
+    if let Some(res) = selected_resource {
+        let res_discovered = is_resource_discovered(codex, res);
+        let display_name = if res_discovered {
+            format!("{} {}", resource_emoji(&res), resource_name(&res))
+        } else {
+            "???".to_string()
+        };
+
+        // Separator + header.
+        let sep_width = area.width as usize;
+        let sep_line = format!(
+            " \u{2500}\u{2500}\u{2500} {} {}",
+            display_name,
+            "\u{2500}".repeat(sep_width.saturating_sub(display_name.len() + 6))
+        );
+        detail_lines.push(Line::from(Span::styled(
+            sep_line,
+            Style::default().fg(Color::Rgb(100, 70, 140)),
+        )));
+
+        // Split detail area into two sub-columns.
+        let producing = recipes_producing(res);
+        let using = recipes_using(res);
+
+        // "Made from:" column
+        let made_from_header = Line::from(vec![
+            Span::styled(
+                "  Made from:                        ",
+                Style::default().fg(Color::Rgb(140, 100, 180)),
+            ),
+            Span::styled("Used in:", Style::default().fg(Color::Rgb(140, 100, 180))),
+        ]);
+        detail_lines.push(made_from_header);
+
+        let max_detail_rows = (detail_area.height as usize).saturating_sub(3);
+        let max_entries = producing.len().max(using.len()).min(max_detail_rows);
+
+        for i in 0..max_entries {
+            let mut spans: Vec<Span<'static>> = Vec::new();
+
+            // Left sub-column: "Made from" recipes.
+            if i < producing.len() {
+                let recipe = &producing[i];
+                let disc = is_recipe_discovered(codex, recipe);
+                if disc {
+                    let text = format!(
+                        "   {} + {} @ {} (x{:.1}) \u{2713}",
+                        resource_name(&recipe.input_a),
+                        resource_name(&recipe.input_b),
+                        node_nature_name(recipe.node_nature),
+                        recipe.amount,
+                    );
+                    // Pad to ~36 chars.
+                    let padded = format!("{:<36}", text);
+                    spans.push(Span::styled(
+                        padded,
+                        Style::default().fg(Color::Rgb(160, 130, 200)),
+                    ));
+                } else {
+                    let text = "   ??? + ??? @ ??? \u{2192} ???";
+                    let padded = format!("{:<36}", text);
+                    spans.push(Span::styled(
+                        padded,
+                        Style::default().fg(Color::Rgb(60, 45, 80)),
+                    ));
+                }
+            } else {
+                spans.push(Span::raw("                                    "));
+            }
+
+            // Right sub-column: "Used in" recipes.
+            if i < using.len() {
+                let recipe = &using[i];
+                let disc = is_recipe_discovered(codex, recipe);
+                if disc {
+                    let other_input = if recipe.input_a == res {
+                        resource_name(&recipe.input_b)
+                    } else {
+                        resource_name(&recipe.input_a)
+                    };
+                    let output_discovered = is_resource_discovered(codex, recipe.output);
+                    let output_name = if output_discovered {
+                        resource_name(&recipe.output)
+                    } else {
+                        "???"
+                    };
+                    let text = format!(
+                        "+ {} @ {} \u{2192} {} (x{:.1})",
+                        other_input,
+                        node_nature_name(recipe.node_nature),
+                        output_name,
+                        recipe.amount,
+                    );
+                    spans.push(Span::styled(
+                        text,
+                        Style::default().fg(Color::Rgb(160, 130, 200)),
+                    ));
+                } else {
+                    spans.push(Span::styled(
+                        "+ ??? @ ??? \u{2192} ???",
+                        Style::default().fg(Color::Rgb(60, 45, 80)),
+                    ));
+                }
+            }
+
+            detail_lines.push(Line::from(spans));
+        }
+
+        // Show remaining undiscovered counts if we couldn't fit them all.
+        let remaining_producing = producing
+            .iter()
+            .skip(max_entries)
+            .filter(|r| !is_recipe_discovered(codex, r))
+            .count();
+        let remaining_using = using
+            .iter()
+            .skip(max_entries)
+            .filter(|r| !is_recipe_discovered(codex, r))
+            .count();
+
+        if remaining_producing > 0 || remaining_using > 0 {
+            let mut spans: Vec<Span<'static>> = Vec::new();
+            if remaining_producing > 0 {
+                let text = format!("   + {} undiscovered...", remaining_producing);
+                spans.push(Span::styled(
+                    format!("{:<36}", text),
+                    Style::default().fg(Color::Rgb(60, 45, 80)),
+                ));
+            } else {
+                spans.push(Span::raw("                                    "));
+            }
+            if remaining_using > 0 {
+                spans.push(Span::styled(
+                    format!("+ {} undiscovered...", remaining_using),
+                    Style::default().fg(Color::Rgb(60, 45, 80)),
+                ));
+            }
+            detail_lines.push(Line::from(spans));
         }
     }
 
-    // Clamp scroll so it can't scroll past the last line.
-    let total_lines = lines.len();
-    let visible_rows = area.height as usize;
-    let scroll = ui
-        .codex_scroll
-        .min(total_lines.saturating_sub(visible_rows));
-
-    let para = Paragraph::new(lines)
+    let detail_para = Paragraph::new(detail_lines)
         .alignment(Alignment::Left)
-        .style(Style::default().bg(Color::Rgb(10, 5, 18)))
-        .scroll((scroll as u16, 0));
-    frame.render_widget(para, area);
+        .style(Style::default().bg(LOOM_BG));
+    frame.render_widget(detail_para, detail_area);
+
+    // ── Footer ────────────────────────────────────────────────────────────────
+    let footer_line = Line::from(vec![
+        Span::styled(
+            format!("  {}/{} Discovered", discovered_count, total_recipes),
+            Style::default().fg(Color::DarkGray),
+        ),
+        Span::raw("                    "),
+        Span::styled(
+            "\u{2190}\u{2192} Column  \u{2191}\u{2193} Resource  Tab: Flow",
+            Style::default().fg(Color::Rgb(80, 60, 120)),
+        ),
+    ]);
+    let footer_para = Paragraph::new(vec![footer_line])
+        .alignment(Alignment::Left)
+        .style(Style::default().bg(LOOM_BG));
+    frame.render_widget(footer_para, footer_area);
 }
 
 /// Returns the display name for a NodeNature.

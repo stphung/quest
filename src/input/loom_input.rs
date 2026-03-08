@@ -24,13 +24,14 @@ pub(super) fn handle_loom(
         KeyCode::Tab => {
             loom_ui.view = cycle_view(loom_ui.view);
             loom_ui.selected_node = 0;
-            loom_ui.codex_scroll = 0;
+            loom_ui.codex_column = 0;
+            loom_ui.codex_row = 0;
             InputResult::Continue
         }
         KeyCode::Up => {
             match loom_ui.view {
                 LoomView::Codex => {
-                    loom_ui.codex_scroll = loom_ui.codex_scroll.saturating_sub(1);
+                    loom_ui.codex_row = loom_ui.codex_row.saturating_sub(1);
                 }
                 LoomView::FlowView => {
                     // Diamond layout: 0=ES, 1=RL, 2=RF, 3=VC, 4=SW, 5=MA, 6+=shuttles
@@ -54,7 +55,10 @@ pub(super) fn handle_loom(
         KeyCode::Down => {
             match loom_ui.view {
                 LoomView::Codex => {
-                    loom_ui.codex_scroll = loom_ui.codex_scroll.saturating_add(1);
+                    let max_row = codex_column_len(loom_ui.codex_column).saturating_sub(1);
+                    if loom_ui.codex_row < max_row {
+                        loom_ui.codex_row += 1;
+                    }
                 }
                 LoomView::FlowView => {
                     // Diamond layout: down moves to the next row.
@@ -82,6 +86,26 @@ pub(super) fn handle_loom(
                         }
                         n => n,
                     };
+                }
+            }
+            InputResult::Continue
+        }
+        KeyCode::Left if loom_ui.view == LoomView::Codex => {
+            if loom_ui.codex_column > 0 {
+                loom_ui.codex_column -= 1;
+                let max_row = codex_column_len(loom_ui.codex_column).saturating_sub(1);
+                if loom_ui.codex_row > max_row {
+                    loom_ui.codex_row = max_row;
+                }
+            }
+            InputResult::Continue
+        }
+        KeyCode::Right if loom_ui.view == LoomView::Codex => {
+            if loom_ui.codex_column < 2 {
+                loom_ui.codex_column += 1;
+                let max_row = codex_column_len(loom_ui.codex_column).saturating_sub(1);
+                if loom_ui.codex_row > max_row {
+                    loom_ui.codex_row = max_row;
                 }
             }
             InputResult::Continue
@@ -355,6 +379,16 @@ fn handle_build_input(
             }
             _ => InputResult::Continue,
         },
+    }
+}
+
+/// Number of resources in a codex column.
+fn codex_column_len(col: usize) -> usize {
+    match col {
+        0 => 6,
+        1 => 6,
+        2 => 1,
+        _ => 0,
     }
 }
 
