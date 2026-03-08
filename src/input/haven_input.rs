@@ -58,6 +58,7 @@ pub(super) fn handle_haven(
                     if let Some((tier, p_spent)) =
                         haven::try_build_room(room, haven, &mut state.prestige_rank)
                     {
+                        state.invalidate_bonuses();
                         // Check Haven tier achievements after upgrade
                         achievements.sync_from_haven(
                             haven.discovered,

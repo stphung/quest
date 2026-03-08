@@ -757,12 +757,11 @@ fn ensure_emergency_recovery_merc(prestige: &mut DeepPrestige) -> bool {
         return false;
     }
 
-    let Some((idx, _)) = prestige
+    let Some((id, _)) = prestige
         .roster
-        .iter()
-        .enumerate()
-        .filter_map(|(idx, merc)| match merc.status {
-            MercStatus::Injured { missions_remaining } => Some((idx, missions_remaining)),
+        .values()
+        .filter_map(|merc| match merc.status {
+            MercStatus::Injured { missions_remaining } => Some((merc.id, missions_remaining)),
             _ => None,
         })
         .min_by_key(|(_, missions_remaining)| *missions_remaining)
@@ -770,14 +769,16 @@ fn ensure_emergency_recovery_merc(prestige: &mut DeepPrestige) -> bool {
         return false;
     };
 
-    prestige.roster[idx].status = MercStatus::Available;
+    if let Some(merc) = prestige.roster.get_mut(&id) {
+        merc.status = MercStatus::Available;
+    }
     true
 }
 
 /// Progress injury recovery counters once per completed mission globally.
 fn progress_injuries_after_completions(prestige: &mut DeepPrestige, completed_count: usize) {
     for _ in 0..completed_count {
-        for merc in &mut prestige.roster {
+        for merc in prestige.roster.values_mut() {
             let _ = tick_merc_injury(merc);
         }
     }
@@ -1184,13 +1185,7 @@ pub fn tick_all_missions(
         let squad_archetypes: Vec<MercArchetype> = mission
             .squad
             .iter()
-            .filter_map(|&id| {
-                prestige
-                    .roster
-                    .iter()
-                    .find(|m| m.id == id)
-                    .map(|m| m.archetype)
-            })
+            .filter_map(|&id| prestige.roster.get(&id).map(|m| m.archetype))
             .collect();
 
         let event_result = tick_mission_events(mission, &squad_archetypes, now, rng);
@@ -1750,13 +1745,7 @@ pub fn resolve_offline_missions(
         let squad_archetypes: Vec<MercArchetype> = mission
             .squad
             .iter()
-            .filter_map(|&id| {
-                prestige
-                    .roster
-                    .iter()
-                    .find(|m| m.id == id)
-                    .map(|m| m.archetype)
-            })
+            .filter_map(|&id| prestige.roster.get(&id).map(|m| m.archetype))
             .collect();
 
         // Auto-resolve all remaining events by advancing time to now.
@@ -1873,7 +1862,7 @@ mod tests {
 
     fn make_prestige_with_mercs(mercs: Vec<Mercenary>) -> DeepPrestige {
         let mut p = DeepPrestige::new();
-        p.roster = mercs;
+        p.roster = mercs.into_iter().map(|m| (m.id, m)).collect();
         p
     }
 
@@ -2399,7 +2388,7 @@ mod tests {
             make_merc(101, MercArchetype::Scout, 20),
         ];
         prestige.recruit_pool.recruit_costs = vec![20, 35];
-        prestige.roster.clear(); // no deployable mercs
+        prestige.roster = std::collections::HashMap::new(); // no deployable mercs
 
         let changed = maybe_refresh_recruit_pool(&mut prestige, &mut persistent, now, &mut rng);
         assert!(
@@ -2420,7 +2409,7 @@ mod tests {
         let mut prestige = DeepPrestige::new();
         let mut lost = make_merc(7, MercArchetype::Vanguard, 30);
         lost.status = MercStatus::Lost;
-        prestige.roster.push(lost);
+        prestige.roster.insert(7, lost);
 
         let changed = run_softlock_safeguards(&mut prestige, &mut persistent, now, &mut rng);
         assert!(changed);
@@ -2438,7 +2427,7 @@ mod tests {
         let mut prestige = DeepPrestige::new();
         let mut lost = make_merc(7, MercArchetype::Vanguard, 30);
         lost.status = MercStatus::Lost;
-        prestige.roster.push(lost);
+        prestige.roster.insert(7, lost);
 
         prestige.pending_results.push(Mission {
             id: 99,
@@ -2460,7 +2449,7 @@ mod tests {
             1,
             "Lost merc should remain for result UI"
         );
-        assert!(matches!(prestige.roster[0].status, MercStatus::Lost));
+        assert!(matches!(prestige.roster[&7].status, MercStatus::Lost));
     }
 
     #[test]
@@ -2478,7 +2467,7 @@ mod tests {
         m2.status = MercStatus::Injured {
             missions_remaining: 1,
         };
-        prestige.roster = vec![m1, m2];
+        prestige.roster = vec![(1, m1), (2, m2)].into_iter().collect();
 
         let changed = run_softlock_safeguards(&mut prestige, &mut persistent, now, &mut rng);
         assert!(changed);
@@ -2876,7 +2865,7 @@ mod tests {
         let merc = make_merc(1, MercArchetype::Vanguard, 30);
         let mut prestige = make_prestige_with_mercs(vec![merc]);
         // Put merc on mission.
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
         let now = Utc::now();
         let mut mission = Mission {
@@ -2916,7 +2905,7 @@ mod tests {
         let _ = persistent.layer_record_mut(1);
         let merc = make_merc(1, MercArchetype::Vanguard, 100); // very powerful
         let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
         let initial_marks = prestige.warband_marks;
 
         let now = Utc::now();
@@ -2948,7 +2937,7 @@ mod tests {
         let _ = persistent.layer_record_mut(1);
         let merc = make_merc(1, MercArchetype::Vanguard, 200); // very powerful = likely success
         let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
         // Use a seeded RNG that will produce a success outcome.
         let mut success_rng = ChaCha8Rng::seed_from_u64(0);
@@ -2998,7 +2987,7 @@ mod tests {
         let _ = persistent.layer_record_mut(1);
         let merc = make_merc(1, MercArchetype::Vanguard, 30);
         let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
         let now = Utc::now();
         let mut mission = Mission {
@@ -3079,7 +3068,7 @@ mod tests {
         let _ = persistent.layer_record_mut(1);
         let merc = make_merc(1, MercArchetype::Vanguard, 30);
         let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
         let now = Utc::now();
         // Mission that completed 2 hours ago.
@@ -3119,7 +3108,7 @@ mod tests {
         let _ = persistent.layer_record_mut(1);
         let merc = make_merc(1, MercArchetype::Vanguard, 30);
         let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
         let now = Utc::now();
         // Mission not yet complete (ends in 5 hours).

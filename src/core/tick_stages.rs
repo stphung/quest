@@ -728,10 +728,15 @@ pub(super) fn sync_derived_stats(
 }
 
 /// Compute merged Haven + Sigil bonuses for the current tick.
+/// Returns cached values if bonuses_dirty is false; recomputes and caches when dirty.
 pub(super) fn compute_merged_bonuses(
     haven: &Haven,
-    state: &GameState,
+    state: &mut GameState,
 ) -> (HavenBonuses, SigilBonuses) {
+    if !state.bonuses_dirty {
+        return (state.cached_haven_bonuses, state.cached_sigil_bonuses);
+    }
+
     let mut haven_bonuses = haven.compute_bonuses();
     let sigil_bonuses = SigilBonuses::compute(&state.storm_sigils);
 
@@ -739,6 +744,10 @@ pub(super) fn compute_merged_bonuses(
     // process_item_drop (drop_rate) and process_fishing_tick (fishing speed)
     haven_bonuses.drop_rate_percent += sigil_bonuses.drop_rate_percent;
     haven_bonuses.fishing_timer_reduction += sigil_bonuses.fishing_speed_percent;
+
+    state.cached_haven_bonuses = haven_bonuses;
+    state.cached_sigil_bonuses = sigil_bonuses;
+    state.bonuses_dirty = false;
 
     (haven_bonuses, sigil_bonuses)
 }

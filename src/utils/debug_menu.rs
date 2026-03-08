@@ -1169,6 +1169,7 @@ fn trigger_etch_random_sigils(state: &mut GameState) -> &'static str {
         let choices = generate_sigil_choices(&mut rng, &SigilEffectType::ALL);
         state.storm_sigils.sigils[slot] = Some(choices[0].clone());
     }
+    state.invalidate_bonuses();
     "All 5 sigil slots unlocked and etched!"
 }
 
@@ -1310,6 +1311,7 @@ fn trigger_etch_s_plus_sigil(state: &mut GameState) -> &'static str {
         value: max,
         grade: SigilGrade::SPlus,
     });
+    state.invalidate_bonuses();
     "S+ Sigil of Fury etched in slot 1!"
 }
 

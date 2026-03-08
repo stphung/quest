@@ -521,7 +521,7 @@ fn render_recruit_split(
     let best_same_arch = deep
         .prestige
         .roster
-        .iter()
+        .values()
         .filter(|m| m.archetype == candidate.archetype)
         .max_by_key(|m| m.effective_power() + m.effective_resilience() + m.expertise);
 

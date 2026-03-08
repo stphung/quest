@@ -77,7 +77,7 @@ fn make_merc_resilient(
 
 fn make_prestige_with_mercs(mercs: Vec<Mercenary>) -> DeepPrestige {
     let mut p = DeepPrestige::new();
-    p.roster = mercs;
+    p.roster = mercs.into_iter().map(|m| (m.id, m)).collect();
     p
 }
 
@@ -297,7 +297,7 @@ fn test_resolve_first_orders_guaranteed_success() {
         let mut persistent = DeepPersistent::new();
         let merc = make_merc(1, MercArchetype::Vanguard, 10);
         let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
         let mut mission = past_mission(1, MissionType::SupplyRun, 1, vec![1], 1);
         mission.is_first_orders = true;
@@ -320,7 +320,7 @@ fn test_resolve_first_orders_awards_15_marks() {
     let mut persistent = DeepPersistent::new();
     let merc = make_merc(1, MercArchetype::Scout, 10);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
     prestige.warband_marks = 0;
 
     let mut mission = past_mission(1, MissionType::SupplyRun, 1, vec![1], 1);
@@ -340,7 +340,7 @@ fn test_resolve_first_orders_grants_familiarity_on_layer_1() {
     let mut persistent = DeepPersistent::new();
     let merc = make_merc(1, MercArchetype::Medic, 10);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let mut mission = past_mission(1, MissionType::SupplyRun, 1, vec![1], 1);
     mission.is_first_orders = true;
@@ -363,7 +363,7 @@ fn test_resolve_first_orders_no_injuries_no_losses() {
     let mut persistent = DeepPersistent::new();
     let merc = make_merc(1, MercArchetype::Arcanist, 5);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let mut mission = past_mission(1, MissionType::SupplyRun, 1, vec![1], 1);
     mission.is_first_orders = true;
@@ -381,7 +381,7 @@ fn test_resolve_first_orders_releases_squad() {
     let mut persistent = DeepPersistent::new();
     let merc = make_merc(1, MercArchetype::Saboteur, 10);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let mut mission = past_mission(1, MissionType::SupplyRun, 1, vec![1], 1);
     mission.is_first_orders = true;
@@ -402,7 +402,7 @@ fn test_resolve_first_orders_adds_warband_log_entry() {
     let mut persistent = DeepPersistent::new();
     let merc = make_merc(1, MercArchetype::Vanguard, 10);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let mut mission = past_mission(1, MissionType::SupplyRun, 1, vec![1], 1);
     mission.is_first_orders = true;
@@ -434,7 +434,7 @@ fn test_resolve_gateway_expedition_success_opens_gateway() {
         // Very powerful merc — should get Success most of the time.
         let merc = make_merc(1, MercArchetype::Vanguard, 5000);
         let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
         let mut mission = Mission {
             id: 1,
@@ -481,7 +481,7 @@ fn test_resolve_gateway_expedition_failure_does_not_open_gateway() {
         let _ = persistent.layer_record_mut(30);
         let merc = make_merc(1, MercArchetype::Scout, 1); // far below threshold
         let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
         let mut mission = Mission {
             id: 1,
@@ -522,7 +522,7 @@ fn test_gateway_expedition_item_ilvl_is_layer_times_10() {
     let _ = persistent.layer_record_mut(30);
     let merc = make_merc(1, MercArchetype::Vanguard, 5000);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let mut mission = Mission {
         id: 1,
@@ -558,7 +558,7 @@ fn test_item_ilvl_supply_run_is_none() {
     let _ = persistent.layer_record_mut(5);
     let merc = make_merc(1, MercArchetype::Vanguard, 100);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let mut mission = past_mission(1, MissionType::SupplyRun, 5, vec![1], 1);
     resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
@@ -577,7 +577,7 @@ fn test_item_ilvl_recon_is_none() {
     let _ = persistent.layer_record_mut(3);
     let merc = make_merc(1, MercArchetype::Scout, 100);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let mut mission = past_mission(1, MissionType::Recon, 3, vec![1], 1);
     resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
@@ -596,7 +596,7 @@ fn test_item_ilvl_construction_is_none() {
     let _ = persistent.layer_record_mut(2);
     let merc = make_merc(1, MercArchetype::Saboteur, 50);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let mut mission = past_mission(
         1,
@@ -621,7 +621,7 @@ fn test_item_ilvl_expedition_is_none() {
     let _ = persistent.layer_record_mut(7);
     let merc = make_merc(1, MercArchetype::Vanguard, 500);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let mut mission = past_mission(1, MissionType::Expedition, 7, vec![1], 1);
     resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
@@ -640,7 +640,7 @@ fn test_item_ilvl_breakthrough_is_none() {
     let _ = persistent.layer_record_mut(4);
     let merc = make_merc(1, MercArchetype::Vanguard, 2000);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let mut mission = past_mission(1, MissionType::Breakthrough, 4, vec![1], 1);
     resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
@@ -670,7 +670,7 @@ fn test_outcome_overpowered_ratio_mostly_success() {
         // Layer 1 Expedition threshold = 20. 200 >> 1.5× threshold.
         let merc = make_merc(1, MercArchetype::Vanguard, 200);
         let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
         let mut mission = Mission {
             id: 1,
@@ -719,7 +719,7 @@ fn test_outcome_at_threshold_mostly_success() {
         // Layer 1 Expedition threshold = 20. Power = 25 → ratio 1.25 (in at-threshold band).
         let merc = make_merc(1, MercArchetype::Vanguard, 25);
         let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
         let mut mission = Mission {
             id: 1,
@@ -774,7 +774,7 @@ fn test_outcome_below_threshold_mixed_results() {
         // Layer 1 Expedition threshold = 20. Power = 17 → ratio 0.85 (in below-threshold band).
         let merc = make_merc(1, MercArchetype::Vanguard, 17);
         let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
         let mut mission = Mission {
             id: 1,
@@ -834,7 +834,7 @@ fn test_outcome_well_below_threshold_mostly_partial_or_failure() {
         // Layer 1 Expedition threshold = 20. Power = 5 → ratio 0.25 (well below).
         let merc = make_merc(1, MercArchetype::Scout, 5);
         let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
         let mut mission = Mission {
             id: 1,
@@ -955,7 +955,7 @@ fn test_danger_bonus_xp_disabled_when_underpowered() {
     // Danger bonus XP is disabled in current design.
     let merc = make_merc(1, MercArchetype::Vanguard, 3);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let mut mission = Mission {
         id: 1,
@@ -993,7 +993,7 @@ fn test_lost_merc_not_in_level_up_list() {
         // Fragile merc in a high-risk Breakthrough (risk_tier = 3, failure → high loss chance)
         let merc = make_merc_resilient(1, MercArchetype::Arcanist, 2, 0);
         let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
         let mut mission = Mission {
             id: 1,
@@ -1125,7 +1125,7 @@ fn test_tick_all_missions_completes_mission_and_increments_counter() {
     let _ = persistent.layer_record_mut(1);
     let merc = make_merc(1, MercArchetype::Vanguard, 50);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     // Push a supply run that already ended.
     prestige
@@ -1147,7 +1147,7 @@ fn test_tick_all_missions_does_not_complete_future_mission() {
     let _ = persistent.layer_record_mut(1);
     let merc = make_merc(1, MercArchetype::Scout, 30);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     prestige
         .active_missions
@@ -1197,7 +1197,7 @@ fn test_tick_all_missions_mercs_lost_tracked_in_summary() {
         // Fragile merc on a high-risk mission in the past.
         let merc = make_merc_resilient(1, MercArchetype::Arcanist, 2, 0);
         let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
         prestige
             .active_missions
@@ -1232,9 +1232,9 @@ fn test_offline_resolution_multiple_missions_different_timings() {
     let merc2 = make_merc(2, MercArchetype::Scout, 40);
     let merc3 = make_merc(3, MercArchetype::Medic, 30);
     let mut prestige = make_prestige_with_mercs(vec![merc1, merc2, merc3]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
-    prestige.roster[1].status = MercStatus::OnMission(2);
-    prestige.roster[2].status = MercStatus::OnMission(3);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&2).unwrap().status = MercStatus::OnMission(2);
+    prestige.roster.get_mut(&3).unwrap().status = MercStatus::OnMission(3);
 
     // Two missions ended in the past, one still running.
     prestige
@@ -1287,8 +1287,8 @@ fn test_offline_resolution_accumulates_marks_across_multiple_missions() {
     let merc1 = make_merc(1, MercArchetype::Vanguard, 200);
     let merc2 = make_merc(2, MercArchetype::Vanguard, 200);
     let mut prestige = make_prestige_with_mercs(vec![merc1, merc2]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
-    prestige.roster[1].status = MercStatus::OnMission(2);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&2).unwrap().status = MercStatus::OnMission(2);
 
     prestige
         .active_missions
@@ -1331,11 +1331,11 @@ fn test_warband_log_capped_at_10_entries() {
     // Directly test the log cap via resolve_mission called 12 times on a shared prestige.
     let merc = make_merc(1, MercArchetype::Vanguard, 50);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     for _ in 0..12 {
         // Reset merc status before each resolve.
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
         let mut mission = past_mission(1, MissionType::SupplyRun, 1, vec![1], 1);
         resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
     }
@@ -1358,7 +1358,7 @@ fn test_total_marks_earned_and_missions_completed_incremented() {
     let _ = persistent.layer_record_mut(1);
     let merc = make_merc(1, MercArchetype::Vanguard, 100);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let initial_missions = prestige.total_missions_completed;
     let initial_marks = prestige.total_marks_earned;
@@ -1408,7 +1408,7 @@ fn test_construction_always_succeeds_regardless_of_power() {
         // Extremely weak merc.
         let merc = make_merc(1, MercArchetype::Scout, 1);
         let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
         let mut mission = Mission {
             id: 1,
@@ -1479,7 +1479,7 @@ fn test_resolve_mission_gains_familiarity() {
 
     let merc = make_merc(1, MercArchetype::Vanguard, 100);
     let mut prestige = make_prestige_with_mercs(vec![merc]);
-    prestige.roster[0].status = MercStatus::OnMission(1);
+    prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let mut mission = past_mission(1, MissionType::SupplyRun, 1, vec![1], 2);
     resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
@@ -1504,7 +1504,7 @@ fn test_resolve_recon_gains_more_familiarity_than_supply_run() {
         let _ = persistent.layer_record_mut(1);
         let merc = make_merc(1, MercArchetype::Scout, 100);
         let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
         let mut mission = past_mission(1, mission_type, 1, vec![1], 2);
         resolve_mission(&mut mission, &mut prestige, &mut persistent, rng);
         persistent
@@ -1540,7 +1540,7 @@ fn test_breakthrough_failure_layer_not_cleared() {
         let _ = persistent.layer_record_mut(1);
         let merc = make_merc(1, MercArchetype::Scout, 1);
         let mut prestige = make_prestige_with_mercs(vec![merc]);
-        prestige.roster[0].status = MercStatus::OnMission(1);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
         let mut mission = Mission {
             id: 1,

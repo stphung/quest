@@ -657,6 +657,7 @@ fn etch_sigil(state: &mut GameState, effect: SigilEffectType, value: f64) {
         value,
         grade: SigilGrade::S,
     });
+    state.invalidate_bonuses();
 }
 
 #[test]
@@ -946,6 +947,7 @@ fn test_multiple_sigils_stack_in_game_tick() {
             grade: SigilGrade::B,
         });
     }
+    state.invalidate_bonuses();
 
     // Run tick with stacked sigils
     game_tick(

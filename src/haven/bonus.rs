@@ -143,7 +143,7 @@ impl HavenRoomId {
 }
 
 /// Pre-computed Haven bonuses for efficient access during gameplay
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 #[allow(dead_code)] // Some fields used outside tick.rs (main.rs, input.rs)
 pub struct HavenBonuses {
     pub damage_percent: f64,
