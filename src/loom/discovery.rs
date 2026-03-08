@@ -136,6 +136,10 @@ fn pattern(index: u32, name: &str, reqs: Vec<(Resource, f64)>) -> WovenPattern {
             .into_iter()
             .map(|(resource, amount)| PatternRequirement {
                 resource,
+                required_rate: 0.0,
+                sustain_duration_secs: 0.0,
+                sustained_secs: 0.0,
+                completed: false,
                 amount,
                 accumulated: 0.0,
             })

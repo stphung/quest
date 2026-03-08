@@ -242,10 +242,22 @@ pub struct WovenPattern {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatternRequirement {
     pub resource: Resource,
-    /// Total amount of this resource needed to complete the pattern.
-    #[serde(alias = "rate_per_hour")]
+    /// Minimum production rate (units/hr) that must be sustained.
+    #[serde(default)]
+    pub required_rate: f64,
+    /// Total seconds the rate must be sustained to complete this requirement.
+    #[serde(default)]
+    pub sustain_duration_secs: f64,
+    /// Seconds sustained so far (timer advances when rate >= threshold, pauses otherwise).
+    #[serde(default)]
+    pub sustained_secs: f64,
+    /// Whether this individual requirement is complete (locks when sustain timer finishes).
+    #[serde(default)]
+    pub completed: bool,
+    /// Legacy field — total amount needed (accumulated totals system). Kept for serde compat.
+    #[serde(default, alias = "rate_per_hour")]
     pub amount: f64,
-    /// Accumulated production so far.
+    /// Legacy field — accumulated production so far. Kept for serde compat.
     #[serde(default)]
     pub accumulated: f64,
 }
@@ -517,12 +529,34 @@ mod tests {
     fn test_pattern_requirement_fields() {
         let req = PatternRequirement {
             resource: Resource::Ember,
+            required_rate: 0.0,
+            sustain_duration_secs: 0.0,
+            sustained_secs: 0.0,
+            completed: false,
             amount: 5.0,
             accumulated: 0.0,
         };
         assert_eq!(req.resource, Resource::Ember);
         assert!((req.amount - 5.0).abs() < 1e-9);
         assert!((req.accumulated - 0.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_pattern_requirement_rate_fields() {
+        let req = PatternRequirement {
+            resource: Resource::Ember,
+            required_rate: 25.0,
+            sustain_duration_secs: 7200.0,
+            sustained_secs: 0.0,
+            completed: false,
+            amount: 0.0,
+            accumulated: 0.0,
+        };
+        assert_eq!(req.resource, Resource::Ember);
+        assert!((req.required_rate - 25.0).abs() < 1e-9);
+        assert!((req.sustain_duration_secs - 7200.0).abs() < 1e-9);
+        assert!((req.sustained_secs).abs() < 1e-9);
+        assert!(!req.completed);
     }
 
     #[test]
