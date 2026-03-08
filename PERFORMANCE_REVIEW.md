@@ -168,27 +168,55 @@ Parses fish names and item names from message strings using `.split().nth(1)` an
 
 ---
 
+## Save System & I/O Optimizations
+
+### 20. Pretty-Printed JSON on All Save Files (Easy Win)
+**Files**: `src/character/persistence.rs:42`, `src/achievements/persistence.rs:35`, `src/haven/logic.rs:90`, `src/enhancement/persistence.rs:26`, `src/deep/persistence.rs:26`, `src/loom/persistence.rs:35`
+
+All 6 save modules use `serde_json::to_string_pretty()`. Switching to `to_string()` reduces file size by 30-50% and speeds up serialization. Consider pretty-printing only behind a debug flag.
+
+**Alternative**: Consider `rmp-serde` (MessagePack) for ~70% faster serialization and ~60% smaller files.
+
+### 21. Unconditional File Writes on Every Autosave
+**File**: `src/main_helpers/persistence.rs:19-42`
+
+`save_files()` serializes and writes all subsystems every 30s even when unchanged. Haven, Enhancement, Deep, and Loom states rarely change between saves.
+
+**Fix**: Add a `dirty` flag to each subsystem. Only serialize/write if the subsystem changed since last save.
+
+### 22. Git `has_changes()` Full Directory Walk
+**File**: `src/history/git.rs:374-379`
+
+Every commit call runs `repo.statuses()` with `include_untracked(true).recurse_untracked_dirs(true)`, walking the entire working directory. Called on every autosave commit.
+
+**Fix**: Track whether `save_files()` actually wrote anything. Skip the git commit entirely if no files changed. Alternatively, use git2's lower-level diff APIs.
+
+### 23. Character List Double File Reads
+**File**: `src/character/persistence.rs:137-230`
+
+`list_characters()` reads each character file twice — once for `load_character_header()` and again for `load_character()`. Each triggers a full JSON deserialization.
+
+**Fix**: Single-pass load that extracts both header and full state in one deserialization.
+
 ## Build & Dependency Optimizations
 
-### 20. Cargo Profile Tuning
+### 24. Missing Release Profile LTO
 **File**: `Cargo.toml`
 
-Current config is already good:
-- `opt-level = 2` for dependencies in dev builds
-- `split-debuginfo = "unpacked"` for faster macOS linking
-- `codegen-units = 256` for test parallelism
+Current config is already good for dev/test builds. Missing release optimization:
+```toml
+[profile.release]
+lto = "thin"
+codegen-units = 4
+```
+This would give 5-10% smaller/faster release binaries.
 
-**Potential addition**: Consider `[profile.release] lto = "thin"` for smaller/faster release binaries if not already set.
-
-### 21. `chess-engine` Dependency
+### 25. `chess-engine` Dependency
 **File**: `Cargo.toml:11`
 
-The `chess-engine` crate is pulled in for a challenge minigame. It's a relatively heavy dependency for a single feature.
+The `chess-engine` crate is pulled in for a single challenge minigame. It's a relatively heavy dependency for one feature.
 
 **Potential**: If build times are a concern, evaluate if a simpler chess implementation would suffice.
-
-### 22. `serde_json` Pretty vs Compact
-If save files use `serde_json::to_string_pretty()`, switching to `to_string()` reduces file size by ~30-40% and speeds up serialization. Only matters if save files are large.
 
 ---
 
@@ -219,7 +247,9 @@ Many `Vec` allocations are for collections with known small upper bounds (equipm
 | Item drop strings | ~0.1ms/drop | Medium | High |
 | Derived stats | ~0.1ms/tick (when dirty) | Low | High |
 | Save cloning | ~5-10ms/30s | High | Medium |
-| Serialization | ~2-5ms/save | High | Medium |
+| Pretty JSON overhead | ~2-5ms/save + 30-50% file size | Low | Medium |
+| Unconditional saves | ~5ms/30s (wasted writes) | Low | Medium |
+| Git status walk | ~50ms/commit | Medium | Medium |
 | Vec allocs in UI | ~0.2-0.5ms/frame | Medium | Medium |
 | String interning | ~1-2ms/tick total | High | Future |
 
