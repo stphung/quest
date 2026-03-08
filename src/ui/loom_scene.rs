@@ -2001,7 +2001,7 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
     if all_done {
         let block = Block::default()
             .title(Span::styled(
-                " \u{2728} Loom Mended \u{2014} All 18 Patterns Complete ",
+                " \u{2728} Loom Mended \u{2014} All 28 Patterns Complete ",
                 Style::default().fg(Color::Rgb(255, 215, 0)),
             ))
             .borders(Borders::ALL)
@@ -2070,16 +2070,49 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
             continue;
         }
 
-        let ratio = if req.amount > 0.0 {
-            (req.accumulated / req.amount).min(1.0)
+        // Use sustained rate fields instead of accumulated/amount
+        let ratio = if req.sustain_duration_secs > 0.0 {
+            (req.sustained_secs / req.sustain_duration_secs).min(1.0)
         } else {
             1.0
         };
-        let met = req.accumulated >= req.amount;
+        let met = req.completed;
+
+        // Get current measured rate from rate trackers
+        let current_rate = loom_state
+            .rate_trackers
+            .get(&req.resource)
+            .map(|t| t.rate_per_hour())
+            .unwrap_or(0.0);
+        let advancing = !met && current_rate >= req.required_rate;
+
+        // Format time: sustained / duration in HH:MM
+        let sustained_mins = (req.sustained_secs / 60.0) as u32;
+        let duration_mins = (req.sustain_duration_secs / 60.0) as u32;
+        let time_label = format!(
+            "{}:{:02}/{}:{:02}",
+            sustained_mins / 60,
+            sustained_mins % 60,
+            duration_mins / 60,
+            duration_mins % 60,
+        );
+
+        // Rate + state indicator
+        let state_icon = if met {
+            "\u{2713}" // checkmark
+        } else if advancing {
+            "\u{25B6}" // play
+        } else {
+            "\u{23F8}" // pause
+        };
+
+        let count_label = format!(
+            "{} {:.0}/{:.0}/hr {}",
+            time_label, current_rate, req.required_rate, state_icon
+        );
 
         // Split: label | gauge | count.
-        let count_label = format!("{:.0}/{:.0}", req.accumulated, req.amount);
-        let count_w = count_label.len() as u16 + 3; // space + text + check
+        let count_w = count_label.len() as u16 + 2; // space + text
         let cols = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
@@ -2094,9 +2127,11 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
         let res_name = resource_name(&req.resource);
         let label_text = format!(" {} {}", emoji, res_name);
         let label_color = if met {
-            Color::Rgb(80, 200, 120)
+            Color::Rgb(80, 200, 120) // green
+        } else if advancing {
+            Color::Rgb(80, 200, 120) // green
         } else {
-            Color::Rgb(180, 150, 210)
+            Color::Rgb(220, 180, 60) // amber
         };
         frame.render_widget(
             Paragraph::new(Span::styled(label_text, Style::default().fg(label_color)))
@@ -2107,19 +2142,20 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
         // Gauge.
         let gauge_color = if met {
             Color::Rgb(80, 200, 120)
+        } else if advancing {
+            Color::Rgb(100, 180, 100)
         } else {
-            Color::Rgb(160, 100, 220)
+            Color::Rgb(180, 140, 40) // amber
         };
         let gauge = Gauge::default()
             .ratio(ratio)
             .gauge_style(Style::default().fg(gauge_color).bg(Color::Rgb(30, 20, 40)));
         frame.render_widget(gauge, cols[1]);
 
-        // Count + check mark.
-        let check = if met { " \u{2713}" } else { "" };
+        // Count: time progress + rate + state icon.
         frame.render_widget(
             Paragraph::new(Span::styled(
-                format!(" {}{}", count_label, check),
+                format!(" {}", count_label),
                 Style::default().fg(label_color),
             ))
             .style(Style::default().bg(LOOM_BG)),
@@ -2139,8 +2175,8 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
                 .requirements
                 .iter()
                 .map(|req| {
-                    if req.amount > 0.0 {
-                        req.accumulated / req.amount
+                    if req.sustain_duration_secs > 0.0 {
+                        req.sustained_secs / req.sustain_duration_secs
                     } else {
                         1.0
                     }
