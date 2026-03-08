@@ -44,15 +44,15 @@ Compare to Power Cores max of 48 PR/day — this is the next tier of power gener
 
 ## 4. Loom Zones (Z31–50)
 
-**Unlock gating** — tied to pattern milestones, mirroring how Deep layers gate Z12–30:
+**Unlock gating** — triple-gated by pattern milestones, ascension level, and prestige rank:
 
-| Patterns Completed | Zones Unlocked |
-|-------------------|----------------|
-| 4 | Z31–34 |
-| 8 (Asc VII) | Z35–38 |
-| 16 (Asc VIII) | Z39–42 |
-| 22 (Asc IX) | Z43–46 |
-| 28 (Asc X) | Z47–50 |
+| Patterns | Ascension | Prestige | Zones Unlocked |
+|----------|-----------|----------|----------------|
+| 4 | — | P2,000 | Z31–34 |
+| 8 | VII | P5,000 | Z35–38 |
+| 16 | VIII | P15,000 | Z39–42 |
+| 22 | IX | P30,000 | Z43–46 |
+| 28 | X | P50,000 | Z47–50 |
 
 **Stat scaling** — 1.25x per zone from Z31 base (gentler than the 1.6x used for Z12–30, tuned to the ~5x power growth across Ascension VII–X):
 

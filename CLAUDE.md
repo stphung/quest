@@ -148,7 +148,7 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - **Ascension multiplier**: 2^level for I-VI (2x to 64x); 64 * 1.5^(level-6) for VII+ (96x, 144x, 216x, 324x)
 - **Ascension pattern gates**: VII = 8 patterns, VIII = 16, IX = 22, X = 28 completed Woven Patterns
 - **Loom Zone stat scaling**: 1.25x per zone from Zone 30 base (LOOM_ZONE_STAT_MULTIPLIER)
-- **Loom Zone unlock**: 4 patterns -> Z31-34, 8 -> Z35-38, 16 -> Z39-42, 22 -> Z43-46, 28 -> Z47-50
+- **Loom Zone unlock** (triple-gated: patterns + ascension + prestige): 4p/—/P2k -> Z31-34, 8p/VII/P5k -> Z35-38, 16p/VIII/P15k -> Z39-42, 22p/IX/P30k -> Z43-46, 28p/X/P50k -> Z47-50
 - **WR→PR brackets**: 0-10 WR/hr = 5 PR/WR/hr/day, 10-25 = 10, 25+ = 15 (activates when all 28 patterns complete)
 - **Shuttle level caps**: Asc 0-VI = 1, VII = 3, VIII = 5, IX = 7, X = 10
 - **Power Cores**: 6 cores (2-18 PR/day), unlocked at Deep Layers 3/7/12/18/25/30, max 48 PR/day total

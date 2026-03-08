@@ -164,32 +164,23 @@ Nineteen zones across six chapters, unlocked by Deep layer breakthroughs. Enemy 
 
 ## Loom Zones 31-50
 
-Twenty zones across five chapters, unlocked by Loom Woven Pattern completion. Enemy stats scale at 1.25x per zone from Zone 30 base (LOOM_ZONE_STAT_MULTIPLIER).
+Twenty zones across five chapters, triple-gated by pattern completion, ascension level, and prestige rank. Enemy stats scale at 1.25x per zone from Zone 30 base (LOOM_ZONE_STAT_MULTIPLIER).
 
-**Zone names and prestige requirements:**
+**Zone gating (all three must be met):**
 
-| Chapter | Zones | Names | Prestige |
-|---------|-------|-------|----------|
-| Ch.7: The Woven Veil | Z31-34 | Thread Gate, Loom Antechamber, Warp Chamber, The Woven Veil | P400 |
-| Ch.8: The Shuttle's Path | Z35-38 | Spindle Corridor, Dye Vaults, Pattern Library, The Shuttle's Path | P500 |
-| Ch.9: The Tapestry | Z39-42 | Fraying Edge, Knot Garden, Weave Core, The Tapestry | P600 |
-| Ch.10: The Unraveling | Z43-46 | Loose Threads, Tangle Maze, Raveling Storm, The Unraveling | P750 |
-| Ch.11: The Final Thread | Z47-50 | Needle's Eye, Spool of Fates, Loom Heart, The Final Thread | P1000 |
-
-**Pattern-gated unlock:**
-
-| Patterns Complete | Zones Unlocked |
-|-------------------|---------------|
-| 4 | Z31-34 |
-| 8 | Z35-38 |
-| 16 | Z39-42 |
-| 22 | Z43-46 |
-| 28 | Z47-50 |
+| Chapter | Zones | Patterns | Ascension | Prestige |
+|---------|-------|----------|-----------|----------|
+| Ch.7: Thread Wilds | Z31-34 | 4 | — | P2,000 |
+| Ch.8: Woven Frontier | Z35-38 | 8 | VII | P5,000 |
+| Ch.9: The Unraveling | Z39-42 | 16 | VIII | P15,000 |
+| Ch.10: Grand Design | Z43-46 | 22 | IX | P30,000 |
+| Ch.11: Final Weave | Z47-50 | 28 | X | P50,000 |
 
 **Progression semantics:**
 - `LoomZoneCycle` boss defeat result: cap zone bosses cycle back to subzone 1 (same pattern as `FractureCycle`)
 - Stat scaling: 1.25x per zone from Zone 30 base
 - Unlock function: `loom_zone_cap_for_patterns(patterns) -> u32`
+- Ascension gate checked in `sync_account_zone_unlocks()` per zone range
 
 ## Zone Access Sync (`access.rs`)
 
