@@ -12,13 +12,13 @@ use std::collections::HashSet;
 // ============================================================================
 
 #[test]
-fn test_exactly_30_zones_exist() {
+fn test_exactly_50_zones_exist() {
     let zones = get_all_zones();
-    assert_eq!(zones.len(), 30, "There must be exactly 30 zones");
+    assert_eq!(zones.len(), 50, "There must be exactly 50 zones");
 }
 
 #[test]
-fn test_zone_ids_are_sequential_1_to_30() {
+fn test_zone_ids_are_sequential_1_to_50() {
     let zones = get_all_zones();
     for (i, zone) in zones.iter().enumerate() {
         let expected_id = (i + 1) as u32;
@@ -320,11 +320,11 @@ fn test_non_final_subzone_boss_is_zone_boss_false() {
 // ============================================================================
 
 #[test]
-fn test_zone_enemy_stats_table_has_30_entries() {
+fn test_zone_enemy_stats_table_has_50_entries() {
     assert_eq!(
         ZONE_ENEMY_STATS.len(),
-        30,
-        "ZONE_ENEMY_STATS must have 30 entries"
+        50,
+        "ZONE_ENEMY_STATS must have 50 entries"
     );
 }
 

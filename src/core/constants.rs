@@ -103,7 +103,7 @@ pub const MOB_FIGHT_TIMEOUT_SECONDS: f64 = 30.0;
 // Zone enemy base stats: (base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)
 // Index 0 = Zone 1, Index 10 = Zone 11 (The Expanse)
 // hp_step/dmg_step/def_step are per-subzone depth increments above depth 1
-pub const ZONE_ENEMY_STATS: [(u32, u32, u32, u32, u32, u32); 30] = [
+pub const ZONE_ENEMY_STATS: [(u32, u32, u32, u32, u32, u32); 50] = [
     (55, 9, 7, 2, 0, 0),           // Zone 1: Meadow
     (90, 14, 13, 3, 2, 1),         // Zone 2: Dark Forest
     (160, 22, 22, 4, 6, 2),        // Zone 3: Mountain Pass
@@ -138,6 +138,37 @@ pub const ZONE_ENEMY_STATS: [(u32, u32, u32, u32, u32, u32); 30] = [
     (14757376, 1180611, 1475754, 236139, 737882, 88550), // Zone 28: Echoing Abyss
     (23611802, 1888978, 2361206, 377822, 1180611, 141680), // Zone 29: Threshold of Silence
     (37778883, 3022365, 3777930, 604515, 1888978, 226688), // Zone 30: The Origin Wound
+    // Loom Zones — 1.25x exponential scaling from Zone 30
+    (47223604, 3777956, 4722412, 755644, 2361222, 283360), // Zone 31: Threadbare Wastes
+    (59029505, 4722445, 5903016, 944555, 2951528, 354200), // Zone 32: Spindle Hollow
+    (73786881, 5903057, 7378770, 1180693, 3689410, 442750), // Zone 33: The Weft Expanse
+    (92233601, 7378821, 9223462, 1475867, 4611763, 553438), // Zone 34: Heart of the Thread Wilds
+    (115292001, 9223526, 11529327, 1844833, 5764703, 691797), // Zone 35: Loom's Edge
+    (144115002, 11529408, 14411659, 2306042, 7205879, 864746), // Zone 36: Shuttle Run
+    (180143752, 14411759, 18014574, 2882552, 9007349, 1080933), // Zone 37: The Pattern Gate
+    (225179690, 18014699, 22518218, 3603190, 11259186, 1351166), // Zone 38: Heart of the Woven Frontier
+    (281474613, 22518374, 28147772, 4503988, 14073983, 1688957), // Zone 39: Frayed Reaches
+    (351843266, 28147968, 35184715, 5629985, 17592479, 2111197), // Zone 40: The Loose Ends
+    (439804082, 35184959, 43980894, 7037481, 21990598, 2638996), // Zone 41: Tangle of Fates
+    (549755103, 43981199, 54976117, 8796851, 27488248, 3298745), // Zone 42: Heart of the Unraveling
+    (687193879, 54976499, 68720146, 10996064, 34360310, 4123431), // Zone 43: The Blueprint Halls
+    (858992348, 68720624, 85900183, 13745080, 42950387, 5154288), // Zone 44: Architect's Loom
+    (1073740435, 85900780, 107375229, 17181350, 53687984, 6442860), // Zone 45: Tapestry of Stars
+    (
+        1342175544, 107375975, 134219036, 21476687, 67109980, 8053576,
+    ), // Zone 46: Heart of the Grand Design
+    (
+        1677719430, 134219968, 167773795, 26845859, 83887475, 10066969,
+    ), // Zone 47: The Last Shuttle
+    (
+        2097149288, 167774961, 209717244, 33557324, 104859343, 12583712,
+    ), // Zone 48: Reality's Seam
+    (
+        2621436609, 209718701, 262146554, 41946654, 131074179, 15729640,
+    ), // Zone 49: The World Loom
+    (
+        3276795762, 262148376, 327683193, 52433318, 163842724, 19662050,
+    ), // Zone 50: The Origin Thread
 ];
 
 // Boss multipliers: (hp_mult, dmg_mult, def_mult)
@@ -223,6 +254,12 @@ pub const FIRST_FRACTURE_ZONE_ID: u32 = 12;
 pub const LAST_FRACTURE_ZONE_ID: u32 = 30;
 #[allow(dead_code)]
 pub const FRACTURE_ZONE_STAT_MULTIPLIER: f64 = 1.6;
+#[allow(dead_code)]
+pub const FIRST_LOOM_ZONE_ID: u32 = 31;
+#[allow(dead_code)]
+pub const LAST_LOOM_ZONE_ID: u32 = 50;
+#[allow(dead_code)]
+pub const LOOM_ZONE_STAT_MULTIPLIER: f64 = 1.25;
 
 // Ticks per second (reciprocal of TICK_INTERVAL_MS / 1000)
 pub const TICKS_PER_SECOND: u32 = 10;
@@ -265,8 +302,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_zone_enemy_stats_has_30_entries() {
-        assert_eq!(ZONE_ENEMY_STATS.len(), 30);
+    fn test_zone_enemy_stats_has_50_entries() {
+        assert_eq!(ZONE_ENEMY_STATS.len(), 50);
     }
 
     #[test]
@@ -286,6 +323,13 @@ mod tests {
         assert_eq!(FIRST_FRACTURE_ZONE_ID, 12);
         assert_eq!(LAST_FRACTURE_ZONE_ID, 30);
         assert!((FRACTURE_ZONE_STAT_MULTIPLIER - 1.6).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_loom_zone_constants() {
+        assert_eq!(FIRST_LOOM_ZONE_ID, 31);
+        assert_eq!(LAST_LOOM_ZONE_ID, 50);
+        assert!((LOOM_ZONE_STAT_MULTIPLIER - 1.25).abs() < 1e-10);
     }
 
     #[test]
