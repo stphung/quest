@@ -287,10 +287,15 @@ pub struct LoomPersistent {
 }
 
 impl LoomPersistent {
+    /// Number of completed Woven Patterns.
+    pub fn completed_pattern_count(&self) -> usize {
+        self.patterns.iter().filter(|p| p.completed).count()
+    }
+
     /// Maximum number of Shuttles the player can build.
     /// Equal to the number of completed Woven Patterns.
     pub fn max_shuttles(&self) -> usize {
-        self.patterns.iter().filter(|p| p.completed).count()
+        self.completed_pattern_count()
     }
 }
 
@@ -572,6 +577,30 @@ mod tests {
         };
         assert!(!pattern.completed);
         assert_eq!(pattern.index, 0);
+    }
+
+    #[test]
+    fn test_completed_pattern_count_empty() {
+        let state = LoomState::new();
+        assert_eq!(state.persistent.completed_pattern_count(), 0);
+    }
+
+    #[test]
+    fn test_completed_pattern_count_some_completed() {
+        let mut state = LoomState::new();
+        state.persistent.patterns.push(WovenPattern {
+            index: 0,
+            name: "A".to_string(),
+            requirements: vec![],
+            completed: true,
+        });
+        state.persistent.patterns.push(WovenPattern {
+            index: 1,
+            name: "B".to_string(),
+            requirements: vec![],
+            completed: false,
+        });
+        assert_eq!(state.persistent.completed_pattern_count(), 1);
     }
 
     #[test]
