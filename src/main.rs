@@ -484,7 +484,7 @@ fn main() -> io::Result<()> {
                                         update_info = Some(info);
                                         update_check_failed = false;
                                     }
-                                    Ok(UpdateInfoStatus::UpToDate) => {
+                                    Ok(UpdateInfoStatus::UpToDate { .. }) => {
                                         update_info = None;
                                         update_check_failed = false;
                                     }

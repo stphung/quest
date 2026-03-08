@@ -479,7 +479,7 @@ fn build_startup_splash_text(
                     ),
                 ]));
             }
-            Some(UpdateInfoStatus::UpToDate) => {
+            Some(UpdateInfoStatus::UpToDate { .. }) => {
                 text.push(Line::from(vec![
                     Span::styled("  \u{2502} ", rail),
                     Span::styled("  \u{2713} ", Style::default().fg(Color::Green)),
@@ -576,14 +576,34 @@ fn build_startup_splash_text(
                     ]));
                 }
             }
-            Some(UpdateInfoStatus::UpToDate) => {
-                text.push(Line::from(vec![
-                    Span::styled("  \u{2502} ", rail),
-                    Span::styled(
-                        "  Current build is already on the latest release.",
-                        Style::default().fg(Color::Gray),
-                    ),
-                ]));
+            Some(UpdateInfoStatus::UpToDate {
+                current_and_previous,
+                current_and_previous_times,
+            }) => {
+                for (idx, item) in current_and_previous.iter().enumerate() {
+                    let item_text = with_relative_prefix(
+                        item,
+                        current_and_previous_times
+                            .get(idx)
+                            .and_then(|s| s.as_deref()),
+                        '-',
+                        &now,
+                    );
+                    text.push(Line::from(vec![
+                        Span::styled("  \u{2502} ", rail),
+                        Span::styled("  \u{2022} ", Style::default().fg(Color::DarkGray)),
+                        Span::styled(item_text, Style::default().fg(Color::White)),
+                    ]));
+                }
+                if current_and_previous.is_empty() {
+                    text.push(Line::from(vec![
+                        Span::styled("  \u{2502} ", rail),
+                        Span::styled(
+                            "  No version history available.",
+                            Style::default().fg(Color::Gray),
+                        ),
+                    ]));
+                }
             }
             Some(UpdateInfoStatus::CheckFailed(_)) => {
                 text.push(Line::from(vec![
