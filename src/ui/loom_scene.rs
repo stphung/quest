@@ -3,7 +3,6 @@
 //!
 //! Dispatches to different view renderers based on `LoomUiState::view`:
 //!   - FlowView:           pipeline diagram with extractors and shuttles
-//!   - ListDetail:         node list + detail panel
 //!   - Codex:              recipe codex
 
 use crate::loom::patterns::all_patterns_complete;
@@ -164,7 +163,6 @@ pub fn render_loom_overlay(
 
     let view_name = match ui.view {
         LoomView::FlowView => "Flow View",
-        LoomView::ListDetail => "Nodes",
         LoomView::Codex => "Recipe Codex",
     };
 
@@ -187,9 +185,6 @@ pub fn render_loom_overlay(
     match ui.view {
         LoomView::FlowView => {
             render_flow_view(frame, inner, loom_state, ui);
-        }
-        LoomView::ListDetail => {
-            render_list_detail(frame, inner, loom_state, ui);
         }
         LoomView::Codex => {
             render_codex(frame, inner, loom_state, ui);
@@ -1490,299 +1485,6 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
     }
 }
 
-fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &LoomUiState) {
-    use crate::loom::types::NodeId;
-    use crate::loom::{node_effective_rate, node_upgrade_cost};
-
-    // Split into left list (60%) and right detail panel (40%).
-    let h_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(58), Constraint::Percentage(42)])
-        .split(area);
-    let list_area = h_chunks[0];
-    let detail_area = h_chunks[1];
-
-    let nodes = NodeId::ALL;
-    let selected_node_id = nodes[ui.selected_node.min(nodes.len() - 1)];
-
-    // ── Left: node list ────────────────────────────────────────────────────────
-    let mut lines = vec![
-        Line::from(""),
-        Line::from(Span::styled(
-            "Nodes",
-            Style::default().fg(Color::Rgb(180, 120, 220)),
-        )),
-        Line::from(""),
-    ];
-
-    for (i, node_id) in nodes.iter().enumerate() {
-        let Some(node) = loom_state
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == *node_id)
-        else {
-            continue;
-        };
-        let is_selected = ui.selected_node == i;
-        let prefix = if is_selected { "\u{25b6} " } else { "  " };
-
-        let color = if !node.unlocked {
-            Color::Rgb(60, 45, 80)
-        } else if is_selected {
-            Color::White
-        } else {
-            Color::Rgb(120, 80, 160)
-        };
-
-        let stall_marker = if node.stalled {
-            Span::styled(" \u{26a0}", Style::default().fg(Color::Rgb(220, 60, 60)))
-        } else {
-            Span::raw("")
-        };
-        let lock_marker = if !node.unlocked {
-            Span::styled(" [locked]", Style::default().fg(Color::Rgb(60, 45, 80)))
-        } else {
-            Span::raw("")
-        };
-
-        lines.push(Line::from(vec![
-            Span::styled(prefix, Style::default().fg(color)),
-            Span::styled(
-                format!("{:<16}", node_id.name()),
-                Style::default().fg(color),
-            ),
-            if node.unlocked {
-                Span::styled(
-                    format!("L{}", node.level),
-                    Style::default().fg(Color::Rgb(100, 75, 140)),
-                )
-            } else {
-                Span::raw("")
-            },
-            stall_marker,
-            lock_marker,
-        ]));
-
-        // Show shuttle consumers of this node inline in the list.
-        if is_selected && node.unlocked {
-            let consumer_count = loom_state
-                .persistent
-                .shuttles
-                .iter()
-                .filter(|r| {
-                    let node_ref = crate::loom::types::LoomNodeRef::Extractor(*node_id);
-                    r.sources_a.contains(&node_ref) || r.sources_b.contains(&node_ref)
-                })
-                .count();
-            if consumer_count == 0 {
-                lines.push(Line::from(Span::styled(
-                    "     no shuttle consumers",
-                    Style::default().fg(Color::Rgb(60, 45, 80)),
-                )));
-            } else {
-                lines.push(Line::from(Span::styled(
-                    format!("     {} shuttle consumer(s)", consumer_count),
-                    Style::default().fg(Color::Rgb(100, 70, 130)),
-                )));
-            }
-        }
-    }
-
-    frame.render_widget(
-        Paragraph::new(lines)
-            .alignment(Alignment::Left)
-            .style(Style::default().bg(Color::Rgb(10, 5, 18))),
-        list_area,
-    );
-
-    // ── Right: selected node detail panel ─────────────────────────────────────
-    let detail_block = Block::default()
-        .title(format!(" {} ", selected_node_id.name()))
-        .borders(Borders::LEFT)
-        .border_style(Style::default().fg(Color::Rgb(80, 60, 110)));
-    let detail_inner = detail_block.inner(detail_area);
-    frame.render_widget(detail_block, detail_area);
-
-    let Some(selected_node) = loom_state
-        .persistent
-        .nodes
-        .iter()
-        .find(|n| n.id == selected_node_id)
-    else {
-        return;
-    };
-
-    let mut detail_lines: Vec<Line> = vec![Line::from("")];
-
-    if !selected_node.unlocked {
-        detail_lines.push(Line::from(Span::styled(
-            " [Locked]",
-            Style::default().fg(Color::Rgb(80, 60, 110)),
-        )));
-        detail_lines.push(Line::from(Span::styled(
-            " Awaiting thread",
-            Style::default().fg(Color::Rgb(60, 45, 80)),
-        )));
-        detail_lines.push(Line::from(""));
-        // Show unlock progress bar if partially unlocked.
-        if selected_node.unlock_progress > 0.0 {
-            let prog_pct = (selected_node.unlock_progress / 2.0).min(1.0);
-            let filled = ((prog_pct * 10.0) as usize).min(10);
-            let empty = 10usize.saturating_sub(filled);
-            detail_lines.push(Line::from(vec![
-                Span::styled(" Progress [", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    "\u{2588}".repeat(filled),
-                    Style::default().fg(Color::Rgb(100, 80, 160)),
-                ),
-                Span::styled(
-                    "\u{2591}".repeat(empty),
-                    Style::default().fg(Color::Rgb(40, 30, 55)),
-                ),
-                Span::styled("]", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    format!(" {:.1}h", selected_node.unlock_progress),
-                    Style::default().fg(Color::Rgb(100, 80, 160)),
-                ),
-            ]));
-        }
-    } else {
-        // Nature and native resource.
-        let nature_name = node_nature_name(selected_node_id.nature());
-        let native = crate::loom::node_native_resource(selected_node_id);
-        detail_lines.push(Line::from(vec![
-            Span::styled(" Nature: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(nature_name, Style::default().fg(Color::Rgb(180, 140, 220))),
-        ]));
-        detail_lines.push(Line::from(vec![
-            Span::styled(" Produces: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                resource_name(&native),
-                Style::default().fg(Color::Rgb(220, 180, 255)),
-            ),
-        ]));
-        detail_lines.push(Line::from(""));
-
-        // Buffer bar.
-        let fill = if selected_node.buffer_capacity > 0.0 {
-            (selected_node.buffer / selected_node.buffer_capacity).min(1.0)
-        } else {
-            0.0
-        };
-        let bar_color = if selected_node.stalled || fill >= 0.90 {
-            Color::Rgb(220, 60, 60)
-        } else if fill >= 0.75 {
-            Color::Rgb(220, 180, 60)
-        } else {
-            Color::Rgb(60, 200, 100)
-        };
-        let filled_cells = ((fill * 12.0) as usize).min(12);
-        let empty_cells = 12usize.saturating_sub(filled_cells);
-        detail_lines.push(Line::from(vec![
-            Span::styled(" Buffer [", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "\u{2588}".repeat(filled_cells),
-                Style::default().fg(bar_color),
-            ),
-            Span::styled(
-                "\u{2591}".repeat(empty_cells),
-                Style::default().fg(Color::Rgb(40, 30, 55)),
-            ),
-            Span::styled("]", Style::default().fg(Color::DarkGray)),
-        ]));
-        detail_lines.push(Line::from(vec![
-            Span::styled(
-                format!(
-                    " {:.0}/{:.0}",
-                    selected_node.buffer, selected_node.buffer_capacity
-                ),
-                Style::default().fg(bar_color),
-            ),
-            if selected_node.stalled {
-                Span::styled(
-                    " \u{26a0} STALLED",
-                    Style::default().fg(Color::Rgb(220, 60, 60)),
-                )
-            } else {
-                Span::raw("")
-            },
-        ]));
-        detail_lines.push(Line::from(""));
-
-        // Production rate.
-        let rate = node_effective_rate(loom_state, selected_node);
-        detail_lines.push(Line::from(vec![
-            Span::styled(" Rate: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                format!("{:.0}/hr", rate),
-                Style::default().fg(Color::Rgb(100, 200, 120)),
-            ),
-            Span::styled(
-                format!(" (Lv{})", selected_node.level),
-                Style::default().fg(Color::Rgb(80, 60, 100)),
-            ),
-        ]));
-        detail_lines.push(Line::from(""));
-
-        // Upgrade cost.
-        let upgrade_cost = node_upgrade_cost(loom_state, selected_node_id);
-        let can_upgrade = selected_node.buffer >= upgrade_cost;
-        let upgrade_color = if can_upgrade {
-            Color::Rgb(180, 255, 180)
-        } else {
-            Color::Rgb(100, 75, 80)
-        };
-        detail_lines.push(Line::from(vec![
-            Span::styled(" Upgrade: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                format!("{:.0} {}", upgrade_cost, resource_name(&native)),
-                Style::default().fg(upgrade_color),
-            ),
-        ]));
-        if can_upgrade {
-            detail_lines.push(Line::from(Span::styled(
-                " [U] Upgrade node",
-                Style::default().fg(Color::Rgb(120, 200, 120)),
-            )));
-        } else {
-            detail_lines.push(Line::from(Span::styled(
-                " (insufficient buffer)",
-                Style::default().fg(Color::Rgb(80, 60, 70)),
-            )));
-        }
-
-        // Shuttle consumer count for this node.
-        let node_ref = crate::loom::types::LoomNodeRef::Extractor(selected_node_id);
-        let consumer_count = loom_state
-            .persistent
-            .shuttles
-            .iter()
-            .filter(|r| r.sources_a.contains(&node_ref) || r.sources_b.contains(&node_ref))
-            .count();
-        if consumer_count > 0 {
-            detail_lines.push(Line::from(""));
-            detail_lines.push(Line::from(vec![
-                Span::styled(" Consumers: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    format!(
-                        "{} shuttle{}",
-                        consumer_count,
-                        if consumer_count == 1 { "y" } else { "ies" }
-                    ),
-                    Style::default().fg(Color::Rgb(140, 100, 180)),
-                ),
-            ]));
-        }
-    }
-
-    detail_lines.truncate(detail_inner.height as usize);
-    frame.render_widget(
-        Paragraph::new(detail_lines).style(Style::default().bg(Color::Rgb(10, 5, 18))),
-        detail_inner,
-    );
-}
-
 /// Build a compact inline ratio bar (e.g. "████░░░░░░" for 40%).
 fn build_ratio_bar(ratio: f64, width: usize) -> String {
     let filled = ((ratio.clamp(0.0, 1.0) * width as f64) as usize).min(width);
@@ -2443,8 +2145,6 @@ fn render_nav_hints(frame: &mut Frame, area: Rect, ui: &LoomUiState) {
 
     let hints = if ui.build.is_some() {
         " [Up/Down] Select  [Space] Toggle  [Enter] Confirm  [Esc] Cancel "
-    } else if ui.view == LoomView::ListDetail {
-        " [Tab] Switch View  [Up/Down] Node  [U] Upgrade  [B] Build  [Esc] Close "
     } else if ui.view == LoomView::FlowView {
         " [Tab] Switch View  [Arrows] Navigate  [U] Upgrade  [B] Build  [D] Demolish  [Esc] Close "
     } else {

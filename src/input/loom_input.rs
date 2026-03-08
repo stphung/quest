@@ -48,9 +48,6 @@ pub(super) fn handle_loom(
                         n => n,
                     };
                 }
-                LoomView::ListDetail => {
-                    loom_ui.selected_node = loom_ui.selected_node.saturating_sub(1);
-                }
             }
             InputResult::Continue
         }
@@ -86,11 +83,6 @@ pub(super) fn handle_loom(
                         n => n,
                     };
                 }
-                LoomView::ListDetail => {
-                    if loom_ui.selected_node + 1 < 6 {
-                        loom_ui.selected_node += 1;
-                    }
-                }
             }
             InputResult::Continue
         }
@@ -117,9 +109,7 @@ pub(super) fn handle_loom(
             }
             InputResult::Continue
         }
-        KeyCode::Char('u') | KeyCode::Char('U')
-            if loom_ui.view == LoomView::ListDetail || loom_ui.view == LoomView::FlowView =>
-        {
+        KeyCode::Char('u') | KeyCode::Char('U') if loom_ui.view == LoomView::FlowView => {
             // Diamond layout grid_ids: 0=ES, 1=RL, 2=RF, 3=VC, 4=SW, 5=MA
             let grid_ids = [
                 crate::loom::types::NodeId::EmberSpindle,
@@ -137,9 +127,7 @@ pub(super) fn handle_loom(
             }
         }
         KeyCode::Enter => InputResult::Continue,
-        KeyCode::Char('b') | KeyCode::Char('B')
-            if loom_ui.view == LoomView::FlowView || loom_ui.view == LoomView::ListDetail =>
-        {
+        KeyCode::Char('b') | KeyCode::Char('B') if loom_ui.view == LoomView::FlowView => {
             start_build(loom_state, loom_ui);
             InputResult::Continue
         }
@@ -373,8 +361,7 @@ fn handle_build_input(
 /// Cycle through views.
 fn cycle_view(current: LoomView) -> LoomView {
     match current {
-        LoomView::FlowView => LoomView::ListDetail,
-        LoomView::ListDetail => LoomView::Codex,
+        LoomView::FlowView => LoomView::Codex,
         LoomView::Codex => LoomView::FlowView,
     }
 }
@@ -410,9 +397,6 @@ mod tests {
         let mut ui = make_ui(LoomView::FlowView);
 
         handle_loom(key(KeyCode::Tab), &mut state, &mut ui);
-        assert_eq!(ui.view, LoomView::ListDetail);
-
-        handle_loom(key(KeyCode::Tab), &mut state, &mut ui);
         assert_eq!(ui.view, LoomView::Codex);
 
         handle_loom(key(KeyCode::Tab), &mut state, &mut ui);
@@ -420,22 +404,7 @@ mod tests {
     }
 
     #[test]
-    fn up_down_node_selection_in_list_detail() {
-        let mut state = LoomState::new();
-        let mut ui = make_ui(LoomView::ListDetail);
-        assert_eq!(ui.selected_node, 0);
-
-        handle_loom(key(KeyCode::Up), &mut state, &mut ui);
-        assert_eq!(ui.selected_node, 0, "should not go below 0");
-
-        for _ in 0..10 {
-            handle_loom(key(KeyCode::Down), &mut state, &mut ui);
-        }
-        assert_eq!(ui.selected_node, 5, "should cap at 5");
-    }
-
-    #[test]
-    fn left_right_no_op_outside_list_detail() {
+    fn left_right_no_op_outside_flow_view() {
         let mut state = LoomState::new();
         let mut ui = make_ui(LoomView::FlowView);
 

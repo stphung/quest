@@ -342,7 +342,6 @@ impl Default for LoomState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LoomView {
     FlowView,
-    ListDetail,
     Codex,
 }
 

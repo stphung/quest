@@ -119,7 +119,7 @@ Extractor (base production) → [direct pull] → Shuttle (recipe processing) �
 
 Two views controlled by `LoomView` enum:
 - **FlowView**: 2D grid with extractors in top 3x2 grid, shuttles in scrollable processing area below (2 columns). Shows source connections in detail panel.
-- **ListDetail**: Vertical list of all nodes with detail panel.
+- **Codex**: Recipe codex showing discovered and undiscovered recipes.
 
 Shuttle boxes show: recipe name, tier badge, construction progress, buffer levels, stall indicator.
 
@@ -141,6 +141,6 @@ Three debug actions in `utils/debug_menu.rs`:
 
 - **Ticked by**: `src/core/tick_stages.rs` `tick_loom()` — calls base production, `tick_shuttle_pull`, shuttle construction, stall detection, pattern sustain
 - **Input from**: `src/input/loom_input.rs` dispatches keyboard events
-- **Rendered by**: `src/ui/loom_scene.rs` renders both views
+- **Rendered by**: `src/ui/loom_scene.rs` renders FlowView and Codex views
 - **Persisted to**: `~/.quest/loom.json` via `persistence.rs`
 - **Discovery**: Triggered by pattern completion milestones
