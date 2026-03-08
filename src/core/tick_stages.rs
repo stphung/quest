@@ -1111,12 +1111,9 @@ pub(super) fn tick_loom(
             loom_cap,
             state.ascension_level,
         );
-        // Emit pattern milestone event if this count is a key milestone
+        // Set pending milestone for tick.rs consumption (mirrors Deep's pending_fracture_region_unlock)
         if let Some(milestone) = crate::loom::PatternMilestone::from_count(completed_count) {
-            result.events.push(TickEvent::PatternMilestoneReached {
-                message: format!("\u{1f9f5} {}", milestone.unlock_log_line()),
-                milestone,
-            });
+            loom.persistent.pending_pattern_milestones.push(milestone);
         }
     }
 

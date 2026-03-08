@@ -287,6 +287,10 @@ pub struct LoomPersistent {
     /// Unix timestamp of last WR→PR grant (wall-clock, like Power Cores).
     #[serde(default)]
     pub wr_pr_last_granted_at: i64,
+    /// Pattern milestones awaiting consumption by the tick pipeline.
+    /// Set by offline resolution or tick_stages; consumed by tick.rs to emit events.
+    #[serde(skip)]
+    pub pending_pattern_milestones: Vec<super::milestones::PatternMilestone>,
 }
 
 impl LoomPersistent {
@@ -319,6 +323,7 @@ impl Default for LoomPersistent {
             second_node_unlock_elapsed: None,
             shuttles: Vec::new(),
             wr_pr_last_granted_at: 0,
+            pending_pattern_milestones: Vec::new(),
         }
     }
 }

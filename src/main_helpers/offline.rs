@@ -125,8 +125,6 @@ pub fn apply_offline_xp(state: &mut GameState, haven: &haven::Haven) -> Option<O
 pub struct LoomOfflineReport {
     /// Number of Woven Patterns completed during offline time.
     pub patterns_completed: u32,
-    /// Pattern milestones crossed during offline time.
-    pub milestones: Vec<loom::PatternMilestone>,
 }
 
 /// Simulate Loom production for time elapsed while offline.
@@ -165,15 +163,13 @@ pub fn resolve_loom_offline(
     let patterns_after = loom_state.persistent.completed_pattern_count();
     let patterns_completed = (patterns_after - patterns_before) as u32;
 
-    // Check which milestones were crossed during offline time
+    // Set pending milestones for tick pipeline consumption (mirrors Deep's pending_fracture_region_unlock)
     let milestones: Vec<loom::PatternMilestone> = ((patterns_before + 1)..=patterns_after)
         .filter_map(loom::PatternMilestone::from_count)
         .collect();
+    loom_state.persistent.pending_pattern_milestones = milestones;
 
-    Some(LoomOfflineReport {
-        patterns_completed,
-        milestones,
-    })
+    Some(LoomOfflineReport { patterns_completed })
 }
 
 /// Run one simulation step of the Loom production chain.
