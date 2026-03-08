@@ -1819,6 +1819,63 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         icon: "\u{2B21}",
         points: 500,
     },
+    // Loom achievements
+    AchievementDef {
+        id: AchievementId::LoomDiscovered,
+        name: "Thread Awakening",
+        description: "Discover the Loom of Worlds",
+        category: AchievementCategory::Loom,
+        icon: "\u{1F9F5}",
+        points: 10,
+    },
+    AchievementDef {
+        id: AchievementId::LoomPattern1,
+        name: "First Thread",
+        description: "Complete your first Woven Pattern",
+        category: AchievementCategory::Loom,
+        icon: "\u{1F9F5}",
+        points: 10,
+    },
+    AchievementDef {
+        id: AchievementId::LoomPattern4,
+        name: "Threadweaver",
+        description: "Complete 4 Woven Patterns",
+        category: AchievementCategory::Loom,
+        icon: "\u{1F9F5}",
+        points: 25,
+    },
+    AchievementDef {
+        id: AchievementId::LoomPattern8,
+        name: "Pattern Adept",
+        description: "Complete 8 Woven Patterns",
+        category: AchievementCategory::Loom,
+        icon: "\u{1F9F5}",
+        points: 50,
+    },
+    AchievementDef {
+        id: AchievementId::LoomPattern16,
+        name: "Pattern Master",
+        description: "Complete 16 Woven Patterns",
+        category: AchievementCategory::Loom,
+        icon: "\u{1F9F5}",
+        points: 100,
+    },
+    AchievementDef {
+        id: AchievementId::LoomPattern22,
+        name: "Grand Weaver",
+        description: "Complete 22 Woven Patterns",
+        category: AchievementCategory::Loom,
+        icon: "\u{1F9F5}",
+        points: 250,
+    },
+    AchievementDef {
+        id: AchievementId::LoomPattern28,
+        name: "Loom Perfected",
+        description: "Complete all 28 Woven Patterns",
+        category: AchievementCategory::Loom,
+        icon: "\u{1F9F5}",
+        points: 500,
+    },
 ];
 
 /// Get the definition for a specific achievement.
@@ -2132,6 +2189,13 @@ mod tests {
             AchievementId::PowerCoreIV,
             AchievementId::PowerCoreV,
             AchievementId::PowerCoreVI,
+            AchievementId::LoomDiscovered,
+            AchievementId::LoomPattern1,
+            AchievementId::LoomPattern4,
+            AchievementId::LoomPattern8,
+            AchievementId::LoomPattern16,
+            AchievementId::LoomPattern22,
+            AchievementId::LoomPattern28,
         ];
 
         // Sanity-check: the slice above must itself be up-to-date.

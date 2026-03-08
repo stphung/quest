@@ -461,6 +461,13 @@ fn main() -> io::Result<()> {
                     Some(&state.character_name),
                 );
 
+                // Sync Loom achievements from persistent state
+                global_achievements.sync_from_loom(
+                    loom_state.persistent.discovered,
+                    loom_state.persistent.completed_pattern_count(),
+                    Some(&state.character_name),
+                );
+
                 play_screen_transition(&mut terminal)?;
                 terminal.clear()?;
 

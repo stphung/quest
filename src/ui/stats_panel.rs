@@ -637,7 +637,7 @@ pub(super) fn draw_zone_info(
             let first_gated = highest_accessible + 1;
             let gate_hint = zone_gate_hint(
                 first_gated,
-                &zones,
+                zones,
                 game_state.prestige_rank,
                 game_state.ascension_level,
             );

@@ -299,12 +299,16 @@ mod tests {
         state.next_category();
         assert_eq!(state.selected_category, AchievementCategory::Deep);
         state.next_category();
+        assert_eq!(state.selected_category, AchievementCategory::Loom);
+        state.next_category();
         assert_eq!(state.selected_category, AchievementCategory::Stats);
         state.next_category();
         assert_eq!(state.selected_category, AchievementCategory::Combat);
 
         state.prev_category();
         assert_eq!(state.selected_category, AchievementCategory::Stats);
+        state.prev_category();
+        assert_eq!(state.selected_category, AchievementCategory::Loom);
         state.prev_category();
         assert_eq!(state.selected_category, AchievementCategory::Deep);
         state.prev_category();
@@ -334,6 +338,7 @@ mod tests {
         state.next_category(); // Challenges
         state.next_category(); // Exploration
         state.next_category(); // Deep
+        state.next_category(); // Loom
         state.next_category(); // Stats
         assert_eq!(state.selected_category, AchievementCategory::Stats);
 
@@ -345,7 +350,11 @@ mod tests {
         state.prev_category();
         assert_eq!(state.selected_category, AchievementCategory::Stats);
 
-        // Backward from Stats goes to Deep
+        // Backward from Stats goes to Loom
+        state.prev_category();
+        assert_eq!(state.selected_category, AchievementCategory::Loom);
+
+        // Backward from Loom goes to Deep
         state.prev_category();
         assert_eq!(state.selected_category, AchievementCategory::Deep);
 

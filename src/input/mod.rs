@@ -18,7 +18,7 @@ pub use types::*;
 // Re-export soulforge UI types from enhancement module
 pub use crate::enhancement::{SoulforgePhase, SoulforgeUiState};
 
-use crate::achievements::get_achievements_by_category;
+use crate::achievements::{get_achievements_by_category, AchievementCategory};
 use crate::challenges::menu::{process_input as process_menu_input, MenuInput};
 use crate::character::prestige::can_prestige;
 use crate::core::game_state::GameState;
@@ -115,7 +115,13 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
             KeyCode::Right => browser.next_category(),
             KeyCode::Up => browser.move_up(),
             KeyCode::Down => {
-                let count = get_achievements_by_category(browser.selected_category).len();
+                let count = if browser.selected_category == AchievementCategory::Stats {
+                    // Stats view uses selected_index as scroll offset;
+                    // allow generous scrolling (content height is ~50 lines).
+                    100
+                } else {
+                    get_achievements_by_category(browser.selected_category).len()
+                };
                 browser.move_down(count);
             }
             KeyCode::Char('t') | KeyCode::Char('T') => {

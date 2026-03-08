@@ -135,7 +135,7 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
     );
 
     // ── 11e. Loom of Worlds discovery check ───────────────────────
-    tick_stages::tick_loom(ctx.deep, ctx.loom, ctx.state, &mut result);
+    tick_stages::tick_loom(ctx.deep, ctx.loom, ctx.state, ctx.achievements, &mut result);
 
     // ── 11d. Fracture region unlock consumption ──────────────────
     if let Some(region) = ctx.deep.persistent.pending_fracture_region_unlock.take() {

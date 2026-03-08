@@ -752,6 +752,7 @@ fn build_stats_right_lines(
         AchievementCategory::Challenges,
         AchievementCategory::Exploration,
         AchievementCategory::Deep,
+        AchievementCategory::Loom,
     ] {
         let (unlocked, total) = achievements.count_by_category(*cat);
         lines.push(Line::from(vec![

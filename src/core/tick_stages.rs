@@ -1001,12 +1001,14 @@ pub(super) fn tick_loom(
     deep: &crate::deep::DeepState,
     loom: &mut crate::loom::LoomState,
     state: &mut crate::core::game_state::GameState,
+    achievements: &mut crate::achievements::Achievements,
     result: &mut TickResult,
 ) {
     // Discovery trigger: requires Deep discovered + Gateway opened.
     if !loom.persistent.discovered {
         if deep.persistent.discovered && deep.persistent.gateway_opened {
             crate::loom::complete_discovery(loom);
+            achievements.on_loom_discovered(Some(&state.character_name));
             result.events.push(TickEvent::LoomDiscovered);
             result.loom_changed = true;
         }
@@ -1092,6 +1094,10 @@ pub(super) fn tick_loom(
         crate::loom::tick_pattern_sustain(&mut loom.persistent, &rates, TICK_SECONDS);
     if pattern_completed {
         result.loom_changed = true;
+        achievements.on_loom_pattern_completed(
+            loom.persistent.completed_pattern_count(),
+            Some(&state.character_name),
+        );
         // Sync Loom zone unlocks on pattern completion
         let loom_cap =
             crate::loom::loom_zone_cap_for_patterns(loom.persistent.completed_pattern_count());

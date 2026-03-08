@@ -444,6 +444,37 @@ impl Achievements {
     }
 
     // =========================================================================
+    // Loom
+    // =========================================================================
+
+    /// Called when the Loom of Worlds is discovered.
+    pub fn on_loom_discovered(&mut self, character_name: Option<&str>) {
+        self.unlock_with_name(AchievementId::LoomDiscovered, character_name);
+    }
+
+    /// Called when a Woven Pattern is completed.
+    /// `completed_count` is the total number of completed patterns.
+    pub fn on_loom_pattern_completed(
+        &mut self,
+        completed_count: usize,
+        character_name: Option<&str>,
+    ) {
+        const PATTERN_MILESTONES: &[(usize, AchievementId)] = &[
+            (1, AchievementId::LoomPattern1),
+            (4, AchievementId::LoomPattern4),
+            (8, AchievementId::LoomPattern8),
+            (16, AchievementId::LoomPattern16),
+            (22, AchievementId::LoomPattern22),
+            (28, AchievementId::LoomPattern28),
+        ];
+        for &(threshold, id) in PATTERN_MILESTONES {
+            if completed_count >= threshold {
+                self.unlock_with_name(id, character_name);
+            }
+        }
+    }
+
+    // =========================================================================
     // State Synchronization (retroactive achievement unlocking)
     // =========================================================================
 
@@ -629,6 +660,22 @@ impl Achievements {
         }
         if all_at_t3 {
             self.on_haven_architect(character_name);
+        }
+    }
+
+    /// Syncs Loom-related achievements based on Loom state.
+    /// Call this when loading Loom data.
+    pub fn sync_from_loom(
+        &mut self,
+        discovered: bool,
+        completed_patterns: usize,
+        character_name: Option<&str>,
+    ) {
+        if discovered {
+            self.on_loom_discovered(character_name);
+        }
+        if completed_patterns > 0 {
+            self.on_loom_pattern_completed(completed_patterns, character_name);
         }
     }
 }
