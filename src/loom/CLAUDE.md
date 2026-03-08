@@ -137,6 +137,45 @@ Three debug actions in `utils/debug_menu.rs`:
 - `LoomBuildTestShuttleT2` — instantly build a T2 test shuttle
 - `LoomClearShuttles` — remove all shuttles
 
+## Shuttle Upgrades
+
+Shuttles can be upgraded to increase their intake cap. Each level adds 0.5x to the base multiplier:
+
+- `node_level_multiplier(level)` = `1.0 + (level - 1) * 0.5` (level 1 = 1.0x, level 2 = 1.5x, level 3 = 2.0x, etc.)
+- `shuttle_effective_intake_cap(tier, level)` = `tier_intake_cap(tier) * node_level_multiplier(level)`
+- `upgrade_shuttle(loom, idx)` — upgrade a shuttle's level (costs resources)
+
+**Max shuttle level** is gated by Ascension tier via `max_shuttle_level(ascension_level)`:
+
+| Ascension Level | Max Shuttle Level |
+|-----------------|-------------------|
+| 0–VI | 1 |
+| VII | 3 |
+| VIII | 5 |
+| IX | 7 |
+| X | 10 |
+
+## WR→PR Generation
+
+When all 28 Woven Patterns are complete, the Loom converts Weave Rate (WR) into Prestige Ranks (PR) per day using tiered brackets:
+
+| WR/hr bracket | PR per WR/hr per day |
+|---------------|---------------------|
+| 0–10 | 5 |
+| 10–25 | 10 |
+| 25+ | 15 |
+
+- `wr_to_pr_per_day(wr_per_hour) -> f64` — calculates daily PR output from current weave rate
+- Activation condition: `completed_pattern_count() >= 28`
+
+## Key Functions (Power Integration)
+
+- `completed_pattern_count() -> usize` — count of fully completed Woven Patterns
+- `loom_zone_cap_for_patterns(patterns) -> u32` — returns max zone ID unlocked by pattern count (Z31-50)
+- `wr_to_pr_per_day(wr_per_hour) -> f64` — tiered WR to PR/day conversion
+- `upgrade_shuttle(loom, idx)` — upgrade shuttle level, increasing effective intake cap
+- `shuttle_effective_intake_cap(tier, level) -> f64` — intake cap adjusted for shuttle level
+
 ## Integration Points
 
 - **Ticked by**: `src/core/tick_stages.rs` `tick_loom()` — calls base production, `tick_shuttle_pull`, shuttle construction, stall detection, pattern sustain
@@ -144,3 +183,5 @@ Three debug actions in `utils/debug_menu.rs`:
 - **Rendered by**: `src/ui/loom_scene.rs` renders FlowView and Codex views
 - **Persisted to**: `~/.quest/loom.json` via `persistence.rs`
 - **Discovery**: Triggered by pattern completion milestones
+- **Ascension** (`ascension/types.rs`): `ascension_pattern_gate()` checks pattern count for VII-X eligibility; `max_shuttle_level()` gates shuttle upgrades by Ascension tier
+- **Zones** (`zones/`): `loom_zone_cap_for_patterns()` unlocks Loom Zones 31-50 based on completed pattern count

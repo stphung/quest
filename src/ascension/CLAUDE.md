@@ -1,6 +1,6 @@
 # Ascension System
 
-Per-character combat power multiplier purchased with prestige ranks, gated by Deep layer milestones. Each Ascension level doubles all combat stats (damage, defense, HP) for levels I-VI, with diminishing returns at VII+.
+Per-character combat power multiplier purchased with prestige ranks, gated by Deep layer milestones (I-VI) or Loom Woven Pattern counts (VII-X). Each Ascension level doubles all combat stats (damage, defense, HP) for levels I-VI, with diminishing returns at VII+. MAX_ASCENSION_LEVEL is 10.
 
 ## Module Structure
 
@@ -18,7 +18,8 @@ src/ascension/
 Returned by `ascend()`:
 - `Success { new_level, multiplier }` -- PR deducted, level incremented
 - `InsufficientPR { needed, have }` -- not enough prestige ranks
-- `DeepGateNotMet { needed_layer, current_layer }` -- Deep layer requirement not reached
+- `DeepGateNotMet { needed_layer, current_layer }` -- Deep layer requirement not reached (levels I-VI)
+- `PatternGateNotMet { needed_patterns, current_patterns }` -- Woven Pattern requirement not reached (levels VII-X)
 
 ## Key Functions
 
@@ -26,7 +27,9 @@ Returned by `ascend()`:
 
 - `ascension_cost(level) -> u32` -- PR cost to reach the given level
 - `ascension_deep_gate(level) -> Option<u32>` -- Deep layer requirement (None for levels 7+)
+- `ascension_pattern_gate(level) -> Option<u32>` -- Woven Pattern requirement for levels 7-10 (None for levels 1-6)
 - `ascension_combat_multiplier(level) -> f64` -- Combat stat multiplier at given level
+- `max_shuttle_level(ascension_level) -> u32` -- Max Loom Shuttle upgrade level for given Ascension tier (1 for 0-VI, 3/5/7/10 for VII-X)
 
 ### `logic.rs`
 
@@ -43,15 +46,20 @@ Returned by `ascend()`:
 | IV | Layer 18 (Sunken Reach) | 200 PR | 16x |
 | V | Layer 25 (Abyss) | 325 PR | 32x |
 | VI | Layer 30 (Gateway) | 500 PR | 64x |
-| VII+ | None (PR only) | 575+ PR (+75 each) | x1.5 each |
+| VII | 8 Patterns | 1,500 PR | 96x |
+| VIII | 16 Patterns | 4,000 PR | 144x |
+| IX | 22 Patterns | 8,000 PR | 216x |
+| X | 28 Patterns | 15,000 PR | 324x |
 
 Total PR for I-VI: 1,245 PR.
 
 ## Formulas
 
-- **Cost**: Levels 1-6 from lookup table `[35, 65, 120, 200, 325, 500]`; levels 7+ = `500 + 75 * (level - 6)`
-- **Deep gate**: Levels 1-6 from lookup table `[3, 7, 12, 18, 25, 30]`; levels 7+ = no gate
+- **Cost**: Levels 1-6 from lookup table `[35, 65, 120, 200, 325, 500]`; levels 7-10 from `[1500, 4000, 8000, 15000]`
+- **Deep gate**: Levels 1-6 from lookup table `[3, 7, 12, 18, 25, 30]`; levels 7+ = no Deep gate
+- **Pattern gate**: Levels 7-10 require `[8, 16, 22, 28]` completed Woven Patterns; levels 1-6 = no pattern gate
 - **Multiplier**: Levels 1-6 = `2^level`; levels 7+ = `64 * 1.5^(level - 6)`
+- **Shuttle level cap**: Asc 0-VI = 1, VII = 3, VIII = 5, IX = 7, X = 10
 
 ## Persistence
 
@@ -68,3 +76,4 @@ Total PR for I-VI: 1,245 PR.
 - **Deep** (`deep/types.rs`): Deep layer milestones gate Ascension availability (account-level check)
 - **Achievements** (`achievements/handlers.rs`): `on_ascended(level)` unlocks `AscensionI` through `AscensionVI` (one achievement per level)
 - **UI** (`ui/stats_prestige.rs`): Shows "Asc N (Mx)" alongside prestige info when level > 0
+- **Loom** (`loom/`): `completed_pattern_count()` provides pattern gate checks for VII-X; `max_shuttle_level(ascension_level)` gates shuttle upgrade caps
