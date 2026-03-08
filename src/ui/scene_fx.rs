@@ -185,7 +185,7 @@ pub fn render_buffer(frame: &mut Frame, area: Rect, buffer: &[Vec<SceneCell>]) {
 }
 
 thread_local! {
-    static SCENE_BUFFER: RefCell<Vec<Vec<SceneCell>>> = RefCell::new(Vec::new());
+    static SCENE_BUFFER: RefCell<Vec<Vec<SceneCell>>> = const { RefCell::new(Vec::new()) };
 }
 
 /// Acquire a reusable scene buffer, resized and cleared to `SceneCell::default()`.

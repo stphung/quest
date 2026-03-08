@@ -1289,7 +1289,7 @@ fn main() -> io::Result<()> {
                             if !debug_mode {
                                 // Only spawn a background save if the previous one finished
                                 let can_save =
-                                    autosave_handle.as_ref().map_or(true, |h| h.is_finished());
+                                    autosave_handle.as_ref().is_none_or(|h| h.is_finished());
                                 if can_save {
                                     // Drop the finished handle before spawning a new one
                                     autosave_handle = Some(spawn_background_save(
