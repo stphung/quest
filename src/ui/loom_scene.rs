@@ -1251,51 +1251,65 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
     };
 
     // Split grid_area into 3 extractor rows + arrow gaps + refinery section.
-    // Each extractor row = NODE_BOX_HEIGHT, each arrow gap = 1 row.
-    // Total extractor section = 3 * NODE_BOX_HEIGHT + 2 * 1 (gaps between rows).
+    // Each extractor row = NODE_BOX_HEIGHT, each arrow gap = 2 rows (│ + ▼/▲).
     let box_h = NODE_BOX_HEIGHT as u16;
+    let gap_h = 2u16;
+    let extractor_total_h = 3 * box_h + 2 * gap_h;
+    let content_h = extractor_total_h + refinery_row_count;
+
+    // Vertical centering: split remaining space equally above and below.
+    let v_pad = grid_area.height.saturating_sub(content_h) / 2;
+
     let mut row_constraints: Vec<Constraint> = Vec::new();
+    row_constraints.push(Constraint::Length(v_pad)); // top padding
     for i in 0..3 {
         row_constraints.push(Constraint::Length(box_h)); // node row
         if i < 2 {
-            row_constraints.push(Constraint::Length(1)); // arrow gap
+            row_constraints.push(Constraint::Length(gap_h)); // arrow gap
         }
     }
     if refinery_row_count > 0 {
         row_constraints.push(Constraint::Length(refinery_row_count));
     }
-    row_constraints.push(Constraint::Min(0)); // absorb remaining space
+    row_constraints.push(Constraint::Min(0)); // absorb remaining space (bottom padding)
 
     let row_rects = Layout::default()
         .direction(Direction::Vertical)
         .constraints(row_constraints)
         .split(grid_area);
 
-    // Indices into row_rects: 0=extractor row 0, 1=gap, 2=extractor row 1, 3=gap, 4=extractor row 2
-    // Then 5=refinery section (if present), last=spacer
-    let extractor_row_rects = [row_rects[0], row_rects[2], row_rects[4]];
-    let gap_rects = [row_rects[1], row_rects[3]];
+    // Indices into row_rects: 0=top pad, 1=extractor row 0, 2=gap, 3=extractor row 1, 4=gap, 5=extractor row 2
+    // Then 6=refinery section (if present), last=spacer
+    let extractor_row_rects = [row_rects[1], row_rects[3], row_rects[5]];
+    let gap_rects = [row_rects[2], row_rects[4]];
 
     let flow_color = Color::Rgb(60, 45, 80);
     let flow_arrow_color = Color::Rgb(120, 80, 180);
+
+    // Horizontal centering: compute padding to center the 2-column grid.
+    let node_w = NODE_BOX_WIDTH as u16;
+    let h_gap_w = 4u16.min(grid_area.width.saturating_sub(node_w * 2)); // 4-col gap between nodes
+    let grid_total_w = node_w * 2 + h_gap_w;
+    let h_pad = grid_area.width.saturating_sub(grid_total_w) / 2;
 
     // Render each extractor row (2 nodes + horizontal arrow gap).
     for (row_idx, (left_id, right_id)) in grid.iter().enumerate() {
         let row_area = extractor_row_rects[row_idx];
 
-        // Split row into: left_node | h_gap | right_node
-        let node_w = NODE_BOX_WIDTH as u16;
+        // Split row into: pad | left_node | h_gap | right_node | pad
         let row_cols = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
+                Constraint::Length(h_pad),
                 Constraint::Length(node_w),
-                Constraint::Min(1),
+                Constraint::Length(h_gap_w),
                 Constraint::Length(node_w),
+                Constraint::Min(0),
             ])
             .split(row_area);
-        let left_rect = row_cols[0];
-        let h_gap_rect = row_cols[1];
-        let right_rect = row_cols[2];
+        let left_rect = row_cols[1];
+        let h_gap_rect = row_cols[2];
+        let right_rect = row_cols[3];
 
         // Render left node.
         if let Some(left_node) = loom_state
@@ -1366,27 +1380,43 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
     }
 
     // Vertical arrows in the gap rows between extractor rows.
+    // With gap_h=2, we render: row 0 = │ (pipe), row 1 = ▼ or ▲ (arrowhead).
     for gap_rect in &gap_rects {
         if gap_rect.width == 0 || gap_rect.height == 0 {
             continue;
         }
         // Split gap the same way as node rows to find node centers.
-        let node_w = NODE_BOX_WIDTH as u16;
         let gap_cols = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
+                Constraint::Length(h_pad),
                 Constraint::Length(node_w),
-                Constraint::Min(1),
+                Constraint::Length(h_gap_w),
                 Constraint::Length(node_w),
+                Constraint::Min(0),
             ])
             .split(*gap_rect);
 
         // Right side: down arrows (RL→VC, VC→RF).
-        let right_center_x = gap_cols[2].x + gap_cols[2].width / 2;
+        let right_center_x = gap_cols[3].x + gap_cols[3].width / 2;
         if right_center_x >= gap_rect.x && right_center_x < gap_rect.x + gap_rect.width {
+            // Pipe character on first row of gap.
+            if gap_rect.height >= 2 {
+                let pipe_rect = Rect {
+                    x: right_center_x,
+                    y: gap_rect.y,
+                    width: 1,
+                    height: 1,
+                };
+                let pipe =
+                    Paragraph::new(Span::styled("\u{2502}", Style::default().fg(flow_color)))
+                        .style(Style::default().bg(LOOM_BG));
+                frame.render_widget(pipe, pipe_rect);
+            }
+            // Arrowhead on last row of gap.
             let arrow_rect = Rect {
                 x: right_center_x,
-                y: gap_rect.y,
+                y: gap_rect.y + gap_rect.height - 1,
                 width: 1,
                 height: 1,
             };
@@ -1399,8 +1429,9 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         }
 
         // Left side: up arrows (SW→MA, MA→ES).
-        let left_center_x = gap_cols[0].x + gap_cols[0].width / 2;
+        let left_center_x = gap_cols[1].x + gap_cols[1].width / 2;
         if left_center_x >= gap_rect.x && left_center_x < gap_rect.x + gap_rect.width {
+            // Arrowhead on first row of gap.
             let arrow_rect = Rect {
                 x: left_center_x,
                 y: gap_rect.y,
@@ -1413,12 +1444,25 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
             ))
             .style(Style::default().bg(LOOM_BG));
             frame.render_widget(para, arrow_rect);
+            // Pipe character on second row of gap.
+            if gap_rect.height >= 2 {
+                let pipe_rect = Rect {
+                    x: left_center_x,
+                    y: gap_rect.y + gap_rect.height - 1,
+                    width: 1,
+                    height: 1,
+                };
+                let pipe =
+                    Paragraph::new(Span::styled("\u{2502}", Style::default().fg(flow_color)))
+                        .style(Style::default().bg(LOOM_BG));
+                frame.render_widget(pipe, pipe_rect);
+            }
         }
     }
 
     // ── Refineries: render below the extractor grid ──────────────────────────
     if !refineries.is_empty() {
-        let refinery_section = row_rects[5]; // index 5 = after 3 extractor rows + 2 gaps
+        let refinery_section = row_rects[6]; // index 6 = after top pad + 3 extractor rows + 2 gaps
 
         // Separator label.
         let sep_rect = Rect {
@@ -1436,7 +1480,6 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
 
         // Refinery boxes in 2-column grid below separator.
         let ref_box_h = NODE_BOX_HEIGHT as u16 + 2; // slightly taller for content
-        let node_w = NODE_BOX_WIDTH as u16;
 
         for (i, refinery) in refineries.iter().enumerate() {
             let grid_row = i / 2;
