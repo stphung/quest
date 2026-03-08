@@ -78,13 +78,74 @@ pub fn render_debug_menu(
     let help_area = sections[2];
     let is_border_category = menu.current_category() == DebugCategory::Borders;
 
+    // Scrollable tab bar: show a window of tabs that fits the available width.
+    let available_width = tabs_area.width as usize;
+    let tab_labels: Vec<String> = DEBUG_CATEGORIES
+        .iter()
+        .map(|c| format!("[{}]", c.label()))
+        .collect();
+
+    // Determine visible window of tabs that fits within available_width.
+    // Center the window around the selected tab.
+    let total_tabs = tab_labels.len();
+    let (tab_start, tab_end) = {
+        // Try to fit as many tabs as possible centered on selected_category.
+        // Calculate total width if all tabs shown.
+        let total_width: usize =
+            tab_labels.iter().map(|l| l.len()).sum::<usize>() + total_tabs.saturating_sub(1); // spaces between tabs
+        if total_width <= available_width {
+            // All tabs fit — no scrolling needed.
+            (0, total_tabs)
+        } else {
+            // Find a window that fits. Start from selected and expand.
+            let mut start = menu.selected_category;
+            let mut end = menu.selected_category + 1;
+            let mut width = tab_labels[start].len();
+
+            loop {
+                let mut expanded = false;
+                // Try expanding left.
+                if start > 0 {
+                    let new_width = width + 1 + tab_labels[start - 1].len();
+                    // Reserve 2 chars for "< " indicator on the left.
+                    let needed = new_width + if start > 1 { 2 } else { 0 };
+                    if needed <= available_width {
+                        start -= 1;
+                        width = new_width;
+                        expanded = true;
+                    }
+                }
+                // Try expanding right.
+                if end < total_tabs {
+                    let new_width = width + 1 + tab_labels[end].len();
+                    // Reserve 2 chars for " >" indicator on the right.
+                    let needed = new_width + if end + 1 < total_tabs { 2 } else { 0 };
+                    if needed <= available_width {
+                        width = new_width;
+                        end += 1;
+                        expanded = true;
+                    }
+                }
+                if !expanded {
+                    break;
+                }
+            }
+            (start, end)
+        }
+    };
+
     let mut tab_spans = Vec::new();
-    for (i, category) in DEBUG_CATEGORIES.iter().enumerate() {
-        if i > 0 {
+    if tab_start > 0 {
+        tab_spans.push(Span::styled(
+            "\u{25c2} ",
+            Style::default().fg(Color::DarkGray),
+        ));
+    }
+    for (offset, label) in tab_labels[tab_start..tab_end].iter().enumerate() {
+        if offset > 0 {
             tab_spans.push(Span::raw(" "));
         }
-        let label = format!("[{}]", category.label());
-        let style = if i == menu.selected_category {
+        let style = if tab_start + offset == menu.selected_category {
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD)
@@ -92,6 +153,12 @@ pub fn render_debug_menu(
             Style::default().fg(Color::DarkGray)
         };
         tab_spans.push(Span::styled(label, style));
+    }
+    if tab_end < total_tabs {
+        tab_spans.push(Span::styled(
+            " \u{25b8}",
+            Style::default().fg(Color::DarkGray),
+        ));
     }
     frame.render_widget(Paragraph::new(Line::from(tab_spans)), tabs_area);
 
@@ -150,6 +217,31 @@ pub fn render_debug_menu(
 
     let list = List::new(items);
     frame.render_widget(list, options_area);
+
+    // Scroll indicators: show ▲/▼ when items are clipped.
+    let total_items = visible_options.len();
+    if total_items > visible_rows {
+        if start > 0 {
+            let arrow = Span::styled("\u{25b2}", Style::default().fg(Color::DarkGray));
+            let arrow_area = Rect {
+                x: options_area.x + options_area.width.saturating_sub(2),
+                y: options_area.y,
+                width: 1,
+                height: 1,
+            };
+            frame.render_widget(Paragraph::new(Line::from(arrow)), arrow_area);
+        }
+        if start + visible_rows < total_items {
+            let arrow = Span::styled("\u{25bc}", Style::default().fg(Color::DarkGray));
+            let arrow_area = Rect {
+                x: options_area.x + options_area.width.saturating_sub(2),
+                y: options_area.y + options_area.height.saturating_sub(1),
+                width: 1,
+                height: 1,
+            };
+            frame.render_widget(Paragraph::new(Line::from(arrow)), arrow_area);
+        }
+    }
 
     if let (Some(preview), Some(selected_style)) = (preview_area, menu.selected_border_style()) {
         render_border_preview(frame, preview, selected_style, active_border_style);
