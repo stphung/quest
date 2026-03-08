@@ -37,6 +37,8 @@ fn test_prestige_then_sync_preserves_zone_11() {
         achievements.is_unlocked(AchievementId::StormsEnd),
         11,
         state.prestige_rank,
+        30,
+        0,
     );
 
     assert!(state.zone_progression.is_zone_unlocked(11));
@@ -61,6 +63,8 @@ fn test_prestige_then_sync_preserves_fracture_zones_12_through_14() {
         achievements.is_unlocked(AchievementId::StormsEnd),
         14,
         state.prestige_rank,
+        30,
+        0,
     );
 
     assert!(state.zone_progression.is_zone_unlocked(11));
@@ -82,6 +86,8 @@ fn test_prestige_then_sync_preserves_all_fracture_zones_cap_20() {
         achievements.is_unlocked(AchievementId::StormsEnd),
         20,
         state.prestige_rank,
+        30,
+        0,
     );
 
     for z in 11..=20 {
@@ -105,6 +111,8 @@ fn test_sync_without_storms_end_does_not_add_zone_11() {
         achievements.is_unlocked(AchievementId::StormsEnd),
         11,
         100,
+        30,
+        0,
     );
 
     assert!(!prog.is_zone_unlocked(11));
@@ -135,6 +143,8 @@ fn test_prestige_resets_position_but_sync_keeps_zone_access() {
         achievements.is_unlocked(AchievementId::StormsEnd),
         14,
         state.prestige_rank,
+        30,
+        0,
     );
 
     // Zones 11-14 should be accessible even though position is zone 1
@@ -154,6 +164,8 @@ fn test_multiple_prestiges_preserve_fracture_access() {
         achievements.is_unlocked(AchievementId::StormsEnd),
         17,
         state.prestige_rank,
+        30,
+        0,
     );
     assert!(state.zone_progression.is_zone_unlocked(17));
 
@@ -167,6 +179,8 @@ fn test_multiple_prestiges_preserve_fracture_access() {
         achievements.is_unlocked(AchievementId::StormsEnd),
         17,
         state.prestige_rank,
+        30,
+        0,
     );
     assert!(state.zone_progression.is_zone_unlocked(17));
     assert!(state.zone_progression.is_zone_unlocked(11));
@@ -185,6 +199,8 @@ fn test_prestige_sync_with_expanded_cap() {
         achievements.is_unlocked(AchievementId::StormsEnd),
         14,
         state.prestige_rank,
+        30,
+        0,
     );
     assert!(state.zone_progression.is_zone_unlocked(14));
 
@@ -196,6 +212,8 @@ fn test_prestige_sync_with_expanded_cap() {
         achievements.is_unlocked(AchievementId::StormsEnd),
         17,
         state.prestige_rank,
+        30,
+        0,
     );
 
     // Should now have zones up to 17
@@ -207,13 +225,13 @@ fn test_sync_respects_prestige_gate_for_fracture_zones() {
     let mut prog = quest::zones::ZoneProgression::new();
 
     // Cap allows zones 12-20, but prestige only P30 — below P50 for zones 12-14
-    sync_account_zone_unlocks(&mut prog, true, 20, 30);
+    sync_account_zone_unlocks(&mut prog, true, 20, 30, 30, 0);
     assert!(prog.is_zone_unlocked(11)); // P25 met
     assert!(!prog.is_zone_unlocked(12)); // P50 not met
     assert!(!prog.is_zone_unlocked(15)); // P75 not met
 
     // Now with P50 — should unlock 12-14 but not 15+
-    sync_account_zone_unlocks(&mut prog, true, 20, 50);
+    sync_account_zone_unlocks(&mut prog, true, 20, 50, 30, 0);
     assert!(prog.is_zone_unlocked(12));
     assert!(prog.is_zone_unlocked(14));
     assert!(!prog.is_zone_unlocked(15));
@@ -229,7 +247,7 @@ fn test_sync_respects_prestige_gate_for_fracture_zones() {
 fn test_exact_p25_boundary_unlocks_zone11_not_zone12() {
     let mut prog = quest::zones::ZoneProgression::new();
     // Cap includes 12 so we can test it's NOT unlocked due to prestige
-    sync_account_zone_unlocks(&mut prog, true, 14, 25);
+    sync_account_zone_unlocks(&mut prog, true, 14, 25, 30, 0);
     assert!(
         prog.is_zone_unlocked(11),
         "Zone 11 requires P25, should unlock at exactly P25"
@@ -244,7 +262,7 @@ fn test_exact_p25_boundary_unlocks_zone11_not_zone12() {
 #[test]
 fn test_p24_does_not_unlock_zone11() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 14, 24);
+    sync_account_zone_unlocks(&mut prog, true, 14, 24, 30, 0);
     assert!(
         !prog.is_zone_unlocked(11),
         "Zone 11 requires P25, should NOT unlock at P24"
@@ -259,7 +277,7 @@ fn test_p24_does_not_unlock_zone11() {
 #[test]
 fn test_exact_p50_boundary_unlocks_zones_12_14_not_zone15() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 17, 50);
+    sync_account_zone_unlocks(&mut prog, true, 17, 50, 30, 0);
     assert!(
         prog.is_zone_unlocked(11),
         "Zone 11 at P25 should unlock at P50"
@@ -286,7 +304,7 @@ fn test_exact_p50_boundary_unlocks_zones_12_14_not_zone15() {
 #[test]
 fn test_p49_does_not_unlock_zone12() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 14, 49);
+    sync_account_zone_unlocks(&mut prog, true, 14, 49, 30, 0);
     assert!(
         prog.is_zone_unlocked(11),
         "Zone 11 requires P25, should unlock at P49"
@@ -301,7 +319,7 @@ fn test_p49_does_not_unlock_zone12() {
 #[test]
 fn test_exact_p75_boundary_unlocks_zones_15_17_not_zone18() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 20, 75);
+    sync_account_zone_unlocks(&mut prog, true, 20, 75, 30, 0);
     assert!(
         prog.is_zone_unlocked(15),
         "Zone 15 requires P75, should unlock at exactly P75"
@@ -324,7 +342,7 @@ fn test_exact_p75_boundary_unlocks_zones_15_17_not_zone18() {
 #[test]
 fn test_exact_p100_boundary_unlocks_zones_18_20_not_zone21() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 23, 100);
+    sync_account_zone_unlocks(&mut prog, true, 23, 100, 30, 0);
     assert!(
         prog.is_zone_unlocked(18),
         "Zone 18 requires P100, should unlock at exactly P100"
@@ -347,7 +365,7 @@ fn test_exact_p100_boundary_unlocks_zones_18_20_not_zone21() {
 #[test]
 fn test_exact_p150_boundary_unlocks_zones_21_23_not_zone24() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 26, 150);
+    sync_account_zone_unlocks(&mut prog, true, 26, 150, 30, 0);
     assert!(
         prog.is_zone_unlocked(21),
         "Zone 21 requires P150, should unlock at exactly P150"
@@ -370,7 +388,7 @@ fn test_exact_p150_boundary_unlocks_zones_21_23_not_zone24() {
 #[test]
 fn test_exact_p200_boundary_unlocks_zones_24_26_not_zone27() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 30, 200);
+    sync_account_zone_unlocks(&mut prog, true, 30, 200, 30, 0);
     assert!(
         prog.is_zone_unlocked(24),
         "Zone 24 requires P200, should unlock at exactly P200"
@@ -393,7 +411,7 @@ fn test_exact_p200_boundary_unlocks_zones_24_26_not_zone27() {
 #[test]
 fn test_exact_p300_boundary_unlocks_all_fracture_zones() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 30, 300);
+    sync_account_zone_unlocks(&mut prog, true, 30, 300, 30, 0);
     for z in 11..=30 {
         assert!(
             prog.is_zone_unlocked(z),
@@ -411,7 +429,7 @@ fn test_exact_p300_boundary_unlocks_all_fracture_zones() {
 #[test]
 fn test_cap14_with_p300_only_unlocks_zones_12_14() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 14, 300);
+    sync_account_zone_unlocks(&mut prog, true, 14, 300, 30, 0);
     assert!(
         prog.is_zone_unlocked(12),
         "Zone 12 should unlock with cap=14 and P300"
@@ -442,7 +460,7 @@ fn test_cap14_with_p300_only_unlocks_zones_12_14() {
 #[test]
 fn test_cap17_with_p300_only_unlocks_zones_12_17() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 17, 300);
+    sync_account_zone_unlocks(&mut prog, true, 17, 300, 30, 0);
     for z in 12..=17 {
         assert!(
             prog.is_zone_unlocked(z),
@@ -464,7 +482,7 @@ fn test_cap17_with_p300_only_unlocks_zones_12_17() {
 #[test]
 fn test_cap20_with_p300_only_unlocks_zones_12_20() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 20, 300);
+    sync_account_zone_unlocks(&mut prog, true, 20, 300, 30, 0);
     for z in 12..=20 {
         assert!(
             prog.is_zone_unlocked(z),
@@ -482,7 +500,7 @@ fn test_cap20_with_p300_only_unlocks_zones_12_20() {
 #[test]
 fn test_cap23_with_p300_only_unlocks_zones_12_23() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 23, 300);
+    sync_account_zone_unlocks(&mut prog, true, 23, 300, 30, 0);
     for z in 12..=23 {
         assert!(
             prog.is_zone_unlocked(z),
@@ -500,7 +518,7 @@ fn test_cap23_with_p300_only_unlocks_zones_12_23() {
 #[test]
 fn test_cap26_with_p300_only_unlocks_zones_12_26() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 26, 300);
+    sync_account_zone_unlocks(&mut prog, true, 26, 300, 30, 0);
     for z in 12..=26 {
         assert!(
             prog.is_zone_unlocked(z),
@@ -518,7 +536,7 @@ fn test_cap26_with_p300_only_unlocks_zones_12_26() {
 #[test]
 fn test_cap30_with_p300_unlocks_all_fracture_zones() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 30, 300);
+    sync_account_zone_unlocks(&mut prog, true, 30, 300, 30, 0);
     for z in 12..=30 {
         assert!(
             prog.is_zone_unlocked(z),
@@ -538,7 +556,7 @@ fn test_cap30_with_p300_unlocks_all_fracture_zones() {
 fn test_no_storms_end_high_prestige_high_cap_unlocks_fracture_not_zone11() {
     let mut prog = quest::zones::ZoneProgression::new();
     // High prestige and cap but StormsEnd not unlocked
-    sync_account_zone_unlocks(&mut prog, false, 30, 300);
+    sync_account_zone_unlocks(&mut prog, false, 30, 300, 30, 0);
     assert!(
         !prog.is_zone_unlocked(11),
         "Zone 11 should NOT unlock without StormsEnd, even with high prestige"
@@ -559,7 +577,7 @@ fn test_no_storms_end_high_prestige_high_cap_unlocks_fracture_not_zone11() {
 #[test]
 fn test_storms_end_true_but_prestige_zero_no_zones_unlock() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 30, 0);
+    sync_account_zone_unlocks(&mut prog, true, 30, 0, 30, 0);
     assert!(
         !prog.is_zone_unlocked(11),
         "Zone 11 requires P25, should NOT unlock at P0 even with StormsEnd"
@@ -578,7 +596,7 @@ fn test_storms_end_true_but_prestige_zero_no_zones_unlock() {
 #[test]
 fn test_no_storms_end_prestige_zero_no_zones_unlock() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, false, 30, 0);
+    sync_account_zone_unlocks(&mut prog, false, 30, 0, 30, 0);
     for z in 11..=30 {
         assert!(
             !prog.is_zone_unlocked(z),
@@ -599,12 +617,12 @@ fn test_sequential_syncs_with_increasing_prestige_only_accumulate() {
     let mut prog = quest::zones::ZoneProgression::new();
 
     // First sync: P25 — unlocks zone 11 only
-    sync_account_zone_unlocks(&mut prog, true, 30, 25);
+    sync_account_zone_unlocks(&mut prog, true, 30, 25, 30, 0);
     assert!(prog.is_zone_unlocked(11));
     assert!(!prog.is_zone_unlocked(12));
 
     // Second sync: P50 — unlocks zones 12-14, zone 11 stays unlocked
-    sync_account_zone_unlocks(&mut prog, true, 30, 50);
+    sync_account_zone_unlocks(&mut prog, true, 30, 50, 30, 0);
     assert!(
         prog.is_zone_unlocked(11),
         "Zone 11 should remain unlocked after second sync"
@@ -614,7 +632,7 @@ fn test_sequential_syncs_with_increasing_prestige_only_accumulate() {
     assert!(!prog.is_zone_unlocked(15));
 
     // Third sync: P75 — unlocks zones 15-17, earlier zones stay
-    sync_account_zone_unlocks(&mut prog, true, 30, 75);
+    sync_account_zone_unlocks(&mut prog, true, 30, 75, 30, 0);
     assert!(prog.is_zone_unlocked(11));
     assert!(prog.is_zone_unlocked(14));
     assert!(prog.is_zone_unlocked(15));
@@ -622,25 +640,25 @@ fn test_sequential_syncs_with_increasing_prestige_only_accumulate() {
     assert!(!prog.is_zone_unlocked(18));
 
     // Fourth sync: P100 — unlocks zones 18-20
-    sync_account_zone_unlocks(&mut prog, true, 30, 100);
+    sync_account_zone_unlocks(&mut prog, true, 30, 100, 30, 0);
     assert!(prog.is_zone_unlocked(18));
     assert!(prog.is_zone_unlocked(20));
     assert!(!prog.is_zone_unlocked(21));
 
     // Fifth sync: P150 — unlocks zones 21-23
-    sync_account_zone_unlocks(&mut prog, true, 30, 150);
+    sync_account_zone_unlocks(&mut prog, true, 30, 150, 30, 0);
     assert!(prog.is_zone_unlocked(21));
     assert!(prog.is_zone_unlocked(23));
     assert!(!prog.is_zone_unlocked(24));
 
     // Sixth sync: P200 — unlocks zones 24-26
-    sync_account_zone_unlocks(&mut prog, true, 30, 200);
+    sync_account_zone_unlocks(&mut prog, true, 30, 200, 30, 0);
     assert!(prog.is_zone_unlocked(24));
     assert!(prog.is_zone_unlocked(26));
     assert!(!prog.is_zone_unlocked(27));
 
     // Seventh sync: P300 — unlocks all remaining zones
-    sync_account_zone_unlocks(&mut prog, true, 30, 300);
+    sync_account_zone_unlocks(&mut prog, true, 30, 300, 30, 0);
     for z in 11..=30 {
         assert!(
             prog.is_zone_unlocked(z),
@@ -656,11 +674,11 @@ fn test_sequential_syncs_decreasing_prestige_never_lock_zones() {
     let mut prog = quest::zones::ZoneProgression::new();
 
     // Unlock zones 12-14 with P50
-    sync_account_zone_unlocks(&mut prog, true, 14, 50);
+    sync_account_zone_unlocks(&mut prog, true, 14, 50, 30, 0);
     assert!(prog.is_zone_unlocked(12));
 
     // Sync again with lower prestige (P25) — zone 12 must remain unlocked
-    sync_account_zone_unlocks(&mut prog, true, 14, 25);
+    sync_account_zone_unlocks(&mut prog, true, 14, 25, 30, 0);
     assert!(
         prog.is_zone_unlocked(12),
         "Zone 12 should remain unlocked even if new sync has lower prestige"
@@ -675,7 +693,7 @@ fn test_sequential_syncs_decreasing_prestige_never_lock_zones() {
 #[test]
 fn test_cap11_no_fracture_zones_unlock() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 11, 300);
+    sync_account_zone_unlocks(&mut prog, true, 11, 300, 30, 0);
     // Zone 11 itself unlocks (via StormsEnd path, not fracture loop)
     assert!(
         prog.is_zone_unlocked(11),
@@ -695,7 +713,7 @@ fn test_cap11_no_fracture_zones_unlock() {
 #[test]
 fn test_cap0_no_fracture_zones_unlock() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 0, 300);
+    sync_account_zone_unlocks(&mut prog, true, 0, 300, 30, 0);
     // Zone 11 still unlocks (via StormsEnd, not fracture loop)
     assert!(
         prog.is_zone_unlocked(11),
@@ -715,7 +733,7 @@ fn test_cap0_no_fracture_zones_unlock() {
 #[test]
 fn test_cap1_no_fracture_zones_unlock() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, false, 1, 300);
+    sync_account_zone_unlocks(&mut prog, false, 1, 300, 30, 0);
     for z in 12..=30 {
         assert!(
             !prog.is_zone_unlocked(z),
@@ -733,7 +751,7 @@ fn test_cap1_no_fracture_zones_unlock() {
 #[test]
 fn test_p60_cap30_unlocks_z11_z12_14_not_z15_plus() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 30, 60);
+    sync_account_zone_unlocks(&mut prog, true, 30, 60, 30, 0);
     assert!(
         prog.is_zone_unlocked(11),
         "Zone 11 at P25, should unlock at P60"
@@ -772,7 +790,7 @@ fn test_p60_cap30_unlocks_z11_z12_14_not_z15_plus() {
 #[test]
 fn test_p80_cap30_unlocks_through_z17_not_z18_plus() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 30, 80);
+    sync_account_zone_unlocks(&mut prog, true, 30, 80, 30, 0);
     assert!(
         prog.is_zone_unlocked(17),
         "Zone 17 at P75, should unlock at P80"
@@ -787,7 +805,7 @@ fn test_p80_cap30_unlocks_through_z17_not_z18_plus() {
 #[test]
 fn test_p125_cap30_unlocks_through_z20_not_z21_plus() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 30, 125);
+    sync_account_zone_unlocks(&mut prog, true, 30, 125, 30, 0);
     assert!(
         prog.is_zone_unlocked(20),
         "Zone 20 at P100, should unlock at P125"
@@ -802,7 +820,7 @@ fn test_p125_cap30_unlocks_through_z20_not_z21_plus() {
 #[test]
 fn test_p175_cap30_unlocks_through_z23_not_z24_plus() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 30, 175);
+    sync_account_zone_unlocks(&mut prog, true, 30, 175, 30, 0);
     assert!(
         prog.is_zone_unlocked(23),
         "Zone 23 at P150, should unlock at P175"
@@ -817,7 +835,7 @@ fn test_p175_cap30_unlocks_through_z23_not_z24_plus() {
 #[test]
 fn test_p250_cap30_unlocks_through_z26_not_z27_plus() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 30, 250);
+    sync_account_zone_unlocks(&mut prog, true, 30, 250, 30, 0);
     assert!(
         prog.is_zone_unlocked(26),
         "Zone 26 at P200, should unlock at P250"
@@ -836,7 +854,7 @@ fn test_p250_cap30_unlocks_through_z26_not_z27_plus() {
 #[test]
 fn test_cap14_p49_no_fracture_zones_unlock() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 14, 49);
+    sync_account_zone_unlocks(&mut prog, true, 14, 49, 30, 0);
     assert!(
         prog.is_zone_unlocked(11),
         "Zone 11 at P25, should unlock at P49"
@@ -859,7 +877,7 @@ fn test_cap14_p49_no_fracture_zones_unlock() {
 #[test]
 fn test_cap30_p74_no_z15_plus_unlock() {
     let mut prog = quest::zones::ZoneProgression::new();
-    sync_account_zone_unlocks(&mut prog, true, 30, 74);
+    sync_account_zone_unlocks(&mut prog, true, 30, 74, 30, 0);
     assert!(
         prog.is_zone_unlocked(14),
         "Zone 14 at P50, should unlock at P74"

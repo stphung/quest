@@ -13,12 +13,13 @@ pub enum AchievementCategory {
     Challenges,
     Exploration,
     Deep,
+    Loom,
     Stats,
 }
 
 impl AchievementCategory {
     /// All categories in display order.
-    pub const ALL: [AchievementCategory; 8] = [
+    pub const ALL: [AchievementCategory; 9] = [
         AchievementCategory::Combat,
         AchievementCategory::Level,
         AchievementCategory::Prestige,
@@ -26,6 +27,7 @@ impl AchievementCategory {
         AchievementCategory::Challenges,
         AchievementCategory::Exploration,
         AchievementCategory::Deep,
+        AchievementCategory::Loom,
         AchievementCategory::Stats,
     ];
 
@@ -39,6 +41,7 @@ impl AchievementCategory {
             AchievementCategory::Challenges => "Challenges",
             AchievementCategory::Exploration => "Exploration",
             AchievementCategory::Deep => "The Deep",
+            AchievementCategory::Loom => "Loom",
             AchievementCategory::Stats => "Stats",
         }
     }
@@ -157,12 +160,16 @@ pub enum AchievementId {
     FractureZone29, // Last Listener
     FractureZone30, // Scar Mender
     // Ascension milestone achievements (one per level, I-VI)
-    AscensionI,   // First Ascension
-    AscensionII,  // Twice Risen
-    AscensionIII, // Deepborn
-    AscensionIV,  // Fourfold
-    AscensionV,   // Quintessence
-    AscensionVI,  // Transcendent
+    AscensionI,    // First Ascension
+    AscensionII,   // Twice Risen
+    AscensionIII,  // Deepborn
+    AscensionIV,   // Fourfold
+    AscensionV,    // Quintessence
+    AscensionVI,   // Transcendent
+    AscensionVII,  // Loombound
+    AscensionVIII, // Threadwarden
+    AscensionIX,   // Worldweaver
+    AscensionX,    // The Absolute
 
     // Challenge achievements - Chess
     ChessNovice,
@@ -288,6 +295,14 @@ pub enum AchievementId {
     GuildRank5,           // Reach Guild Rank 5 (Vanguard)
     FirstMercLost,        // Lose a mercenary for the first time
     GatewayOpened,        // Opened the Gateway beneath the world
+    // Loom of Worlds achievements
+    LoomDiscovered, // Discover the Loom of Worlds
+    LoomPattern1,   // Complete first Woven Pattern
+    LoomPattern4,   // Complete 4 Woven Patterns (unlocks Z31-34)
+    LoomPattern8,   // Complete 8 Woven Patterns (unlocks Z35-38)
+    LoomPattern16,  // Complete 16 Woven Patterns (unlocks Z39-42)
+    LoomPattern22,  // Complete 22 Woven Patterns (unlocks Z43-46)
+    LoomPattern28,  // Complete all 28 Woven Patterns (unlocks Z47-50)
     // Power Cores — unlocked at fracture zone unlock layers
     PowerCoreI,   // Deep Layer 3 — Red Fault core
     PowerCoreII,  // Deep Layer 7 — Mirror Scar core
@@ -309,7 +324,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 213;
+    pub const VARIANT_COUNT: usize = 224;
 }
 
 /// Static definition of an achievement.
@@ -594,6 +609,7 @@ mod tests {
         assert_eq!(AchievementCategory::Challenges.name(), "Challenges");
         assert_eq!(AchievementCategory::Exploration.name(), "Exploration");
         assert_eq!(AchievementCategory::Deep.name(), "The Deep");
+        assert_eq!(AchievementCategory::Loom.name(), "Loom");
         assert_eq!(AchievementCategory::Stats.name(), "Stats");
     }
 
@@ -609,6 +625,7 @@ mod tests {
                 AchievementCategory::Challenges,
                 AchievementCategory::Exploration,
                 AchievementCategory::Deep,
+                AchievementCategory::Loom,
                 AchievementCategory::Stats,
             ]
         );

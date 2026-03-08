@@ -1,6 +1,6 @@
 # Zone System
 
-Zone and subzone progression with prestige-gated tiers, boss encounters, the Stormbreaker weapon gate, and Deep-unlocked fracture zones 12-30.
+Zone and subzone progression with prestige-gated tiers, boss encounters, the Stormbreaker weapon gate, Deep-unlocked fracture zones 12-30, and Loom-unlocked zones 31-50.
 
 ## Module Structure
 
@@ -63,6 +63,7 @@ Enum returned by `on_boss_defeated()` / `on_boss_defeated_with_cap()`:
 - **StormsEnd** -- completed Zone 10, unlocks Zone 11
 - **ExpanseCycle** -- completed Zone 11 cycle, loops back to subzone 1
 - **FractureCycle { zone_id }** -- completed a fracture cap zone cycle, loops back to subzone 1
+- **LoomZoneCycle { zone_id }** -- completed a Loom cap zone cycle, loops back to subzone 1
 
 ### `FractureRegion` (`fracture.rs`)
 Named fracture chapters, each containing 3-4 zones:
@@ -161,12 +162,33 @@ Nineteen zones across six chapters, unlocked by Deep layer breakthroughs. Enemy 
 
 **Boss defeat with cap awareness:** `on_boss_defeated_with_cap(prestige_rank, achievements, fracture_zone_cap)` extends the original `on_boss_defeated()` to handle fracture cycling logic.
 
+## Loom Zones 31-50
+
+Twenty zones across five chapters, triple-gated by pattern completion, ascension level, and prestige rank. Enemy stats scale at 1.25x per zone from Zone 30 base (LOOM_ZONE_STAT_MULTIPLIER).
+
+**Zone gating (all three must be met):**
+
+| Chapter | Zones | Patterns | Ascension | Prestige |
+|---------|-------|----------|-----------|----------|
+| Ch.7: Thread Wilds | Z31-34 | 4 | — | P2,000 |
+| Ch.8: Woven Frontier | Z35-38 | 8 | VII | P5,000 |
+| Ch.9: The Unraveling | Z39-42 | 16 | VIII | P15,000 |
+| Ch.10: Grand Design | Z43-46 | 22 | IX | P30,000 |
+| Ch.11: Final Weave | Z47-50 | 28 | X | P50,000 |
+
+**Progression semantics:**
+- `LoomZoneCycle` boss defeat result: cap zone bosses cycle back to subzone 1 (same pattern as `FractureCycle`)
+- Stat scaling: 1.25x per zone from Zone 30 base
+- Unlock function: `loom_zone_cap_for_ascension(patterns) -> u32`
+- Ascension gate checked in `sync_account_zone_unlocks()` per zone range
+
 ## Zone Access Sync (`access.rs`)
 
-`sync_account_zone_unlocks(prog, storms_end_unlocked, fracture_zone_cap)`:
-- Called at: character load, prestige reset, StormsEnd, fracture region unlock
+`sync_account_zone_unlocks(prog, storms_end_unlocked, fracture_zone_cap, prestige_rank, loom_zone_cap)`:
+- Called at: character load, prestige reset, StormsEnd, fracture region unlock, pattern completion
 - If `storms_end_unlocked`, unlocks Zone 11
 - Unlocks every zone in `12..=fracture_zone_cap`
+- Unlocks every Loom zone in `31..=loom_zone_cap` if prestige requirement met
 - Never unlocks above cap, never removes earlier unlocks
 
 ## Prestige Reset
@@ -196,4 +218,5 @@ Nineteen zones across six chapters, unlocked by Deep layer breakthroughs. Enemy 
 - **Haven** (`haven/types.rs`): Storm Forge room enables Stormbreaker creation
 - **Ascension** (`ascension/`): Ascension multiplier provides the combat power to progress through fracture zones
 - **Deep** (`deep/types.rs`): `DeepPersistent.fracture_zone_cap` and `pending_fracture_region_unlock` control zone access
+- **Loom** (`loom/logic.rs`): `loom_zone_cap_for_ascension()` controls Loom Zone 31-50 access based on completed pattern count
 - **UI** (`ui/stats_panel.rs`): Displays current zone/subzone names, kill progress, and POST row for zones 12-30

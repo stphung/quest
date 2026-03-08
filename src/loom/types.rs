@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::collections::VecDeque;
 
 /// Which archetype the player chose at Loom unlock.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -86,23 +87,23 @@ pub enum Resource {
     WovenReality,
 }
 
-/// Unified address for any node in the Loom — either a fixed Extractor or a built Refinery.
+/// Unified address for any node in the Loom — either a fixed Extractor or a built Shuttle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum LoomNodeRef {
     /// One of the 6 fixed extractor nodes.
     Extractor(NodeId),
-    /// A player-built refinery, identified by index in `LoomPersistent::refineries`.
-    Refinery(usize),
+    /// A player-built shuttle, identified by index in `LoomPersistent::shuttles`.
+    Shuttle(usize),
 }
 
 /// A player-built processing node that runs a single locked recipe.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Refinery {
-    /// First input resource for this refinery's locked recipe.
+pub struct Shuttle {
+    /// First input resource for this shuttle's locked recipe.
     pub input_a: Resource,
-    /// Second input resource for this refinery's locked recipe.
+    /// Second input resource for this shuttle's locked recipe.
     pub input_b: Resource,
-    /// The nature catalyst for this refinery's recipe.
+    /// The nature catalyst for this shuttle's recipe.
     pub nature: NodeNature,
     /// Output resource produced.
     pub output: Resource,
@@ -116,10 +117,10 @@ pub struct Refinery {
     /// Buffer capacity.
     #[serde(default = "default_buffer_capacity")]
     pub buffer_capacity: f64,
-    /// Refinery level (for future upgrades).
+    /// Shuttle level (for future upgrades).
     #[serde(default = "default_node_level")]
     pub level: u32,
-    /// Whether this refinery is stalled (missing inputs or buffer full).
+    /// Whether this shuttle is stalled (missing inputs or buffer full).
     #[serde(default)]
     pub stalled: bool,
     /// Whether currently under construction.
@@ -128,15 +129,15 @@ pub struct Refinery {
     /// Ticks remaining for construction.
     #[serde(default)]
     pub construction_ticks_remaining: u32,
-    /// Sources for input A — extractors or lower-tier refineries.
+    /// Sources for input A — extractors or lower-tier shuttles.
     #[serde(default)]
     pub sources_a: Vec<LoomNodeRef>,
-    /// Sources for input B — extractors or lower-tier refineries.
+    /// Sources for input B — extractors or lower-tier shuttles.
     #[serde(default)]
     pub sources_b: Vec<LoomNodeRef>,
 }
 
-impl Refinery {
+impl Shuttle {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         input_a: Resource,
@@ -156,7 +157,7 @@ impl Refinery {
             amount,
             tier,
             buffer: 0.0,
-            buffer_capacity: 20.0,
+            buffer_capacity: 200.0,
             level: 1,
             stalled: false,
             under_construction: false,
@@ -194,11 +195,11 @@ fn default_node_level() -> u32 {
 }
 
 fn default_buffer_capacity() -> f64 {
-    20.0
+    200.0
 }
 
 fn default_base_rate() -> f64 {
-    5.0
+    50.0
 }
 
 impl LoomNode {
@@ -208,8 +209,8 @@ impl LoomNode {
             level: 1,
             unlocked: false,
             buffer: 0.0,
-            buffer_capacity: 20.0, // 4 hours at 5/hr base
-            base_rate: 5.0,
+            buffer_capacity: 200.0, // 4 hours at 50/hr base
+            base_rate: 50.0,
             stalled: false,
             unlock_progress: 0.0,
         }
@@ -241,10 +242,22 @@ pub struct WovenPattern {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatternRequirement {
     pub resource: Resource,
-    /// Total amount of this resource needed to complete the pattern.
-    #[serde(alias = "rate_per_hour")]
+    /// Minimum production rate (units/hr) that must be sustained.
+    #[serde(default)]
+    pub required_rate: f64,
+    /// Total seconds the rate must be sustained to complete this requirement.
+    #[serde(default)]
+    pub sustain_duration_secs: f64,
+    /// Seconds sustained so far (timer advances when rate >= threshold, pauses otherwise).
+    #[serde(default)]
+    pub sustained_secs: f64,
+    /// Whether this individual requirement is complete (locks when sustain timer finishes).
+    #[serde(default)]
+    pub completed: bool,
+    /// Legacy field — total amount needed (accumulated totals system). Kept for serde compat.
+    #[serde(default, alias = "rate_per_hour")]
     pub amount: f64,
-    /// Accumulated production so far.
+    /// Legacy field — accumulated production so far. Kept for serde compat.
     #[serde(default)]
     pub accumulated: f64,
 }
@@ -268,16 +281,24 @@ pub struct LoomPersistent {
     pub stockpiles: HashMap<Resource, f64>,
     #[serde(default)]
     pub second_node_unlock_elapsed: Option<f64>,
-    /// Player-built refineries (recipe-locked processing nodes).
+    /// Player-built shuttles (recipe-locked processing nodes).
     #[serde(default)]
-    pub refineries: Vec<Refinery>,
+    pub shuttles: Vec<Shuttle>,
+    /// Unix timestamp of last WR→PR grant (wall-clock, like Power Cores).
+    #[serde(default)]
+    pub wr_pr_last_granted_at: i64,
 }
 
 impl LoomPersistent {
-    /// Maximum number of Refineries the player can build.
-    /// Equal to the number of completed Woven Patterns.
-    pub fn max_refineries(&self) -> usize {
+    /// Number of completed Woven Patterns.
+    pub fn completed_pattern_count(&self) -> usize {
         self.patterns.iter().filter(|p| p.completed).count()
+    }
+
+    /// Maximum number of Shuttles the player can build.
+    /// Equal to the number of completed Woven Patterns.
+    pub fn max_shuttles(&self) -> usize {
+        self.completed_pattern_count()
     }
 }
 
@@ -296,7 +317,8 @@ impl Default for LoomPersistent {
             patterns: Vec::new(),
             stockpiles: HashMap::new(),
             second_node_unlock_elapsed: None,
-            refineries: Vec::new(),
+            shuttles: Vec::new(),
+            wr_pr_last_granted_at: 0,
         }
     }
 }
@@ -305,12 +327,16 @@ impl Default for LoomPersistent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoomState {
     pub persistent: LoomPersistent,
+    /// Per-resource rolling rate trackers (transient, not serialized).
+    #[serde(skip)]
+    pub rate_trackers: HashMap<Resource, RateTracker>,
 }
 
 impl LoomState {
     pub fn new() -> Self {
         Self {
             persistent: LoomPersistent::default(),
+            rate_trackers: HashMap::new(),
         }
     }
 }
@@ -324,10 +350,42 @@ impl Default for LoomState {
 /// Which view the Loom UI is showing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LoomView {
-    ArchetypeSelection,
     FlowView,
-    ListDetail,
     Codex,
+}
+
+/// Which step of the shuttle build flow the player is on.
+#[derive(Debug, Clone)]
+pub enum BuildStep {
+    /// Selecting a recipe from the filtered list. `cursor` indexes into the available recipes.
+    SelectRecipe { cursor: usize },
+    /// Selecting sources for input A. `toggle[i]` = whether source i is selected.
+    SelectSourcesA { cursor: usize, toggle: Vec<bool> },
+    /// Selecting sources for input B.
+    SelectSourcesB { cursor: usize, toggle: Vec<bool> },
+    /// Confirm build — shows summary and expected throughput.
+    Confirm,
+    /// Build is blocked — shows why (e.g., need more patterns).
+    Blocked { message: String },
+}
+
+/// State for the multi-step shuttle build flow.
+#[derive(Debug, Clone)]
+pub struct BuildState {
+    pub step: BuildStep,
+    pub tier: u8,
+    /// Index into `all_recipes()` for the selected recipe.
+    pub recipe_index: usize,
+    /// Available recipes for current tier (indices into all_recipes()).
+    pub available_recipes: Vec<usize>,
+    /// Eligible source nodes for input A.
+    pub eligible_sources_a: Vec<LoomNodeRef>,
+    /// Eligible source nodes for input B.
+    pub eligible_sources_b: Vec<LoomNodeRef>,
+    /// Selected sources for input A (populated after SelectSourcesA step).
+    pub selected_sources_a: Vec<LoomNodeRef>,
+    /// Selected sources for input B (populated after SelectSourcesB step).
+    pub selected_sources_b: Vec<LoomNodeRef>,
 }
 
 /// Runtime-only UI state (not serialized).
@@ -336,9 +394,14 @@ pub struct LoomUiState {
     pub open: bool,
     pub view: LoomView,
     pub selected_node: usize,
-    pub selected_archetype: usize,
-    /// Scroll offset for the Codex view (number of lines scrolled down).
-    pub codex_scroll: usize,
+    /// Codex graph cursor: column (0=Base, 1=Confluence, 2=Terminal).
+    pub codex_column: usize,
+    /// Codex graph cursor: row within current column.
+    pub codex_row: usize,
+    /// Frame counter for throbber animation (incremented each render call).
+    pub throbber_frame: u32,
+    /// Active build flow state, if any.
+    pub build: Option<BuildState>,
 }
 
 impl LoomUiState {
@@ -347,8 +410,10 @@ impl LoomUiState {
             open: false,
             view: LoomView::FlowView,
             selected_node: 0,
-            selected_archetype: 0,
-            codex_scroll: 0,
+            codex_column: 0,
+            codex_row: 0,
+            throbber_frame: 0,
+            build: None,
         }
     }
 
@@ -358,6 +423,51 @@ impl LoomUiState {
 }
 
 impl Default for LoomUiState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Rolling window rate tracker for measuring resource production over 60 seconds.
+///
+/// Uses a circular buffer of 600 ticks (at 100ms/tick = 60 seconds).
+/// The running sum gives O(1) per-tick updates. Not serialized — on load,
+/// it starts empty and ramps up over 60 seconds.
+const RATE_WINDOW_SIZE: usize = 600;
+const TICKS_PER_HOUR: f64 = 36_000.0;
+
+#[derive(Debug, Clone)]
+pub struct RateTracker {
+    buffer: VecDeque<f64>,
+    sum: f64,
+}
+
+impl RateTracker {
+    pub fn new() -> Self {
+        Self {
+            buffer: VecDeque::new(),
+            sum: 0.0,
+        }
+    }
+
+    /// Push one tick's production amount, evicting the oldest value if the window is full.
+    pub fn push(&mut self, amount: f64) {
+        if self.buffer.len() >= RATE_WINDOW_SIZE {
+            if let Some(old) = self.buffer.pop_front() {
+                self.sum -= old;
+            }
+        }
+        self.buffer.push_back(amount);
+        self.sum += amount;
+    }
+
+    /// Returns the estimated production rate per hour based on the rolling window.
+    pub fn rate_per_hour(&self) -> f64 {
+        (self.sum / RATE_WINDOW_SIZE as f64) * TICKS_PER_HOUR
+    }
+}
+
+impl Default for RateTracker {
     fn default() -> Self {
         Self::new()
     }
@@ -380,9 +490,9 @@ mod tests {
     fn test_loom_node_ref_equality() {
         let ext_a = LoomNodeRef::Extractor(NodeId::EmberSpindle);
         let ext_b = LoomNodeRef::Extractor(NodeId::EmberSpindle);
-        let ref_a = LoomNodeRef::Refinery(0);
-        let ref_b = LoomNodeRef::Refinery(0);
-        let ref_c = LoomNodeRef::Refinery(1);
+        let ref_a = LoomNodeRef::Shuttle(0);
+        let ref_b = LoomNodeRef::Shuttle(0);
+        let ref_c = LoomNodeRef::Shuttle(1);
         assert_eq!(ext_a, ext_b);
         assert_eq!(ref_a, ref_b);
         assert_ne!(ext_a, ref_a);
@@ -390,8 +500,8 @@ mod tests {
     }
 
     #[test]
-    fn test_refinery_new() {
-        let r = Refinery::new(
+    fn test_shuttle_new() {
+        let r = Shuttle::new(
             Resource::Ember,
             Resource::VoidEssence,
             NodeNature::Heat,
@@ -409,34 +519,56 @@ mod tests {
         assert_eq!(r.tier, 1);
         assert!(!r.stalled);
         assert!((r.buffer - 0.0).abs() < 0.001);
-        assert!((r.buffer_capacity - 20.0).abs() < 0.001);
+        assert!((r.buffer_capacity - 200.0).abs() < 0.001);
         assert_eq!(r.level, 1);
         assert_eq!(r.sources_a.len(), 1);
         assert_eq!(r.sources_b.len(), 1);
     }
 
     #[test]
-    fn test_loom_state_default_has_empty_refineries() {
+    fn test_loom_state_default_has_empty_shuttles() {
         let state = LoomState::new();
-        assert!(state.persistent.refineries.is_empty());
+        assert!(state.persistent.shuttles.is_empty());
     }
 
     #[test]
-    fn test_refinery_limit_zero_with_no_patterns() {
+    fn test_shuttle_limit_zero_with_no_patterns() {
         let state = LoomState::new();
-        assert_eq!(state.persistent.max_refineries(), 0);
+        assert_eq!(state.persistent.max_shuttles(), 0);
     }
 
     #[test]
     fn test_pattern_requirement_fields() {
         let req = PatternRequirement {
             resource: Resource::Ember,
+            required_rate: 0.0,
+            sustain_duration_secs: 0.0,
+            sustained_secs: 0.0,
+            completed: false,
             amount: 5.0,
             accumulated: 0.0,
         };
         assert_eq!(req.resource, Resource::Ember);
         assert!((req.amount - 5.0).abs() < 1e-9);
         assert!((req.accumulated - 0.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_pattern_requirement_rate_fields() {
+        let req = PatternRequirement {
+            resource: Resource::Ember,
+            required_rate: 25.0,
+            sustain_duration_secs: 7200.0,
+            sustained_secs: 0.0,
+            completed: false,
+            amount: 0.0,
+            accumulated: 0.0,
+        };
+        assert_eq!(req.resource, Resource::Ember);
+        assert!((req.required_rate - 25.0).abs() < 1e-9);
+        assert!((req.sustain_duration_secs - 7200.0).abs() < 1e-9);
+        assert!((req.sustained_secs).abs() < 1e-9);
+        assert!(!req.completed);
     }
 
     #[test]
@@ -449,5 +581,66 @@ mod tests {
         };
         assert!(!pattern.completed);
         assert_eq!(pattern.index, 0);
+    }
+
+    #[test]
+    fn test_completed_pattern_count_empty() {
+        let state = LoomState::new();
+        assert_eq!(state.persistent.completed_pattern_count(), 0);
+    }
+
+    #[test]
+    fn test_completed_pattern_count_some_completed() {
+        let mut state = LoomState::new();
+        state.persistent.patterns.push(WovenPattern {
+            index: 0,
+            name: "A".to_string(),
+            requirements: vec![],
+            completed: true,
+        });
+        state.persistent.patterns.push(WovenPattern {
+            index: 1,
+            name: "B".to_string(),
+            requirements: vec![],
+            completed: false,
+        });
+        assert_eq!(state.persistent.completed_pattern_count(), 1);
+    }
+
+    #[test]
+    fn test_rate_tracker_new_is_empty() {
+        let tracker = RateTracker::new();
+        assert!((tracker.rate_per_hour()).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_rate_tracker_push_single_value() {
+        let mut tracker = RateTracker::new();
+        tracker.push(1.0);
+        let rate = tracker.rate_per_hour();
+        assert!((rate - 60.0).abs() < 1e-6, "rate was {}", rate);
+    }
+
+    #[test]
+    fn test_rate_tracker_full_window_steady() {
+        let mut tracker = RateTracker::new();
+        let per_tick = 50.0 / 36000.0;
+        for _ in 0..600 {
+            tracker.push(per_tick);
+        }
+        let rate = tracker.rate_per_hour();
+        assert!((rate - 50.0).abs() < 0.1, "rate was {}", rate);
+    }
+
+    #[test]
+    fn test_rate_tracker_evicts_old_values() {
+        let mut tracker = RateTracker::new();
+        for _ in 0..600 {
+            tracker.push(1.0);
+        }
+        for _ in 0..600 {
+            tracker.push(0.0);
+        }
+        assert!((tracker.rate_per_hour()).abs() < 1e-9);
     }
 }

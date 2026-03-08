@@ -256,7 +256,8 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                             xp_gained
                         )
                     }
-                    BossDefeatResult::FractureCycle { zone_id } => {
+                    BossDefeatResult::FractureCycle { zone_id }
+                    | BossDefeatResult::LoomZoneCycle { zone_id } => {
                         let zone_name = crate::zones::get_zone(*zone_id)
                             .map(|z| z.name)
                             .unwrap_or("Unknown");
@@ -746,6 +747,18 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 loom_discovered = true;
                 game_state.combat_state.add_log_entry(
                     "\u{29BF} The Gateway opens. Beyond it, threads of reality stretch into the void. The Loom of Worlds awaits...".to_string(),
+                    false,
+                    true,
+                );
+            }
+            TickEvent::WovenRealityPRGranted { pr_amount, wr_rate } => {
+                game_state.combat_state.add_log_entry(
+                    format!(
+                        "\u{29BF} Woven Reality grants +{} Prestige Rank{} ({:.1} WR/hr)",
+                        pr_amount,
+                        if *pr_amount == 1 { "" } else { "s" },
+                        wr_rate,
+                    ),
                     false,
                     true,
                 );

@@ -73,12 +73,15 @@ pub(super) fn handle_vault_selection(
                     // Reset prestige-scoped Deep state while preserving guild rank,
                     // layer progression, and infrastructure.
                     deep.on_prestige();
-                    // Re-sync fracture zone unlocks after prestige reset
+                    // Re-sync zone unlocks after prestige reset
+                    let loom_cap = state.cached_loom_zone_cap;
                     crate::zones::sync_account_zone_unlocks(
                         &mut state.zone_progression,
                         achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
                         deep.persistent.fracture_zone_cap,
                         state.prestige_rank,
+                        loom_cap,
+                        state.ascension_level,
                     );
                     *overlay = GameOverlay::None;
                     let new_rank = state.prestige_rank;
@@ -153,12 +156,15 @@ pub(super) fn handle_prestige_confirm(
                 // Reset prestige-scoped Deep state while preserving guild rank,
                 // layer progression, and infrastructure.
                 deep.on_prestige();
-                // Re-sync fracture zone unlocks after prestige reset
+                // Re-sync zone unlocks after prestige reset
+                let loom_cap = state.cached_loom_zone_cap;
                 crate::zones::sync_account_zone_unlocks(
                     &mut state.zone_progression,
                     achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
                     deep.persistent.fracture_zone_cap,
                     state.prestige_rank,
+                    loom_cap,
+                    state.ascension_level,
                 );
                 *overlay = GameOverlay::None;
                 let new_rank = state.prestige_rank;

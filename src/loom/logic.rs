@@ -1,10 +1,9 @@
 #![allow(dead_code)]
 use super::types::{
-    LoomArchetype, LoomNode, LoomNodeRef, LoomState, NodeId, NodeNature, Refinery, Resource,
+    LoomArchetype, LoomNode, LoomNodeRef, LoomState, NodeId, NodeNature, Resource, Shuttle,
 };
 
-/// Archetype-to-node mapping.
-/// Returns (first_node, second_node) for the archetype.
+/// Legacy archetype-to-node mapping (kept for save compatibility).
 pub fn archetype_nodes(archetype: LoomArchetype) -> (NodeId, NodeId) {
     match archetype {
         LoomArchetype::BurnBright => (NodeId::EmberSpindle, NodeId::VoidCondenser),
@@ -13,187 +12,70 @@ pub fn archetype_nodes(archetype: LoomArchetype) -> (NodeId, NodeId) {
     }
 }
 
-/// Select an archetype at Loom unlock.
-///
-/// - Sets the archetype.
-/// - Unlocks the first archetype node immediately.
-/// - Applies the first node's passive bonuses.
-/// - Starts the staggered unlock timer for the second node.
+/// Legacy: select_archetype is kept as a no-op for save compatibility.
+/// All 6 extractors now unlock on discovery via initialize_loom().
 pub fn select_archetype(loom: &mut LoomState, archetype: LoomArchetype) {
-    if loom.persistent.archetype.is_some() {
-        return; // Archetype already chosen — cannot re-select.
-    }
     loom.persistent.archetype = Some(archetype);
-
-    let (first, _second) = archetype_nodes(archetype);
-
-    // Unlock the first node in a scoped borrow.
-    if let Some(node) = loom.persistent.nodes.iter_mut().find(|n| n.id == first) {
-        node.unlocked = true;
-    }
-    // Apply passives with full access to loom.
-    apply_node_passive_on_unlock(first, loom);
-
-    // Staggered unlock: start timer at 0 seconds elapsed.
-    loom.persistent.second_node_unlock_elapsed = Some(0.0);
 }
 
-/// Apply passive effects to a node when it first unlocks.
-/// Mutates the LoomState directly (may affect stockpiles, other nodes, etc.).
-fn apply_node_passive_on_unlock(node_id: NodeId, loom: &mut LoomState) {
-    match node_id {
-        NodeId::EmberSpindle => {
-            // +50% throughput applied at production time (checked via archetype field).
-            // Neighbors unlock 30% slower — also applied at unlock time.
-            // No immediate state mutation needed beyond unlocking the node.
-        }
-        NodeId::VoidCondenser => {
-            // 2x conversion ratio at levels 1-3 — applied at production time.
-            // No immediate state mutation.
-        }
-        NodeId::ReflectionLens => {
-            // Unlocks 3 neighbors instead of 2 — applied at neighbor unlock time.
-            // No immediate state mutation.
-        }
-        NodeId::MemoryArchive => {
-            // Starts with a stockpile of 3 of each adjacent resource.
-            // Adjacent resources to MemoryArchive in the cycle:
-            //   Ember → Reflection → Void Essence → Memory → Silence → Resonance → (back to Ember)
-            // Memory's neighbors in the cycle: VoidEssence (input) and Silence (output).
-            let adjacent = [Resource::VoidEssence, Resource::Silence];
-            for resource in adjacent {
-                *loom.persistent.stockpiles.entry(resource).or_insert(0.0) += 3.0;
-            }
-        }
-        NodeId::SilenceWell => {
-            // -25% upgrade costs for first 5 levels — applied at upgrade time.
-            // No immediate state mutation.
-        }
-        NodeId::ResonanceForge => {
-            // Feedback loop at 50% strength before cycle closes — applied at production time.
-            // No immediate state mutation.
-        }
-    }
-}
+/// No-op: archetype passives removed for rebalancing.
+fn apply_node_passive_on_unlock(_node_id: NodeId, _loom: &mut LoomState) {}
 
-/// Tick the staggered second-node unlock timer.
-///
-/// Call once per tick with the elapsed seconds for that tick.
-/// When elapsed >= SECOND_NODE_UNLOCK_SECONDS, the second node unlocks.
-pub const SECOND_NODE_UNLOCK_SECONDS: f64 = 14_400.0; // 4 hours
-
-pub fn tick_loom_staggered_unlock(loom: &mut LoomState, elapsed_seconds: f64) -> bool {
-    let archetype = match loom.persistent.archetype {
-        Some(a) => a,
-        None => return false,
-    };
-
-    let timer = match &mut loom.persistent.second_node_unlock_elapsed {
-        Some(t) => t,
-        None => return false,
-    };
-
-    let (_first, second) = archetype_nodes(archetype);
-
-    // If already unlocked, nothing to do.
-    if loom
+/// Initialize the Loom on discovery: unlock only Ember Spindle.
+/// Other nodes unlock via the neighbor unlock system as the player progresses.
+pub fn initialize_loom(loom: &mut LoomState) {
+    if let Some(node) = loom
         .persistent
         .nodes
-        .iter()
-        .any(|n| n.id == second && n.unlocked)
+        .iter_mut()
+        .find(|n| n.id == NodeId::EmberSpindle)
     {
-        loom.persistent.second_node_unlock_elapsed = None;
-        return false;
+        node.unlocked = true;
     }
+    loom.persistent.second_node_unlock_elapsed = None;
+}
 
-    *timer += elapsed_seconds;
+/// Legacy constant kept for save compatibility.
+pub const SECOND_NODE_UNLOCK_SECONDS: f64 = 14_400.0;
 
-    if *timer >= SECOND_NODE_UNLOCK_SECONDS {
-        loom.persistent.second_node_unlock_elapsed = None;
-
-        // Unlock the second node and apply its passive.
-        let second_id = second;
-        if let Some(node) = loom.persistent.nodes.iter_mut().find(|n| n.id == second_id) {
-            node.unlocked = true;
-        }
-        apply_node_passive_on_unlock(second_id, loom);
-
-        return true; // Signal that unlock just happened
-    }
-
+/// Legacy: staggered unlock is disabled. Returns false always.
+pub fn tick_loom_staggered_unlock(_loom: &mut LoomState, _elapsed_seconds: f64) -> bool {
     false
 }
 
-/// Returns the throughput multiplier for a node based on archetype passives.
-/// 1.0 = no bonus.
-pub fn node_throughput_multiplier(loom: &LoomState, node_id: NodeId) -> f64 {
-    match loom.persistent.archetype {
-        Some(LoomArchetype::BurnBright) if node_id == NodeId::EmberSpindle => 1.5,
-        _ => 1.0,
-    }
+/// Returns the throughput multiplier for a node.
+/// Currently always 1.0 (archetype bonuses removed for rebalancing).
+pub fn node_throughput_multiplier(_loom: &LoomState, _node_id: NodeId) -> f64 {
+    1.0
 }
 
-/// Returns the conversion ratio multiplier for a node based on archetype passives.
-/// 1.0 = no bonus.
-pub fn node_conversion_multiplier(loom: &LoomState, node_id: NodeId) -> f64 {
-    if loom.persistent.archetype == Some(LoomArchetype::BurnBright)
-        && node_id == NodeId::VoidCondenser
-    {
-        // Find the node's level
-        if let Some(node) = loom.persistent.nodes.iter().find(|n| n.id == node_id) {
-            if node.level <= 3 {
-                return 2.0;
-            }
-        }
-    }
+/// Returns the conversion ratio multiplier for a node.
+/// Currently always 1.0 (archetype bonuses removed for rebalancing).
+pub fn node_conversion_multiplier(_loom: &LoomState, _node_id: NodeId) -> f64 {
     1.0
 }
 
 /// Returns the number of neighbors that unlock when a node produces enough.
-pub fn node_neighbor_unlock_count(loom: &LoomState, node_id: NodeId) -> usize {
-    if loom.persistent.archetype == Some(LoomArchetype::ReachWide)
-        && node_id == NodeId::ReflectionLens
-    {
-        3
-    } else {
-        2
-    }
+pub fn node_neighbor_unlock_count(_loom: &LoomState, _node_id: NodeId) -> usize {
+    2
 }
 
-/// Returns the upgrade cost multiplier for a node based on archetype passives.
-/// 1.0 = no bonus. 0.75 = 25% discount.
-pub fn node_upgrade_cost_multiplier(loom: &LoomState, node_id: NodeId) -> f64 {
-    if loom.persistent.archetype == Some(LoomArchetype::RunDeep) && node_id == NodeId::SilenceWell {
-        if let Some(node) = loom.persistent.nodes.iter().find(|n| n.id == node_id) {
-            if node.level <= 5 {
-                return 0.75;
-            }
-        }
-    }
+/// Returns the upgrade cost multiplier for a node.
+/// Currently always 1.0 (archetype bonuses removed for rebalancing).
+pub fn node_upgrade_cost_multiplier(_loom: &LoomState, _node_id: NodeId) -> f64 {
     1.0
 }
 
 /// Returns the neighbor unlock speed multiplier for a node.
-/// 1.0 = normal, >1.0 = faster (not used currently), <1.0 = slower.
-pub fn node_neighbor_unlock_speed_multiplier(loom: &LoomState, node_id: NodeId) -> f64 {
-    if loom.persistent.archetype == Some(LoomArchetype::BurnBright)
-        && node_id == NodeId::EmberSpindle
-    {
-        0.7 // 30% slower
-    } else {
-        1.0
-    }
+/// Currently always 1.0 (archetype bonuses removed for rebalancing).
+pub fn node_neighbor_unlock_speed_multiplier(_loom: &LoomState, _node_id: NodeId) -> f64 {
+    1.0
 }
 
-/// Returns whether the Resonance Forge feedback loop passive is active (50% strength).
-/// This is only true before the cycle fully closes.
-pub fn resonance_early_feedback_active(loom: &LoomState) -> bool {
-    loom.persistent.archetype == Some(LoomArchetype::RunDeep)
-        && loom
-            .persistent
-            .nodes
-            .iter()
-            .any(|n| n.id == NodeId::ResonanceForge && n.unlocked)
+/// Returns whether the Resonance Forge feedback loop passive is active.
+/// Currently always false (archetype bonuses removed for rebalancing).
+pub fn resonance_early_feedback_active(_loom: &LoomState) -> bool {
+    false
 }
 
 // ── Phase 3: Node Base Production ─────────────────────────────────────────────
@@ -230,7 +112,7 @@ pub fn node_effective_rate(loom: &LoomState, node: &LoomNode) -> f64 {
 /// `delta_seconds` is the wall-clock time elapsed since the last tick (typically 0.1s).
 /// Each unlocked node produces its native resource at its effective rate and stores
 /// the output in the node's buffer (capped at buffer_capacity).
-/// Stalled nodes (buffer full) skip production.
+/// Full buffers auto-drain (excess is discarded); extractors never stall.
 ///
 /// Returns a map of resource → total produced this tick (for pattern rate tracking).
 pub fn tick_base_production(
@@ -258,21 +140,13 @@ pub fn tick_base_production(
         }
         let node = &mut loom.persistent.nodes[idx];
 
-        // If buffer is at capacity, node stalls — no production.
-        if node.buffer >= capacity {
-            node.stalled = true;
-            continue;
-        }
-
         let amount = rate * delta_hours;
-        let new_buffer = (node.buffer + amount).min(capacity);
-        let actually_produced = new_buffer - node.buffer;
-        node.buffer = new_buffer;
+        node.buffer = (node.buffer + amount).min(capacity);
         node.stalled = false;
 
-        if actually_produced > 0.0 {
+        if amount > 0.0 {
             let resource = node_native_resource(node_id);
-            *produced.entry(resource).or_insert(0.0) += actually_produced;
+            *produced.entry(resource).or_insert(0.0) += amount;
         }
     }
 
@@ -285,7 +159,7 @@ pub fn tick_base_production(
 /// Base cost: 10 * level^1.5, rounded. Silence Well gets 25% discount at levels 1-5.
 pub fn node_upgrade_cost(loom: &LoomState, node_id: NodeId) -> f64 {
     if let Some(node) = loom.persistent.nodes.iter().find(|n| n.id == node_id) {
-        let base_cost = 10.0 * (node.level as f64).powf(1.5);
+        let base_cost = 100.0 * (node.level as f64).powf(1.5);
         let multiplier = node_upgrade_cost_multiplier(loom, node_id);
         (base_cost * multiplier).round()
     } else {
@@ -428,31 +302,80 @@ pub fn tick_stall_detection(loom: &mut LoomState) -> Vec<NodeId> {
     changed
 }
 
-// ── Phase 6: Direct-Pull Refinery Tick ────────────────────────────────────────
+// ── Phase 6: Direct-Pull Shuttle Tick ────────────────────────────────────────
 
-/// Max intake rate per input slot, by refinery tier (units/hour).
+/// Max intake rate per input slot, by shuttle tier (units/hour).
 pub fn tier_intake_cap(tier: u8) -> f64 {
     match tier {
-        1 => 2.0,
-        2 => 3.0,
-        3 => 4.0,
-        _ => 2.0,
+        1 => 20.0,
+        2 => 30.0,
+        3 => 40.0,
+        _ => 20.0,
     }
 }
 
-/// Check whether a source node reference is valid for a given refinery tier.
-/// Extractors are always valid. Refineries are valid only if their tier is
-/// strictly less than the consuming refinery's tier.
-pub fn valid_source_for_tier(
-    source: LoomNodeRef,
-    refinery_tier: u8,
-    refineries: &[Refinery],
-) -> bool {
+/// Effective intake cap for a shuttle, applying the level multiplier.
+pub fn shuttle_effective_intake_cap(tier: u8, level: u32) -> f64 {
+    tier_intake_cap(tier) * node_level_multiplier(level)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ShuttleUpgradeError {
+    InvalidIndex,
+    UnderConstruction,
+    AscensionTooLow,
+    AtMaxLevel,
+    InsufficientBuffer { needed: f64, have: f64 },
+}
+
+/// Upgrade a shuttle's level. Cost: 100 × level^1.5 from shuttle buffer.
+/// Max level capped by Ascension level via max_shuttle_level().
+pub fn upgrade_shuttle(
+    loom: &mut LoomState,
+    shuttle_idx: usize,
+    ascension_level: u32,
+) -> Result<(), ShuttleUpgradeError> {
+    let max_level = crate::ascension::types::max_shuttle_level(ascension_level);
+    if max_level <= 1 {
+        return Err(ShuttleUpgradeError::AscensionTooLow);
+    }
+
+    let shuttle = loom
+        .persistent
+        .shuttles
+        .get(shuttle_idx)
+        .ok_or(ShuttleUpgradeError::InvalidIndex)?;
+
+    if shuttle.under_construction {
+        return Err(ShuttleUpgradeError::UnderConstruction);
+    }
+    if shuttle.level >= max_level {
+        return Err(ShuttleUpgradeError::AtMaxLevel);
+    }
+
+    let cost = 100.0 * (shuttle.level as f64).powf(1.5);
+    if shuttle.buffer < cost {
+        return Err(ShuttleUpgradeError::InsufficientBuffer {
+            needed: cost,
+            have: shuttle.buffer,
+        });
+    }
+
+    let shuttle = loom.persistent.shuttles.get_mut(shuttle_idx).unwrap();
+    shuttle.buffer -= cost;
+    shuttle.level += 1;
+    Ok(())
+}
+
+/// Check whether a source node reference is valid for a given shuttle tier.
+/// Extractors are always valid. Shuttles are valid only if their tier is
+/// strictly less than the consuming shuttle's tier.
+pub fn valid_source_for_tier(source: LoomNodeRef, shuttle_tier: u8, shuttles: &[Shuttle]) -> bool {
     match source {
         LoomNodeRef::Extractor(_) => true,
-        LoomNodeRef::Refinery(idx) => {
-            if let Some(source_ref) = refineries.get(idx) {
-                source_ref.tier < refinery_tier
+        LoomNodeRef::Shuttle(idx) => {
+            if let Some(source_ref) = shuttles.get(idx) {
+                source_ref.tier < shuttle_tier
             } else {
                 false
             }
@@ -460,29 +383,37 @@ pub fn valid_source_for_tier(
     }
 }
 
-/// Tick all refinery direct-pull processing.
+/// Tick all shuttle direct-pull processing.
 ///
 /// Each tick:
 /// 1. Count consumers per source (for contention splitting).
-/// 2. Process refineries by tier order (T1 first, then T2, then T3).
-/// 3. For each refinery: calculate available pull for each input slot.
+/// 2. Process shuttles by tier order (T1 first, then T2, then T3).
+/// 3. For each shuttle: calculate available pull for each input slot.
 ///    - For each source: `share = source_available / num_consumers_of_that_source`
 ///    - `actual_pull = min(tier_intake_cap, share)` summed across all sources for that slot
 /// 4. `output_rate = min(total_pull_a, total_pull_b) * recipe_amount`
-/// 5. Add output to refinery buffer (capped at capacity).
+/// 5. Add output to shuttle buffer (capped at capacity).
 ///
 /// Returns a map of resource → total produced this tick (for pattern tracking).
-pub fn tick_refinery_pull(
+pub fn tick_shuttle_pull(
     loom: &mut LoomState,
     delta_seconds: f64,
 ) -> std::collections::HashMap<Resource, f64> {
     let delta_hours = delta_seconds / 3600.0;
     let mut produced: std::collections::HashMap<Resource, f64> = std::collections::HashMap::new();
 
-    // ── Step 1: Count consumers per source across all non-construction refineries ──
+    // ── Pre-compute per-node throughput multipliers before mutable borrow ──
+    let node_multipliers: std::collections::HashMap<NodeId, f64> = loom
+        .persistent
+        .nodes
+        .iter()
+        .map(|n| (n.id, node_throughput_multiplier(loom, n.id)))
+        .collect();
+
+    // ── Step 1: Count consumers per source across all non-construction shuttles ──
     let mut consumer_count: std::collections::HashMap<LoomNodeRef, usize> =
         std::collections::HashMap::new();
-    for r in &loom.persistent.refineries {
+    for r in &loom.persistent.shuttles {
         if r.under_construction {
             continue;
         }
@@ -491,14 +422,14 @@ pub fn tick_refinery_pull(
         }
     }
 
-    // ── Step 2: Process refineries by tier (T1 before T2 before T3) ──
-    // Track effective output rates per refinery index for higher-tier pulls.
-    let mut refinery_output_rates: Vec<f64> = vec![0.0; loom.persistent.refineries.len()];
+    // ── Step 2: Process shuttles by tier (T1 before T2 before T3) ──
+    // Track effective output rates per shuttle index for higher-tier pulls.
+    let mut shuttle_output_rates: Vec<f64> = vec![0.0; loom.persistent.shuttles.len()];
 
     for tier in 1u8..=3 {
         let indices: Vec<usize> = loom
             .persistent
-            .refineries
+            .shuttles
             .iter()
             .enumerate()
             .filter(|(_, r)| !r.under_construction && r.tier == tier)
@@ -506,16 +437,20 @@ pub fn tick_refinery_pull(
             .collect();
 
         for idx in indices {
-            let r = &loom.persistent.refineries[idx];
-            let cap = tier_intake_cap(r.tier);
+            let r = &loom.persistent.shuttles[idx];
+            let cap = shuttle_effective_intake_cap(r.tier, r.level);
 
             // Calculate available pull for input A.
             let pull_a: f64 = r
                 .sources_a
                 .iter()
                 .map(|&src| {
-                    let available =
-                        source_available_rate(src, &loom.persistent, &refinery_output_rates);
+                    let available = source_available_rate(
+                        src,
+                        &loom.persistent,
+                        &shuttle_output_rates,
+                        &node_multipliers,
+                    );
                     let consumers = consumer_count.get(&src).copied().unwrap_or(1).max(1);
                     let share = available / consumers as f64;
                     share.min(cap)
@@ -528,8 +463,12 @@ pub fn tick_refinery_pull(
                 .sources_b
                 .iter()
                 .map(|&src| {
-                    let available =
-                        source_available_rate(src, &loom.persistent, &refinery_output_rates);
+                    let available = source_available_rate(
+                        src,
+                        &loom.persistent,
+                        &shuttle_output_rates,
+                        &node_multipliers,
+                    );
                     let consumers = consumer_count.get(&src).copied().unwrap_or(1).max(1);
                     let share = available / consumers as f64;
                     share.min(cap)
@@ -539,12 +478,12 @@ pub fn tick_refinery_pull(
 
             // Output rate for this tick = min(pull_a, pull_b) * recipe_amount.
             let output_rate = pull_a.min(pull_b) * r.amount;
-            refinery_output_rates[idx] = output_rate;
+            shuttle_output_rates[idx] = output_rate;
 
             // Add to buffer.
             let output_this_tick = output_rate * delta_hours;
             if output_this_tick > 0.0 {
-                let r = &mut loom.persistent.refineries[idx];
+                let r = &mut loom.persistent.shuttles[idx];
                 let space = (r.buffer_capacity - r.buffer).max(0.0);
                 let actual = output_this_tick.min(space);
                 r.buffer += actual;
@@ -563,26 +502,28 @@ pub fn tick_refinery_pull(
 fn source_available_rate(
     src: LoomNodeRef,
     persistent: &super::types::LoomPersistent,
-    refinery_rates: &[f64],
+    shuttle_rates: &[f64],
+    node_multipliers: &std::collections::HashMap<NodeId, f64>,
 ) -> f64 {
     match src {
         LoomNodeRef::Extractor(node_id) => {
             if let Some(node) = persistent.nodes.iter().find(|n| n.id == node_id) {
-                node_effective_rate_from_node(node)
+                let throughput_mult = node_multipliers.get(&node_id).copied().unwrap_or(1.0);
+                node_effective_rate_from_node(node, throughput_mult)
             } else {
                 0.0
             }
         }
-        LoomNodeRef::Refinery(idx) => refinery_rates.get(idx).copied().unwrap_or(0.0),
+        LoomNodeRef::Shuttle(idx) => shuttle_rates.get(idx).copied().unwrap_or(0.0),
     }
 }
 
 /// Compute a node's effective rate without needing the full LoomState borrow.
-fn node_effective_rate_from_node(node: &LoomNode) -> f64 {
+fn node_effective_rate_from_node(node: &LoomNode, throughput_multiplier: f64) -> f64 {
     if !node.unlocked {
         return 0.0;
     }
-    node.base_rate * node_level_multiplier(node.level)
+    node.base_rate * node_level_multiplier(node.level) * throughput_multiplier
 }
 
 /// Record a recipe discovery in the codex.
@@ -675,12 +616,12 @@ pub fn loom_production_bonus(
     1.0 + deep_bonus + haven_bonus + sigil_bonus + ascension_bonus
 }
 
-/// Ticks required for a refinery to finish construction (2 hours at 100ms/tick = 72000 ticks).
-pub const REFINERY_CONSTRUCTION_TICKS: u32 = 72_000;
+/// Ticks required for a shuttle to finish construction (2 hours at 100ms/tick = 72000 ticks).
+pub const SHUTTLE_CONSTRUCTION_TICKS: u32 = 72_000;
 
-/// Error conditions for refinery building.
+/// Error conditions for shuttle building.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RefineryError {
+pub enum ShuttleError {
     InvalidRecipe,
     TierLocked,
     AtCapacity,
@@ -688,43 +629,89 @@ pub enum RefineryError {
     InvalidSource,
 }
 
-fn refinery_build_cost(tier: u8) -> f64 {
+fn shuttle_build_cost(tier: u8) -> f64 {
     match tier {
-        1 => 25.0,
-        2 => 15.0,
-        _ => 10.0,
+        1 => 250.0,
+        2 => 150.0,
+        _ => 100.0,
     }
 }
 
-fn refinery_tier_unlock_threshold(tier: u8) -> usize {
+fn shuttle_tier_unlock_threshold(tier: u8) -> usize {
     match tier {
         1 => 1,
-        2 => 6,
-        _ => 12,
+        2 => 8,
+        _ => 15,
     }
 }
 
-/// Attempt to build a new Refinery locked to the given recipe.
+/// Returns the tiers currently unlocked based on completed pattern count.
+pub fn unlocked_tiers(loom: &LoomState) -> Vec<u8> {
+    let completed = loom
+        .persistent
+        .patterns
+        .iter()
+        .filter(|p| p.completed)
+        .count();
+    let mut tiers = Vec::new();
+    for tier in 1u8..=3 {
+        if completed >= shuttle_tier_unlock_threshold(tier) {
+            tiers.push(tier);
+        }
+    }
+    tiers
+}
+
+/// Returns the build cost for a shuttle of the given tier.
+pub fn shuttle_build_cost_public(tier: u8) -> f64 {
+    shuttle_build_cost(tier)
+}
+
+/// Returns all eligible source nodes for a given shuttle tier.
+pub fn eligible_sources_for_tier(
+    loom: &LoomState,
+    tier: u8,
+    resource: Resource,
+) -> Vec<LoomNodeRef> {
+    let mut sources = Vec::new();
+    // Extractors that produce the needed resource.
+    for node in &loom.persistent.nodes {
+        if node.unlocked && node_native_resource(node.id) == resource {
+            sources.push(LoomNodeRef::Extractor(node.id));
+        }
+    }
+    // Shuttles of lower tier that output the needed resource.
+    for (i, r) in loom.persistent.shuttles.iter().enumerate() {
+        if r.output == resource
+            && valid_source_for_tier(LoomNodeRef::Shuttle(i), tier, &loom.persistent.shuttles)
+        {
+            sources.push(LoomNodeRef::Shuttle(i));
+        }
+    }
+    sources
+}
+
+/// Attempt to build a new Shuttle locked to the given recipe.
 ///
 /// # Errors
-/// - `RefineryError::InvalidRecipe` — no recipe exists for the given inputs and nature.
-/// - `RefineryError::TierLocked` — the recipe's tier requires more completed patterns.
-/// - `RefineryError::AtCapacity` — the player already has the maximum number of refineries.
-/// - `RefineryError::InsufficientResources` — not enough `input_a` stockpile to pay the build cost.
-/// - `RefineryError::InvalidSource` — a source node is invalid for the recipe's tier.
+/// - `ShuttleError::InvalidRecipe` — no recipe exists for the given inputs and nature.
+/// - `ShuttleError::TierLocked` — the recipe's tier requires more completed patterns.
+/// - `ShuttleError::AtCapacity` — the player already has the maximum number of shuttles.
+/// - `ShuttleError::InsufficientResources` — not enough `input_a` stockpile to pay the build cost.
+/// - `ShuttleError::InvalidSource` — a source node is invalid for the recipe's tier.
 ///
 /// # Returns
-/// The index of the newly created `Refinery` in `loom.persistent.refineries`.
-pub fn build_refinery(
+/// The index of the newly created `Shuttle` in `loom.persistent.shuttles`.
+pub fn build_shuttle(
     loom: &mut LoomState,
     input_a: Resource,
     input_b: Resource,
     nature: NodeNature,
     sources_a: Vec<LoomNodeRef>,
     sources_b: Vec<LoomNodeRef>,
-) -> Result<usize, RefineryError> {
+) -> Result<usize, ShuttleError> {
     let recipe = crate::loom::recipes::find_recipe(input_a, input_b, nature)
-        .ok_or(RefineryError::InvalidRecipe)?;
+        .ok_or(ShuttleError::InvalidRecipe)?;
 
     let completed_patterns = loom
         .persistent
@@ -732,29 +719,29 @@ pub fn build_refinery(
         .iter()
         .filter(|p| p.completed)
         .count();
-    if completed_patterns < refinery_tier_unlock_threshold(recipe.tier) {
-        return Err(RefineryError::TierLocked);
+    if completed_patterns < shuttle_tier_unlock_threshold(recipe.tier) {
+        return Err(ShuttleError::TierLocked);
     }
 
-    if loom.persistent.refineries.len() >= loom.persistent.max_refineries() {
-        return Err(RefineryError::AtCapacity);
+    if loom.persistent.shuttles.len() >= loom.persistent.max_shuttles() {
+        return Err(ShuttleError::AtCapacity);
     }
 
     // Validate all sources for this tier.
     for &src in sources_a.iter().chain(sources_b.iter()) {
-        if !valid_source_for_tier(src, recipe.tier, &loom.persistent.refineries) {
-            return Err(RefineryError::InvalidSource);
+        if !valid_source_for_tier(src, recipe.tier, &loom.persistent.shuttles) {
+            return Err(ShuttleError::InvalidSource);
         }
     }
 
-    let cost = refinery_build_cost(recipe.tier);
+    let cost = shuttle_build_cost(recipe.tier);
     let stockpile = loom.persistent.stockpiles.entry(input_a).or_insert(0.0);
     if *stockpile < cost {
-        return Err(RefineryError::InsufficientResources);
+        return Err(ShuttleError::InsufficientResources);
     }
     *stockpile -= cost;
 
-    let mut r = Refinery::new(
+    let mut r = Shuttle::new(
         recipe.input_a,
         recipe.input_b,
         recipe.node_nature,
@@ -765,16 +752,16 @@ pub fn build_refinery(
         sources_b,
     );
     r.under_construction = true;
-    r.construction_ticks_remaining = REFINERY_CONSTRUCTION_TICKS;
-    loom.persistent.refineries.push(r);
-    Ok(loom.persistent.refineries.len() - 1)
+    r.construction_ticks_remaining = SHUTTLE_CONSTRUCTION_TICKS;
+    loom.persistent.shuttles.push(r);
+    Ok(loom.persistent.shuttles.len() - 1)
 }
 
-/// Tick construction for all refineries under construction.
-/// Returns indices of refineries that completed this tick.
-pub fn tick_refinery_construction(loom: &mut LoomState) -> Vec<usize> {
+/// Tick construction for all shuttles under construction.
+/// Returns indices of shuttles that completed this tick.
+pub fn tick_shuttle_construction(loom: &mut LoomState) -> Vec<usize> {
     let mut completed = Vec::new();
-    for (i, r) in loom.persistent.refineries.iter_mut().enumerate() {
+    for (i, r) in loom.persistent.shuttles.iter_mut().enumerate() {
         if !r.under_construction {
             continue;
         }
@@ -787,27 +774,27 @@ pub fn tick_refinery_construction(loom: &mut LoomState) -> Vec<usize> {
     completed
 }
 
-/// Demolish a refinery by index.
-/// Removes the refinery and re-indexes source references in remaining refineries.
-pub fn demolish_refinery(loom: &mut LoomState, idx: usize) {
-    if idx >= loom.persistent.refineries.len() {
+/// Demolish a shuttle by index.
+/// Removes the shuttle and re-indexes source references in remaining shuttles.
+pub fn demolish_shuttle(loom: &mut LoomState, idx: usize) {
+    if idx >= loom.persistent.shuttles.len() {
         return;
     }
 
-    // Remove the refinery.
-    loom.persistent.refineries.remove(idx);
+    // Remove the shuttle.
+    loom.persistent.shuttles.remove(idx);
 
-    // Re-index source references in remaining refineries.
-    for r in &mut loom.persistent.refineries {
+    // Re-index source references in remaining shuttles.
+    for r in &mut loom.persistent.shuttles {
         reindex_sources(&mut r.sources_a, idx);
         reindex_sources(&mut r.sources_b, idx);
     }
 }
 
 fn reindex_sources(sources: &mut Vec<LoomNodeRef>, removed_idx: usize) {
-    sources.retain(|s| !matches!(s, LoomNodeRef::Refinery(i) if *i == removed_idx));
+    sources.retain(|s| !matches!(s, LoomNodeRef::Shuttle(i) if *i == removed_idx));
     for s in sources.iter_mut() {
-        if let LoomNodeRef::Refinery(ref mut i) = s {
+        if let LoomNodeRef::Shuttle(ref mut i) = s {
             if *i > removed_idx {
                 *i -= 1;
             }
@@ -815,9 +802,9 @@ fn reindex_sources(sources: &mut Vec<LoomNodeRef>, removed_idx: usize) {
     }
 }
 
-/// Update stall flags for all refineries.
-pub fn tick_refinery_stall_detection(loom: &mut LoomState) {
-    for r in &mut loom.persistent.refineries {
+/// Update stall flags for all shuttles.
+pub fn tick_shuttle_stall_detection(loom: &mut LoomState) {
+    for r in &mut loom.persistent.shuttles {
         if r.under_construction {
             continue;
         }
@@ -827,280 +814,117 @@ pub fn tick_refinery_stall_detection(loom: &mut LoomState) {
     }
 }
 
+/// Calculate PR generated per day from a given WR production rate (units/hr).
+///
+/// Tiered brackets:
+/// - 0–10 WR/hr: 5 PR per WR/hr per day
+/// - 10–25 WR/hr: 10 PR per WR/hr per day
+/// - 25+ WR/hr: 15 PR per WR/hr per day
+pub fn wr_to_pr_per_day(wr_per_hour: f64) -> u32 {
+    if wr_per_hour <= 0.0 {
+        return 0;
+    }
+    let mut pr = 0.0;
+    let mut remaining = wr_per_hour;
+
+    // Bracket 1: 0–10 at 5 PR per WR/hr
+    let b1 = remaining.min(10.0);
+    pr += b1 * 5.0;
+    remaining -= b1;
+
+    // Bracket 2: 10–25 at 10 PR per WR/hr
+    if remaining > 0.0 {
+        let b2 = remaining.min(15.0);
+        pr += b2 * 10.0;
+        remaining -= b2;
+    }
+
+    // Bracket 3: 25+ at 15 PR per WR/hr
+    if remaining > 0.0 {
+        pr += remaining * 15.0;
+    }
+
+    pr.round() as u32
+}
+
+/// Returns the highest zone ID unlocked by the given number of completed Woven Patterns.
+pub fn loom_zone_cap_for_patterns(completed_patterns: usize) -> u32 {
+    if completed_patterns >= 28 {
+        50
+    } else if completed_patterns >= 22 {
+        46
+    } else if completed_patterns >= 16 {
+        42
+    } else if completed_patterns >= 8 {
+        38
+    } else if completed_patterns >= 4 {
+        34
+    } else {
+        0 // No Loom zones unlocked yet
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_select_archetype_burn_bright() {
-        let mut loom = LoomState::new();
-        loom.persistent.discovered = true;
-
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
-
-        assert_eq!(loom.persistent.archetype, Some(LoomArchetype::BurnBright));
-
-        // First node (Ember Spindle) unlocked immediately
-        let ember = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap();
-        assert!(ember.unlocked);
-
-        // Second node (Void Condenser) NOT yet unlocked (staggered)
-        let void_n = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::VoidCondenser)
-            .unwrap();
-        assert!(!void_n.unlocked);
-
-        // Staggered unlock timer started
-        assert_eq!(loom.persistent.second_node_unlock_elapsed, Some(0.0));
+    fn test_loom_zone_cap_for_patterns() {
+        assert_eq!(loom_zone_cap_for_patterns(0), 0);
+        assert_eq!(loom_zone_cap_for_patterns(3), 0);
+        assert_eq!(loom_zone_cap_for_patterns(4), 34);
+        assert_eq!(loom_zone_cap_for_patterns(7), 34);
+        assert_eq!(loom_zone_cap_for_patterns(8), 38);
+        assert_eq!(loom_zone_cap_for_patterns(16), 42);
+        assert_eq!(loom_zone_cap_for_patterns(22), 46);
+        assert_eq!(loom_zone_cap_for_patterns(28), 50);
     }
 
     #[test]
-    fn test_select_archetype_reach_wide() {
-        let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::ReachWide);
-
-        let lens = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::ReflectionLens)
-            .unwrap();
-        assert!(lens.unlocked);
-
-        let archive = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::MemoryArchive)
-            .unwrap();
-        assert!(!archive.unlocked);
-
-        assert_eq!(loom.persistent.second_node_unlock_elapsed, Some(0.0));
+    fn test_wr_to_pr_per_day_zero_rate() {
+        assert_eq!(wr_to_pr_per_day(0.0), 0);
     }
 
     #[test]
-    fn test_select_archetype_run_deep() {
-        let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::RunDeep);
-
-        let well = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::SilenceWell)
-            .unwrap();
-        assert!(well.unlocked);
-
-        let forge = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::ResonanceForge)
-            .unwrap();
-        assert!(!forge.unlocked);
-
-        assert_eq!(loom.persistent.second_node_unlock_elapsed, Some(0.0));
+    fn test_wr_to_pr_per_day_low_bracket() {
+        assert_eq!(wr_to_pr_per_day(5.0), 25);
     }
 
     #[test]
-    fn test_memory_archive_passive_stockpile() {
-        let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::ReachWide);
-
-        // After selecting ReachWide, ReflectionLens is immediately unlocked.
-        // MemoryArchive passive doesn't apply yet (second node, not yet unlocked).
-        // Manually unlock MemoryArchive and apply passive.
-        apply_node_passive_on_unlock(NodeId::MemoryArchive, &mut loom);
-
-        // Adjacent resources: VoidEssence and Silence should each have 3 stockpiled.
-        assert_eq!(
-            *loom
-                .persistent
-                .stockpiles
-                .get(&Resource::VoidEssence)
-                .unwrap_or(&0.0),
-            3.0
-        );
-        assert_eq!(
-            *loom
-                .persistent
-                .stockpiles
-                .get(&Resource::Silence)
-                .unwrap_or(&0.0),
-            3.0
-        );
+    fn test_wr_to_pr_per_day_mid_bracket() {
+        assert_eq!(wr_to_pr_per_day(20.0), 150);
     }
 
     #[test]
-    fn test_staggered_unlock_not_yet() {
-        let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
-
-        // Simulate 2 hours (7200 seconds) — not enough
-        let unlocked = tick_loom_staggered_unlock(&mut loom, 7200.0);
-        assert!(!unlocked);
-
-        let void_n = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::VoidCondenser)
-            .unwrap();
-        assert!(!void_n.unlocked);
-
-        // Timer should have advanced
-        assert_eq!(loom.persistent.second_node_unlock_elapsed, Some(7200.0));
+    fn test_wr_to_pr_per_day_high_bracket() {
+        assert_eq!(wr_to_pr_per_day(60.0), 725);
     }
 
     #[test]
-    fn test_staggered_unlock_after_4_hours() {
+    fn test_wr_to_pr_per_day_exact_bracket_boundary() {
+        assert_eq!(wr_to_pr_per_day(10.0), 50);
+        assert_eq!(wr_to_pr_per_day(25.0), 200);
+    }
+
+    #[test]
+    fn test_initialize_loom_unlocks_only_ember_spindle() {
         let mut loom = LoomState::new();
-        loom.persistent.discovered = true;
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
 
-        // Simulate 4 hours of ticks (14400 seconds)
-        let unlocked = tick_loom_staggered_unlock(&mut loom, 14400.0);
-        assert!(unlocked);
-
-        let void_n = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::VoidCondenser)
-            .unwrap();
-        assert!(void_n.unlocked);
-
-        // Timer should be cleared
+        for node in &loom.persistent.nodes {
+            if node.id == NodeId::EmberSpindle {
+                assert!(node.unlocked, "EmberSpindle should be unlocked");
+            } else {
+                assert!(!node.unlocked, "node {:?} should be locked", node.id);
+            }
+        }
         assert_eq!(loom.persistent.second_node_unlock_elapsed, None);
     }
 
     #[test]
-    fn test_ember_spindle_throughput_passive() {
-        let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
-
-        assert_eq!(node_throughput_multiplier(&loom, NodeId::EmberSpindle), 1.5);
-        // Other nodes unaffected
-        assert_eq!(
-            node_throughput_multiplier(&loom, NodeId::ResonanceForge),
-            1.0
-        );
-    }
-
-    #[test]
-    fn test_void_condenser_conversion_passive_levels_1_to_3() {
-        let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
-
-        // Level 1 — 2x multiplier
-        assert_eq!(
-            node_conversion_multiplier(&loom, NodeId::VoidCondenser),
-            2.0
-        );
-
-        // Level 3 — still 2x
-        let void_node = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::VoidCondenser)
-            .unwrap();
-        void_node.level = 3;
-        assert_eq!(
-            node_conversion_multiplier(&loom, NodeId::VoidCondenser),
-            2.0
-        );
-
-        // Level 4 — back to 1x
-        let void_node = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::VoidCondenser)
-            .unwrap();
-        void_node.level = 4;
-        assert_eq!(
-            node_conversion_multiplier(&loom, NodeId::VoidCondenser),
-            1.0
-        );
-    }
-
-    #[test]
-    fn test_reflection_lens_neighbor_count() {
-        let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::ReachWide);
-
-        assert_eq!(node_neighbor_unlock_count(&loom, NodeId::ReflectionLens), 3);
-        // Other nodes get 2
-        assert_eq!(node_neighbor_unlock_count(&loom, NodeId::EmberSpindle), 2);
-    }
-
-    #[test]
-    fn test_silence_well_upgrade_cost_passive() {
-        let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::RunDeep);
-
-        // Level 1 — 25% discount
-        assert_eq!(
-            node_upgrade_cost_multiplier(&loom, NodeId::SilenceWell),
-            0.75
-        );
-
-        // Level 5 — still discounted
-        let well = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::SilenceWell)
-            .unwrap();
-        well.level = 5;
-        assert_eq!(
-            node_upgrade_cost_multiplier(&loom, NodeId::SilenceWell),
-            0.75
-        );
-
-        // Level 6 — no discount
-        let well = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::SilenceWell)
-            .unwrap();
-        well.level = 6;
-        assert_eq!(
-            node_upgrade_cost_multiplier(&loom, NodeId::SilenceWell),
-            1.0
-        );
-    }
-
-    #[test]
-    fn test_resonance_early_feedback_active() {
-        let mut loom = LoomState::new();
-
-        // No archetype — not active
-        assert!(!resonance_early_feedback_active(&loom));
-
-        // RunDeep but Resonance Forge not yet unlocked
-        select_archetype(&mut loom, LoomArchetype::RunDeep);
-        // SilenceWell is unlocked (first node), ResonanceForge is not yet.
-        assert!(!resonance_early_feedback_active(&loom));
-
-        // Unlock ResonanceForge
-        tick_loom_staggered_unlock(&mut loom, 14400.0);
-        assert!(resonance_early_feedback_active(&loom));
-    }
-
-    #[test]
-    fn test_no_archetype_no_passives() {
+    fn test_multipliers_are_neutral() {
         let loom = LoomState::new();
+        // All multiplier functions return neutral values (archetype bonuses removed)
         assert_eq!(node_throughput_multiplier(&loom, NodeId::EmberSpindle), 1.0);
         assert_eq!(
             node_conversion_multiplier(&loom, NodeId::VoidCondenser),
@@ -1111,19 +935,18 @@ mod tests {
             node_upgrade_cost_multiplier(&loom, NodeId::SilenceWell),
             1.0
         );
+        assert_eq!(
+            node_neighbor_unlock_speed_multiplier(&loom, NodeId::EmberSpindle),
+            1.0
+        );
+        assert!(!resonance_early_feedback_active(&loom));
     }
 
     #[test]
-    fn test_wrong_archetype_no_passives() {
+    fn test_staggered_unlock_is_noop() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::ReachWide);
-
-        // BurnBright passives shouldn't apply
-        assert_eq!(node_throughput_multiplier(&loom, NodeId::EmberSpindle), 1.0);
-        assert_eq!(
-            node_conversion_multiplier(&loom, NodeId::VoidCondenser),
-            1.0
-        );
+        // Staggered unlock always returns false now
+        assert!(!tick_loom_staggered_unlock(&mut loom, 14400.0));
     }
 
     // ── Phase 3: Node Base Production tests ───────────────────────────────────
@@ -1160,8 +983,7 @@ mod tests {
     #[test]
     fn test_base_production_fills_buffer() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
-        // EmberSpindle is now unlocked.
+        initialize_loom(&mut loom);
 
         tick_base_production(&mut loom, 3600.0);
 
@@ -1171,10 +993,10 @@ mod tests {
             .iter()
             .find(|n| n.id == NodeId::EmberSpindle)
             .unwrap();
-        // BurnBright: 5/hr base * 1.5x passive = 7.5/hr. After 1 hr: 7.5 units.
+        // 50/hr base * 1.0x (no archetype bonus). After 1 hr: 50.0 units.
         assert!(
-            (ember.buffer - 7.5).abs() < 0.001,
-            "buffer should be ~7.5, got {}",
+            (ember.buffer - 50.0).abs() < 0.001,
+            "buffer should be ~50.0, got {}",
             ember.buffer
         );
     }
@@ -1182,8 +1004,14 @@ mod tests {
     #[test]
     fn test_base_production_locked_node_produces_nothing() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
-        // VoidCondenser is locked.
+        // Don't initialize — leave nodes locked.
+        // Manually unlock just EmberSpindle.
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .unlocked = true;
 
         tick_base_production(&mut loom, 3600.0);
 
@@ -1197,9 +1025,9 @@ mod tests {
     }
 
     #[test]
-    fn test_base_production_stalls_at_capacity() {
+    fn test_base_production_caps_buffer_at_capacity() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
 
         // Fill buffer to capacity.
         let ember = loom
@@ -1210,7 +1038,7 @@ mod tests {
             .unwrap();
         ember.buffer = ember.buffer_capacity;
 
-        tick_base_production(&mut loom, 3600.0);
+        let produced = tick_base_production(&mut loom, 3600.0);
 
         let ember = loom
             .persistent
@@ -1218,8 +1046,48 @@ mod tests {
             .iter()
             .find(|n| n.id == NodeId::EmberSpindle)
             .unwrap();
-        assert!(ember.stalled);
+        // Extractor no longer stalls from full buffer — it auto-drains.
+        assert!(!ember.stalled);
         assert_eq!(ember.buffer, ember.buffer_capacity);
+        // Full production amount is still reported for rate tracking.
+        let ember_produced = produced.get(&Resource::Ember).copied().unwrap_or(0.0);
+        assert!(
+            ember_produced > 0.0,
+            "should report production even with full buffer"
+        );
+    }
+
+    #[test]
+    fn test_extractor_produces_at_full_rate_when_buffer_full() {
+        let mut loom = LoomState::new();
+        loom.persistent.nodes[0].unlocked = true;
+        loom.persistent.nodes[0].buffer = loom.persistent.nodes[0].buffer_capacity;
+
+        let produced = tick_base_production(&mut loom, 0.1);
+
+        let ember_produced = produced.get(&Resource::Ember).copied().unwrap_or(0.0);
+        assert!(
+            ember_produced > 0.0,
+            "extractor should report production even with full buffer"
+        );
+        assert!(
+            !loom.persistent.nodes[0].stalled,
+            "extractor should not stall from full buffer"
+        );
+    }
+
+    #[test]
+    fn test_extractor_buffer_does_not_exceed_capacity() {
+        let mut loom = LoomState::new();
+        loom.persistent.nodes[0].unlocked = true;
+        loom.persistent.nodes[0].buffer = loom.persistent.nodes[0].buffer_capacity - 0.001;
+
+        tick_base_production(&mut loom, 0.1);
+
+        assert!(
+            loom.persistent.nodes[0].buffer <= loom.persistent.nodes[0].buffer_capacity + 1e-9,
+            "buffer should not exceed capacity"
+        );
     }
 
     // ── Phase 3: Node Upgrading tests ─────────────────────────────────────────
@@ -1228,13 +1096,13 @@ mod tests {
     fn test_upgrade_cost_level1() {
         let loom = LoomState::new();
         let cost = node_upgrade_cost(&loom, NodeId::EmberSpindle);
-        assert_eq!(cost, 10.0); // 10 * 1^1.5 = 10
+        assert_eq!(cost, 100.0); // 100 * 1^1.5 = 100
     }
 
     #[test]
     fn test_upgrade_succeeds_with_sufficient_buffer() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
 
         let ember = loom
             .persistent
@@ -1242,7 +1110,7 @@ mod tests {
             .iter_mut()
             .find(|n| n.id == NodeId::EmberSpindle)
             .unwrap();
-        ember.buffer = 50.0;
+        ember.buffer = 500.0;
 
         let result = try_upgrade_node(&mut loom, NodeId::EmberSpindle);
         assert!(result);
@@ -1259,7 +1127,7 @@ mod tests {
     #[test]
     fn test_upgrade_fails_with_insufficient_buffer() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
 
         let result = try_upgrade_node(&mut loom, NodeId::EmberSpindle);
         assert!(!result);
@@ -1289,14 +1157,15 @@ mod tests {
     }
 
     #[test]
-    fn test_silence_well_upgrade_discount_applied() {
+    fn test_upgrade_cost_no_discount() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::RunDeep);
+        initialize_loom(&mut loom);
 
-        let base_cost = 10.0_f64 * 1.0_f64.powf(1.5);
-        let discounted = (base_cost * 0.75).round();
+        // No archetype discount — cost is base cost * 1.0
+        let base_cost = 100.0_f64 * 1.0_f64.powf(1.5);
+        let expected = (base_cost * 1.0).round();
         let cost = node_upgrade_cost(&loom, NodeId::SilenceWell);
-        assert_eq!(cost, discounted);
+        assert_eq!(cost, expected);
     }
 
     // ── Phase 3: Neighbor Unlocking tests ─────────────────────────────────────
@@ -1318,7 +1187,13 @@ mod tests {
     #[test]
     fn test_neighbor_unlocking_accumulates_progress() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        // Only unlock EmberSpindle, leave neighbors locked.
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .unlocked = true;
 
         let ember = loom
             .persistent
@@ -1341,8 +1216,13 @@ mod tests {
     #[test]
     fn test_neighbor_unlocks_after_threshold() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::ReachWide);
-        // ReflectionLens is unlocked.
+        // Only unlock ReflectionLens.
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::ReflectionLens)
+            .unwrap()
+            .unlocked = true;
 
         let lens = loom
             .persistent
@@ -1361,9 +1241,15 @@ mod tests {
     }
 
     #[test]
-    fn test_ember_spindle_unlock_speed_is_slower() {
+    fn test_neighbor_unlock_speed_is_normal() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        // Only unlock EmberSpindle.
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .unlocked = true;
 
         let ember = loom
             .persistent
@@ -1373,37 +1259,27 @@ mod tests {
             .unwrap();
         ember.buffer = ember.buffer_capacity;
 
-        // At 0.7x speed, 2hr tick = 1.4hr progress — not enough to unlock (threshold = 2hr).
-        tick_neighbor_unlocking(&mut loom, 7200.0);
-
-        for &nb in node_neighbors(NodeId::EmberSpindle) {
-            let n = loom.persistent.nodes.iter().find(|n| n.id == nb).unwrap();
-            assert!(
-                !n.unlocked,
-                "{:?} should not be unlocked with 0.7x speed in 2hr",
-                nb
-            );
-            assert!(
-                (n.unlock_progress - 1.4).abs() < 0.01,
-                "expected ~1.4hr progress, got {}",
-                n.unlock_progress
-            );
-        }
+        // At 1.0x speed (no archetype bonus), 2hr tick = 2.0hr progress — enough to unlock.
+        let unlocked = tick_neighbor_unlocking(&mut loom, 7200.0);
+        assert!(
+            !unlocked.is_empty(),
+            "Should have unlocked neighbors at 1.0x speed in 2hr"
+        );
     }
 
-    // ── Phase 6: Direct-Pull Refinery tests ───────────────────────────────────
+    // ── Phase 6: Direct-Pull Shuttle tests ───────────────────────────────────
 
     #[test]
-    fn test_tick_refinery_pull_empty_no_panic() {
+    fn test_tick_shuttle_pull_empty_no_panic() {
         let mut loom = LoomState::new();
-        let produced = tick_refinery_pull(&mut loom, 0.1);
+        let produced = tick_shuttle_pull(&mut loom, 0.1);
         assert!(produced.is_empty());
     }
 
     #[test]
-    fn test_tick_refinery_pull_with_unlocked_source_produces_output() {
+    fn test_tick_shuttle_pull_with_unlocked_source_produces_output() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
         // Fill EmberSpindle buffer to give it a non-zero rate proxy.
         let ember_node = loom
             .persistent
@@ -1422,7 +1298,7 @@ mod tests {
         void_node.unlocked = true;
         void_node.buffer = void_node.buffer_capacity;
 
-        let mut r = Refinery::new(
+        let mut r = Shuttle::new(
             Resource::Ember,
             Resource::VoidEssence,
             NodeNature::Heat,
@@ -1433,10 +1309,10 @@ mod tests {
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         );
         r.under_construction = false;
-        loom.persistent.refineries.push(r);
+        loom.persistent.shuttles.push(r);
 
         // Run for 1 hour worth of ticks.
-        let produced = tick_refinery_pull(&mut loom, 3600.0);
+        let produced = tick_shuttle_pull(&mut loom, 3600.0);
         // Should produce some ForgedLight.
         assert!(
             produced.get(&Resource::ForgedLight).copied().unwrap_or(0.0) > 0.0,
@@ -1445,9 +1321,9 @@ mod tests {
     }
 
     #[test]
-    fn test_tick_refinery_pull_under_construction_skipped() {
+    fn test_tick_shuttle_pull_under_construction_skipped() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
         let void_node = loom
             .persistent
             .nodes
@@ -1456,7 +1332,7 @@ mod tests {
             .unwrap();
         void_node.unlocked = true;
 
-        let mut r = Refinery::new(
+        let mut r = Shuttle::new(
             Resource::Ember,
             Resource::VoidEssence,
             NodeNature::Heat,
@@ -1468,12 +1344,12 @@ mod tests {
         );
         r.under_construction = true;
         r.construction_ticks_remaining = 100;
-        loom.persistent.refineries.push(r);
+        loom.persistent.shuttles.push(r);
 
-        let produced = tick_refinery_pull(&mut loom, 3600.0);
+        let produced = tick_shuttle_pull(&mut loom, 3600.0);
         assert!(
             produced.is_empty(),
-            "under-construction refinery should produce nothing"
+            "under-construction shuttle should produce nothing"
         );
     }
 
@@ -1502,7 +1378,7 @@ mod tests {
     #[test]
     fn test_tick_stall_detection_marks_stalled_node() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
 
         // Fill EmberSpindle's buffer to capacity with no outgoing pipes.
         let ember = loom
@@ -1531,7 +1407,7 @@ mod tests {
     #[test]
     fn test_tick_stall_detection_clears_stall_when_buffer_drains() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
 
         // First: fill buffer → stall.
         {
@@ -1601,7 +1477,7 @@ mod tests {
     #[test]
     fn test_tick_stall_detection_no_change_when_already_stalled() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
 
         // Pre-stall the node.
         let ember = loom
@@ -1793,8 +1669,13 @@ mod tests {
     #[test]
     fn test_node_effective_rate_level2_scales_correctly() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::RunDeep);
-        // SilenceWell is unlocked by RunDeep (no throughput multiplier for RunDeep on SilenceWell).
+        // Manually unlock SilenceWell for this test
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::SilenceWell)
+            .unwrap()
+            .unlocked = true;
         let well = loom
             .persistent
             .nodes
@@ -1810,14 +1691,18 @@ mod tests {
             .find(|n| n.id == NodeId::SilenceWell)
             .unwrap();
         let rate = node_effective_rate(&loom, well);
-        // base_rate 5.0 * level_mult(2) 1.5 * throughput_mult 1.0 = 7.5
-        assert!((rate - 7.5).abs() < 0.001, "expected 7.5/hr, got {}", rate);
+        // base_rate 50.0 * level_mult(2) 1.5 * throughput_mult 1.0 = 75.0
+        assert!(
+            (rate - 75.0).abs() < 0.001,
+            "expected 75.0/hr, got {}",
+            rate
+        );
     }
 
     #[test]
-    fn test_node_effective_rate_burn_bright_ember_spindle_with_level() {
+    fn test_node_effective_rate_ember_spindle_with_level() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
         let ember = loom
             .persistent
             .nodes
@@ -1833,10 +1718,10 @@ mod tests {
             .find(|n| n.id == NodeId::EmberSpindle)
             .unwrap();
         let rate = node_effective_rate(&loom, ember);
-        // base_rate 5.0 * level_mult(3) 2.0 * throughput_mult 1.5 = 15.0
+        // base_rate 50.0 * level_mult(3) 2.0 * throughput_mult 1.0 = 100.0
         assert!(
-            (rate - 15.0).abs() < 0.001,
-            "expected 15.0/hr, got {}",
+            (rate - 100.0).abs() < 0.001,
+            "expected 100.0/hr, got {}",
             rate
         );
     }
@@ -1846,7 +1731,7 @@ mod tests {
     #[test]
     fn test_upgrade_node_increases_buffer_capacity() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
         let old_capacity = loom
             .persistent
             .nodes
@@ -1861,7 +1746,7 @@ mod tests {
             .iter_mut()
             .find(|n| n.id == NodeId::EmberSpindle)
             .unwrap();
-        ember.buffer = 50.0;
+        ember.buffer = 500.0;
         try_upgrade_node(&mut loom, NodeId::EmberSpindle);
 
         let new_capacity = loom
@@ -1882,7 +1767,7 @@ mod tests {
     #[test]
     fn test_upgrade_node_deducts_cost_from_buffer() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
         let cost = node_upgrade_cost(&loom, NodeId::EmberSpindle);
         let starting_buffer = cost + 5.0;
 
@@ -1914,7 +1799,7 @@ mod tests {
     #[test]
     fn test_tick_base_production_returns_produced_map() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
 
         let produced = tick_base_production(&mut loom, 3600.0);
 
@@ -1923,10 +1808,10 @@ mod tests {
             "produced map should include Ember"
         );
         let ember_amount = produced[&Resource::Ember];
-        // BurnBright EmberSpindle: 5/hr * 1.5 = 7.5/hr; after 1hr = 7.5 units
+        // 50/hr base * 1.0x (no archetype bonus); after 1hr = 50.0 units
         assert!(
-            (ember_amount - 7.5).abs() < 0.001,
-            "expected 7.5 Ember produced, got {}",
+            (ember_amount - 50.0).abs() < 0.001,
+            "expected 50.0 Ember produced, got {}",
             ember_amount
         );
     }
@@ -1934,7 +1819,13 @@ mod tests {
     #[test]
     fn test_tick_base_production_locked_nodes_absent_from_produced_map() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        // Only unlock EmberSpindle, leave others locked.
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .unlocked = true;
 
         let produced = tick_base_production(&mut loom, 3600.0);
 
@@ -1950,7 +1841,13 @@ mod tests {
     #[test]
     fn test_neighbor_unlocking_no_progress_when_buffer_below_threshold() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        // Only unlock EmberSpindle, leave neighbors locked.
+        loom.persistent
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == NodeId::EmberSpindle)
+            .unwrap()
+            .unlocked = true;
 
         // EmberSpindle buffer at 0 — well below the 50% threshold.
         tick_neighbor_unlocking(&mut loom, 7200.0);
@@ -1973,7 +1870,7 @@ mod tests {
     #[test]
     fn test_neighbor_unlocking_returns_empty_when_no_unlock_occurs() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
         // Buffer is empty — nothing should unlock.
         let unlocked = tick_neighbor_unlocking(&mut loom, 3600.0);
         assert!(
@@ -2054,11 +1951,12 @@ mod tests {
     // ── node_neighbor_unlock_speed_multiplier ─────────────────────────────────
 
     #[test]
-    fn test_ember_spindle_unlock_speed_burn_bright_is_point_seven() {
+    fn test_ember_spindle_unlock_speed_is_normal() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
+        // No archetype bonus — speed is 1.0x for all nodes.
         assert!(
-            (node_neighbor_unlock_speed_multiplier(&loom, NodeId::EmberSpindle) - 0.7).abs()
+            (node_neighbor_unlock_speed_multiplier(&loom, NodeId::EmberSpindle) - 1.0).abs()
                 < 0.001
         );
     }
@@ -2066,7 +1964,7 @@ mod tests {
     #[test]
     fn test_other_nodes_unlock_speed_is_one() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
         assert_eq!(
             node_neighbor_unlock_speed_multiplier(&loom, NodeId::VoidCondenser),
             1.0
@@ -2082,7 +1980,7 @@ mod tests {
     #[test]
     fn test_upgrade_cost_increases_with_level() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
 
         let cost_l1 = node_upgrade_cost(&loom, NodeId::EmberSpindle);
         loom.persistent
@@ -2109,14 +2007,14 @@ mod tests {
         );
     }
 
-    // ── Refinery Ticking ──────────────────────────────────────────────────────
+    // ── Shuttle Ticking ──────────────────────────────────────────────────────
 
     #[test]
-    fn test_refinery_construction_completes() {
+    fn test_shuttle_construction_completes() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
-        loom.persistent.refineries.push({
-            let mut r = Refinery::new(
+        initialize_loom(&mut loom);
+        loom.persistent.shuttles.push({
+            let mut r = Shuttle::new(
                 Resource::Ember,
                 Resource::VoidEssence,
                 NodeNature::Heat,
@@ -2131,21 +2029,21 @@ mod tests {
             r
         });
 
-        let completed = tick_refinery_construction(&mut loom);
+        let completed = tick_shuttle_construction(&mut loom);
         assert_eq!(completed.len(), 1);
-        assert!(!loom.persistent.refineries[0].under_construction);
+        assert!(!loom.persistent.shuttles[0].under_construction);
     }
 
     #[test]
-    fn test_refinery_pull_produces_output() {
+    fn test_shuttle_pull_produces_output() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
         // Unlock two extractor nodes and fill their buffers.
         loom.persistent.nodes[0].unlocked = true;
         loom.persistent.nodes[0].buffer = 50.0;
         loom.persistent.nodes[1].unlocked = true;
         loom.persistent.nodes[1].buffer = 50.0;
-        loom.persistent.refineries.push(Refinery::new(
+        loom.persistent.shuttles.push(Shuttle::new(
             Resource::Ember,
             Resource::VoidEssence,
             NodeNature::Heat,
@@ -2156,16 +2054,16 @@ mod tests {
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         ));
 
-        let produced = tick_refinery_pull(&mut loom, 1.0);
-        // A T1 refinery should produce some output when sources have stock.
-        assert!(!produced.is_empty() || loom.persistent.refineries[0].buffer >= 0.0);
+        let produced = tick_shuttle_pull(&mut loom, 1.0);
+        // A T1 shuttle should produce some output when sources have stock.
+        assert!(!produced.is_empty() || loom.persistent.shuttles[0].buffer >= 0.0);
     }
 
     #[test]
-    fn test_refinery_stall_when_buffer_full() {
+    fn test_shuttle_stall_when_buffer_full() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
-        let mut r = Refinery::new(
+        initialize_loom(&mut loom);
+        let mut r = Shuttle::new(
             Resource::Ember,
             Resource::VoidEssence,
             NodeNature::Heat,
@@ -2176,17 +2074,17 @@ mod tests {
             vec![],
         );
         r.buffer = r.buffer_capacity;
-        loom.persistent.refineries.push(r);
+        loom.persistent.shuttles.push(r);
 
-        tick_refinery_stall_detection(&mut loom);
-        assert!(loom.persistent.refineries[0].stalled);
+        tick_shuttle_stall_detection(&mut loom);
+        assert!(loom.persistent.shuttles[0].stalled);
     }
 
     #[test]
-    fn test_demolish_refinery() {
+    fn test_demolish_shuttle() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
-        loom.persistent.refineries.push(Refinery::new(
+        initialize_loom(&mut loom);
+        loom.persistent.shuttles.push(Shuttle::new(
             Resource::Ember,
             Resource::VoidEssence,
             NodeNature::Heat,
@@ -2197,16 +2095,16 @@ mod tests {
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         ));
 
-        demolish_refinery(&mut loom, 0);
-        assert!(loom.persistent.refineries.is_empty());
+        demolish_shuttle(&mut loom, 0);
+        assert!(loom.persistent.shuttles.is_empty());
     }
 
     #[test]
-    fn test_demolish_refinery_reindexes_sources() {
+    fn test_demolish_shuttle_reindexes_sources() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
-        // Build two refineries; second references first via sources_a.
-        loom.persistent.refineries.push(Refinery::new(
+        initialize_loom(&mut loom);
+        // Build two shuttles; second references first via sources_a.
+        loom.persistent.shuttles.push(Shuttle::new(
             Resource::Ember,
             Resource::VoidEssence,
             NodeNature::Heat,
@@ -2216,26 +2114,26 @@ mod tests {
             vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         ));
-        loom.persistent.refineries.push(Refinery::new(
+        loom.persistent.shuttles.push(Shuttle::new(
             Resource::ForgedLight,
             Resource::Reflection,
             NodeNature::Form,
             Resource::EchoGlass,
             1.0,
             2,
-            vec![LoomNodeRef::Refinery(0)],
+            vec![LoomNodeRef::Shuttle(0)],
             vec![LoomNodeRef::Extractor(NodeId::ReflectionLens)],
         ));
-        // Insert a T1 refinery before index 0 — then demolish it.
+        // Insert a T1 shuttle before index 0 — then demolish it.
         // Actually insert at index 0 by inserting first, shifting second to index 1.
-        // Easier: demolish refinery 0 and check that refinery (now index 0) has its
-        // sources_a updated from Refinery(0) to be removed (was pointing to the removed one).
-        demolish_refinery(&mut loom, 0);
-        assert_eq!(loom.persistent.refineries.len(), 1);
-        // sources_a pointed to Refinery(0) which was demolished → should be empty.
+        // Easier: demolish shuttle 0 and check that shuttle (now index 0) has its
+        // sources_a updated from Shuttle(0) to be removed (was pointing to the removed one).
+        demolish_shuttle(&mut loom, 0);
+        assert_eq!(loom.persistent.shuttles.len(), 1);
+        // sources_a pointed to Shuttle(0) which was demolished → should be empty.
         assert!(
-            loom.persistent.refineries[0].sources_a.is_empty(),
-            "source reference to demolished refinery should be removed"
+            loom.persistent.shuttles[0].sources_a.is_empty(),
+            "source reference to demolished shuttle should be removed"
         );
     }
 }
@@ -2409,17 +2307,17 @@ mod external_bonus_tests {
     }
 
     #[test]
-    fn test_build_refinery_success() {
+    fn test_build_shuttle_success() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
         setup_patterns(&mut loom, 1);
         *loom
             .persistent
             .stockpiles
             .entry(Resource::Ember)
-            .or_insert(0.0) += 50.0;
+            .or_insert(0.0) += 500.0;
 
-        let result = build_refinery(
+        let result = build_shuttle(
             &mut loom,
             Resource::Ember,
             Resource::VoidEssence,
@@ -2428,18 +2326,18 @@ mod external_bonus_tests {
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         );
         assert!(result.is_ok());
-        assert_eq!(loom.persistent.refineries.len(), 1);
-        let r = &loom.persistent.refineries[0];
+        assert_eq!(loom.persistent.shuttles.len(), 1);
+        let r = &loom.persistent.shuttles[0];
         assert_eq!(r.output, Resource::ForgedLight);
         assert!(r.under_construction);
     }
 
     #[test]
-    fn test_build_refinery_fails_at_capacity() {
+    fn test_build_shuttle_fails_at_capacity() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
-        // No completed patterns → max_refineries() == 0 → AtCapacity.
-        let result = build_refinery(
+        initialize_loom(&mut loom);
+        // No completed patterns → max_shuttles() == 0 → AtCapacity.
+        let result = build_shuttle(
             &mut loom,
             Resource::Ember,
             Resource::VoidEssence,
@@ -2451,12 +2349,12 @@ mod external_bonus_tests {
     }
 
     #[test]
-    fn test_build_refinery_fails_insufficient_resources() {
+    fn test_build_shuttle_fails_insufficient_resources() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
         setup_patterns(&mut loom, 1);
         // No Ember stockpile → InsufficientResources.
-        let result = build_refinery(
+        let result = build_shuttle(
             &mut loom,
             Resource::Ember,
             Resource::VoidEssence,
@@ -2468,9 +2366,9 @@ mod external_bonus_tests {
     }
 
     #[test]
-    fn test_build_refinery_fails_invalid_recipe() {
+    fn test_build_shuttle_fails_invalid_recipe() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
+        initialize_loom(&mut loom);
         setup_patterns(&mut loom, 1);
         *loom
             .persistent
@@ -2478,7 +2376,7 @@ mod external_bonus_tests {
             .entry(Resource::Ember)
             .or_insert(0.0) += 50.0;
 
-        let result = build_refinery(
+        let result = build_shuttle(
             &mut loom,
             Resource::WovenReality,
             Resource::WovenReality,
@@ -2490,10 +2388,10 @@ mod external_bonus_tests {
     }
 
     #[test]
-    fn test_build_refinery_tier_gating() {
+    fn test_build_shuttle_tier_gating() {
         let mut loom = LoomState::new();
-        select_archetype(&mut loom, LoomArchetype::BurnBright);
-        // Only 1 completed pattern; Tier 2 recipes require 6 → TierLocked.
+        initialize_loom(&mut loom);
+        // Only 1 completed pattern; Tier 2 recipes require 8 → TierLocked.
         setup_patterns(&mut loom, 1);
         *loom
             .persistent
@@ -2506,7 +2404,7 @@ mod external_bonus_tests {
             .entry(Resource::EchoGlass)
             .or_insert(0.0) += 50.0;
 
-        let result = build_refinery(
+        let result = build_shuttle(
             &mut loom,
             Resource::ForgedLight,
             Resource::EchoGlass,
@@ -2514,6 +2412,188 @@ mod external_bonus_tests {
             vec![],
             vec![],
         );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_tick_shuttle_pull_basic() {
+        let mut loom = LoomState::new();
+        for node in loom.persistent.nodes.iter_mut() {
+            node.unlocked = true;
+        }
+
+        let mut r = Shuttle::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        r.under_construction = false;
+        loom.persistent.shuttles.push(r);
+
+        // Run for exactly 1 hour.
+        let produced = tick_shuttle_pull(&mut loom, 3600.0);
+        let forged = produced.get(&Resource::ForgedLight).copied().unwrap_or(0.0);
+
+        // T1 intake cap = 20.0/hr. EmberSpindle = 50.0/hr, VoidCondenser = 50.0/hr.
+        // pull_a = min(50.0, 20.0 cap) = 20.0; pull_b = min(50.0, 20.0 cap) = 20.0
+        // output = min(20.0, 20.0) * 1.0 = 20.0/hr => 20.0 in 1 hour.
+        assert!(
+            (forged - 20.0).abs() < 0.01,
+            "expected ~20.0 ForgedLight, got {forged}"
+        );
+    }
+
+    #[test]
+    fn test_tick_shuttle_pull_contention_splits_evenly() {
+        let mut loom = LoomState::new();
+        for node in loom.persistent.nodes.iter_mut() {
+            node.unlocked = true;
+        }
+
+        // Two T1 shuttles both pulling from EmberSpindle (and VoidCondenser).
+        for _ in 0..2 {
+            let mut r = Shuttle::new(
+                Resource::Ember,
+                Resource::VoidEssence,
+                NodeNature::Heat,
+                Resource::ForgedLight,
+                1.0,
+                1,
+                vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+                vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+            );
+            r.under_construction = false;
+            loom.persistent.shuttles.push(r);
+        }
+
+        let produced = tick_shuttle_pull(&mut loom, 3600.0);
+        let forged = produced.get(&Resource::ForgedLight).copied().unwrap_or(0.0);
+
+        // EmberSpindle effective = 50.0/hr, split 2 ways = 25.0 each, capped at 20.0.
+        // VoidCondenser = 50.0/hr, split 2 ways = 25.0 each, capped at 20.0.
+        // Each shuttle: min(20.0, 20.0) * 1.0 = 20.0/hr. Total = 40.0/hr => 40.0 in 1 hour.
+        assert!(
+            (forged - 40.0).abs() < 0.01,
+            "expected ~40.0 ForgedLight from two shuttles, got {forged}"
+        );
+    }
+
+    #[test]
+    fn test_tier_gates_shifted() {
+        let mut loom = LoomState::new();
+        crate::loom::complete_discovery(&mut loom);
+        assert!(unlocked_tiers(&loom).is_empty());
+        loom.persistent.patterns[0].completed = true;
+        assert_eq!(unlocked_tiers(&loom), vec![1]);
+        for i in 1..7 {
+            loom.persistent.patterns[i].completed = true;
+        }
+        assert_eq!(unlocked_tiers(&loom), vec![1]);
+        loom.persistent.patterns[7].completed = true;
+        assert_eq!(unlocked_tiers(&loom), vec![1, 2]);
+        for i in 8..14 {
+            loom.persistent.patterns[i].completed = true;
+        }
+        assert_eq!(unlocked_tiers(&loom), vec![1, 2]);
+        loom.persistent.patterns[14].completed = true;
+        assert_eq!(unlocked_tiers(&loom), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_shuttle_effective_intake_cap() {
+        assert!((shuttle_effective_intake_cap(1, 1) - 20.0).abs() < 0.001);
+        assert!((shuttle_effective_intake_cap(1, 3) - 40.0).abs() < 0.001);
+        assert!((shuttle_effective_intake_cap(3, 5) - 120.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_upgrade_shuttle_success() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        setup_patterns(&mut loom, 8);
+        for node in loom.persistent.nodes.iter_mut() {
+            node.unlocked = true;
+        }
+        *loom
+            .persistent
+            .stockpiles
+            .entry(Resource::Ember)
+            .or_insert(0.0) += 500.0;
+        let _ = build_shuttle(
+            &mut loom,
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        loom.persistent.shuttles[0].buffer = 500.0;
+        loom.persistent.shuttles[0].under_construction = false;
+
+        let result = upgrade_shuttle(&mut loom, 0, 7);
+        assert!(result.is_ok());
+        assert_eq!(loom.persistent.shuttles[0].level, 2);
+    }
+
+    #[test]
+    fn test_upgrade_shuttle_blocked_by_ascension_cap() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        setup_patterns(&mut loom, 8);
+        for node in loom.persistent.nodes.iter_mut() {
+            node.unlocked = true;
+        }
+        *loom
+            .persistent
+            .stockpiles
+            .entry(Resource::Ember)
+            .or_insert(0.0) += 500.0;
+        let _ = build_shuttle(
+            &mut loom,
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        loom.persistent.shuttles[0].buffer = 5000.0;
+        loom.persistent.shuttles[0].under_construction = false;
+        loom.persistent.shuttles[0].level = 3;
+
+        let result = upgrade_shuttle(&mut loom, 0, 7); // max for Asc VII is 3
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_upgrade_shuttle_blocked_without_ascension_vii() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        setup_patterns(&mut loom, 1);
+        for node in loom.persistent.nodes.iter_mut() {
+            node.unlocked = true;
+        }
+        *loom
+            .persistent
+            .stockpiles
+            .entry(Resource::Ember)
+            .or_insert(0.0) += 500.0;
+        let _ = build_shuttle(
+            &mut loom,
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        loom.persistent.shuttles[0].buffer = 5000.0;
+        loom.persistent.shuttles[0].under_construction = false;
+
+        let result = upgrade_shuttle(&mut loom, 0, 6); // Asc VI, no shuttle upgrades
         assert!(result.is_err());
     }
 }

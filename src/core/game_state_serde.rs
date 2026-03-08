@@ -113,6 +113,7 @@ impl FlatGameState {
             game_over_shown_at: None,
             cached_power_rating: 0.0,
             cached_fracture_zone_cap: 0,
+            cached_loom_zone_cap: 0,
             cached_haven_bonuses: Default::default(),
             cached_sigil_bonuses: Default::default(),
             bonuses_dirty: true,

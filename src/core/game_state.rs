@@ -113,6 +113,8 @@ pub struct GameState {
     pub cached_power_rating: f64,
     /// Cached fracture zone cap from Deep — used by UI for zone track rendering
     pub cached_fracture_zone_cap: u32,
+    /// Cached Loom zone cap from completed patterns — used by UI for zone track rendering
+    pub cached_loom_zone_cap: u32,
     /// Cached merged Haven bonuses — recomputed only when bonuses_dirty is true
     pub cached_haven_bonuses: HavenBonuses,
     /// Cached merged Sigil bonuses — recomputed only when bonuses_dirty is true
@@ -168,6 +170,7 @@ impl GameState {
             game_over_shown_at: None,
             cached_power_rating: 0.0,
             cached_fracture_zone_cap: 0,
+            cached_loom_zone_cap: 0,
             cached_haven_bonuses: HavenBonuses::default(),
             cached_sigil_bonuses: SigilBonuses::default(),
             bonuses_dirty: true,

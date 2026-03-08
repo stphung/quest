@@ -18,7 +18,7 @@ pub use types::*;
 // Re-export soulforge UI types from enhancement module
 pub use crate::enhancement::{SoulforgePhase, SoulforgeUiState};
 
-use crate::achievements::get_achievements_by_category;
+use crate::achievements::{get_achievements_by_category, AchievementCategory};
 use crate::challenges::menu::{process_input as process_menu_input, MenuInput};
 use crate::character::prestige::can_prestige;
 use crate::core::game_state::GameState;
@@ -115,7 +115,13 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
             KeyCode::Right => browser.next_category(),
             KeyCode::Up => browser.move_up(),
             KeyCode::Down => {
-                let count = get_achievements_by_category(browser.selected_category).len();
+                let count = if browser.selected_category == AchievementCategory::Stats {
+                    // Stats view uses selected_index as scroll offset;
+                    // allow generous scrolling (content height is ~50 lines).
+                    100
+                } else {
+                    get_achievements_by_category(browser.selected_category).len()
+                };
                 browser.move_down(count);
             }
             KeyCode::Char('t') | KeyCode::Char('T') => {
@@ -234,7 +240,7 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
 
     // 1f. Ascension confirmation modal (blocks all other input)
     if matches!(overlay, GameOverlay::AscensionConfirm) {
-        return handle_ascension_confirm(key, state, deep_state, overlay, achievements);
+        return handle_ascension_confirm(key, state, deep_state, loom_state, achievements, overlay);
     }
 
     // 2. Haven screen (blocks other input when open)
@@ -341,10 +347,6 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
     if matches!(key.code, KeyCode::Char('l') | KeyCode::Char('L'))
         && loom_state.persistent.discovered
     {
-        // If no archetype chosen yet, show archetype selection.
-        if loom_state.persistent.archetype.is_none() {
-            loom_ui.view = crate::loom::LoomView::ArchetypeSelection;
-        }
         loom_ui.open = true;
         return InputResult::Continue;
     }
@@ -376,13 +378,15 @@ fn handle_ascension_confirm(
     key: KeyEvent,
     state: &mut GameState,
     deep_state: &mut crate::deep::DeepState,
-    overlay: &mut GameOverlay,
+    loom_state: &crate::loom::LoomState,
     achievements: &mut crate::achievements::Achievements,
+    overlay: &mut GameOverlay,
 ) -> InputResult {
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
             let deepest = deep_state.persistent.deepest_layer_reached;
-            match crate::ascension::ascend(state, deepest) {
+            let patterns = loom_state.persistent.completed_pattern_count();
+            match crate::ascension::ascend(state, deepest, patterns) {
                 crate::ascension::AscendResult::Success {
                     new_level,
                     multiplier,
@@ -403,6 +407,26 @@ fn handle_ascension_confirm(
                         bold: true,
                         segments: None,
                     });
+                    // Wire ascension achievement
+                    achievements.on_ascended(new_level, Some(&state.character_name));
+
+                    // Sync zone unlocks (loom zones may have new access)
+                    let storms_end = state
+                        .zone_progression
+                        .is_zone_unlocked(crate::core::constants::EXPANSE_ZONE_ID);
+                    let fracture_cap = deep_state.persistent.fracture_zone_cap;
+                    let loom_cap = crate::loom::loom_zone_cap_for_patterns(
+                        loom_state.persistent.completed_pattern_count(),
+                    );
+                    state.cached_loom_zone_cap = loom_cap;
+                    crate::zones::sync_account_zone_unlocks(
+                        &mut state.zone_progression,
+                        storms_end,
+                        fracture_cap,
+                        state.prestige_rank,
+                        loom_cap,
+                        state.ascension_level,
+                    );
                     *overlay = GameOverlay::None;
                     InputResult::NeedsSaveWithEvent(crate::history::SaveEvent::AchievementUnlocked(
                         format!("Ascension {roman}"),

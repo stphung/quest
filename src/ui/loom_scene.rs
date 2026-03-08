@@ -2,19 +2,17 @@
 #![allow(dead_code)]
 //!
 //! Dispatches to different view renderers based on `LoomUiState::view`:
-//!   - ArchetypeSelection: choose your archetype at unlock
-//!   - FlowView:           pipeline diagram placeholder
-//!   - ListDetail:         node list + detail panel placeholder
-//!   - Codex:              recipe codex placeholder
+//!   - FlowView:           pipeline diagram with extractors and shuttles
+//!   - Codex:              recipe codex
 
-use crate::loom::patterns::{active_pattern_requirement_status, all_patterns_complete};
-use crate::loom::types::{LoomArchetype, LoomState, LoomUiState, LoomView};
-use crate::ui::scene_fx::{current_millis, put_cell, put_text, render_buffer, SceneCell};
+use crate::loom::patterns::all_patterns_complete;
+use crate::loom::types::{LoomState, LoomUiState, LoomView};
+use crate::ui::scene_fx::current_millis;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Block, Borders, Clear, Gauge, Paragraph},
     Frame,
 };
 
@@ -26,8 +24,8 @@ const LOOM_BG: Color = Color::Rgb(10, 5, 18);
 
 /// Width of a single node box in columns (including borders).
 const NODE_BOX_WIDTH: usize = 28;
-/// Height of a node box in rows (including borders, excluding port label row).
-const NODE_BOX_HEIGHT: usize = 6;
+/// Height of a node box in rows (including borders).
+const NODE_BOX_HEIGHT: usize = 4;
 
 /// Per-node identity colors used for port labels and highlighting.
 fn node_color(id: crate::loom::types::NodeId) -> Color {
@@ -55,15 +53,15 @@ fn node_letter(id: crate::loom::types::NodeId) -> char {
     }
 }
 
-/// Extract NodeId from a LoomNodeRef, returning None for Refineries.
+/// Extract NodeId from a LoomNodeRef, returning None for Shuttles.
 fn noderef_to_id(r: crate::loom::types::LoomNodeRef) -> Option<crate::loom::types::NodeId> {
     match r {
         crate::loom::types::LoomNodeRef::Extractor(id) => Some(id),
-        crate::loom::types::LoomNodeRef::Refinery(_) => None,
+        crate::loom::types::LoomNodeRef::Shuttle(_) => None,
     }
 }
 
-/// Color for a LoomNodeRef (gray fallback for refineries).
+/// Color for a LoomNodeRef (gray fallback for shuttles).
 fn noderef_color(r: crate::loom::types::LoomNodeRef) -> Color {
     match noderef_to_id(r) {
         Some(id) => node_color(id),
@@ -71,7 +69,7 @@ fn noderef_color(r: crate::loom::types::LoomNodeRef) -> Color {
     }
 }
 
-/// Letter for a LoomNodeRef ('?' fallback for refineries).
+/// Letter for a LoomNodeRef ('?' fallback for shuttles).
 fn noderef_letter(r: crate::loom::types::LoomNodeRef) -> char {
     match noderef_to_id(r) {
         Some(id) => node_letter(id),
@@ -83,7 +81,7 @@ fn noderef_letter(r: crate::loom::types::LoomNodeRef) -> char {
 fn noderef_name(r: crate::loom::types::LoomNodeRef) -> &'static str {
     match noderef_to_id(r) {
         Some(id) => id.name(),
-        None => "Refinery",
+        None => "Shuttle",
     }
 }
 
@@ -107,6 +105,50 @@ fn resource_short(resource: &crate::loom::types::Resource) -> &'static str {
     }
 }
 
+/// Emoji icon for each resource, used as visual shorthand in sidebar and recipes.
+fn resource_emoji(resource: &crate::loom::types::Resource) -> &'static str {
+    use crate::loom::types::Resource;
+    match resource {
+        Resource::Ember => "\u{1f525}",          // 🔥
+        Resource::Reflection => "\u{1f48e}",     // 💎
+        Resource::VoidEssence => "\u{1f300}",    // 🌀
+        Resource::Memory => "\u{1f4dc}",         // 📜
+        Resource::Silence => "\u{1f311}",        // 🌑
+        Resource::Resonance => "\u{1f514}",      // 🔔
+        Resource::ForgedLight => "\u{2728}",     // ✨
+        Resource::EchoGlass => "\u{1fa9e}",      // 🪞
+        Resource::StillbornSong => "\u{1f3b5}",  // 🎵
+        Resource::CondensedEmber => "\u{1f536}", // 🔶
+        Resource::EmberEcho => "\u{1f538}",      // 🔸
+        Resource::PurifiedVoid => "\u{1f49c}",   // 💜
+        Resource::WovenReality => "\u{1f310}",   // 🌐
+    }
+}
+
+/// Emoji icon for a node identity.
+fn node_emoji(id: crate::loom::types::NodeId) -> &'static str {
+    use crate::loom::types::NodeId;
+    match id {
+        NodeId::EmberSpindle => "\u{1f525}",   // 🔥
+        NodeId::ReflectionLens => "\u{1f48e}", // 💎
+        NodeId::VoidCondenser => "\u{1f300}",  // 🌀
+        NodeId::MemoryArchive => "\u{1f4dc}",  // 📜
+        NodeId::SilenceWell => "\u{1f311}",    // 🌑
+        NodeId::ResonanceForge => "\u{1f514}", // 🔔
+    }
+}
+
+/// Number of completed patterns determines which recipe tiers are visible.
+fn visible_recipe_tier(completed_patterns: usize) -> u8 {
+    if completed_patterns >= 15 {
+        3
+    } else if completed_patterns >= 8 {
+        2
+    } else {
+        1
+    }
+}
+
 // ── Main entry point ──────────────────────────────────────────────────────────
 
 /// Render the Loom of Worlds overlay.
@@ -114,14 +156,13 @@ pub fn render_loom_overlay(
     frame: &mut Frame,
     area: Rect,
     loom_state: &LoomState,
-    ui: &LoomUiState,
+    ui: &mut LoomUiState,
 ) {
+    ui.throbber_frame = ui.throbber_frame.wrapping_add(1);
     frame.render_widget(Clear, area);
 
     let view_name = match ui.view {
-        LoomView::ArchetypeSelection => "Archetype Selection",
         LoomView::FlowView => "Flow View",
-        LoomView::ListDetail => "Nodes",
         LoomView::Codex => "Recipe Codex",
     };
 
@@ -142,337 +183,104 @@ pub fn render_loom_overlay(
     }
 
     match ui.view {
-        LoomView::ArchetypeSelection => {
-            render_archetype_selection(frame, inner, loom_state, ui);
-        }
         LoomView::FlowView => {
             render_flow_view(frame, inner, loom_state, ui);
-        }
-        LoomView::ListDetail => {
-            render_list_detail(frame, inner, loom_state, ui);
         }
         LoomView::Codex => {
             render_codex(frame, inner, loom_state, ui);
         }
     }
 
-    render_nav_hints(frame, area, ui);
+    // Render build overlay on top if active.
+    if ui.build.is_some() {
+        render_build_overlay(frame, inner, loom_state, ui);
+    }
+
+    render_nav_hints(frame, area, &*ui);
 }
 
 // ── View renderers ────────────────────────────────────────────────────────────
 
-fn render_archetype_selection(
-    frame: &mut Frame,
-    area: Rect,
-    loom_state: &LoomState,
-    ui: &LoomUiState,
-) {
-    let archetypes = [
-        (
-            LoomArchetype::BurnBright,
-            "Burn Bright",
-            "Ember Spindle + Void Condenser",
-            "High throughput, volatile output",
-        ),
-        (
-            LoomArchetype::ReachWide,
-            "Reach Wide",
-            "Reflection Lens + Memory Archive",
-            "Broad coverage, pattern synergies",
-        ),
-        (
-            LoomArchetype::RunDeep,
-            "Run Deep",
-            "Silence Well + Resonance Forge",
-            "Efficient conversion, deep reactions",
-        ),
-    ];
+// ── Factory floor rendering ──────────────────────────────────────────────────
 
-    let already_chosen = loom_state.persistent.archetype;
-
-    let mut lines = vec![
-        Line::from(""),
-        Line::from(Span::styled(
-            "Choose your archetype to unlock the Loom:",
-            Style::default().fg(Color::Rgb(200, 170, 240)),
-        )),
-        Line::from(""),
-    ];
-
-    for (i, (archetype, name, nodes, desc)) in archetypes.iter().enumerate() {
-        let is_selected = ui.selected_archetype == i;
-        let is_chosen = already_chosen == Some(*archetype);
-
-        let prefix = if is_chosen {
-            "\u{2713} "
-        } else if is_selected {
-            "\u{25b6} "
-        } else {
-            "  "
-        };
-
-        let name_color = if is_chosen {
-            Color::Rgb(255, 215, 0)
-        } else if is_selected {
-            Color::White
-        } else {
-            Color::Rgb(140, 110, 180)
-        };
-
-        lines.push(Line::from(vec![
-            Span::styled(prefix, Style::default().fg(name_color)),
-            Span::styled(
-                format!("[{}] {}", i + 1, name),
-                Style::default().fg(name_color),
-            ),
-        ]));
-        lines.push(Line::from(Span::styled(
-            format!("     Nodes: {}", nodes),
-            Style::default().fg(Color::DarkGray),
-        )));
-        lines.push(Line::from(Span::styled(
-            format!("     {}", desc),
-            Style::default().fg(Color::Rgb(100, 80, 140)),
-        )));
-        lines.push(Line::from(""));
-    }
-
-    if already_chosen.is_none() {
-        lines.push(Line::from(Span::styled(
-            "[Enter] Confirm selection",
-            Style::default().fg(Color::DarkGray),
-        )));
-    } else {
-        lines.push(Line::from(Span::styled(
-            "Archetype chosen. Use [Tab] to explore the Loom.",
-            Style::default().fg(Color::DarkGray),
-        )));
-    }
-
-    let para = Paragraph::new(lines)
-        .alignment(Alignment::Left)
-        .style(Style::default().bg(Color::Rgb(10, 5, 18)));
-    frame.render_widget(para, area);
-}
-
-// ── Factory floor rendering (Tasks 2-7) ──────────────────────────────────────
-
-/// Render the animated 2-row texture interior for a node.
-fn render_node_texture(
-    buffer: &mut [Vec<SceneCell>],
-    row: i32,
-    col: i32,
-    width: usize,
-    node_id: crate::loom::types::NodeId,
-    stalled: bool,
-    unlocked: bool,
-) {
+/// Build the animated texture string for an extractor node.
+fn node_texture_string(node_id: crate::loom::types::NodeId, width: usize, stalled: bool) -> String {
     use crate::loom::types::NodeId;
-
-    if !unlocked {
-        let lock_text = "locked";
-        let start = col + (width as i32 - lock_text.len() as i32) / 2;
-        let dim = Color::Rgb(40, 30, 55);
-        put_text(buffer, row, start, lock_text, dim);
-        return;
-    }
-
     let millis = current_millis();
     let frame_idx = if stalled { 0 } else { (millis / 300) as usize };
-    let color = if stalled {
-        Color::Rgb(40, 30, 55)
-    } else {
-        node_color(node_id)
-    };
-
-    for r in 0..2i32 {
-        for c in 0..width as i32 {
-            let ch = match node_id {
-                NodeId::EmberSpindle => {
-                    let offset = (frame_idx + c as usize + r as usize) % 4;
-                    match offset {
-                        0 | 2 => '~',
-                        _ => ' ',
-                    }
+    let mut s = String::with_capacity(width);
+    for c in 0..width {
+        let ch = match node_id {
+            NodeId::EmberSpindle => {
+                if (frame_idx + c) % 4 == 0 || (frame_idx + c) % 4 == 2 {
+                    '~'
+                } else {
+                    ' '
                 }
-                NodeId::ReflectionLens => {
-                    let offset = (frame_idx + c as usize * 3 + r as usize * 7) % 6;
-                    match offset {
-                        0 | 4 => '.',
-                        1 | 3 => '\u{b7}',
-                        2 => '*',
-                        _ => ' ',
-                    }
+            }
+            NodeId::ReflectionLens => match (frame_idx + c * 3) % 6 {
+                0 | 4 => '.',
+                1 | 3 => '\u{b7}',
+                2 => '*',
+                _ => ' ',
+            },
+            NodeId::VoidCondenser => match (frame_idx + c * 2) % 4 {
+                0 => ':',
+                2 => '\u{b7}',
+                _ => ' ',
+            },
+            NodeId::MemoryArchive => {
+                if (frame_idx + c) % 4 == 0 || (frame_idx + c) % 4 == 2 {
+                    '\u{2573}'
+                } else {
+                    ' '
                 }
-                NodeId::VoidCondenser => {
-                    let offset = (frame_idx + c as usize * 2 + r as usize) % 4;
-                    match offset {
-                        0 => ':',
-                        2 => '\u{b7}',
-                        _ => ' ',
-                    }
+            }
+            NodeId::SilenceWell => {
+                let m = (frame_idx + c) % 6;
+                if m == 0 || m == 2 || m == 4 {
+                    '_'
+                } else {
+                    ' '
                 }
-                NodeId::MemoryArchive => {
-                    let offset = (frame_idx + c as usize + r as usize) % 4;
-                    match offset {
-                        0 | 2 => '\u{2573}',
-                        _ => ' ',
-                    }
+            }
+            NodeId::ResonanceForge => {
+                if (frame_idx + c) % 4 == 0 || (frame_idx + c) % 4 == 2 {
+                    '\u{2248}'
+                } else {
+                    ' '
                 }
-                NodeId::SilenceWell => {
-                    let offset = (frame_idx + c as usize) % 6;
-                    match offset {
-                        0 | 2 | 4 => '_',
-                        _ => ' ',
-                    }
-                }
-                NodeId::ResonanceForge => {
-                    let offset = (frame_idx + c as usize + r as usize * 3) % 4;
-                    match offset {
-                        0 | 2 => '\u{2248}',
-                        _ => ' ',
-                    }
-                }
-            };
-            put_cell(buffer, row + r, col + c, ch, color);
-        }
-    }
-}
-
-/// Render recipe input slots inside a node box row.
-fn render_recipe_slots(
-    buffer: &mut [Vec<SceneCell>],
-    row: i32,
-    col: i32,
-    _width: usize,
-    node: &crate::loom::types::LoomNode,
-    _loom_state: &LoomState,
-) {
-    use crate::loom::recipes::recipes_by_nature;
-
-    if !node.unlocked {
-        return;
-    }
-
-    let nature = node.id.nature();
-    let recipes = recipes_by_nature(nature);
-    if recipes.is_empty() {
-        return;
-    }
-
-    // In the direct-pull model, incoming resources are determined by refinery sources.
-    // For extractor nodes, we show all possible recipes without pipe-based highlighting.
-    let incoming_resources: std::collections::HashSet<crate::loom::types::Resource> =
-        std::collections::HashSet::new();
-
-    // Find the best recipe: prefer one with both inputs filled, then one with most.
-    let best = recipes.iter().max_by_key(|r| {
-        let has_a = incoming_resources.contains(&r.input_a) as u8;
-        let has_b = incoming_resources.contains(&r.input_b) as u8;
-        (has_a + has_b, (r.amount * 100.0) as u32)
-    });
-
-    if let Some(recipe) = best {
-        let has_a = incoming_resources.contains(&recipe.input_a);
-        let has_b = incoming_resources.contains(&recipe.input_b);
-        let producing = has_a && has_b;
-
-        let millis = current_millis();
-        let pulse_bright = producing && (millis / 500).is_multiple_of(2);
-
-        let filled_color = Color::Rgb(180, 220, 180);
-        let empty_color = Color::Rgb(120, 50, 50);
-        let output_color = if producing {
-            Color::Rgb(220, 200, 255)
-        } else {
-            Color::Rgb(80, 60, 100)
+            }
         };
-
-        let dot_a = if has_a { '\u{25cf}' } else { '\u{25cb}' };
-        let dot_b = if has_b { '\u{25cf}' } else { '\u{25cb}' };
-        let arrow = if pulse_bright { '\u{25b6}' } else { '>' };
-
-        let slot_a = format!("[{}{}]", dot_a, resource_short(&recipe.input_a));
-        let slot_b = format!("[{}{}]", dot_b, resource_short(&recipe.input_b));
-        let output = resource_short(&recipe.output);
-
-        let mut pos = 0i32;
-        for ch in slot_a.chars() {
-            put_cell(
-                buffer,
-                row,
-                col + pos,
-                ch,
-                if has_a { filled_color } else { empty_color },
-            );
-            pos += 1;
-        }
-        put_cell(buffer, row, col + pos, ' ', LOOM_BG);
-        pos += 1;
-        for ch in slot_b.chars() {
-            put_cell(
-                buffer,
-                row,
-                col + pos,
-                ch,
-                if has_b { filled_color } else { empty_color },
-            );
-            pos += 1;
-        }
-        put_cell(buffer, row, col + pos, ' ', LOOM_BG);
-        pos += 1;
-        put_cell(buffer, row, col + pos, arrow, output_color);
-        pos += 1;
-        put_cell(buffer, row, col + pos, ' ', LOOM_BG);
-        pos += 1;
-        for ch in output.chars() {
-            put_cell(buffer, row, col + pos, ch, output_color);
-            pos += 1;
-        }
+        s.push(ch);
     }
+    s
 }
 
-/// Render a single machine node box into the cell buffer.
-/// Returns the row just below the box (where port labels go).
-fn render_node_box(
-    buffer: &mut [Vec<SceneCell>],
-    top: i32,
-    left: i32,
+/// Render a single extractor node as ratatui widgets into a given Rect.
+///
+/// Layout (4 rows):
+///   Row 0: border + title (handled by Block)
+///   Row 1: animated texture line
+///   Row 2: resource + gauge bar (or locked-node info)
+///   Row 3: bottom border (handled by Block)
+fn render_node_widget(
+    frame: &mut Frame,
+    area: Rect,
     node: &crate::loom::types::LoomNode,
     loom_state: &LoomState,
     selected: bool,
-) -> i32 {
-    let w = NODE_BOX_WIDTH as i32;
-    let inner_w = (w - 2) as usize;
+) {
+    if area.height < 3 || area.width < 6 {
+        return;
+    }
 
-    let (tl, tr, bl, br, h, v) = if selected {
-        (
-            '\u{250f}', '\u{2513}', '\u{2517}', '\u{251b}', '\u{2501}', '\u{2503}',
-        )
-    } else {
-        (
-            '\u{250c}', '\u{2510}', '\u{2514}', '\u{2518}', '\u{2500}', '\u{2502}',
-        )
-    };
     let border_color = if selected {
         Color::Rgb(220, 180, 255)
     } else if !node.unlocked {
         Color::Rgb(40, 30, 55)
     } else {
         Color::Rgb(80, 60, 110)
-    };
-
-    // Row 0: top border with title.
-    put_cell(buffer, top, left, tl, border_color);
-    for c in 1..w - 1 {
-        put_cell(buffer, top, left + c, h, border_color);
-    }
-    put_cell(buffer, top, left + w - 1, tr, border_color);
-
-    let title = if node.unlocked {
-        format!(" {} Lv.{} ", node.id.name(), node.level)
-    } else {
-        format!(" {} ", node.id.name())
     };
     let title_color = if selected {
         Color::White
@@ -481,29 +289,126 @@ fn render_node_box(
     } else {
         node_color(node.id)
     };
-    let title_start = left + 1;
-    for (i, ch) in title.chars().enumerate().take(inner_w) {
-        put_cell(buffer, top, title_start + i as i32, ch, title_color);
+
+    let emoji = node_emoji(node.id);
+    let title = if node.unlocked {
+        format!(" {} {} Lv.{} ", emoji, node.id.name(), node.level)
+    } else {
+        format!(" {} {} ", emoji, node.id.name())
+    };
+
+    let border_type = if selected {
+        ratatui::widgets::BorderType::Thick
+    } else {
+        ratatui::widgets::BorderType::Rounded
+    };
+
+    let block = Block::default()
+        .title(Span::styled(title, Style::default().fg(title_color)))
+        .borders(Borders::ALL)
+        .border_type(border_type)
+        .border_style(Style::default().fg(border_color))
+        .style(Style::default().bg(LOOM_BG));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if inner.height == 0 || inner.width == 0 {
+        return;
     }
 
-    // Rows 1-2: animated texture.
-    for r in 1..=2 {
-        put_cell(buffer, top + r, left, v, border_color);
-        put_cell(buffer, top + r, left + w - 1, v, border_color);
-    }
-    render_node_texture(
-        buffer,
-        top + 1,
-        left + 1,
-        inner_w,
-        node.id,
-        node.stalled,
-        node.unlocked,
-    );
+    let inner_w = inner.width as usize;
 
-    // Row 3: buffer bar.
-    put_cell(buffer, top + 3, left, v, border_color);
-    if node.unlocked {
+    if !node.unlocked {
+        // Locked node: line 1 = source hint, line 2 = progress.
+        let neighbors = crate::loom::node_neighbors(node.id);
+        let feeding: Vec<&crate::loom::types::NodeId> = neighbors
+            .iter()
+            .filter(|nid| {
+                loom_state
+                    .persistent
+                    .nodes
+                    .iter()
+                    .any(|n| n.id == **nid && n.unlocked)
+            })
+            .collect();
+
+        let hint = if !feeding.is_empty() {
+            format!("woven from {}", feeding[0].name())
+        } else {
+            "unwoven".to_string()
+        };
+        let hint_color = if !feeding.is_empty() {
+            Color::Rgb(80, 60, 120)
+        } else {
+            Color::Rgb(50, 38, 65)
+        };
+
+        let progress_text = if node.unlock_progress > 0.0 {
+            format!("{:.1}/2.0h weaving", node.unlock_progress)
+        } else if feeding.is_empty() {
+            "unwoven".to_string()
+        } else {
+            "weaving...".to_string()
+        };
+        let progress_color = if node.unlock_progress > 0.0 {
+            Color::Rgb(100, 80, 160)
+        } else {
+            Color::Rgb(50, 38, 65)
+        };
+
+        let lines = vec![
+            Line::from(Span::styled(hint, Style::default().fg(hint_color))),
+            Line::from(Span::styled(
+                progress_text,
+                Style::default().fg(progress_color),
+            )),
+        ];
+        let para = Paragraph::new(lines)
+            .alignment(Alignment::Center)
+            .style(Style::default().bg(LOOM_BG));
+        frame.render_widget(para, inner);
+    } else {
+        // Unlocked node: line 1 = texture, line 2 = resource + gauge.
+        let texture_color = if node.stalled {
+            Color::Rgb(40, 30, 55)
+        } else {
+            node_color(node.id)
+        };
+        let texture = node_texture_string(node.id, inner_w, node.stalled);
+
+        // Split inner into texture row (1) and data row (rest).
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Min(1)])
+            .split(inner);
+
+        let texture_para = Paragraph::new(Line::from(Span::styled(
+            texture,
+            Style::default().fg(texture_color),
+        )))
+        .style(Style::default().bg(LOOM_BG));
+        frame.render_widget(texture_para, rows[0]);
+
+        // Data row: "Ember 50/hr" label + Gauge for buffer.
+        let resource = crate::loom::logic::node_native_resource(node.id);
+        let res_name = resource_name(&resource);
+        let rate = node.base_rate * crate::loom::logic::node_level_multiplier(node.level);
+        let label = format!("{} {:.0}/hr", res_name, rate);
+        let label_len = (label.len() + 1) as u16;
+
+        let data_cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Length(label_len), Constraint::Min(4)])
+            .split(rows[1]);
+
+        let label_para = Paragraph::new(Span::styled(
+            label,
+            Style::default().fg(Color::Rgb(140, 120, 170)),
+        ))
+        .style(Style::default().bg(LOOM_BG));
+        frame.render_widget(label_para, data_cols[0]);
+
         let fill = if node.buffer_capacity > 0.0 {
             (node.buffer / node.buffer_capacity).min(1.0)
         } else {
@@ -516,210 +421,232 @@ fn render_node_box(
         } else {
             Color::Rgb(60, 200, 100)
         };
-        let bar_w = 10usize.min(inner_w.saturating_sub(8));
-        let filled = ((fill * bar_w as f64) as usize).min(bar_w);
-        let empty = bar_w.saturating_sub(filled);
-        let bar_str = format!(
-            " {}{} {:>4.1}/{:.0}",
-            "\u{2588}".repeat(filled),
-            "\u{2591}".repeat(empty),
-            node.buffer,
-            node.buffer_capacity
-        );
-        let c = left + 1;
-        for (i, ch) in bar_str.chars().enumerate().take(inner_w) {
-            let fg = if i == 0 || i > filled + empty {
-                Color::Rgb(120, 100, 140)
-            } else if i <= filled {
-                bar_color
-            } else {
-                Color::Rgb(40, 30, 55)
-            };
-            put_cell(buffer, top + 3, c + i as i32, ch, fg);
-        }
+        let gauge_label = format!("{:.0}/{:.0}", node.buffer, node.buffer_capacity);
+        let gauge = Gauge::default()
+            .gauge_style(Style::default().fg(bar_color).bg(Color::Rgb(30, 20, 40)))
+            .label(Span::styled(
+                gauge_label,
+                Style::default().fg(Color::Rgb(200, 180, 220)),
+            ))
+            .ratio(fill);
+        frame.render_widget(gauge, data_cols[1]);
     }
-    put_cell(buffer, top + 3, left + w - 1, v, border_color);
-
-    // Row 4: recipe slots.
-    put_cell(buffer, top + 4, left, v, border_color);
-    render_recipe_slots(buffer, top + 4, left + 1, inner_w, node, loom_state);
-    put_cell(buffer, top + 4, left + w - 1, v, border_color);
-
-    // Row 5: bottom border.
-    put_cell(buffer, top + 5, left, bl, border_color);
-    for c in 1..w - 1 {
-        put_cell(buffer, top + 5, left + c, h, border_color);
-    }
-    put_cell(buffer, top + 5, left + w - 1, br, border_color);
-
-    top + NODE_BOX_HEIGHT as i32
 }
 
-/// Render port labels below a node box.
-fn render_port_labels(
-    buffer: &mut [Vec<SceneCell>],
-    row: i32,
-    left: i32,
-    node_id: crate::loom::types::NodeId,
-    loom_state: &LoomState,
-    selected: bool,
-    selected_node_id: crate::loom::types::NodeId,
-) {
-    // Port labels removed — direct-pull model has no pipes to display.
-    let _ = (
-        buffer,
-        row,
-        left,
-        node_id,
-        loom_state,
-        selected,
-        selected_node_id,
-    );
+/// Two-letter abbreviation for a LoomNodeRef used in source badges.
+fn noderef_short(r: crate::loom::types::LoomNodeRef, idx: usize) -> String {
+    use crate::loom::types::{LoomNodeRef, NodeId};
+    match r {
+        LoomNodeRef::Extractor(id) => match id {
+            NodeId::EmberSpindle => "ES".to_string(),
+            NodeId::ReflectionLens => "RL".to_string(),
+            NodeId::VoidCondenser => "VC".to_string(),
+            NodeId::MemoryArchive => "MA".to_string(),
+            NodeId::SilenceWell => "SW".to_string(),
+            NodeId::ResonanceForge => "RF".to_string(),
+        },
+        LoomNodeRef::Shuttle(_) => format!("R{}", idx),
+    }
 }
 
-/// Render a single refinery node box into the cell buffer.
-fn render_refinery_box(
-    buffer: &mut [Vec<SceneCell>],
-    top: i32,
-    left: i32,
-    refinery: &crate::loom::types::Refinery,
+/// Braille throbber character for a given frame counter and tier.
+/// T1: advances every 5 frames (slow), T2: every 3 frames, T3: every 1 frame.
+/// Stalled: frozen at frame 0.
+fn throbber_char(throbber_frame: u32, tier: u8, stalled: bool) -> char {
+    const FRAMES: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    if stalled {
+        return FRAMES[0];
+    }
+    let step = match tier {
+        1 => 5u32,
+        2 => 3u32,
+        _ => 1u32,
+    };
+    let idx = ((throbber_frame / step) as usize) % FRAMES.len();
+    FRAMES[idx]
+}
+
+/// Render a single shuttle node as ratatui widgets into a given Rect.
+fn render_shuttle_widget(
+    frame: &mut Frame,
+    area: Rect,
+    shuttle: &crate::loom::types::Shuttle,
     selected: bool,
     index: usize,
+    throbber_frame: u32,
 ) {
-    let w = NODE_BOX_WIDTH as i32;
-    let h = NODE_BOX_HEIGHT as i32;
+    if area.height < 3 || area.width < 6 {
+        return;
+    }
 
-    let (tl, tr, bl, br, horiz, vert) = if selected {
-        (
-            '\u{250f}', '\u{2513}', '\u{2517}', '\u{251b}', '\u{2501}', '\u{2503}',
-        )
-    } else {
-        (
-            '\u{250c}', '\u{2510}', '\u{2514}', '\u{2518}', '\u{2500}', '\u{2502}',
-        )
-    };
     let border_color = if selected {
         Color::Rgb(200, 170, 240)
     } else {
         Color::Rgb(50, 35, 65)
     };
-
-    // Top border.
-    put_cell(buffer, top, left, tl, border_color);
-    for c in 1..w - 1 {
-        put_cell(buffer, top, left + c, horiz, border_color);
-    }
-    put_cell(buffer, top, left + w - 1, tr, border_color);
-
-    // Side borders for interior rows.
-    for r in 1..h - 1 {
-        put_cell(buffer, top + r, left, vert, border_color);
-        put_cell(buffer, top + r, left + w - 1, vert, border_color);
-    }
-
-    // Bottom border.
-    put_cell(buffer, top + h - 1, left, bl, border_color);
-    for c in 1..w - 1 {
-        put_cell(buffer, top + h - 1, left + c, horiz, border_color);
-    }
-    put_cell(buffer, top + h - 1, left + w - 1, br, border_color);
-
-    // Row 0 (top+1): Title — "R{i} T{tier}→{output}" or building status.
-    let title = if refinery.under_construction {
-        format!("R{} [Building...]", index)
+    let border_type = if selected {
+        ratatui::widgets::BorderType::Thick
     } else {
-        format!(
-            "R{} T{}\u{2192}{}",
-            index,
-            refinery.tier,
-            resource_short(&refinery.output)
-        )
+        ratatui::widgets::BorderType::Rounded
     };
-    let title_color = if selected {
+
+    // Title: "R0 T1 ForgedLight" or "R0 [Building... 3s]"
+    let title = if shuttle.under_construction {
+        let secs = shuttle.construction_ticks_remaining / 10;
+        format!(" R{} [Building... {}s] ", index, secs)
+    } else {
+        let out_name = resource_name(&shuttle.output);
+        format!(" R{} T{} {} ", index, shuttle.tier, out_name)
+    };
+
+    let title_color = if shuttle.under_construction {
+        Color::Rgb(100, 80, 130)
+    } else if selected {
         Color::White
     } else {
         Color::Rgb(160, 130, 190)
     };
-    let inner_w = (w - 2) as usize;
-    for (i, ch) in title.chars().enumerate().take(inner_w) {
-        put_cell(buffer, top + 1, left + 1 + i as i32, ch, title_color);
+    let tier_color = match shuttle.tier {
+        1 => Color::Rgb(100, 160, 100),
+        2 => Color::Rgb(160, 140, 80),
+        _ => Color::Rgb(180, 100, 200),
+    };
+
+    let block = Block::default()
+        .title(Span::styled(title, Style::default().fg(title_color)))
+        .borders(Borders::ALL)
+        .border_type(border_type)
+        .border_style(Style::default().fg(border_color))
+        .style(Style::default().bg(LOOM_BG));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if inner.height == 0 || inner.width == 0 || shuttle.under_construction {
+        return;
     }
 
-    // Row 1 (top+2): Gear animation texture.
-    let millis = current_millis();
-    let frame = (millis / 400) % 2;
-    let gear_color = if refinery.stalled {
-        Color::Rgb(100, 40, 40)
-    } else if refinery.under_construction {
-        Color::Rgb(60, 50, 70)
-    } else {
-        Color::Rgb(120, 90, 160)
-    };
-    for x in 0..inner_w as i32 {
-        let ch = if (x as u128 + frame).is_multiple_of(2) {
-            '\u{2699}'
-        } else {
-            '\u{b7}'
-        };
-        put_cell(buffer, top + 2, left + 1 + x, ch, gear_color);
-    }
+    // Build content lines for the inner area.
+    let mut content_lines: Vec<Line> = Vec::new();
 
-    // Row 2 (top+3): Buffer bar.
-    let fill_pct = if refinery.buffer_capacity > 0.0 {
-        (refinery.buffer / refinery.buffer_capacity).min(1.0)
+    // Line 1: throbber + recipe summary
+    let throb = throbber_char(throbber_frame, shuttle.tier, shuttle.stalled);
+    let throb_color = if shuttle.stalled {
+        Color::Rgb(160, 60, 60)
     } else {
-        0.0
+        Color::Rgb(140, 100, 200)
     };
-    let bar_color = if refinery.stalled || fill_pct >= 0.90 {
-        Color::Rgb(220, 60, 60)
-    } else if fill_pct >= 0.75 {
-        Color::Rgb(220, 180, 60)
-    } else {
-        Color::Rgb(60, 200, 100)
-    };
-    let bar_w = 10usize.min(inner_w.saturating_sub(8));
-    let filled = ((fill_pct * bar_w as f64) as usize).min(bar_w);
-    let empty = bar_w.saturating_sub(filled);
-    let bar_str = format!(
-        " {}{} {:>4.1}/{:.0}",
-        "\u{2588}".repeat(filled),
-        "\u{2591}".repeat(empty),
-        refinery.buffer,
-        refinery.buffer_capacity
-    );
-    for (i, ch) in bar_str.chars().enumerate().take(inner_w) {
-        let fg = if i == 0 || i > filled + empty {
-            Color::Rgb(120, 100, 140)
-        } else if i <= filled {
-            bar_color
-        } else {
-            Color::Rgb(40, 30, 55)
-        };
-        put_cell(buffer, top + 3, left + 1 + i as i32, ch, fg);
-    }
-
-    // Row 3 (top+4): Recipe summary — "{input_a}+{input_b}▶{output}".
-    let recipe_text = format!(
+    let recipe_emoji = format!(
         "{}+{}\u{25b6}{}",
-        resource_short(&refinery.input_a),
-        resource_short(&refinery.input_b),
-        resource_short(&refinery.output)
+        resource_emoji(&shuttle.input_a),
+        resource_emoji(&shuttle.input_b),
+        resource_emoji(&shuttle.output),
     );
-    let recipe_color = Color::Rgb(100, 80, 130);
-    for (i, ch) in recipe_text.chars().enumerate().take(inner_w) {
-        put_cell(buffer, top + 4, left + 1 + i as i32, ch, recipe_color);
+    let stall_suffix = if shuttle.stalled {
+        " \u{26a0}STALL"
+    } else {
+        ""
+    };
+    content_lines.push(Line::from(vec![
+        Span::styled(format!("{} ", throb), Style::default().fg(throb_color)),
+        Span::styled(
+            format!("T{} ", shuttle.tier),
+            Style::default().fg(tier_color),
+        ),
+        Span::styled(recipe_emoji, Style::default().fg(Color::Rgb(160, 130, 190))),
+        Span::styled(
+            stall_suffix.to_string(),
+            Style::default().fg(Color::Rgb(180, 80, 80)),
+        ),
+    ]));
+
+    // Line 2: source badges
+    let source_label_color = Color::Rgb(100, 80, 140);
+    let mut source_spans: Vec<Span> = Vec::new();
+    for src in &shuttle.sources_a {
+        let short_src = match src {
+            crate::loom::types::LoomNodeRef::Extractor(_) => noderef_short(*src, 0),
+            crate::loom::types::LoomNodeRef::Shuttle(ri) => format!("R{}", ri),
+        };
+        let res_short = resource_short(&shuttle.input_a);
+        source_spans.push(Span::styled(
+            format!("{}\u{2190}[{}] ", res_short, short_src),
+            Style::default().fg(source_label_color),
+        ));
+    }
+    for src in &shuttle.sources_b {
+        let short_src = match src {
+            crate::loom::types::LoomNodeRef::Extractor(_) => noderef_short(*src, 0),
+            crate::loom::types::LoomNodeRef::Shuttle(ri) => format!("R{}", ri),
+        };
+        let res_short = resource_short(&shuttle.input_b);
+        source_spans.push(Span::styled(
+            format!("{}\u{2190}[{}] ", res_short, short_src),
+            Style::default().fg(source_label_color),
+        ));
+    }
+    if source_spans.is_empty() {
+        source_spans.push(Span::styled(
+            "no sources".to_string(),
+            Style::default().fg(Color::Rgb(60, 45, 80)),
+        ));
+    }
+    content_lines.push(Line::from(source_spans));
+
+    // Render text content (lines 1-2).
+    let text_h = content_lines.len() as u16;
+    if inner.height > 1 {
+        let content_area = Rect {
+            x: inner.x,
+            y: inner.y,
+            width: inner.width,
+            height: inner.height.saturating_sub(1).min(text_h),
+        };
+        let para = Paragraph::new(content_lines).style(Style::default().bg(LOOM_BG));
+        frame.render_widget(para, content_area);
+    }
+
+    // Last row: buffer gauge.
+    if inner.height >= 2 {
+        let gauge_area = Rect {
+            x: inner.x,
+            y: inner.y + inner.height - 1,
+            width: inner.width,
+            height: 1,
+        };
+        let fill_pct = if shuttle.buffer_capacity > 0.0 {
+            (shuttle.buffer / shuttle.buffer_capacity).min(1.0)
+        } else {
+            0.0
+        };
+        let bar_color = if shuttle.stalled || fill_pct >= 0.90 {
+            Color::Rgb(220, 60, 60)
+        } else if fill_pct >= 0.75 {
+            Color::Rgb(220, 180, 60)
+        } else {
+            Color::Rgb(60, 200, 100)
+        };
+        let gauge_label = format!("{:.0}/{:.0}", shuttle.buffer, shuttle.buffer_capacity);
+        let gauge = Gauge::default()
+            .gauge_style(Style::default().fg(bar_color).bg(Color::Rgb(30, 20, 40)))
+            .label(Span::styled(
+                gauge_label,
+                Style::default().fg(Color::Rgb(200, 180, 220)),
+            ))
+            .ratio(fill_pct);
+        frame.render_widget(gauge, gauge_area);
     }
 }
 
-/// Render the sidebar detail panel for the selected node.
+/// Render the sidebar detail panel for the selected node (Option H layout).
 fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &LoomUiState) {
     use crate::loom::node_effective_rate;
     use crate::loom::recipes::recipes_by_nature;
     use crate::loom::types::NodeId;
 
-    // If selected_node >= 6, show refinery detail instead of extractor detail.
+    // If selected_node >= 6, show shuttle detail instead of extractor detail.
     if ui.selected_node >= 6 {
-        render_flow_sidebar_refinery(frame, area, loom_state, ui);
+        render_flow_sidebar_shuttle(frame, area, loom_state, ui);
         return;
     }
 
@@ -736,55 +663,64 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
     };
 
     let block = Block::default()
-        .title(format!(" {} ", selected_id.name()))
         .borders(Borders::LEFT)
         .border_style(Style::default().fg(Color::Rgb(80, 60, 110)));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let mut lines: Vec<Line> = Vec::new();
+    if inner.height < 4 || inner.width < 8 {
+        return;
+    }
+
+    // Split: header (3 lines) | gauge (1 line) | body (rest).
+    let gauge_row_count = if node.unlocked { 1u16 } else { 0 };
+    let v_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),               // header: emoji+name, rate/level
+            Constraint::Length(gauge_row_count), // gauge bar
+            Constraint::Min(0),                  // recipes + upgrade
+        ])
+        .split(inner);
+    let header_area = v_chunks[0];
+    let gauge_area = v_chunks[1];
+    let body_area = v_chunks[2];
+
+    // ── Header ──
+    let emoji = node_emoji(selected_id);
+    let mut header_lines = vec![Line::from(Span::styled(
+        format!("{} {}", emoji, selected_id.name()),
+        Style::default().fg(node_color(selected_id)),
+    ))];
 
     if !node.unlocked {
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
+        header_lines.push(Line::from(Span::styled(
             " [Locked]",
             Style::default().fg(Color::Rgb(80, 60, 110)),
         )));
         if node.unlock_progress > 0.0 {
-            let pct = (node.unlock_progress / 2.0).min(1.0);
-            let filled = ((pct * 10.0) as usize).min(10);
-            let empty = 10usize.saturating_sub(filled);
-            lines.push(Line::from(vec![
-                Span::styled(" [", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    "\u{2588}".repeat(filled),
-                    Style::default().fg(Color::Rgb(100, 80, 160)),
-                ),
-                Span::styled(
-                    "\u{2591}".repeat(empty),
-                    Style::default().fg(Color::Rgb(40, 30, 55)),
-                ),
-                Span::styled("] ", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    format!("{:.1}h", node.unlock_progress),
-                    Style::default().fg(Color::Rgb(100, 80, 160)),
-                ),
-            ]));
+            header_lines.push(Line::from(Span::styled(
+                format!(" {:.1}/2.0h unlocking", node.unlock_progress),
+                Style::default().fg(Color::Rgb(100, 80, 160)),
+            )));
+        } else {
+            header_lines.push(Line::from(""));
         }
     } else {
-        lines.push(Line::from(""));
-        lines.push(Line::from(vec![
-            Span::styled(
-                format!(" Lv.{}", node.level),
-                Style::default().fg(Color::Rgb(120, 90, 160)),
-            ),
-            Span::styled(
-                format!("  {}", node_nature_name(node.id.nature())),
-                Style::default().fg(Color::Rgb(140, 100, 180)),
-            ),
-        ]));
+        let rate = node_effective_rate(loom_state, node);
+        header_lines.push(Line::from(Span::styled(
+            format!(" +{:.0}/hr", rate),
+            Style::default().fg(Color::Rgb(100, 200, 120)),
+        )));
+        header_lines.push(Line::from(""));
+    }
+    frame.render_widget(
+        Paragraph::new(header_lines).style(Style::default().bg(LOOM_BG)),
+        header_area,
+    );
 
-        // Buffer bar.
+    // ── Gauge (unlocked only) ──
+    if node.unlocked && gauge_area.height > 0 {
         let fill = if node.buffer_capacity > 0.0 {
             (node.buffer / node.buffer_capacity).min(1.0)
         } else {
@@ -797,100 +733,135 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
         } else {
             Color::Rgb(60, 200, 100)
         };
-        let filled = ((fill * 10.0) as usize).min(10);
-        let empty = 10usize.saturating_sub(filled);
-        lines.push(Line::from(vec![
-            Span::styled(" [", Style::default().fg(Color::DarkGray)),
-            Span::styled("\u{2588}".repeat(filled), Style::default().fg(bar_color)),
-            Span::styled(
-                "\u{2591}".repeat(empty),
-                Style::default().fg(Color::Rgb(40, 30, 55)),
-            ),
-            Span::styled("]", Style::default().fg(Color::DarkGray)),
-        ]));
-        lines.push(Line::from(Span::styled(
-            format!(" {:.1}/{:.0}", node.buffer, node.buffer_capacity),
-            Style::default().fg(bar_color),
-        )));
+        let label = format!("{:.0}/{:.0}", node.buffer, node.buffer_capacity);
+        let gauge = Gauge::default()
+            .ratio(fill)
+            .label(label)
+            .gauge_style(Style::default().fg(bar_color).bg(Color::Rgb(30, 20, 40)));
+        frame.render_widget(gauge, gauge_area);
+    }
 
-        let rate = node_effective_rate(loom_state, node);
-        lines.push(Line::from(Span::styled(
-            format!(" +{:.1}/hr", rate),
-            Style::default().fg(Color::Rgb(100, 200, 120)),
-        )));
+    // ── Body ──
+    let mut lines: Vec<Line> = Vec::new();
+
+    if !node.unlocked {
+        // Locked node body: neighbor info.
+        let neighbors = crate::loom::node_neighbors(node.id);
+        let unlocked_neighbors: Vec<&crate::loom::types::NodeId> = neighbors
+            .iter()
+            .filter(|nid| {
+                loom_state
+                    .persistent
+                    .nodes
+                    .iter()
+                    .any(|n| n.id == **nid && n.unlocked)
+            })
+            .collect();
         lines.push(Line::from(""));
-
-        // Recipe list.
+        if !unlocked_neighbors.is_empty() {
+            lines.push(Line::from(Span::styled(
+                " Woven from:",
+                Style::default().fg(Color::Rgb(80, 60, 110)),
+            )));
+            for nid in &unlocked_neighbors {
+                lines.push(Line::from(Span::styled(
+                    format!("  \u{25bc} {} {}", node_emoji(**nid), nid.name()),
+                    Style::default().fg(Color::Rgb(100, 80, 160)),
+                )));
+            }
+        } else {
+            lines.push(Line::from(Span::styled(
+                " Unwoven",
+                Style::default().fg(Color::Rgb(60, 45, 80)),
+            )));
+        }
+    } else {
+        // Unlocked node body: recipes + upgrade.
         let nature = node.id.nature();
-        let recipes = recipes_by_nature(nature);
+        let max_tier = visible_recipe_tier(
+            loom_state
+                .persistent
+                .patterns
+                .iter()
+                .filter(|p| p.completed)
+                .count(),
+        );
+        let recipes: Vec<_> = recipes_by_nature(nature)
+            .into_iter()
+            .filter(|r| r.tier <= max_tier)
+            .collect();
 
-        // In the direct-pull model, no pipe-based incoming tracking for extractors.
-        let incoming: std::collections::HashSet<crate::loom::types::Resource> =
-            std::collections::HashSet::new();
-
+        lines.push(Line::from(""));
         if recipes.is_empty() {
             lines.push(Line::from(Span::styled(
-                " No recipes",
+                " No recipes yet",
                 Style::default().fg(Color::DarkGray),
             )));
         } else {
             lines.push(Line::from(Span::styled(
-                format!(" Recipes ({}):", node_nature_name(nature)),
+                format!(" {} recipes:", node_nature_name(nature)),
                 Style::default().fg(Color::Rgb(140, 100, 180)),
             )));
             for r in &recipes {
-                let has_a = incoming.contains(&r.input_a);
-                let has_b = incoming.contains(&r.input_b);
-                let active = has_a && has_b;
-                let dot_a = if has_a { "\u{25cf}" } else { "\u{25cb}" };
-                let dot_b = if has_b { "\u{25cf}" } else { "\u{25cb}" };
-                let color = if active {
-                    Color::Rgb(200, 180, 240)
-                } else {
-                    Color::Rgb(70, 55, 90)
-                };
+                let ea = resource_emoji(&r.input_a);
+                let eb = resource_emoji(&r.input_b);
+                let eo = resource_emoji(&r.output);
+                let out_name = resource_name(&r.output);
                 lines.push(Line::from(Span::styled(
-                    format!(
-                        " {}{} {}{}\u{25b6}{}",
-                        dot_a,
-                        resource_short(&r.input_a),
-                        dot_b,
-                        resource_short(&r.input_b),
-                        resource_short(&r.output)
-                    ),
-                    Style::default().fg(color),
+                    format!(" {}+{}\u{2192}{} {}", ea, eb, eo, out_name),
+                    Style::default().fg(Color::Rgb(120, 100, 160)),
                 )));
             }
         }
 
+        // Upgrade.
         lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            " [U]pgrade",
-            Style::default().fg(Color::DarkGray),
-        )));
+        let cost = crate::loom::node_upgrade_cost(loom_state, node.id);
+        let can_afford = node.buffer >= cost;
+        let resource = crate::loom::logic::node_native_resource(node.id);
+        let re = resource_emoji(&resource);
+        let cost_color = if can_afford {
+            Color::Rgb(100, 200, 120)
+        } else {
+            Color::Rgb(80, 60, 100)
+        };
+        lines.push(Line::from(vec![
+            Span::styled(
+                " [U] ",
+                Style::default().fg(if can_afford {
+                    Color::Rgb(200, 180, 240)
+                } else {
+                    Color::DarkGray
+                }),
+            ),
+            Span::styled(
+                format!("{:.0}{} to Lv{}", cost, re, node.level + 1),
+                Style::default().fg(cost_color),
+            ),
+        ]));
     }
 
-    lines.truncate(inner.height as usize);
+    lines.truncate(body_area.height as usize);
     frame.render_widget(
         Paragraph::new(lines).style(Style::default().bg(LOOM_BG)),
-        inner,
+        body_area,
     );
 }
 
-/// Render sidebar when a refinery (selected_node >= 6) is selected.
-fn render_flow_sidebar_refinery(
+/// Render sidebar when a shuttle (selected_node >= 6) is selected.
+fn render_flow_sidebar_shuttle(
     frame: &mut Frame,
     area: Rect,
     loom_state: &LoomState,
     ui: &LoomUiState,
 ) {
-    let refinery_idx = ui.selected_node - 6;
-    let refineries = &loom_state.persistent.refineries;
+    let shuttle_idx = ui.selected_node - 6;
+    let shuttles = &loom_state.persistent.shuttles;
 
-    let title = if refinery_idx < refineries.len() {
-        format!(" Refinery {} ", refinery_idx)
+    let title = if shuttle_idx < shuttles.len() {
+        format!(" Shuttle {} ", shuttle_idx)
     } else {
-        " Refinery ".to_string()
+        " Shuttle ".to_string()
     };
 
     let block = Block::default()
@@ -902,10 +873,10 @@ fn render_flow_sidebar_refinery(
 
     let mut lines: Vec<Line> = Vec::new();
 
-    if refinery_idx >= refineries.len() {
+    if shuttle_idx >= shuttles.len() {
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
-            " [No refinery]",
+            " [No shuttle]",
             Style::default().fg(Color::Rgb(80, 60, 110)),
         )));
         lines.truncate(inner.height as usize);
@@ -916,16 +887,16 @@ fn render_flow_sidebar_refinery(
         return;
     }
 
-    let refinery = &refineries[refinery_idx];
+    let shuttle = &shuttles[shuttle_idx];
 
     lines.push(Line::from(""));
 
-    if refinery.under_construction {
+    if shuttle.under_construction {
         lines.push(Line::from(Span::styled(
             " [Under Construction]",
             Style::default().fg(Color::Rgb(160, 120, 200)),
         )));
-        let ticks = refinery.construction_ticks_remaining;
+        let ticks = shuttle.construction_ticks_remaining;
         let secs = ticks / 10;
         lines.push(Line::from(Span::styled(
             format!(" ~{}s remaining", secs),
@@ -935,11 +906,11 @@ fn render_flow_sidebar_refinery(
         // Tier and output.
         lines.push(Line::from(vec![
             Span::styled(
-                format!(" Tier {}", refinery.tier),
+                format!(" Tier {}", shuttle.tier),
                 Style::default().fg(Color::Rgb(180, 140, 220)),
             ),
             Span::styled(
-                format!("  \u{2192} {}", resource_name(&refinery.output)),
+                format!("  \u{2192} {}", resource_name(&shuttle.output)),
                 Style::default().fg(Color::Rgb(220, 180, 255)),
             ),
         ]));
@@ -950,21 +921,21 @@ fn render_flow_sidebar_refinery(
             Span::styled(
                 format!(
                     "{} + {} \u{25b6} {}",
-                    resource_name(&refinery.input_a),
-                    resource_name(&refinery.input_b),
-                    resource_name(&refinery.output)
+                    resource_name(&shuttle.input_a),
+                    resource_name(&shuttle.input_b),
+                    resource_name(&shuttle.output)
                 ),
                 Style::default().fg(Color::Rgb(160, 120, 200)),
             ),
         ]));
 
         // Buffer bar.
-        let fill = if refinery.buffer_capacity > 0.0 {
-            (refinery.buffer / refinery.buffer_capacity).min(1.0)
+        let fill = if shuttle.buffer_capacity > 0.0 {
+            (shuttle.buffer / shuttle.buffer_capacity).min(1.0)
         } else {
             0.0
         };
-        let bar_color = if refinery.stalled || fill >= 0.90 {
+        let bar_color = if shuttle.stalled || fill >= 0.90 {
             Color::Rgb(220, 60, 60)
         } else if fill >= 0.75 {
             Color::Rgb(220, 180, 60)
@@ -988,10 +959,10 @@ fn render_flow_sidebar_refinery(
         ]));
         lines.push(Line::from(vec![
             Span::styled(
-                format!(" {:.1}/{:.0}", refinery.buffer, refinery.buffer_capacity),
+                format!(" {:.0}/{:.0}", shuttle.buffer, shuttle.buffer_capacity),
                 Style::default().fg(bar_color),
             ),
-            if refinery.stalled {
+            if shuttle.stalled {
                 Span::styled(
                     " \u{26a0} STALLED",
                     Style::default().fg(Color::Rgb(220, 60, 60)),
@@ -1006,24 +977,89 @@ fn render_flow_sidebar_refinery(
         lines.push(Line::from(vec![
             Span::styled(" Yield: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
-                format!("x{:.1}/cycle", refinery.amount),
+                format!("x{:.1}/cycle", shuttle.amount),
                 Style::default().fg(Color::Rgb(100, 200, 120)),
             ),
         ]));
 
-        // Source connections.
-        let sources_a_count = refinery.sources_a.len();
-        let sources_b_count = refinery.sources_b.len();
-        if sources_a_count > 0 || sources_b_count > 0 {
-            lines.push(Line::from(""));
+        // Source connections — show per-input sources.
+        lines.push(Line::from(""));
+        if shuttle.sources_a.is_empty() && shuttle.sources_b.is_empty() {
+            lines.push(Line::from(Span::styled(
+                " No sources assigned",
+                Style::default().fg(Color::Rgb(80, 60, 110)),
+            )));
+        } else {
             lines.push(Line::from(vec![
-                Span::styled(" Sources: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(" In-A (", Style::default().fg(Color::DarkGray)),
                 Span::styled(
-                    format!("A:{} B:{}", sources_a_count, sources_b_count),
-                    Style::default().fg(Color::Rgb(140, 100, 180)),
+                    resource_short(&shuttle.input_a),
+                    Style::default().fg(Color::Rgb(180, 140, 220)),
                 ),
+                Span::styled("):", Style::default().fg(Color::DarkGray)),
             ]));
+            if shuttle.sources_a.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    "   none",
+                    Style::default().fg(Color::Rgb(60, 45, 80)),
+                )));
+            } else {
+                for src in &shuttle.sources_a {
+                    let src_name = match src {
+                        crate::loom::types::LoomNodeRef::Extractor(id) => id.name(),
+                        crate::loom::types::LoomNodeRef::Shuttle(_) => "Shuttle",
+                    };
+                    let src_color = noderef_color(*src);
+                    lines.push(Line::from(vec![
+                        Span::styled("   \u{2190} ", Style::default().fg(Color::DarkGray)),
+                        Span::styled(src_name, Style::default().fg(src_color)),
+                    ]));
+                }
+            }
+            lines.push(Line::from(vec![
+                Span::styled(" In-B (", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    resource_short(&shuttle.input_b),
+                    Style::default().fg(Color::Rgb(180, 140, 220)),
+                ),
+                Span::styled("):", Style::default().fg(Color::DarkGray)),
+            ]));
+            if shuttle.sources_b.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    "   none",
+                    Style::default().fg(Color::Rgb(60, 45, 80)),
+                )));
+            } else {
+                for src in &shuttle.sources_b {
+                    let src_name = match src {
+                        crate::loom::types::LoomNodeRef::Extractor(id) => id.name(),
+                        crate::loom::types::LoomNodeRef::Shuttle(_) => "Shuttle",
+                    };
+                    let src_color = noderef_color(*src);
+                    lines.push(Line::from(vec![
+                        Span::styled("   \u{2190} ", Style::default().fg(Color::DarkGray)),
+                        Span::styled(src_name, Style::default().fg(src_color)),
+                    ]));
+                }
+            }
         }
+
+        // Status line.
+        let status_text = if shuttle.stalled {
+            " Status: STALLED"
+        } else {
+            " Status: Running"
+        };
+        let status_color = if shuttle.stalled {
+            Color::Rgb(220, 60, 60)
+        } else {
+            Color::Rgb(80, 200, 120)
+        };
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            status_text,
+            Style::default().fg(status_color),
+        )));
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             " [D]emolish",
@@ -1041,17 +1077,28 @@ fn render_flow_sidebar_refinery(
 fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &LoomUiState) {
     use crate::loom::types::NodeId;
 
-    // Split: factory floor (left) | sidebar (right, 22 cols).
+    // Split: factory floor (left) | sidebar (right, 28 cols).
     let h_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Min(0), Constraint::Length(22)])
+        .constraints([Constraint::Min(0), Constraint::Length(28)])
         .split(area);
     let floor_area = h_chunks[0];
     let sidebar_area = h_chunks[1];
 
-    // Split factory floor: node grid (top) | pattern bar (bottom, 4 rows).
+    // Split factory floor: node grid (top) | pattern bar (bottom).
     let has_patterns = !loom_state.persistent.patterns.is_empty();
-    let pattern_h = if has_patterns { 4u16 } else { 0u16 };
+    let req_count = loom_state
+        .persistent
+        .patterns
+        .get(loom_state.persistent.active_pattern)
+        .map(|p| p.requirements.len())
+        .unwrap_or(0);
+    let pattern_h = if has_patterns {
+        // Bordered block: 2 (borders) + req_count + 1 (blank) + 1 (overall gauge).
+        (4 + req_count as u16).min(14)
+    } else {
+        0u16
+    };
     let v_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(pattern_h)])
@@ -1060,100 +1107,355 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
     let grid_area = v_chunks[0];
     let pattern_area = v_chunks[1];
 
-    // ── Factory floor: 3x2 grid of machine nodes ─────────────────────────────
+    // Fill grid background.
+    frame.render_widget(
+        Paragraph::new("").style(Style::default().bg(LOOM_BG)),
+        grid_area,
+    );
 
-    let grid: [(NodeId, NodeId); 3] = [
-        (NodeId::EmberSpindle, NodeId::VoidCondenser),
-        (NodeId::ReflectionLens, NodeId::MemoryArchive),
-        (NodeId::SilenceWell, NodeId::ResonanceForge),
+    // ── Factory floor: branching tree layout ─────────────────────────────────
+    // Diamond shape showing the two unlock paths from Ember Spindle:
+    //   Row 0:       ES            (start node, centered)
+    //              ╱    ╲
+    //   Row 1:   RL      RF       (first neighbors)
+    //            │        │
+    //   Row 2:   VC      SW       (second neighbors)
+    //              ╲    ╱
+    //   Row 3:       MA            (final node, centered)
+
+    // Grid index mapping for cursor navigation:
+    //   0 = ES (row 0, center)
+    //   1 = RL (row 1, left),  2 = RF (row 1, right)
+    //   3 = VC (row 2, left),  4 = SW (row 2, right)
+    //   5 = MA (row 3, center)
+    let grid_ids = [
+        NodeId::EmberSpindle,   // 0: top center
+        NodeId::ReflectionLens, // 1: left branch tier 1
+        NodeId::ResonanceForge, // 2: right branch tier 1
+        NodeId::VoidCondenser,  // 3: left branch tier 2
+        NodeId::SilenceWell,    // 4: right branch tier 2
+        NodeId::MemoryArchive,  // 5: bottom center
     ];
+    let selected_id = grid_ids[ui.selected_node.min(5)];
 
-    // ── Render factory floor using cell buffer ────────────────────────────────
-    let rows = grid_area.height as usize;
-    let cols = grid_area.width as usize;
-    let mut buffer = vec![vec![SceneCell::new(' ', LOOM_BG, LOOM_BG); cols]; rows];
-
-    // Calculate grid positions: 3 rows, 2 columns of node boxes.
-    let col_spacing = if cols > (NODE_BOX_WIDTH * 2 + 4) {
-        (cols - NODE_BOX_WIDTH * 2) / 3
+    // Determine shuttle section height.
+    let shuttles = &loom_state.persistent.shuttles;
+    let shuttle_row_count = if shuttles.is_empty() {
+        0u16
     } else {
-        1
-    };
-    // Each node row = NODE_BOX_HEIGHT (6) + 1 (port labels) + 1 (gap) = 8 rows.
-    let row_stride = NODE_BOX_HEIGHT + 2;
-
-    let selected_id = {
-        let sel_idx = ui.selected_node.min(5);
-        let all_ids = [
-            NodeId::EmberSpindle,
-            NodeId::VoidCondenser,
-            NodeId::ReflectionLens,
-            NodeId::MemoryArchive,
-            NodeId::SilenceWell,
-            NodeId::ResonanceForge,
-        ];
-        all_ids[sel_idx]
+        let shuttle_grid_rows = shuttles.len().div_ceil(2);
+        1 + (shuttle_grid_rows as u16) * (NODE_BOX_HEIGHT as u16 + 2)
     };
 
-    for (row_idx, (left_id, right_id)) in grid.iter().enumerate() {
-        let top = (row_idx * row_stride) as i32;
-        let left_col = col_spacing as i32;
-        let right_col = (col_spacing + NODE_BOX_WIDTH + col_spacing) as i32;
+    // Layout: 4 extractor rows (single, pair, pair, single) + shuttles.
+    let box_h = NODE_BOX_HEIGHT as u16;
+    let gap_h = 1u16;
+    let extractor_total_h = 4 * box_h + 3 * gap_h; // gaps used for vertical spacing only
+    let content_h = extractor_total_h + shuttle_row_count;
 
-        // Render left node.
-        if let Some(left_node) = loom_state
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == *left_id)
-        {
-            let is_sel = ui.selected_node < 6 && *left_id == selected_id;
-            render_node_box(&mut buffer, top, left_col, left_node, loom_state, is_sel);
-        }
+    let v_pad = grid_area.height.saturating_sub(content_h) / 2;
 
-        // Render right node.
-        if let Some(right_node) = loom_state
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == *right_id)
-        {
-            let is_sel = ui.selected_node < 6 && *right_id == selected_id;
-            render_node_box(&mut buffer, top, right_col, right_node, loom_state, is_sel);
+    let mut row_constraints: Vec<Constraint> = Vec::new();
+    row_constraints.push(Constraint::Length(v_pad));
+    for i in 0..4 {
+        row_constraints.push(Constraint::Length(box_h));
+        if i < 3 {
+            row_constraints.push(Constraint::Length(gap_h));
         }
     }
+    if shuttle_row_count > 0 {
+        row_constraints.push(Constraint::Length(shuttle_row_count));
+    }
+    row_constraints.push(Constraint::Min(0));
 
-    // ── Refineries: render below the 3-row extractor grid ────────────────────
-    let refineries = &loom_state.persistent.refineries;
-    if !refineries.is_empty() {
-        // Separator label just above the first refinery row.
-        let sep_row = (3 * row_stride) as i32 - 1;
-        put_text(
-            &mut buffer,
-            sep_row,
-            col_spacing as i32,
-            "\u{2500}\u{2500} Processing \u{2500}\u{2500}",
-            Color::Rgb(80, 60, 100),
+    let row_rects = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(row_constraints)
+        .split(grid_area);
+
+    // Indices: 0=pad, 1=row0(ES), 2=gap, 3=row1(RL,RF), 4=gap, 5=row2(VC,SW), 6=gap, 7=row3(MA)
+    // Then 8=shuttle section (if present), last=spacer
+    let node_row_rects = [row_rects[1], row_rects[3], row_rects[5], row_rects[7]];
+    let gap_rects = [row_rects[2], row_rects[4], row_rects[6]];
+    let flow_arrow_color = Color::Rgb(120, 80, 180);
+
+    let node_w = NODE_BOX_WIDTH as u16;
+    let h_gap_w = 4u16.min(grid_area.width.saturating_sub(node_w * 2));
+    let grid_total_w = node_w * 2 + h_gap_w;
+    let h_pad = grid_area.width.saturating_sub(grid_total_w) / 2;
+
+    // Helper: split a row into left/right columns with centering.
+    let split_pair_row = |row_area: Rect| -> (Rect, Rect) {
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(h_pad),
+                Constraint::Length(node_w),
+                Constraint::Length(h_gap_w),
+                Constraint::Length(node_w),
+                Constraint::Min(0),
+            ])
+            .split(row_area);
+        (cols[1], cols[3])
+    };
+
+    // Helper: center a single node in a row.
+    let center_single_row = |row_area: Rect| -> Rect {
+        let center_pad = row_area.width.saturating_sub(node_w) / 2;
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(center_pad),
+                Constraint::Length(node_w),
+                Constraint::Min(0),
+            ])
+            .split(row_area);
+        cols[1]
+    };
+
+    // Row 0: Ember Spindle (centered).
+    let es_rect = center_single_row(node_row_rects[0]);
+    if let Some(node) = loom_state
+        .persistent
+        .nodes
+        .iter()
+        .find(|n| n.id == NodeId::EmberSpindle)
+    {
+        render_node_widget(
+            frame,
+            es_rect,
+            node,
+            loom_state,
+            ui.selected_node < 6 && selected_id == NodeId::EmberSpindle,
         );
-
-        let refinery_row_start = 3 * row_stride;
-        let refinery_cols = 2usize;
-
-        for (i, refinery) in refineries.iter().enumerate() {
-            let grid_row = i / refinery_cols;
-            let grid_col = i % refinery_cols;
-            let top = (refinery_row_start + grid_row * row_stride) as i32;
-            let left_col = if grid_col == 0 {
-                col_spacing as i32
-            } else {
-                (col_spacing + NODE_BOX_WIDTH + col_spacing) as i32
-            };
-            let is_sel = ui.selected_node >= 6 && (ui.selected_node - 6) == i;
-            render_refinery_box(&mut buffer, top, left_col, refinery, is_sel, i);
-        }
     }
 
-    render_buffer(frame, grid_area, &buffer);
+    // Row 1: Reflection Lens (left) + Resonance Forge (right).
+    let (rl_rect, rf_rect) = split_pair_row(node_row_rects[1]);
+    if let Some(node) = loom_state
+        .persistent
+        .nodes
+        .iter()
+        .find(|n| n.id == NodeId::ReflectionLens)
+    {
+        render_node_widget(
+            frame,
+            rl_rect,
+            node,
+            loom_state,
+            ui.selected_node < 6 && selected_id == NodeId::ReflectionLens,
+        );
+    }
+    if let Some(node) = loom_state
+        .persistent
+        .nodes
+        .iter()
+        .find(|n| n.id == NodeId::ResonanceForge)
+    {
+        render_node_widget(
+            frame,
+            rf_rect,
+            node,
+            loom_state,
+            ui.selected_node < 6 && selected_id == NodeId::ResonanceForge,
+        );
+    }
+
+    // Row 2: Void Condenser (left) + Silence Well (right).
+    let (vc_rect, sw_rect) = split_pair_row(node_row_rects[2]);
+    if let Some(node) = loom_state
+        .persistent
+        .nodes
+        .iter()
+        .find(|n| n.id == NodeId::VoidCondenser)
+    {
+        render_node_widget(
+            frame,
+            vc_rect,
+            node,
+            loom_state,
+            ui.selected_node < 6 && selected_id == NodeId::VoidCondenser,
+        );
+    }
+    if let Some(node) = loom_state
+        .persistent
+        .nodes
+        .iter()
+        .find(|n| n.id == NodeId::SilenceWell)
+    {
+        render_node_widget(
+            frame,
+            sw_rect,
+            node,
+            loom_state,
+            ui.selected_node < 6 && selected_id == NodeId::SilenceWell,
+        );
+    }
+
+    // Row 3: Memory Archive (centered).
+    let ma_rect = center_single_row(node_row_rects[3]);
+    if let Some(node) = loom_state
+        .persistent
+        .nodes
+        .iter()
+        .find(|n| n.id == NodeId::MemoryArchive)
+    {
+        render_node_widget(
+            frame,
+            ma_rect,
+            node,
+            loom_state,
+            ui.selected_node < 6 && selected_id == NodeId::MemoryArchive,
+        );
+    }
+
+    // ── Arrows between rows ─────────────────────────────────────────────────
+
+    // Gap 0 (ES → RL, ES → RF).
+    if gap_rects[0].height > 0 {
+        let rl_center_x = rl_rect.x + rl_rect.width / 2;
+        let rf_center_x = rf_rect.x + rf_rect.width / 2;
+        let gy = gap_rects[0].y;
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                "\u{25bc}",
+                Style::default().fg(flow_arrow_color),
+            ))
+            .style(Style::default().bg(LOOM_BG)),
+            Rect {
+                x: rl_center_x,
+                y: gy,
+                width: 1,
+                height: 1,
+            },
+        );
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                "\u{25bc}",
+                Style::default().fg(flow_arrow_color),
+            ))
+            .style(Style::default().bg(LOOM_BG)),
+            Rect {
+                x: rf_center_x,
+                y: gy,
+                width: 1,
+                height: 1,
+            },
+        );
+    }
+
+    // Gap 1 (RL → VC, RF → SW).
+    if gap_rects[1].height > 0 {
+        let rl_center_x = rl_rect.x + rl_rect.width / 2;
+        let rf_center_x = rf_rect.x + rf_rect.width / 2;
+        let gy = gap_rects[1].y;
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                "\u{25bc}",
+                Style::default().fg(flow_arrow_color),
+            ))
+            .style(Style::default().bg(LOOM_BG)),
+            Rect {
+                x: rl_center_x,
+                y: gy,
+                width: 1,
+                height: 1,
+            },
+        );
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                "\u{25bc}",
+                Style::default().fg(flow_arrow_color),
+            ))
+            .style(Style::default().bg(LOOM_BG)),
+            Rect {
+                x: rf_center_x,
+                y: gy,
+                width: 1,
+                height: 1,
+            },
+        );
+    }
+
+    // Gap 2 (VC → MA, SW → MA).
+    if gap_rects[2].height > 0 {
+        let ma_center_x = ma_rect.x + ma_rect.width / 2;
+        let gy = gap_rects[2].y;
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                "\u{25bc}",
+                Style::default().fg(flow_arrow_color),
+            ))
+            .style(Style::default().bg(LOOM_BG)),
+            Rect {
+                x: ma_center_x.saturating_sub(2),
+                y: gy,
+                width: 1,
+                height: 1,
+            },
+        );
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                "\u{25bc}",
+                Style::default().fg(flow_arrow_color),
+            ))
+            .style(Style::default().bg(LOOM_BG)),
+            Rect {
+                x: ma_center_x + 2,
+                y: gy,
+                width: 1,
+                height: 1,
+            },
+        );
+    }
+
+    // ── Shuttles: render below the extractor grid ──────────────────────────
+    if !shuttles.is_empty() {
+        let shuttle_section = row_rects[8]; // index 8 = after top pad + 4 extractor rows + 3 gaps
+
+        // Separator label.
+        let sep_rect = Rect {
+            x: shuttle_section.x,
+            y: shuttle_section.y,
+            width: shuttle_section.width,
+            height: 1,
+        };
+        let sep = Paragraph::new(Line::from(Span::styled(
+            "\u{2500}\u{2500} Shuttles \u{2500}\u{2500}",
+            Style::default().fg(Color::Rgb(80, 60, 100)),
+        )))
+        .style(Style::default().bg(LOOM_BG));
+        frame.render_widget(sep, sep_rect);
+
+        // Shuttle boxes in 2-column grid below separator.
+        let ref_box_h = NODE_BOX_HEIGHT as u16 + 2; // slightly taller for content
+
+        for (i, shuttle) in shuttles.iter().enumerate() {
+            let grid_row = i / 2;
+            let grid_col = i % 2;
+
+            let ref_y = shuttle_section.y + 1 + (grid_row as u16) * ref_box_h;
+            if ref_y + ref_box_h > shuttle_section.y + shuttle_section.height {
+                break; // out of visible area
+            }
+
+            let ref_x = if grid_col == 0 {
+                shuttle_section.x
+            } else {
+                shuttle_section.x + shuttle_section.width.saturating_sub(node_w)
+            };
+
+            let ref_rect = Rect {
+                x: ref_x,
+                y: ref_y,
+                width: node_w.min(shuttle_section.width),
+                height: ref_box_h,
+            };
+
+            let is_sel = ui.selected_node >= 6 && (ui.selected_node - 6) == i;
+            render_shuttle_widget(frame, ref_rect, shuttle, is_sel, i, ui.throbber_frame);
+        }
+    }
 
     // ── Sidebar ─────────────────────────────────────────────────────────────
     render_flow_sidebar(frame, sidebar_area, loom_state, ui);
@@ -1164,299 +1466,6 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
     }
 }
 
-fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &LoomUiState) {
-    use crate::loom::types::NodeId;
-    use crate::loom::{node_effective_rate, node_upgrade_cost};
-
-    // Split into left list (60%) and right detail panel (40%).
-    let h_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(58), Constraint::Percentage(42)])
-        .split(area);
-    let list_area = h_chunks[0];
-    let detail_area = h_chunks[1];
-
-    let nodes = NodeId::ALL;
-    let selected_node_id = nodes[ui.selected_node.min(nodes.len() - 1)];
-
-    // ── Left: node list ────────────────────────────────────────────────────────
-    let mut lines = vec![
-        Line::from(""),
-        Line::from(Span::styled(
-            "Nodes",
-            Style::default().fg(Color::Rgb(180, 120, 220)),
-        )),
-        Line::from(""),
-    ];
-
-    for (i, node_id) in nodes.iter().enumerate() {
-        let Some(node) = loom_state
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == *node_id)
-        else {
-            continue;
-        };
-        let is_selected = ui.selected_node == i;
-        let prefix = if is_selected { "\u{25b6} " } else { "  " };
-
-        let color = if !node.unlocked {
-            Color::Rgb(60, 45, 80)
-        } else if is_selected {
-            Color::White
-        } else {
-            Color::Rgb(120, 80, 160)
-        };
-
-        let stall_marker = if node.stalled {
-            Span::styled(" \u{26a0}", Style::default().fg(Color::Rgb(220, 60, 60)))
-        } else {
-            Span::raw("")
-        };
-        let lock_marker = if !node.unlocked {
-            Span::styled(" [locked]", Style::default().fg(Color::Rgb(60, 45, 80)))
-        } else {
-            Span::raw("")
-        };
-
-        lines.push(Line::from(vec![
-            Span::styled(prefix, Style::default().fg(color)),
-            Span::styled(
-                format!("{:<16}", node_id.name()),
-                Style::default().fg(color),
-            ),
-            if node.unlocked {
-                Span::styled(
-                    format!("L{}", node.level),
-                    Style::default().fg(Color::Rgb(100, 75, 140)),
-                )
-            } else {
-                Span::raw("")
-            },
-            stall_marker,
-            lock_marker,
-        ]));
-
-        // Show refinery consumers of this node inline in the list.
-        if is_selected && node.unlocked {
-            let consumer_count = loom_state
-                .persistent
-                .refineries
-                .iter()
-                .filter(|r| {
-                    let node_ref = crate::loom::types::LoomNodeRef::Extractor(*node_id);
-                    r.sources_a.contains(&node_ref) || r.sources_b.contains(&node_ref)
-                })
-                .count();
-            if consumer_count == 0 {
-                lines.push(Line::from(Span::styled(
-                    "     no refinery consumers",
-                    Style::default().fg(Color::Rgb(60, 45, 80)),
-                )));
-            } else {
-                lines.push(Line::from(Span::styled(
-                    format!("     {} refinery consumer(s)", consumer_count),
-                    Style::default().fg(Color::Rgb(100, 70, 130)),
-                )));
-            }
-        }
-    }
-
-    frame.render_widget(
-        Paragraph::new(lines)
-            .alignment(Alignment::Left)
-            .style(Style::default().bg(Color::Rgb(10, 5, 18))),
-        list_area,
-    );
-
-    // ── Right: selected node detail panel ─────────────────────────────────────
-    let detail_block = Block::default()
-        .title(format!(" {} ", selected_node_id.name()))
-        .borders(Borders::LEFT)
-        .border_style(Style::default().fg(Color::Rgb(80, 60, 110)));
-    let detail_inner = detail_block.inner(detail_area);
-    frame.render_widget(detail_block, detail_area);
-
-    let Some(selected_node) = loom_state
-        .persistent
-        .nodes
-        .iter()
-        .find(|n| n.id == selected_node_id)
-    else {
-        return;
-    };
-
-    let mut detail_lines: Vec<Line> = vec![Line::from("")];
-
-    if !selected_node.unlocked {
-        detail_lines.push(Line::from(Span::styled(
-            " [Locked]",
-            Style::default().fg(Color::Rgb(80, 60, 110)),
-        )));
-        detail_lines.push(Line::from(Span::styled(
-            " Unlock via neighbor",
-            Style::default().fg(Color::Rgb(60, 45, 80)),
-        )));
-        detail_lines.push(Line::from(""));
-        // Show unlock progress bar if partially unlocked.
-        if selected_node.unlock_progress > 0.0 {
-            let prog_pct = (selected_node.unlock_progress / 2.0).min(1.0);
-            let filled = ((prog_pct * 10.0) as usize).min(10);
-            let empty = 10usize.saturating_sub(filled);
-            detail_lines.push(Line::from(vec![
-                Span::styled(" Progress [", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    "\u{2588}".repeat(filled),
-                    Style::default().fg(Color::Rgb(100, 80, 160)),
-                ),
-                Span::styled(
-                    "\u{2591}".repeat(empty),
-                    Style::default().fg(Color::Rgb(40, 30, 55)),
-                ),
-                Span::styled("]", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    format!(" {:.1}h", selected_node.unlock_progress),
-                    Style::default().fg(Color::Rgb(100, 80, 160)),
-                ),
-            ]));
-        }
-    } else {
-        // Nature and native resource.
-        let nature_name = node_nature_name(selected_node_id.nature());
-        let native = crate::loom::node_native_resource(selected_node_id);
-        detail_lines.push(Line::from(vec![
-            Span::styled(" Nature: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(nature_name, Style::default().fg(Color::Rgb(180, 140, 220))),
-        ]));
-        detail_lines.push(Line::from(vec![
-            Span::styled(" Produces: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                resource_name(&native),
-                Style::default().fg(Color::Rgb(220, 180, 255)),
-            ),
-        ]));
-        detail_lines.push(Line::from(""));
-
-        // Buffer bar.
-        let fill = if selected_node.buffer_capacity > 0.0 {
-            (selected_node.buffer / selected_node.buffer_capacity).min(1.0)
-        } else {
-            0.0
-        };
-        let bar_color = if selected_node.stalled || fill >= 0.90 {
-            Color::Rgb(220, 60, 60)
-        } else if fill >= 0.75 {
-            Color::Rgb(220, 180, 60)
-        } else {
-            Color::Rgb(60, 200, 100)
-        };
-        let filled_cells = ((fill * 12.0) as usize).min(12);
-        let empty_cells = 12usize.saturating_sub(filled_cells);
-        detail_lines.push(Line::from(vec![
-            Span::styled(" Buffer [", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "\u{2588}".repeat(filled_cells),
-                Style::default().fg(bar_color),
-            ),
-            Span::styled(
-                "\u{2591}".repeat(empty_cells),
-                Style::default().fg(Color::Rgb(40, 30, 55)),
-            ),
-            Span::styled("]", Style::default().fg(Color::DarkGray)),
-        ]));
-        detail_lines.push(Line::from(vec![
-            Span::styled(
-                format!(
-                    " {:.1}/{:.1}",
-                    selected_node.buffer, selected_node.buffer_capacity
-                ),
-                Style::default().fg(bar_color),
-            ),
-            if selected_node.stalled {
-                Span::styled(
-                    " \u{26a0} STALLED",
-                    Style::default().fg(Color::Rgb(220, 60, 60)),
-                )
-            } else {
-                Span::raw("")
-            },
-        ]));
-        detail_lines.push(Line::from(""));
-
-        // Production rate.
-        let rate = node_effective_rate(loom_state, selected_node);
-        detail_lines.push(Line::from(vec![
-            Span::styled(" Rate: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                format!("{:.1}/hr", rate),
-                Style::default().fg(Color::Rgb(100, 200, 120)),
-            ),
-            Span::styled(
-                format!(" (Lv{})", selected_node.level),
-                Style::default().fg(Color::Rgb(80, 60, 100)),
-            ),
-        ]));
-        detail_lines.push(Line::from(""));
-
-        // Upgrade cost.
-        let upgrade_cost = node_upgrade_cost(loom_state, selected_node_id);
-        let can_upgrade = selected_node.buffer >= upgrade_cost;
-        let upgrade_color = if can_upgrade {
-            Color::Rgb(180, 255, 180)
-        } else {
-            Color::Rgb(100, 75, 80)
-        };
-        detail_lines.push(Line::from(vec![
-            Span::styled(" Upgrade: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                format!("{:.0} {}", upgrade_cost, resource_name(&native)),
-                Style::default().fg(upgrade_color),
-            ),
-        ]));
-        if can_upgrade {
-            detail_lines.push(Line::from(Span::styled(
-                " [U] Upgrade node",
-                Style::default().fg(Color::Rgb(120, 200, 120)),
-            )));
-        } else {
-            detail_lines.push(Line::from(Span::styled(
-                " (insufficient buffer)",
-                Style::default().fg(Color::Rgb(80, 60, 70)),
-            )));
-        }
-
-        // Refinery consumer count for this node.
-        let node_ref = crate::loom::types::LoomNodeRef::Extractor(selected_node_id);
-        let consumer_count = loom_state
-            .persistent
-            .refineries
-            .iter()
-            .filter(|r| r.sources_a.contains(&node_ref) || r.sources_b.contains(&node_ref))
-            .count();
-        if consumer_count > 0 {
-            detail_lines.push(Line::from(""));
-            detail_lines.push(Line::from(vec![
-                Span::styled(" Consumers: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    format!(
-                        "{} refiner{}",
-                        consumer_count,
-                        if consumer_count == 1 { "y" } else { "ies" }
-                    ),
-                    Style::default().fg(Color::Rgb(140, 100, 180)),
-                ),
-            ]));
-        }
-    }
-
-    detail_lines.truncate(detail_inner.height as usize);
-    frame.render_widget(
-        Paragraph::new(detail_lines).style(Style::default().bg(Color::Rgb(10, 5, 18))),
-        detail_inner,
-    );
-}
-
 /// Build a compact inline ratio bar (e.g. "████░░░░░░" for 40%).
 fn build_ratio_bar(ratio: f64, width: usize) -> String {
     let filled = ((ratio.clamp(0.0, 1.0) * width as f64) as usize).min(width);
@@ -1464,8 +1473,89 @@ fn build_ratio_bar(ratio: f64, width: usize) -> String {
     format!("{}{}", "\u{2588}".repeat(filled), "\u{2591}".repeat(empty))
 }
 
+/// Resource lists for each codex column.
+const CODEX_BASE: [crate::loom::types::Resource; 6] = {
+    use crate::loom::types::Resource;
+    [
+        Resource::Ember,
+        Resource::VoidEssence,
+        Resource::Reflection,
+        Resource::Memory,
+        Resource::Silence,
+        Resource::Resonance,
+    ]
+};
+
+const CODEX_CONFLUENCE: [crate::loom::types::Resource; 6] = {
+    use crate::loom::types::Resource;
+    [
+        Resource::ForgedLight,
+        Resource::CondensedEmber,
+        Resource::EmberEcho,
+        Resource::PurifiedVoid,
+        Resource::EchoGlass,
+        Resource::StillbornSong,
+    ]
+};
+
+const CODEX_TERMINAL: [crate::loom::types::Resource; 1] =
+    [crate::loom::types::Resource::WovenReality];
+
+/// Get the resource at a given (column, row) in the codex graph.
+fn codex_resource_at(col: usize, row: usize) -> Option<crate::loom::types::Resource> {
+    match col {
+        0 => CODEX_BASE.get(row).copied(),
+        1 => CODEX_CONFLUENCE.get(row).copied(),
+        2 => CODEX_TERMINAL.get(row).copied(),
+        _ => None,
+    }
+}
+
+/// Number of resources in a codex column.
+fn codex_column_len(col: usize) -> usize {
+    match col {
+        0 => 6,
+        1 => 6,
+        2 => 1,
+        _ => 0,
+    }
+}
+
+/// Check if a recipe is discovered in the codex.
+fn is_recipe_discovered(
+    codex: &[crate::loom::types::CodexEntry],
+    recipe: &crate::loom::recipes::Recipe,
+) -> bool {
+    codex.iter().any(|e| {
+        e.discovered
+            && e.output == recipe.output
+            && e.node_nature == recipe.node_nature
+            && e.inputs.len() == 2
+            && ((e.inputs[0] == recipe.input_a && e.inputs[1] == recipe.input_b)
+                || (e.inputs[0] == recipe.input_b && e.inputs[1] == recipe.input_a))
+    })
+}
+
+/// Check if a confluence resource has been discovered (at least one recipe producing it is known).
+fn is_resource_discovered(
+    codex: &[crate::loom::types::CodexEntry],
+    resource: crate::loom::types::Resource,
+) -> bool {
+    use crate::loom::types::Resource;
+    // Base resources are always discovered.
+    matches!(
+        resource,
+        Resource::Ember
+            | Resource::Reflection
+            | Resource::VoidEssence
+            | Resource::Memory
+            | Resource::Silence
+            | Resource::Resonance
+    ) || codex.iter().any(|e| e.discovered && e.output == resource)
+}
+
 fn render_codex(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &LoomUiState) {
-    use crate::loom::recipes::all_recipes;
+    use crate::loom::recipes::{all_recipes, recipes_producing, recipes_using};
 
     let discovered_count = loom_state
         .persistent
@@ -1474,86 +1564,345 @@ fn render_codex(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &Loom
         .filter(|e| e.discovered)
         .count();
     let total_recipes = all_recipes().len();
-    let hint_indices = crate::loom::logic::codex_hint_indices(&loom_state.persistent.codex);
-    let hint_count = hint_indices.len();
 
-    let count_label = format!("  {}/{} Discovered", discovered_count, total_recipes);
+    // Split area into top (topology graph ~60%) and bottom (detail panel ~40%).
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(58),
+            Constraint::Percentage(38),
+            Constraint::Length(1), // footer
+        ])
+        .split(area);
+    let graph_area = chunks[0];
+    let detail_area = chunks[1];
+    let footer_area = chunks[2];
 
-    let mut lines = vec![
-        Line::from(""),
-        Line::from(vec![
-            Span::styled(
-                "Recipe Codex",
-                Style::default().fg(Color::Rgb(180, 120, 220)),
-            ),
-            Span::styled(count_label, Style::default().fg(Color::DarkGray)),
-        ]),
-        Line::from(""),
+    // ── Top half: Topology graph ──────────────────────────────────────────────
+    let mut graph_lines: Vec<Line<'static>> = Vec::new();
+
+    graph_lines.push(Line::from(""));
+
+    // Build header line with column labels.
+    {
+        let mut spans = vec![Span::raw("  ")];
+        let header_style = Style::default().fg(Color::Rgb(140, 100, 180));
+        spans.push(Span::styled(format!("{:<24}", "BASE"), header_style));
+        spans.push(Span::styled(format!("{:<26}", "CONFLUENCE"), header_style));
+        spans.push(Span::styled("TERMINAL", header_style));
+        graph_lines.push(Line::from(spans));
+    }
+    graph_lines.push(Line::from(""));
+
+    // Build the graph rows. We'll render the maximum column length (6 rows).
+    let max_rows = 6usize;
+    let codex = &loom_state.persistent.codex;
+
+    // Primary connection map: base resources → their primary confluence target.
+    // Used for rendering connection indicators.
+    let connections: &[(usize, usize)] = &[
+        (0, 0), // Ember → ForgedLight
+        (1, 0), // VoidEssence → ForgedLight
+        (3, 4), // Memory → EchoGlass
+        (4, 4), // Silence → EchoGlass
+        (5, 5), // Resonance → StillbornSong
     ];
+    // Confluence → Terminal connections.
+    let conf_to_term: &[usize] = &[0, 4]; // ForgedLight, EchoGlass → WovenReality
 
-    if discovered_count == 0 && hint_count == 0 {
-        lines.push(Line::from(Span::styled(
-            "No recipes discovered yet.",
-            Style::default().fg(Color::DarkGray),
-        )));
-        lines.push(Line::from(Span::styled(
-            "Process resources through nodes to reveal reactions.",
-            Style::default().fg(Color::Rgb(80, 60, 100)),
-        )));
-    } else {
-        // Discovered recipes with proper nature names and output multiplier.
-        for entry in loom_state.persistent.codex.iter().filter(|e| e.discovered) {
-            let inputs: Vec<&str> = entry.inputs.iter().map(|r| resource_name(r)).collect();
-            let nature = node_nature_name(entry.node_nature);
-            lines.push(Line::from(vec![
-                Span::styled(
-                    format!(" {} @ {}", inputs.join(" + "), nature),
-                    Style::default().fg(Color::Rgb(160, 100, 200)),
-                ),
-                Span::styled(" \u{2192} ", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    resource_name(&entry.output),
-                    Style::default().fg(Color::Rgb(220, 180, 255)),
-                ),
-                Span::styled(
-                    format!(" (x{:.1})", entry.output_amount),
-                    Style::default().fg(Color::Rgb(130, 90, 170)),
-                ),
-            ]));
+    for row in 0..max_rows {
+        let mut spans: Vec<Span<'static>> = Vec::new();
+        spans.push(Span::raw("  "));
+
+        // ── Base column ──
+        if let Some(res) = codex_resource_at(0, row) {
+            let is_selected = ui.codex_column == 0 && ui.codex_row == row;
+            let name = resource_name(&res);
+            let emoji = resource_emoji(&res);
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 200))
+                    .bg(Color::Rgb(60, 40, 80))
+            } else {
+                Style::default().fg(Color::Rgb(180, 140, 220))
+            };
+            let cursor = if is_selected { "\u{25b6} " } else { "  " };
+            spans.push(Span::styled(format!("{}{} {}", cursor, emoji, name), style));
+            // Pad to column width.
+            let label_len = 2 + 2 + 1 + name.len(); // cursor(2) + emoji(2) + space(1) + name
+            let pad = 22usize.saturating_sub(label_len);
+
+            // Connection indicator: check if this base resource connects to a confluence.
+            let has_connection = connections.iter().any(|(b, _)| *b == row);
+            if has_connection {
+                let pad_str = " ".repeat(pad.saturating_sub(3));
+                spans.push(Span::styled(
+                    format!("{}\u{2500}\u{2500}\u{25b6}", pad_str),
+                    Style::default().fg(Color::Rgb(80, 60, 120)),
+                ));
+            } else {
+                spans.push(Span::raw(" ".repeat(pad)));
+            }
+        } else {
+            spans.push(Span::raw("                        "));
         }
 
-        // "???" hints for adjacent undiscovered recipes — show all of them (scrollable).
-        if hint_count > 0 {
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                format!(
-                    " {} adjacent reaction{} hinted:",
-                    hint_count,
-                    if hint_count == 1 { "" } else { "s" }
-                ),
-                Style::default().fg(Color::DarkGray),
-            )));
-            for _ in 0..hint_count {
-                lines.push(Line::from(Span::styled(
-                    " ??? + ??? @ ??? \u{2192} ???",
-                    Style::default().fg(Color::Rgb(60, 45, 80)),
-                )));
+        // ── Confluence column ──
+        if let Some(res) = codex_resource_at(1, row) {
+            let is_selected = ui.codex_column == 1 && ui.codex_row == row;
+            let discovered = is_resource_discovered(codex, res);
+            let name = if discovered {
+                resource_name(&res)
+            } else {
+                "???"
+            };
+            let emoji = if discovered {
+                resource_emoji(&res)
+            } else {
+                "\u{2753}"
+            }; // ❓
+            let tier_mark = if discovered { "\u{2726} " } else { "  " }; // ✦
+
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 200))
+                    .bg(Color::Rgb(60, 40, 80))
+            } else if discovered {
+                Style::default().fg(Color::Rgb(200, 160, 240))
+            } else {
+                Style::default().fg(Color::Rgb(60, 45, 80))
+            };
+
+            let cursor = if is_selected { "\u{25b6} " } else { "  " };
+            spans.push(Span::styled(
+                format!("{}{}{} {}", cursor, tier_mark, emoji, name),
+                style,
+            ));
+            // Pad and add terminal connection if applicable.
+            let label_len = 2 + 2 + 2 + 1 + name.len();
+            let pad = 24usize.saturating_sub(label_len);
+
+            let has_term_conn = conf_to_term.contains(&row);
+            if has_term_conn {
+                let pad_str = " ".repeat(pad.saturating_sub(3));
+                spans.push(Span::styled(
+                    format!("{}\u{2500}\u{2500}\u{25b6}", pad_str),
+                    Style::default().fg(Color::Rgb(80, 60, 120)),
+                ));
+            } else {
+                spans.push(Span::raw(" ".repeat(pad)));
             }
+        } else {
+            spans.push(Span::raw("                          "));
+        }
+
+        // ── Terminal column ──
+        if let Some(res) = codex_resource_at(2, row) {
+            let is_selected = ui.codex_column == 2 && ui.codex_row == row;
+            let discovered = is_resource_discovered(codex, res);
+            let name = if discovered {
+                resource_name(&res)
+            } else {
+                "???"
+            };
+            let emoji = if discovered {
+                resource_emoji(&res)
+            } else {
+                "\u{2753}"
+            };
+            let star = if discovered { "\u{2605} " } else { "  " }; // ★
+
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 200))
+                    .bg(Color::Rgb(60, 40, 80))
+            } else if discovered {
+                Style::default().fg(Color::Rgb(255, 215, 0))
+            } else {
+                Style::default().fg(Color::Rgb(60, 45, 80))
+            };
+
+            let cursor = if is_selected { "\u{25b6} " } else { "  " };
+            spans.push(Span::styled(
+                format!("{}{}{} {}", cursor, star, emoji, name),
+                style,
+            ));
+        }
+
+        graph_lines.push(Line::from(spans));
+    }
+
+    let graph_para = Paragraph::new(graph_lines)
+        .alignment(Alignment::Left)
+        .style(Style::default().bg(LOOM_BG));
+    frame.render_widget(graph_para, graph_area);
+
+    // ── Bottom half: Detail panel ─────────────────────────────────────────────
+    let selected_resource = codex_resource_at(ui.codex_column, ui.codex_row);
+    let mut detail_lines: Vec<Line<'static>> = Vec::new();
+
+    if let Some(res) = selected_resource {
+        let res_discovered = is_resource_discovered(codex, res);
+        let display_name = if res_discovered {
+            format!("{} {}", resource_emoji(&res), resource_name(&res))
+        } else {
+            "???".to_string()
+        };
+
+        // Separator + header.
+        let sep_width = area.width as usize;
+        let sep_line = format!(
+            " \u{2500}\u{2500}\u{2500} {} {}",
+            display_name,
+            "\u{2500}".repeat(sep_width.saturating_sub(display_name.len() + 6))
+        );
+        detail_lines.push(Line::from(Span::styled(
+            sep_line,
+            Style::default().fg(Color::Rgb(100, 70, 140)),
+        )));
+
+        // Split detail area into two sub-columns.
+        let producing = recipes_producing(res);
+        let using = recipes_using(res);
+
+        // "Made from:" column
+        let made_from_header = Line::from(vec![
+            Span::styled(
+                "  Made from:                        ",
+                Style::default().fg(Color::Rgb(140, 100, 180)),
+            ),
+            Span::styled("Used in:", Style::default().fg(Color::Rgb(140, 100, 180))),
+        ]);
+        detail_lines.push(made_from_header);
+
+        let max_detail_rows = (detail_area.height as usize).saturating_sub(3);
+        let max_entries = producing.len().max(using.len()).min(max_detail_rows);
+
+        for i in 0..max_entries {
+            let mut spans: Vec<Span<'static>> = Vec::new();
+
+            // Left sub-column: "Made from" recipes.
+            if i < producing.len() {
+                let recipe = &producing[i];
+                let disc = is_recipe_discovered(codex, recipe);
+                if disc {
+                    let text = format!(
+                        "   {} + {} @ {} (x{:.1}) \u{2713}",
+                        resource_name(&recipe.input_a),
+                        resource_name(&recipe.input_b),
+                        node_nature_name(recipe.node_nature),
+                        recipe.amount,
+                    );
+                    // Pad to ~36 chars.
+                    let padded = format!("{:<36}", text);
+                    spans.push(Span::styled(
+                        padded,
+                        Style::default().fg(Color::Rgb(160, 130, 200)),
+                    ));
+                } else {
+                    let text = "   ??? + ??? @ ??? \u{2192} ???";
+                    let padded = format!("{:<36}", text);
+                    spans.push(Span::styled(
+                        padded,
+                        Style::default().fg(Color::Rgb(60, 45, 80)),
+                    ));
+                }
+            } else {
+                spans.push(Span::raw("                                    "));
+            }
+
+            // Right sub-column: "Used in" recipes.
+            if i < using.len() {
+                let recipe = &using[i];
+                let disc = is_recipe_discovered(codex, recipe);
+                if disc {
+                    let other_input = if recipe.input_a == res {
+                        resource_name(&recipe.input_b)
+                    } else {
+                        resource_name(&recipe.input_a)
+                    };
+                    let output_discovered = is_resource_discovered(codex, recipe.output);
+                    let output_name = if output_discovered {
+                        resource_name(&recipe.output)
+                    } else {
+                        "???"
+                    };
+                    let text = format!(
+                        "+ {} @ {} \u{2192} {} (x{:.1})",
+                        other_input,
+                        node_nature_name(recipe.node_nature),
+                        output_name,
+                        recipe.amount,
+                    );
+                    spans.push(Span::styled(
+                        text,
+                        Style::default().fg(Color::Rgb(160, 130, 200)),
+                    ));
+                } else {
+                    spans.push(Span::styled(
+                        "+ ??? @ ??? \u{2192} ???",
+                        Style::default().fg(Color::Rgb(60, 45, 80)),
+                    ));
+                }
+            }
+
+            detail_lines.push(Line::from(spans));
+        }
+
+        // Show remaining undiscovered counts if we couldn't fit them all.
+        let remaining_producing = producing
+            .iter()
+            .skip(max_entries)
+            .filter(|r| !is_recipe_discovered(codex, r))
+            .count();
+        let remaining_using = using
+            .iter()
+            .skip(max_entries)
+            .filter(|r| !is_recipe_discovered(codex, r))
+            .count();
+
+        if remaining_producing > 0 || remaining_using > 0 {
+            let mut spans: Vec<Span<'static>> = Vec::new();
+            if remaining_producing > 0 {
+                let text = format!("   + {} undiscovered...", remaining_producing);
+                spans.push(Span::styled(
+                    format!("{:<36}", text),
+                    Style::default().fg(Color::Rgb(60, 45, 80)),
+                ));
+            } else {
+                spans.push(Span::raw("                                    "));
+            }
+            if remaining_using > 0 {
+                spans.push(Span::styled(
+                    format!("+ {} undiscovered...", remaining_using),
+                    Style::default().fg(Color::Rgb(60, 45, 80)),
+                ));
+            }
+            detail_lines.push(Line::from(spans));
         }
     }
 
-    // Clamp scroll so it can't scroll past the last line.
-    let total_lines = lines.len();
-    let visible_rows = area.height as usize;
-    let scroll = ui
-        .codex_scroll
-        .min(total_lines.saturating_sub(visible_rows));
-
-    let para = Paragraph::new(lines)
+    let detail_para = Paragraph::new(detail_lines)
         .alignment(Alignment::Left)
-        .style(Style::default().bg(Color::Rgb(10, 5, 18)))
-        .scroll((scroll as u16, 0));
-    frame.render_widget(para, area);
+        .style(Style::default().bg(LOOM_BG));
+    frame.render_widget(detail_para, detail_area);
+
+    // ── Footer ────────────────────────────────────────────────────────────────
+    let footer_line = Line::from(vec![
+        Span::styled(
+            format!("  {}/{} Discovered", discovered_count, total_recipes),
+            Style::default().fg(Color::DarkGray),
+        ),
+        Span::raw("                    "),
+        Span::styled(
+            "\u{2190}\u{2192} Column  \u{2191}\u{2193} Resource  Tab: Flow",
+            Style::default().fg(Color::Rgb(80, 60, 120)),
+        ),
+    ]);
+    let footer_para = Paragraph::new(vec![footer_line])
+        .alignment(Alignment::Left)
+        .style(Style::default().bg(LOOM_BG));
+    frame.render_widget(footer_para, footer_area);
 }
 
 /// Returns the display name for a NodeNature.
@@ -1638,32 +1987,23 @@ fn build_node_buffer_line(node: &crate::loom::types::LoomNode, width: u16) -> Li
 /// Shows: pattern name + index, per-requirement checkmarks, sustain progress bar.
 /// When all patterns are complete, shows a completion message.
 fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
-    if area.height == 0 {
+    if area.height < 3 {
         return;
     }
 
-    let req_status = active_pattern_requirement_status(&loom_state.persistent);
     let all_done = all_patterns_complete(&loom_state.persistent);
 
-    let block = Block::default()
-        .borders(Borders::TOP)
-        .border_style(Style::default().fg(Color::Rgb(100, 60, 140)));
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    if inner.height == 0 {
-        return;
-    }
-
     if all_done {
-        let line = Line::from(Span::styled(
-            " \u{2728} Loom Mended \u{2014} All 18 Patterns Complete",
-            Style::default().fg(Color::Rgb(255, 215, 0)),
-        ));
-        frame.render_widget(
-            Paragraph::new(line).style(Style::default().bg(Color::Rgb(10, 5, 18))),
-            inner,
-        );
+        let block = Block::default()
+            .title(Span::styled(
+                " \u{2728} Loom Mended \u{2014} All 28 Patterns Complete ",
+                Style::default().fg(Color::Rgb(255, 215, 0)),
+            ))
+            .borders(Borders::ALL)
+            .border_type(ratatui::widgets::BorderType::Rounded)
+            .border_style(Style::default().fg(Color::Rgb(100, 60, 140)))
+            .style(Style::default().bg(LOOM_BG));
+        frame.render_widget(block, area);
         return;
     }
 
@@ -1678,96 +2018,443 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
     let pattern_count = loom_state.persistent.patterns.len();
     let active_idx = loom_state.persistent.active_pattern;
 
-    // Line 1: pattern name and index.
-    let pattern_title = format!(
-        " PATTERN {}/{}: \"{}\"",
+    // Bordered block with pattern name as title.
+    let title = format!(
+        " Pattern {}/{}: \"{}\" ",
         active_idx + 1,
         pattern_count,
         pattern.name
     );
+    let block = Block::default()
+        .title(Span::styled(
+            title,
+            Style::default().fg(Color::Rgb(200, 160, 240)),
+        ))
+        .borders(Borders::ALL)
+        .border_type(ratatui::widgets::BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Rgb(100, 60, 140)))
+        .style(Style::default().bg(LOOM_BG));
 
-    // Line 2: per-requirement status chips (accumulated/amount + resource name).
-    let mut req_spans: Vec<Span> = vec![Span::raw(" ")];
-    for (i, req) in pattern.requirements.iter().enumerate() {
-        let (accumulated, amount) = req_status.get(i).copied().unwrap_or((0.0, 0.0));
-        let met = accumulated >= amount;
-        let check = if met { "\u{2713}" } else { "\u{2717}" };
-        let color = if met {
-            Color::Rgb(80, 200, 120)
-        } else {
-            Color::Rgb(200, 80, 80)
-        };
-        let res_name = resource_name(&req.resource);
-        req_spans.push(Span::styled(
-            format!("{} {} {:.1}/{:.1} ", check, res_name, accumulated, amount),
-            Style::default().fg(color),
-        ));
-        if i + 1 < pattern.requirements.len() {
-            req_spans.push(Span::styled(
-                "\u{2502} ",
-                Style::default().fg(Color::DarkGray),
-            ));
-        }
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if inner.height == 0 || inner.width == 0 {
+        return;
     }
 
-    // Line 3: progress bar — use the minimum completion ratio across all requirements.
-    let min_ratio = if pattern.requirements.is_empty() {
-        0.0
-    } else {
-        pattern
-            .requirements
-            .iter()
-            .map(|req| {
-                if req.amount > 0.0 {
-                    req.accumulated / req.amount
-                } else {
-                    1.0
-                }
-            })
-            .fold(f64::INFINITY, f64::min)
-            .min(1.0)
-    };
-    let progress_line = build_progress_line_ratio(min_ratio, inner.width);
+    // Layout: per-requirement gauge rows + blank line + overall gauge.
+    let req_count = pattern.requirements.len();
+    let mut constraints: Vec<Constraint> = Vec::with_capacity(req_count + 2);
+    for _ in 0..req_count {
+        constraints.push(Constraint::Length(1)); // per-resource gauge
+    }
+    constraints.push(Constraint::Length(1)); // blank separator
+    constraints.push(Constraint::Length(1)); // overall gauge
+    constraints.push(Constraint::Min(0)); // absorb extra
 
-    let mut lines: Vec<Line> = vec![
-        Line::from(Span::styled(
-            pattern_title,
-            Style::default().fg(Color::Rgb(200, 160, 240)),
-        )),
-        Line::from(req_spans),
-        progress_line,
-    ];
-    lines.truncate(inner.height as usize);
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(inner);
 
-    frame.render_widget(
-        Paragraph::new(lines).style(Style::default().bg(Color::Rgb(10, 5, 18))),
-        inner,
-    );
+    // Rows 0..N: per-resource Gauge.
+    let label_w = 14u16; // width for "emoji+name" column
+    for (i, req) in pattern.requirements.iter().enumerate() {
+        let row_area = rows[i];
+        if row_area.height == 0 {
+            continue;
+        }
+
+        // Use sustained rate fields instead of accumulated/amount
+        let ratio = if req.sustain_duration_secs > 0.0 {
+            (req.sustained_secs / req.sustain_duration_secs).min(1.0)
+        } else {
+            1.0
+        };
+        let met = req.completed;
+
+        // Get current measured rate from rate trackers
+        let current_rate = loom_state
+            .rate_trackers
+            .get(&req.resource)
+            .map(|t| t.rate_per_hour())
+            .unwrap_or(0.0);
+        let advancing = !met && current_rate >= req.required_rate;
+
+        // Format time: sustained / duration in HH:MM
+        let sustained_mins = (req.sustained_secs / 60.0) as u32;
+        let duration_mins = (req.sustain_duration_secs / 60.0) as u32;
+        let time_label = format!(
+            "{}:{:02}/{}:{:02}",
+            sustained_mins / 60,
+            sustained_mins % 60,
+            duration_mins / 60,
+            duration_mins % 60,
+        );
+
+        // Rate + state indicator
+        let state_icon = if met {
+            "\u{2713}" // checkmark
+        } else if advancing {
+            "\u{25B6}" // play
+        } else {
+            "\u{23F8}" // pause
+        };
+
+        let count_label = format!(
+            "{} {:.0}/hr (need {:.0}) {}",
+            time_label, current_rate, req.required_rate, state_icon
+        );
+
+        // Split: label | gauge | count.
+        let count_w = count_label.len() as u16 + 2; // space + text
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(label_w),
+                Constraint::Min(6),
+                Constraint::Length(count_w),
+            ])
+            .split(row_area);
+
+        // Label: emoji + resource name.
+        let emoji = resource_emoji(&req.resource);
+        let res_name = resource_name(&req.resource);
+        let label_text = format!(" {} {}", emoji, res_name);
+        let label_color = if met || advancing {
+            Color::Rgb(80, 200, 120) // green
+        } else {
+            Color::Rgb(220, 180, 60) // amber
+        };
+        frame.render_widget(
+            Paragraph::new(Span::styled(label_text, Style::default().fg(label_color)))
+                .style(Style::default().bg(LOOM_BG)),
+            cols[0],
+        );
+
+        // Gauge.
+        let gauge_color = if met {
+            Color::Rgb(80, 200, 120)
+        } else if advancing {
+            Color::Rgb(100, 180, 100)
+        } else {
+            Color::Rgb(180, 140, 40) // amber
+        };
+        let gauge = Gauge::default()
+            .ratio(ratio)
+            .gauge_style(Style::default().fg(gauge_color).bg(Color::Rgb(30, 20, 40)));
+        frame.render_widget(gauge, cols[1]);
+
+        // Count: time progress + rate + state icon.
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                format!(" {}", count_label),
+                Style::default().fg(label_color),
+            ))
+            .style(Style::default().bg(LOOM_BG)),
+            cols[2],
+        );
+    }
+
+    // Blank separator row (rows[req_count]) — just background, nothing to render.
+
+    // Overall progress row.
+    let overall_row = rows[req_count + 1];
+    if overall_row.height > 0 {
+        let overall_ratio = if pattern.requirements.is_empty() {
+            0.0
+        } else {
+            pattern
+                .requirements
+                .iter()
+                .map(|req| {
+                    if req.sustain_duration_secs > 0.0 {
+                        req.sustained_secs / req.sustain_duration_secs
+                    } else {
+                        1.0
+                    }
+                })
+                .sum::<f64>()
+                / pattern.requirements.len() as f64
+        };
+
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(label_w),
+                Constraint::Min(6),
+                Constraint::Length(6),
+            ])
+            .split(overall_row);
+
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                " Overall",
+                Style::default().fg(Color::Rgb(200, 160, 240)),
+            ))
+            .style(Style::default().bg(LOOM_BG)),
+            cols[0],
+        );
+
+        let label = format!("{:.0}%", overall_ratio * 100.0);
+        let gauge = Gauge::default()
+            .ratio(overall_ratio.min(1.0))
+            .label(label)
+            .gauge_style(
+                Style::default()
+                    .fg(Color::Rgb(200, 160, 240))
+                    .bg(Color::Rgb(30, 20, 40)),
+            );
+        frame.render_widget(gauge, cols[1]);
+    }
 }
 
-/// Build the pattern progress bar line from a completion ratio in [0.0, 1.0].
-fn build_progress_line_ratio(ratio: f64, width: u16) -> Line<'static> {
-    let label_prefix = " Weaving: ";
-    let pct_suffix = format!("  {:.0}%", (ratio * 100.0).min(100.0));
-    let bar_width = (width as usize)
-        .saturating_sub(label_prefix.len() + pct_suffix.len() + 2)
-        .min(40);
+// ── Build Shuttle Overlay ────────────────────────────────────────────────────
 
-    let filled = ((ratio * bar_width as f64) as usize).min(bar_width);
-    let empty = bar_width.saturating_sub(filled);
+fn render_build_overlay(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &LoomUiState) {
+    let build = match &ui.build {
+        Some(b) => b,
+        None => return,
+    };
 
-    let bar = format!(
-        "{}{}{}{}",
-        label_prefix,
-        "\u{2588}".repeat(filled),
-        "\u{2591}".repeat(empty),
-        pct_suffix,
-    );
+    let popup_w = area.width.clamp(30, 50);
+    let popup_h = area.height.clamp(10, 20);
+    let popup_x = area.x + (area.width.saturating_sub(popup_w)) / 2;
+    let popup_y = area.y + (area.height.saturating_sub(popup_h)) / 2;
+    let popup = Rect::new(popup_x, popup_y, popup_w, popup_h);
 
-    Line::from(Span::styled(
-        bar,
-        Style::default().fg(Color::Rgb(160, 100, 220)),
-    ))
+    frame.render_widget(Clear, popup);
+
+    let recipes = crate::loom::recipes::all_recipes();
+
+    let (title, lines) = match &build.step {
+        crate::loom::BuildStep::SelectRecipe { cursor } => {
+            let mut lines = Vec::new();
+            lines.push(Line::from(Span::styled(
+                format!(" T{} Recipes:", build.tier),
+                Style::default().fg(Color::Rgb(180, 140, 220)),
+            )));
+            lines.push(Line::from(""));
+            for (i, &ridx) in build.available_recipes.iter().enumerate() {
+                let r = &recipes[ridx];
+                let marker = if i == *cursor { "\u{25b6} " } else { "  " };
+                let color = if i == *cursor {
+                    Color::White
+                } else {
+                    Color::Rgb(140, 110, 170)
+                };
+                lines.push(Line::from(Span::styled(
+                    format!(
+                        "{}{} + {} \u{2192} {}",
+                        marker,
+                        resource_name(&r.input_a),
+                        resource_name(&r.input_b),
+                        resource_name(&r.output),
+                    ),
+                    Style::default().fg(color),
+                )));
+            }
+            lines.push(Line::from(""));
+            let cost = crate::loom::shuttle_build_cost_public(build.tier);
+            lines.push(Line::from(Span::styled(
+                format!(" Build cost: {:.0} of input A resource", cost),
+                Style::default().fg(Color::Rgb(100, 80, 130)),
+            )));
+            (" Build Shuttle ", lines)
+        }
+        crate::loom::BuildStep::SelectSourcesA { cursor, toggle } => {
+            let r = &recipes[build.recipe_index];
+            let mut lines = Vec::new();
+            lines.push(Line::from(Span::styled(
+                format!(
+                    " {} + {} \u{2192} {}",
+                    resource_name(&r.input_a),
+                    resource_name(&r.input_b),
+                    resource_name(&r.output)
+                ),
+                Style::default().fg(Color::Rgb(180, 140, 220)),
+            )));
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                format!(" Select sources for {}:", resource_name(&r.input_a)),
+                Style::default().fg(Color::Rgb(140, 110, 170)),
+            )));
+            for (i, src) in build.eligible_sources_a.iter().enumerate() {
+                let marker = if i == *cursor { "\u{25b6}" } else { " " };
+                let check = if toggle[i] { "[\u{2713}]" } else { "[ ]" };
+                let name = source_display_name(src, loom_state);
+                let color = if i == *cursor {
+                    Color::White
+                } else {
+                    Color::Rgb(140, 110, 170)
+                };
+                lines.push(Line::from(Span::styled(
+                    format!(" {} {} {}", marker, check, name),
+                    Style::default().fg(color),
+                )));
+            }
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                " [Space] Toggle  [Enter] Next",
+                Style::default().fg(Color::DarkGray),
+            )));
+            (" Sources: Input A ", lines)
+        }
+        crate::loom::BuildStep::SelectSourcesB { cursor, toggle } => {
+            let r = &recipes[build.recipe_index];
+            let mut lines = Vec::new();
+            lines.push(Line::from(Span::styled(
+                format!(
+                    " {} + {} \u{2192} {}",
+                    resource_name(&r.input_a),
+                    resource_name(&r.input_b),
+                    resource_name(&r.output)
+                ),
+                Style::default().fg(Color::Rgb(180, 140, 220)),
+            )));
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                format!(" Select sources for {}:", resource_name(&r.input_b)),
+                Style::default().fg(Color::Rgb(140, 110, 170)),
+            )));
+            for (i, src) in build.eligible_sources_b.iter().enumerate() {
+                let marker = if i == *cursor { "\u{25b6}" } else { " " };
+                let check = if toggle[i] { "[\u{2713}]" } else { "[ ]" };
+                let name = source_display_name(src, loom_state);
+                let color = if i == *cursor {
+                    Color::White
+                } else {
+                    Color::Rgb(140, 110, 170)
+                };
+                lines.push(Line::from(Span::styled(
+                    format!(" {} {} {}", marker, check, name),
+                    Style::default().fg(color),
+                )));
+            }
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                " [Space] Toggle  [Enter] Next",
+                Style::default().fg(Color::DarkGray),
+            )));
+            (" Sources: Input B ", lines)
+        }
+        crate::loom::BuildStep::Confirm => {
+            let r = &recipes[build.recipe_index];
+            let mut lines = Vec::new();
+            lines.push(Line::from(Span::styled(
+                format!(
+                    " {} + {} \u{2192} {}",
+                    resource_name(&r.input_a),
+                    resource_name(&r.input_b),
+                    resource_name(&r.output)
+                ),
+                Style::default().fg(Color::Rgb(180, 140, 220)),
+            )));
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                " Sources A:",
+                Style::default().fg(Color::Rgb(140, 110, 170)),
+            )));
+            for src in &build.selected_sources_a {
+                lines.push(Line::from(Span::styled(
+                    format!("   {}", source_display_name(src, loom_state)),
+                    Style::default().fg(Color::Rgb(120, 100, 160)),
+                )));
+            }
+            lines.push(Line::from(Span::styled(
+                " Sources B:",
+                Style::default().fg(Color::Rgb(140, 110, 170)),
+            )));
+            for src in &build.selected_sources_b {
+                lines.push(Line::from(Span::styled(
+                    format!("   {}", source_display_name(src, loom_state)),
+                    Style::default().fg(Color::Rgb(120, 100, 160)),
+                )));
+            }
+            lines.push(Line::from(""));
+            let cost = crate::loom::shuttle_build_cost_public(build.tier);
+            let stockpile = loom_state
+                .persistent
+                .stockpiles
+                .get(&r.input_a)
+                .copied()
+                .unwrap_or(0.0);
+            let can_afford = stockpile >= cost;
+            let cost_color = if can_afford {
+                Color::Rgb(100, 180, 100)
+            } else {
+                Color::Rgb(180, 80, 80)
+            };
+            lines.push(Line::from(Span::styled(
+                format!(
+                    " Cost: {:.0} {} (have {:.0})",
+                    cost,
+                    resource_name(&r.input_a),
+                    stockpile
+                ),
+                Style::default().fg(cost_color),
+            )));
+            lines.push(Line::from(""));
+            if can_afford {
+                lines.push(Line::from(Span::styled(
+                    " [Enter] Build  [Esc] Cancel",
+                    Style::default().fg(Color::DarkGray),
+                )));
+            } else {
+                lines.push(Line::from(Span::styled(
+                    " Insufficient resources. [Esc] Cancel",
+                    Style::default().fg(Color::Rgb(180, 80, 80)),
+                )));
+            }
+            (" Confirm Build ", lines)
+        }
+        crate::loom::BuildStep::Blocked { message } => {
+            let mut lines = Vec::new();
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                format!(" {}", message),
+                Style::default().fg(Color::Rgb(180, 120, 80)),
+            )));
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                " Press any key to dismiss",
+                Style::default().fg(Color::DarkGray),
+            )));
+            (" Cannot Build ", lines)
+        }
+    };
+
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Rgb(160, 120, 200)));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    let para = Paragraph::new(lines);
+    frame.render_widget(para, inner);
+}
+
+fn source_display_name(src: &crate::loom::types::LoomNodeRef, loom_state: &LoomState) -> String {
+    match src {
+        crate::loom::types::LoomNodeRef::Extractor(node_id) => {
+            let rate = loom_state
+                .persistent
+                .nodes
+                .iter()
+                .find(|n| n.id == *node_id)
+                .map(|n| crate::loom::node_effective_rate(loom_state, n))
+                .unwrap_or(0.0);
+            format!("{} ({:.0}/hr)", node_id.name(), rate)
+        }
+        crate::loom::types::LoomNodeRef::Shuttle(idx) => {
+            if let Some(r) = loom_state.persistent.shuttles.get(*idx) {
+                format!("R{} {} ({:.1}x)", idx, resource_name(&r.output), r.amount)
+            } else {
+                format!("R{} (unknown)", idx)
+            }
+        }
+    }
 }
 
 // ── Navigation hints ──────────────────────────────────────────────────────────
@@ -1777,10 +2464,10 @@ fn render_nav_hints(frame: &mut Frame, area: Rect, ui: &LoomUiState) {
         return;
     }
 
-    let hints = if ui.view == LoomView::ArchetypeSelection {
-        " [Up/Down] Select  [Enter] Confirm  [Esc] Close "
-    } else if ui.view == LoomView::ListDetail {
-        " [Tab] Switch View  [Up/Down] Node  [U] Upgrade  [Esc] Close "
+    let hints = if ui.build.is_some() {
+        " [Up/Down] Select  [Space] Toggle  [Enter] Confirm  [Esc] Cancel "
+    } else if ui.view == LoomView::FlowView {
+        " [Tab] Switch View  [Arrows] Navigate  [U] Upgrade  [B] Build  [D] Demolish  [Esc] Close "
     } else {
         " [Tab] Switch View  [Up/Down] Navigate  [Esc] Close "
     };

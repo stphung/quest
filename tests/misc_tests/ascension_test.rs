@@ -5,16 +5,16 @@ use quest::GameState;
 #[test]
 fn test_can_ascend_basic() {
     // Level 0 -> 1: needs 35 PR and Deep layer 3
-    assert!(can_ascend(0, 35, 3));
-    assert!(!can_ascend(0, 34, 3)); // insufficient PR
-    assert!(!can_ascend(0, 35, 2)); // deep gate not met
+    assert!(can_ascend(0, 35, 3, 0));
+    assert!(!can_ascend(0, 34, 3, 0)); // insufficient PR
+    assert!(!can_ascend(0, 35, 2, 0)); // deep gate not met
 }
 
 #[test]
 fn test_cannot_ascend_past_max_level() {
-    // Level 6 is max — cannot ascend further regardless of PR or depth
-    assert!(!can_ascend(6, 10000, 30));
-    assert!(!can_ascend(6, 575, 0));
+    // Level 10 is max — cannot ascend further regardless of PR, depth, or patterns
+    assert!(!can_ascend(10, 100000, 30, 28));
+    assert!(!can_ascend(10, 100000, 30, 100));
 }
 
 #[test]
@@ -23,7 +23,7 @@ fn test_ascend_deducts_pr() {
     state.prestige_rank = 50;
     state.ascension_level = 0;
 
-    let result = ascend(&mut state, 3);
+    let result = ascend(&mut state, 3, 0);
     assert_eq!(
         result,
         AscendResult::Success {
@@ -41,7 +41,7 @@ fn test_ascend_insufficient_pr() {
     state.prestige_rank = 30;
     state.ascension_level = 0;
 
-    let result = ascend(&mut state, 3);
+    let result = ascend(&mut state, 3, 0);
     assert_eq!(
         result,
         AscendResult::InsufficientPR {
@@ -59,7 +59,7 @@ fn test_ascend_deep_gate_not_met() {
     state.prestige_rank = 100;
     state.ascension_level = 0;
 
-    let result = ascend(&mut state, 2); // need layer 3
+    let result = ascend(&mut state, 2, 0); // need layer 3
     assert_eq!(
         result,
         AscendResult::DeepGateNotMet {
@@ -96,13 +96,13 @@ fn test_new_character_starts_at_ascension_zero() {
 #[test]
 fn test_ascend_at_max_level_returns_max_level_reached() {
     let mut state = GameState::new("Test".to_string(), 0);
-    state.prestige_rank = 10000;
-    state.ascension_level = 6; // max
+    state.prestige_rank = 100000;
+    state.ascension_level = 10; // max
 
-    let result = ascend(&mut state, 30);
+    let result = ascend(&mut state, 30, 28);
     assert_eq!(result, AscendResult::MaxLevelReached);
-    assert_eq!(state.ascension_level, 6); // unchanged
-    assert_eq!(state.prestige_rank, 10000); // unchanged
+    assert_eq!(state.ascension_level, 10); // unchanged
+    assert_eq!(state.prestige_rank, 100000); // unchanged
 }
 
 // --- Edge case tests ---
@@ -110,25 +110,25 @@ fn test_ascend_at_max_level_returns_max_level_reached() {
 #[test]
 fn test_can_ascend_exact_pr_boundary_level_1() {
     // Exactly 35 PR with layer 3: should succeed
-    assert!(can_ascend(0, 35, 3));
+    assert!(can_ascend(0, 35, 3, 0));
 }
 
 #[test]
 fn test_can_ascend_one_less_pr_than_needed_level_1() {
     // 34 PR (one less than 35 required): should fail
-    assert!(!can_ascend(0, 34, 3));
+    assert!(!can_ascend(0, 34, 3, 0));
 }
 
 #[test]
 fn test_can_ascend_exact_deep_layer_gate_level_1() {
     // Exactly layer 3 with sufficient PR: should succeed
-    assert!(can_ascend(0, 35, 3));
+    assert!(can_ascend(0, 35, 3, 0));
 }
 
 #[test]
 fn test_can_ascend_deep_layer_2_for_level_1_fails() {
     // Layer 2 (one below required gate 3): should fail
-    assert!(!can_ascend(0, 10000, 2));
+    assert!(!can_ascend(0, 10000, 2, 0));
 }
 
 #[test]
@@ -141,20 +141,20 @@ fn test_can_ascend_exact_boundaries_all_levels() {
         let current_level = i as u32;
         // Exact boundary: should succeed
         assert!(
-            can_ascend(current_level, cost, gate),
-            "Expected can_ascend({current_level}, {cost}, {gate}) to be true"
+            can_ascend(current_level, cost, gate, 0),
+            "Expected can_ascend({current_level}, {cost}, {gate}, 0) to be true"
         );
         // One less PR: should fail
         assert!(
-            !can_ascend(current_level, cost - 1, gate),
-            "Expected can_ascend({current_level}, {}, {gate}) to be false",
+            !can_ascend(current_level, cost - 1, gate, 0),
+            "Expected can_ascend({current_level}, {}, {gate}, 0) to be false",
             cost - 1
         );
         // One less layer: should fail
         if gate > 0 {
             assert!(
-                !can_ascend(current_level, cost, gate - 1),
-                "Expected can_ascend({current_level}, {cost}, {}) to be false",
+                !can_ascend(current_level, cost, gate - 1, 0),
+                "Expected can_ascend({current_level}, {cost}, {}, 0) to be false",
                 gate - 1
             );
         }
@@ -168,7 +168,7 @@ fn test_ascend_to_level_vi_succeeds() {
     state.prestige_rank = 600; // more than 500 required
     state.ascension_level = 5;
 
-    let result = ascend(&mut state, 30); // gate is layer 30
+    let result = ascend(&mut state, 30, 0); // gate is layer 30
     assert_eq!(
         result,
         AscendResult::Success {
@@ -181,17 +181,17 @@ fn test_ascend_to_level_vi_succeeds() {
 }
 
 #[test]
-fn test_ascend_beyond_vi_returns_max_level_reached() {
-    // Ascension is capped at level VI — attempting level VII returns MaxLevelReached
+fn test_ascend_beyond_x_returns_max_level_reached() {
+    // Ascension is capped at level X — attempting level XI returns MaxLevelReached
     let mut state = GameState::new("Test".to_string(), 0);
-    state.prestige_rank = 10000;
-    state.ascension_level = 6;
+    state.prestige_rank = 100000;
+    state.ascension_level = 10;
 
-    let result = ascend(&mut state, 30);
+    let result = ascend(&mut state, 30, 28);
     assert_eq!(result, AscendResult::MaxLevelReached);
     // State is unchanged
-    assert_eq!(state.ascension_level, 6);
-    assert_eq!(state.prestige_rank, 10000);
+    assert_eq!(state.ascension_level, 10);
+    assert_eq!(state.prestige_rank, 100000);
 }
 
 #[test]
@@ -245,10 +245,13 @@ fn test_ascension_cost_each_level() {
     assert_eq!(ascension_cost(4), 200);
     assert_eq!(ascension_cost(5), 325);
     assert_eq!(ascension_cost(6), 500);
-    // Level VII+: 500 + 75*(level-6)
-    assert_eq!(ascension_cost(7), 575); // 500 + 75*1
-    assert_eq!(ascension_cost(8), 650); // 500 + 75*2
-    assert_eq!(ascension_cost(10), 800); // 500 + 75*4
+    // Levels VII-X: Loom-gated costs
+    assert_eq!(ascension_cost(7), 1500);
+    assert_eq!(ascension_cost(8), 4000);
+    assert_eq!(ascension_cost(9), 8000);
+    assert_eq!(ascension_cost(10), 15000);
+    // Level XI+: returns 0
+    assert_eq!(ascension_cost(11), 0);
 }
 
 #[test]
@@ -271,7 +274,7 @@ fn test_ascend_exact_pr_with_exact_gate_level_1() {
     state.prestige_rank = 35;
     state.ascension_level = 0;
 
-    let result = ascend(&mut state, 3);
+    let result = ascend(&mut state, 3, 0);
     assert_eq!(
         result,
         AscendResult::Success {
@@ -296,7 +299,7 @@ fn test_ascend_pr_deducted_correctly_for_all_levels() {
 
     for (i, (&cost, &gate)) in costs.iter().zip(gates.iter()).enumerate() {
         let expected_level = (i + 1) as u32;
-        let result = ascend(&mut state, gate);
+        let result = ascend(&mut state, gate, 0);
         expected_remaining -= cost;
 
         assert_eq!(
@@ -314,19 +317,25 @@ fn test_ascend_pr_deducted_correctly_for_all_levels() {
         assert_eq!(state.ascension_level, expected_level);
     }
 
-    // After VI, further ascend should return MaxLevelReached
-    let result = ascend(&mut state, 30);
-    assert_eq!(result, AscendResult::MaxLevelReached);
+    // After VI with 0 PR remaining, further ascend should return InsufficientPR
+    let result = ascend(&mut state, 30, 0);
+    assert_eq!(
+        result,
+        AscendResult::InsufficientPR {
+            needed: 1500,
+            have: 0
+        }
+    );
 }
 
 #[test]
 fn test_can_ascend_level_5_to_6_exact_boundary() {
     // Exactly 500 PR and layer 30: should succeed
-    assert!(can_ascend(5, 500, 30));
+    assert!(can_ascend(5, 500, 30, 0));
     // 499 PR: should fail
-    assert!(!can_ascend(5, 499, 30));
+    assert!(!can_ascend(5, 499, 30, 0));
     // Layer 29: should fail
-    assert!(!can_ascend(5, 500, 29));
+    assert!(!can_ascend(5, 500, 29, 0));
 }
 
 #[test]

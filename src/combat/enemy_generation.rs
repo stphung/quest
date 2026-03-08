@@ -118,6 +118,11 @@ fn get_zone_enemy_prefixes(zone_id: u32) -> &'static [&'static str] {
         28 => &["Echo", "Reverb", "Temporal", "Infinite", "Ancient"],
         29 => &["Dimming", "Hushed", "Shadow", "Silent", "Final"],
         30 => &["Fissure", "Primordial", "Wound", "Unbroken", "Origin"],
+        31..=34 => &["Threadbare", "Woven", "Spindle", "Weft", "Loom"],
+        35..=38 => &["Shuttle", "Pattern", "Weave", "Fabric", "Tapestry"],
+        39..=42 => &["Frayed", "Unraveled", "Tangled", "Knotted", "Snarled"],
+        43..=46 => &["Grand", "Master", "Blueprint", "Forged", "Gilded"],
+        47..=50 => &["Final", "Origin", "Reality", "World", "Infinite"],
         _ => &["Wild", "Fierce", "Dark", "Savage", "Grim"],
     }
 }
@@ -232,6 +237,23 @@ fn get_zone_enemy_suffixes(zone_id: u32) -> &'static [&'static str] {
         28 => &["Echo", "Dweller", "Noise", "Once-Slain", "Reverberation"],
         29 => &["Walker", "Muted", "Beast", "Frequency", "Warden"],
         30 => &["Guardian", "Titan", "Unbroken", "Heart", "Final"],
+        31..=34 => &["Weaver", "Spinner", "Threader", "Bobbin", "Shuttle"],
+        35..=38 => &[
+            "Loomguard",
+            "Weftwalker",
+            "Patternborn",
+            "Fabricant",
+            "Threadseeker",
+        ],
+        39..=42 => &["Unmaker", "Raveler", "Tanglefoe", "Knotter", "Splicer"],
+        43..=46 => &["Architect", "Designer", "Schemer", "Artificer", "Crafter"],
+        47..=50 => &[
+            "Worldweaver",
+            "Realityborn",
+            "Originkeeper",
+            "Threadmaster",
+            "Loombinder",
+        ],
         _ => &[
             "Beast",
             "Horror",

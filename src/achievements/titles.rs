@@ -100,6 +100,10 @@ pub const ALL_TITLES: &[TitleDef] = &[
         achievement_id: AchievementId::AscensionVI,
         title_text: "Ascended VI",
     },
+    TitleDef {
+        achievement_id: AchievementId::AscensionX,
+        title_text: "Ascended X",
+    },
     // Combat
     TitleDef {
         achievement_id: AchievementId::SlayerV,

@@ -1764,10 +1764,1255 @@ static ALL_ZONES: LazyLock<Vec<Zone>> = LazyLock::new(|| {
                 },
             ],
         },
+        // Chapter 7: The Thread Wilds (Zones 31-34) — Loom Zones, 1.25x scaling from Zone 30
+        Zone {
+            id: 31,
+            name: "Threadbare Wastes",
+            description: "Wind-scoured plains where reality wears thin. Threads of forgotten worlds drift like cobwebs.",
+            prestige_requirement: 2000,
+            min_level: 450,
+            max_level: 465,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Dust of Threads",
+                    description: "Fine filaments dissolve into sand. The wind carries whispers of unraveled stories.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Threadworn Sentinel",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Barren Loomfield",
+                    description: "Rusted loom frames jut from cracked earth like tombstones for forgotten weavers.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Loomfield Ravager",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Fraying Dunes",
+                    description: "Sand shifts in patterns no wind could make. Each grain was once a thread.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Dune Unraveler",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Cobweb Canyons",
+                    description: "Massive thread-webs span the canyon walls, vibrating with trapped power.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Canyon Spinner",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "Threadbare Heart",
+                    description: "The center of the wastes where reality is thinnest. Step carefully or fall through.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Threadbare",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 32,
+            name: "Spindle Hollow",
+            description: "A sunken valley of crystallized thread. Ancient looms lie broken among the roots.",
+            prestige_requirement: 2000,
+            min_level: 465,
+            max_level: 480,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Crystal Thread Pools",
+                    description: "Liquid thread pools in crystal basins, reflecting futures that never were.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Pool Watcher",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Root Loom Caverns",
+                    description: "Tree roots have grown through ancient looms, weaving themselves into the pattern.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Root Weaver",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Spindle Grotto",
+                    description: "Massive spindles of crystallized thread hum with residual creation energy.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Grotto Spinner",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Hollow Deep",
+                    description: "The deepest point of the hollow where broken looms still try to weave.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Deep Hollow Guardian",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "Spindle's Core",
+                    description: "The original spindle that carved this hollow. It still turns, slowly, endlessly.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Eternal Spindle",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 33,
+            name: "The Weft Expanse",
+            description: "Endless woven plains stretching to every horizon. The ground ripples like fabric underfoot.",
+            prestige_requirement: 2000,
+            min_level: 480,
+            max_level: 495,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Woven Steppes",
+                    description: "The ground is literally woven from threads of reality. Walking creates new patterns.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Steppe Walker",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Ripple Fields",
+                    description: "Waves of woven reality roll across the landscape like fabric in a breeze.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Ripple Beast",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Pattern Maze",
+                    description: "The weave forms walls and corridors that shift with each step.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Maze Weaver",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Horizon Thread",
+                    description: "Where the weft meets the sky, threads stretch upward into nothing.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Horizon Binder",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "Weft's End",
+                    description: "The edge of the expanse where the weave frays into raw creation.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Weft King",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 34,
+            name: "Heart of the Thread Wilds",
+            description: "Where the wild threads converge. Reality itself is barely held together.",
+            prestige_requirement: 2000,
+            min_level: 495,
+            max_level: 510,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Convergence Path",
+                    description: "Wild threads from every direction flow toward a single point ahead.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Path Warden",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Thread Storm",
+                    description: "Threads whip through the air in a perpetual storm of creation and destruction.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Storm Threader",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Wild Nexus",
+                    description: "A knot of wild threads so dense light cannot pass through.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Nexus Tangler",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Primal Weave",
+                    description: "The oldest threads in existence, woven before meaning existed.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Primal Weaver",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "Heart of Wilds",
+                    description: "The beating heart of the Thread Wilds. Reality pulses like a living thing.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Wild Heart",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        // Chapter 8: The Woven Frontier (Zones 35-38)
+        Zone {
+            id: 35,
+            name: "Loom's Edge",
+            description: "The boundary where woven reality meets the void. Shuttles of light streak overhead.",
+            prestige_requirement: 5000,
+            min_level: 510,
+            max_level: 525,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Border Threads",
+                    description: "The last threads of woven reality stretch thin against the void beyond.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Border Guard",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Shuttle Corridor",
+                    description: "Beams of light weave back and forth like cosmic shuttles on an infinite loom.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Shuttle Phantom",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Edge Walk",
+                    description: "A narrow path along the very edge of woven existence. Don't look down.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Edge Stalker",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Void Fringe",
+                    description: "Threads dissolve into nothing here. The void breathes cold against your skin.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Fringe Devourer",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Loom's Edge",
+                    description: "The absolute boundary. Beyond this, nothing is woven. Nothing is real.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "Guardian of the Edge",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 36,
+            name: "Shuttle Run",
+            description: "Corridors of compressed thread humming with energy. Something weaves endlessly in the dark.",
+            prestige_requirement: 5000,
+            min_level: 525,
+            max_level: 540,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Thread Tunnels",
+                    description: "Tunnels woven from compressed thread pulse with rhythmic energy.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Tunnel Weaver",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Shuttle Tracks",
+                    description: "Grooves worn by countless shuttle passes glow with residual light.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Track Runner",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Warp Chamber",
+                    description: "The warp threads are held taut here, vibrating at frequencies that blur vision.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Warp Keeper",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Dark Loom Hall",
+                    description: "A vast hall where something massive weaves in absolute darkness.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Dark Loom Beast",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Endless Run",
+                    description: "The shuttle's path stretches to infinity. Only the strong reach its end.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Endless Shuttle",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 37,
+            name: "The Pattern Gate",
+            description: "A massive arch woven from every known thread. Only the worthy pass through.",
+            prestige_requirement: 5000,
+            min_level: 540,
+            max_level: 555,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Outer Archway",
+                    description: "The first woven arch, made from threads of a thousand conquered worlds.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Arch Sentinel",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Pattern Trials",
+                    description: "The gate tests all who approach. Each step reveals a new pattern to survive.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Trial Master",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Thread Gauntlet",
+                    description: "A corridor of whipping threads that strike like blades at the unworthy.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Gauntlet Warden",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Inner Gate",
+                    description: "The true gate reveals itself. Woven from threads of pure intention.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Inner Gate Keeper",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Pattern Gate",
+                    description: "The gate itself. To pass is to be remade. To fail is to be unwoven.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Pattern Lord",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 38,
+            name: "Heart of the Woven Frontier",
+            description: "Beyond the gate, reality is denser, richer, more dangerous.",
+            prestige_requirement: 5000,
+            min_level: 555,
+            max_level: 570,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Dense Weave",
+                    description: "Reality is woven so tightly here that air itself has texture.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Weave Crusher",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Layered Reality",
+                    description: "Multiple layers of woven reality overlap, creating impossible geometries.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Layer Breaker",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Frontier Core",
+                    description: "The densest point of the frontier. Every thread here carries immense power.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Core Defender",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Woven Depths",
+                    description: "Below the surface, the weave extends deeper than any explorer has mapped.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Depth Crawler",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "Frontier's Heart",
+                    description: "The pulsing center of the woven frontier. Power incarnate.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "Heart of the Frontier",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        // Chapter 9: The Unraveling (Zones 39-42)
+        Zone {
+            id: 39,
+            name: "Frayed Reaches",
+            description: "Where the grand design begins to fray. Loose threads whip like razor wire.",
+            prestige_requirement: 15000,
+            min_level: 570,
+            max_level: 585,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Outer Frays",
+                    description: "The first signs of unraveling. Loose threads snap in the air like whips.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Fray Hunter",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Razor Thread Valley",
+                    description: "Threads sharp enough to cut steel hang across the valley like tripwires.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Razor Weaver",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Unspooling Cliffs",
+                    description: "Cliffs of woven reality slowly unspool, dropping threads into the abyss.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Cliff Unraveler",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Snap Point",
+                    description: "Where threads under tension finally break. The air cracks with released energy.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Snap Point Terror",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Frayed Edge",
+                    description: "The furthest reach of the fraying. Beyond here, nothing holds together.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Frayed One",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 40,
+            name: "The Loose Ends",
+            description: "Abandoned patterns unravel into chaos. Each thread a weapon, each gap a trap.",
+            prestige_requirement: 15000,
+            min_level: 585,
+            max_level: 600,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Abandoned Patterns",
+                    description: "Half-finished designs collapse into tangles. Something lives in the loose weave.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Pattern Ghoul",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Thread Traps",
+                    description: "Every gap hides a snare of invisible thread. Every thread is a blade.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Trap Spinner",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Chaos Weave",
+                    description: "Patterns form and dissolve randomly. Reality rewrites itself each moment.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Chaos Weaver",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "End Point",
+                    description: "Where every loose end terminates. The floor is thick with dead threads.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "End Point Watcher",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Last Loose End",
+                    description: "One final thread hangs loose. Pull it, and everything changes.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Loose End",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 41,
+            name: "Tangle of Fates",
+            description: "Destiny itself is knotted here. Past and future twist together.",
+            prestige_requirement: 15000,
+            min_level: 600,
+            max_level: 615,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Fate Threads",
+                    description: "Threads of destiny cross and tangle. Touching one rewrites a life.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Fate Snarer",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Temporal Knot",
+                    description: "Past and future are knotted together. Echoes of both play out simultaneously.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Knot Warden",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Destiny's Snarl",
+                    description: "A massive snarl of fate threads blocks the way. It must be cut, not untangled.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Snarl Guardian",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Woven Futures",
+                    description: "Possible futures play out in the threads around you. Most end badly.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Future Weaver",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "Heart of Tangled Fates",
+                    description: "The central knot where all fates converge. Unraveling it means rewriting destiny.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Fate Tangler",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 42,
+            name: "Heart of the Unraveling",
+            description: "The epicenter of the unraveling. Only strength of will holds form.",
+            prestige_requirement: 15000,
+            min_level: 615,
+            max_level: 630,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Dissolution Fields",
+                    description: "Matter dissolves back into thread here. Standing still means becoming nothing.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Dissolution Horror",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Will's Bastion",
+                    description: "Only willpower maintains form this deep. The weak simply cease to exist.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Bastion Breaker",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Unmaking Ground",
+                    description: "The ground itself is being unmade thread by thread. Walk on what remains.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "The Unmaker",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Entropy Well",
+                    description: "A well of pure entropy where all patterns are consumed and forgotten.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Entropy Beast",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Unraveling Core",
+                    description: "The epicenter. Here, the unraveling began. Here, it might be stopped.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "Heart of Unraveling",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        // Chapter 10: The Grand Design (Zones 43-46)
+        Zone {
+            id: 43,
+            name: "The Blueprint Halls",
+            description: "Vast chambers where reality's architecture is laid bare. Every wall is a schematic.",
+            prestige_requirement: 30000,
+            min_level: 630,
+            max_level: 645,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Outer Drafting Room",
+                    description: "Walls covered in woven schematics for worlds that were never built.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Draft Guardian",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Structural Gallery",
+                    description: "The load-bearing threads of reality are on display. Touch nothing.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Gallery Warden",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Schematic Vault",
+                    description: "Protected designs for the most powerful patterns ever conceived.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Vault Keeper",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Master Plans",
+                    description: "The master blueprints for existence itself. Reading them changes you.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Plan Executor",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Grand Blueprint",
+                    description: "The original blueprint. The design that started everything.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Grand Architect",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 44,
+            name: "Architect's Loom",
+            description: "The loom that wove the first world. It still turns, creating and destroying.",
+            prestige_requirement: 30000,
+            min_level: 645,
+            max_level: 660,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Loom Approach",
+                    description: "The air vibrates with the rhythm of the great loom ahead.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Approach Warden",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Warp Beam",
+                    description: "The massive warp beam holds threads stretched across eternity.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Beam Walker",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Heddle Frame",
+                    description: "The heddles lift and lower, creating the pattern of reality itself.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Heddle Master",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Cloth Beam",
+                    description: "Finished reality is wound here. Worlds upon worlds, layer upon layer.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Cloth Guardian",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Architect's Seat",
+                    description: "Where the architect sat to weave the first world. The seat is warm.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Architect's Shadow",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 45,
+            name: "Tapestry of Stars",
+            description: "Constellations woven into the floor. Each star a nexus of power.",
+            prestige_requirement: 30000,
+            min_level: 660,
+            max_level: 675,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Star Threads",
+                    description: "Threads of starlight woven into the ground pulse with celestial energy.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Star Weaver",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Constellation Walk",
+                    description: "Walk among the constellations. Each one tells a story in thread.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Constellation Guard",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Nexus Points",
+                    description: "Where star threads cross, power concentrates into blazing nexus points.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Nexus Defender",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Celestial Pattern",
+                    description: "The pattern formed by all stars together. It spells something ancient.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Celestial Warden",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The North Star",
+                    description: "The brightest star in the tapestry. The thread that guides all others.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Pole Star",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 46,
+            name: "Heart of the Grand Design",
+            description: "The center of creation's blueprint. Understanding comes at a terrible cost.",
+            prestige_requirement: 30000,
+            min_level: 675,
+            max_level: 690,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Design Threshold",
+                    description: "The boundary of understanding. Cross it and knowledge becomes burden.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Threshold Guardian",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Truth Threads",
+                    description: "Threads of absolute truth. Each one reveals a law of reality.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Truth Keeper",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Creation Matrix",
+                    description: "The mathematical framework of all creation, woven in living thread.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Matrix Sentinel",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Design Core",
+                    description: "The core of the grand design pulses with the rhythm of all existence.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Core Architect",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Grand Design",
+                    description: "The complete design, revealed at last. Its beauty is terrible.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Grand Designer",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        // Chapter 11: The Final Weave (Zones 47-50)
+        Zone {
+            id: 47,
+            name: "The Last Shuttle",
+            description: "The final tool of creation makes its final pass. Everything trembles.",
+            prestige_requirement: 50000,
+            min_level: 690,
+            max_level: 705,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Final Approach",
+                    description: "The last shuttle begins its journey. The air shakes with each pass.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Approach Herald",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Shuttle Wake",
+                    description: "The wake of the shuttle's passage tears reality into ribbons.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Wake Rider",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Thread Impact",
+                    description: "Where the shuttle strikes thread into the weave. The impact echoes forever.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Impact Golem",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Shuttle Core",
+                    description: "The heart of the last shuttle. A tool older than the worlds it created.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Core Engine",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Final Pass",
+                    description: "The shuttle makes its last pass. After this, no more can be woven.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Last Shuttle",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 48,
+            name: "Reality's Seam",
+            description: "Where all threads meet. The boundary between existence and void.",
+            prestige_requirement: 50000,
+            min_level: 705,
+            max_level: 720,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Seam Approach",
+                    description: "The seam between real and unreal becomes visible. A line of pure light.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Seam Walker",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Stitched Reality",
+                    description: "Reality is stitched together here with threads of raw power.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Reality Stitcher",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "The Joining",
+                    description: "Where existence meets the void. Both push against the seam.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Joining Guardian",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Void Stitch",
+                    description: "Stitches that hold back the void strain under impossible pressure.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Void Stitcher",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Seam",
+                    description: "The seam itself. Pull one thread and everything unravels.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Seam Keeper",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 49,
+            name: "The World Loom",
+            description: "The machine that weaves all worlds. Its rhythm is the heartbeat of existence.",
+            prestige_requirement: 50000,
+            min_level: 720,
+            max_level: 735,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Loom Foundations",
+                    description: "The foundations of the world loom extend beyond sight in every direction.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Foundation Beast",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Thread Spools",
+                    description: "Infinite spools of unspun possibility await the loom's hunger.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Spool Guardian",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Weaving Chamber",
+                    description: "The chamber where worlds are woven into being. The noise is deafening.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Chamber Warden",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Loom Heart",
+                    description: "The beating heart of the world loom. Its rhythm drives all creation.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Loom Heart Beast",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The World Loom",
+                    description: "The loom itself. Ancient beyond measure. Still weaving. Always weaving.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The World Weaver",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
+        Zone {
+            id: 50,
+            name: "The Origin Thread",
+            description: "The first thread. The last thread. Where everything began and must end.",
+            prestige_requirement: 50000,
+            min_level: 735,
+            max_level: u32::MAX,
+            requires_weapon: false,
+            weapon_name: None,
+            subzones: vec![
+                Subzone {
+                    id: 1,
+                    name: "Thread's Beginning",
+                    description: "The point where the first thread was spun. Before this, nothing existed.",
+                    depth: 1,
+                    boss: SubzoneBoss {
+                        name: "Origin Watcher",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 2,
+                    name: "Primordial Strand",
+                    description: "The oldest strand of thread in existence. It remembers the time before time.",
+                    depth: 2,
+                    boss: SubzoneBoss {
+                        name: "Primordial Guardian",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 3,
+                    name: "Alpha Weave",
+                    description: "The first pattern ever woven. Simple, perfect, and terrifyingly powerful.",
+                    depth: 3,
+                    boss: SubzoneBoss {
+                        name: "Alpha Sentinel",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 4,
+                    name: "Omega Thread",
+                    description: "The thread that will be last. When it is cut, everything ends.",
+                    depth: 4,
+                    boss: SubzoneBoss {
+                        name: "Omega Warden",
+                        is_zone_boss: false,
+                    },
+                },
+                Subzone {
+                    id: 5,
+                    name: "The Origin Thread",
+                    description: "The first and last thread. Beginning and end. The thread that holds everything.",
+                    depth: 5,
+                    boss: SubzoneBoss {
+                        name: "The Origin",
+                        is_zone_boss: true,
+                    },
+                },
+            ],
+        },
     ]
 });
 
-/// Returns all zones in the game (zones 1-30).
+/// Returns all zones in the game (zones 1-50).
 /// Returns a static slice reference — no allocation on each call.
 pub fn get_all_zones() -> &'static [Zone] {
     &ALL_ZONES
@@ -1797,7 +3042,7 @@ mod tests {
     #[test]
     fn test_zone_count() {
         let zones = get_all_zones();
-        assert_eq!(zones.len(), 30); // Zones 1-11 + Fracture Zones 12-30
+        assert_eq!(zones.len(), 50); // Zones 1-11 + Fracture Zones 12-30 + Loom Zones 31-50
     }
 
     #[test]
@@ -1890,7 +3135,11 @@ mod tests {
         assert!(get_zone(21).is_some());
         assert_eq!(get_zone(21).unwrap().name, "Sunken Processional");
         assert!(get_zone(30).is_some());
-        assert!(get_zone(31).is_none());
+        assert!(get_zone(31).is_some());
+        assert_eq!(get_zone(31).unwrap().name, "Threadbare Wastes");
+        assert!(get_zone(50).is_some());
+        assert_eq!(get_zone(50).unwrap().name, "The Origin Thread");
+        assert!(get_zone(51).is_none());
         assert!(get_zone(0).is_none());
     }
 
@@ -1929,8 +3178,15 @@ mod tests {
         assert_eq!(zone.name, "Sunken Processional");
         assert_eq!(subzone.name, "Pilgrim's Descent");
 
+        // Loom zone exists
+        let result = get_subzone(31, 1);
+        assert!(result.is_some());
+        let (zone, subzone) = result.unwrap();
+        assert_eq!(zone.name, "Threadbare Wastes");
+        assert_eq!(subzone.name, "Dust of Threads");
+
         // Invalid zone
-        assert!(get_subzone(31, 1).is_none());
+        assert!(get_subzone(51, 1).is_none());
         // Invalid subzone
         assert!(get_subzone(1, 5).is_none());
     }

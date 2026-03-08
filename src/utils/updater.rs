@@ -425,7 +425,11 @@ pub enum UpdateInfoStatus {
     /// A newer release is available.
     UpdateAvailable(UpdateInfo),
     /// Current build matches or is newer than latest release.
-    UpToDate,
+    UpToDate {
+        /// Recent changes in the current build (commit summaries).
+        current_and_previous: Vec<String>,
+        current_and_previous_times: Vec<Option<String>>,
+    },
     /// Could not determine update status (network/auth/etc.).
     CheckFailed(String),
 }
@@ -521,7 +525,28 @@ pub fn check_update_info() -> UpdateInfoStatus {
                 current_and_previous_times,
             })
         }
-        UpdateCheck::UpToDate => UpdateInfoStatus::UpToDate,
+        UpdateCheck::UpToDate => {
+            let current_commit_short = short_commit(BUILD_COMMIT);
+            let current_and_previous =
+                fetch_commit_summaries(BUILD_COMMIT, 6).unwrap_or_else(|_| {
+                    vec![CommitSummary {
+                        text: format!("{}  (current build)", current_commit_short),
+                        committed_at: None,
+                    }]
+                });
+            let current_and_previous_text = current_and_previous
+                .iter()
+                .map(|e| e.text.clone())
+                .collect::<Vec<_>>();
+            let current_and_previous_times = current_and_previous
+                .iter()
+                .map(|e| e.committed_at.clone())
+                .collect::<Vec<_>>();
+            UpdateInfoStatus::UpToDate {
+                current_and_previous: current_and_previous_text,
+                current_and_previous_times,
+            }
+        }
         UpdateCheck::CheckFailed(err) => UpdateInfoStatus::CheckFailed(err),
     }
 }
@@ -565,13 +590,7 @@ pub fn run_update_command() -> Result<bool, Box<dyn Error>> {
             if !changelog.is_empty() {
                 println!("What's new:");
                 for entry in changelog.iter().take(15) {
-                    // Truncate long messages
-                    let msg = if entry.message.len() > 60 {
-                        format!("{}...", &entry.message[..57])
-                    } else {
-                        entry.message.clone()
-                    };
-                    println!("  • {}", msg);
+                    println!("  • {}", entry.message);
                 }
                 if changelog.len() > 15 {
                     println!("  ...and {} more", changelog.len() - 15);

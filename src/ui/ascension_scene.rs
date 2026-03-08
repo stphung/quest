@@ -4,10 +4,12 @@ use super::responsive::LayoutContext;
 use super::stats_prestige::to_roman;
 use crate::ascension::can_ascend;
 use crate::ascension::types::{
-    ascension_combat_multiplier, ascension_cost, ascension_deep_gate, MAX_ASCENSION_LEVEL,
+    ascension_combat_multiplier, ascension_cost, ascension_deep_gate, ascension_pattern_gate,
+    MAX_ASCENSION_LEVEL,
 };
 use crate::core::game_state::GameState;
 use crate::deep::DeepState;
+use crate::loom::LoomState;
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
@@ -24,6 +26,7 @@ pub fn render_ascension_confirm(
     area: Rect,
     state: &GameState,
     deep_state: &DeepState,
+    loom: &LoomState,
     _ctx: &LayoutContext,
 ) {
     let modal_width = 60u16.min(area.width.saturating_sub(4));
@@ -99,9 +102,17 @@ pub fn render_ascension_confirm(
         let cost = ascension_cost(next_level);
         let deep_gate = ascension_deep_gate(next_level);
         let deepest = deep_state.persistent.deepest_layer_reached;
+        let completed_patterns = loom.persistent.completed_pattern_count();
+        let pattern_gate = ascension_pattern_gate(next_level);
         let can_afford_pr = state.prestige_rank >= cost;
         let can_pass_gate = deep_gate.is_none_or(|g| deepest >= g);
-        let eligible = can_ascend(current_level, state.prestige_rank, deepest);
+        let can_pass_pattern_gate = pattern_gate.is_none_or(|g| completed_patterns >= g);
+        let eligible = can_ascend(
+            current_level,
+            state.prestige_rank,
+            deepest,
+            completed_patterns,
+        );
 
         // Next level
         lines.push(Line::from(vec![
@@ -146,9 +157,28 @@ pub fn render_ascension_confirm(
                     Style::default().fg(Color::DarkGray),
                 ),
             ]));
-        } else {
+        }
+
+        // Loom pattern requirement
+        if let Some(required_patterns) = pattern_gate {
+            let met = can_pass_pattern_gate;
+            let color = if met { Color::Green } else { Color::Red };
+            lines.push(Line::from(vec![
+                Span::styled("Requires: ", Style::default().fg(Color::White)),
+                Span::styled(
+                    format!("{} Woven Patterns", required_patterns),
+                    Style::default().fg(color),
+                ),
+                Span::styled(
+                    format!("  (completed: {})", completed_patterns),
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ]));
+        }
+
+        if deep_gate.is_none() && pattern_gate.is_none() {
             lines.push(Line::from(Span::styled(
-                "No Deep requirement (PR only)",
+                "No gate requirement (PR only)",
                 Style::default().fg(Color::DarkGray),
             )));
         }

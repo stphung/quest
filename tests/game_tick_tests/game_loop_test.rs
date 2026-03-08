@@ -46,6 +46,7 @@ fn simulate_tick_with_rng<R: rand::Rng>(state: &mut GameState, rng: &mut R) -> V
         &mut achievements,
         &derived,
         11,
+        30,
     )
 }
 

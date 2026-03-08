@@ -27,6 +27,7 @@ pub(crate) fn resolve_player_attack<R: Rng>(
     achievements: &mut crate::achievements::Achievements,
     derived: &DerivedStats,
     fracture_zone_cap: u32,
+    loom_zone_cap: u32,
 ) -> (Vec<CombatEvent>, bool) {
     let mut events = Vec::new();
 
@@ -102,6 +103,7 @@ pub(crate) fn resolve_player_attack<R: Rng>(
                 achievements,
                 bonuses.xp_gain_percent,
                 fracture_zone_cap,
+                loom_zone_cap,
             );
             events.extend(death_events);
             return (events, true);

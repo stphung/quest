@@ -627,7 +627,8 @@ pub(super) fn process_zone_achievements(
         BossDefeatResult::ExpanseCycle => {
             achievements.on_zone_fully_cleared(11, Some(character_name));
         }
-        BossDefeatResult::FractureCycle { zone_id } => {
+        BossDefeatResult::FractureCycle { zone_id }
+        | BossDefeatResult::LoomZoneCycle { zone_id } => {
             achievements.on_zone_fully_cleared(*zone_id, Some(character_name));
         }
         _ => {}
@@ -761,6 +762,7 @@ pub(super) fn run_combat<R: Rng>(
     sigil_bonuses: &SigilBonuses,
     achievements: &mut Achievements,
     deep: &mut crate::deep::DeepState,
+    _loom: &crate::loom::LoomState,
     debug_mode: bool,
     result: &mut TickResult,
     rng: &mut R,
@@ -805,6 +807,7 @@ pub(super) fn run_combat<R: Rng>(
         state.combat_state.player_max_hp,
     );
 
+    let loom_zone_cap = state.cached_loom_zone_cap;
     let combat_events = update_combat(
         rng,
         state,
@@ -813,6 +816,7 @@ pub(super) fn run_combat<R: Rng>(
         achievements,
         &derived,
         deep.persistent.fracture_zone_cap,
+        loom_zone_cap,
     );
 
     process_combat_events(
@@ -996,12 +1000,15 @@ pub(super) fn tick_deep_missions(
 pub(super) fn tick_loom(
     deep: &crate::deep::DeepState,
     loom: &mut crate::loom::LoomState,
+    state: &mut crate::core::game_state::GameState,
+    achievements: &mut crate::achievements::Achievements,
     result: &mut TickResult,
 ) {
     // Discovery trigger: requires Deep discovered + Gateway opened.
     if !loom.persistent.discovered {
         if deep.persistent.discovered && deep.persistent.gateway_opened {
             crate::loom::complete_discovery(loom);
+            achievements.on_loom_discovered(Some(&state.character_name));
             result.events.push(TickEvent::LoomDiscovered);
             result.loom_changed = true;
         }
@@ -1018,26 +1025,26 @@ pub(super) fn tick_loom(
         }
     }
 
-    // Tick refinery construction (decrement timers, complete when done).
-    let completed_refineries = crate::loom::tick_refinery_construction(loom);
-    if !completed_refineries.is_empty() {
+    // Tick shuttle construction (decrement timers, complete when done).
+    let completed_shuttles = crate::loom::tick_shuttle_construction(loom);
+    if !completed_shuttles.is_empty() {
         result.loom_changed = true;
     }
 
-    // Tick direct-pull refinery processing.
-    let refinery_produced = crate::loom::tick_refinery_pull(loom, TICK_SECONDS);
+    // Tick direct-pull shuttle processing.
+    let shuttle_produced = crate::loom::tick_shuttle_pull(loom, TICK_SECONDS);
 
     // Update stall flags for UI display.
     crate::loom::tick_stall_detection(loom);
 
-    // Update refinery stall flags.
-    crate::loom::tick_refinery_stall_detection(loom);
+    // Update shuttle stall flags.
+    crate::loom::tick_shuttle_stall_detection(loom);
 
     // Tick base production for all unlocked nodes.
     let mut produced = crate::loom::tick_base_production(loom, TICK_SECONDS);
 
-    // Merge refinery production into base production map for pattern sustain.
-    for (resource, amount) in refinery_produced {
+    // Merge shuttle production into base production map for pattern sustain.
+    for (resource, amount) in shuttle_produced {
         *produced.entry(resource).or_insert(0.0) += amount;
     }
 
@@ -1047,23 +1054,103 @@ pub(super) fn tick_loom(
         result.loom_changed = true;
     }
 
-    // Tick pattern sustain timer using per-node effective rates (units/hour).
+    // Push per-tick production amounts into rate trackers.
+    for (resource, &amount) in &produced {
+        loom.rate_trackers
+            .entry(*resource)
+            .or_default()
+            .push(amount);
+    }
+    // Push 0.0 for resources not produced this tick (so their rate decays naturally).
+    let all_resources = [
+        crate::loom::Resource::Ember,
+        crate::loom::Resource::Reflection,
+        crate::loom::Resource::VoidEssence,
+        crate::loom::Resource::Memory,
+        crate::loom::Resource::Silence,
+        crate::loom::Resource::Resonance,
+        crate::loom::Resource::ForgedLight,
+        crate::loom::Resource::EchoGlass,
+        crate::loom::Resource::StillbornSong,
+        crate::loom::Resource::CondensedEmber,
+        crate::loom::Resource::EmberEcho,
+        crate::loom::Resource::PurifiedVoid,
+        crate::loom::Resource::WovenReality,
+    ];
+    for resource in &all_resources {
+        if !produced.contains_key(resource) {
+            loom.rate_trackers.entry(*resource).or_default().push(0.0);
+        }
+    }
+
+    // Read measured rates from trackers for pattern sustain.
     let rates: std::collections::HashMap<crate::loom::Resource, f64> = loom
-        .persistent
-        .nodes
+        .rate_trackers
         .iter()
-        .filter(|n| n.unlocked)
-        .map(|n| {
-            let resource = crate::loom::node_native_resource(n.id);
-            let rate = crate::loom::node_effective_rate(loom, n);
-            (resource, rate)
-        })
+        .map(|(resource, tracker)| (*resource, tracker.rate_per_hour()))
         .collect();
 
     let pattern_completed =
         crate::loom::tick_pattern_sustain(&mut loom.persistent, &rates, TICK_SECONDS);
     if pattern_completed {
         result.loom_changed = true;
+        achievements.on_loom_pattern_completed(
+            loom.persistent.completed_pattern_count(),
+            Some(&state.character_name),
+        );
+        // Sync Loom zone unlocks on pattern completion
+        let loom_cap =
+            crate::loom::loom_zone_cap_for_patterns(loom.persistent.completed_pattern_count());
+        state.cached_loom_zone_cap = loom_cap;
+        let fracture_cap = state.cached_fracture_zone_cap;
+        let storms_end = state
+            .zone_progression
+            .is_zone_unlocked(crate::core::constants::EXPANSE_ZONE_ID);
+        crate::zones::sync_account_zone_unlocks(
+            &mut state.zone_progression,
+            storms_end,
+            fracture_cap,
+            state.prestige_rank,
+            loom_cap,
+            state.ascension_level,
+        );
+    }
+
+    // Tick WR→PR conversion (active after all 28 patterns complete).
+    if crate::loom::all_patterns_complete(&loom.persistent) {
+        let now = chrono::Utc::now().timestamp();
+        if loom.persistent.wr_pr_last_granted_at == 0 || loom.persistent.wr_pr_last_granted_at > now
+        {
+            loom.persistent.wr_pr_last_granted_at = now;
+            result.loom_changed = true;
+        } else {
+            let wr_rate = loom
+                .rate_trackers
+                .get(&crate::loom::Resource::WovenReality)
+                .map(|t| t.rate_per_hour())
+                .unwrap_or(0.0);
+            let pr_per_day = crate::loom::wr_to_pr_per_day(wr_rate);
+            if pr_per_day > 0 {
+                let fill_secs = 86400i64 / pr_per_day as i64;
+                let last = loom.persistent.wr_pr_last_granted_at;
+                // Cap elapsed to 7 days to prevent exploits from bogus timestamps
+                let elapsed = (now - last).min(604800);
+                if elapsed >= fill_secs {
+                    let completed_cycles = (elapsed / fill_secs) as u32;
+                    state.prestige_rank = state.prestige_rank.saturating_add(completed_cycles);
+                    state.recalculate_prestige_bonuses();
+                    state.derived_stats_dirty = true;
+                    loom.persistent.wr_pr_last_granted_at =
+                        last + fill_secs * completed_cycles as i64;
+                    // Coalesce into a single event with total PR
+                    result.events.push(TickEvent::WovenRealityPRGranted {
+                        pr_amount: completed_cycles,
+                        wr_rate,
+                    });
+                    result.loom_changed = true;
+                }
+            }
+        }
     }
 }
 

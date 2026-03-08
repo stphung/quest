@@ -89,6 +89,7 @@ fn force_player_attack(
         &mut achievements,
         &d,
         11,
+        30,
     )
 }
 
@@ -102,7 +103,7 @@ fn force_enemy_attack(
     state.combat_state.player_attack_timer = 0.0;
     state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
     let mut achievements = Achievements::default();
-    update_combat(rng, state, 0.0, bonuses, &mut achievements, &d, 11)
+    update_combat(rng, state, 0.0, bonuses, &mut achievements, &d, 11, 30)
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -426,6 +427,7 @@ fn regen_advances_timer_during_regeneration() {
         &mut ach,
         &d,
         11,
+        30,
     );
 
     // Timer should have advanced
@@ -459,6 +461,7 @@ fn regen_completes_after_full_duration() {
         &mut ach,
         &d,
         11,
+        30,
     );
 
     // Regen should be complete
@@ -496,7 +499,7 @@ fn regen_with_haven_bonus_completes_faster() {
     let mut ach = Achievements::default();
 
     // At 50% reduction, effective duration is ~1.25s. Use 1.5s.
-    let _events = update_combat(&mut rng, &mut state, 1.5, &bonuses, &mut ach, &d, 11);
+    let _events = update_combat(&mut rng, &mut state, 1.5, &bonuses, &mut ach, &d, 11, 30);
 
     assert!(
         !state.combat_state.is_regenerating,
@@ -522,7 +525,7 @@ fn regen_with_god_item_bonus_completes_faster() {
     let d = derived(&state);
     let mut ach = Achievements::default();
 
-    let _events = update_combat(&mut rng, &mut state, 1.5, &bonuses, &mut ach, &d, 11);
+    let _events = update_combat(&mut rng, &mut state, 1.5, &bonuses, &mut ach, &d, 11, 30);
 
     assert!(
         !state.combat_state.is_regenerating,
@@ -552,6 +555,7 @@ fn regen_at_full_hp_emits_zero_heal() {
         &mut ach,
         &d,
         11,
+        30,
     );
 
     // When healing from max to max (0 healed), no RegenComplete event should fire
@@ -588,6 +592,7 @@ fn update_combat_returns_empty_when_no_enemy() {
         &mut ach,
         &d,
         11,
+        30,
     );
 
     assert!(events.is_empty(), "No events when no enemy and not regen");
@@ -614,6 +619,7 @@ fn update_combat_delegates_to_regen_when_regenerating() {
         &mut ach,
         &d,
         11,
+        30,
     );
 
     // Timer should advance (delegation to regen module)
@@ -639,6 +645,7 @@ fn update_combat_accumulates_both_timers() {
         &mut ach,
         &d,
         11,
+        30,
     );
 
     // Both timers should have accumulated 0.5
@@ -671,6 +678,7 @@ fn update_combat_player_attacks_when_timer_ready() {
         &mut ach,
         &d,
         11,
+        30,
     );
 
     let has_player_attack = events
@@ -705,6 +713,7 @@ fn update_combat_enemy_attacks_when_timer_ready() {
         &mut ach,
         &d,
         11,
+        30,
     );
 
     let has_enemy_attack = events
@@ -732,6 +741,7 @@ fn update_combat_player_kills_enemy_skips_enemy_attack() {
         &mut ach,
         &d,
         11,
+        30,
     );
 
     // Should have player attack and enemy death, but no enemy attack
@@ -1336,6 +1346,7 @@ fn damage_reflection_with_gear_reflects_damage() {
         &mut ach,
         &d,
         11,
+        30,
     );
 
     let has_reflection = events
@@ -1383,6 +1394,7 @@ fn full_combat_cycle_attack_kill_regen() {
         &mut ach,
         &d,
         11,
+        30,
     );
     assert!(state.combat_state.is_regenerating, "Still regenerating");
     assert!(
@@ -1399,6 +1411,7 @@ fn full_combat_cycle_attack_kill_regen() {
         &mut ach,
         &d,
         11,
+        30,
     );
     assert!(!state.combat_state.is_regenerating, "Regen should complete");
     assert_eq!(
@@ -1426,6 +1439,7 @@ fn both_player_and_enemy_attack_same_tick() {
         &mut ach,
         &d,
         11,
+        30,
     );
 
     let player_attacks = events
@@ -1458,7 +1472,16 @@ fn god_item_attack_speed_reduces_player_interval() {
     let d = derived(&state);
     let mut ach = Achievements::default();
 
-    let events = update_combat(&mut rng, &mut state, 0.1, &speed_bonuses, &mut ach, &d, 11);
+    let events = update_combat(
+        &mut rng,
+        &mut state,
+        0.1,
+        &speed_bonuses,
+        &mut ach,
+        &d,
+        11,
+        30,
+    );
 
     let has_attack = events
         .iter()
@@ -1517,6 +1540,7 @@ fn test_mob_fight_timeout_triggers_retreat() {
             &mut achievements,
             &d,
             11,
+            30,
         );
         for e in &events {
             if matches!(e, CombatEvent::CombatRetreat { .. }) {
@@ -1558,6 +1582,7 @@ fn test_mob_fight_timeout_does_not_apply_to_bosses() {
             &mut achievements,
             &d,
             11,
+            30,
         );
         for e in &events {
             if matches!(e, CombatEvent::CombatRetreat { .. }) {
@@ -1597,6 +1622,7 @@ fn test_consecutive_deaths_triggers_retreat() {
             &mut achievements,
             &d,
             11,
+            30,
         );
         for e in &events {
             if matches!(e, CombatEvent::CombatRetreat { .. }) {
@@ -1639,6 +1665,7 @@ fn test_consecutive_deaths_reset_on_kill() {
             &mut achievements,
             &d,
             11,
+            30,
         );
         let enemy_died = events.iter().any(|e| {
             matches!(
@@ -1683,6 +1710,7 @@ fn test_retreat_target_is_last_safe_zone() {
             &mut achievements,
             &d,
             11,
+            30,
         );
         for e in &events {
             if let CombatEvent::CombatRetreat { zone_name } = e {

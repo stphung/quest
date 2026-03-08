@@ -70,7 +70,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 | Core | `src/core/` | [CLAUDE.md](src/core/CLAUDE.md) | Game tick engine, state, XP/leveling, constants |
 | Combat | `src/combat/` | [CLAUDE.md](src/combat/CLAUDE.md) | Combat state machine, damage pipelines |
 | Character | `src/character/` | [CLAUDE.md](src/character/CLAUDE.md) | Attributes, prestige, persistence |
-| Zones | `src/zones/` | [CLAUDE.md](src/zones/CLAUDE.md) | 30 zones, fracture regions, progression |
+| Zones | `src/zones/` | [CLAUDE.md](src/zones/CLAUDE.md) | 50 zones, fracture regions, Loom zones, progression |
 | Dungeon | `src/dungeon/` | [CLAUDE.md](src/dungeon/CLAUDE.md) | Procedural generation, room system |
 | Fishing | `src/fishing/` | [CLAUDE.md](src/fishing/CLAUDE.md) | Sessions, 40 ranks, Storm Leviathan |
 | Items | `src/items/` | [CLAUDE.md](src/items/CLAUDE.md) | Generation, scoring, drop rates |
@@ -87,7 +87,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 | Input | `src/input/` | [CLAUDE.md](src/input/CLAUDE.md) | Keyboard input routing |
 | UI | `src/ui/` | [CLAUDE.md](src/ui/CLAUDE.md) | Terminal UI components (Ratatui) |
 | Utils | `src/utils/` | [CLAUDE.md](src/utils/CLAUDE.md) | Build info, updater, debug menu |
-| Loom | `src/loom/` | [CLAUDE.md](src/loom/CLAUDE.md) | Resource production chains, refineries, pipes |
+| Loom | `src/loom/` | [CLAUDE.md](src/loom/CLAUDE.md) | Resource production chains, direct-pull refineries |
 | Main Helpers | `src/main_helpers/` | [CLAUDE.md](src/main_helpers/CLAUDE.md) | Orchestration between main.rs and domain modules |
 
 ### Simulators
@@ -144,13 +144,18 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - **Enhancement costs**: 1 PR (+1-4), 2/3/3 PR (+5-7), 4 PR (+8-9), 5 PR (+10)
 - **Fracture zone stat scaling**: 1.6x per zone from Zone 11 base (FRACTURE_ZONE_STAT_MULTIPLIER)
 - **Fracture zone unlock**: Deep Layer 3 -> Z12-14, Layer 7 -> Z15-17, Layer 12 -> Z18-20, Layer 18 -> Z21-23, Layer 25 -> Z24-26, Layer 30 -> Z27-30
-- **Ascension cost**: [35, 65, 120, 200, 325, 500] PR for I-VI; 500 + 75*(level-6) PR for VII+
-- **Ascension multiplier**: 2^level for I-VI (2x to 64x); 64 * 1.5^(level-6) for VII+
+- **Ascension cost**: [35, 65, 120, 200, 325, 500] PR for I-VI; [1500, 4000, 8000, 15000] PR for VII-X
+- **Ascension multiplier**: 2^level for I-VI (2x to 64x); 64 * 1.5^(level-6) for VII+ (96x, 144x, 216x, 324x)
+- **Ascension pattern gates**: VII = 8 patterns, VIII = 16, IX = 22, X = 28 completed Woven Patterns
+- **Loom Zone stat scaling**: 1.25x per zone from Zone 30 base (LOOM_ZONE_STAT_MULTIPLIER)
+- **Loom Zone unlock** (triple-gated: patterns + ascension + prestige): 4p/—/P2k -> Z31-34, 8p/VII/P5k -> Z35-38, 16p/VIII/P15k -> Z39-42, 22p/IX/P30k -> Z43-46, 28p/X/P50k -> Z47-50
+- **WR→PR brackets**: 0-10 WR/hr = 5 PR/WR/hr/day, 10-25 = 10, 25+ = 15 (activates when all 28 patterns complete)
+- **Shuttle level caps**: Asc 0-VI = 1, VII = 3, VIII = 5, IX = 7, X = 10
 - **Power Cores**: 6 cores (2-18 PR/day), unlocked at Deep Layers 3/7/12/18/25/30, max 48 PR/day total
 
 ## Combat Mechanics
 
-- **Enemy scaling**: Static zone-based stats from `ZONE_ENEMY_STATS` table. Fracture zones scale 1.6x per zone from Zone 11 base
+- **Enemy scaling**: Static zone-based stats from `ZONE_ENEMY_STATS` table. Fracture zones scale 1.6x per zone from Zone 11 base. Loom zones scale 1.25x per zone from Zone 30 base
 - **Damage pipeline**: base -> Giant's Might % -> Haven % -> prestige flat -> ascension mult -> defense -> min 1 -> Bulwark DR -> crit
 - **Defense pipeline**: base -> prestige flat -> ascension mult -> DR %
 - **Death**: Boss death resets to subzone 1; dungeon death exits dungeon (no prestige loss)

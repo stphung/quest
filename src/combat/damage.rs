@@ -16,6 +16,7 @@ pub(crate) fn handle_enemy_death<R: Rng>(
     achievements: &mut crate::achievements::Achievements,
     haven_xp_gain_percent: f64,
     fracture_zone_cap: u32,
+    loom_zone_cap: u32,
 ) -> (Vec<CombatEvent>, bool) {
     let mut events = Vec::new();
 
@@ -62,6 +63,7 @@ pub(crate) fn handle_enemy_death<R: Rng>(
                     state.prestige_rank,
                     achievements,
                     fracture_zone_cap,
+                    loom_zone_cap,
                 );
                 events.push(CombatEvent::SubzoneBossDefeated { xp_gained, result });
             } else {

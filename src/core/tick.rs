@@ -82,6 +82,7 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
         &sigil_bonuses,
         ctx.achievements,
         ctx.deep,
+        ctx.loom,
         ctx.debug_mode,
         &mut result,
         rng,
@@ -134,16 +135,19 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
     );
 
     // ── 11e. Loom of Worlds discovery check ───────────────────────
-    tick_stages::tick_loom(ctx.deep, ctx.loom, &mut result);
+    tick_stages::tick_loom(ctx.deep, ctx.loom, ctx.state, ctx.achievements, &mut result);
 
     // ── 11d. Fracture region unlock consumption ──────────────────
     if let Some(region) = ctx.deep.persistent.pending_fracture_region_unlock.take() {
+        let loom_cap = ctx.state.cached_loom_zone_cap;
         crate::zones::sync_account_zone_unlocks(
             &mut ctx.state.zone_progression,
             ctx.achievements
                 .is_unlocked(crate::achievements::AchievementId::StormsEnd),
             ctx.deep.persistent.fracture_zone_cap,
             ctx.state.prestige_rank,
+            loom_cap,
+            ctx.state.ascension_level,
         );
         result.events.push(TickEvent::FractureRegionUnlocked {
             region,
@@ -152,8 +156,10 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
         result.deep_changed = true;
     }
 
-    // Sync cached fracture zone cap for UI rendering
+    // Sync cached zone caps for UI rendering
     ctx.state.cached_fracture_zone_cap = ctx.deep.persistent.fracture_zone_cap;
+    ctx.state.cached_loom_zone_cap =
+        crate::loom::loom_zone_cap_for_patterns(ctx.loom.persistent.completed_pattern_count());
 
     // ── 12a. Power Cores tick ─────────────────────────────────────
     crate::power_cores::tick::tick_power_cores(ctx.state, ctx.deep, ctx.achievements, &mut result);

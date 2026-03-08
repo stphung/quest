@@ -10,6 +10,7 @@ use super::events::{CombatBonuses, CombatEvent};
 /// `bonuses` contains all combined combat bonuses from Haven, god items, prestige, and sigils.
 /// `achievements` is used to check for Stormbreaker achievement (Zone 10 boss)
 /// `derived` contains pre-computed derived stats (avoids redundant recalculation)
+#[allow(clippy::too_many_arguments)]
 pub fn update_combat<R: Rng>(
     rng: &mut R,
     state: &mut GameState,
@@ -18,6 +19,7 @@ pub fn update_combat<R: Rng>(
     achievements: &mut crate::achievements::Achievements,
     derived: &DerivedStats,
     fracture_zone_cap: u32,
+    loom_zone_cap: u32,
 ) -> Vec<CombatEvent> {
     let mut events = Vec::new();
 
@@ -71,6 +73,7 @@ pub fn update_combat<R: Rng>(
             achievements,
             derived,
             fracture_zone_cap,
+            loom_zone_cap,
         );
         events.extend(attack_events);
         if enemy_died {
@@ -87,6 +90,7 @@ pub fn update_combat<R: Rng>(
             achievements,
             derived,
             fracture_zone_cap,
+            loom_zone_cap,
         );
         events.extend(attack_events);
     }
@@ -250,6 +254,7 @@ mod tests {
             &mut Achievements::default(),
             &DerivedStats::default(),
             11,
+            30,
         );
 
         assert!(matches!(
@@ -287,6 +292,7 @@ mod tests {
             &mut Achievements::default(),
             &DerivedStats::default(),
             11,
+            30,
         );
 
         let expected_zone = crate::zones::get_zone(4).unwrap().name.to_string();

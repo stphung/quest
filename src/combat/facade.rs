@@ -22,6 +22,7 @@ pub struct CombatInput<'a> {
 /// Delegates to `orchestration::update_combat()` which still requires
 /// `&mut GameState`. The `CombatInput` struct above documents the
 /// aspirational decomposed interface for future `_core` extraction.
+#[allow(clippy::too_many_arguments)]
 pub fn update_combat_facade<R: Rng>(
     rng: &mut R,
     state: &mut GameState,
@@ -30,6 +31,7 @@ pub fn update_combat_facade<R: Rng>(
     achievements: &mut Achievements,
     derived: &DerivedStats,
     fracture_zone_cap: u32,
+    loom_zone_cap: u32,
 ) -> Vec<CombatEvent> {
     crate::combat::orchestration::update_combat(
         rng,
@@ -39,6 +41,7 @@ pub fn update_combat_facade<R: Rng>(
         achievements,
         derived,
         fracture_zone_cap,
+        loom_zone_cap,
     )
 }
 
@@ -64,6 +67,7 @@ mod tests {
             &mut achievements,
             &derived,
             11,
+            30,
         );
         assert!(events.is_empty(), "No events when no enemy");
     }
@@ -92,6 +96,7 @@ mod tests {
                 &mut achievements,
                 &derived,
                 11,
+                30,
             );
         }
         // Should have processed some combat -- just verify no panic

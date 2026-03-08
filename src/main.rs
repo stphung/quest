@@ -423,11 +423,48 @@ fn main() -> io::Result<()> {
                     &mut global_achievements,
                     &state.character_name,
                 );
+
+                // Resolve Loom production that occurred while offline
+                if let Some(ref report) = offline_report {
+                    if let Some(loom_report) = main_helpers::offline::resolve_loom_offline(
+                        &mut loom_state,
+                        report.elapsed_seconds,
+                    ) {
+                        state.combat_state.add_log_entry(
+                            "\u{1f52e} Loom produced resources while offline".to_string(),
+                            false,
+                            true,
+                        );
+                        if loom_report.patterns_completed > 0 {
+                            state.combat_state.add_log_entry(
+                                format!(
+                                    "\u{1f9f5} {} Woven Pattern{} completed offline",
+                                    loom_report.patterns_completed,
+                                    if loom_report.patterns_completed == 1 {
+                                        ""
+                                    } else {
+                                        "s"
+                                    },
+                                ),
+                                false,
+                                true,
+                            );
+                        }
+                    }
+                }
+
                 // Sync Deep achievements from persistent state
                 global_achievements.sync_from_deep(
                     deep_state.persistent.discovered,
                     deep_state.persistent.guild_rank.0 as u32,
                     deep_state.persistent.deepest_layer_reached,
+                    Some(&state.character_name),
+                );
+
+                // Sync Loom achievements from persistent state
+                global_achievements.sync_from_loom(
+                    loom_state.persistent.discovered,
+                    loom_state.persistent.completed_pattern_count(),
                     Some(&state.character_name),
                 );
 
@@ -487,7 +524,7 @@ fn main() -> io::Result<()> {
                                         update_info = Some(info);
                                         update_check_failed = false;
                                     }
-                                    Ok(UpdateInfoStatus::UpToDate) => {
+                                    Ok(UpdateInfoStatus::UpToDate { .. }) => {
                                         update_info = None;
                                         update_check_failed = false;
                                     }
@@ -608,7 +645,7 @@ fn main() -> io::Result<()> {
                                 &deep_state,
                             );
                             {
-                                let game_ctx = main_helpers::game_context::GameContext {
+                                let mut game_ctx = main_helpers::game_context::GameContext {
                                     state: &mut state,
                                     haven: &mut haven,
                                     haven_ui: &mut haven_ui,
@@ -637,7 +674,7 @@ fn main() -> io::Result<()> {
                                     chrono_summary: chrono_summary.as_ref(),
                                     layout_ctx: &ctx,
                                 };
-                                draw_game_overlays(frame, &game_ctx, &extras);
+                                draw_game_overlays(frame, &mut game_ctx, &extras);
                             }
                         })?;
 
