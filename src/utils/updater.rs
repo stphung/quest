@@ -590,13 +590,7 @@ pub fn run_update_command() -> Result<bool, Box<dyn Error>> {
             if !changelog.is_empty() {
                 println!("What's new:");
                 for entry in changelog.iter().take(15) {
-                    // Truncate long messages
-                    let msg = if entry.message.len() > 60 {
-                        format!("{}...", &entry.message[..57])
-                    } else {
-                        entry.message.clone()
-                    };
-                    println!("  • {}", msg);
+                    println!("  • {}", entry.message);
                 }
                 if changelog.len() > 15 {
                     println!("  ...and {} more", changelog.len() - 15);
