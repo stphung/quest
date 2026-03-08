@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::collections::VecDeque;
 
 /// Which archetype the player chose at Loom unlock.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -403,6 +404,51 @@ impl Default for LoomUiState {
     }
 }
 
+/// Rolling window rate tracker for measuring resource production over 60 seconds.
+///
+/// Uses a circular buffer of 600 ticks (at 100ms/tick = 60 seconds).
+/// The running sum gives O(1) per-tick updates. Not serialized — on load,
+/// it starts empty and ramps up over 60 seconds.
+const RATE_WINDOW_SIZE: usize = 600;
+const TICKS_PER_HOUR: f64 = 36_000.0;
+
+#[derive(Debug, Clone)]
+pub struct RateTracker {
+    buffer: VecDeque<f64>,
+    sum: f64,
+}
+
+impl RateTracker {
+    pub fn new() -> Self {
+        Self {
+            buffer: VecDeque::new(),
+            sum: 0.0,
+        }
+    }
+
+    /// Push one tick's production amount, evicting the oldest value if the window is full.
+    pub fn push(&mut self, amount: f64) {
+        if self.buffer.len() >= RATE_WINDOW_SIZE {
+            if let Some(old) = self.buffer.pop_front() {
+                self.sum -= old;
+            }
+        }
+        self.buffer.push_back(amount);
+        self.sum += amount;
+    }
+
+    /// Returns the estimated production rate per hour based on the rolling window.
+    pub fn rate_per_hour(&self) -> f64 {
+        (self.sum / RATE_WINDOW_SIZE as f64) * TICKS_PER_HOUR
+    }
+}
+
+impl Default for RateTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -489,5 +535,42 @@ mod tests {
         };
         assert!(!pattern.completed);
         assert_eq!(pattern.index, 0);
+    }
+
+    #[test]
+    fn test_rate_tracker_new_is_empty() {
+        let tracker = RateTracker::new();
+        assert!((tracker.rate_per_hour()).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_rate_tracker_push_single_value() {
+        let mut tracker = RateTracker::new();
+        tracker.push(1.0);
+        let rate = tracker.rate_per_hour();
+        assert!((rate - 60.0).abs() < 1e-6, "rate was {}", rate);
+    }
+
+    #[test]
+    fn test_rate_tracker_full_window_steady() {
+        let mut tracker = RateTracker::new();
+        let per_tick = 50.0 / 36000.0;
+        for _ in 0..600 {
+            tracker.push(per_tick);
+        }
+        let rate = tracker.rate_per_hour();
+        assert!((rate - 50.0).abs() < 0.1, "rate was {}", rate);
+    }
+
+    #[test]
+    fn test_rate_tracker_evicts_old_values() {
+        let mut tracker = RateTracker::new();
+        for _ in 0..600 {
+            tracker.push(1.0);
+        }
+        for _ in 0..600 {
+            tracker.push(0.0);
+        }
+        assert!((tracker.rate_per_hour()).abs() < 1e-9);
     }
 }
