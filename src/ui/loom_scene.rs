@@ -339,7 +339,7 @@ fn render_node_widget(
             .collect();
 
         let hint = if !feeding.is_empty() {
-            format!("\u{25b2} threaded from {}", feeding[0].name())
+            format!("\u{25bc} threaded from {}", feeding[0].name())
         } else {
             "unthreaded".to_string()
         };
@@ -770,7 +770,7 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
             )));
             for nid in &unlocked_neighbors {
                 lines.push(Line::from(Span::styled(
-                    format!("  \u{25b2} {} {}", node_emoji(**nid), nid.name()),
+                    format!("  \u{25bc} {} {}", node_emoji(**nid), nid.name()),
                     Style::default().fg(Color::Rgb(100, 80, 160)),
                 )));
             }
@@ -1329,7 +1329,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         if diag_left_x >= gap_rects[0].x && diag_left_x < gap_rects[0].x + gap_rects[0].width {
             frame.render_widget(
                 Paragraph::new(Span::styled(
-                    "\u{25b2}",
+                    "\u{25bc}",
                     Style::default().fg(flow_arrow_color),
                 ))
                 .style(Style::default().bg(LOOM_BG)),
@@ -1346,7 +1346,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         if diag_right_x >= gap_rects[0].x && diag_right_x < gap_rects[0].x + gap_rects[0].width {
             frame.render_widget(
                 Paragraph::new(Span::styled(
-                    "\u{25b2}",
+                    "\u{25bc}",
                     Style::default().fg(flow_arrow_color),
                 ))
                 .style(Style::default().bg(LOOM_BG)),
@@ -1403,7 +1403,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         if diag_left_x >= gap_rects[2].x && diag_left_x < gap_rects[2].x + gap_rects[2].width {
             frame.render_widget(
                 Paragraph::new(Span::styled(
-                    "\u{25b2}",
+                    "\u{25bc}",
                     Style::default().fg(flow_arrow_color),
                 ))
                 .style(Style::default().bg(LOOM_BG)),
@@ -1419,7 +1419,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         if diag_right_x >= gap_rects[2].x && diag_right_x < gap_rects[2].x + gap_rects[2].width {
             frame.render_widget(
                 Paragraph::new(Span::styled(
-                    "\u{25b2}",
+                    "\u{25bc}",
                     Style::default().fg(flow_arrow_color),
                 ))
                 .style(Style::default().bg(LOOM_BG)),
