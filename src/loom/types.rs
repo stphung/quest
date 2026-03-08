@@ -87,23 +87,23 @@ pub enum Resource {
     WovenReality,
 }
 
-/// Unified address for any node in the Loom — either a fixed Extractor or a built Refinery.
+/// Unified address for any node in the Loom — either a fixed Extractor or a built Shuttle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum LoomNodeRef {
     /// One of the 6 fixed extractor nodes.
     Extractor(NodeId),
-    /// A player-built refinery, identified by index in `LoomPersistent::refineries`.
-    Refinery(usize),
+    /// A player-built shuttle, identified by index in `LoomPersistent::shuttles`.
+    Shuttle(usize),
 }
 
 /// A player-built processing node that runs a single locked recipe.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Refinery {
-    /// First input resource for this refinery's locked recipe.
+pub struct Shuttle {
+    /// First input resource for this shuttle's locked recipe.
     pub input_a: Resource,
-    /// Second input resource for this refinery's locked recipe.
+    /// Second input resource for this shuttle's locked recipe.
     pub input_b: Resource,
-    /// The nature catalyst for this refinery's recipe.
+    /// The nature catalyst for this shuttle's recipe.
     pub nature: NodeNature,
     /// Output resource produced.
     pub output: Resource,
@@ -117,10 +117,10 @@ pub struct Refinery {
     /// Buffer capacity.
     #[serde(default = "default_buffer_capacity")]
     pub buffer_capacity: f64,
-    /// Refinery level (for future upgrades).
+    /// Shuttle level (for future upgrades).
     #[serde(default = "default_node_level")]
     pub level: u32,
-    /// Whether this refinery is stalled (missing inputs or buffer full).
+    /// Whether this shuttle is stalled (missing inputs or buffer full).
     #[serde(default)]
     pub stalled: bool,
     /// Whether currently under construction.
@@ -129,15 +129,15 @@ pub struct Refinery {
     /// Ticks remaining for construction.
     #[serde(default)]
     pub construction_ticks_remaining: u32,
-    /// Sources for input A — extractors or lower-tier refineries.
+    /// Sources for input A — extractors or lower-tier shuttles.
     #[serde(default)]
     pub sources_a: Vec<LoomNodeRef>,
-    /// Sources for input B — extractors or lower-tier refineries.
+    /// Sources for input B — extractors or lower-tier shuttles.
     #[serde(default)]
     pub sources_b: Vec<LoomNodeRef>,
 }
 
-impl Refinery {
+impl Shuttle {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         input_a: Resource,
@@ -281,15 +281,15 @@ pub struct LoomPersistent {
     pub stockpiles: HashMap<Resource, f64>,
     #[serde(default)]
     pub second_node_unlock_elapsed: Option<f64>,
-    /// Player-built refineries (recipe-locked processing nodes).
+    /// Player-built shuttles (recipe-locked processing nodes).
     #[serde(default)]
-    pub refineries: Vec<Refinery>,
+    pub shuttles: Vec<Shuttle>,
 }
 
 impl LoomPersistent {
-    /// Maximum number of Refineries the player can build.
+    /// Maximum number of Shuttles the player can build.
     /// Equal to the number of completed Woven Patterns.
-    pub fn max_refineries(&self) -> usize {
+    pub fn max_shuttles(&self) -> usize {
         self.patterns.iter().filter(|p| p.completed).count()
     }
 }
@@ -309,7 +309,7 @@ impl Default for LoomPersistent {
             patterns: Vec::new(),
             stockpiles: HashMap::new(),
             second_node_unlock_elapsed: None,
-            refineries: Vec::new(),
+            shuttles: Vec::new(),
         }
     }
 }
@@ -346,7 +346,7 @@ pub enum LoomView {
     Codex,
 }
 
-/// Which step of the refinery build flow the player is on.
+/// Which step of the shuttle build flow the player is on.
 #[derive(Debug, Clone)]
 pub enum BuildStep {
     /// Selecting a recipe from the filtered list. `cursor` indexes into the available recipes.
@@ -361,7 +361,7 @@ pub enum BuildStep {
     Blocked { message: String },
 }
 
-/// State for the multi-step refinery build flow.
+/// State for the multi-step shuttle build flow.
 #[derive(Debug, Clone)]
 pub struct BuildState {
     pub step: BuildStep,
@@ -479,9 +479,9 @@ mod tests {
     fn test_loom_node_ref_equality() {
         let ext_a = LoomNodeRef::Extractor(NodeId::EmberSpindle);
         let ext_b = LoomNodeRef::Extractor(NodeId::EmberSpindle);
-        let ref_a = LoomNodeRef::Refinery(0);
-        let ref_b = LoomNodeRef::Refinery(0);
-        let ref_c = LoomNodeRef::Refinery(1);
+        let ref_a = LoomNodeRef::Shuttle(0);
+        let ref_b = LoomNodeRef::Shuttle(0);
+        let ref_c = LoomNodeRef::Shuttle(1);
         assert_eq!(ext_a, ext_b);
         assert_eq!(ref_a, ref_b);
         assert_ne!(ext_a, ref_a);
@@ -489,8 +489,8 @@ mod tests {
     }
 
     #[test]
-    fn test_refinery_new() {
-        let r = Refinery::new(
+    fn test_shuttle_new() {
+        let r = Shuttle::new(
             Resource::Ember,
             Resource::VoidEssence,
             NodeNature::Heat,
@@ -515,15 +515,15 @@ mod tests {
     }
 
     #[test]
-    fn test_loom_state_default_has_empty_refineries() {
+    fn test_loom_state_default_has_empty_shuttles() {
         let state = LoomState::new();
-        assert!(state.persistent.refineries.is_empty());
+        assert!(state.persistent.shuttles.is_empty());
     }
 
     #[test]
-    fn test_refinery_limit_zero_with_no_patterns() {
+    fn test_shuttle_limit_zero_with_no_patterns() {
         let state = LoomState::new();
-        assert_eq!(state.persistent.max_refineries(), 0);
+        assert_eq!(state.persistent.max_shuttles(), 0);
     }
 
     #[test]

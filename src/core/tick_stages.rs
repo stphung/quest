@@ -1009,26 +1009,26 @@ pub(super) fn tick_loom(
         }
     }
 
-    // Tick refinery construction (decrement timers, complete when done).
-    let completed_refineries = crate::loom::tick_refinery_construction(loom);
-    if !completed_refineries.is_empty() {
+    // Tick shuttle construction (decrement timers, complete when done).
+    let completed_shuttles = crate::loom::tick_shuttle_construction(loom);
+    if !completed_shuttles.is_empty() {
         result.loom_changed = true;
     }
 
-    // Tick direct-pull refinery processing.
-    let refinery_produced = crate::loom::tick_refinery_pull(loom, TICK_SECONDS);
+    // Tick direct-pull shuttle processing.
+    let shuttle_produced = crate::loom::tick_shuttle_pull(loom, TICK_SECONDS);
 
     // Update stall flags for UI display.
     crate::loom::tick_stall_detection(loom);
 
-    // Update refinery stall flags.
-    crate::loom::tick_refinery_stall_detection(loom);
+    // Update shuttle stall flags.
+    crate::loom::tick_shuttle_stall_detection(loom);
 
     // Tick base production for all unlocked nodes.
     let mut produced = crate::loom::tick_base_production(loom, TICK_SECONDS);
 
-    // Merge refinery production into base production map for pattern sustain.
-    for (resource, amount) in refinery_produced {
+    // Merge shuttle production into base production map for pattern sustain.
+    for (resource, amount) in shuttle_produced {
         *produced.entry(resource).or_insert(0.0) += amount;
     }
 

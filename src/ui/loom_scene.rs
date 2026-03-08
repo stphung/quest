@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 //!
 //! Dispatches to different view renderers based on `LoomUiState::view`:
-//!   - FlowView:           pipeline diagram with extractors and refineries
+//!   - FlowView:           pipeline diagram with extractors and shuttles
 //!   - ListDetail:         node list + detail panel
 //!   - Codex:              recipe codex
 
@@ -54,15 +54,15 @@ fn node_letter(id: crate::loom::types::NodeId) -> char {
     }
 }
 
-/// Extract NodeId from a LoomNodeRef, returning None for Refineries.
+/// Extract NodeId from a LoomNodeRef, returning None for Shuttles.
 fn noderef_to_id(r: crate::loom::types::LoomNodeRef) -> Option<crate::loom::types::NodeId> {
     match r {
         crate::loom::types::LoomNodeRef::Extractor(id) => Some(id),
-        crate::loom::types::LoomNodeRef::Refinery(_) => None,
+        crate::loom::types::LoomNodeRef::Shuttle(_) => None,
     }
 }
 
-/// Color for a LoomNodeRef (gray fallback for refineries).
+/// Color for a LoomNodeRef (gray fallback for shuttles).
 fn noderef_color(r: crate::loom::types::LoomNodeRef) -> Color {
     match noderef_to_id(r) {
         Some(id) => node_color(id),
@@ -70,7 +70,7 @@ fn noderef_color(r: crate::loom::types::LoomNodeRef) -> Color {
     }
 }
 
-/// Letter for a LoomNodeRef ('?' fallback for refineries).
+/// Letter for a LoomNodeRef ('?' fallback for shuttles).
 fn noderef_letter(r: crate::loom::types::LoomNodeRef) -> char {
     match noderef_to_id(r) {
         Some(id) => node_letter(id),
@@ -82,7 +82,7 @@ fn noderef_letter(r: crate::loom::types::LoomNodeRef) -> char {
 fn noderef_name(r: crate::loom::types::LoomNodeRef) -> &'static str {
     match noderef_to_id(r) {
         Some(id) => id.name(),
-        None => "Refinery",
+        None => "Shuttle",
     }
 }
 
@@ -450,7 +450,7 @@ fn noderef_short(r: crate::loom::types::LoomNodeRef, idx: usize) -> String {
             NodeId::SilenceWell => "SW".to_string(),
             NodeId::ResonanceForge => "RF".to_string(),
         },
-        LoomNodeRef::Refinery(_) => format!("R{}", idx),
+        LoomNodeRef::Shuttle(_) => format!("R{}", idx),
     }
 }
 
@@ -471,11 +471,11 @@ fn throbber_char(throbber_frame: u32, tier: u8, stalled: bool) -> char {
     FRAMES[idx]
 }
 
-/// Render a single refinery node as ratatui widgets into a given Rect.
-fn render_refinery_widget(
+/// Render a single shuttle node as ratatui widgets into a given Rect.
+fn render_shuttle_widget(
     frame: &mut Frame,
     area: Rect,
-    refinery: &crate::loom::types::Refinery,
+    shuttle: &crate::loom::types::Shuttle,
     selected: bool,
     index: usize,
     throbber_frame: u32,
@@ -496,22 +496,22 @@ fn render_refinery_widget(
     };
 
     // Title: "R0 T1 ForgedLight" or "R0 [Building... 3s]"
-    let title = if refinery.under_construction {
-        let secs = refinery.construction_ticks_remaining / 10;
+    let title = if shuttle.under_construction {
+        let secs = shuttle.construction_ticks_remaining / 10;
         format!(" R{} [Building... {}s] ", index, secs)
     } else {
-        let out_name = resource_name(&refinery.output);
-        format!(" R{} T{} {} ", index, refinery.tier, out_name)
+        let out_name = resource_name(&shuttle.output);
+        format!(" R{} T{} {} ", index, shuttle.tier, out_name)
     };
 
-    let title_color = if refinery.under_construction {
+    let title_color = if shuttle.under_construction {
         Color::Rgb(100, 80, 130)
     } else if selected {
         Color::White
     } else {
         Color::Rgb(160, 130, 190)
     };
-    let tier_color = match refinery.tier {
+    let tier_color = match shuttle.tier {
         1 => Color::Rgb(100, 160, 100),
         2 => Color::Rgb(160, 140, 80),
         _ => Color::Rgb(180, 100, 200),
@@ -527,7 +527,7 @@ fn render_refinery_widget(
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    if inner.height == 0 || inner.width == 0 || refinery.under_construction {
+    if inner.height == 0 || inner.width == 0 || shuttle.under_construction {
         return;
     }
 
@@ -535,19 +535,19 @@ fn render_refinery_widget(
     let mut content_lines: Vec<Line> = Vec::new();
 
     // Line 1: throbber + recipe summary
-    let throb = throbber_char(throbber_frame, refinery.tier, refinery.stalled);
-    let throb_color = if refinery.stalled {
+    let throb = throbber_char(throbber_frame, shuttle.tier, shuttle.stalled);
+    let throb_color = if shuttle.stalled {
         Color::Rgb(160, 60, 60)
     } else {
         Color::Rgb(140, 100, 200)
     };
     let recipe_emoji = format!(
         "{}+{}\u{25b6}{}",
-        resource_emoji(&refinery.input_a),
-        resource_emoji(&refinery.input_b),
-        resource_emoji(&refinery.output),
+        resource_emoji(&shuttle.input_a),
+        resource_emoji(&shuttle.input_b),
+        resource_emoji(&shuttle.output),
     );
-    let stall_suffix = if refinery.stalled {
+    let stall_suffix = if shuttle.stalled {
         " \u{26a0}STALL"
     } else {
         ""
@@ -555,7 +555,7 @@ fn render_refinery_widget(
     content_lines.push(Line::from(vec![
         Span::styled(format!("{} ", throb), Style::default().fg(throb_color)),
         Span::styled(
-            format!("T{} ", refinery.tier),
+            format!("T{} ", shuttle.tier),
             Style::default().fg(tier_color),
         ),
         Span::styled(recipe_emoji, Style::default().fg(Color::Rgb(160, 130, 190))),
@@ -568,23 +568,23 @@ fn render_refinery_widget(
     // Line 2: source badges
     let source_label_color = Color::Rgb(100, 80, 140);
     let mut source_spans: Vec<Span> = Vec::new();
-    for src in &refinery.sources_a {
+    for src in &shuttle.sources_a {
         let short_src = match src {
             crate::loom::types::LoomNodeRef::Extractor(_) => noderef_short(*src, 0),
-            crate::loom::types::LoomNodeRef::Refinery(ri) => format!("R{}", ri),
+            crate::loom::types::LoomNodeRef::Shuttle(ri) => format!("R{}", ri),
         };
-        let res_short = resource_short(&refinery.input_a);
+        let res_short = resource_short(&shuttle.input_a);
         source_spans.push(Span::styled(
             format!("{}\u{2190}[{}] ", res_short, short_src),
             Style::default().fg(source_label_color),
         ));
     }
-    for src in &refinery.sources_b {
+    for src in &shuttle.sources_b {
         let short_src = match src {
             crate::loom::types::LoomNodeRef::Extractor(_) => noderef_short(*src, 0),
-            crate::loom::types::LoomNodeRef::Refinery(ri) => format!("R{}", ri),
+            crate::loom::types::LoomNodeRef::Shuttle(ri) => format!("R{}", ri),
         };
-        let res_short = resource_short(&refinery.input_b);
+        let res_short = resource_short(&shuttle.input_b);
         source_spans.push(Span::styled(
             format!("{}\u{2190}[{}] ", res_short, short_src),
             Style::default().fg(source_label_color),
@@ -619,19 +619,19 @@ fn render_refinery_widget(
             width: inner.width,
             height: 1,
         };
-        let fill_pct = if refinery.buffer_capacity > 0.0 {
-            (refinery.buffer / refinery.buffer_capacity).min(1.0)
+        let fill_pct = if shuttle.buffer_capacity > 0.0 {
+            (shuttle.buffer / shuttle.buffer_capacity).min(1.0)
         } else {
             0.0
         };
-        let bar_color = if refinery.stalled || fill_pct >= 0.90 {
+        let bar_color = if shuttle.stalled || fill_pct >= 0.90 {
             Color::Rgb(220, 60, 60)
         } else if fill_pct >= 0.75 {
             Color::Rgb(220, 180, 60)
         } else {
             Color::Rgb(60, 200, 100)
         };
-        let gauge_label = format!("{:.0}/{:.0}", refinery.buffer, refinery.buffer_capacity);
+        let gauge_label = format!("{:.0}/{:.0}", shuttle.buffer, shuttle.buffer_capacity);
         let gauge = Gauge::default()
             .gauge_style(Style::default().fg(bar_color).bg(Color::Rgb(30, 20, 40)))
             .label(Span::styled(
@@ -649,9 +649,9 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
     use crate::loom::recipes::recipes_by_nature;
     use crate::loom::types::NodeId;
 
-    // If selected_node >= 6, show refinery detail instead of extractor detail.
+    // If selected_node >= 6, show shuttle detail instead of extractor detail.
     if ui.selected_node >= 6 {
-        render_flow_sidebar_refinery(frame, area, loom_state, ui);
+        render_flow_sidebar_shuttle(frame, area, loom_state, ui);
         return;
     }
 
@@ -853,20 +853,20 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
     );
 }
 
-/// Render sidebar when a refinery (selected_node >= 6) is selected.
-fn render_flow_sidebar_refinery(
+/// Render sidebar when a shuttle (selected_node >= 6) is selected.
+fn render_flow_sidebar_shuttle(
     frame: &mut Frame,
     area: Rect,
     loom_state: &LoomState,
     ui: &LoomUiState,
 ) {
-    let refinery_idx = ui.selected_node - 6;
-    let refineries = &loom_state.persistent.refineries;
+    let shuttle_idx = ui.selected_node - 6;
+    let shuttles = &loom_state.persistent.shuttles;
 
-    let title = if refinery_idx < refineries.len() {
-        format!(" Refinery {} ", refinery_idx)
+    let title = if shuttle_idx < shuttles.len() {
+        format!(" Shuttle {} ", shuttle_idx)
     } else {
-        " Refinery ".to_string()
+        " Shuttle ".to_string()
     };
 
     let block = Block::default()
@@ -878,10 +878,10 @@ fn render_flow_sidebar_refinery(
 
     let mut lines: Vec<Line> = Vec::new();
 
-    if refinery_idx >= refineries.len() {
+    if shuttle_idx >= shuttles.len() {
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
-            " [No refinery]",
+            " [No shuttle]",
             Style::default().fg(Color::Rgb(80, 60, 110)),
         )));
         lines.truncate(inner.height as usize);
@@ -892,16 +892,16 @@ fn render_flow_sidebar_refinery(
         return;
     }
 
-    let refinery = &refineries[refinery_idx];
+    let shuttle = &shuttles[shuttle_idx];
 
     lines.push(Line::from(""));
 
-    if refinery.under_construction {
+    if shuttle.under_construction {
         lines.push(Line::from(Span::styled(
             " [Under Construction]",
             Style::default().fg(Color::Rgb(160, 120, 200)),
         )));
-        let ticks = refinery.construction_ticks_remaining;
+        let ticks = shuttle.construction_ticks_remaining;
         let secs = ticks / 10;
         lines.push(Line::from(Span::styled(
             format!(" ~{}s remaining", secs),
@@ -911,11 +911,11 @@ fn render_flow_sidebar_refinery(
         // Tier and output.
         lines.push(Line::from(vec![
             Span::styled(
-                format!(" Tier {}", refinery.tier),
+                format!(" Tier {}", shuttle.tier),
                 Style::default().fg(Color::Rgb(180, 140, 220)),
             ),
             Span::styled(
-                format!("  \u{2192} {}", resource_name(&refinery.output)),
+                format!("  \u{2192} {}", resource_name(&shuttle.output)),
                 Style::default().fg(Color::Rgb(220, 180, 255)),
             ),
         ]));
@@ -926,21 +926,21 @@ fn render_flow_sidebar_refinery(
             Span::styled(
                 format!(
                     "{} + {} \u{25b6} {}",
-                    resource_name(&refinery.input_a),
-                    resource_name(&refinery.input_b),
-                    resource_name(&refinery.output)
+                    resource_name(&shuttle.input_a),
+                    resource_name(&shuttle.input_b),
+                    resource_name(&shuttle.output)
                 ),
                 Style::default().fg(Color::Rgb(160, 120, 200)),
             ),
         ]));
 
         // Buffer bar.
-        let fill = if refinery.buffer_capacity > 0.0 {
-            (refinery.buffer / refinery.buffer_capacity).min(1.0)
+        let fill = if shuttle.buffer_capacity > 0.0 {
+            (shuttle.buffer / shuttle.buffer_capacity).min(1.0)
         } else {
             0.0
         };
-        let bar_color = if refinery.stalled || fill >= 0.90 {
+        let bar_color = if shuttle.stalled || fill >= 0.90 {
             Color::Rgb(220, 60, 60)
         } else if fill >= 0.75 {
             Color::Rgb(220, 180, 60)
@@ -964,10 +964,10 @@ fn render_flow_sidebar_refinery(
         ]));
         lines.push(Line::from(vec![
             Span::styled(
-                format!(" {:.0}/{:.0}", refinery.buffer, refinery.buffer_capacity),
+                format!(" {:.0}/{:.0}", shuttle.buffer, shuttle.buffer_capacity),
                 Style::default().fg(bar_color),
             ),
-            if refinery.stalled {
+            if shuttle.stalled {
                 Span::styled(
                     " \u{26a0} STALLED",
                     Style::default().fg(Color::Rgb(220, 60, 60)),
@@ -982,14 +982,14 @@ fn render_flow_sidebar_refinery(
         lines.push(Line::from(vec![
             Span::styled(" Yield: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
-                format!("x{:.1}/cycle", refinery.amount),
+                format!("x{:.1}/cycle", shuttle.amount),
                 Style::default().fg(Color::Rgb(100, 200, 120)),
             ),
         ]));
 
         // Source connections — show per-input sources.
         lines.push(Line::from(""));
-        if refinery.sources_a.is_empty() && refinery.sources_b.is_empty() {
+        if shuttle.sources_a.is_empty() && shuttle.sources_b.is_empty() {
             lines.push(Line::from(Span::styled(
                 " No sources assigned",
                 Style::default().fg(Color::Rgb(80, 60, 110)),
@@ -998,21 +998,21 @@ fn render_flow_sidebar_refinery(
             lines.push(Line::from(vec![
                 Span::styled(" In-A (", Style::default().fg(Color::DarkGray)),
                 Span::styled(
-                    resource_short(&refinery.input_a),
+                    resource_short(&shuttle.input_a),
                     Style::default().fg(Color::Rgb(180, 140, 220)),
                 ),
                 Span::styled("):", Style::default().fg(Color::DarkGray)),
             ]));
-            if refinery.sources_a.is_empty() {
+            if shuttle.sources_a.is_empty() {
                 lines.push(Line::from(Span::styled(
                     "   none",
                     Style::default().fg(Color::Rgb(60, 45, 80)),
                 )));
             } else {
-                for src in &refinery.sources_a {
+                for src in &shuttle.sources_a {
                     let src_name = match src {
                         crate::loom::types::LoomNodeRef::Extractor(id) => id.name(),
-                        crate::loom::types::LoomNodeRef::Refinery(_) => "Refinery",
+                        crate::loom::types::LoomNodeRef::Shuttle(_) => "Shuttle",
                     };
                     let src_color = noderef_color(*src);
                     lines.push(Line::from(vec![
@@ -1024,21 +1024,21 @@ fn render_flow_sidebar_refinery(
             lines.push(Line::from(vec![
                 Span::styled(" In-B (", Style::default().fg(Color::DarkGray)),
                 Span::styled(
-                    resource_short(&refinery.input_b),
+                    resource_short(&shuttle.input_b),
                     Style::default().fg(Color::Rgb(180, 140, 220)),
                 ),
                 Span::styled("):", Style::default().fg(Color::DarkGray)),
             ]));
-            if refinery.sources_b.is_empty() {
+            if shuttle.sources_b.is_empty() {
                 lines.push(Line::from(Span::styled(
                     "   none",
                     Style::default().fg(Color::Rgb(60, 45, 80)),
                 )));
             } else {
-                for src in &refinery.sources_b {
+                for src in &shuttle.sources_b {
                     let src_name = match src {
                         crate::loom::types::LoomNodeRef::Extractor(id) => id.name(),
-                        crate::loom::types::LoomNodeRef::Refinery(_) => "Refinery",
+                        crate::loom::types::LoomNodeRef::Shuttle(_) => "Shuttle",
                     };
                     let src_color = noderef_color(*src);
                     lines.push(Line::from(vec![
@@ -1050,12 +1050,12 @@ fn render_flow_sidebar_refinery(
         }
 
         // Status line.
-        let status_text = if refinery.stalled {
+        let status_text = if shuttle.stalled {
             " Status: STALLED"
         } else {
             " Status: Running"
         };
-        let status_color = if refinery.stalled {
+        let status_color = if shuttle.stalled {
             Color::Rgb(220, 60, 60)
         } else {
             Color::Rgb(80, 200, 120)
@@ -1143,20 +1143,20 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
     ];
     let selected_id = grid_ids[ui.selected_node.min(5)];
 
-    // Determine refinery section height.
-    let refineries = &loom_state.persistent.refineries;
-    let refinery_row_count = if refineries.is_empty() {
+    // Determine shuttle section height.
+    let shuttles = &loom_state.persistent.shuttles;
+    let shuttle_row_count = if shuttles.is_empty() {
         0u16
     } else {
-        let refinery_grid_rows = refineries.len().div_ceil(2);
-        1 + (refinery_grid_rows as u16) * (NODE_BOX_HEIGHT as u16 + 2)
+        let shuttle_grid_rows = shuttles.len().div_ceil(2);
+        1 + (shuttle_grid_rows as u16) * (NODE_BOX_HEIGHT as u16 + 2)
     };
 
-    // Layout: 4 extractor rows (single, pair, pair, single) + 3 arrow gaps + refineries.
+    // Layout: 4 extractor rows (single, pair, pair, single) + 3 arrow gaps + shuttles.
     let box_h = NODE_BOX_HEIGHT as u16;
     let gap_h = 1u16;
     let extractor_total_h = 4 * box_h + 3 * gap_h;
-    let content_h = extractor_total_h + refinery_row_count;
+    let content_h = extractor_total_h + shuttle_row_count;
 
     let v_pad = grid_area.height.saturating_sub(content_h) / 2;
 
@@ -1168,8 +1168,8 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
             row_constraints.push(Constraint::Length(gap_h));
         }
     }
-    if refinery_row_count > 0 {
-        row_constraints.push(Constraint::Length(refinery_row_count));
+    if shuttle_row_count > 0 {
+        row_constraints.push(Constraint::Length(shuttle_row_count));
     }
     row_constraints.push(Constraint::Min(0));
 
@@ -1179,7 +1179,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         .split(grid_area);
 
     // Indices: 0=pad, 1=row0(ES), 2=gap, 3=row1(RL,RF), 4=gap, 5=row2(VC,SW), 6=gap, 7=row3(MA)
-    // Then 8=refinery section (if present), last=spacer
+    // Then 8=shuttle section (if present), last=spacer
     let node_row_rects = [row_rects[1], row_rects[3], row_rects[5], row_rects[7]];
     let gap_rects = [row_rects[2], row_rects[4], row_rects[6]];
 
@@ -1433,51 +1433,51 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         }
     }
 
-    // ── Refineries: render below the extractor grid ──────────────────────────
-    if !refineries.is_empty() {
-        let refinery_section = row_rects[8]; // index 8 = after top pad + 4 extractor rows + 3 gaps
+    // ── Shuttles: render below the extractor grid ──────────────────────────
+    if !shuttles.is_empty() {
+        let shuttle_section = row_rects[8]; // index 8 = after top pad + 4 extractor rows + 3 gaps
 
         // Separator label.
         let sep_rect = Rect {
-            x: refinery_section.x,
-            y: refinery_section.y,
-            width: refinery_section.width,
+            x: shuttle_section.x,
+            y: shuttle_section.y,
+            width: shuttle_section.width,
             height: 1,
         };
         let sep = Paragraph::new(Line::from(Span::styled(
-            "\u{2500}\u{2500} Processing \u{2500}\u{2500}",
+            "\u{2500}\u{2500} Shuttles \u{2500}\u{2500}",
             Style::default().fg(Color::Rgb(80, 60, 100)),
         )))
         .style(Style::default().bg(LOOM_BG));
         frame.render_widget(sep, sep_rect);
 
-        // Refinery boxes in 2-column grid below separator.
+        // Shuttle boxes in 2-column grid below separator.
         let ref_box_h = NODE_BOX_HEIGHT as u16 + 2; // slightly taller for content
 
-        for (i, refinery) in refineries.iter().enumerate() {
+        for (i, shuttle) in shuttles.iter().enumerate() {
             let grid_row = i / 2;
             let grid_col = i % 2;
 
-            let ref_y = refinery_section.y + 1 + (grid_row as u16) * ref_box_h;
-            if ref_y + ref_box_h > refinery_section.y + refinery_section.height {
+            let ref_y = shuttle_section.y + 1 + (grid_row as u16) * ref_box_h;
+            if ref_y + ref_box_h > shuttle_section.y + shuttle_section.height {
                 break; // out of visible area
             }
 
             let ref_x = if grid_col == 0 {
-                refinery_section.x
+                shuttle_section.x
             } else {
-                refinery_section.x + refinery_section.width.saturating_sub(node_w)
+                shuttle_section.x + shuttle_section.width.saturating_sub(node_w)
             };
 
             let ref_rect = Rect {
                 x: ref_x,
                 y: ref_y,
-                width: node_w.min(refinery_section.width),
+                width: node_w.min(shuttle_section.width),
                 height: ref_box_h,
             };
 
             let is_sel = ui.selected_node >= 6 && (ui.selected_node - 6) == i;
-            render_refinery_widget(frame, ref_rect, refinery, is_sel, i, ui.throbber_frame);
+            render_shuttle_widget(frame, ref_rect, shuttle, is_sel, i, ui.throbber_frame);
         }
     }
 
@@ -1564,11 +1564,11 @@ fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui:
             lock_marker,
         ]));
 
-        // Show refinery consumers of this node inline in the list.
+        // Show shuttle consumers of this node inline in the list.
         if is_selected && node.unlocked {
             let consumer_count = loom_state
                 .persistent
-                .refineries
+                .shuttles
                 .iter()
                 .filter(|r| {
                     let node_ref = crate::loom::types::LoomNodeRef::Extractor(*node_id);
@@ -1577,12 +1577,12 @@ fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui:
                 .count();
             if consumer_count == 0 {
                 lines.push(Line::from(Span::styled(
-                    "     no refinery consumers",
+                    "     no shuttle consumers",
                     Style::default().fg(Color::Rgb(60, 45, 80)),
                 )));
             } else {
                 lines.push(Line::from(Span::styled(
-                    format!("     {} refinery consumer(s)", consumer_count),
+                    format!("     {} shuttle consumer(s)", consumer_count),
                     Style::default().fg(Color::Rgb(100, 70, 130)),
                 )));
             }
@@ -1752,11 +1752,11 @@ fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui:
             )));
         }
 
-        // Refinery consumer count for this node.
+        // Shuttle consumer count for this node.
         let node_ref = crate::loom::types::LoomNodeRef::Extractor(selected_node_id);
         let consumer_count = loom_state
             .persistent
-            .refineries
+            .shuttles
             .iter()
             .filter(|r| r.sources_a.contains(&node_ref) || r.sources_b.contains(&node_ref))
             .count();
@@ -1766,7 +1766,7 @@ fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui:
                 Span::styled(" Consumers: ", Style::default().fg(Color::DarkGray)),
                 Span::styled(
                     format!(
-                        "{} refiner{}",
+                        "{} shuttle{}",
                         consumer_count,
                         if consumer_count == 1 { "y" } else { "ies" }
                     ),
@@ -2186,7 +2186,7 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
     }
 }
 
-// ── Build Refinery Overlay ────────────────────────────────────────────────────
+// ── Build Shuttle Overlay ────────────────────────────────────────────────────
 
 fn render_build_overlay(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &LoomUiState) {
     let build = match &ui.build {
@@ -2232,12 +2232,12 @@ fn render_build_overlay(frame: &mut Frame, area: Rect, loom_state: &LoomState, u
                 )));
             }
             lines.push(Line::from(""));
-            let cost = crate::loom::refinery_build_cost_public(build.tier);
+            let cost = crate::loom::shuttle_build_cost_public(build.tier);
             lines.push(Line::from(Span::styled(
                 format!(" Build cost: {:.0} of input A resource", cost),
                 Style::default().fg(Color::Rgb(100, 80, 130)),
             )));
-            (" Build Refinery ", lines)
+            (" Build Shuttle ", lines)
         }
         crate::loom::BuildStep::SelectSourcesA { cursor, toggle } => {
             let r = &recipes[build.recipe_index];
@@ -2349,7 +2349,7 @@ fn render_build_overlay(frame: &mut Frame, area: Rect, loom_state: &LoomState, u
                 )));
             }
             lines.push(Line::from(""));
-            let cost = crate::loom::refinery_build_cost_public(build.tier);
+            let cost = crate::loom::shuttle_build_cost_public(build.tier);
             let stockpile = loom_state
                 .persistent
                 .stockpiles
@@ -2424,8 +2424,8 @@ fn source_display_name(src: &crate::loom::types::LoomNodeRef, loom_state: &LoomS
                 .unwrap_or(0.0);
             format!("{} ({:.0}/hr)", node_id.name(), rate)
         }
-        crate::loom::types::LoomNodeRef::Refinery(idx) => {
-            if let Some(r) = loom_state.persistent.refineries.get(*idx) {
+        crate::loom::types::LoomNodeRef::Shuttle(idx) => {
+            if let Some(r) = loom_state.persistent.shuttles.get(*idx) {
                 format!("R{} {} ({:.1}x)", idx, resource_name(&r.output), r.amount)
             } else {
                 format!("R{} (unknown)", idx)

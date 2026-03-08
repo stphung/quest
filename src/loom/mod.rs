@@ -8,17 +8,16 @@ pub mod types;
 pub use discovery::complete_discovery;
 #[allow(unused_imports)]
 pub use logic::{
-    archetype_nodes, build_refinery, check_node_stall, codex_hint_indices, demolish_refinery,
+    archetype_nodes, build_shuttle, check_node_stall, codex_hint_indices, demolish_shuttle,
     effective_buffer_capacity, effective_node_base_rate, eligible_sources_for_tier,
     initialize_loom, loom_external_bonuses, loom_production_bonus, node_conversion_multiplier,
     node_effective_rate, node_level_multiplier, node_native_resource, node_neighbor_unlock_count,
     node_neighbor_unlock_speed_multiplier, node_neighbors, node_throughput_multiplier,
-    node_upgrade_cost, node_upgrade_cost_multiplier, refinery_build_cost_public,
-    resonance_early_feedback_active, select_archetype, tick_base_production,
-    tick_loom_staggered_unlock, tick_neighbor_unlocking, tick_refinery_construction,
-    tick_refinery_pull, tick_refinery_stall_detection, tick_stall_detection, try_upgrade_node,
-    unlocked_tiers, LoomExternalBonuses, RefineryError, REFINERY_CONSTRUCTION_TICKS,
-    SECOND_NODE_UNLOCK_SECONDS,
+    node_upgrade_cost, node_upgrade_cost_multiplier, resonance_early_feedback_active,
+    select_archetype, shuttle_build_cost_public, tick_base_production, tick_loom_staggered_unlock,
+    tick_neighbor_unlocking, tick_shuttle_construction, tick_shuttle_pull,
+    tick_shuttle_stall_detection, tick_stall_detection, try_upgrade_node, unlocked_tiers,
+    LoomExternalBonuses, ShuttleError, SECOND_NODE_UNLOCK_SECONDS, SHUTTLE_CONSTRUCTION_TICKS,
 };
 #[allow(unused_imports)]
 pub use patterns::{
@@ -31,5 +30,5 @@ pub use persistence::{load_loom, loom_save_path, save_loom};
 pub use types::{
     BuildState, BuildStep, CodexEntry, LoomArchetype, LoomNode, LoomNodeRef, LoomPersistent,
     LoomState, LoomUiState, LoomView, NodeId, NodeNature, PatternRequirement, RateTracker,
-    Refinery, Resource, WovenPattern,
+    Resource, Shuttle, WovenPattern,
 };

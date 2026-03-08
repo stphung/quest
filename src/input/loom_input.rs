@@ -33,7 +33,7 @@ pub(super) fn handle_loom(
                     loom_ui.codex_scroll = loom_ui.codex_scroll.saturating_sub(1);
                 }
                 LoomView::FlowView => {
-                    // Diamond layout: 0=ES, 1=RL, 2=RF, 3=VC, 4=SW, 5=MA, 6+=refineries
+                    // Diamond layout: 0=ES, 1=RL, 2=RF, 3=VC, 4=SW, 5=MA, 6+=shuttles
                     // Up moves to the previous row, preserving left/right position.
                     loom_ui.selected_node = match loom_ui.selected_node {
                         0 => 0,     // ES: stay
@@ -42,7 +42,7 @@ pub(super) fn handle_loom(
                         4 => 2,     // SW → RF
                         5 => 3,     // MA → VC (default left)
                         n if n >= 6 => {
-                            // Refineries → MA
+                            // Shuttles → MA
                             5
                         }
                         n => n,
@@ -61,14 +61,14 @@ pub(super) fn handle_loom(
                 }
                 LoomView::FlowView => {
                     // Diamond layout: down moves to the next row.
-                    let total_nodes = 6 + loom_state.persistent.refineries.len();
+                    let total_nodes = 6 + loom_state.persistent.shuttles.len();
                     loom_ui.selected_node = match loom_ui.selected_node {
                         0 => 1,     // ES → RL (default left)
                         1 => 3,     // RL → VC
                         2 => 4,     // RF → SW
                         3 | 4 => 5, // VC/SW → MA
                         5 => {
-                            // MA → first refinery (if any)
+                            // MA → first shuttle (if any)
                             if total_nodes > 6 {
                                 6
                             } else {
@@ -76,7 +76,7 @@ pub(super) fn handle_loom(
                             }
                         }
                         n if n >= 6 => {
-                            // Navigate within refineries (2-col grid)
+                            // Navigate within shuttles (2-col grid)
                             if n + 2 < total_nodes {
                                 n + 2
                             } else {
@@ -95,23 +95,23 @@ pub(super) fn handle_loom(
             InputResult::Continue
         }
         KeyCode::Left if loom_ui.view == LoomView::FlowView => {
-            // Diamond layout: left toggles to left node on pair rows, or moves in refinery grid.
+            // Diamond layout: left toggles to left node on pair rows, or moves in shuttle grid.
             match loom_ui.selected_node {
                 2 => loom_ui.selected_node = 1,                          // RF → RL
                 4 => loom_ui.selected_node = 3,                          // SW → VC
-                n if n >= 6 && n % 2 == 1 => loom_ui.selected_node -= 1, // refinery right → left
+                n if n >= 6 && n % 2 == 1 => loom_ui.selected_node -= 1, // shuttle right → left
                 _ => {}
             }
             InputResult::Continue
         }
         KeyCode::Right if loom_ui.view == LoomView::FlowView => {
             // Diamond layout: right toggles to right node on pair rows.
-            let total_nodes = 6 + loom_state.persistent.refineries.len();
+            let total_nodes = 6 + loom_state.persistent.shuttles.len();
             match loom_ui.selected_node {
                 1 => loom_ui.selected_node = 2, // RL → RF
                 3 => loom_ui.selected_node = 4, // VC → SW
                 n if n >= 6 && n % 2 == 0 && n + 1 < total_nodes => {
-                    loom_ui.selected_node += 1; // refinery left → right
+                    loom_ui.selected_node += 1; // shuttle left → right
                 }
                 _ => {}
             }
@@ -146,11 +146,11 @@ pub(super) fn handle_loom(
         KeyCode::Char('d') | KeyCode::Char('D')
             if loom_ui.view == LoomView::FlowView && loom_ui.selected_node >= 6 =>
         {
-            let refinery_idx = loom_ui.selected_node - 6;
-            if refinery_idx < loom_state.persistent.refineries.len() {
-                crate::loom::demolish_refinery(loom_state, refinery_idx);
+            let shuttle_idx = loom_ui.selected_node - 6;
+            if shuttle_idx < loom_state.persistent.shuttles.len() {
+                crate::loom::demolish_shuttle(loom_state, shuttle_idx);
                 // Clamp selection if we deleted the last item.
-                let total = 6 + loom_state.persistent.refineries.len();
+                let total = 6 + loom_state.persistent.shuttles.len();
                 if loom_ui.selected_node >= total && total > 0 {
                     loom_ui.selected_node = total - 1;
                 }
@@ -163,7 +163,7 @@ pub(super) fn handle_loom(
     }
 }
 
-/// Start the build refinery flow.
+/// Start the build shuttle flow.
 fn start_build(loom_state: &LoomState, loom_ui: &mut LoomUiState) {
     use crate::loom::types::BuildStep;
     let tiers = crate::loom::unlocked_tiers(loom_state);
@@ -178,7 +178,7 @@ fn start_build(loom_state: &LoomState, loom_ui: &mut LoomUiState) {
         loom_ui.build = Some(BuildState {
             step: BuildStep::Blocked {
                 message: format!(
-                    "Complete 1 pattern to unlock T1 refineries ({}/1 done)",
+                    "Complete 1 pattern to unlock T1 shuttles ({}/1 done)",
                     completed
                 ),
             },
@@ -215,7 +215,7 @@ fn start_build(loom_state: &LoomState, loom_ui: &mut LoomUiState) {
     });
 }
 
-/// Handle input while in the build refinery flow.
+/// Handle input while in the build shuttle flow.
 fn handle_build_input(
     key: KeyEvent,
     loom_state: &mut LoomState,
@@ -351,7 +351,7 @@ fn handle_build_input(
                 let recipe = &recipes[build.recipe_index];
                 let sources_a = build.selected_sources_a.clone();
                 let sources_b = build.selected_sources_b.clone();
-                let result = crate::loom::build_refinery(
+                let result = crate::loom::build_shuttle(
                     loom_state,
                     recipe.input_a,
                     recipe.input_b,
@@ -449,13 +449,13 @@ mod tests {
     }
 
     #[test]
-    fn test_navigation_extends_to_refineries() {
+    fn test_navigation_extends_to_shuttles() {
         let mut state = LoomState::new();
         crate::loom::logic::initialize_loom(&mut state);
         state
             .persistent
-            .refineries
-            .push(crate::loom::types::Refinery::new(
+            .shuttles
+            .push(crate::loom::types::Shuttle::new(
                 crate::loom::types::Resource::Ember,
                 crate::loom::types::Resource::VoidEssence,
                 crate::loom::types::NodeNature::Heat,
@@ -476,9 +476,9 @@ mod tests {
         assert_eq!(ui.selected_node, 5, "SW → MA");
 
         handle_loom(key(KeyCode::Down), &mut state, &mut ui);
-        assert_eq!(ui.selected_node, 6, "MA → refinery area");
+        assert_eq!(ui.selected_node, 6, "MA → shuttle area");
 
         handle_loom(key(KeyCode::Up), &mut state, &mut ui);
-        assert_eq!(ui.selected_node, 5, "refinery → MA");
+        assert_eq!(ui.selected_node, 5, "shuttle → MA");
     }
 }

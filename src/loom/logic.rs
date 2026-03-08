@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use super::types::{
-    LoomArchetype, LoomNode, LoomNodeRef, LoomState, NodeId, NodeNature, Refinery, Resource,
+    LoomArchetype, LoomNode, LoomNodeRef, LoomState, NodeId, NodeNature, Resource, Shuttle,
 };
 
 /// Legacy archetype-to-node mapping (kept for save compatibility).
@@ -302,9 +302,9 @@ pub fn tick_stall_detection(loom: &mut LoomState) -> Vec<NodeId> {
     changed
 }
 
-// ── Phase 6: Direct-Pull Refinery Tick ────────────────────────────────────────
+// ── Phase 6: Direct-Pull Shuttle Tick ────────────────────────────────────────
 
-/// Max intake rate per input slot, by refinery tier (units/hour).
+/// Max intake rate per input slot, by shuttle tier (units/hour).
 pub fn tier_intake_cap(tier: u8) -> f64 {
     match tier {
         1 => 20.0,
@@ -314,19 +314,15 @@ pub fn tier_intake_cap(tier: u8) -> f64 {
     }
 }
 
-/// Check whether a source node reference is valid for a given refinery tier.
-/// Extractors are always valid. Refineries are valid only if their tier is
-/// strictly less than the consuming refinery's tier.
-pub fn valid_source_for_tier(
-    source: LoomNodeRef,
-    refinery_tier: u8,
-    refineries: &[Refinery],
-) -> bool {
+/// Check whether a source node reference is valid for a given shuttle tier.
+/// Extractors are always valid. Shuttles are valid only if their tier is
+/// strictly less than the consuming shuttle's tier.
+pub fn valid_source_for_tier(source: LoomNodeRef, shuttle_tier: u8, shuttles: &[Shuttle]) -> bool {
     match source {
         LoomNodeRef::Extractor(_) => true,
-        LoomNodeRef::Refinery(idx) => {
-            if let Some(source_ref) = refineries.get(idx) {
-                source_ref.tier < refinery_tier
+        LoomNodeRef::Shuttle(idx) => {
+            if let Some(source_ref) = shuttles.get(idx) {
+                source_ref.tier < shuttle_tier
             } else {
                 false
             }
@@ -334,19 +330,19 @@ pub fn valid_source_for_tier(
     }
 }
 
-/// Tick all refinery direct-pull processing.
+/// Tick all shuttle direct-pull processing.
 ///
 /// Each tick:
 /// 1. Count consumers per source (for contention splitting).
-/// 2. Process refineries by tier order (T1 first, then T2, then T3).
-/// 3. For each refinery: calculate available pull for each input slot.
+/// 2. Process shuttles by tier order (T1 first, then T2, then T3).
+/// 3. For each shuttle: calculate available pull for each input slot.
 ///    - For each source: `share = source_available / num_consumers_of_that_source`
 ///    - `actual_pull = min(tier_intake_cap, share)` summed across all sources for that slot
 /// 4. `output_rate = min(total_pull_a, total_pull_b) * recipe_amount`
-/// 5. Add output to refinery buffer (capped at capacity).
+/// 5. Add output to shuttle buffer (capped at capacity).
 ///
 /// Returns a map of resource → total produced this tick (for pattern tracking).
-pub fn tick_refinery_pull(
+pub fn tick_shuttle_pull(
     loom: &mut LoomState,
     delta_seconds: f64,
 ) -> std::collections::HashMap<Resource, f64> {
@@ -361,10 +357,10 @@ pub fn tick_refinery_pull(
         .map(|n| (n.id, node_throughput_multiplier(loom, n.id)))
         .collect();
 
-    // ── Step 1: Count consumers per source across all non-construction refineries ──
+    // ── Step 1: Count consumers per source across all non-construction shuttles ──
     let mut consumer_count: std::collections::HashMap<LoomNodeRef, usize> =
         std::collections::HashMap::new();
-    for r in &loom.persistent.refineries {
+    for r in &loom.persistent.shuttles {
         if r.under_construction {
             continue;
         }
@@ -373,14 +369,14 @@ pub fn tick_refinery_pull(
         }
     }
 
-    // ── Step 2: Process refineries by tier (T1 before T2 before T3) ──
-    // Track effective output rates per refinery index for higher-tier pulls.
-    let mut refinery_output_rates: Vec<f64> = vec![0.0; loom.persistent.refineries.len()];
+    // ── Step 2: Process shuttles by tier (T1 before T2 before T3) ──
+    // Track effective output rates per shuttle index for higher-tier pulls.
+    let mut shuttle_output_rates: Vec<f64> = vec![0.0; loom.persistent.shuttles.len()];
 
     for tier in 1u8..=3 {
         let indices: Vec<usize> = loom
             .persistent
-            .refineries
+            .shuttles
             .iter()
             .enumerate()
             .filter(|(_, r)| !r.under_construction && r.tier == tier)
@@ -388,7 +384,7 @@ pub fn tick_refinery_pull(
             .collect();
 
         for idx in indices {
-            let r = &loom.persistent.refineries[idx];
+            let r = &loom.persistent.shuttles[idx];
             let cap = tier_intake_cap(r.tier);
 
             // Calculate available pull for input A.
@@ -399,7 +395,7 @@ pub fn tick_refinery_pull(
                     let available = source_available_rate(
                         src,
                         &loom.persistent,
-                        &refinery_output_rates,
+                        &shuttle_output_rates,
                         &node_multipliers,
                     );
                     let consumers = consumer_count.get(&src).copied().unwrap_or(1).max(1);
@@ -417,7 +413,7 @@ pub fn tick_refinery_pull(
                     let available = source_available_rate(
                         src,
                         &loom.persistent,
-                        &refinery_output_rates,
+                        &shuttle_output_rates,
                         &node_multipliers,
                     );
                     let consumers = consumer_count.get(&src).copied().unwrap_or(1).max(1);
@@ -429,12 +425,12 @@ pub fn tick_refinery_pull(
 
             // Output rate for this tick = min(pull_a, pull_b) * recipe_amount.
             let output_rate = pull_a.min(pull_b) * r.amount;
-            refinery_output_rates[idx] = output_rate;
+            shuttle_output_rates[idx] = output_rate;
 
             // Add to buffer.
             let output_this_tick = output_rate * delta_hours;
             if output_this_tick > 0.0 {
-                let r = &mut loom.persistent.refineries[idx];
+                let r = &mut loom.persistent.shuttles[idx];
                 let space = (r.buffer_capacity - r.buffer).max(0.0);
                 let actual = output_this_tick.min(space);
                 r.buffer += actual;
@@ -453,7 +449,7 @@ pub fn tick_refinery_pull(
 fn source_available_rate(
     src: LoomNodeRef,
     persistent: &super::types::LoomPersistent,
-    refinery_rates: &[f64],
+    shuttle_rates: &[f64],
     node_multipliers: &std::collections::HashMap<NodeId, f64>,
 ) -> f64 {
     match src {
@@ -465,7 +461,7 @@ fn source_available_rate(
                 0.0
             }
         }
-        LoomNodeRef::Refinery(idx) => refinery_rates.get(idx).copied().unwrap_or(0.0),
+        LoomNodeRef::Shuttle(idx) => shuttle_rates.get(idx).copied().unwrap_or(0.0),
     }
 }
 
@@ -567,12 +563,12 @@ pub fn loom_production_bonus(
     1.0 + deep_bonus + haven_bonus + sigil_bonus + ascension_bonus
 }
 
-/// Ticks required for a refinery to finish construction (2 hours at 100ms/tick = 72000 ticks).
-pub const REFINERY_CONSTRUCTION_TICKS: u32 = 72_000;
+/// Ticks required for a shuttle to finish construction (2 hours at 100ms/tick = 72000 ticks).
+pub const SHUTTLE_CONSTRUCTION_TICKS: u32 = 72_000;
 
-/// Error conditions for refinery building.
+/// Error conditions for shuttle building.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RefineryError {
+pub enum ShuttleError {
     InvalidRecipe,
     TierLocked,
     AtCapacity,
@@ -580,7 +576,7 @@ pub enum RefineryError {
     InvalidSource,
 }
 
-fn refinery_build_cost(tier: u8) -> f64 {
+fn shuttle_build_cost(tier: u8) -> f64 {
     match tier {
         1 => 250.0,
         2 => 150.0,
@@ -588,7 +584,7 @@ fn refinery_build_cost(tier: u8) -> f64 {
     }
 }
 
-fn refinery_tier_unlock_threshold(tier: u8) -> usize {
+fn shuttle_tier_unlock_threshold(tier: u8) -> usize {
     match tier {
         1 => 1,
         2 => 8,
@@ -606,19 +602,19 @@ pub fn unlocked_tiers(loom: &LoomState) -> Vec<u8> {
         .count();
     let mut tiers = Vec::new();
     for tier in 1u8..=3 {
-        if completed >= refinery_tier_unlock_threshold(tier) {
+        if completed >= shuttle_tier_unlock_threshold(tier) {
             tiers.push(tier);
         }
     }
     tiers
 }
 
-/// Returns the build cost for a refinery of the given tier.
-pub fn refinery_build_cost_public(tier: u8) -> f64 {
-    refinery_build_cost(tier)
+/// Returns the build cost for a shuttle of the given tier.
+pub fn shuttle_build_cost_public(tier: u8) -> f64 {
+    shuttle_build_cost(tier)
 }
 
-/// Returns all eligible source nodes for a given refinery tier.
+/// Returns all eligible source nodes for a given shuttle tier.
 pub fn eligible_sources_for_tier(
     loom: &LoomState,
     tier: u8,
@@ -631,38 +627,38 @@ pub fn eligible_sources_for_tier(
             sources.push(LoomNodeRef::Extractor(node.id));
         }
     }
-    // Refineries of lower tier that output the needed resource.
-    for (i, r) in loom.persistent.refineries.iter().enumerate() {
+    // Shuttles of lower tier that output the needed resource.
+    for (i, r) in loom.persistent.shuttles.iter().enumerate() {
         if r.output == resource
-            && valid_source_for_tier(LoomNodeRef::Refinery(i), tier, &loom.persistent.refineries)
+            && valid_source_for_tier(LoomNodeRef::Shuttle(i), tier, &loom.persistent.shuttles)
         {
-            sources.push(LoomNodeRef::Refinery(i));
+            sources.push(LoomNodeRef::Shuttle(i));
         }
     }
     sources
 }
 
-/// Attempt to build a new Refinery locked to the given recipe.
+/// Attempt to build a new Shuttle locked to the given recipe.
 ///
 /// # Errors
-/// - `RefineryError::InvalidRecipe` — no recipe exists for the given inputs and nature.
-/// - `RefineryError::TierLocked` — the recipe's tier requires more completed patterns.
-/// - `RefineryError::AtCapacity` — the player already has the maximum number of refineries.
-/// - `RefineryError::InsufficientResources` — not enough `input_a` stockpile to pay the build cost.
-/// - `RefineryError::InvalidSource` — a source node is invalid for the recipe's tier.
+/// - `ShuttleError::InvalidRecipe` — no recipe exists for the given inputs and nature.
+/// - `ShuttleError::TierLocked` — the recipe's tier requires more completed patterns.
+/// - `ShuttleError::AtCapacity` — the player already has the maximum number of shuttles.
+/// - `ShuttleError::InsufficientResources` — not enough `input_a` stockpile to pay the build cost.
+/// - `ShuttleError::InvalidSource` — a source node is invalid for the recipe's tier.
 ///
 /// # Returns
-/// The index of the newly created `Refinery` in `loom.persistent.refineries`.
-pub fn build_refinery(
+/// The index of the newly created `Shuttle` in `loom.persistent.shuttles`.
+pub fn build_shuttle(
     loom: &mut LoomState,
     input_a: Resource,
     input_b: Resource,
     nature: NodeNature,
     sources_a: Vec<LoomNodeRef>,
     sources_b: Vec<LoomNodeRef>,
-) -> Result<usize, RefineryError> {
+) -> Result<usize, ShuttleError> {
     let recipe = crate::loom::recipes::find_recipe(input_a, input_b, nature)
-        .ok_or(RefineryError::InvalidRecipe)?;
+        .ok_or(ShuttleError::InvalidRecipe)?;
 
     let completed_patterns = loom
         .persistent
@@ -670,29 +666,29 @@ pub fn build_refinery(
         .iter()
         .filter(|p| p.completed)
         .count();
-    if completed_patterns < refinery_tier_unlock_threshold(recipe.tier) {
-        return Err(RefineryError::TierLocked);
+    if completed_patterns < shuttle_tier_unlock_threshold(recipe.tier) {
+        return Err(ShuttleError::TierLocked);
     }
 
-    if loom.persistent.refineries.len() >= loom.persistent.max_refineries() {
-        return Err(RefineryError::AtCapacity);
+    if loom.persistent.shuttles.len() >= loom.persistent.max_shuttles() {
+        return Err(ShuttleError::AtCapacity);
     }
 
     // Validate all sources for this tier.
     for &src in sources_a.iter().chain(sources_b.iter()) {
-        if !valid_source_for_tier(src, recipe.tier, &loom.persistent.refineries) {
-            return Err(RefineryError::InvalidSource);
+        if !valid_source_for_tier(src, recipe.tier, &loom.persistent.shuttles) {
+            return Err(ShuttleError::InvalidSource);
         }
     }
 
-    let cost = refinery_build_cost(recipe.tier);
+    let cost = shuttle_build_cost(recipe.tier);
     let stockpile = loom.persistent.stockpiles.entry(input_a).or_insert(0.0);
     if *stockpile < cost {
-        return Err(RefineryError::InsufficientResources);
+        return Err(ShuttleError::InsufficientResources);
     }
     *stockpile -= cost;
 
-    let mut r = Refinery::new(
+    let mut r = Shuttle::new(
         recipe.input_a,
         recipe.input_b,
         recipe.node_nature,
@@ -703,16 +699,16 @@ pub fn build_refinery(
         sources_b,
     );
     r.under_construction = true;
-    r.construction_ticks_remaining = REFINERY_CONSTRUCTION_TICKS;
-    loom.persistent.refineries.push(r);
-    Ok(loom.persistent.refineries.len() - 1)
+    r.construction_ticks_remaining = SHUTTLE_CONSTRUCTION_TICKS;
+    loom.persistent.shuttles.push(r);
+    Ok(loom.persistent.shuttles.len() - 1)
 }
 
-/// Tick construction for all refineries under construction.
-/// Returns indices of refineries that completed this tick.
-pub fn tick_refinery_construction(loom: &mut LoomState) -> Vec<usize> {
+/// Tick construction for all shuttles under construction.
+/// Returns indices of shuttles that completed this tick.
+pub fn tick_shuttle_construction(loom: &mut LoomState) -> Vec<usize> {
     let mut completed = Vec::new();
-    for (i, r) in loom.persistent.refineries.iter_mut().enumerate() {
+    for (i, r) in loom.persistent.shuttles.iter_mut().enumerate() {
         if !r.under_construction {
             continue;
         }
@@ -725,27 +721,27 @@ pub fn tick_refinery_construction(loom: &mut LoomState) -> Vec<usize> {
     completed
 }
 
-/// Demolish a refinery by index.
-/// Removes the refinery and re-indexes source references in remaining refineries.
-pub fn demolish_refinery(loom: &mut LoomState, idx: usize) {
-    if idx >= loom.persistent.refineries.len() {
+/// Demolish a shuttle by index.
+/// Removes the shuttle and re-indexes source references in remaining shuttles.
+pub fn demolish_shuttle(loom: &mut LoomState, idx: usize) {
+    if idx >= loom.persistent.shuttles.len() {
         return;
     }
 
-    // Remove the refinery.
-    loom.persistent.refineries.remove(idx);
+    // Remove the shuttle.
+    loom.persistent.shuttles.remove(idx);
 
-    // Re-index source references in remaining refineries.
-    for r in &mut loom.persistent.refineries {
+    // Re-index source references in remaining shuttles.
+    for r in &mut loom.persistent.shuttles {
         reindex_sources(&mut r.sources_a, idx);
         reindex_sources(&mut r.sources_b, idx);
     }
 }
 
 fn reindex_sources(sources: &mut Vec<LoomNodeRef>, removed_idx: usize) {
-    sources.retain(|s| !matches!(s, LoomNodeRef::Refinery(i) if *i == removed_idx));
+    sources.retain(|s| !matches!(s, LoomNodeRef::Shuttle(i) if *i == removed_idx));
     for s in sources.iter_mut() {
-        if let LoomNodeRef::Refinery(ref mut i) = s {
+        if let LoomNodeRef::Shuttle(ref mut i) = s {
             if *i > removed_idx {
                 *i -= 1;
             }
@@ -753,9 +749,9 @@ fn reindex_sources(sources: &mut Vec<LoomNodeRef>, removed_idx: usize) {
     }
 }
 
-/// Update stall flags for all refineries.
-pub fn tick_refinery_stall_detection(loom: &mut LoomState) {
-    for r in &mut loom.persistent.refineries {
+/// Update stall flags for all shuttles.
+pub fn tick_shuttle_stall_detection(loom: &mut LoomState) {
+    for r in &mut loom.persistent.shuttles {
         if r.under_construction {
             continue;
         }
@@ -1130,17 +1126,17 @@ mod tests {
         );
     }
 
-    // ── Phase 6: Direct-Pull Refinery tests ───────────────────────────────────
+    // ── Phase 6: Direct-Pull Shuttle tests ───────────────────────────────────
 
     #[test]
-    fn test_tick_refinery_pull_empty_no_panic() {
+    fn test_tick_shuttle_pull_empty_no_panic() {
         let mut loom = LoomState::new();
-        let produced = tick_refinery_pull(&mut loom, 0.1);
+        let produced = tick_shuttle_pull(&mut loom, 0.1);
         assert!(produced.is_empty());
     }
 
     #[test]
-    fn test_tick_refinery_pull_with_unlocked_source_produces_output() {
+    fn test_tick_shuttle_pull_with_unlocked_source_produces_output() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
         // Fill EmberSpindle buffer to give it a non-zero rate proxy.
@@ -1161,7 +1157,7 @@ mod tests {
         void_node.unlocked = true;
         void_node.buffer = void_node.buffer_capacity;
 
-        let mut r = Refinery::new(
+        let mut r = Shuttle::new(
             Resource::Ember,
             Resource::VoidEssence,
             NodeNature::Heat,
@@ -1172,10 +1168,10 @@ mod tests {
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         );
         r.under_construction = false;
-        loom.persistent.refineries.push(r);
+        loom.persistent.shuttles.push(r);
 
         // Run for 1 hour worth of ticks.
-        let produced = tick_refinery_pull(&mut loom, 3600.0);
+        let produced = tick_shuttle_pull(&mut loom, 3600.0);
         // Should produce some ForgedLight.
         assert!(
             produced.get(&Resource::ForgedLight).copied().unwrap_or(0.0) > 0.0,
@@ -1184,7 +1180,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tick_refinery_pull_under_construction_skipped() {
+    fn test_tick_shuttle_pull_under_construction_skipped() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
         let void_node = loom
@@ -1195,7 +1191,7 @@ mod tests {
             .unwrap();
         void_node.unlocked = true;
 
-        let mut r = Refinery::new(
+        let mut r = Shuttle::new(
             Resource::Ember,
             Resource::VoidEssence,
             NodeNature::Heat,
@@ -1207,12 +1203,12 @@ mod tests {
         );
         r.under_construction = true;
         r.construction_ticks_remaining = 100;
-        loom.persistent.refineries.push(r);
+        loom.persistent.shuttles.push(r);
 
-        let produced = tick_refinery_pull(&mut loom, 3600.0);
+        let produced = tick_shuttle_pull(&mut loom, 3600.0);
         assert!(
             produced.is_empty(),
-            "under-construction refinery should produce nothing"
+            "under-construction shuttle should produce nothing"
         );
     }
 
@@ -1870,14 +1866,14 @@ mod tests {
         );
     }
 
-    // ── Refinery Ticking ──────────────────────────────────────────────────────
+    // ── Shuttle Ticking ──────────────────────────────────────────────────────
 
     #[test]
-    fn test_refinery_construction_completes() {
+    fn test_shuttle_construction_completes() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
-        loom.persistent.refineries.push({
-            let mut r = Refinery::new(
+        loom.persistent.shuttles.push({
+            let mut r = Shuttle::new(
                 Resource::Ember,
                 Resource::VoidEssence,
                 NodeNature::Heat,
@@ -1892,13 +1888,13 @@ mod tests {
             r
         });
 
-        let completed = tick_refinery_construction(&mut loom);
+        let completed = tick_shuttle_construction(&mut loom);
         assert_eq!(completed.len(), 1);
-        assert!(!loom.persistent.refineries[0].under_construction);
+        assert!(!loom.persistent.shuttles[0].under_construction);
     }
 
     #[test]
-    fn test_refinery_pull_produces_output() {
+    fn test_shuttle_pull_produces_output() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
         // Unlock two extractor nodes and fill their buffers.
@@ -1906,7 +1902,7 @@ mod tests {
         loom.persistent.nodes[0].buffer = 50.0;
         loom.persistent.nodes[1].unlocked = true;
         loom.persistent.nodes[1].buffer = 50.0;
-        loom.persistent.refineries.push(Refinery::new(
+        loom.persistent.shuttles.push(Shuttle::new(
             Resource::Ember,
             Resource::VoidEssence,
             NodeNature::Heat,
@@ -1917,16 +1913,16 @@ mod tests {
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         ));
 
-        let produced = tick_refinery_pull(&mut loom, 1.0);
-        // A T1 refinery should produce some output when sources have stock.
-        assert!(!produced.is_empty() || loom.persistent.refineries[0].buffer >= 0.0);
+        let produced = tick_shuttle_pull(&mut loom, 1.0);
+        // A T1 shuttle should produce some output when sources have stock.
+        assert!(!produced.is_empty() || loom.persistent.shuttles[0].buffer >= 0.0);
     }
 
     #[test]
-    fn test_refinery_stall_when_buffer_full() {
+    fn test_shuttle_stall_when_buffer_full() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
-        let mut r = Refinery::new(
+        let mut r = Shuttle::new(
             Resource::Ember,
             Resource::VoidEssence,
             NodeNature::Heat,
@@ -1937,17 +1933,17 @@ mod tests {
             vec![],
         );
         r.buffer = r.buffer_capacity;
-        loom.persistent.refineries.push(r);
+        loom.persistent.shuttles.push(r);
 
-        tick_refinery_stall_detection(&mut loom);
-        assert!(loom.persistent.refineries[0].stalled);
+        tick_shuttle_stall_detection(&mut loom);
+        assert!(loom.persistent.shuttles[0].stalled);
     }
 
     #[test]
-    fn test_demolish_refinery() {
+    fn test_demolish_shuttle() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
-        loom.persistent.refineries.push(Refinery::new(
+        loom.persistent.shuttles.push(Shuttle::new(
             Resource::Ember,
             Resource::VoidEssence,
             NodeNature::Heat,
@@ -1958,16 +1954,16 @@ mod tests {
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         ));
 
-        demolish_refinery(&mut loom, 0);
-        assert!(loom.persistent.refineries.is_empty());
+        demolish_shuttle(&mut loom, 0);
+        assert!(loom.persistent.shuttles.is_empty());
     }
 
     #[test]
-    fn test_demolish_refinery_reindexes_sources() {
+    fn test_demolish_shuttle_reindexes_sources() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
-        // Build two refineries; second references first via sources_a.
-        loom.persistent.refineries.push(Refinery::new(
+        // Build two shuttles; second references first via sources_a.
+        loom.persistent.shuttles.push(Shuttle::new(
             Resource::Ember,
             Resource::VoidEssence,
             NodeNature::Heat,
@@ -1977,26 +1973,26 @@ mod tests {
             vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         ));
-        loom.persistent.refineries.push(Refinery::new(
+        loom.persistent.shuttles.push(Shuttle::new(
             Resource::ForgedLight,
             Resource::Reflection,
             NodeNature::Form,
             Resource::EchoGlass,
             1.0,
             2,
-            vec![LoomNodeRef::Refinery(0)],
+            vec![LoomNodeRef::Shuttle(0)],
             vec![LoomNodeRef::Extractor(NodeId::ReflectionLens)],
         ));
-        // Insert a T1 refinery before index 0 — then demolish it.
+        // Insert a T1 shuttle before index 0 — then demolish it.
         // Actually insert at index 0 by inserting first, shifting second to index 1.
-        // Easier: demolish refinery 0 and check that refinery (now index 0) has its
-        // sources_a updated from Refinery(0) to be removed (was pointing to the removed one).
-        demolish_refinery(&mut loom, 0);
-        assert_eq!(loom.persistent.refineries.len(), 1);
-        // sources_a pointed to Refinery(0) which was demolished → should be empty.
+        // Easier: demolish shuttle 0 and check that shuttle (now index 0) has its
+        // sources_a updated from Shuttle(0) to be removed (was pointing to the removed one).
+        demolish_shuttle(&mut loom, 0);
+        assert_eq!(loom.persistent.shuttles.len(), 1);
+        // sources_a pointed to Shuttle(0) which was demolished → should be empty.
         assert!(
-            loom.persistent.refineries[0].sources_a.is_empty(),
-            "source reference to demolished refinery should be removed"
+            loom.persistent.shuttles[0].sources_a.is_empty(),
+            "source reference to demolished shuttle should be removed"
         );
     }
 }
@@ -2170,7 +2166,7 @@ mod external_bonus_tests {
     }
 
     #[test]
-    fn test_build_refinery_success() {
+    fn test_build_shuttle_success() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
         setup_patterns(&mut loom, 1);
@@ -2180,7 +2176,7 @@ mod external_bonus_tests {
             .entry(Resource::Ember)
             .or_insert(0.0) += 500.0;
 
-        let result = build_refinery(
+        let result = build_shuttle(
             &mut loom,
             Resource::Ember,
             Resource::VoidEssence,
@@ -2189,18 +2185,18 @@ mod external_bonus_tests {
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         );
         assert!(result.is_ok());
-        assert_eq!(loom.persistent.refineries.len(), 1);
-        let r = &loom.persistent.refineries[0];
+        assert_eq!(loom.persistent.shuttles.len(), 1);
+        let r = &loom.persistent.shuttles[0];
         assert_eq!(r.output, Resource::ForgedLight);
         assert!(r.under_construction);
     }
 
     #[test]
-    fn test_build_refinery_fails_at_capacity() {
+    fn test_build_shuttle_fails_at_capacity() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
-        // No completed patterns → max_refineries() == 0 → AtCapacity.
-        let result = build_refinery(
+        // No completed patterns → max_shuttles() == 0 → AtCapacity.
+        let result = build_shuttle(
             &mut loom,
             Resource::Ember,
             Resource::VoidEssence,
@@ -2212,12 +2208,12 @@ mod external_bonus_tests {
     }
 
     #[test]
-    fn test_build_refinery_fails_insufficient_resources() {
+    fn test_build_shuttle_fails_insufficient_resources() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
         setup_patterns(&mut loom, 1);
         // No Ember stockpile → InsufficientResources.
-        let result = build_refinery(
+        let result = build_shuttle(
             &mut loom,
             Resource::Ember,
             Resource::VoidEssence,
@@ -2229,7 +2225,7 @@ mod external_bonus_tests {
     }
 
     #[test]
-    fn test_build_refinery_fails_invalid_recipe() {
+    fn test_build_shuttle_fails_invalid_recipe() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
         setup_patterns(&mut loom, 1);
@@ -2239,7 +2235,7 @@ mod external_bonus_tests {
             .entry(Resource::Ember)
             .or_insert(0.0) += 50.0;
 
-        let result = build_refinery(
+        let result = build_shuttle(
             &mut loom,
             Resource::WovenReality,
             Resource::WovenReality,
@@ -2251,7 +2247,7 @@ mod external_bonus_tests {
     }
 
     #[test]
-    fn test_build_refinery_tier_gating() {
+    fn test_build_shuttle_tier_gating() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
         // Only 1 completed pattern; Tier 2 recipes require 8 → TierLocked.
@@ -2267,7 +2263,7 @@ mod external_bonus_tests {
             .entry(Resource::EchoGlass)
             .or_insert(0.0) += 50.0;
 
-        let result = build_refinery(
+        let result = build_shuttle(
             &mut loom,
             Resource::ForgedLight,
             Resource::EchoGlass,
@@ -2279,13 +2275,13 @@ mod external_bonus_tests {
     }
 
     #[test]
-    fn test_tick_refinery_pull_basic() {
+    fn test_tick_shuttle_pull_basic() {
         let mut loom = LoomState::new();
         for node in loom.persistent.nodes.iter_mut() {
             node.unlocked = true;
         }
 
-        let mut r = Refinery::new(
+        let mut r = Shuttle::new(
             Resource::Ember,
             Resource::VoidEssence,
             NodeNature::Heat,
@@ -2296,10 +2292,10 @@ mod external_bonus_tests {
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         );
         r.under_construction = false;
-        loom.persistent.refineries.push(r);
+        loom.persistent.shuttles.push(r);
 
         // Run for exactly 1 hour.
-        let produced = tick_refinery_pull(&mut loom, 3600.0);
+        let produced = tick_shuttle_pull(&mut loom, 3600.0);
         let forged = produced.get(&Resource::ForgedLight).copied().unwrap_or(0.0);
 
         // T1 intake cap = 20.0/hr. EmberSpindle = 50.0/hr, VoidCondenser = 50.0/hr.
@@ -2312,15 +2308,15 @@ mod external_bonus_tests {
     }
 
     #[test]
-    fn test_tick_refinery_pull_contention_splits_evenly() {
+    fn test_tick_shuttle_pull_contention_splits_evenly() {
         let mut loom = LoomState::new();
         for node in loom.persistent.nodes.iter_mut() {
             node.unlocked = true;
         }
 
-        // Two T1 refineries both pulling from EmberSpindle (and VoidCondenser).
+        // Two T1 shuttles both pulling from EmberSpindle (and VoidCondenser).
         for _ in 0..2 {
-            let mut r = Refinery::new(
+            let mut r = Shuttle::new(
                 Resource::Ember,
                 Resource::VoidEssence,
                 NodeNature::Heat,
@@ -2331,18 +2327,18 @@ mod external_bonus_tests {
                 vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
             );
             r.under_construction = false;
-            loom.persistent.refineries.push(r);
+            loom.persistent.shuttles.push(r);
         }
 
-        let produced = tick_refinery_pull(&mut loom, 3600.0);
+        let produced = tick_shuttle_pull(&mut loom, 3600.0);
         let forged = produced.get(&Resource::ForgedLight).copied().unwrap_or(0.0);
 
         // EmberSpindle effective = 50.0/hr, split 2 ways = 25.0 each, capped at 20.0.
         // VoidCondenser = 50.0/hr, split 2 ways = 25.0 each, capped at 20.0.
-        // Each refinery: min(20.0, 20.0) * 1.0 = 20.0/hr. Total = 40.0/hr => 40.0 in 1 hour.
+        // Each shuttle: min(20.0, 20.0) * 1.0 = 20.0/hr. Total = 40.0/hr => 40.0 in 1 hour.
         assert!(
             (forged - 40.0).abs() < 0.01,
-            "expected ~40.0 ForgedLight from two refineries, got {forged}"
+            "expected ~40.0 ForgedLight from two shuttles, got {forged}"
         );
     }
 
