@@ -1098,9 +1098,20 @@ impl DeepUiState {
     }
 
     pub fn open(&mut self) {
+        self.open_at(0);
+    }
+
+    pub fn open_at_frontier(&mut self, persistent: &DeepPersistent) {
+        let idx = (persistent.frontier_layer() as usize).saturating_sub(1);
+        // Clamp to valid range
+        let idx = idx.min(persistent.layers.len().saturating_sub(1));
+        self.open_at(idx);
+    }
+
+    fn open_at(&mut self, selected: usize) {
         self.open = true;
         self.view = DeepView::Infrastructure;
-        self.selected_index = 0;
+        self.selected_index = selected;
         self.event_mission_id = None;
         self.event_choice_index = 0;
         self.event_modal_open = false;

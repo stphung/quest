@@ -60,12 +60,12 @@ pub(super) fn handle_deep(
         match key.code {
             KeyCode::Right => {
                 let new_view = deep_ui.view.next_tab();
-                switch_view(deep_ui, new_view);
+                switch_view_with_deep(deep_ui, new_view, deep_state);
                 return InputResult::Continue;
             }
             KeyCode::Left => {
                 let new_view = deep_ui.view.prev_tab();
-                switch_view(deep_ui, new_view);
+                switch_view_with_deep(deep_ui, new_view, deep_state);
                 return InputResult::Continue;
             }
             _ => {}
@@ -676,9 +676,16 @@ fn handle_infrastructure(
 // ── View switching with visit counter ──────────────────────────────────────────
 
 /// Switch to a new view, resetting selection and incrementing the visit counter.
-fn switch_view(ui: &mut DeepUiState, target: DeepView) {
+fn switch_view_with_deep(ui: &mut DeepUiState, target: DeepView, deep: &DeepState) {
     ui.view = target;
-    ui.selected_index = 0;
+    if target == DeepView::Infrastructure {
+        let frontier = deep.persistent.frontier_layer() as usize;
+        ui.selected_index = frontier
+            .saturating_sub(1)
+            .min(deep.persistent.layers.len().saturating_sub(1));
+    } else {
+        ui.selected_index = 0;
+    }
     ui.staged_squad.clear();
     ui.show_help = false;
     match target {
