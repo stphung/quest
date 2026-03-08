@@ -142,7 +142,7 @@ fn extract_save_event(
         match event {
             TickEvent::SubzoneBossDefeated { result, .. } => match result {
                 BossDefeatResult::ZoneComplete { old_zone, .. } => {
-                    return Some(SaveEvent::ZoneBossDefeated(old_zone.clone()));
+                    return Some(SaveEvent::ZoneBossDefeated(old_zone.to_string()));
                 }
                 BossDefeatResult::StormsEnd => {
                     return Some(SaveEvent::ZoneBossDefeated("Storm Citadel".to_string()));

@@ -167,33 +167,43 @@ fn default_tier() -> u8 {
 
 impl Item {
     /// Returns a short stat summary string like "+8 STR +3 DEX +Crit"
+    /// Uses a single String allocation with in-place writes instead of Vec<String> + join.
     pub fn stat_summary(&self) -> String {
+        use std::fmt::Write;
         const ATTR_LABELS: [&str; 6] = ["STR", "DEX", "CON", "INT", "WIS", "CHA"];
-        let mut parts = Vec::new();
+        let mut result = String::with_capacity(64);
 
         for (value, label) in self.attributes.as_array().iter().zip(ATTR_LABELS.iter()) {
             if *value > 0 {
-                parts.push(format!("+{} {}", value, label));
+                if !result.is_empty() {
+                    result.push(' ');
+                }
+                let _ = write!(result, "+{} {}", value, label);
             }
         }
 
         for affix in &self.affixes {
-            let label = match affix.affix_type {
-                AffixType::DamagePercent => format!("+{:.0}% Dmg", affix.value),
-                AffixType::CritChance => format!("+{:.0}% Crit", affix.value),
-                AffixType::CritMultiplier => format!("+{:.1}x CritDmg", affix.value),
-                AffixType::AttackSpeed => format!("+{:.0}% AtkSpd", affix.value),
-                AffixType::HPBonus => format!("+{:.0} HP", affix.value),
-                AffixType::DamageReduction => format!("+{:.0}% DR", affix.value),
-                AffixType::HPRegen => format!("+{:.0} Regen", affix.value),
-                AffixType::DamageReflection => format!("+{:.0}% Reflect", affix.value),
-                AffixType::XPGain => format!("+{:.0}% XP", affix.value),
-                AffixType::Unknown => continue,
+            if affix.affix_type == AffixType::Unknown {
+                continue;
+            }
+            if !result.is_empty() {
+                result.push(' ');
+            }
+            let _ = match affix.affix_type {
+                AffixType::DamagePercent => write!(result, "+{:.0}% Dmg", affix.value),
+                AffixType::CritChance => write!(result, "+{:.0}% Crit", affix.value),
+                AffixType::CritMultiplier => write!(result, "+{:.1}x CritDmg", affix.value),
+                AffixType::AttackSpeed => write!(result, "+{:.0}% AtkSpd", affix.value),
+                AffixType::HPBonus => write!(result, "+{:.0} HP", affix.value),
+                AffixType::DamageReduction => write!(result, "+{:.0}% DR", affix.value),
+                AffixType::HPRegen => write!(result, "+{:.0} Regen", affix.value),
+                AffixType::DamageReflection => write!(result, "+{:.0}% Reflect", affix.value),
+                AffixType::XPGain => write!(result, "+{:.0}% XP", affix.value),
+                AffixType::Unknown => Ok(()),
             };
-            parts.push(label);
         }
 
-        parts.join(" ")
+        result
     }
 
     /// Returns the slot name as a string

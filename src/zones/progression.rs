@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-use super::data::get_all_zones;
+use super::data::get_zone;
 pub use crate::core::constants::KILLS_FOR_BOSS;
 
 /// Tracks the player's progression through zones and subzones.
@@ -94,18 +94,18 @@ impl ZoneProgression {
     }
 
     /// Gets the current zone and subzone names.
-    pub fn current_location_names(&self) -> (String, String) {
-        let zones = get_all_zones();
-        if let Some(zone) = zones.iter().find(|z| z.id == self.current_zone_id) {
+    /// Uses O(1) direct zone indexing and returns static string references (zero allocation).
+    pub fn current_location_names(&self) -> (&'static str, &'static str) {
+        if let Some(zone) = get_zone(self.current_zone_id) {
             if let Some(subzone) = zone
                 .subzones
                 .iter()
                 .find(|s| s.id == self.current_subzone_id)
             {
-                return (zone.name.to_string(), subzone.name.to_string());
+                return (zone.name, subzone.name);
             }
         }
-        ("Unknown".to_string(), "Unknown".to_string())
+        ("Unknown", "Unknown")
     }
 }
 
