@@ -22,6 +22,7 @@ pub struct CombatInput<'a> {
 /// Delegates to `orchestration::update_combat()` which still requires
 /// `&mut GameState`. The `CombatInput` struct above documents the
 /// aspirational decomposed interface for future `_core` extraction.
+#[allow(clippy::too_many_arguments)]
 pub fn update_combat_facade<R: Rng>(
     rng: &mut R,
     state: &mut GameState,

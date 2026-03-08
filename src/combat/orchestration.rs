@@ -10,6 +10,7 @@ use super::events::{CombatBonuses, CombatEvent};
 /// `bonuses` contains all combined combat bonuses from Haven, god items, prestige, and sigils.
 /// `achievements` is used to check for Stormbreaker achievement (Zone 10 boss)
 /// `derived` contains pre-computed derived stats (avoids redundant recalculation)
+#[allow(clippy::too_many_arguments)]
 pub fn update_combat<R: Rng>(
     rng: &mut R,
     state: &mut GameState,
