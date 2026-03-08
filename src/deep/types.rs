@@ -162,7 +162,7 @@ pub enum MercStatus {
 }
 
 /// Type of mission.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MissionType {
     /// 2–4h, no risk, cleared layers only.  Resource farming and safe merc XP.
     SupplyRun,

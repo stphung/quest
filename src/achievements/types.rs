@@ -1092,7 +1092,14 @@ mod tests {
         let mut achievements = Achievements::default();
 
         // Sync with level 120 character
-        achievements.sync_from_game_state(120, 0, 1, 0, &[], Some("Hero"));
+        achievements.sync_from_game_state(
+            120,
+            0,
+            1,
+            0,
+            &std::collections::BTreeSet::new(),
+            Some("Hero"),
+        );
 
         // Should have all level achievements up to 100
         assert!(achievements.is_unlocked(AchievementId::Level10));
@@ -1108,7 +1115,14 @@ mod tests {
         let mut achievements = Achievements::default();
 
         // Sync with prestige 17 character
-        achievements.sync_from_game_state(1, 17, 1, 0, &[], Some("Hero"));
+        achievements.sync_from_game_state(
+            1,
+            17,
+            1,
+            0,
+            &std::collections::BTreeSet::new(),
+            Some("Hero"),
+        );
 
         // Should have prestige achievements up to P15
         assert!(achievements.is_unlocked(AchievementId::FirstPrestige));
@@ -1123,7 +1137,14 @@ mod tests {
     fn test_sync_from_game_state_new_endgame_achievements() {
         let mut achievements = Achievements::default();
 
-        achievements.sync_from_game_state(100000, 10000, 1, 0, &[], Some("Hero"));
+        achievements.sync_from_game_state(
+            100000,
+            10000,
+            1,
+            0,
+            &std::collections::BTreeSet::new(),
+            Some("Hero"),
+        );
 
         assert!(achievements.is_unlocked(AchievementId::Level100000));
         assert!(achievements.is_unlocked(AchievementId::Prestige10000));
@@ -1134,7 +1155,14 @@ mod tests {
         let mut achievements = Achievements::default();
 
         // Sync with fishing rank 15
-        achievements.sync_from_game_state(1, 0, 15, 500, &[], Some("Hero"));
+        achievements.sync_from_game_state(
+            1,
+            0,
+            15,
+            500,
+            &std::collections::BTreeSet::new(),
+            Some("Hero"),
+        );
 
         // Should have FishermanI (rank 10)
         assert!(achievements.is_unlocked(AchievementId::FishermanI));
@@ -1152,13 +1180,13 @@ mod tests {
         let mut achievements = Achievements::default();
 
         // Zone 1 has 3 subzones, Zone 2 has 3 subzones
-        let defeated_bosses = vec![
+        let defeated_bosses = std::collections::BTreeSet::from([
             (1, 1),
             (1, 2),
             (1, 3), // Zone 1 complete
             (2, 1),
             (2, 2), // Zone 2 incomplete (missing subzone 3)
-        ];
+        ]);
 
         achievements.sync_from_game_state(1, 0, 1, 0, &defeated_bosses, Some("Hero"));
 
@@ -1171,7 +1199,7 @@ mod tests {
         let mut achievements = Achievements::default();
 
         // Simulate a well-progressed character
-        let defeated_bosses = vec![
+        let defeated_bosses = std::collections::BTreeSet::from([
             // Zone 1-4 complete
             (1, 1),
             (1, 2),
@@ -1185,7 +1213,7 @@ mod tests {
             (4, 1),
             (4, 2),
             (4, 3),
-        ];
+        ]);
 
         achievements.sync_from_game_state(
             150,  // level
@@ -1234,7 +1262,14 @@ mod tests {
         };
 
         // Sync with a lower fish count from save
-        achievements.sync_from_game_state(1, 0, 1, 1000, &[], Some("Hero"));
+        achievements.sync_from_game_state(
+            1,
+            0,
+            1,
+            1000,
+            &std::collections::BTreeSet::new(),
+            Some("Hero"),
+        );
 
         // Should NOT have decreased the counter
         assert_eq!(achievements.total_fish_caught, 50000);

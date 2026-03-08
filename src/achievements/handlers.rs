@@ -495,7 +495,7 @@ impl Achievements {
         prestige_rank: u32,
         fishing_rank: u32,
         total_fish_caught: u32,
-        defeated_bosses: &[(u32, u32)],
+        defeated_bosses: &std::collections::BTreeSet<(u32, u32)>,
         character_name: Option<&str>,
     ) {
         // Sync level achievements
@@ -539,7 +539,7 @@ impl Achievements {
     /// Syncs zone completion achievements based on defeated bosses.
     fn sync_zone_completions(
         &mut self,
-        defeated_bosses: &[(u32, u32)],
+        defeated_bosses: &std::collections::BTreeSet<(u32, u32)>,
         character_name: Option<&str>,
     ) {
         use crate::zones::get_all_zones;

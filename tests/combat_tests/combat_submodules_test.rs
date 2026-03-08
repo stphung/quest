@@ -1170,7 +1170,7 @@ fn player_death_to_zone_boss_retreats_to_safe_zone() {
     state.zone_progression.fighting_boss = true;
     state.zone_progression.kills_in_subzone = KILLS_FOR_BOSS;
     // Mark zone 4 boss as defeated so retreat goes there
-    state.zone_progression.defeated_bosses.push((4, 3));
+    state.zone_progression.defeated_bosses.insert((4, 3));
 
     let events = force_enemy_attack(&mut rng, &mut state, &default_bonuses());
 
@@ -1688,7 +1688,9 @@ fn test_consecutive_deaths_reset_on_kill() {
 fn test_retreat_target_is_last_safe_zone() {
     let mut state = state_with_enemy(99999, 1, 0);
     // Player has cleared bosses in zone 3
-    state.zone_progression.defeated_bosses = vec![(1, 1), (1, 2), (1, 3), (2, 1), (3, 1)];
+    state.zone_progression.defeated_bosses = [(1, 1), (1, 2), (1, 3), (2, 1), (3, 1)]
+        .into_iter()
+        .collect();
     state.zone_progression.current_zone_id = 5;
     state.zone_progression.current_subzone_id = 2;
     state.zone_progression.unlock_zone(3);

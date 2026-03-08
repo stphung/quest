@@ -1031,7 +1031,14 @@ fn test_minigame_won_grand_champion_milestone() {
 #[test]
 fn test_sync_from_game_state_high_level_character() {
     let mut ach = Achievements::default();
-    ach.sync_from_game_state(500, 0, 0, 0, &[], Some("Hero"));
+    ach.sync_from_game_state(
+        500,
+        0,
+        0,
+        0,
+        &std::collections::BTreeSet::new(),
+        Some("Hero"),
+    );
     assert!(ach.is_unlocked(AchievementId::Level500));
     assert!(!ach.is_unlocked(AchievementId::Level750));
 }
@@ -1039,14 +1046,28 @@ fn test_sync_from_game_state_high_level_character() {
 #[test]
 fn test_sync_from_game_state_prestige_100_unlocks_eternal() {
     let mut ach = Achievements::default();
-    ach.sync_from_game_state(1, 100, 0, 0, &[], Some("Hero"));
+    ach.sync_from_game_state(
+        1,
+        100,
+        0,
+        0,
+        &std::collections::BTreeSet::new(),
+        Some("Hero"),
+    );
     assert!(ach.is_unlocked(AchievementId::Eternal));
 }
 
 #[test]
 fn test_sync_from_game_state_fishing_rank_40_unlocks_fisherman_iv() {
     let mut ach = Achievements::default();
-    ach.sync_from_game_state(1, 0, 40, 0, &[], Some("Hero"));
+    ach.sync_from_game_state(
+        1,
+        0,
+        40,
+        0,
+        &std::collections::BTreeSet::new(),
+        Some("Hero"),
+    );
     assert!(ach.is_unlocked(AchievementId::FishermanI));
     assert!(ach.is_unlocked(AchievementId::FishermanII));
     assert!(ach.is_unlocked(AchievementId::FishermanIII));
@@ -1056,7 +1077,14 @@ fn test_sync_from_game_state_fishing_rank_40_unlocks_fisherman_iv() {
 #[test]
 fn test_sync_from_game_state_fish_count_1000_unlocks_fishcatcher_ii() {
     let mut ach = Achievements::default();
-    ach.sync_from_game_state(1, 0, 0, 1000, &[], Some("Hero"));
+    ach.sync_from_game_state(
+        1,
+        0,
+        0,
+        1000,
+        &std::collections::BTreeSet::new(),
+        Some("Hero"),
+    );
     assert!(ach.is_unlocked(AchievementId::GoneFishing));
     assert!(ach.is_unlocked(AchievementId::FishCatcherI));
     assert!(ach.is_unlocked(AchievementId::FishCatcherII));
@@ -1070,7 +1098,14 @@ fn test_sync_from_game_state_uses_max_of_saved_and_existing_fish_count() {
         total_fish_caught: 10000,
         ..Default::default()
     };
-    ach.sync_from_game_state(1, 0, 0, 500, &[], Some("Hero"));
+    ach.sync_from_game_state(
+        1,
+        0,
+        0,
+        500,
+        &std::collections::BTreeSet::new(),
+        Some("Hero"),
+    );
     // 10000 > 500, so should keep 10000
     assert_eq!(ach.total_fish_caught, 10000);
     assert!(ach.is_unlocked(AchievementId::FishCatcherIII)); // 10000
@@ -1081,7 +1116,8 @@ fn test_sync_from_game_state_zone_10_complete() {
     let mut ach = Achievements::default();
     // Zone 10 has 4 subzones (Floating Isles / Storm Citadel have 4)
     // Per CLAUDE.md: Zone 10 Storm Citadel has 4 subzones
-    let defeated_bosses: Vec<(u32, u32)> = vec![(10, 1), (10, 2), (10, 3), (10, 4)];
+    let defeated_bosses: std::collections::BTreeSet<(u32, u32)> =
+        [(10, 1), (10, 2), (10, 3), (10, 4)].into_iter().collect();
     ach.sync_from_game_state(1, 0, 0, 0, &defeated_bosses, Some("Hero"));
     assert!(ach.is_unlocked(AchievementId::Zone10Complete));
 }
@@ -1090,7 +1126,7 @@ fn test_sync_from_game_state_zone_10_complete() {
 fn test_sync_from_game_state_calls_refresh_progress() {
     let mut ach = Achievements::default();
     ach.total_kills = 50;
-    ach.sync_from_game_state(1, 0, 0, 0, &[], Some("Hero"));
+    ach.sync_from_game_state(1, 0, 0, 0, &std::collections::BTreeSet::new(), Some("Hero"));
 
     // refresh_progress is called as the last step of sync_from_game_state
     let p = ach

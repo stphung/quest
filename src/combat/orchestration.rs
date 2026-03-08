@@ -221,8 +221,8 @@ mod tests {
     #[test]
     fn resolve_combat_retreat_uses_highest_defeated_zone() {
         let mut state = state_with_enemy("Dire Wolf");
-        state.zone_progression.defeated_bosses.push((3, 3));
-        state.zone_progression.defeated_bosses.push((5, 2));
+        state.zone_progression.defeated_bosses.insert((3, 3));
+        state.zone_progression.defeated_bosses.insert((5, 2));
 
         let events = resolve_combat_retreat(&mut state);
         let expected_zone = crate::zones::get_zone(5).unwrap().name.to_string();
@@ -281,7 +281,7 @@ mod tests {
         let mut state = state_with_enemy("Bandit");
         state.zone_progression.current_zone_id = 6;
         state.zone_progression.current_subzone_id = 2;
-        state.zone_progression.defeated_bosses.push((4, 3));
+        state.zone_progression.defeated_bosses.insert((4, 3));
         state.combat_state.current_fight_elapsed = MOB_FIGHT_TIMEOUT_SECONDS - 0.05;
 
         let events = update_combat(

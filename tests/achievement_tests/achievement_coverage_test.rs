@@ -551,7 +551,7 @@ fn test_offline_progression_does_not_call_achievement_handlers() {
         state.prestige_rank,
         state.fishing.rank,
         0, // no fish caught
-        &[],
+        &std::collections::BTreeSet::new(),
         Some(&state.character_name),
     );
 
@@ -1170,22 +1170,23 @@ fn test_sync_from_game_state_twice_is_idempotent() {
     let mut achievements = Achievements::default();
 
     // First sync with a fully-progressed character
+    let bosses = std::collections::BTreeSet::from([
+        (1, 1),
+        (1, 2),
+        (1, 3),
+        (2, 1),
+        (2, 2),
+        (2, 3),
+        (3, 1),
+        (3, 2),
+        (3, 3),
+    ]);
     achievements.sync_from_game_state(
         150,  // level
         25,   // prestige rank
         20,   // fishing rank
         5000, // fish caught
-        &[
-            (1, 1),
-            (1, 2),
-            (1, 3),
-            (2, 1),
-            (2, 2),
-            (2, 3),
-            (3, 1),
-            (3, 2),
-            (3, 3),
-        ],
+        &bosses,
         Some("SyncHero"),
     );
 
@@ -1194,24 +1195,7 @@ fn test_sync_from_game_state_twice_is_idempotent() {
     let notifications_after_first = achievements.pending_notifications.len();
 
     // Second sync with same state — should not unlock anything new
-    achievements.sync_from_game_state(
-        150,
-        25,
-        20,
-        5000,
-        &[
-            (1, 1),
-            (1, 2),
-            (1, 3),
-            (2, 1),
-            (2, 2),
-            (2, 3),
-            (3, 1),
-            (3, 2),
-            (3, 3),
-        ],
-        Some("SyncHero"),
-    );
+    achievements.sync_from_game_state(150, 25, 20, 5000, &bosses, Some("SyncHero"));
 
     let count_after_second = achievements.unlocked.len();
 
@@ -1244,7 +1228,14 @@ fn test_sync_after_normal_progression_is_safe() {
 
     // Now call sync with the same level/prestige data
     // Level is 1 (no level-up achievements yet), prestige is 0 (no prestige achievements)
-    achievements.sync_from_game_state(1, 0, 0, 0, &[], Some("ProgressHero"));
+    achievements.sync_from_game_state(
+        1,
+        0,
+        0,
+        0,
+        &std::collections::BTreeSet::new(),
+        Some("ProgressHero"),
+    );
 
     let unlocked_count_after_sync = achievements.unlocked.len();
 
@@ -1330,14 +1321,28 @@ fn test_sync_with_higher_prestige_than_existing_unlocks_new() {
     let mut achievements = Achievements::default();
 
     // First sync at prestige 10
-    achievements.sync_from_game_state(100, 10, 0, 0, &[], Some("Hero"));
+    achievements.sync_from_game_state(
+        100,
+        10,
+        0,
+        0,
+        &std::collections::BTreeSet::new(),
+        Some("Hero"),
+    );
     assert!(achievements.is_unlocked(AchievementId::PrestigeX));
     assert!(!achievements.is_unlocked(AchievementId::PrestigeXV));
 
     let count_at_p10 = achievements.unlocked.len();
 
     // Second sync at prestige 15 — should unlock PrestigeXV
-    achievements.sync_from_game_state(100, 15, 0, 0, &[], Some("Hero"));
+    achievements.sync_from_game_state(
+        100,
+        15,
+        0,
+        0,
+        &std::collections::BTreeSet::new(),
+        Some("Hero"),
+    );
     assert!(achievements.is_unlocked(AchievementId::PrestigeXV));
 
     let count_at_p15 = achievements.unlocked.len();
