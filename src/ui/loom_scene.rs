@@ -2107,7 +2107,7 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
         };
 
         let count_label = format!(
-            "{} {:.0}/{:.0}/hr {}",
+            "{} {:.0}/hr (need {:.0}) {}",
             time_label, current_rate, req.required_rate, state_icon
         );
 
@@ -2126,9 +2126,7 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
         let emoji = resource_emoji(&req.resource);
         let res_name = resource_name(&req.resource);
         let label_text = format!(" {} {}", emoji, res_name);
-        let label_color = if met {
-            Color::Rgb(80, 200, 120) // green
-        } else if advancing {
+        let label_color = if met || advancing {
             Color::Rgb(80, 200, 120) // green
         } else {
             Color::Rgb(220, 180, 60) // amber
