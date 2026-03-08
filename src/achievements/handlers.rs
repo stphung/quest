@@ -496,6 +496,15 @@ impl Achievements {
         self.refresh_progress();
     }
 
+    /// Syncs ascension achievements based on current ascension level.
+    /// Call this when loading a character to retroactively unlock achievements
+    /// for ascension levels already reached.
+    pub fn sync_from_ascension(&mut self, ascension_level: u32, character_name: Option<&str>) {
+        for level in 1..=ascension_level {
+            self.on_ascended(level, character_name);
+        }
+    }
+
     /// Syncs zone completion achievements based on defeated bosses.
     fn sync_zone_completions(
         &mut self,

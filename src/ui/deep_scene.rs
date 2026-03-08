@@ -17,7 +17,8 @@ use ratatui::{
 
 use super::responsive::{LayoutContext, SizeTier};
 use super::scene_fx::{
-    current_millis, hash2d, lerp_rgb, put_cell, put_text, render_buffer, SceneCell,
+    current_millis, hash2d, lerp_rgb, put_cell, put_text, render_buffer, with_scene_buffer,
+    SceneCell,
 };
 
 /// Themed border color for The Deep overlay.
@@ -320,13 +321,13 @@ fn render_status_summary(
     let ready_mercs = deep
         .prestige
         .roster
-        .iter()
+        .values()
         .filter(|m| matches!(m.status, crate::deep::MercStatus::Available))
         .count();
     let injured_mercs = deep
         .prestige
         .roster
-        .iter()
+        .values()
         .filter(|m| matches!(m.status, crate::deep::MercStatus::Injured { .. }))
         .count();
     let crew_str = if injured_mercs > 0 {
@@ -493,7 +494,7 @@ fn icon_label(view: DeepView, deep: &DeepState) -> String {
             let alive = deep
                 .prestige
                 .roster
-                .iter()
+                .values()
                 .filter(|m| !matches!(m.status, crate::deep::MercStatus::Lost))
                 .count();
             let max = deep.persistent.guild_rank.max_roster();
@@ -686,102 +687,110 @@ pub fn render_deep_overlay(
         return;
     }
 
-    // Build scene buffer and paint backdrop
-    let mut buffer = vec![vec![SceneCell::default(); width]; height];
-    let millis = current_millis();
-    let frontier_tier = Some(LayerTier::from_layer(deep.persistent.frontier_layer()));
-    paint_deep_backdrop(&mut buffer, millis, ui.view, frontier_tier);
-    if let Some(elapsed) = open_elapsed_ms {
-        paint_opening_deep_fx(&mut buffer, millis, elapsed);
-    }
+    // Build scene buffer and paint backdrop (reuses a thread-local buffer)
+    with_scene_buffer(width, height, |buffer| {
+        let millis = current_millis();
+        let frontier_tier = Some(LayerTier::from_layer(deep.persistent.frontier_layer()));
+        paint_deep_backdrop(buffer, millis, ui.view, frontier_tier);
+        if let Some(elapsed) = open_elapsed_ms {
+            paint_opening_deep_fx(buffer, millis, elapsed);
+        }
 
-    // ── Status summary bar (row 0) ──
-    render_status_summary(&mut buffer, width, deep, millis);
+        // ── Status summary bar (row 0) ──
+        render_status_summary(buffer, width, deep, millis);
 
-    // ── Frontier / rank advancement bar (row 1) ──
-    render_frontier_bar(&mut buffer, width, deep);
+        // ── Frontier / rank advancement bar (row 1) ──
+        render_frontier_bar(buffer, width, deep);
 
-    // ── Tab bar (row 2) ──
-    render_tab_bar(&mut buffer[2..], width, ui.view, deep);
+        // ── Tab bar (row 2) ──
+        render_tab_bar(&mut buffer[2..], width, ui.view, deep);
 
-    // Sub-views render below status bar (row 0), frontier bar (row 1), tab bar (rows 2-3),
-    // and separator (row 4). Content starts at row 5.
-    let content_height = height.saturating_sub(5);
-    let content_buffer = &mut buffer[5..];
+        // Sub-views render below status bar (row 0), frontier bar (row 1), tab bar (rows 2-3),
+        // and separator (row 4). Content starts at row 5.
+        let content_height = height.saturating_sub(5);
+        let content_buffer = &mut buffer[5..];
 
-    // Dispatch to the appropriate sub-view
-    match ui.view {
-        DeepView::Active => {
-            super::deep_missions::render_active(
-                content_buffer,
-                width,
-                content_height,
-                deep,
-                ui,
-                ctx,
+        // Dispatch to the appropriate sub-view
+        match ui.view {
+            DeepView::Active => {
+                super::deep_missions::render_active(
+                    content_buffer,
+                    width,
+                    content_height,
+                    deep,
+                    ui,
+                    ctx,
+                );
+            }
+            DeepView::NewMission => {
+                super::deep_missions::render_deploy(
+                    content_buffer,
+                    width,
+                    content_height,
+                    deep,
+                    ui,
+                    ctx,
+                );
+            }
+            DeepView::Roster => {
+                super::deep_missions::render_roster(
+                    content_buffer,
+                    width,
+                    content_height,
+                    deep,
+                    ui,
+                    ctx,
+                );
+            }
+            DeepView::Recruit => {
+                super::deep_roster::render_recruit(
+                    content_buffer,
+                    width,
+                    content_height,
+                    deep,
+                    ui,
+                    ctx,
+                );
+            }
+            DeepView::Infrastructure => {
+                super::deep_layers::render_layers(
+                    content_buffer,
+                    width,
+                    content_height,
+                    deep,
+                    ui,
+                    ctx,
+                );
+            }
+            DeepView::EventResponse => {
+                // Events are rendered as a modal over Active; this arm is unreachable.
+            }
+        }
+
+        // Event badge footer reminder when not on Active tab
+        if ui.view != DeepView::Active
+            && ui.view != DeepView::Infrastructure
+            && deep.prestige.has_any_pending_event()
+        {
+            let reminder = "\u{26a1} Event pending \u{2014} [\u{2192}] to Active";
+            let rem_col = (width as i32 - reminder.len() as i32) / 2;
+            put_text(
+                buffer,
+                (height as i32 - 1).max(0),
+                rem_col.max(1),
+                reminder,
+                Color::Yellow,
             );
         }
-        DeepView::NewMission => {
-            super::deep_missions::render_deploy(
-                content_buffer,
-                width,
-                content_height,
-                deep,
-                ui,
-                ctx,
-            );
-        }
-        DeepView::Roster => {
-            super::deep_missions::render_roster(
-                content_buffer,
-                width,
-                content_height,
-                deep,
-                ui,
-                ctx,
-            );
-        }
-        DeepView::Recruit => {
-            super::deep_roster::render_recruit(
-                content_buffer,
-                width,
-                content_height,
-                deep,
-                ui,
-                ctx,
-            );
-        }
-        DeepView::Infrastructure => {
-            super::deep_layers::render_layers(content_buffer, width, content_height, deep, ui, ctx);
-        }
-        DeepView::EventResponse => {
-            // Events are rendered as a modal over Active; this arm is unreachable.
-        }
-    }
 
-    // Event badge footer reminder when not on Active tab
-    if ui.view != DeepView::Active
-        && ui.view != DeepView::Infrastructure
-        && deep.prestige.has_any_pending_event()
-    {
-        let reminder = "\u{26a1} Event pending \u{2014} [\u{2192}] to Active";
-        let rem_col = (width as i32 - reminder.len() as i32) / 2;
-        put_text(
-            &mut buffer,
-            (height as i32 - 1).max(0),
-            rem_col.max(1),
-            reminder,
-            Color::Yellow,
-        );
-    }
+        // Help panel overlay ([?] toggle)
+        if ui.show_help {
+            render_help_panel(buffer, width, height, ui.view, ctx);
+        }
 
-    // Help panel overlay ([?] toggle)
-    if ui.show_help {
-        render_help_panel(&mut buffer, width, height, ui.view, ctx);
-    }
-
-    // Flush buffer to frame
-    render_buffer(frame, inner, &buffer);
+        // Flush buffer to frame
+        render_buffer(frame, inner, buffer);
+    });
 
     // Event response modal over hub
     if ui.event_modal_open && ui.event_mission_id.is_some() {

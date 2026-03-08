@@ -3019,14 +3019,19 @@ pub fn get_all_zones() -> &'static [Zone] {
 }
 
 /// Gets a zone by its ID.
+/// Uses O(1) array indexing since zone IDs are contiguous 1-30.
 pub fn get_zone(zone_id: u32) -> Option<&'static Zone> {
-    get_all_zones().iter().find(|z| z.id == zone_id)
+    let zones = get_all_zones();
+    let index = zone_id.checked_sub(1)? as usize;
+    zones.get(index)
 }
 
 /// Gets a subzone within a zone.
+/// Uses O(1) array indexing since subzone IDs are contiguous 1-based within each zone.
 pub fn get_subzone(zone_id: u32, subzone_id: u32) -> Option<(&'static Zone, &'static Subzone)> {
     let zone = get_zone(zone_id)?;
-    let subzone = zone.subzones.iter().find(|s| s.id == subzone_id)?;
+    let index = subzone_id.checked_sub(1)? as usize;
+    let subzone = zone.subzones.get(index)?;
     Some((zone, subzone))
 }
 

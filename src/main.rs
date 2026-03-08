@@ -40,7 +40,7 @@ use main_helpers::input_routing::{
 };
 use main_helpers::offline::apply_offline_xp;
 use main_helpers::overlay::draw_game_overlays;
-use main_helpers::persistence::{commit_save, save_files};
+use main_helpers::persistence::{commit_save, save_files, spawn_background_save};
 use main_helpers::scene::{current_scene_kind, is_realtime_minigame, is_wide_scene};
 use main_helpers::update::{
     jittered_update_interval, show_startup_splash_screen, StartupSplashResult,
@@ -455,6 +455,9 @@ fn main() -> io::Result<()> {
                     let mut prev_overlay_was_fullscreen =
                         matches!(overlay, GameOverlay::Achievements { .. });
                     let mut prev_scene_kind = current_scene_kind(&state);
+
+                    // Background autosave thread handle
+                    let mut autosave_handle: Option<std::thread::JoinHandle<()>> = None;
 
                     // Save indicator state (for non-debug mode)
                     let mut last_save_instant: Option<Instant> = None;
@@ -1284,16 +1287,22 @@ fn main() -> io::Result<()> {
 
                             // Skip file I/O in debug mode
                             if !debug_mode {
-                                save_files(
-                                    &character_manager,
-                                    &state,
-                                    &global_achievements,
-                                    &haven,
-                                    &enhancement,
-                                    &deep_state,
-                                    &loom_state,
-                                );
-                                last_save_instant = Some(Instant::now());
+                                // Only spawn a background save if the previous one finished
+                                let can_save =
+                                    autosave_handle.as_ref().is_none_or(|h| h.is_finished());
+                                if can_save {
+                                    // Drop the finished handle before spawning a new one
+                                    autosave_handle = Some(spawn_background_save(
+                                        &character_manager,
+                                        &state,
+                                        &global_achievements,
+                                        &haven,
+                                        &enhancement,
+                                        &deep_state,
+                                        &loom_state,
+                                    ));
+                                    last_save_instant = Some(Instant::now());
+                                }
                             }
                         }
 

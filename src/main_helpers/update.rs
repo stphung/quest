@@ -1673,6 +1673,8 @@ fn load_character_for_game(
                 &haven.rooms,
                 Some(&state.character_name),
             );
+            global_achievements
+                .sync_from_ascension(state.ascension_level, Some(&state.character_name));
 
             // Retroactive enhancement/soulforge achievement sync
             if enhancement.discovered {

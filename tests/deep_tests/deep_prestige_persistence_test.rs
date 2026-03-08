@@ -50,7 +50,9 @@ fn build_generation_1_state() -> DeepState {
         || deep.persistent.next_merc_id(),
         &mut rng,
     );
-    deep.prestige.roster.extend(starters);
+    deep.prestige
+        .roster
+        .extend(starters.into_iter().map(|m| (m.id, m)));
 
     // Clear layers 1-5
     for layer in 1..=5 {
@@ -414,7 +416,9 @@ fn test_three_generation_lifecycle_ratchet() {
         || deep.persistent.next_merc_id(),
         &mut rng,
     );
-    deep.prestige.roster.extend(gen1_starters);
+    deep.prestige
+        .roster
+        .extend(gen1_starters.into_iter().map(|m| (m.id, m)));
     assert_eq!(deep.prestige.roster.len(), 3);
 
     // Clear L1-3 and build infrastructure
@@ -640,7 +644,8 @@ fn test_prestige_with_injured_mercs_preserves_roster() {
     let mut deep = build_generation_1_state();
 
     // Injure a merc
-    deep.prestige.roster[0].status = MercStatus::Injured {
+    let first_id = *deep.prestige.roster.keys().next().unwrap();
+    deep.prestige.roster.get_mut(&first_id).unwrap().status = MercStatus::Injured {
         missions_remaining: 5,
     };
     let roster_len = deep.prestige.roster.len();
@@ -658,7 +663,8 @@ fn test_prestige_with_lost_mercs_preserves_roster() {
     let mut deep = build_generation_1_state();
 
     // Mark a merc as lost
-    deep.prestige.roster[0].status = MercStatus::Lost;
+    let first_id = *deep.prestige.roster.keys().next().unwrap();
+    deep.prestige.roster.get_mut(&first_id).unwrap().status = MercStatus::Lost;
     let roster_len = deep.prestige.roster.len();
     deep.on_prestige();
 
@@ -674,8 +680,9 @@ fn test_prestige_with_mercs_on_mission_preserves_state() {
     let mut deep = build_generation_1_state();
 
     // Put mercs on mission
-    deep.prestige.roster[0].status = MercStatus::OnMission(1);
-    deep.prestige.roster[1].status = MercStatus::OnMission(2);
+    let ids: Vec<u64> = deep.prestige.roster.keys().copied().collect();
+    deep.prestige.roster.get_mut(&ids[0]).unwrap().status = MercStatus::OnMission(1);
+    deep.prestige.roster.get_mut(&ids[1]).unwrap().status = MercStatus::OnMission(2);
     let roster_len = deep.prestige.roster.len();
     deep.on_prestige();
 
@@ -700,7 +707,7 @@ fn test_prestige_with_full_roster_preserves() {
             missions_completed: 0,
             status: MercStatus::Available,
         };
-        deep.prestige.roster.push(merc);
+        deep.prestige.roster.insert(merc.id, merc);
     }
     assert_eq!(deep.prestige.roster.len(), 7); // Full at rank 2
 

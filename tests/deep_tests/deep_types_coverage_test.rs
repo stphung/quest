@@ -703,16 +703,14 @@ fn test_deep_persistent_frontier_layer_deepest_zero_fallback() {
 #[test]
 fn test_deep_prestige_find_merc_success_and_failure() {
     let mut dp = DeepPrestige::new();
-    dp.roster.push(make_merc(
-        10,
-        MercArchetype::Vanguard,
-        MercStatus::Available,
-    ));
-    dp.roster.push(make_merc(
-        20,
-        MercArchetype::Scout,
-        MercStatus::OnMission(1),
-    ));
+    {
+        let m = make_merc(10, MercArchetype::Vanguard, MercStatus::Available);
+        dp.roster.insert(m.id, m);
+    }
+    {
+        let m = make_merc(20, MercArchetype::Scout, MercStatus::OnMission(1));
+        dp.roster.insert(m.id, m);
+    }
 
     let found = dp.find_merc(10);
     assert!(found.is_some());
@@ -724,36 +722,39 @@ fn test_deep_prestige_find_merc_success_and_failure() {
 #[test]
 fn test_deep_prestige_find_merc_mut_success_and_failure() {
     let mut dp = DeepPrestige::new();
-    dp.roster
-        .push(make_merc(5, MercArchetype::Medic, MercStatus::Available));
+    {
+        let m = make_merc(5, MercArchetype::Medic, MercStatus::Available);
+        dp.roster.insert(m.id, m);
+    }
 
     {
         let merc = dp.find_merc_mut(5);
         assert!(merc.is_some());
         merc.unwrap().level = 3;
     }
-    assert_eq!(dp.roster[0].level, 3);
+    assert_eq!(dp.roster[&5].level, 3);
     assert!(dp.find_merc_mut(999).is_none());
 }
 
 #[test]
 fn test_deep_prestige_available_merc_count_mixed_statuses() {
     let mut dp = DeepPrestige::new();
-    dp.roster
-        .push(make_merc(1, MercArchetype::Vanguard, MercStatus::Available));
-    dp.roster
-        .push(make_merc(2, MercArchetype::Scout, MercStatus::OnMission(1)));
-    dp.roster
-        .push(make_merc(3, MercArchetype::Medic, MercStatus::Available));
-    dp.roster.push(make_merc(
-        4,
-        MercArchetype::Arcanist,
-        MercStatus::Injured {
-            missions_remaining: 2,
-        },
-    ));
-    dp.roster
-        .push(make_merc(5, MercArchetype::Saboteur, MercStatus::Lost));
+    for (id, arch, status) in [
+        (1, MercArchetype::Vanguard, MercStatus::Available),
+        (2, MercArchetype::Scout, MercStatus::OnMission(1)),
+        (3, MercArchetype::Medic, MercStatus::Available),
+        (
+            4,
+            MercArchetype::Arcanist,
+            MercStatus::Injured {
+                missions_remaining: 2,
+            },
+        ),
+        (5, MercArchetype::Saboteur, MercStatus::Lost),
+    ] {
+        let m = make_merc(id, arch, status);
+        dp.roster.insert(m.id, m);
+    }
 
     assert_eq!(dp.available_merc_count(), 2);
 }
@@ -768,8 +769,8 @@ fn test_deep_prestige_available_merc_count_empty_roster() {
 fn test_deep_prestige_available_merc_count_all_available() {
     let mut dp = DeepPrestige::new();
     for i in 0..3 {
-        dp.roster
-            .push(make_merc(i, MercArchetype::Vanguard, MercStatus::Available));
+        let m = make_merc(i, MercArchetype::Vanguard, MercStatus::Available);
+        dp.roster.insert(m.id, m);
     }
     assert_eq!(dp.available_merc_count(), 3);
 }
@@ -1066,9 +1067,10 @@ fn test_deep_state_on_prestige_preserves_all_state() {
     ds.persistent.guild_rank = GuildRank(3);
     ds.persistent.deepest_layer_reached = 7;
     ds.prestige.warband_marks = 5000;
-    ds.prestige
-        .roster
-        .push(make_merc(1, MercArchetype::Vanguard, MercStatus::Available));
+    {
+        let m = make_merc(1, MercArchetype::Vanguard, MercStatus::Available);
+        ds.prestige.roster.insert(m.id, m);
+    }
 
     ds.on_prestige();
 

@@ -430,6 +430,63 @@ pub(super) fn render_layers(
     }
 }
 
+/// Compute a scroll offset (in layer indices) so that `selected_index` is visible.
+///
+/// Each layer takes 1 row, plus tier headers take 1 row each when the tier changes.
+/// We compute total logical rows up to the selected index and scroll so it's centered.
+fn layer_scroll_offset(
+    layers: &[crate::deep::types::LayerRecord],
+    selected: usize,
+    visible_rows: i32,
+) -> usize {
+    if layers.is_empty() || visible_rows <= 0 {
+        return 0;
+    }
+    // Count logical rows consumed up to and including the selected layer.
+    // Row 0 = "SURFACE" header (always 1 row).
+    let mut rows_used: i32 = 1; // SURFACE header
+    let mut last_tier: Option<LayerTier> = None;
+    for (i, layer) in layers.iter().enumerate() {
+        let tier = LayerTier::from_layer(layer.index);
+        if last_tier != Some(tier) {
+            rows_used += 1; // tier section header
+            last_tier = Some(tier);
+        }
+        if i == selected {
+            break;
+        }
+        rows_used += 1; // the layer row itself
+    }
+    // `rows_used` is now the row number where the selected layer would render (1-based).
+    // Scroll so the selected layer is near the middle of the viewport.
+    let half = visible_rows / 2;
+    if rows_used <= half {
+        0 // selected is near the top, no scroll needed
+    } else {
+        // Find how many layer indices to skip. Walk again, counting rows to skip.
+        let target_skip_rows = (rows_used - half).max(0);
+        let mut skip_rows: i32 = 0;
+        let mut skip_idx: usize = 0;
+        let mut prev_tier: Option<LayerTier> = None;
+        // Skip the SURFACE header
+        skip_rows += 1;
+        for (i, layer) in layers.iter().enumerate() {
+            if skip_rows >= target_skip_rows {
+                skip_idx = i;
+                break;
+            }
+            let tier = LayerTier::from_layer(layer.index);
+            if prev_tier != Some(tier) {
+                skip_rows += 1; // tier header
+                prev_tier = Some(tier);
+            }
+            skip_rows += 1; // layer row
+            skip_idx = i + 1;
+        }
+        skip_idx
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn render_layers_compact(
     buffer: &mut [Vec<SceneCell>],
@@ -441,15 +498,17 @@ fn render_layers_compact(
     content_bottom: i32,
     frontier: u32,
 ) {
+    let visible_rows = content_bottom - content_top;
+    let scroll = layer_scroll_offset(&deep.persistent.layers, ui.selected_index, visible_rows);
     let mut row = content_top;
     let mut last_tier: Option<LayerTier> = None;
 
-    if row < content_bottom {
+    if scroll == 0 && row < content_bottom {
         put_text(buffer, row, 1, "SURFACE", Color::Rgb(70, 95, 125));
         row += 1;
     }
 
-    for (i, layer) in deep.persistent.layers.iter().enumerate() {
+    for (i, layer) in deep.persistent.layers.iter().enumerate().skip(scroll) {
         if row >= content_bottom {
             break;
         }
@@ -578,15 +637,17 @@ fn render_layers_split(
     }
 
     // Left: layer list with tier section headers
+    let visible_rows = content_bottom - content_top;
+    let scroll = layer_scroll_offset(&deep.persistent.layers, ui.selected_index, visible_rows);
     let mut row = content_top;
     let mut last_tier: Option<LayerTier> = None;
 
-    if row < content_bottom {
+    if scroll == 0 && row < content_bottom {
         put_text(buffer, row, 1, "SURFACE", Color::Rgb(70, 95, 125));
         row += 1;
     }
 
-    for (i, layer) in deep.persistent.layers.iter().enumerate() {
+    for (i, layer) in deep.persistent.layers.iter().enumerate().skip(scroll) {
         if row >= content_bottom {
             break;
         }

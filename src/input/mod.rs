@@ -385,6 +385,7 @@ fn handle_ascension_confirm(
                     new_level,
                     multiplier,
                 } => {
+                    achievements.on_ascended(new_level, Some(&state.character_name));
                     let roman = crate::ui::stats_prestige::to_roman(new_level);
                     state.combat_state.add_log_entry(
                         format!(
@@ -600,7 +601,7 @@ fn handle_base_game(
         }
         KeyCode::Char('d') | KeyCode::Char('D') => {
             if deep_state.persistent.discovered {
-                deep_ui.open();
+                deep_ui.open_at_frontier(&deep_state.persistent);
             }
             InputResult::Continue
         }

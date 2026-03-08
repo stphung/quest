@@ -834,7 +834,7 @@ fn test_generate_starter_roster_names_vary_across_seeds() {
 
 #[test]
 fn test_roster_has_capacity_empty_roster_always_true() {
-    let roster: Vec<Mercenary> = Vec::new();
+    let roster: std::collections::HashMap<u64, Mercenary> = std::collections::HashMap::new();
     for rank in 1u8..=5 {
         assert!(
             roster_has_capacity(&roster, GuildRank(rank)),
@@ -850,9 +850,11 @@ fn test_roster_has_capacity_at_all_rank_maximums() {
     let maxima = [(1u8, 5usize), (2, 7), (3, 9), (4, 12), (5, 15)];
     let mut rng = seeded_rng(500);
     for (rank, max) in maxima {
-        let roster: Vec<_> = (0..max as u64)
+        let roster: std::collections::HashMap<u64, Mercenary> = (0..max as u64)
             .map(|id| {
-                generate_mercenary(id, MercArchetype::Vanguard, MercQuality::Common, &mut rng)
+                let m =
+                    generate_mercenary(id, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+                (m.id, m)
             })
             .collect();
         assert!(
@@ -861,9 +863,14 @@ fn test_roster_has_capacity_at_all_rank_maximums() {
             rank,
             max
         );
-        let one_below = &roster[..max - 1];
+        // Build a smaller roster with one fewer merc
+        let one_below: std::collections::HashMap<u64, Mercenary> = roster
+            .iter()
+            .take(max - 1)
+            .map(|(&k, v)| (k, v.clone()))
+            .collect();
         assert!(
-            roster_has_capacity(one_below, GuildRank(rank)),
+            roster_has_capacity(&one_below, GuildRank(rank)),
             "Rank {} at {} mercs should still have capacity",
             rank,
             max - 1
@@ -874,8 +881,11 @@ fn test_roster_has_capacity_at_all_rank_maximums() {
 #[test]
 fn test_roster_has_capacity_rank1_full_has_capacity_at_rank2() {
     let mut rng = seeded_rng(501);
-    let roster: Vec<_> = (0..5)
-        .map(|id| generate_mercenary(id, MercArchetype::Vanguard, MercQuality::Common, &mut rng))
+    let roster: std::collections::HashMap<u64, Mercenary> = (0..5)
+        .map(|id| {
+            let m = generate_mercenary(id, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+            (m.id, m)
+        })
         .collect();
     assert!(
         !roster_has_capacity(&roster, GuildRank(1)),
@@ -893,7 +903,7 @@ fn test_roster_has_capacity_rank1_full_has_capacity_at_rank2() {
 
 #[test]
 fn test_available_mercs_empty_roster() {
-    let roster: Vec<Mercenary> = Vec::new();
+    let roster: std::collections::HashMap<u64, Mercenary> = std::collections::HashMap::new();
     assert!(available_mercs(&roster).is_empty());
 }
 
@@ -910,7 +920,10 @@ fn test_available_mercs_filters_all_status_variants() {
     };
     m3.status = MercStatus::Lost;
     // m4 remains Available.
-    let roster = vec![m1, m2, m3, m4];
+    let roster: std::collections::HashMap<u64, Mercenary> =
+        vec![(1, m1), (2, m2), (3, m3), (4, m4)]
+            .into_iter()
+            .collect();
     let avail = available_mercs(&roster);
     assert_eq!(avail.len(), 1, "Only the Available merc should appear");
     assert_eq!(avail[0].id, 4, "Available merc should be id=4");
@@ -919,8 +932,11 @@ fn test_available_mercs_filters_all_status_variants() {
 #[test]
 fn test_available_mercs_all_available() {
     let mut rng = seeded_rng(601);
-    let roster: Vec<_> = (1..=5)
-        .map(|id| generate_mercenary(id, MercArchetype::Vanguard, MercQuality::Common, &mut rng))
+    let roster: std::collections::HashMap<u64, Mercenary> = (1..=5)
+        .map(|id| {
+            let m = generate_mercenary(id, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+            (m.id, m)
+        })
         .collect();
     assert_eq!(
         available_mercs(&roster).len(),
@@ -932,12 +948,12 @@ fn test_available_mercs_all_available() {
 #[test]
 fn test_available_mercs_all_on_mission_returns_empty() {
     let mut rng = seeded_rng(602);
-    let mut roster = vec![
-        generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng),
-        generate_mercenary(2, MercArchetype::Scout, MercQuality::Common, &mut rng),
-    ];
-    roster[0].status = MercStatus::OnMission(10);
-    roster[1].status = MercStatus::OnMission(11);
+    let mut m1 = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+    let mut m2 = generate_mercenary(2, MercArchetype::Scout, MercQuality::Common, &mut rng);
+    m1.status = MercStatus::OnMission(10);
+    m2.status = MercStatus::OnMission(11);
+    let roster: std::collections::HashMap<u64, Mercenary> =
+        vec![(1, m1), (2, m2)].into_iter().collect();
     assert!(available_mercs(&roster).is_empty());
 }
 
@@ -1112,22 +1128,26 @@ fn test_purge_lost_mercs_removes_only_lost() {
     let mut m3 = generate_mercenary(3, MercArchetype::Medic, MercQuality::Common, &mut rng);
     mark_merc_lost(&mut m1);
     mark_merc_lost(&mut m3);
-    let mut roster = vec![m1, m2, m3];
+    let mut roster: std::collections::HashMap<u64, Mercenary> =
+        vec![(1, m1), (2, m2), (3, m3)].into_iter().collect();
     let purged = purge_lost_mercs(&mut roster);
     assert_eq!(purged, 2, "Two mercs were marked lost");
     assert_eq!(roster.len(), 1, "Only one merc should remain");
-    assert_eq!(roster[0].id, 2, "Surviving merc should have id=2");
+    assert!(roster.contains_key(&2), "Surviving merc should have id=2");
 }
 
 #[test]
 fn test_purge_lost_mercs_returns_count() {
     let mut rng = seeded_rng(902);
-    let mut roster: Vec<_> = (1..=5)
+    let mercs: Vec<_> = (1..=5)
         .map(|id| generate_mercenary(id, MercArchetype::Vanguard, MercQuality::Common, &mut rng))
         .collect();
-    mark_merc_lost(&mut roster[0]);
-    mark_merc_lost(&mut roster[2]);
-    mark_merc_lost(&mut roster[4]);
+    let mut roster: std::collections::HashMap<u64, Mercenary> =
+        mercs.into_iter().map(|m| (m.id, m)).collect();
+    // Mark mercs with ids 1, 3, 5 as lost
+    mark_merc_lost(roster.get_mut(&1).unwrap());
+    mark_merc_lost(roster.get_mut(&3).unwrap());
+    mark_merc_lost(roster.get_mut(&5).unwrap());
     let purged = purge_lost_mercs(&mut roster);
     assert_eq!(purged, 3);
     assert_eq!(roster.len(), 2);
@@ -1135,7 +1155,7 @@ fn test_purge_lost_mercs_returns_count() {
 
 #[test]
 fn test_purge_lost_mercs_on_empty_roster() {
-    let mut roster: Vec<Mercenary> = Vec::new();
+    let mut roster: std::collections::HashMap<u64, Mercenary> = std::collections::HashMap::new();
     let purged = purge_lost_mercs(&mut roster);
     assert_eq!(purged, 0);
 }
@@ -1143,8 +1163,11 @@ fn test_purge_lost_mercs_on_empty_roster() {
 #[test]
 fn test_purge_lost_mercs_noop_when_none_lost() {
     let mut rng = seeded_rng(903);
-    let mut roster: Vec<_> = (1..=3)
-        .map(|id| generate_mercenary(id, MercArchetype::Scout, MercQuality::Common, &mut rng))
+    let mut roster: std::collections::HashMap<u64, Mercenary> = (1..=3)
+        .map(|id| {
+            let m = generate_mercenary(id, MercArchetype::Scout, MercQuality::Common, &mut rng);
+            (m.id, m)
+        })
         .collect();
     let len_before = roster.len();
     let purged = purge_lost_mercs(&mut roster);
@@ -1296,7 +1319,7 @@ fn test_on_prestige_preserves_roster() {
     let mut ids = id_counter();
     let starters = generate_starter_roster(GuildRank(1), &mut ids, &mut rng);
     let count = starters.len();
-    state.prestige.roster = starters;
+    state.prestige.roster = starters.into_iter().map(|m| (m.id, m)).collect();
     assert!(!state.prestige.roster.is_empty());
     state.on_prestige();
     assert_eq!(
@@ -1369,7 +1392,7 @@ fn test_on_prestige_preserves_merc_id_counter() {
     // Consume IDs for starters.
     let starters =
         generate_starter_roster(GuildRank(1), || state.persistent.next_merc_id(), &mut rng);
-    state.prestige.roster = starters;
+    state.prestige.roster = starters.into_iter().map(|m| (m.id, m)).collect();
     let counter_before = state.persistent.merc_id_counter;
     assert_eq!(counter_before, 3, "Three IDs consumed");
     state.on_prestige();
@@ -1411,7 +1434,7 @@ fn test_deep_prestige_available_merc_count() {
     m1.status = MercStatus::Injured {
         missions_remaining: 1,
     };
-    prestige.roster = vec![m1, m2];
+    prestige.roster = vec![(m1.id, m1), (m2.id, m2)].into_iter().collect();
     assert_eq!(prestige.available_merc_count(), 1);
 }
 
@@ -1420,7 +1443,7 @@ fn test_deep_prestige_find_merc_found_and_not_found() {
     let mut rng = seeded_rng(3001);
     let mut prestige = DeepPrestige::new();
     let merc = generate_mercenary(7, MercArchetype::Medic, MercQuality::Common, &mut rng);
-    prestige.roster = vec![merc];
+    prestige.roster = vec![(merc.id, merc)].into_iter().collect();
     assert!(
         prestige.find_merc(7).is_some(),
         "find_merc should find existing id"
@@ -1436,10 +1459,10 @@ fn test_deep_prestige_find_merc_mut_modifies_in_place() {
     let mut rng = seeded_rng(3002);
     let mut prestige = DeepPrestige::new();
     let merc = generate_mercenary(7, MercArchetype::Medic, MercQuality::Common, &mut rng);
-    prestige.roster = vec![merc];
+    prestige.roster = vec![(merc.id, merc)].into_iter().collect();
     let found = prestige.find_merc_mut(7).unwrap();
     found.missions_completed = 5;
-    assert_eq!(prestige.roster[0].missions_completed, 5);
+    assert_eq!(prestige.roster[&7].missions_completed, 5);
 }
 
 // =============================================================================

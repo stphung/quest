@@ -49,7 +49,13 @@ fn force_discover(deep: &mut DeepState) -> ChaCha8Rng {
 fn make_elapsed_supply_run(deep: &mut DeepState) -> Mission {
     let now = Utc::now();
     let id = deep.persistent.next_mission_id();
-    let merc_id = deep.prestige.roster.first().map(|m| m.id).unwrap_or(1);
+    let merc_id = deep
+        .prestige
+        .roster
+        .values()
+        .next()
+        .map(|m| m.id)
+        .unwrap_or(1);
     Mission {
         id,
         mission_type: MissionType::SupplyRun,
@@ -69,7 +75,13 @@ fn make_elapsed_supply_run(deep: &mut DeepState) -> Mission {
 fn make_active_supply_run(deep: &mut DeepState) -> Mission {
     let now = Utc::now();
     let id = deep.persistent.next_mission_id();
-    let merc_id = deep.prestige.roster.first().map(|m| m.id).unwrap_or(1);
+    let merc_id = deep
+        .prestige
+        .roster
+        .values()
+        .next()
+        .map(|m| m.id)
+        .unwrap_or(1);
     Mission {
         id,
         mission_type: MissionType::SupplyRun,
@@ -220,7 +232,7 @@ fn test_discovery_creates_initial_state() {
         3,
         "Starter roster must have exactly 3 mercs"
     );
-    for merc in &deep.prestige.roster {
+    for merc in deep.prestige.roster.values() {
         assert_eq!(merc.level, 1, "Starter mercs must be level 1");
         assert_eq!(merc.missions_completed, 0);
         assert!(
@@ -238,7 +250,8 @@ fn test_discovery_starter_roster_archetypes() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
-    let archetypes: Vec<MercArchetype> = deep.prestige.roster.iter().map(|m| m.archetype).collect();
+    let archetypes: Vec<MercArchetype> =
+        deep.prestige.roster.values().map(|m| m.archetype).collect();
 
     assert!(
         archetypes.contains(&MercArchetype::Vanguard),
@@ -259,7 +272,8 @@ fn test_discovery_merc_ids_are_unique_and_sequential() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
-    let ids: Vec<u64> = deep.prestige.roster.iter().map(|m| m.id).collect();
+    let mut ids: Vec<u64> = deep.prestige.roster.values().map(|m| m.id).collect();
+    ids.sort();
     // IDs should be 1, 2, 3 (counter starts at 0 and increments before assignment).
     assert_eq!(ids, vec![1, 2, 3]);
     let expected_counter =
@@ -439,7 +453,7 @@ fn test_prestige_preserves_active_missions() {
     deep.prestige.active_missions.push(mission);
 
     // Mark the merc as on this mission.
-    if let Some(merc) = deep.prestige.roster.first_mut() {
+    if let Some(merc) = deep.prestige.roster.values_mut().next() {
         merc.status = MercStatus::OnMission(mission_id);
     }
 
@@ -462,14 +476,14 @@ fn test_offline_mission_resolution_completes_elapsed_mission() {
     force_discover(&mut deep);
 
     // Ensure the roster merc is available.
-    let _merc_id = deep.prestige.roster.first().unwrap().id;
+    let _merc_id = deep.prestige.roster.values().next().unwrap().id;
 
     // Create a mission whose timer has elapsed.
     let mission = make_elapsed_supply_run(&mut deep);
     deep.prestige.active_missions.push(mission);
 
     // Mark merc as on the mission.
-    if let Some(merc) = deep.prestige.roster.first_mut() {
+    if let Some(merc) = deep.prestige.roster.values_mut().next() {
         merc.status = MercStatus::OnMission(1);
     }
 

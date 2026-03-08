@@ -7,6 +7,7 @@ use ratatui::{
     widgets::Paragraph,
     Frame,
 };
+use std::cell::RefCell;
 use std::time::{SystemTime, UNIX_EPOCH};
 use unicode_width::UnicodeWidthChar;
 
@@ -181,6 +182,51 @@ pub fn render_buffer(frame: &mut Frame, area: Rect, buffer: &[Vec<SceneCell>]) {
         let row_area = Rect::new(area.x, area.y + row as u16, area.width, 1);
         frame.render_widget(Paragraph::new(Line::from(spans)), row_area);
     }
+}
+
+thread_local! {
+    static SCENE_BUFFER: RefCell<Vec<Vec<SceneCell>>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Acquire a reusable scene buffer, resized and cleared to `SceneCell::default()`.
+///
+/// The returned guard holds a mutable borrow on a thread-local buffer that
+/// persists across frames, avoiding per-frame heap allocation.  When the
+/// terminal is resized the buffer rows/columns are grown (never shrunk) so
+/// that a resize only costs one allocation rather than one per frame.
+///
+/// The caller receives `&mut Vec<Vec<SceneCell>>` via the provided closure.
+pub fn with_scene_buffer<F, R>(width: usize, height: usize, f: F) -> R
+where
+    F: FnOnce(&mut Vec<Vec<SceneCell>>) -> R,
+{
+    SCENE_BUFFER.with(|cell| {
+        let mut buf = cell.borrow_mut();
+
+        // Grow rows if needed
+        if buf.len() < height {
+            buf.resize_with(height, || vec![SceneCell::default(); width]);
+        }
+
+        // Ensure every row has enough columns and reset to default
+        let default = SceneCell::default();
+        for row in buf.iter_mut().take(height) {
+            if row.len() < width {
+                row.resize(width, default);
+            }
+            for cell in row.iter_mut().take(width) {
+                *cell = default;
+            }
+        }
+
+        // Truncate extra rows so downstream code sees the right dimensions
+        buf.truncate(height);
+        for row in buf.iter_mut() {
+            row.truncate(width);
+        }
+
+        f(&mut buf)
+    })
 }
 
 /// Clamps an i16 to the u8 range [0, 255].

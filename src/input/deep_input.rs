@@ -60,12 +60,12 @@ pub(super) fn handle_deep(
         match key.code {
             KeyCode::Right => {
                 let new_view = deep_ui.view.next_tab();
-                switch_view(deep_ui, new_view);
+                switch_view_with_deep(deep_ui, new_view, deep_state);
                 return InputResult::Continue;
             }
             KeyCode::Left => {
                 let new_view = deep_ui.view.prev_tab();
-                switch_view(deep_ui, new_view);
+                switch_view_with_deep(deep_ui, new_view, deep_state);
                 return InputResult::Continue;
             }
             _ => {}
@@ -214,7 +214,7 @@ fn handle_recruit(
                 let occupied_slots = deep_state
                     .prestige
                     .roster
-                    .iter()
+                    .values()
                     .filter(|m| !matches!(m.status, MercStatus::Lost))
                     .count();
                 if occupied_slots >= max_roster {
@@ -227,7 +227,8 @@ fn handle_recruit(
                 let mut merc = deep_state.prestige.recruit_pool.candidates.remove(idx);
                 deep_state.prestige.recruit_pool.recruit_costs.remove(idx);
                 merc.id = deep_state.persistent.next_merc_id();
-                deep_state.prestige.roster.push(merc);
+                let merc_id = merc.id;
+                deep_state.prestige.roster.insert(merc_id, merc);
 
                 let now = Utc::now();
                 let mut rng = rand::rng();
@@ -419,7 +420,7 @@ fn handle_squad_assignment(
     let available_mercs: Vec<u64> = deep_state
         .prestige
         .roster
-        .iter()
+        .values()
         .filter(|m| m.is_available())
         .map(|m| m.id)
         .collect();
@@ -675,9 +676,16 @@ fn handle_infrastructure(
 // ── View switching with visit counter ──────────────────────────────────────────
 
 /// Switch to a new view, resetting selection and incrementing the visit counter.
-fn switch_view(ui: &mut DeepUiState, target: DeepView) {
+fn switch_view_with_deep(ui: &mut DeepUiState, target: DeepView, deep: &DeepState) {
     ui.view = target;
-    ui.selected_index = 0;
+    if target == DeepView::Infrastructure {
+        let frontier = deep.persistent.frontier_layer() as usize;
+        ui.selected_index = frontier
+            .saturating_sub(1)
+            .min(deep.persistent.layers.len().saturating_sub(1));
+    } else {
+        ui.selected_index = 0;
+    }
     ui.staged_squad.clear();
     ui.show_help = false;
     match target {
@@ -822,7 +830,8 @@ mod tests {
     #[test]
     fn collect_pending_result_purges_lost_after_last_result() {
         let mut deep_state = DeepState::new();
-        deep_state.prestige.roster.push(make_lost_merc(7));
+        let lost_merc = make_lost_merc(7);
+        deep_state.prestige.roster.insert(7, lost_merc);
         deep_state
             .prestige
             .pending_results
@@ -842,7 +851,8 @@ mod tests {
     #[test]
     fn collect_pending_result_keeps_lost_while_other_results_remain() {
         let mut deep_state = DeepState::new();
-        deep_state.prestige.roster.push(make_lost_merc(7));
+        let lost_merc = make_lost_merc(7);
+        deep_state.prestige.roster.insert(7, lost_merc);
         deep_state
             .prestige
             .pending_results
@@ -863,7 +873,7 @@ mod tests {
             "Lost merc should stay visible until all results are acknowledged"
         );
         assert!(matches!(
-            deep_state.prestige.roster[0].status,
+            deep_state.prestige.roster[&7].status,
             MercStatus::Lost
         ));
     }

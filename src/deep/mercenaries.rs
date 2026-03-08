@@ -15,6 +15,7 @@
 use super::types::{GuildRank, MercArchetype, MercStatus, Mercenary, RecruitPool};
 use chrono::Utc;
 use rand::{Rng, RngExt};
+use std::collections::HashMap;
 
 // ── Quality Tiers ─────────────────────────────────────────────────────────────
 
@@ -537,20 +538,20 @@ fn archetype_base_expertise(archetype: MercArchetype) -> u32 {
 // ── Roster Management ─────────────────────────────────────────────────────────
 
 /// Whether the roster has room for another mercenary.
-pub fn roster_has_capacity(roster: &[Mercenary], guild_rank: GuildRank) -> bool {
+pub fn roster_has_capacity(roster: &HashMap<u64, Mercenary>, guild_rank: GuildRank) -> bool {
     roster.len() < guild_rank.max_roster() as usize
 }
 
 /// Available (non-injured, non-on-mission) mercenaries in the roster.
-pub fn available_mercs(roster: &[Mercenary]) -> Vec<&Mercenary> {
-    roster.iter().filter(|m| m.is_available()).collect()
+pub fn available_mercs(roster: &HashMap<u64, Mercenary>) -> Vec<&Mercenary> {
+    roster.values().filter(|m| m.is_available()).collect()
 }
 
 /// Remove permanently-lost mercs from the roster (after death notification acknowledged).
 /// Returns the number removed.
-pub fn purge_lost_mercs(roster: &mut Vec<Mercenary>) -> u32 {
+pub fn purge_lost_mercs(roster: &mut HashMap<u64, Mercenary>) -> u32 {
     let before = roster.len();
-    roster.retain(|m| !matches!(m.status, MercStatus::Lost));
+    roster.retain(|_, m| !matches!(m.status, MercStatus::Lost));
     (before - roster.len()) as u32
 }
 
@@ -1136,16 +1137,15 @@ mod tests {
     #[test]
     fn test_mark_merc_lost_and_purge() {
         let mut rng = seeded_rng(204);
-        let mut roster = vec![
-            generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng),
-            generate_mercenary(2, MercArchetype::Scout, MercQuality::Common, &mut rng),
-        ];
-        mark_merc_lost(&mut roster[0]);
-        assert!(matches!(roster[0].status, MercStatus::Lost));
+        let m1 = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+        let m2 = generate_mercenary(2, MercArchetype::Scout, MercQuality::Common, &mut rng);
+        let mut roster: HashMap<u64, Mercenary> = vec![(1, m1), (2, m2)].into_iter().collect();
+        mark_merc_lost(roster.get_mut(&1).unwrap());
+        assert!(matches!(roster[&1].status, MercStatus::Lost));
         let purged = purge_lost_mercs(&mut roster);
         assert_eq!(purged, 1);
         assert_eq!(roster.len(), 1);
-        assert_eq!(roster[0].id, 2);
+        assert!(roster.contains_key(&2));
     }
 
     // ── Roster Management ─────────────────────────────────────────────────────
@@ -1153,15 +1153,12 @@ mod tests {
     #[test]
     fn test_roster_has_capacity() {
         let mut rng = seeded_rng(300);
-        let mut roster = Vec::new();
+        let mut roster = HashMap::new();
         assert!(roster_has_capacity(&roster, GuildRank(1))); // 0/5
         for i in 0..5 {
-            roster.push(generate_mercenary(
-                i,
-                MercArchetype::Vanguard,
-                MercQuality::Common,
-                &mut rng,
-            ));
+            let merc =
+                generate_mercenary(i, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+            roster.insert(i, merc);
         }
         assert!(!roster_has_capacity(&roster, GuildRank(1))); // 5/5 full
         assert!(roster_has_capacity(&roster, GuildRank(2))); // 5/7 ok
@@ -1178,7 +1175,9 @@ mod tests {
         merc2.status = MercStatus::Injured {
             missions_remaining: 2,
         };
-        let roster = vec![merc1, merc2, merc3];
+        let roster: HashMap<u64, Mercenary> = vec![(1, merc1), (2, merc2), (3, merc3)]
+            .into_iter()
+            .collect();
         let available = available_mercs(&roster);
         assert_eq!(available.len(), 1);
         assert_eq!(available[0].id, 3);

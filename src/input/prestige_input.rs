@@ -66,7 +66,7 @@ pub(super) fn handle_vault_selection(
                     deep_ui.farewell_mercs = deep
                         .prestige
                         .roster
-                        .iter()
+                        .values()
                         .map(|m| (m.name.clone(), m.level, m.missions_completed))
                         .collect();
                     crate::character::prestige::perform_prestige_with_vault(state, selected_slots);
@@ -149,7 +149,7 @@ pub(super) fn handle_prestige_confirm(
                 deep_ui.farewell_mercs = deep
                     .prestige
                     .roster
-                    .iter()
+                    .values()
                     .map(|m| (m.name.clone(), m.level, m.missions_completed))
                     .collect();
                 perform_prestige(state);

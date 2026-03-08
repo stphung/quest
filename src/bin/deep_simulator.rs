@@ -356,7 +356,7 @@ fn initialize_state(
 
     let mut prestige = DeepPrestige {
         warband_marks: config.starting_marks,
-        roster: starter_roster,
+        roster: starter_roster.into_iter().map(|m| (m.id, m)).collect(),
         active_missions: Vec::new(),
         available_missions: Vec::new(),
         recruit_pool: RecruitPool {
@@ -447,7 +447,7 @@ fn ai_recruit(
         if prestige.spend_marks(cost) {
             let merc = prestige.recruit_pool.candidates.remove(best_idx);
             prestige.recruit_pool.recruit_costs.remove(best_idx);
-            prestige.roster.push(merc);
+            prestige.roster.insert(merc.id, merc);
             stats.mercs_recruited += 1;
             stats.marks_spent_recruitment += cost as u64;
         }
@@ -471,7 +471,7 @@ fn find_best_recruit(prestige: &DeepPrestige) -> Option<usize> {
 fn pick_squad(available: &AvailableMission, prestige: &DeepPrestige) -> Option<Vec<u64>> {
     let mut candidates: Vec<_> = prestige
         .roster
-        .iter()
+        .values()
         .filter(|m| m.is_available())
         .collect();
 
@@ -893,7 +893,7 @@ fn run_simulation(config: &DeepSimConfig, seed: u64) -> DeepSimStats {
         }
 
         // Tick injuries for mercs who just completed missions.
-        for merc in &mut prestige.roster {
+        for merc in prestige.roster.values_mut() {
             if matches!(merc.status, MercStatus::Injured { .. }) {
                 tick_merc_injury(merc);
             }
@@ -937,7 +937,7 @@ fn run_simulation(config: &DeepSimConfig, seed: u64) -> DeepSimStats {
                 let id = persistent.next_merc_id();
                 let archetype = MercArchetype::Vanguard; // Reliable frontliner
                 let emergency = generate_mercenary(id, archetype, MercQuality::Common, &mut rng);
-                prestige.roster.push(emergency);
+                prestige.roster.insert(emergency.id, emergency);
                 if config.verbose {
                     let elapsed_h = (now - sim_start).num_minutes() as f64 / 60.0;
                     println!(
@@ -986,7 +986,7 @@ fn run_simulation(config: &DeepSimConfig, seed: u64) -> DeepSimStats {
                     && m.min_squad_power
                         <= prestige
                             .roster
-                            .iter()
+                            .values()
                             .map(|r| r.effective_power())
                             .sum::<u32>()
             });
@@ -1029,7 +1029,7 @@ fn run_simulation(config: &DeepSimConfig, seed: u64) -> DeepSimStats {
             stall_count += 1;
             if stall_count > 10 {
                 now += Duration::hours(6);
-                for merc in &mut prestige.roster {
+                for merc in prestige.roster.values_mut() {
                     if matches!(merc.status, MercStatus::Injured { .. }) {
                         tick_merc_injury(merc);
                     }
@@ -1050,7 +1050,7 @@ fn run_simulation(config: &DeepSimConfig, seed: u64) -> DeepSimStats {
     stats.layers_cleared = persistent.layers.iter().filter(|l| l.cleared).count() as u32;
 
     // Track max merc level from final roster.
-    for merc in &prestige.roster {
+    for merc in prestige.roster.values() {
         if merc.level > stats.max_merc_level {
             stats.max_merc_level = merc.level;
         }

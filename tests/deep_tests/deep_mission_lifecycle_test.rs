@@ -156,7 +156,7 @@ fn test_supply_run_full_lifecycle() {
 
     // Add a merc with enough power.
     let merc = make_merc(1, MercArchetype::Vanguard, 20);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let available = supply_run_mission(1);
     let now = t0();
@@ -245,7 +245,7 @@ fn test_supply_run_no_item_drop() {
     let mut rng = rng(1002);
     let mut state = fresh_state();
     let merc = make_merc(1, MercArchetype::Scout, 15);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let available = supply_run_mission(1);
     let mission = start_mission(
@@ -287,7 +287,7 @@ fn test_recon_lifecycle_familiarity_gain() {
     state.prestige.warband_marks = 200;
 
     let merc = make_merc(1, MercArchetype::Scout, 50);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let available = recon_mission(1, 10);
     let now = t0();
@@ -337,7 +337,7 @@ fn test_recon_no_item_drop() {
     state.prestige.warband_marks = 200;
 
     let merc = make_merc(1, MercArchetype::Scout, 100);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let available = recon_mission(1, 10);
     let mission = start_mission(
@@ -373,7 +373,7 @@ fn test_expedition_can_drop_item() {
     state.prestige.warband_marks = 500;
 
     let merc = make_merc(1, MercArchetype::Vanguard, 100);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let layer = 3u32;
     let available = expedition_mission(layer, 20);
@@ -414,7 +414,7 @@ fn test_expedition_marks_deducted_on_start() {
     state.prestige.warband_marks = 200;
 
     let merc = make_merc(1, MercArchetype::Arcanist, 80);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let marks_before = state.prestige.warband_marks;
     let available = expedition_mission(1, 10);
@@ -454,9 +454,10 @@ fn test_breakthrough_success_clears_layer() {
         let mut rng2 = ChaCha8Rng::seed_from_u64(4000 + seed);
         let mut s = fresh_state();
         s.prestige.warband_marks = 1000;
-        s.prestige
-            .roster
-            .push(make_merc(1, MercArchetype::Vanguard, 500));
+        {
+            let m = make_merc(1, MercArchetype::Vanguard, 500);
+            s.prestige.roster.insert(m.id, m);
+        }
 
         let m = start_mission(
             &available,
@@ -528,9 +529,10 @@ fn test_breakthrough_failure_does_not_clear_layer() {
         let mut rng2 = ChaCha8Rng::seed_from_u64(4100 + seed);
         let mut s = fresh_state();
         s.prestige.warband_marks = 1000;
-        s.prestige
-            .roster
-            .push(make_merc(1, MercArchetype::Medic, 1));
+        {
+            let m = make_merc(1, MercArchetype::Medic, 1);
+            s.prestige.roster.insert(m.id, m);
+        }
 
         let m = start_mission(
             &avail,
@@ -588,7 +590,7 @@ fn test_breakthrough_item_ilvl() {
 
     let layer = 2u32;
     let merc = make_merc(1, MercArchetype::Vanguard, 200);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let available = breakthrough_mission(layer, 10);
     let m = start_mission(
@@ -630,7 +632,7 @@ fn test_construction_always_succeeds_no_casualties() {
     let mut state = fresh_state();
 
     let merc = make_merc(1, MercArchetype::Scout, 20);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let available = construction_mission(1);
     let m = start_mission(
@@ -681,7 +683,7 @@ fn test_construction_no_item_drop() {
     let mut state = fresh_state();
 
     let merc = make_merc(1, MercArchetype::Saboteur, 30);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let available = construction_mission(1);
     let m = start_mission(
@@ -717,7 +719,7 @@ fn test_construction_builds_watchtower_on_layer() {
     state.persistent.layer_record_mut(2).cleared = true;
 
     let merc = make_merc(1, MercArchetype::Arcanist, 30);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let available = construction_mission_with(2, Infrastructure::Watchtower);
     let m = start_mission(
@@ -760,7 +762,7 @@ fn test_auto_resolve_used_when_no_player_response() {
     state.prestige.warband_marks = 500;
 
     let merc = make_merc(1, MercArchetype::Vanguard, 100);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let available = expedition_mission(1, 10);
     let m = start_mission(
@@ -816,7 +818,7 @@ fn test_validate_empty_squad_rejected() {
 fn test_validate_insufficient_power_rejected() {
     let mut state = fresh_state();
     let merc = make_merc(1, MercArchetype::Medic, 5); // Very low power
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let available = AvailableMission {
         mission_type: MissionType::Expedition,
@@ -846,7 +848,7 @@ fn test_validate_insufficient_power_rejected() {
 fn test_validate_missing_required_archetype_rejected() {
     let mut state = fresh_state();
     let merc = make_merc(1, MercArchetype::Vanguard, 200);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let available = AvailableMission {
         mission_type: MissionType::Breakthrough,
@@ -880,8 +882,8 @@ fn test_validate_with_required_archetype_passes() {
     state.prestige.warband_marks = 500;
     let merc1 = make_merc(1, MercArchetype::Vanguard, 100);
     let merc2 = make_merc(2, MercArchetype::Medic, 80);
-    state.prestige.roster.push(merc1);
-    state.prestige.roster.push(merc2);
+    state.prestige.roster.insert(merc1.id, merc1);
+    state.prestige.roster.insert(merc2.id, merc2);
 
     let available = AvailableMission {
         mission_type: MissionType::Breakthrough,
@@ -914,7 +916,7 @@ fn test_validate_insufficient_marks_rejected() {
     let mut state = fresh_state();
     state.prestige.warband_marks = 5; // Not enough
     let merc = make_merc(1, MercArchetype::Scout, 100);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let available = AvailableMission {
         mission_type: MissionType::Expedition,
@@ -948,7 +950,7 @@ fn test_validate_free_supply_run_bypasses_marks_check() {
     let mut state = fresh_state();
     state.prestige.warband_marks = 0; // No marks
     let merc = make_merc(1, MercArchetype::Scout, 20);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let available = AvailableMission {
         mission_type: MissionType::SupplyRun,
@@ -988,7 +990,7 @@ fn test_validate_on_mission_merc_rejected() {
     let mut state = fresh_state();
     let mut merc = make_merc(1, MercArchetype::Vanguard, 100);
     merc.status = MercStatus::OnMission(42); // Already on a mission
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let available = supply_run_mission(1);
     let result =
@@ -1015,8 +1017,8 @@ fn test_concurrent_mission_limit_enforced() {
 
     let merc1 = make_merc(1, MercArchetype::Vanguard, 50);
     let merc2 = make_merc(2, MercArchetype::Scout, 50);
-    state.prestige.roster.push(merc1);
-    state.prestige.roster.push(merc2);
+    state.prestige.roster.insert(merc1.id, merc1);
+    state.prestige.roster.insert(merc2.id, merc2);
 
     // Start first mission.
     let avail1 = supply_run_mission(1);
@@ -1054,9 +1056,9 @@ fn test_guild_rank_3_allows_2_concurrent() {
     let merc1 = make_merc(1, MercArchetype::Vanguard, 50);
     let merc2 = make_merc(2, MercArchetype::Scout, 50);
     let merc3 = make_merc(3, MercArchetype::Medic, 50);
-    state.prestige.roster.push(merc1);
-    state.prestige.roster.push(merc2);
-    state.prestige.roster.push(merc3);
+    state.prestige.roster.insert(merc1.id, merc1);
+    state.prestige.roster.insert(merc2.id, merc2);
+    state.prestige.roster.insert(merc3.id, merc3);
 
     // Start first mission.
     let avail1 = supply_run_mission(1);
@@ -1108,7 +1110,7 @@ fn test_merc_locked_during_mission() {
     let mut state = fresh_state();
 
     let merc = make_merc(1, MercArchetype::Vanguard, 30);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let available = supply_run_mission(1);
     let m = start_mission(
@@ -1138,7 +1140,7 @@ fn test_merc_available_after_safe_mission() {
     let mut state = fresh_state();
 
     let merc = make_merc(1, MercArchetype::Scout, 25);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     let available = supply_run_mission(1);
     let m = start_mission(
@@ -1173,10 +1175,8 @@ fn test_multiple_mercs_all_released_after_mission() {
     let mut state = fresh_state();
 
     for i in 1u64..=3 {
-        state
-            .prestige
-            .roster
-            .push(make_merc(i, MercArchetype::Vanguard, 30));
+        let m = make_merc(i, MercArchetype::Vanguard, 30);
+        state.prestige.roster.insert(m.id, m);
     }
 
     let available = supply_run_mission(1);
@@ -1230,7 +1230,7 @@ fn test_offline_mission_resolved_on_load() {
     let mut state = fresh_state();
 
     let merc = make_merc(1, MercArchetype::Vanguard, 50);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     // Start a 2-hour supply run at T0.
     let available = supply_run_mission(1);
@@ -1277,7 +1277,7 @@ fn test_mission_not_yet_complete_stays_active() {
     let mut state = fresh_state();
 
     let merc = make_merc(1, MercArchetype::Scout, 30);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     // Start a mission with starts_at and ends_at both in the future.
     // Note: start_mission computes actual duration from base_mission_duration_secs,
@@ -1332,10 +1332,10 @@ fn test_supply_run_never_causes_casualties() {
     for seed in 0u64..30 {
         let mut rng = rng(11000 + seed);
         let mut state = fresh_state();
-        state
-            .prestige
-            .roster
-            .push(make_merc(1, MercArchetype::Medic, 5)); // Even fragile mercs
+        {
+            let m = make_merc(1, MercArchetype::Medic, 5); // Even fragile mercs
+            state.prestige.roster.insert(m.id, m);
+        }
 
         let available = supply_run_mission(1);
         let m = start_mission(
@@ -1376,10 +1376,10 @@ fn test_construction_never_causes_casualties() {
     for seed in 0u64..20 {
         let mut rng = rng(11100 + seed);
         let mut state = fresh_state();
-        state
-            .prestige
-            .roster
-            .push(make_merc(1, MercArchetype::Arcanist, 5));
+        {
+            let m = make_merc(1, MercArchetype::Arcanist, 5);
+            state.prestige.roster.insert(m.id, m);
+        }
 
         let available = construction_mission(1);
         let m = start_mission(
@@ -1429,10 +1429,10 @@ fn test_underpowered_squad_higher_injury_rate() {
         let mut r = ChaCha8Rng::seed_from_u64(seed);
         let mut state = fresh_state();
         state.prestige.warband_marks = 1000;
-        state
-            .prestige
-            .roster
-            .push(make_merc(1, MercArchetype::Medic, power));
+        {
+            let m = make_merc(1, MercArchetype::Medic, power);
+            state.prestige.roster.insert(m.id, m);
+        }
 
         let available = AvailableMission {
             mission_type: MissionType::Expedition,
@@ -1509,7 +1509,7 @@ fn test_merc_levels_up_after_milestone() {
     let initial_level = merc.level;
     // missions_to_next_level(1) = 3 + 1*2 = 5
     let needed = Mercenary::missions_to_next_level(initial_level);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     // Complete exactly `needed` missions.
     for i in 0..needed {
@@ -1555,7 +1555,7 @@ fn test_merc_missions_completed_increments() {
     let mut state = fresh_state();
 
     let merc = make_merc(1, MercArchetype::Scout, 30);
-    state.prestige.roster.push(merc);
+    state.prestige.roster.insert(merc.id, merc);
 
     for i in 0u32..3 {
         let available = supply_run_mission(1);

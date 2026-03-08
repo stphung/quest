@@ -54,6 +54,7 @@ pub struct CharacterInfo {
     pub is_corrupted: bool,
 }
 
+#[derive(Clone)]
 pub struct CharacterManager {
     pub(super) quest_dir: PathBuf,
 }
@@ -139,6 +140,9 @@ mod tests {
             game_over_shown_at: None,
             cached_power_rating: 0.0,
             cached_fracture_zone_cap: 0,
+            cached_haven_bonuses: Default::default(),
+            cached_sigil_bonuses: Default::default(),
+            bonuses_dirty: true,
             stormglass: 0,
             stormglass_discovered: false,
             storm_sigils: crate::stormglass::sigils::StormSigils::new(),
