@@ -74,7 +74,6 @@ impl ZoneProgression {
             .filter(|z| z.id <= 30 && z.prestige_requirement <= new_prestige_rank)
             .map(|z| z.id)
             .collect();
-        self.unlocked_zones.sort();
     }
 }
 

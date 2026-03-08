@@ -173,25 +173,47 @@ impl Haven {
             .sum()
     }
 
-    /// Compute all bonuses from the current Haven state
+    /// Compute all bonuses from the current Haven state.
+    ///
+    /// Uses a single pass over all rooms instead of per-bonus-type passes,
+    /// reducing iterations from ~196 (14 rooms x 14 bonus types) to 14.
     pub fn compute_bonuses(&self) -> HavenBonuses {
-        HavenBonuses {
-            damage_percent: self.get_bonus(HavenBonusType::DamagePercent),
-            xp_gain_percent: self.get_bonus(HavenBonusType::XpGainPercent),
-            drop_rate_percent: self.get_bonus(HavenBonusType::DropRatePercent),
-            crit_chance_percent: self.get_bonus(HavenBonusType::CritChancePercent),
-            hp_regen_percent: self.get_bonus(HavenBonusType::HpRegenPercent),
-            double_strike_chance: self.get_bonus(HavenBonusType::DoubleStrikeChance),
-            offline_xp_percent: self.get_bonus(HavenBonusType::OfflineXpPercent),
-            challenge_discovery_percent: self.get_bonus(HavenBonusType::ChallengeDiscoveryPercent),
-            fishing_timer_reduction: self.get_bonus(HavenBonusType::FishingTimerReduction),
-            double_fish_chance: self.get_bonus(HavenBonusType::DoubleFishChance),
-            item_rarity_percent: self.get_bonus(HavenBonusType::ItemRarityPercent),
-            hp_regen_delay_reduction: self.get_bonus(HavenBonusType::HpRegenDelayReduction),
-            vault_slots: self.get_bonus(HavenBonusType::VaultSlots) as u8,
-            max_fishing_rank_bonus: self.fishing_rank_bonus(),
-            has_storm_forge: self.has_storm_forge(),
+        let mut bonuses = HavenBonuses::default();
+        for room in HavenRoomId::ALL.iter() {
+            let tier = self.room_tier(*room);
+            if tier == 0 {
+                continue;
+            }
+            let bonus = room.bonus();
+            let value = bonus.values[(tier - 1) as usize];
+            match bonus.bonus_type {
+                HavenBonusType::DamagePercent => bonuses.damage_percent += value,
+                HavenBonusType::XpGainPercent => bonuses.xp_gain_percent += value,
+                HavenBonusType::DropRatePercent => bonuses.drop_rate_percent += value,
+                HavenBonusType::CritChancePercent => bonuses.crit_chance_percent += value,
+                HavenBonusType::HpRegenPercent => bonuses.hp_regen_percent += value,
+                HavenBonusType::DoubleStrikeChance => bonuses.double_strike_chance += value,
+                HavenBonusType::OfflineXpPercent => bonuses.offline_xp_percent += value,
+                HavenBonusType::ChallengeDiscoveryPercent => {
+                    bonuses.challenge_discovery_percent += value;
+                }
+                HavenBonusType::FishingTimerReduction => bonuses.fishing_timer_reduction += value,
+                HavenBonusType::DoubleFishChance => bonuses.double_fish_chance += value,
+                HavenBonusType::ItemRarityPercent => bonuses.item_rarity_percent += value,
+                HavenBonusType::HpRegenDelayReduction => {
+                    bonuses.hp_regen_delay_reduction += value;
+                }
+                HavenBonusType::VaultSlots => bonuses.vault_slots = value as u8,
+                HavenBonusType::MaxFishingRank | HavenBonusType::StormForgeAccess => {
+                    // Handled below via dedicated methods that encode special logic
+                }
+            }
         }
+        // FishingDock T4 grants +10 max fishing rank (different bonus type than T1-3)
+        bonuses.max_fishing_rank_bonus = self.fishing_rank_bonus();
+        // StormForge is a boolean presence check (single tier)
+        bonuses.has_storm_forge = self.has_storm_forge();
+        bonuses
     }
 }
 

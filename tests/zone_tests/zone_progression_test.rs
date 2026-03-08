@@ -120,8 +120,8 @@ fn test_unlock_zone_maintains_sort_order() {
     prog.unlock_zone(5);
     prog.unlock_zone(7);
 
-    // Should be sorted
-    let unlocked: Vec<u32> = prog.unlocked_zones.clone();
+    // BTreeSet is always sorted — verify elements are in order
+    let unlocked: Vec<u32> = prog.unlocked_zones.iter().copied().collect();
     let mut sorted = unlocked.clone();
     sorted.sort();
     assert_eq!(unlocked, sorted);

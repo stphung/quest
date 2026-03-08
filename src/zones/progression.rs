@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 use super::data::get_all_zones;
 pub use crate::core::constants::KILLS_FOR_BOSS;
@@ -14,10 +15,10 @@ pub struct ZoneProgression {
     pub current_zone_id: u32,
     /// Current subzone ID within the zone
     pub current_subzone_id: u32,
-    /// List of defeated bosses as (zone_id, subzone_id) pairs
-    pub defeated_bosses: Vec<(u32, u32)>,
-    /// List of unlocked zone IDs
-    pub unlocked_zones: Vec<u32>,
+    /// Set of defeated bosses as (zone_id, subzone_id) pairs
+    pub defeated_bosses: BTreeSet<(u32, u32)>,
+    /// Set of unlocked zone IDs
+    pub unlocked_zones: BTreeSet<u32>,
     /// Kills in current subzone (resets when boss spawns or subzone changes)
     #[serde(default)]
     pub kills_in_subzone: u32,
@@ -41,8 +42,8 @@ impl ZoneProgression {
         Self {
             current_zone_id: 1,
             current_subzone_id: 1,
-            defeated_bosses: vec![],
-            unlocked_zones: vec![1, 2], // Start with zones 1-2 unlocked (P0 zones)
+            defeated_bosses: BTreeSet::new(),
+            unlocked_zones: [1, 2].into_iter().collect(), // Start with zones 1-2 unlocked (P0 zones)
             kills_in_subzone: 0,
             fighting_boss: false,
             has_stormbreaker: false, // Must be forged to defeat Zone 10 boss
@@ -81,17 +82,12 @@ impl ZoneProgression {
 
     /// Unlocks a zone.
     pub fn unlock_zone(&mut self, zone_id: u32) {
-        if !self.unlocked_zones.contains(&zone_id) {
-            self.unlocked_zones.push(zone_id);
-            self.unlocked_zones.sort();
-        }
+        self.unlocked_zones.insert(zone_id);
     }
 
     /// Records a boss defeat.
     pub fn defeat_boss(&mut self, zone_id: u32, subzone_id: u32) {
-        if !self.is_boss_defeated(zone_id, subzone_id) {
-            self.defeated_bosses.push((zone_id, subzone_id));
-        }
+        self.defeated_bosses.insert((zone_id, subzone_id));
         // Reset kill counter and boss flag
         self.kills_in_subzone = 0;
         self.fighting_boss = false;
@@ -142,7 +138,7 @@ mod tests {
                 .iter()
                 .filter(|&&b| b == (1, 1))
                 .count(),
-            1
+            1 // BTreeSet naturally deduplicates
         );
     }
 

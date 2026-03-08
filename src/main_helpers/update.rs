@@ -1659,13 +1659,12 @@ fn load_character_for_game(
             }
 
             // Sync achievements from character state (retroactive unlocks)
-            let defeated_bosses = state.zone_progression.defeated_bosses.to_vec();
             global_achievements.sync_from_game_state(
                 state.character_level,
                 state.prestige_rank,
                 state.fishing.rank,
                 state.fishing.total_fish_caught,
-                &defeated_bosses,
+                &state.zone_progression.defeated_bosses,
                 Some(&state.character_name),
             );
             global_achievements.sync_from_haven(

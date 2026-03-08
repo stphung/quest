@@ -3,7 +3,7 @@
 use super::generation::reveal_adjacent_rooms;
 use super::logic::DungeonEvent;
 use super::types::{Dungeon, RoomState, RoomType};
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Time between room movements during auto-exploration (seconds)
 pub const ROOM_MOVE_INTERVAL: f64 = 2.5;
@@ -74,16 +74,14 @@ pub fn find_path_to(
         return Some(vec![from]);
     }
 
-    // BFS state: position + path taken to reach it
-    type BfsNode = (usize, usize, Vec<(usize, usize)>);
-
     let mut visited: HashSet<(usize, usize)> = HashSet::new();
-    let mut queue: VecDeque<BfsNode> = VecDeque::new();
+    let mut parents: HashMap<(usize, usize), (usize, usize)> = HashMap::new();
+    let mut queue: VecDeque<(usize, usize)> = VecDeque::new();
 
     visited.insert(from);
-    queue.push_back((from.0, from.1, vec![from]));
+    queue.push_back(from);
 
-    while let Some((x, y, path)) = queue.pop_front() {
+    while let Some((x, y)) = queue.pop_front() {
         let neighbors = dungeon.get_connected_neighbors(x, y);
 
         for (nx, ny) in neighbors {
@@ -91,11 +89,18 @@ pub fn find_path_to(
                 continue;
             }
 
-            let mut new_path = path.clone();
-            new_path.push((nx, ny));
+            parents.insert((nx, ny), (x, y));
 
             if (nx, ny) == to {
-                return Some(new_path);
+                // Reconstruct path from parents
+                let mut path = vec![to];
+                let mut current = to;
+                while current != from {
+                    current = parents[&current];
+                    path.push(current);
+                }
+                path.reverse();
+                return Some(path);
             }
 
             // Can only traverse through cleared or current rooms (or revealed if it's the target)
@@ -107,7 +112,7 @@ pub fn find_path_to(
 
                 if can_traverse {
                     visited.insert((nx, ny));
-                    queue.push_back((nx, ny, new_path));
+                    queue.push_back((nx, ny));
                 }
             }
         }

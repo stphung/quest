@@ -272,8 +272,14 @@ fn push_or_replace_for_layer(
         return true;
     }
 
+    // Pre-compute layer counts to avoid O(n²)
+    let mut layer_counts: std::collections::HashMap<u32, usize> = std::collections::HashMap::new();
+    for m in pool.iter() {
+        *layer_counts.entry(m.layer).or_insert(0) += 1;
+    }
+
     if let Some(idx) = pool.iter().position(|m| {
-        m.layer != target_layer && pool.iter().filter(|x| x.layer == m.layer).count() > 1
+        m.layer != target_layer && layer_counts.get(&m.layer).copied().unwrap_or(0) > 1
     }) {
         pool[idx] = candidate;
         return true;
@@ -341,7 +347,7 @@ fn prune_invalid_pool_missions(
     persistent: &DeepPersistent,
 ) -> bool {
     let before = pool.len();
-    let mut seen: Vec<(u32, MissionType)> = Vec::new();
+    let mut seen: std::collections::HashSet<(u32, MissionType)> = std::collections::HashSet::new();
     pool.retain(|m| {
         let valid =
             layer_in_window(m.layer, persistent) && is_valid_construction_mission(m, persistent);
@@ -356,10 +362,9 @@ fn prune_invalid_pool_missions(
             }
         }
         let key = (m.layer, m.mission_type);
-        if seen.contains(&key) {
+        if !seen.insert(key) {
             return false;
         }
-        seen.push(key);
         true
     });
     before != pool.len()
