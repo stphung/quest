@@ -709,8 +709,8 @@ fn refinery_build_cost(tier: u8) -> f64 {
 fn refinery_tier_unlock_threshold(tier: u8) -> usize {
     match tier {
         1 => 1,
-        2 => 6,
-        _ => 12,
+        2 => 8,
+        _ => 15,
     }
 }
 
@@ -2593,7 +2593,7 @@ mod external_bonus_tests {
     fn test_build_refinery_tier_gating() {
         let mut loom = LoomState::new();
         select_archetype(&mut loom, LoomArchetype::BurnBright);
-        // Only 1 completed pattern; Tier 2 recipes require 6 → TierLocked.
+        // Only 1 completed pattern; Tier 2 recipes require 8 → TierLocked.
         setup_patterns(&mut loom, 1);
         *loom
             .persistent
@@ -2707,5 +2707,26 @@ mod external_bonus_tests {
             (forged - 40.0).abs() < 0.01,
             "expected ~40.0 ForgedLight from two refineries, got {forged}"
         );
+    }
+
+    #[test]
+    fn test_tier_gates_shifted() {
+        let mut loom = LoomState::new();
+        crate::loom::complete_discovery(&mut loom);
+        assert!(unlocked_tiers(&loom).is_empty());
+        loom.persistent.patterns[0].completed = true;
+        assert_eq!(unlocked_tiers(&loom), vec![1]);
+        for i in 1..7 {
+            loom.persistent.patterns[i].completed = true;
+        }
+        assert_eq!(unlocked_tiers(&loom), vec![1]);
+        loom.persistent.patterns[7].completed = true;
+        assert_eq!(unlocked_tiers(&loom), vec![1, 2]);
+        for i in 8..14 {
+            loom.persistent.patterns[i].completed = true;
+        }
+        assert_eq!(unlocked_tiers(&loom), vec![1, 2]);
+        loom.persistent.patterns[14].completed = true;
+        assert_eq!(unlocked_tiers(&loom), vec![1, 2, 3]);
     }
 }

@@ -142,9 +142,9 @@ fn node_emoji(id: crate::loom::types::NodeId) -> &'static str {
 
 /// Number of completed patterns determines which recipe tiers are visible.
 fn visible_recipe_tier(completed_patterns: usize) -> u8 {
-    if completed_patterns >= 12 {
+    if completed_patterns >= 15 {
         3
-    } else if completed_patterns >= 6 {
+    } else if completed_patterns >= 8 {
         2
     } else {
         1
