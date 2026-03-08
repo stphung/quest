@@ -22,6 +22,31 @@ use ratatui::{
 // Re-export for haven_scene.rs which uses super::stats_panel::enhancement_style
 pub(super) use super::stats_equipment::enhancement_style;
 
+/// Cached map of prestige rank → unlocked feature/zone names.
+/// Built once from zone data + hardcoded feature unlocks, avoids
+/// scanning all zones every frame.
+fn prestige_unlock_names(rank: u32) -> &'static [&'static str] {
+    use std::collections::HashMap;
+    use std::sync::LazyLock;
+
+    static MAP: LazyLock<HashMap<u32, Vec<&'static str>>> = LazyLock::new(|| {
+        let mut m: HashMap<u32, Vec<&'static str>> = HashMap::new();
+        for zone in crate::zones::get_all_zones() {
+            if zone.prestige_requirement > 0 {
+                m.entry(zone.prestige_requirement)
+                    .or_default()
+                    .push(zone.name);
+            }
+        }
+        m.entry(10).or_default().push("Haven");
+        m.entry(15).or_default().push("Soulforge");
+        m.entry(15).or_default().push("Stormglass");
+        m
+    });
+
+    MAP.get(&rank).map(|v| v.as_slice()).unwrap_or(&[])
+}
+
 /// Status indicator for the [D]eep shortcut in the footer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum DeepIndicatorStatus {
@@ -298,24 +323,11 @@ fn draw_hero_panel(
     ));
     prestige_lines.push(Line::from(xp_spans));
 
-    // Prestige row 4: Unlock hint
+    // Prestige row 4: Unlock hint (uses cached lookup to avoid per-frame zone scan)
     let next_prestige = get_next_prestige_tier(game_state.prestige_rank);
     let mult_delta = next_prestige.multiplier - tier.multiplier;
     let unlock_hint = {
-        let mut unlocks = Vec::new();
-        let zones = crate::zones::get_all_zones();
-        for zone in zones {
-            if zone.prestige_requirement == next_prestige.rank {
-                unlocks.push(zone.name);
-            }
-        }
-        if next_prestige.rank == 10 {
-            unlocks.push("Haven");
-        }
-        if next_prestige.rank == 15 {
-            unlocks.push("Soulforge");
-            unlocks.push("Stormglass");
-        }
+        let unlocks = prestige_unlock_names(next_prestige.rank);
         if unlocks.is_empty() {
             format!("\u{1f513} +{:.2}x mult", mult_delta)
         } else {
