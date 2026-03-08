@@ -313,4 +313,101 @@ mod tests {
         advance_to_next_pattern(&mut state.persistent);
         assert_eq!(state.persistent.active_pattern, last);
     }
+
+    // ── multi-requirement and 28-pattern coverage ──
+
+    #[test]
+    fn test_multi_requirement_independent_completion() {
+        let mut state = state_with_patterns();
+        // Pattern 4 "Mirror and Void": Reflection 30/hr for 6hr, VoidEssence 30/hr for 6hr
+        for i in 0..4 {
+            state.persistent.patterns[i].completed = true;
+        }
+        state.persistent.active_pattern = 4;
+
+        // Complete only the first requirement.
+        state.persistent.patterns[4].requirements[0].sustained_secs =
+            state.persistent.patterns[4].requirements[0].sustain_duration_secs;
+        state.persistent.patterns[4].requirements[0].completed = true;
+
+        // Pattern should NOT be complete yet (second requirement pending).
+        assert!(!active_pattern_requirements_met(&state.persistent));
+
+        // Complete second requirement.
+        state.persistent.patterns[4].requirements[1].sustained_secs =
+            state.persistent.patterns[4].requirements[1].sustain_duration_secs;
+        state.persistent.patterns[4].requirements[1].completed = true;
+
+        // Now pattern should be met.
+        assert!(active_pattern_requirements_met(&state.persistent));
+    }
+
+    #[test]
+    fn test_multi_requirement_partial_does_not_complete_pattern() {
+        let mut state = state_with_patterns();
+        // Pattern 5 "Full Circle" has 6 requirements
+        for i in 0..5 {
+            state.persistent.patterns[i].completed = true;
+        }
+        state.persistent.active_pattern = 5;
+
+        // Complete only 5 of 6 requirements
+        for req in state.persistent.patterns[5].requirements.iter_mut().take(5) {
+            req.sustained_secs = req.sustain_duration_secs;
+            req.completed = true;
+        }
+
+        // Pattern should NOT be complete.
+        assert!(!active_pattern_requirements_met(&state.persistent));
+    }
+
+    #[test]
+    fn test_all_28_patterns_complete() {
+        let mut state = state_with_patterns();
+        for p in &mut state.persistent.patterns {
+            p.completed = true;
+        }
+        assert!(all_patterns_complete(&state.persistent));
+        assert_eq!(state.persistent.patterns.len(), 28);
+    }
+
+    #[test]
+    fn test_28_patterns_not_complete_with_one_remaining() {
+        let mut state = state_with_patterns();
+        let n = state.persistent.patterns.len();
+        for p in state.persistent.patterns.iter_mut().take(n - 1) {
+            p.completed = true;
+        }
+        assert!(!all_patterns_complete(&state.persistent));
+    }
+
+    #[test]
+    fn test_requirement_status_for_multi_req_pattern() {
+        let mut state = state_with_patterns();
+        // Pattern 5 "Full Circle" has 6 requirements
+        for i in 0..5 {
+            state.persistent.patterns[i].completed = true;
+        }
+        state.persistent.active_pattern = 5;
+        let status = active_pattern_requirement_status(&state.persistent);
+        assert_eq!(status.len(), 6);
+    }
+
+    #[test]
+    fn test_tick_advances_only_matching_resources() {
+        let mut state = state_with_patterns();
+        // Pattern 4 "Mirror and Void": needs Reflection and VoidEssence
+        for i in 0..4 {
+            state.persistent.patterns[i].completed = true;
+        }
+        state.persistent.active_pattern = 4;
+
+        // Only provide Reflection, not VoidEssence
+        let r = rates(&[(Resource::Reflection, 100.0)]);
+        tick_pattern_sustain(&mut state.persistent, &r, 1.0);
+
+        // First req (Reflection) should advance, second (VoidEssence) should not
+        assert!(state.persistent.patterns[4].requirements[0].sustained_secs > 0.0);
+        assert!((state.persistent.patterns[4].requirements[1].sustained_secs).abs() < 1e-9);
+    }
 }
