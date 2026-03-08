@@ -230,7 +230,7 @@ pub fn node_effective_rate(loom: &LoomState, node: &LoomNode) -> f64 {
 /// `delta_seconds` is the wall-clock time elapsed since the last tick (typically 0.1s).
 /// Each unlocked node produces its native resource at its effective rate and stores
 /// the output in the node's buffer (capped at buffer_capacity).
-/// Stalled nodes (buffer full) skip production.
+/// Full buffers auto-drain (excess is discarded); extractors never stall.
 ///
 /// Returns a map of resource → total produced this tick (for pattern rate tracking).
 pub fn tick_base_production(
@@ -258,21 +258,13 @@ pub fn tick_base_production(
         }
         let node = &mut loom.persistent.nodes[idx];
 
-        // If buffer is at capacity, node stalls — no production.
-        if node.buffer >= capacity {
-            node.stalled = true;
-            continue;
-        }
-
         let amount = rate * delta_hours;
-        let new_buffer = (node.buffer + amount).min(capacity);
-        let actually_produced = new_buffer - node.buffer;
-        node.buffer = new_buffer;
+        node.buffer = (node.buffer + amount).min(capacity);
         node.stalled = false;
 
-        if actually_produced > 0.0 {
+        if amount > 0.0 {
             let resource = node_native_resource(node_id);
-            *produced.entry(resource).or_insert(0.0) += actually_produced;
+            *produced.entry(resource).or_insert(0.0) += amount;
         }
     }
 
@@ -1261,7 +1253,7 @@ mod tests {
     }
 
     #[test]
-    fn test_base_production_stalls_at_capacity() {
+    fn test_base_production_caps_buffer_at_capacity() {
         let mut loom = LoomState::new();
         select_archetype(&mut loom, LoomArchetype::BurnBright);
 
@@ -1274,7 +1266,7 @@ mod tests {
             .unwrap();
         ember.buffer = ember.buffer_capacity;
 
-        tick_base_production(&mut loom, 3600.0);
+        let produced = tick_base_production(&mut loom, 3600.0);
 
         let ember = loom
             .persistent
@@ -1282,8 +1274,48 @@ mod tests {
             .iter()
             .find(|n| n.id == NodeId::EmberSpindle)
             .unwrap();
-        assert!(ember.stalled);
+        // Extractor no longer stalls from full buffer — it auto-drains.
+        assert!(!ember.stalled);
         assert_eq!(ember.buffer, ember.buffer_capacity);
+        // Full production amount is still reported for rate tracking.
+        let ember_produced = produced.get(&Resource::Ember).copied().unwrap_or(0.0);
+        assert!(
+            ember_produced > 0.0,
+            "should report production even with full buffer"
+        );
+    }
+
+    #[test]
+    fn test_extractor_produces_at_full_rate_when_buffer_full() {
+        let mut loom = LoomState::new();
+        loom.persistent.nodes[0].unlocked = true;
+        loom.persistent.nodes[0].buffer = loom.persistent.nodes[0].buffer_capacity;
+
+        let produced = tick_base_production(&mut loom, 0.1);
+
+        let ember_produced = produced.get(&Resource::Ember).copied().unwrap_or(0.0);
+        assert!(
+            ember_produced > 0.0,
+            "extractor should report production even with full buffer"
+        );
+        assert!(
+            !loom.persistent.nodes[0].stalled,
+            "extractor should not stall from full buffer"
+        );
+    }
+
+    #[test]
+    fn test_extractor_buffer_does_not_exceed_capacity() {
+        let mut loom = LoomState::new();
+        loom.persistent.nodes[0].unlocked = true;
+        loom.persistent.nodes[0].buffer = loom.persistent.nodes[0].buffer_capacity - 0.001;
+
+        tick_base_production(&mut loom, 0.1);
+
+        assert!(
+            loom.persistent.nodes[0].buffer <= loom.persistent.nodes[0].buffer_capacity + 1e-9,
+            "buffer should not exceed capacity"
+        );
     }
 
     // ── Phase 3: Node Upgrading tests ─────────────────────────────────────────
