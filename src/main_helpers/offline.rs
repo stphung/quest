@@ -1,8 +1,9 @@
-//! Offline XP processing.
+//! Offline progression processing.
 
 use crate::core::game_logic::{process_offline_progression, OfflineReport};
 use crate::core::game_state::GameState;
 use crate::haven;
+use crate::loom;
 
 /// Resolve Deep missions that completed while the game was closed.
 pub fn resolve_deep_offline(
@@ -118,4 +119,75 @@ pub fn apply_offline_xp(state: &mut GameState, haven: &haven::Haven) -> Option<O
     } else {
         None
     }
+}
+
+/// Simulate Loom production for time elapsed while offline.
+///
+/// Runs extractor production, shuttle processing, neighbor unlocking,
+/// and pattern sustain in 10-second steps for the offline duration
+/// (capped at 7 days). Rate trackers are rebuilt from scratch since
+/// they are transient.
+pub fn resolve_loom_offline(loom_state: &mut loom::LoomState, elapsed_seconds: i64) {
+    if !loom_state.persistent.discovered || elapsed_seconds <= 0 {
+        return;
+    }
+
+    // Cap at 7 days, same as offline XP.
+    let max_offline: i64 = 7 * 24 * 3600;
+    let total_seconds = elapsed_seconds.min(max_offline) as f64;
+
+    // Simulate in 10-second steps for reasonable accuracy + speed.
+    // 7 days = ~60,480 steps — completes in milliseconds.
+    const STEP_SECONDS: f64 = 10.0;
+    let steps = (total_seconds / STEP_SECONDS) as u64;
+    let remainder = total_seconds - (steps as f64 * STEP_SECONDS);
+
+    for _ in 0..steps {
+        simulate_loom_step(loom_state, STEP_SECONDS);
+    }
+    if remainder > 0.0 {
+        simulate_loom_step(loom_state, remainder);
+    }
+}
+
+/// Run one simulation step of the Loom production chain.
+fn simulate_loom_step(loom_state: &mut loom::LoomState, delta_seconds: f64) {
+    // Staggered unlock (legacy, currently no-op).
+    if loom_state.persistent.second_node_unlock_elapsed.is_some() {
+        loom::tick_loom_staggered_unlock(loom_state, delta_seconds);
+    }
+
+    // Shuttle construction.
+    loom::tick_shuttle_construction(loom_state);
+
+    // Shuttle direct-pull processing.
+    let shuttle_produced = loom::tick_shuttle_pull(loom_state, delta_seconds);
+
+    // Base extractor production.
+    let mut produced = loom::tick_base_production(loom_state, delta_seconds);
+
+    // Merge shuttle output.
+    for (resource, amount) in shuttle_produced {
+        *produced.entry(resource).or_insert(0.0) += amount;
+    }
+
+    // Neighbor unlocking.
+    loom::tick_neighbor_unlocking(loom_state, delta_seconds);
+
+    // Push production into rate trackers for pattern sustain.
+    for (resource, &amount) in &produced {
+        loom_state
+            .rate_trackers
+            .entry(*resource)
+            .or_default()
+            .push(amount);
+    }
+
+    // Read measured rates and advance pattern sustain.
+    let rates: std::collections::HashMap<loom::Resource, f64> = loom_state
+        .rate_trackers
+        .iter()
+        .map(|(resource, tracker)| (*resource, tracker.rate_per_hour()))
+        .collect();
+    loom::tick_pattern_sustain(&mut loom_state.persistent, &rates, delta_seconds);
 }

@@ -423,6 +423,15 @@ fn main() -> io::Result<()> {
                     &mut global_achievements,
                     &state.character_name,
                 );
+
+                // Resolve Loom production that occurred while offline
+                if let Some(ref report) = offline_report {
+                    main_helpers::offline::resolve_loom_offline(
+                        &mut loom_state,
+                        report.elapsed_seconds,
+                    );
+                }
+
                 // Sync Deep achievements from persistent state
                 global_achievements.sync_from_deep(
                     deep_state.persistent.discovered,
