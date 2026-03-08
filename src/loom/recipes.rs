@@ -8,9 +8,51 @@
 //! Tier 2 (~12 recipes): At least one confluence resource as input.
 //! Tier 3 (~10 recipes): Three inputs or tapestry-tier outputs. Late progression.
 #![allow(dead_code)]
+use std::collections::HashMap;
 use std::sync::OnceLock;
 
 use super::types::{NodeNature, Resource};
+
+/// Normalize key so (a, b) and (b, a) map to the same entry.
+fn normalize_key(a: Resource, b: Resource, nature: NodeNature) -> (Resource, Resource, NodeNature) {
+    if (a as u8) <= (b as u8) {
+        (a, b, nature)
+    } else {
+        (b, a, nature)
+    }
+}
+
+/// Cached O(1) recipe lookup table, built once on first access.
+fn recipe_map() -> &'static HashMap<(Resource, Resource, NodeNature), RecipeOutput> {
+    static MAP: OnceLock<HashMap<(Resource, Resource, NodeNature), RecipeOutput>> = OnceLock::new();
+    MAP.get_or_init(|| {
+        let mut m = HashMap::new();
+        for r in all_recipes() {
+            let key = normalize_key(r.input_a, r.input_b, r.node_nature);
+            m.insert(
+                key,
+                RecipeOutput {
+                    resource: r.output,
+                    amount: r.amount,
+                },
+            );
+        }
+        m
+    })
+}
+
+/// Cached O(1) full recipe lookup table.
+fn recipe_full_map() -> &'static HashMap<(Resource, Resource, NodeNature), usize> {
+    static MAP: OnceLock<HashMap<(Resource, Resource, NodeNature), usize>> = OnceLock::new();
+    MAP.get_or_init(|| {
+        let mut m = HashMap::new();
+        for (i, r) in all_recipes().iter().enumerate() {
+            let key = normalize_key(r.input_a, r.input_b, r.node_nature);
+            m.insert(key, i);
+        }
+        m
+    })
+}
 
 /// The output of a successful recipe lookup.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -143,22 +185,17 @@ fn recipe_registry() -> &'static [Recipe] {
 /// Look up a recipe by two input resources and the node's nature.
 /// Returns None if no recipe matches (inputs accumulate in buffer).
 pub fn lookup_recipe(a: Resource, b: Resource, nature: NodeNature) -> Option<RecipeOutput> {
-    all_recipes()
-        .iter()
-        .find(|r| r.matches(a, b, nature))
-        .map(|r| RecipeOutput {
-            resource: r.output,
-            amount: r.amount,
-        })
+    let key = normalize_key(a, b, nature);
+    recipe_map().get(&key).copied()
 }
 
 /// Find and return the full recipe for two inputs and a node nature.
 /// Used by the debug menu and shuttle construction to look up recipes by example.
 pub fn find_recipe(a: Resource, b: Resource, nature: NodeNature) -> Option<Recipe> {
-    all_recipes()
-        .iter()
-        .find(|r| r.matches(a, b, nature))
-        .cloned()
+    let key = normalize_key(a, b, nature);
+    recipe_full_map()
+        .get(&key)
+        .map(|&i| all_recipes()[i].clone())
 }
 
 /// Returns all recipes of a given tier.
@@ -202,6 +239,8 @@ pub fn recipes_by_nature(nature: NodeNature) -> Vec<Recipe> {
 /// Used to generate "???" codex hints.
 pub fn adjacent_recipe_indices(discovered_indices: &[usize]) -> Vec<usize> {
     let registry = all_recipes();
+    let discovered_set: std::collections::HashSet<usize> =
+        discovered_indices.iter().copied().collect();
     let discovered_inputs: std::collections::HashSet<Resource> = discovered_indices
         .iter()
         .flat_map(|&i| {
@@ -214,7 +253,7 @@ pub fn adjacent_recipe_indices(discovered_indices: &[usize]) -> Vec<usize> {
         .iter()
         .enumerate()
         .filter(|(i, r)| {
-            !discovered_indices.contains(i)
+            !discovered_set.contains(i)
                 && (discovered_inputs.contains(&r.input_a)
                     || discovered_inputs.contains(&r.input_b))
         })
