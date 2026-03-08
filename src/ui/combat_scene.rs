@@ -549,9 +549,9 @@ pub fn render_pattern_milestone_modal(
     let show_ascension = asc_unlocked.is_some_and(|lvl| ascension_level < lvl);
     let zone_count = (milestone.end_zone_id() - milestone.start_zone_id() + 1) as u16;
     let show_wr_pr = milestone.wr_pr_narrative().is_some();
-    let mut modal_height = 17u16 + zone_count;
+    let mut modal_height = 19u16 + zone_count;
     if show_ascension {
-        modal_height += 4;
+        modal_height += 5;
     }
     if show_wr_pr {
         modal_height += 3;
@@ -566,7 +566,7 @@ pub fn render_pattern_milestone_modal(
     frame.render_widget(Clear, modal_area);
 
     let block = Block::default()
-        .title(" \u{25b6} Pattern Milestone \u{25c0} ")
+        .title(" \u{25b6} New Zones Unlocked \u{25c0} ")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(super::themed_border_color(Color::Cyan)));
     let inner = super::render_themed_block(
@@ -593,6 +593,15 @@ pub fn render_pattern_milestone_modal(
                 .add_modifier(Modifier::ITALIC),
         )),
     ];
+
+    // Mechanical unlock text
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        milestone.unlock_mechanical(),
+        Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::ITALIC),
+    )));
 
     // Pattern count
     lines.push(Line::from(""));
@@ -633,6 +642,7 @@ pub fn render_pattern_milestone_modal(
                     .fg(Color::White)
                     .add_modifier(Modifier::ITALIC),
             )));
+            lines.push(Line::from(""));
             lines.push(Line::from(vec![Span::styled(
                 format!(
                     "\u{2726} ASCENSION {}  \u{2014}  \u{00d7}{:.1} power",
