@@ -1,7 +1,7 @@
 //! Ascension system constants and helper types.
 
 /// Maximum Ascension level currently available.
-pub const MAX_ASCENSION_LEVEL: u32 = 6;
+pub const MAX_ASCENSION_LEVEL: u32 = 10;
 
 /// PR cost lookup for Ascension levels 1-6.
 const ASCENSION_COSTS: [u32; 6] = [35, 65, 120, 200, 325, 500];
@@ -9,14 +9,41 @@ const ASCENSION_COSTS: [u32; 6] = [35, 65, 120, 200, 325, 500];
 /// Deep layer gate lookup for Ascension levels 1-6.
 const ASCENSION_DEEP_GATES: [u32; 6] = [3, 7, 12, 18, 25, 30];
 
+/// Loom-gated Ascension costs for levels 7-10.
+const LOOM_ASCENSION_COSTS: [u32; 4] = [1500, 4000, 8000, 15000];
+
+/// Loom pattern gates for Ascension levels 7-10.
+const LOOM_ASCENSION_PATTERN_GATES: [usize; 4] = [8, 16, 22, 28];
+
+/// Max shuttle level per Ascension tier (7-10).
+const LOOM_SHUTTLE_LEVEL_CAPS: [u32; 4] = [3, 5, 7, 10];
+
 /// Prestige rank cost to Ascend to the given level.
 pub fn ascension_cost(level: u32) -> u32 {
     if (1..=6).contains(&level) {
         ASCENSION_COSTS[(level - 1) as usize]
-    } else if level > 6 {
-        500 + 75 * (level - 6)
+    } else if (7..=10).contains(&level) {
+        LOOM_ASCENSION_COSTS[(level - 7) as usize]
     } else {
         0
+    }
+}
+
+/// Loom pattern gate for the given Ascension level. None means no pattern gate.
+pub fn ascension_pattern_gate(level: u32) -> Option<usize> {
+    if (7..=10).contains(&level) {
+        Some(LOOM_ASCENSION_PATTERN_GATES[(level - 7) as usize])
+    } else {
+        None
+    }
+}
+
+/// Maximum shuttle level allowed at the given Ascension level.
+pub fn max_shuttle_level(ascension_level: u32) -> u32 {
+    if (7..=10).contains(&ascension_level) {
+        LOOM_SHUTTLE_LEVEL_CAPS[(ascension_level - 7) as usize]
+    } else {
+        1
     }
 }
 
@@ -56,10 +83,45 @@ mod tests {
     }
 
     #[test]
-    fn test_ascension_cost_level_7_plus() {
-        assert_eq!(ascension_cost(7), 575); // 500 + 75*(7-6) = 575
-        assert_eq!(ascension_cost(8), 650); // 500 + 75*(8-6) = 650
-        assert_eq!(ascension_cost(10), 800); // 500 + 75*(10-6) = 800
+    fn test_ascension_cost_levels_7_through_10_loom() {
+        assert_eq!(ascension_cost(7), 1500);
+        assert_eq!(ascension_cost(8), 4000);
+        assert_eq!(ascension_cost(9), 8000);
+        assert_eq!(ascension_cost(10), 15000);
+    }
+
+    #[test]
+    fn test_ascension_cost_level_11_plus_returns_zero() {
+        assert_eq!(ascension_cost(11), 0);
+        assert_eq!(ascension_cost(100), 0);
+    }
+
+    #[test]
+    fn test_ascension_pattern_gate() {
+        assert_eq!(ascension_pattern_gate(1), None);
+        assert_eq!(ascension_pattern_gate(6), None);
+        assert_eq!(ascension_pattern_gate(7), Some(8));
+        assert_eq!(ascension_pattern_gate(8), Some(16));
+        assert_eq!(ascension_pattern_gate(9), Some(22));
+        assert_eq!(ascension_pattern_gate(10), Some(28));
+    }
+
+    #[test]
+    fn test_max_shuttle_level_for_ascension() {
+        assert_eq!(max_shuttle_level(0), 1);
+        assert_eq!(max_shuttle_level(6), 1);
+        assert_eq!(max_shuttle_level(7), 3);
+        assert_eq!(max_shuttle_level(8), 5);
+        assert_eq!(max_shuttle_level(9), 7);
+        assert_eq!(max_shuttle_level(10), 10);
+    }
+
+    #[test]
+    fn test_ascension_combat_multiplier_levels_7_through_10() {
+        assert!((ascension_combat_multiplier(7) - 96.0).abs() < 1e-10);
+        assert!((ascension_combat_multiplier(8) - 144.0).abs() < 1e-10);
+        assert!((ascension_combat_multiplier(9) - 216.0).abs() < 1e-10);
+        assert!((ascension_combat_multiplier(10) - 324.0).abs() < 1e-10);
     }
 
     #[test]

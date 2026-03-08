@@ -9,4 +9,7 @@ pub mod types;
 #[allow(unused_imports)]
 pub use logic::{ascend, can_ascend, AscendResult};
 #[allow(unused_imports)]
-pub use types::{ascension_combat_multiplier, ascension_cost, ascension_deep_gate};
+pub use types::{
+    ascension_combat_multiplier, ascension_cost, ascension_deep_gate, ascension_pattern_gate,
+    max_shuttle_level,
+};

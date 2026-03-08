@@ -14,12 +14,22 @@ pub enum AscendResult {
         needed_layer: u32,
         current_layer: u32,
     },
+    /// Loom pattern gate not met.
+    PatternGateNotMet {
+        needed_patterns: usize,
+        current_patterns: usize,
+    },
     /// Already at the maximum Ascension level.
     MaxLevelReached,
 }
 
 /// Check if the character can Ascend to their next level.
-pub fn can_ascend(ascension_level: u32, prestige_rank: u32, deepest_layer: u32) -> bool {
+pub fn can_ascend(
+    ascension_level: u32,
+    prestige_rank: u32,
+    deepest_layer: u32,
+    completed_patterns: usize,
+) -> bool {
     if ascension_level >= super::types::MAX_ASCENSION_LEVEL {
         return false;
     }
@@ -33,13 +43,22 @@ pub fn can_ascend(ascension_level: u32, prestige_rank: u32, deepest_layer: u32) 
             return false;
         }
     }
+    if let Some(pattern_gate) = super::types::ascension_pattern_gate(next) {
+        if completed_patterns < pattern_gate {
+            return false;
+        }
+    }
     true
 }
 
 /// Attempt to Ascend the character to the next level.
 ///
 /// Checks PR cost and Deep layer gates. On success, deducts PR and increments ascension_level.
-pub fn ascend(state: &mut crate::core::game_state::GameState, deepest_layer: u32) -> AscendResult {
+pub fn ascend(
+    state: &mut crate::core::game_state::GameState,
+    deepest_layer: u32,
+    completed_patterns: usize,
+) -> AscendResult {
     if state.ascension_level >= super::types::MAX_ASCENSION_LEVEL {
         return AscendResult::MaxLevelReached;
     }
@@ -59,6 +78,15 @@ pub fn ascend(state: &mut crate::core::game_state::GameState, deepest_layer: u32
             return AscendResult::DeepGateNotMet {
                 needed_layer: gate,
                 current_layer: deepest_layer,
+            };
+        }
+    }
+
+    if let Some(pattern_gate) = super::types::ascension_pattern_gate(next) {
+        if completed_patterns < pattern_gate {
+            return AscendResult::PatternGateNotMet {
+                needed_patterns: pattern_gate,
+                current_patterns: completed_patterns,
             };
         }
     }
