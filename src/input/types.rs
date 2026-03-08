@@ -115,6 +115,10 @@ pub enum GameOverlay {
     },
     /// Loom of Worlds discovery celebration modal
     LoomDiscovery,
+    /// Pattern milestone unlock celebration modal
+    PatternMilestoneUnlock {
+        milestone: crate::loom::PatternMilestone,
+    },
 }
 
 /// Result of handling a game input event.

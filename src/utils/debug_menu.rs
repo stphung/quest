@@ -616,7 +616,26 @@ impl DebugAction {
                 if loom.persistent.active_pattern + 1 < loom.persistent.patterns.len() {
                     loom.persistent.active_pattern += 1;
                 }
-                "Current pattern completed."
+                let count = loom.persistent.completed_pattern_count();
+                state.cached_loom_zone_cap = crate::loom::loom_zone_cap_for_patterns(count);
+                match crate::loom::PatternMilestone::from_count(count) {
+                    Some(crate::loom::PatternMilestone::ThreadWilds) => {
+                        "Pattern milestone: Thread Wilds"
+                    }
+                    Some(crate::loom::PatternMilestone::WovenFrontier) => {
+                        "Pattern milestone: Woven Frontier"
+                    }
+                    Some(crate::loom::PatternMilestone::TheUnraveling) => {
+                        "Pattern milestone: Unraveling"
+                    }
+                    Some(crate::loom::PatternMilestone::GrandDesign) => {
+                        "Pattern milestone: Grand Design"
+                    }
+                    Some(crate::loom::PatternMilestone::FinalWeave) => {
+                        "Pattern milestone: Final Weave"
+                    }
+                    None => "Current pattern completed.",
+                }
             }
             Self::LoomAdvanceToPattern(n) => {
                 let target = n.min(loom.persistent.patterns.len().saturating_sub(1));

@@ -1094,13 +1094,10 @@ pub(super) fn tick_loom(
         crate::loom::tick_pattern_sustain(&mut loom.persistent, &rates, TICK_SECONDS);
     if pattern_completed {
         result.loom_changed = true;
-        achievements.on_loom_pattern_completed(
-            loom.persistent.completed_pattern_count(),
-            Some(&state.character_name),
-        );
+        let completed_count = loom.persistent.completed_pattern_count();
+        achievements.on_loom_pattern_completed(completed_count, Some(&state.character_name));
         // Sync Loom zone unlocks on pattern completion
-        let loom_cap =
-            crate::loom::loom_zone_cap_for_patterns(loom.persistent.completed_pattern_count());
+        let loom_cap = crate::loom::loom_zone_cap_for_patterns(completed_count);
         state.cached_loom_zone_cap = loom_cap;
         let fracture_cap = state.cached_fracture_zone_cap;
         let storms_end = state
@@ -1114,6 +1111,10 @@ pub(super) fn tick_loom(
             loom_cap,
             state.ascension_level,
         );
+        // Set pending milestone for tick.rs consumption (mirrors Deep's pending_fracture_region_unlock)
+        if let Some(milestone) = crate::loom::PatternMilestone::from_count(completed_count) {
+            loom.persistent.pending_pattern_milestones.push(milestone);
+        }
     }
 
     // Tick WR→PR conversion (active after all 28 patterns complete).

@@ -229,6 +229,7 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
             | GameOverlay::DeepDiscovery
             | GameOverlay::LoomDiscovery
             | GameOverlay::FractureRegionUnlock { .. }
+            | GameOverlay::PatternMilestoneUnlock { .. }
     ) {
         return handle_dismiss_overlay(key, overlay);
     }
@@ -539,6 +540,26 @@ fn handle_debug_menu(
             } else if msg.contains("Origin Wound unlocked") {
                 *overlay = GameOverlay::FractureRegionUnlock {
                     region: crate::zones::FractureRegion::OriginWound,
+                };
+            } else if msg.contains("Pattern milestone: Thread Wilds") {
+                *overlay = GameOverlay::PatternMilestoneUnlock {
+                    milestone: crate::loom::PatternMilestone::ThreadWilds,
+                };
+            } else if msg.contains("Pattern milestone: Woven Frontier") {
+                *overlay = GameOverlay::PatternMilestoneUnlock {
+                    milestone: crate::loom::PatternMilestone::WovenFrontier,
+                };
+            } else if msg.contains("Pattern milestone: Unraveling") {
+                *overlay = GameOverlay::PatternMilestoneUnlock {
+                    milestone: crate::loom::PatternMilestone::TheUnraveling,
+                };
+            } else if msg.contains("Pattern milestone: Grand Design") {
+                *overlay = GameOverlay::PatternMilestoneUnlock {
+                    milestone: crate::loom::PatternMilestone::GrandDesign,
+                };
+            } else if msg.contains("Pattern milestone: Final Weave") {
+                *overlay = GameOverlay::PatternMilestoneUnlock {
+                    milestone: crate::loom::PatternMilestone::FinalWeave,
                 };
             }
         }

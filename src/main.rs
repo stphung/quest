@@ -449,6 +449,22 @@ fn main() -> io::Result<()> {
                                 false,
                                 true,
                             );
+                            // Sync Loom zone unlocks for offline pattern completions
+                            let count = loom_state.persistent.completed_pattern_count();
+                            let loom_cap = crate::loom::loom_zone_cap_for_patterns(count);
+                            state.cached_loom_zone_cap = loom_cap;
+                            let fracture_cap = state.cached_fracture_zone_cap;
+                            let storms_end = state
+                                .zone_progression
+                                .is_zone_unlocked(crate::core::constants::EXPANSE_ZONE_ID);
+                            crate::zones::sync_account_zone_unlocks(
+                                &mut state.zone_progression,
+                                storms_end,
+                                fracture_cap,
+                                state.prestige_rank,
+                                loom_cap,
+                                state.ascension_level,
+                            );
                         }
                     }
                 }
@@ -1165,6 +1181,11 @@ fn main() -> io::Result<()> {
                                 if let Some(region) = tick_flags.fracture_region_unlocked {
                                     pending_overlays
                                         .push_back(GameOverlay::FractureRegionUnlock { region });
+                                }
+                                if let Some(milestone) = tick_flags.pattern_milestone_reached {
+                                    pending_overlays.push_back(
+                                        GameOverlay::PatternMilestoneUnlock { milestone },
+                                    );
                                 }
                                 if !tick_result.achievement_modal_ready.is_empty() {
                                     pending_overlays.push_back(GameOverlay::AchievementUnlocked {

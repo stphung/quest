@@ -156,6 +156,31 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
         result.deep_changed = true;
     }
 
+    // ── 11f. Pattern milestone consumption ─────────────────────────
+    if !ctx.loom.persistent.pending_pattern_milestones.is_empty() {
+        let milestones: Vec<crate::loom::PatternMilestone> =
+            std::mem::take(&mut ctx.loom.persistent.pending_pattern_milestones);
+        let loom_cap =
+            crate::loom::loom_zone_cap_for_patterns(ctx.loom.persistent.completed_pattern_count());
+        ctx.state.cached_loom_zone_cap = loom_cap;
+        crate::zones::sync_account_zone_unlocks(
+            &mut ctx.state.zone_progression,
+            ctx.achievements
+                .is_unlocked(crate::achievements::AchievementId::StormsEnd),
+            ctx.deep.persistent.fracture_zone_cap,
+            ctx.state.prestige_rank,
+            loom_cap,
+            ctx.state.ascension_level,
+        );
+        for milestone in milestones {
+            result.events.push(TickEvent::PatternMilestoneReached {
+                message: format!("\u{1f9f5} {}", milestone.unlock_log_line()),
+                milestone,
+            });
+        }
+        result.loom_changed = true;
+    }
+
     // Sync cached zone caps for UI rendering
     ctx.state.cached_fracture_zone_cap = ctx.deep.persistent.fracture_zone_cap;
     ctx.state.cached_loom_zone_cap =

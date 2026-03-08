@@ -23,6 +23,7 @@ pub struct TickEventFlags {
     pub deep_discovered: bool,
     pub loom_discovered: bool,
     pub fracture_region_unlocked: Option<crate::zones::FractureRegion>,
+    pub pattern_milestone_reached: Option<crate::loom::PatternMilestone>,
 }
 
 /// Maps tick events to combat log entries and visual effects.
@@ -34,6 +35,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
     let mut deep_discovered = false;
     let mut loom_discovered = false;
     let mut fracture_region_unlocked = None;
+    let mut pattern_milestone_reached = None;
     for event in events {
         match event {
             TickEvent::PlayerAttack { damage, was_crit } => {
@@ -763,6 +765,19 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     true,
                 );
             }
+            TickEvent::PatternMilestoneReached { milestone, message } => {
+                game_state
+                    .combat_state
+                    .add_log_entry(message.clone(), false, true);
+                game_state.ticker.push(TickerEntry {
+                    icon: "\u{1F9F5}",
+                    text: milestone.unlock_ticker_text().to_string(),
+                    color: Color::Cyan,
+                    bold: true,
+                    segments: None,
+                });
+                pattern_milestone_reached = Some(*milestone);
+            }
         }
     }
     TickEventFlags {
@@ -772,5 +787,6 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
         deep_discovered,
         loom_discovered,
         fracture_region_unlocked,
+        pattern_milestone_reached,
     }
 }

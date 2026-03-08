@@ -163,6 +163,12 @@ pub fn resolve_loom_offline(
     let patterns_after = loom_state.persistent.completed_pattern_count();
     let patterns_completed = (patterns_after - patterns_before) as u32;
 
+    // Set pending milestones for tick pipeline consumption (mirrors Deep's pending_fracture_region_unlock)
+    let milestones: Vec<loom::PatternMilestone> = ((patterns_before + 1)..=patterns_after)
+        .filter_map(loom::PatternMilestone::from_count)
+        .collect();
+    loom_state.persistent.pending_pattern_milestones = milestones;
+
     Some(LoomOfflineReport { patterns_completed })
 }
 

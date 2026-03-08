@@ -1,5 +1,6 @@
 pub mod discovery;
 pub mod logic;
+pub mod milestones;
 pub mod patterns;
 pub mod persistence;
 pub mod recipes;
@@ -21,6 +22,7 @@ pub use logic::{
     upgrade_shuttle, wr_to_pr_per_day, LoomExternalBonuses, ShuttleError, ShuttleUpgradeError,
     SECOND_NODE_UNLOCK_SECONDS, SHUTTLE_CONSTRUCTION_TICKS,
 };
+pub use milestones::PatternMilestone;
 #[allow(unused_imports)]
 pub use patterns::{
     active_pattern_requirement_status, active_pattern_requirements_met, all_patterns_complete,

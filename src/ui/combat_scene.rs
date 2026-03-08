@@ -532,3 +532,150 @@ pub fn render_fracture_region_unlock_modal(
         .wrap(Wrap { trim: true });
     frame.render_widget(text, inner);
 }
+
+pub fn render_pattern_milestone_modal(
+    frame: &mut Frame,
+    area: Rect,
+    milestone: crate::loom::PatternMilestone,
+    ascension_level: u32,
+    _ctx: &LayoutContext,
+) {
+    use crate::ascension::types::{ascension_combat_multiplier, ascension_cost};
+    use ratatui::widgets::Clear;
+
+    const GOLD: Color = Color::Rgb(255, 215, 0);
+
+    let asc_unlocked = milestone.ascension_level_unlocked();
+    let show_ascension = asc_unlocked.is_some_and(|lvl| ascension_level < lvl);
+    let zone_count = (milestone.end_zone_id() - milestone.start_zone_id() + 1) as u16;
+    let show_wr_pr = milestone.wr_pr_narrative().is_some();
+    let mut modal_height = 19u16 + zone_count;
+    if show_ascension {
+        modal_height += 5;
+    }
+    if show_wr_pr {
+        modal_height += 3;
+    }
+
+    let modal_width = 58u16.min(area.width.saturating_sub(4));
+    let modal_height = modal_height.min(area.height.saturating_sub(4));
+    let x = area.x + (area.width.saturating_sub(modal_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(modal_height)) / 2;
+    let modal_area = Rect::new(x, y, modal_width, modal_height);
+
+    frame.render_widget(Clear, modal_area);
+
+    let block = Block::default()
+        .title(" \u{25b6} New Zones Unlocked \u{25c0} ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(super::themed_border_color(Color::Cyan)));
+    let inner = super::render_themed_block(
+        frame,
+        modal_area,
+        block,
+        Color::Cyan,
+        super::BorderFxContext,
+    );
+
+    let mut lines: Vec<Line> = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            milestone.unlock_headline(),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            milestone.unlock_atmospheric(),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::ITALIC),
+        )),
+    ];
+
+    // Mechanical unlock text
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        milestone.unlock_mechanical(),
+        Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::ITALIC),
+    )));
+
+    // Pattern count
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![Span::styled(
+        format!(
+            "\u{1F9F5} {}/28 Woven Patterns Complete",
+            milestone.pattern_count()
+        ),
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )]));
+
+    // Zone list
+    lines.push(Line::from(""));
+    for zid in milestone.start_zone_id()..=milestone.end_zone_id() {
+        let name = crate::zones::get_zone(zid).map(|z| z.name).unwrap_or("???");
+        lines.push(Line::from(vec![
+            Span::styled("  \u{25c6} ", Style::default().fg(Color::Cyan)),
+            Span::styled(
+                format!("Zone {}  {}", zid, name),
+                Style::default().fg(Color::White),
+            ),
+        ]));
+    }
+
+    // Ascension narrative bridge
+    if let Some(asc_level) = asc_unlocked {
+        if show_ascension {
+            let roman = crate::ui::stats_prestige::to_roman(asc_level);
+            let mult = ascension_combat_multiplier(asc_level);
+            let cost = ascension_cost(asc_level);
+
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                milestone.ascension_narrative(),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::ITALIC),
+            )));
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![Span::styled(
+                format!(
+                    "\u{2726} ASCENSION {}  \u{2014}  \u{00d7}{:.1} power",
+                    roman, mult
+                ),
+                Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+            )]));
+            lines.push(Line::from(vec![Span::styled(
+                format!("  Cost: {} PR  \u{2022}  [U] to Ascend", cost),
+                Style::default().fg(GOLD),
+            )]));
+        }
+    }
+
+    // WR->PR narrative (only for FinalWeave)
+    if let Some(wr_narrative) = milestone.wr_pr_narrative() {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            wr_narrative,
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::ITALIC),
+        )));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "[Enter] to dismiss",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let text = Paragraph::new(lines)
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: true });
+    frame.render_widget(text, inner);
+}
