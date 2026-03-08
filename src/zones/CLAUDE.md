@@ -193,10 +193,11 @@ Twenty zones across five chapters, unlocked by Loom Woven Pattern completion. En
 
 ## Zone Access Sync (`access.rs`)
 
-`sync_account_zone_unlocks(prog, storms_end_unlocked, fracture_zone_cap)`:
-- Called at: character load, prestige reset, StormsEnd, fracture region unlock
+`sync_account_zone_unlocks(prog, storms_end_unlocked, fracture_zone_cap, prestige_rank, loom_zone_cap)`:
+- Called at: character load, prestige reset, StormsEnd, fracture region unlock, pattern completion
 - If `storms_end_unlocked`, unlocks Zone 11
 - Unlocks every zone in `12..=fracture_zone_cap`
+- Unlocks every Loom zone in `31..=loom_zone_cap` if prestige requirement met
 - Never unlocks above cap, never removes earlier unlocks
 
 ## Prestige Reset

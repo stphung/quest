@@ -8,6 +8,7 @@ use crate::haven::Haven;
 use crate::items;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn handle_vault_selection(
     key: KeyEvent,
     state: &mut GameState,
@@ -16,6 +17,7 @@ pub(super) fn handle_vault_selection(
     deep_ui: &mut crate::deep::DeepUiState,
     overlay: &mut GameOverlay,
     achievements: &crate::achievements::Achievements,
+    loom_state: &crate::loom::LoomState,
 ) -> InputResult {
     if let GameOverlay::VaultSelection {
         ref mut selected_index,
@@ -73,15 +75,16 @@ pub(super) fn handle_vault_selection(
                     // Reset prestige-scoped Deep state while preserving guild rank,
                     // layer progression, and infrastructure.
                     deep.on_prestige();
-                    // Re-sync fracture zone unlocks after prestige reset
-                    // (loom_zone_cap=30: no loom context in prestige input;
-                    // tick_loom re-syncs on next pattern completion)
+                    // Re-sync zone unlocks after prestige reset
+                    let loom_cap = crate::loom::loom_zone_cap_for_patterns(
+                        loom_state.persistent.completed_pattern_count(),
+                    );
                     crate::zones::sync_account_zone_unlocks(
                         &mut state.zone_progression,
                         achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
                         deep.persistent.fracture_zone_cap,
                         state.prestige_rank,
-                        30,
+                        loom_cap,
                     );
                     *overlay = GameOverlay::None;
                     let new_rank = state.prestige_rank;
@@ -115,6 +118,7 @@ pub(super) fn handle_vault_selection(
     InputResult::Continue
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn handle_prestige_confirm(
     key: KeyEvent,
     state: &mut GameState,
@@ -123,6 +127,7 @@ pub(super) fn handle_prestige_confirm(
     deep_ui: &mut crate::deep::DeepUiState,
     overlay: &mut GameOverlay,
     achievements: &crate::achievements::Achievements,
+    loom_state: &crate::loom::LoomState,
 ) -> InputResult {
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
@@ -156,15 +161,16 @@ pub(super) fn handle_prestige_confirm(
                 // Reset prestige-scoped Deep state while preserving guild rank,
                 // layer progression, and infrastructure.
                 deep.on_prestige();
-                // Re-sync fracture zone unlocks after prestige reset
-                // (loom_zone_cap=30: no loom context in prestige input;
-                // tick_loom re-syncs on next pattern completion)
+                // Re-sync zone unlocks after prestige reset
+                let loom_cap = crate::loom::loom_zone_cap_for_patterns(
+                    loom_state.persistent.completed_pattern_count(),
+                );
                 crate::zones::sync_account_zone_unlocks(
                     &mut state.zone_progression,
                     achievements.is_unlocked(crate::achievements::AchievementId::StormsEnd),
                     deep.persistent.fracture_zone_cap,
                     state.prestige_rank,
-                    30,
+                    loom_cap,
                 );
                 *overlay = GameOverlay::None;
                 let new_rank = state.prestige_rank;
