@@ -102,19 +102,19 @@ pub const ALL_TITLES: &[TitleDef] = &[
     },
     TitleDef {
         achievement_id: AchievementId::AscensionVII,
-        title_text: "Loombound",
+        title_text: "Ascended VII",
     },
     TitleDef {
         achievement_id: AchievementId::AscensionVIII,
-        title_text: "Threadwarden",
+        title_text: "Ascended VIII",
     },
     TitleDef {
         achievement_id: AchievementId::AscensionIX,
-        title_text: "Worldweaver",
+        title_text: "Ascended IX",
     },
     TitleDef {
         achievement_id: AchievementId::AscensionX,
-        title_text: "The Absolute",
+        title_text: "Ascended X",
     },
     // Combat
     TitleDef {
