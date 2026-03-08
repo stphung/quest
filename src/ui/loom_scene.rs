@@ -1198,7 +1198,8 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         .map(|p| p.requirements.len())
         .unwrap_or(0);
     let pattern_h = if has_patterns {
-        (3 + req_count as u16).min(12)
+        // Bordered block: 2 (borders) + req_count + 1 (blank) + 1 (overall gauge).
+        (4 + req_count as u16).min(14)
     } else {
         0u16
     };
@@ -1991,31 +1992,23 @@ fn build_node_buffer_line(node: &crate::loom::types::LoomNode, width: u16) -> Li
 /// Shows: pattern name + index, per-requirement checkmarks, sustain progress bar.
 /// When all patterns are complete, shows a completion message.
 fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
-    if area.height == 0 {
+    if area.height < 3 {
         return;
     }
 
     let all_done = all_patterns_complete(&loom_state.persistent);
 
-    let block = Block::default()
-        .borders(Borders::TOP)
-        .border_style(Style::default().fg(Color::Rgb(100, 60, 140)));
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    if inner.height == 0 {
-        return;
-    }
-
     if all_done {
-        let line = Line::from(Span::styled(
-            " \u{2728} Loom Mended \u{2014} All 18 Patterns Complete",
-            Style::default().fg(Color::Rgb(255, 215, 0)),
-        ));
-        frame.render_widget(
-            Paragraph::new(line).style(Style::default().bg(LOOM_BG)),
-            inner,
-        );
+        let block = Block::default()
+            .title(Span::styled(
+                " \u{2728} Loom Mended \u{2014} All 18 Patterns Complete ",
+                Style::default().fg(Color::Rgb(255, 215, 0)),
+            ))
+            .borders(Borders::ALL)
+            .border_type(ratatui::widgets::BorderType::Rounded)
+            .border_style(Style::default().fg(Color::Rgb(100, 60, 140)))
+            .style(Style::default().bg(LOOM_BG));
+        frame.render_widget(block, area);
         return;
     }
 
@@ -2030,41 +2023,49 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
     let pattern_count = loom_state.persistent.patterns.len();
     let active_idx = loom_state.persistent.active_pattern;
 
-    // Title row (1 line) + per-requirement gauge rows + overall row.
+    // Bordered block with pattern name as title.
+    let title = format!(
+        " Pattern {}/{}: \"{}\" ",
+        active_idx + 1,
+        pattern_count,
+        pattern.name
+    );
+    let block = Block::default()
+        .title(Span::styled(
+            title,
+            Style::default().fg(Color::Rgb(200, 160, 240)),
+        ))
+        .borders(Borders::ALL)
+        .border_type(ratatui::widgets::BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Rgb(100, 60, 140)))
+        .style(Style::default().bg(LOOM_BG));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if inner.height == 0 || inner.width == 0 {
+        return;
+    }
+
+    // Layout: per-requirement gauge rows + blank line + overall gauge.
     let req_count = pattern.requirements.len();
-    let total_rows = 2 + req_count; // title + reqs + overall
-    let mut constraints: Vec<Constraint> = Vec::with_capacity(total_rows);
-    constraints.push(Constraint::Length(1)); // title
+    let mut constraints: Vec<Constraint> = Vec::with_capacity(req_count + 2);
     for _ in 0..req_count {
         constraints.push(Constraint::Length(1)); // per-resource gauge
     }
+    constraints.push(Constraint::Length(1)); // blank separator
     constraints.push(Constraint::Length(1)); // overall gauge
+    constraints.push(Constraint::Min(0)); // absorb extra
 
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints(constraints)
         .split(inner);
 
-    // Row 0: title.
-    let title = format!(
-        " Pattern {}/{}: \"{}\"",
-        active_idx + 1,
-        pattern_count,
-        pattern.name
-    );
-    frame.render_widget(
-        Paragraph::new(Line::from(Span::styled(
-            title,
-            Style::default().fg(Color::Rgb(200, 160, 240)),
-        )))
-        .style(Style::default().bg(LOOM_BG)),
-        rows[0],
-    );
-
-    // Rows 1..=N: per-resource Gauge.
-    let label_w = 13usize; // width for "emoji+name" column
+    // Rows 0..N: per-resource Gauge.
+    let label_w = 14u16; // width for "emoji+name" column
     for (i, req) in pattern.requirements.iter().enumerate() {
-        let row_area = rows[1 + i];
+        let row_area = rows[i];
         if row_area.height == 0 {
             continue;
         }
@@ -2078,11 +2079,11 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
 
         // Split: label | gauge | count.
         let count_label = format!("{:.0}/{:.0}", req.accumulated, req.amount);
-        let count_w = count_label.len() as u16 + 2;
+        let count_w = count_label.len() as u16 + 3; // space + text + check
         let cols = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(label_w as u16),
+                Constraint::Length(label_w),
                 Constraint::Min(6),
                 Constraint::Length(count_w),
             ])
@@ -2126,8 +2127,10 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
         );
     }
 
-    // Last row: overall progress.
-    let overall_row = rows[1 + req_count];
+    // Blank separator row (rows[req_count]) — just background, nothing to render.
+
+    // Overall progress row.
+    let overall_row = rows[req_count + 1];
     if overall_row.height > 0 {
         let overall_ratio = if pattern.requirements.is_empty() {
             0.0
@@ -2149,7 +2152,7 @@ fn render_pattern_bar(frame: &mut Frame, area: Rect, loom_state: &LoomState) {
         let cols = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(label_w as u16),
+                Constraint::Length(label_w),
                 Constraint::Min(6),
                 Constraint::Length(6),
             ])
