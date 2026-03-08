@@ -426,10 +426,31 @@ fn main() -> io::Result<()> {
 
                 // Resolve Loom production that occurred while offline
                 if let Some(ref report) = offline_report {
-                    main_helpers::offline::resolve_loom_offline(
+                    if let Some(loom_report) = main_helpers::offline::resolve_loom_offline(
                         &mut loom_state,
                         report.elapsed_seconds,
-                    );
+                    ) {
+                        state.combat_state.add_log_entry(
+                            "\u{1f52e} Loom produced resources while offline".to_string(),
+                            false,
+                            true,
+                        );
+                        if loom_report.patterns_completed > 0 {
+                            state.combat_state.add_log_entry(
+                                format!(
+                                    "\u{1f9f5} {} Woven Pattern{} completed offline",
+                                    loom_report.patterns_completed,
+                                    if loom_report.patterns_completed == 1 {
+                                        ""
+                                    } else {
+                                        "s"
+                                    },
+                                ),
+                                false,
+                                true,
+                            );
+                        }
+                    }
                 }
 
                 // Sync Deep achievements from persistent state

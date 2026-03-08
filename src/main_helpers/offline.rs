@@ -121,16 +121,27 @@ pub fn apply_offline_xp(state: &mut GameState, haven: &haven::Haven) -> Option<O
     }
 }
 
+/// Result of offline Loom simulation.
+pub struct LoomOfflineReport {
+    /// Number of Woven Patterns completed during offline time.
+    pub patterns_completed: u32,
+}
+
 /// Simulate Loom production for time elapsed while offline.
 ///
 /// Runs extractor production, shuttle processing, neighbor unlocking,
 /// and pattern sustain in 10-second steps for the offline duration
 /// (capped at 7 days). Rate trackers are rebuilt from scratch since
 /// they are transient.
-pub fn resolve_loom_offline(loom_state: &mut loom::LoomState, elapsed_seconds: i64) {
+pub fn resolve_loom_offline(
+    loom_state: &mut loom::LoomState,
+    elapsed_seconds: i64,
+) -> Option<LoomOfflineReport> {
     if !loom_state.persistent.discovered || elapsed_seconds <= 0 {
-        return;
+        return None;
     }
+
+    let patterns_before = loom_state.persistent.completed_pattern_count();
 
     // Cap at 7 days, same as offline XP.
     let max_offline: i64 = 7 * 24 * 3600;
@@ -148,6 +159,11 @@ pub fn resolve_loom_offline(loom_state: &mut loom::LoomState, elapsed_seconds: i
     if remainder > 0.0 {
         simulate_loom_step(loom_state, remainder);
     }
+
+    let patterns_after = loom_state.persistent.completed_pattern_count();
+    let patterns_completed = (patterns_after - patterns_before) as u32;
+
+    Some(LoomOfflineReport { patterns_completed })
 }
 
 /// Run one simulation step of the Loom production chain.
