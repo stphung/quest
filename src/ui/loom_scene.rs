@@ -339,9 +339,9 @@ fn render_node_widget(
             .collect();
 
         let hint = if !feeding.is_empty() {
-            format!("\u{2190} {} (50%)", feeding[0].name())
+            format!("\u{25b2} threaded from {}", feeding[0].name())
         } else {
-            "dormant".to_string()
+            "unthreaded".to_string()
         };
         let hint_color = if !feeding.is_empty() {
             Color::Rgb(80, 60, 120)
@@ -350,11 +350,11 @@ fn render_node_widget(
         };
 
         let progress_text = if node.unlock_progress > 0.0 {
-            format!("{:.1}/2.0h unlocking", node.unlock_progress)
+            format!("{:.1}/2.0h threading", node.unlock_progress)
         } else if feeding.is_empty() {
-            "no active neighbors".to_string()
+            "unthreaded".to_string()
         } else {
-            "waiting for 50% buffer".to_string()
+            "thread forming...".to_string()
         };
         let progress_color = if node.unlock_progress > 0.0 {
             Color::Rgb(100, 80, 160)
@@ -765,18 +765,18 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
         lines.push(Line::from(""));
         if !unlocked_neighbors.is_empty() {
             lines.push(Line::from(Span::styled(
-                " Active neighbors:",
+                " Threaded from:",
                 Style::default().fg(Color::Rgb(80, 60, 110)),
             )));
             for nid in &unlocked_neighbors {
                 lines.push(Line::from(Span::styled(
-                    format!("  {} {}", node_emoji(**nid), nid.name()),
+                    format!("  \u{25b2} {} {}", node_emoji(**nid), nid.name()),
                     Style::default().fg(Color::Rgb(100, 80, 160)),
                 )));
             }
         } else {
             lines.push(Line::from(Span::styled(
-                " No active neighbors",
+                " Unthreaded",
                 Style::default().fg(Color::Rgb(60, 45, 80)),
             )));
         }
@@ -1318,7 +1318,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
 
     // ── Arrows between rows ─────────────────────────────────────────────────
 
-    // Gap 0 (ES → RL, ES → RF): diagonal arrows from center down to left and right.
+    // Gap 0 (ES → RL, ES → RF): up-arrows showing thread source.
     if gap_rects[0].height > 0 {
         let es_center_x = es_rect.x + es_rect.width / 2;
         let rl_center_x = rl_rect.x + rl_rect.width / 2;
@@ -1329,7 +1329,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         if diag_left_x >= gap_rects[0].x && diag_left_x < gap_rects[0].x + gap_rects[0].width {
             frame.render_widget(
                 Paragraph::new(Span::styled(
-                    "\u{25bc}",
+                    "\u{25b2}",
                     Style::default().fg(flow_arrow_color),
                 ))
                 .style(Style::default().bg(LOOM_BG)),
@@ -1346,7 +1346,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         if diag_right_x >= gap_rects[0].x && diag_right_x < gap_rects[0].x + gap_rects[0].width {
             frame.render_widget(
                 Paragraph::new(Span::styled(
-                    "\u{25bc}",
+                    "\u{25b2}",
                     Style::default().fg(flow_arrow_color),
                 ))
                 .style(Style::default().bg(LOOM_BG)),
@@ -1360,7 +1360,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         }
     }
 
-    // Gap 1 (RL → VC, RF → SW): straight down arrows.
+    // Gap 1 (RL → VC, RF → SW): up-arrows showing thread source.
     if gap_rects[1].height > 0 {
         let rl_center_x = rl_rect.x + rl_rect.width / 2;
         let rf_center_x = rf_rect.x + rf_rect.width / 2;
@@ -1393,7 +1393,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         );
     }
 
-    // Gap 2 (VC → MA, SW → MA): converging arrows to center.
+    // Gap 2 (VC → MA, SW → MA): up-arrows showing thread source.
     if gap_rects[2].height > 0 {
         let ma_center_x = ma_rect.x + ma_rect.width / 2;
         let vc_center_x = vc_rect.x + vc_rect.width / 2;
@@ -1403,7 +1403,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         if diag_left_x >= gap_rects[2].x && diag_left_x < gap_rects[2].x + gap_rects[2].width {
             frame.render_widget(
                 Paragraph::new(Span::styled(
-                    "\u{25bc}",
+                    "\u{25b2}",
                     Style::default().fg(flow_arrow_color),
                 ))
                 .style(Style::default().bg(LOOM_BG)),
@@ -1419,7 +1419,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         if diag_right_x >= gap_rects[2].x && diag_right_x < gap_rects[2].x + gap_rects[2].width {
             frame.render_widget(
                 Paragraph::new(Span::styled(
-                    "\u{25bc}",
+                    "\u{25b2}",
                     Style::default().fg(flow_arrow_color),
                 ))
                 .style(Style::default().bg(LOOM_BG)),
@@ -1621,7 +1621,7 @@ fn render_list_detail(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui:
             Style::default().fg(Color::Rgb(80, 60, 110)),
         )));
         detail_lines.push(Line::from(Span::styled(
-            " Unlock via neighbor",
+            " Awaiting thread",
             Style::default().fg(Color::Rgb(60, 45, 80)),
         )));
         detail_lines.push(Line::from(""));
