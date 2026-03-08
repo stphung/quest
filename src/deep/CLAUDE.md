@@ -156,10 +156,10 @@ Four types, each buildable once per layer (persists across prestiges):
 
 | Type | Effect | Build Cost |
 |------|--------|-----------|
-| Outpost | -25% mission duration on this layer | 60 + 4*layer |
-| SupplyCache | Supply runs yield bonus resources | 80 + 5*layer |
-| Watchtower | Better intel, auto-resolve, +40 familiarity on build | 70 + 4*layer |
-| Bridge | -2% mission duration per bridged layer (max -30%) | 100 + 5*layer |
+| Outpost | -25% mission duration on this layer | 85 + 6*layer |
+| SupplyCache | Supply runs yield bonus resources | 110 + 7*layer |
+| Watchtower | Better intel, auto-resolve, +40 familiarity on build | 100 + 6*layer |
+| Bridge | -2% mission duration per bridged layer (max -30%) | 140 + 7*layer |
 
 ### `MissionType` (`types.rs`)
 ```rust
@@ -260,7 +260,7 @@ pub enum DeepView { Hub, NewMission, Roster, Infrastructure, EventResponse, Recr
 - `apply_duration_modifiers(base_secs, mods) -> u64` — Full pipeline: Outpost (-25%) * Familiarity (-10/-20/-30%) * Saboteur (-10/-15%) * Overpower (-10%), clamped to 30min floor
 
 **Familiarity:**
-- `familiarity_gain(mission_type) -> u8` — Per-mission gain (Supply Run: 5, Recon: 15, Expedition: 10, Breakthrough: 15, Construction: 5)
+- `familiarity_gain(mission_type) -> u8` — Per-mission gain (Supply Run: 2, Recon: 5, Expedition: 15, Breakthrough: 15, Construction: 5)
 - `apply_familiarity_gain(record, mission_type)` — Apply gain capped at 100
 - `FamiliarityLevel::from_familiarity(pct)` — Unknown (0-24%), Mapped (25-49%), Familiar (50-74%), Mastered (75-100%)
 
@@ -378,9 +378,9 @@ XP curve: `200 * level^1.3` per level. Max level: 20. Stat variance: +/-10%.
 ### Familiarity Gain Per Mission
 | Mission Type | Gain |
 |-------------|------|
-| Supply Run | +5 |
-| Recon | +15 |
-| Expedition | +10 |
+| Supply Run | +2 |
+| Recon | +5 |
+| Expedition | +15 |
 | Breakthrough | +15 |
 | Construction | +5 |
 
