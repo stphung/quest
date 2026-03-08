@@ -148,6 +148,7 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
             ctx.deep.persistent.fracture_zone_cap,
             ctx.state.prestige_rank,
             loom_cap,
+            ctx.state.ascension_level,
         );
         result.events.push(TickEvent::FractureRegionUnlocked {
             region,

@@ -85,6 +85,7 @@ pub(super) fn handle_vault_selection(
                         deep.persistent.fracture_zone_cap,
                         state.prestige_rank,
                         loom_cap,
+                        state.ascension_level,
                     );
                     *overlay = GameOverlay::None;
                     let new_rank = state.prestige_rank;
@@ -171,6 +172,7 @@ pub(super) fn handle_prestige_confirm(
                     deep.persistent.fracture_zone_cap,
                     state.prestige_rank,
                     loom_cap,
+                    state.ascension_level,
                 );
                 *overlay = GameOverlay::None;
                 let new_rank = state.prestige_rank;

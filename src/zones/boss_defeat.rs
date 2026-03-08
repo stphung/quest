@@ -559,7 +559,7 @@ mod tests {
         prog.fighting_boss = true;
 
         // Call with loom_zone_cap = 34
-        let result = prog.on_boss_defeated_with_cap(500, &mut achievements, 30, 34);
+        let result = prog.on_boss_defeated_with_cap(2000, &mut achievements, 30, 34);
         assert_eq!(result, BossDefeatResult::LoomZoneCycle { zone_id: 34 });
         assert_eq!(prog.current_zone_id, 34);
         assert_eq!(prog.current_subzone_id, 1);
@@ -580,7 +580,7 @@ mod tests {
         prog.fighting_boss = true;
 
         // Call with loom_zone_cap = 34 — zone 33 is NOT the cap, so should advance
-        let result = prog.on_boss_defeated_with_cap(500, &mut achievements, 30, 34);
+        let result = prog.on_boss_defeated_with_cap(2000, &mut achievements, 30, 34);
         assert!(
             matches!(
                 result,

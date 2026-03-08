@@ -1097,6 +1097,7 @@ pub(super) fn tick_loom(
             fracture_cap,
             state.prestige_rank,
             loom_cap,
+            state.ascension_level,
         );
     }
 

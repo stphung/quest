@@ -902,6 +902,7 @@ impl DebugMenu {
             deep.persistent.fracture_zone_cap,
             state.prestige_rank,
             loom_cap,
+            state.ascension_level,
         );
         state.cached_fracture_zone_cap = deep.persistent.fracture_zone_cap;
 
@@ -1280,6 +1281,7 @@ fn trigger_unlock_deep_layer(
             deep.persistent.fracture_zone_cap,
             state.prestige_rank,
             30,
+            state.ascension_level,
         );
     }
 
@@ -1383,6 +1385,7 @@ fn trigger_travel_to_zone(
         deep.persistent.fracture_zone_cap,
         state.prestige_rank,
         30,
+        state.ascension_level,
     );
 
     // Travel to subzone 1
@@ -2208,6 +2211,7 @@ mod tests {
             deep.persistent.fracture_zone_cap,
             state.prestige_rank,
             30,
+            state.ascension_level,
         );
         state.cached_fracture_zone_cap = deep.persistent.fracture_zone_cap;
         assert_eq!(state.prestige_rank, 100);
