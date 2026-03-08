@@ -284,97 +284,61 @@ pub(super) fn draw_deep_panel(
         ]));
     }
 
-    // Row 2: Missions + progress bar + ETA + events badge
-    {
-        let dw = super::scene_fx::display_width;
-        let active = deep.prestige.active_mission_count();
-        let max_concurrent = crate::deep::effective_concurrent_missions(
-            deep.persistent.guild_rank,
-            deep.persistent.deepest_layer_reached,
-        );
-        let events = pending_event_count(&deep.prestige);
+    // Row 2 data: Missions + progress gauge + ETA + events badge
+    // (rendered separately below as a horizontal layout with a Gauge widget)
+    let active = deep.prestige.active_mission_count();
+    let max_concurrent = crate::deep::effective_concurrent_missions(
+        deep.persistent.guild_rank,
+        deep.persistent.deepest_layer_reached,
+    );
+    let events = pending_event_count(&deep.prestige);
+    let now_chrono = chrono::Utc::now();
+    let nearest_mission = deep
+        .prestige
+        .active_missions
+        .iter()
+        .filter(|m| {
+            matches!(
+                m.status,
+                crate::deep::MissionStatus::Active | crate::deep::MissionStatus::EventPending
+            )
+        })
+        .min_by_key(|m| m.ends_at);
+    let eta = next_mission_eta_secs(&deep.prestige);
+    let mission_progress = nearest_mission.map(|m| m.progress(now_chrono));
 
-        let mut left_spans: Vec<Span> = Vec::new();
-        let mut right_spans: Vec<Span> = Vec::new();
-
-        let msn_str = format!("Missions {}/{} ", active, max_concurrent);
-        left_spans.push(Span::styled(msn_str, Style::default().fg(Color::Cyan)));
-
-        // Find the nearest active mission for the progress bar
-        let now_chrono = chrono::Utc::now();
-        let nearest_mission = deep
-            .prestige
-            .active_missions
-            .iter()
-            .filter(|m| {
-                matches!(
-                    m.status,
-                    crate::deep::MissionStatus::Active | crate::deep::MissionStatus::EventPending
-                )
-            })
-            .min_by_key(|m| m.ends_at);
-
-        let eta = next_mission_eta_secs(&deep.prestige);
-
-        if let Some(mission) = nearest_mission {
-            // Build 12-char progress bar [████████░░░░]
-            let progress = mission.progress(now_chrono);
-            let filled = (progress * 12.0).round() as usize;
-            let empty = 12 - filled;
-            left_spans.push(Span::styled("[", Style::default().fg(Color::DarkGray)));
-            if filled > 0 {
-                left_spans.push(Span::styled(
-                    "\u{2588}".repeat(filled),
-                    Style::default().fg(CORE_AMBER),
-                ));
-            }
-            if empty > 0 {
-                left_spans.push(Span::styled(
-                    "\u{2591}".repeat(empty),
-                    Style::default().fg(Color::DarkGray),
-                ));
-            }
-            left_spans.push(Span::styled("]", Style::default().fg(Color::DarkGray)));
-
-            // ETA text (right-aligned)
-            if let Some(secs) = eta {
-                let eta_color = if secs < 900 {
-                    Color::Yellow
-                } else {
-                    Color::DarkGray
-                };
-                right_spans.push(Span::styled(
-                    format_eta(secs as u64),
-                    Style::default().fg(eta_color),
-                ));
-            }
-        } else {
-            // No active missions: idle state (right-aligned)
-            right_spans.push(Span::styled(
-                "\u{25f7} idle",
+    // Build right-side text for Row 2
+    let row2_right = {
+        let mut spans: Vec<Span> = Vec::new();
+        if let Some(secs) = eta {
+            let eta_color = if secs < 900 {
+                Color::Yellow
+            } else {
+                Color::DarkGray
+            };
+            spans.push(Span::styled(
+                format!(" {}", format_eta(secs as u64)),
+                Style::default().fg(eta_color),
+            ));
+        } else if nearest_mission.is_none() {
+            spans.push(Span::styled(
+                " \u{25f7} idle",
                 Style::default().fg(Color::DarkGray),
             ));
         }
-
-        // Events badge (right-aligned, after ETA/idle)
         if events > 0 {
-            right_spans.push(Span::styled(
+            spans.push(Span::styled(
                 format!("  \u{26a1}{}", events),
                 Style::default().fg(Color::Yellow),
             ));
         }
+        spans
+    };
+    let row2_left_str = format!("Missions {}/{} ", active, max_concurrent);
+    let row2_right_width: usize = row2_right.iter().map(|s| s.content.len()).sum();
 
-        // Combine with padding
-        let left_width: usize = left_spans.iter().map(|s| dw(&s.content)).sum();
-        let right_width: usize = right_spans.iter().map(|s| dw(&s.content)).sum();
-        let padding = width.saturating_sub(left_width + right_width);
-
-        let mut spans = left_spans;
-        spans.push(Span::raw(" ".repeat(padding)));
-        spans.extend(right_spans);
-
-        lines.push(Line::from(spans));
-    }
+    // Placeholder line so the Paragraph still takes 3 lines of vertical space
+    lines.push(Line::from(""));
 
     // Row 3: Team glyphs + Frontier
     {
@@ -456,8 +420,7 @@ pub(super) fn draw_deep_panel(
         lines.push(Line::from(team_spans));
     }
 
-    // Render header lines (rows 1-3) as a Paragraph in the top section,
-    // then render cores in a bordered sub-block below.
+    // Render header: Row 1 (line), Row 2 (gauge), Row 3 (line), then cores sub-block.
     let summary = core_summary(achievements, deep);
     let core_count = summary.cores.len() as u16;
 
@@ -467,9 +430,50 @@ pub(super) fn draw_deep_panel(
         .constraints([Constraint::Length(3), Constraint::Min(0)])
         .split(inner);
 
-    // Render header lines
+    // Render header lines (Row 1 and Row 3; Row 2 placeholder is blank)
     let para = Paragraph::new(lines);
     frame.render_widget(para, chunks[0]);
+
+    // Render Row 2 with a Gauge widget for mission progress
+    let row2_area = Rect {
+        x: chunks[0].x,
+        y: chunks[0].y + 1,
+        width: chunks[0].width,
+        height: 1,
+    };
+    let left_len = row2_left_str.len() as u16;
+    let right_len = row2_right_width as u16;
+    let gauge_width = row2_area.width.saturating_sub(left_len + right_len);
+    let row2_cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Length(left_len),
+            Constraint::Length(gauge_width),
+            Constraint::Length(right_len),
+        ])
+        .split(row2_area);
+
+    // Left label
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            &row2_left_str,
+            Style::default().fg(Color::Cyan),
+        ))),
+        row2_cols[0],
+    );
+
+    // Gauge (or empty if no active mission)
+    if let Some(progress) = mission_progress {
+        let gauge = Gauge::default()
+            .gauge_style(Style::default().fg(CORE_AMBER).bg(Color::Rgb(28, 18, 0)))
+            .ratio(progress.clamp(0.0, 1.0));
+        frame.render_widget(gauge, row2_cols[1]);
+    }
+
+    // Right info (ETA / idle / events)
+    if !row2_right.is_empty() {
+        frame.render_widget(Paragraph::new(Line::from(row2_right)), row2_cols[2]);
+    }
 
     // Render "Power Cores" bordered sub-block
     let total_pr_per_day: u32 = summary
