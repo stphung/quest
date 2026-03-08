@@ -11,7 +11,7 @@ src/loom/
 ├── logic.rs        — Node upgrades, base production, stall detection, reactions, refinery building/demolishing, direct-pull tick
 ├── recipes.rs      — Recipe registry, lookup_recipe(a, b, nature), recipes_by_nature()
 ├── patterns.rs     — Woven Pattern sustain timer and completion tracking
-├── discovery.rs    — 18 woven patterns defined in create_pattern_sequence()
+├── discovery.rs    — 28 woven patterns defined in create_pattern_sequence()
 └── persistence.rs  — Save/load from ~/.quest/loom.json
 ```
 
@@ -24,7 +24,8 @@ src/loom/
 | `LoomNode` | Extractor state: level, buffers per resource, nature, stall flag, unlocked status |
 | `Refinery` | Recipe-locked processing node: input_a/b, nature, output, amount, tier, buffer, sources_a/sources_b, construction state |
 | `Resource` | Enum of all resources: 6 base + confluence + reaction products |
-| `WovenPattern` | Pattern with resource requirements (raw accumulated amounts), completion state |
+| `WovenPattern` | Pattern with resource requirements (sustained rate thresholds and durations), completion state |
+| `RateTracker` | 60-second rolling window rate measurement (transient, not serialized) |
 | `LoomState` | Top-level state: `persistent` (saved) + `ui_state` (transient) |
 | `LoomPersistent` | Saved state: nodes, refineries, stockpile, codex, patterns |
 
@@ -77,10 +78,10 @@ Refineries are recipe-locked processing nodes that create multi-step production 
 | Tier | Pattern gate | Resource cost |
 |------|-------------|---------------|
 | T1 | 1 pattern complete | 25 of input_a resource |
-| T2 | 6 patterns complete | 15 of input_a resource |
-| T3 | 12 patterns complete | 10 of input_a resource |
+| T2 | 8 patterns complete | 15 of input_a resource |
+| T3 | 15 patterns complete | 10 of input_a resource |
 
-**Refinery limit**: Max refineries = number of completed Woven Patterns (max 18).
+**Refinery limit**: Max refineries = number of completed Woven Patterns (max 28).
 
 **Construction**: Refineries have a 50-tick construction period. `tick_refinery_construction()` decrements timers and marks them ready.
 
@@ -92,12 +93,16 @@ Refineries are recipe-locked processing nodes that create multi-step production 
 
 ## Pattern System
 
-Woven Patterns use raw accumulated amounts rather than rate×time:
+Woven Patterns use sustained production rates rather than accumulated totals:
 
-- `PatternRequirement::amount` — total resource amount needed to complete the pattern
-- `PatternRequirement::accumulated` — amount accumulated so far (incremented each tick from refinery output)
-- Pattern completes when all requirements reach their `amount` threshold
-- Pattern requirements are set as raw totals (e.g., 50 units), not hourly rates
+- `PatternRequirement::required_rate` — minimum production rate (units/hr) that must be sustained
+- `PatternRequirement::sustain_duration_secs` — total seconds the rate must be sustained
+- `PatternRequirement::sustained_secs` — seconds sustained so far (advances when rate >= threshold, pauses when below)
+- `PatternRequirement::completed` — whether this individual requirement is complete (locks independently)
+- Pattern completes when all requirements have `completed = true`
+- Requirements complete independently — the player doesn't need to sustain all resources simultaneously
+- Rate measurement uses a 60-second rolling window (`RateTracker` struct, transient, not serialized)
+- Simple pause model: progress never decays, only pauses when rate drops below threshold
 
 ## Production Chain Flow
 
