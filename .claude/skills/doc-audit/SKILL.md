@@ -1,5 +1,5 @@
 ---
-name: audit-docs
+name: doc-audit
 description: Multi-agent developer documentation audit — finds stale constants, missing files, and outdated types across CLAUDE.md files and docs/. Use when docs are stale, after adding features, or before releases.
 ---
 
@@ -15,7 +15,7 @@ Multi-agent audit of developer documentation. Finds stale content, missing files
 - New modules exist without CLAUDE.md files
 - When asked to audit or update docs
 
-**For player-facing wiki:** Use the `audit-wiki` skill instead.
+**For player-facing wiki:** Use the `wiki-audit` skill instead.
 
 ## Phase 1: Parallel Audit (5 Agents, Read-Only)
 
