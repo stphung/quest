@@ -239,7 +239,7 @@ When prestiging with a Vault, the player selects which equipped items to keep. T
 
 ### Structure
 
-30 total zones: 10 prestige-gated zones, Zone 11 (The Expanse, post-game cycling), and 19 fracture zones (12-30) unlocked by Deep layer breakthroughs. Zones 1-10 have 3-4 subzones; zones 12-30 have 5 subzones each.
+50 total zones: 10 prestige-gated zones, Zone 11 (The Expanse, post-game cycling), 19 fracture zones (12-30) unlocked by Deep layer breakthroughs, and 20 Loom zones (31-50) unlocked by Woven Pattern completion. Zones 1-10 have 3-4 subzones; zones 12-50 have 5 subzones each.
 
 | Tier | Gate | Zones | Subzones/Zone |
 |------|------|-------|---------------|
@@ -255,6 +255,11 @@ When prestiging with a Vault, the player selects which equipped items to keep. T
 | Ch.4 The Hollow Throne | Deep Layer 18 | Z21-23 | 5 each |
 | Ch.5 The Wailing Reach | Deep Layer 25 | Z24-26 | 5 each |
 | Ch.6 The Origin Wound | Deep Layer 30 | Z27-30 | 5 each |
+| Ch.7 Thread Wilds | 4 patterns / P2,000 | Z31-34 | 5 each |
+| Ch.8 Woven Frontier | 8 patterns / Asc VII / P5,000 | Z35-38 | 5 each |
+| Ch.9 The Unraveling | 16 patterns / Asc VIII / P15,000 | Z39-42 | 5 each |
+| Ch.10 Grand Design | 22 patterns / Asc IX / P30,000 | Z43-46 | 5 each |
+| Ch.11 Final Weave | 28 patterns / Asc X / P50,000 | Z47-50 | 5 each |
 
 ### Complete Zone List
 
