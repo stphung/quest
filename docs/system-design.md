@@ -189,7 +189,7 @@ pub struct TickResult {
 | `ATTACK_INTERVAL_SECONDS` | 1.5s | Base combat speed |
 | `HP_REGEN_DURATION_SECONDS` | 2.5s | Post-kill healing |
 | `AUTOSAVE_INTERVAL_SECONDS` | 30s | Periodic save |
-| `UPDATE_CHECK_INTERVAL_SECONDS` | 1800s | Version polling |
+| `UPDATE_CHECK_INTERVAL_SECONDS` | 900s | Version polling |
 | `UPDATE_CHECK_JITTER_SECONDS` | 300s | Spread API requests |
 
 ---
