@@ -56,6 +56,7 @@ Agent-invocable skills — ask in natural language to trigger them.
 | `update-docs` | "audit the docs", "update documentation", "restructure docs" | Audits CLAUDE.md files and docs/ for structural health and content accuracy |
 | `update-wiki` | "update the wiki", "wiki is stale" | Updates player-facing wiki (quest.wiki/) to match current game |
 | `test-health-audit` | "audit the tests", "fix flaky tests" | Parallel flakiness + performance audit, fixes, 10x verification run |
+| `perf-audit` | "audit performance", "optimize hot paths", "profile the game" | Multi-agent perf audit: finds bottlenecks, auto-fixes, adds benchmarks |
 | `ship` | "ship it", "push and merge", "land this" | Push branch, create PR with automerge, watch CI until merged, fix failures |
 
 ## Architecture
