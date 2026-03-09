@@ -7,7 +7,7 @@ Keyboard input routing for the Game screen, dispatching to overlay handlers, min
 | File | Purpose |
 |------|---------|
 | `mod.rs` | Top-level dispatcher (`handle_game_input`) with numbered priority chain; modal dismiss handlers; debug menu routing; base game hotkeys |
-| `types.rs` | `GameOverlay` enum (18 variants), `InputResult` enum (22 variants), `HavenUiState` struct, `HavenConfirmation` enum |
+| `types.rs` | `GameOverlay` enum (20 variants), `InputResult` enum (23 variants), `HavenUiState` struct, `HavenConfirmation` enum |
 | `loom_input.rs` | Loom of Worlds overlay input: FlowView navigation, shuttle build/demolish, Codex browsing |
 | `minigame_input.rs` | Dispatches keyboard events to all 10 challenge minigame input handlers; game-over cooldown (2s) logic |
 | `haven_input.rs` | Haven overlay input: room selection, build confirmation, Storm Forge confirmation |
@@ -19,8 +19,8 @@ Keyboard input routing for the Game screen, dispatching to overlay handlers, min
 
 ## Key Types
 
-- **`GameOverlay`**: Enum with 18 variants representing the active modal/overlay. At most one is active at a time. Includes discovery modals, achievement browser, Time Vault, bug report, quit confirm, and more.
-- **`InputResult`**: Enum with 22 variants describing what happened after processing input. Variants range from `Continue` (no-op) to `NeedsSaveWithEvent` (save + git commit) to cloud sync actions like `PushCloud`, `ResolveKeepLocal`, etc.
+- **`GameOverlay`**: Enum with 20 variants representing the active modal/overlay. At most one is active at a time. Includes discovery modals, achievement browser, Time Vault, bug report, quit confirm, and more.
+- **`InputResult`**: Enum with 23 variants describing what happened after processing input. Variants range from `Continue` (no-op) to `NeedsSaveWithEvent` (save + git commit) to cloud sync actions like `PushCloud`, `ResolveKeepLocal`, etc.
 - **`HavenUiState`**: Tracks Haven overlay visibility, selected room index, confirmation state, and open timestamp for animations.
 - **`HavenConfirmation`**: Three-state enum (`None`, `Build`, `Forge`) for Haven build/forge confirmation dialogs.
 

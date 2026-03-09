@@ -22,10 +22,6 @@ src/core/
 ├── power_rating.rs  # Character power rating (sqrt of DPS x eHP)
 ├── tick_context.rs  # TickContext struct — bundles all mutable references (state, haven, deep, etc.) for game_tick()
 ├── game_state_serde.rs # FlatGameState intermediate for backward-compatible JSON serialization during sub-struct migration
-├── player_identity.rs # PlayerIdentity sub-struct — character ID, name, level, XP, attributes, prestige rank
-├── combat_context.rs  # CombatContext sub-struct — combat state, equipment, zone progression, active dungeon
-├── progression_state.rs # ProgressionState sub-struct — fishing, stormglass, sigils, challenge menu, minigames
-├── session_state.rs   # SessionState sub-struct — save time, play time, caches, ticker, derived stats, XP tracking
 ├── discovery_facade.rs # DiscoveryInput/DiscoveryResult structs and roll_discoveries_facade() for decoupled discovery rolls
 └── paths.rs             # Centralized save path resolution for ~/.quest/ directory
 ```
@@ -337,7 +333,6 @@ Zone 11 (The Expanse) is an endgame wall: `(5000, 400, 500, 80, 250, 30)` — ro
 | Constant | Value | Notes |
 |----------|-------|-------|
 | `KILLS_FOR_BOSS` | 10 | Kills per subzone before boss |
-| `KILLS_FOR_BOSS_RETRY` | 5 | Kills needed to retry after boss death |
 | `BASE_MAX_FISHING_RANK` | 30 | Without Haven |
 | `MAX_FISHING_RANK` | 40 | With Fishing Dock T4 |
 

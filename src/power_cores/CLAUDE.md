@@ -8,8 +8,7 @@ Passive prestige rank generation tied to Deep layer milestones. Six Power Cores,
 src/power_cores/
 ├── mod.rs           # Public re-exports
 ├── types.rs         # PowerCoreDef, PowerCoreState, ALL_POWER_CORES, helper functions
-├── tick.rs          # Per-tick processing (tick_power_cores), offline catchup (apply_offline_power_cores), init_new_core
-└── persistence.rs   # Save/load from ~/.quest/power_cores.json
+└── tick.rs          # Per-tick processing (tick_power_cores), offline catchup (apply_offline_power_cores), init_new_core
 ```
 
 ## Key Types
@@ -62,10 +61,7 @@ Each game tick (100ms):
 
 ## Persistence
 
-- **File**: `~/.quest/power_cores.json` (pretty-printed JSON via serde)
-- **Load**: `load_power_cores()` — returns default if missing/corrupted
-- **Save**: `save_power_cores()` — creates `~/.quest/` if needed
-- **Trigger**: `main.rs` saves when `TickResult::power_cores_changed` is true
+Power Cores state is persisted as part of the Deep system. `DeepState.persistent.power_core_last_granted: HashMap<AchievementId, i64>` holds the Unix timestamp per core for when it last granted a PR. It is saved/loaded alongside `~/.quest/deep.json` by the Deep module's persistence functions.
 
 ## Integration Points
 

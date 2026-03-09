@@ -13,7 +13,6 @@ src/ui/
 ├── stats_attributes.rs         # Attribute rendering helpers for stats panel
 ├── stats_equipment.rs          # Equipment rendering helpers for stats panel
 ├── stats_prestige.rs           # Prestige and fishing panel rendering helpers
-├── stats_sigils.rs             # Storm Sigils rendering helpers for stats panel
 ├── ticker.rs                   # Scrolling loot ticker with independent per-entry scrolling
 ├── throbber.rs                 # Spinner animations and atmospheric messages
 │

@@ -9,6 +9,7 @@ src/fishing/
 ├── mod.rs         # Public re-exports
 ├── types.rs       # FishRarity, FishingPhase, FishingSession, FishingState, rank names/thresholds
 ├── generation.rs  # Rarity rolling, fish/session generation, Storm Leviathan encounter logic
+├── facade.rs      # FishingInput struct and tick_fishing_facade() for decoupled fishing ticking
 ├── logic.rs       # Tick processing, Haven bonus integration (discovery/drops/rank extracted)
 ├── discovery.rs   # Fishing spot discovery (try_discover_fishing)
 ├── drops.rs       # Item drop chance and generation from fish catches
