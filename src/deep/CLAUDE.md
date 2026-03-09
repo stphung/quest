@@ -169,6 +169,7 @@ pub enum MissionType {
     Expedition,              // 8-16h, medium risk, frontier
     Breakthrough,            // 18-24h, high risk, frontier (once per layer)
     Construction(Infrastructure), // 4-8h, no risk, cleared layers
+    GatewayExpedition,       // 48h, Layer 30 only, opens the Gateway (one-time)
 }
 ```
 

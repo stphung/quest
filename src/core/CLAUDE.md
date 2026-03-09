@@ -26,7 +26,8 @@ src/core/
 ├── combat_context.rs  # CombatContext sub-struct — combat state, equipment, zone progression, active dungeon
 ├── progression_state.rs # ProgressionState sub-struct — fishing, stormglass, sigils, challenge menu, minigames
 ├── session_state.rs   # SessionState sub-struct — save time, play time, caches, ticker, derived stats, XP tracking
-└── discovery_facade.rs # DiscoveryInput/DiscoveryResult structs and roll_discoveries_facade() for decoupled discovery rolls
+├── discovery_facade.rs # DiscoveryInput/DiscoveryResult structs and roll_discoveries_facade() for decoupled discovery rolls
+└── paths.rs             # Centralized save path resolution for ~/.quest/ directory
 ```
 
 ## Key Types
@@ -253,7 +254,7 @@ All functions above are re-exported through `game_logic.rs` for backward compati
 | `ATTACK_INTERVAL_SECONDS` | 1.5 | |
 | `HP_REGEN_DURATION_SECONDS` | 2.5 | After kill |
 | `AUTOSAVE_INTERVAL_SECONDS` | 30 | |
-| `UPDATE_CHECK_INTERVAL_SECONDS` | 1800 | 30 minutes |
+| `UPDATE_CHECK_INTERVAL_SECONDS` | 900 | 15 minutes |
 | `UPDATE_CHECK_JITTER_SECONDS` | 300 | +/- 5 min |
 
 ### XP and Leveling

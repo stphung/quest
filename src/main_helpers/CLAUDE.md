@@ -8,6 +8,9 @@ Thin orchestration wrappers extracted from `main.rs` to keep the game loop reada
 |------|---------|
 | `mod.rs` | Module declarations and public re-exports |
 | `achievements.rs` | `log_synced_achievements()` -- logs newly synced achievements to combat log; `track_input_achievements()` -- tracks prestige, fishing rank, and minigame win achievements triggered by player input (not by game_tick) |
+| `chrono_surge.rs` | Chrono Surge batched tick execution for accelerated gameplay |
+| `cloud_sync.rs` | Cloud sync state and operations (polling results, dispatching cloud input actions) |
+| `game_context.rs` | Shared game context structs to reduce argument counts on hot-path functions |
 | `character_screens.rs` | `ScreenTransition` enum and frame handlers for character creation, deletion, and rename screens; each draws UI, polls input, returns transition |
 | `cloud_ops.rs` | `reload_account_state()` -- reloads Haven, Enhancement, and Achievements from disk after cloud pull/resolve operations |
 | `input_routing.rs` | `InputAction` enum and `route_game_input()` -- maps `InputResult` variants to side effects (save, quit, etc.); bridges input handling and persistence |
