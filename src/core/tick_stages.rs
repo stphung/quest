@@ -474,13 +474,17 @@ pub fn process_combat_events<R: Rng>(
                 if matches!(defeat_result, BossDefeatResult::WeaponRequired { .. }) {
                     continue;
                 }
-                result.events.push(TickEvent::SubzoneBossDefeated {
-                    xp_gained,
-                    result: defeat_result.clone(),
-                });
 
                 // Deep discovery: first Endless kill at P15+
-                if matches!(defeat_result, BossDefeatResult::ExpanseCycle)
+                // Check before moving defeat_result into the event
+                let is_expanse_cycle = matches!(defeat_result, BossDefeatResult::ExpanseCycle);
+
+                result.events.push(TickEvent::SubzoneBossDefeated {
+                    xp_gained,
+                    result: defeat_result,
+                });
+
+                if is_expanse_cycle
                     && !deep.persistent.discovered
                     && state.prestige_rank >= crate::deep::DEEP_MIN_PRESTIGE_RANK
                 {
@@ -534,6 +538,11 @@ pub(super) fn process_item_drop(
         if equipped {
             state.invalidate_derived_stats();
         }
+        // Check if stormglass salvage will occur (needs item_name later)
+        let will_salvage = !equipped
+            && (state.stormglass_discovered || state.prestige_rank >= STORMGLASS_MIN_PRESTIGE_RANK);
+
+        // Clone for add_recent_drop; move originals into events
         state.add_recent_drop(
             item_name.clone(),
             rarity,
@@ -542,23 +551,21 @@ pub(super) fn process_item_drop(
             slot.clone(),
             stats.clone(),
         );
-        result.events.push(TickEvent::ItemDropped {
-            item_name: item_name.clone(),
-            rarity,
-            tier,
-            ilvl,
-            power,
-            equipped,
-            slot,
-            stats,
-            from_boss: was_boss,
-        });
 
-        // Stormglass: salvage non-equipped items
-        // Discovery requires P15+; once discovered, salvage always works
-        if !equipped
-            && (state.stormglass_discovered || state.prestige_rank >= STORMGLASS_MIN_PRESTIGE_RANK)
-        {
+        // If stormglass salvage needs item_name too, clone for ItemDropped and move into salvage
+        if will_salvage {
+            result.events.push(TickEvent::ItemDropped {
+                item_name: item_name.clone(),
+                rarity,
+                tier,
+                ilvl,
+                power,
+                equipped,
+                slot,
+                stats,
+                from_boss: was_boss,
+            });
+
             let sg_amount = crate::stormglass::earning::salvage_value(rarity);
             state.stormglass += sg_amount;
 
@@ -572,6 +579,18 @@ pub(super) fn process_item_drop(
                 item_name,
                 rarity,
                 amount: sg_amount,
+            });
+        } else {
+            result.events.push(TickEvent::ItemDropped {
+                item_name,
+                rarity,
+                tier,
+                ilvl,
+                power,
+                equipped,
+                slot,
+                stats,
+                from_boss: was_boss,
             });
         }
     }

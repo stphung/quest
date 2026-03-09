@@ -222,9 +222,14 @@ impl CharacterDeleteScreen {
         let input_text = {
             let char_count = self.confirmation_input.chars().count();
             if self.cursor_position < char_count {
-                let chars: Vec<char> = self.confirmation_input.chars().collect();
-                let before: String = chars[..self.cursor_position].iter().collect();
-                let after: String = chars[self.cursor_position..].iter().collect();
+                let byte_pos = self
+                    .confirmation_input
+                    .char_indices()
+                    .nth(self.cursor_position)
+                    .map(|(i, _)| i)
+                    .unwrap_or(self.confirmation_input.len());
+                let before = &self.confirmation_input[..byte_pos];
+                let after = &self.confirmation_input[byte_pos..];
                 format!("{}{}{}", before, "_", after)
             } else {
                 format!("{}_", self.confirmation_input)
@@ -279,19 +284,25 @@ impl CharacterDeleteScreen {
     }
 
     pub fn handle_char_input(&mut self, c: char) {
-        let chars: Vec<char> = self.confirmation_input.chars().collect();
-        let before: String = chars[..self.cursor_position].iter().collect();
-        let after: String = chars[self.cursor_position..].iter().collect();
-        self.confirmation_input = format!("{}{}{}", before, c, after);
+        let byte_pos = self
+            .confirmation_input
+            .char_indices()
+            .nth(self.cursor_position)
+            .map(|(i, _)| i)
+            .unwrap_or(self.confirmation_input.len());
+        self.confirmation_input.insert(byte_pos, c);
         self.cursor_position += 1;
     }
 
     pub fn handle_backspace(&mut self) {
         if self.cursor_position > 0 {
-            let chars: Vec<char> = self.confirmation_input.chars().collect();
-            let before: String = chars[..self.cursor_position - 1].iter().collect();
-            let after: String = chars[self.cursor_position..].iter().collect();
-            self.confirmation_input = format!("{}{}", before, after);
+            let byte_pos = self
+                .confirmation_input
+                .char_indices()
+                .nth(self.cursor_position - 1)
+                .map(|(i, _)| i)
+                .unwrap_or(self.confirmation_input.len());
+            self.confirmation_input.remove(byte_pos);
             self.cursor_position -= 1;
         }
     }
