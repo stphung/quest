@@ -44,7 +44,7 @@ Eight categories for browsing: `Combat`, `Level`, `Prestige`, `Progression`, `Ch
 
 ### `AchievementDef` (`data.rs`)
 
-Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 213 achievements total.
+Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 224 achievements total.
 
 Achievement score is computed at runtime by summing the point values of all unlocked achievements. Score is displayed in four locations: browser title bar, achievement unlock modal, achievement detail panel, and stats view.
 
@@ -123,7 +123,7 @@ Additionally, `newly_unlocked` is drained each tick by `collect_achievement_even
 
 Titles are display names earned by unlocking specific achievements. Players can select one title to display after their character name (e.g., "Hero, Godslayer"). Titles are account-wide and persist in `selected_title` on the `Achievements` struct.
 
-- `ALL_TITLES`: const slice of `TitleDef { achievement_id, title_text }` — 63 curated titles across level, prestige, combat, challenges, exploration, enhancement, fracture, and Deep categories
+- `ALL_TITLES`: const slice of `TitleDef { achievement_id, title_text }` — 64 curated titles across level, prestige, combat, challenges, exploration, enhancement, fracture, and Deep categories
 - `get_title_text(id)`: returns the title text for an achievement, if it grants a title
 - `get_unlocked_titles(achievements)`: returns all titles the player has earned, in display order
 - `validate_selected_title(achievements)`: clears `selected_title` if the achievement isn't unlocked or doesn't grant a title (called on load)
