@@ -8,6 +8,7 @@ Keyboard input routing for the Game screen, dispatching to overlay handlers, min
 |------|---------|
 | `mod.rs` | Top-level dispatcher (`handle_game_input`) with numbered priority chain; modal dismiss handlers; debug menu routing; base game hotkeys |
 | `types.rs` | `GameOverlay` enum (18 variants), `InputResult` enum (22 variants), `HavenUiState` struct, `HavenConfirmation` enum |
+| `loom_input.rs` | Loom of Worlds overlay input: FlowView navigation, shuttle build/demolish, Codex browsing |
 | `minigame_input.rs` | Dispatches keyboard events to all 10 challenge minigame input handlers; game-over cooldown (2s) logic |
 | `haven_input.rs` | Haven overlay input: room selection, build confirmation, Storm Forge confirmation |
 | `prestige_input.rs` | Prestige confirmation dialog and Vault item selection (equipment preservation across prestige) |

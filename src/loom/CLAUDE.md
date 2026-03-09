@@ -12,6 +12,7 @@ src/loom/
 ├── recipes.rs      — Recipe registry, lookup_recipe(a, b, nature), recipes_by_nature()
 ├── patterns.rs     — Woven Pattern sustain timer and completion tracking
 ├── discovery.rs    — 28 woven patterns defined in create_pattern_sequence()
+├── milestones.rs   — Pattern milestone types and helpers for key pattern completion modals
 └── persistence.rs  — Save/load from ~/.quest/loom.json
 ```
 

@@ -22,6 +22,8 @@ src/ui/
 ├── combat_effects.rs           # Visual effects (damage numbers, flashes)
 ├── enemy_sprites.rs            # ASCII enemy sprite templates and archetype logic
 ├── enemy_sprite_data.rs        # Enemy sprite constant data, archetype mapping tables, zone suffix lookups
+├── fracture_sprites_1.rs       # ASCII sprites for fracture zone enemies (zones 12-20)
+├── fracture_sprites_2.rs       # ASCII sprites for fracture zone enemies (zones 21-30)
 ├── dungeon_map.rs              # Top-down dungeon minimap with fog of war
 ├── fishing_scene.rs            # Fishing UI with phase display
 ├── prestige_confirm.rs         # Prestige confirmation dialog
@@ -57,6 +59,7 @@ src/ui/
 ├── soulforge_scene.rs          # Soulforge enhancement overlay (delegates to helpers below)
 ├── soulforge_effects.rs        # Soulforge hammering/success/failure animation effects
 ├── soulforge_slots.rs          # Soulforge slot selection menu
+├── loom_scene.rs               # Loom of Worlds overlay (FlowView, Codex)
 ├── ascension_scene.rs          # Ascension overlay UI (level display, cost/gate info, ascend confirmation)
 ├── stormglass_scene.rs         # Stormglass Exchange overlay with animations (Invoke Trial rolling, Chrono Surge speed ramp/fast-forward, Storm Sigils daily rotation, Storm Lure)
 ├── time_vault_scene.rs         # Time Vault overlay (branch/commit browser, restore, fork, GitHub cloud sync)
