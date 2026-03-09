@@ -124,6 +124,7 @@ struct SimConfig {
     quiet: bool,
     stormbreaker: bool,
     haven_strategy: Option<HavenStrategy>,
+    profile: bool,
 }
 
 impl Default for SimConfig {
@@ -138,6 +139,7 @@ impl Default for SimConfig {
             quiet: false,
             stormbreaker: false,
             haven_strategy: None,
+            profile: false,
         }
     }
 }
@@ -171,6 +173,7 @@ fn parse_args() -> SimConfig {
             }
             "--quiet" => config.quiet = true,
             "--stormbreaker" => config.stormbreaker = true,
+            "--profile" => config.profile = true,
             "--haven" => {
                 i += 1;
                 if i >= args.len() {
@@ -217,6 +220,7 @@ fn print_usage() {
          \x20 --quiet         Only final summary line\n\
          \x20 --stormbreaker  Unlock Stormbreaker achievement (access Zone 10 boss)\n\
          \x20 --haven STR     Haven auto-build strategy (combat, qol, balanced, full)\n\
+         \x20 --profile       Print per-tick timing profile\n\
          \x20 --help, -h      Show this help"
     );
 }
@@ -308,6 +312,42 @@ impl Default for SimStats {
             final_fishing_rank: 1,
             final_attributes: [10; 6],
         }
+    }
+}
+
+#[derive(Default)]
+struct TickProfile {
+    tick_count: u64,
+    total_ns: u128,
+    min_ns: u128,
+    max_ns: u128,
+}
+
+impl TickProfile {
+    fn record(&mut self, elapsed_ns: u128) {
+        self.tick_count += 1;
+        self.total_ns += elapsed_ns;
+        if self.tick_count == 1 || elapsed_ns < self.min_ns {
+            self.min_ns = elapsed_ns;
+        }
+        if elapsed_ns > self.max_ns {
+            self.max_ns = elapsed_ns;
+        }
+    }
+
+    fn avg_us(&self) -> f64 {
+        if self.tick_count == 0 {
+            return 0.0;
+        }
+        (self.total_ns as f64 / self.tick_count as f64) / 1000.0
+    }
+
+    fn min_us(&self) -> f64 {
+        self.min_ns as f64 / 1000.0
+    }
+
+    fn max_us(&self) -> f64 {
+        self.max_ns as f64 / 1000.0
     }
 }
 
@@ -424,7 +464,7 @@ impl SimStats {
 // ── Core Simulation Loop ─────────────────────────────────────────────
 
 #[allow(deprecated)]
-fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
+fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState, Option<TickProfile>) {
     let mut state = GameState::new("Simulator".to_string(), 0);
     state.prestige_rank = config.prestige;
 
@@ -454,6 +494,11 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
     let mut tick_counter: u32 = 0;
     let mut stats = SimStats::default();
+    let mut tick_profile = if config.profile {
+        Some(TickProfile::default())
+    } else {
+        None
+    };
 
     // Track zone changes
     let mut prev_zone = (
@@ -475,16 +520,35 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
     });
 
     for tick in 0..config.ticks {
-        let result = game_tick(
-            &mut state,
-            &mut tick_counter,
-            &mut haven,
-            &mut enhancement,
-            &mut deep_state,
-            &mut achievements,
-            false,
-            &mut rng,
-        );
+        let result = if tick_profile.is_some() {
+            let start = std::time::Instant::now();
+            let r = game_tick(
+                &mut state,
+                &mut tick_counter,
+                &mut haven,
+                &mut enhancement,
+                &mut deep_state,
+                &mut achievements,
+                false,
+                &mut rng,
+            );
+            tick_profile
+                .as_mut()
+                .unwrap()
+                .record(start.elapsed().as_nanos());
+            r
+        } else {
+            game_tick(
+                &mut state,
+                &mut tick_counter,
+                &mut haven,
+                &mut enhancement,
+                &mut deep_state,
+                &mut achievements,
+                false,
+                &mut rng,
+            )
+        };
 
         // Detect zone changes
         let curr_zone = (
@@ -562,7 +626,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState) {
     }
 
     stats.finalize(&state);
-    (stats, state)
+    (stats, state, tick_profile)
 }
 
 // ── Verbose Output ───────────────────────────────────────────────────
@@ -956,6 +1020,40 @@ fn print_multi_run_summary(all_stats: &[SimStats]) {
     println!();
 }
 
+fn print_profile(profile: &TickProfile, config: &SimConfig) {
+    println!();
+    println!(
+        "=== Tick Profile ({} ticks, P{}) ===",
+        config.ticks, config.prestige
+    );
+    println!("{:<25} {:>10}", "Metric", "Value");
+    println!("{}", "\u{2500}".repeat(37));
+    println!(
+        "{:<25} {:>10.1} \u{00b5}s",
+        "Avg per tick",
+        profile.avg_us()
+    );
+    println!(
+        "{:<25} {:>10.1} \u{00b5}s",
+        "Min per tick",
+        profile.min_us()
+    );
+    println!(
+        "{:<25} {:>10.1} \u{00b5}s",
+        "Max per tick",
+        profile.max_us()
+    );
+    let total_s = profile.total_ns as f64 / 1_000_000_000.0;
+    println!("{:<25} {:>10.3} s", "Total wall time", total_s);
+    if total_s > 0.0 {
+        println!(
+            "{:<25} {:>10.0}",
+            "Ticks/second",
+            profile.tick_count as f64 / total_s
+        );
+    }
+}
+
 // ── Main ─────────────────────────────────────────────────────────────
 
 fn main() {
@@ -988,12 +1086,15 @@ fn main() {
             eprintln!("--- Run {}/{} (seed={seed}) ---", run + 1, config.runs);
         }
 
-        let (stats, final_state) = run_simulation(&config, seed);
+        let (stats, final_state, tick_profile) = run_simulation(&config, seed);
 
         if config.runs == 1 {
             // Single run: print full final state
             print_summary(&stats, seed, &config);
             print_final_equipment(&final_state);
+            if let Some(ref profile) = tick_profile {
+                print_profile(profile, &config);
+            }
         } else if !config.quiet {
             // Multi-run: print one-liner per run
             let total_items: u64 = stats.items_by_rarity.iter().sum();
