@@ -89,7 +89,7 @@ A special legendary fish required to forge the Stormbreaker weapon:
 
 - **Requirement**: Fishing Rank 40+ (requires FishingDock T4)
 - **Appearance**: Only when catching legendary fish at Rank 40+
-- **10 encounters required** before it can be caught, with decreasing encounter rates: 8%, 6%, 5%, 4%, 3%, 2%, 1.5%, 1%, 0.5%, 0.25%
+- **10 encounters required** before it can be caught, with encounter rates (non-monotonic narrative arc): 5%, 3%, 4%, 5%, 4%, 3%, 2%, 1.5%, 1%, 0.8%
 - **Catch chance**: 25% per legendary fish after 10 encounters
 - **XP reward**: 10,000-15,000
 - **Unlocks**: `StormLeviathan` achievement (required for Stormbreaker forging)
