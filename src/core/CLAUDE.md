@@ -117,6 +117,7 @@ pub struct OfflineReport {
     pub level_after: u32,
     pub offline_rate_percent: f64,
     pub haven_bonus_percent: f64,
+    pub power_core_pr: u32,            // Prestige ranks granted by Power Cores while offline (0 if none)
 }
 ```
 
@@ -155,6 +156,7 @@ pub struct TickResult {
     pub enhancement_changed: bool,                 // Signal to persist to disk
     pub god_items_changed: bool,                   // Signal to persist to disk
     pub deep_changed: bool,                        // Signal to persist to disk
+    pub loom_changed: bool,                        // Signal to persist to disk
     pub achievement_modal_ready: Vec<AchievementId>, // Ready for overlay display
 }
 ```
