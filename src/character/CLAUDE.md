@@ -58,7 +58,7 @@ Named tiers from Bronze through Eternal with diminishing-returns XP multipliers.
 Characters are saved as individual JSON files in `~/.quest/`:
 - File pattern: `~/.quest/{character_name}.json`
 - Auto-save every 30 seconds (driven by `main.rs` timer)
-- Name validation (`name_validation.rs`): 1-20 chars, alphanumeric + spaces/hyphens/underscores, no leading/trailing spaces, reserved names blocked
+- Name validation (`name_validation.rs`): 1-16 chars, alphanumeric + spaces/hyphens/underscores, no leading/trailing spaces, reserved names blocked
 
 `manager.rs` defines the `CharacterManager` struct, `CharacterSaveData`, and `CharacterInfo` types. `persistence.rs` implements the file I/O methods on `CharacterManager`.
 
