@@ -23,6 +23,7 @@ unicode-width = "0.2"
 
 [dev-dependencies]
 tempfile = "3"
+criterion = { version = "0.5", features = ["html_reports"] }
 
 # rand_chacha moved to [dependencies] for the simulator binary
 
@@ -50,3 +51,7 @@ split-debuginfo = "unpacked"
 
 [profile.test.package."*"]
 opt-level = 2
+
+[[bench]]
+name = "game_tick"
+harness = false
