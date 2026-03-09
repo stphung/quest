@@ -56,7 +56,7 @@ pub fn check_rank_up_with_max(fishing_state: &mut FishingState, max_rank: u32) -
 /// - Each rank requires a certain number of fish to catch
 /// - Fish requirement increases with rank tier
 /// - Excess fish count carries over to next rank
-/// - Rank is capped at MAX_FISHING_RANK (30)
+/// - Rank is capped at MAX_FISHING_RANK (40)
 pub fn check_rank_up(fishing_state: &mut FishingState) -> Option<String> {
     check_rank_up_with_max(fishing_state, MAX_FISHING_RANK)
 }
