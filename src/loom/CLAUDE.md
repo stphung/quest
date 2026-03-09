@@ -166,14 +166,14 @@ When all 28 Woven Patterns are complete, the Loom converts Weave Rate (WR) into 
 | 10–25 | 10 |
 | 25+ | 15 |
 
-- `wr_to_pr_per_day(wr_per_hour) -> f64` — calculates daily PR output from current weave rate
+- `wr_to_pr_per_day(wr_per_hour) -> u32` — calculates daily PR output from current weave rate
 - Activation condition: `completed_pattern_count() >= 28`
 
 ## Key Functions (Power Integration)
 
 - `completed_pattern_count() -> usize` — count of fully completed Woven Patterns
 - `loom_zone_cap_for_patterns(completed_patterns) -> u32` — returns max zone ID unlocked by pattern count (Z31-50)
-- `wr_to_pr_per_day(wr_per_hour) -> f64` — tiered WR to PR/day conversion
+- `wr_to_pr_per_day(wr_per_hour) -> u32` — tiered WR to PR/day conversion
 - `upgrade_shuttle(loom, idx)` — upgrade shuttle level, increasing effective intake cap
 - `shuttle_effective_intake_cap(tier, level) -> f64` — intake cap adjusted for shuttle level
 
