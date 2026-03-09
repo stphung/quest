@@ -53,11 +53,12 @@ Agent-invocable skills — ask in natural language to trigger them.
 
 | Skill | Trigger phrases | What it does |
 |-------|----------------|--------------|
+| `audit` | "full audit", "audit everything" | Runs all 4 audit skills in sequence (perf, test, doc, wiki) |
+| `perf-audit` | "audit performance", "optimize hot paths" | Multi-agent perf audit: finds bottlenecks, auto-fixes, adds benchmarks |
+| `test-audit` | "audit the tests", "fix flaky tests" | Multi-agent test audit: finds flakiness + perf issues by area, auto-fixes, 10x verification |
 | `doc-audit` | "audit the docs", "update documentation" | Multi-agent docs audit: finds stale constants, missing files, outdated types across CLAUDE.md and docs/ |
 | `wiki-audit` | "audit the wiki", "wiki is stale" | Multi-agent wiki audit: finds stale numbers, missing systems, broken links in quest.wiki/ |
-| `test-audit` | "audit the tests", "fix flaky tests" | Multi-agent test audit: finds flakiness + perf issues by area, auto-fixes, 10x verification |
-| `perf-audit` | "audit performance", "optimize hot paths", "profile the game" | Multi-agent perf audit: finds bottlenecks, auto-fixes, adds benchmarks |
-| `ship` | "ship it", "push and merge", "land this" | Push branch, create PR with automerge, watch CI until merged, fix failures |
+| `ship` | "ship it", `/ship` | Push branch, create PR with automerge, watch CI until merged, fix failures |
 
 ## Architecture
 
