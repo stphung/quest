@@ -1,5 +1,5 @@
 ---
-name: audit-wiki
+name: wiki-audit
 description: Multi-agent wiki audit — finds stale numbers, missing systems, and broken links in the player-facing wiki. Use when wiki is stale, after game changes, or before releases.
 ---
 
@@ -14,7 +14,7 @@ Multi-agent audit of the GitHub wiki (`quest.wiki/` submodule). Finds stale cont
 - New zones, rooms, achievements, or equipment added
 - Before a release
 
-**For developer docs:** Use the `audit-docs` skill instead.
+**For developer docs:** Use the `doc-audit` skill instead.
 
 ## Initialize Wiki Submodule
 
