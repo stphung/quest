@@ -39,8 +39,15 @@ pub struct Dungeon {
     pub entrance_position: (usize, usize),
     pub boss_position: (usize, usize),
     pub has_key: bool,
-    pub boss_defeated: bool,
+    pub move_timer: f64,                // Timer for auto-exploration movement (seconds)
+    pub collected_items: Vec<Item>,     // Items collected during this dungeon run
+    pub xp_earned: u64,                 // Total XP earned in this dungeon
+    pub rooms_cleared: u32,             // Number of rooms cleared
     #[serde(default)]
+    pub current_room_cleared: bool,     // Whether current room's combat is done
+    #[serde(skip)]
+    pub is_traveling: bool,             // Currently traveling through cleared rooms (UI display)
+    #[serde(default = "default_dungeon_zone")]
     pub zone_id: u32,                   // Zone where dungeon was discovered (for enemy scaling)
 }
 ```

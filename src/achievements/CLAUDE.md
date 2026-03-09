@@ -23,7 +23,7 @@ src/achievements/
 
 ### `AchievementId` (`types.rs`)
 
-Enum with 213 variants covering all trackable milestones. Organized by domain:
+Enum with 224 variants covering all trackable milestones. Organized by domain:
 
 - **Combat**: `SlayerI`..`SlayerXV` (100 to 1B kills), `BossHunterI`..`BossHunterXV` (1 to 10M bosses)
 - **Level**: `Level10`..`Level100000` (18 milestones)

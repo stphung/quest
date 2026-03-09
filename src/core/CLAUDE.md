@@ -16,7 +16,7 @@ src/core/
 ├── recent_drops.rs  # RecentDrop struct, recent drops deque management
 ├── tick.rs          # game_tick() orchestration — coordinates all stages
 ├── tick_stages.rs   # Tick processing stages 4-6 and helper functions
-├── tick_types.rs    # TickEvent enum (45 variants) and TickResult struct
+├── tick_types.rs    # TickEvent enum (48 variants) and TickResult struct
 ├── ticker.rs        # Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
 ├── xp.rs            # XP curves, leveling, combat kill XP, distribute_level_up_points
 ├── power_rating.rs  # Character power rating (sqrt of DPS x eHP)
@@ -122,7 +122,7 @@ pub struct OfflineReport {
 
 ### `TickEvent` (`tick_types.rs`)
 
-Enum with 45 variants describing everything that can happen in a single tick. The presentation layer (main.rs) maps these to combat log entries and visual effects. Game logic never touches UI types.
+Enum with 48 variants describing everything that can happen in a single tick. The presentation layer (main.rs) maps these to combat log entries and visual effects. Game logic never touches UI types.
 
 **Categories:**
 - **Combat**: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`, `DamageReflected`, `RegenComplete`, `BossEnrage`, `CombatRetreat`
@@ -130,13 +130,15 @@ Enum with 45 variants describing everything that can happen in a single tick. Th
 - **Zone Progression**: `SubzoneBossDefeated` (with `BossDefeatResult`)
 - **Dungeon**: `DungeonRoomEntered`, `DungeonTreasureFound`, `DungeonKeyFound`, `DungeonBossUnlocked`, `DungeonBossDefeated`, `DungeonEliteDefeated`, `DungeonFailed`, `DungeonCompleted`
 - **Fishing**: `FishingMessage`, `FishCaught`, `FishingItemFound`, `FishingRankUp`, `StormLeviathanCaught`
-- **Discovery**: `ChallengeDiscovered`, `DungeonDiscovered`, `FishingSpotDiscovered`, `HavenDiscovered`, `SoulforgeDiscovered`, `StormglassDiscovered`
+- **Discovery**: `ChallengeDiscovered`, `DungeonDiscovered`, `FishingSpotDiscovered`, `HavenDiscovered`, `SoulforgeDiscovered`, `DeepDiscovered`, `StormglassDiscovered`
 - **The Deep**: `DeepMissionComplete`, `DeepEventPending`, `DeepMercInjured`, `DeepMercLost`, `DeepBreakthrough`, `DeepGuildRankUp`
 - **Stormglass**: `StormglassSalvaged`, `StormglassDungeonCache`
 - **Fracture Zones**: `FractureRegionUnlocked` (with `FractureRegion`)
 - **Ascension**: `Ascended` (with level and message)
 - **Achievements**: `AchievementUnlocked`
 - **Level Up**: `LeveledUp`
+- **Power Cores**: `PowerCoreGranted` (with `core_name`)
+- **Loom**: `LoomDiscovered`, `WovenRealityPRGranted`, `PatternMilestoneReached`
 
 Each variant carries pre-formatted message strings with unicode escapes (e.g., `\u{2694}` for crossed swords). The presentation layer uses these directly for log entries.
 
@@ -301,7 +303,7 @@ All functions above are re-exported through `game_logic.rs` for backward compati
 ### Zone Enemy Stats
 | Constant | Value | Notes |
 |----------|-------|-------|
-| `ZONE_ENEMY_STATS` | `[(u32,u32,u32,u32,u32,u32); 30]` | Per-zone `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)`. Index 0=Zone 1, Index 29=Zone 30. Zones 12-30 scale at 1.6x per zone from Zone 11 base. Steps are per-subzone-depth increments above depth 1 |
+| `ZONE_ENEMY_STATS` | `[(u32,u32,u32,u32,u32,u32); 50]` | Per-zone `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)`. Index 0=Zone 1, Index 49=Zone 50. Zones 12-30 scale at 1.6x per zone from Zone 11 base. Zones 31-50 scale at 1.25x per zone from Zone 30 base. Steps are per-subzone-depth increments above depth 1 |
 
 Zone 11 (The Expanse) is an endgame wall: `(5000, 400, 500, 80, 250, 30)` — roughly 6.2x HP, 4.6x DMG, 4.8x DEF over Zone 10.
 
