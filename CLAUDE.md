@@ -56,6 +56,7 @@ Agent-invocable skills — ask in natural language to trigger them.
 | `update-docs` | "audit the docs", "update documentation", "restructure docs" | Audits CLAUDE.md files and docs/ for structural health and content accuracy |
 | `update-wiki` | "update the wiki", "wiki is stale" | Updates player-facing wiki (quest.wiki/) to match current game |
 | `test-health-audit` | "audit the tests", "fix flaky tests" | Parallel flakiness + performance audit, fixes, 10x verification run |
+| `ship` | "ship it", "push and merge", "land this" | Push branch, create PR with automerge, watch CI until merged, fix failures |
 
 ## Architecture
 
@@ -128,7 +129,7 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - **Enemy attack intervals**: normal 2.0s, subzone boss 1.8s, zone boss 1.5s, dungeon elite 1.6s, dungeon boss 1.4s
 - **HP regen after kill**: 2.5s
 - **Autosave**: every 30s
-- **Update check**: every 30min +/-5min jitter
+- **Update check**: every 15min +/-5min jitter
 - **XP gain**: Only from defeating enemies (200-400 XP per kill)
 - **Offline XP**: 25% rate, max 7 days (simulates kills)
 - **Mob item drop rate**: 15% base + 1% per prestige rank (capped at 25%), max rarity Epic
