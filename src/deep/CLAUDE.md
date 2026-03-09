@@ -164,11 +164,11 @@ Four types, each buildable once per layer (persists across prestiges):
 ### `MissionType` (`types.rs`)
 ```rust
 pub enum MissionType {
-    SupplyRun,               // 2-4h, no risk, cleared layers
-    Recon,                   // 4-8h, low risk, frontier
-    Expedition,              // 8-16h, medium risk, frontier
-    Breakthrough,            // 18-24h, high risk, frontier (once per layer)
-    Construction(Infrastructure), // 4-8h, no risk, cleared layers
+    SupplyRun,               // 1-6h, no risk, cleared layers
+    Recon,                   // 1-10h, low risk, frontier
+    Expedition,              // 3-30h, medium risk, frontier
+    Breakthrough,            // 4-40h, high risk, frontier (once per layer)
+    Construction(Infrastructure), // 2-20h, no risk, cleared layers
     GatewayExpedition,       // 48h, Layer 30 only, opens the Gateway (one-time)
 }
 ```
@@ -257,7 +257,7 @@ pub enum DeepView { Hub, NewMission, Roster, Infrastructure, EventResponse, Recr
 - `mission_power_threshold(layer, mission_type) -> u32` — Convenience wrapper selecting the right threshold for a mission type
 
 **Durations:**
-- `base_mission_duration_secs(tier, mission_type) -> u64` — Base duration before modifiers (2h Supply Run to 24h Breakthrough)
+- `mission_duration_secs(tier, mission_type) -> u64` — Final duration before modifiers (1h Supply Run to 40h Breakthrough)
 - `apply_duration_modifiers(base_secs, mods) -> u64` — Full pipeline: Outpost (-25%) * Familiarity (-10/-20/-30%) * Saboteur (-10/-15%) * Overpower (-10%), clamped to 30min floor
 
 **Familiarity:**
@@ -337,11 +337,12 @@ Layers 1-25 use a lookup table. Void (26+) scales linearly at +80/layer. Sample 
 ### Mission Durations (Base, Before Modifiers)
 | Tier | Supply Run | Recon | Expedition | Breakthrough | Construction |
 |------|-----------|-------|------------|--------------|-------------|
-| Shallows | 2.0h | 4.0h | 8.0h | 18.0h | 4.0h |
-| Warrens | 2.5h | 5.0h | 10.0h | 20.0h | 5.0h |
-| Hollows | 3.0h | 6.0h | 12.0h | 22.0h | 6.0h |
-| Sunken Reach | 3.5h | 7.0h | 14.0h | 24.0h | 7.0h |
-| Abyss/Void | 4.0h | 8.0h | 16.0h | 24.0h | 8.0h |
+| Shallows | 1h | 1h | 3h | 4h | 2h |
+| Warrens | 2h | 3h | 9h | 12h | 6h |
+| Hollows | 3h | 5h | 15h | 20h | 10h |
+| Sunken Reach | 4h | 6h | 18h | 24h | 12h |
+| Abyss | 5h | 8h | 24h | 32h | 16h |
+| Void | 6h | 10h | 30h | 40h | 20h |
 
 Minimum duration floor: 30 minutes (`MIN_MISSION_DURATION_SECS = 1800`).
 

@@ -564,7 +564,7 @@ Session size: 3-8 fish per session.
 
 Progressive 10-encounter hunt, only available at rank 40 on legendary fish catches:
 
-1. Encounter chances (decreasing): 8%, 6%, 5%, 4%, 3%, 2%, 1.5%, 1%, 0.5%, 0.25%
+1. Encounter chances (non-monotonic narrative arc): 5%, 3%, 4%, 5%, 4%, 3%, 2%, 1.5%, 1%, 0.8%
 2. After 10 encounters: 25% catch chance per legendary fish
 3. Catching awards 10,000-15,000 XP and enables Stormbreaker forging
 
@@ -634,7 +634,7 @@ Minimum PR to max all 7 slots to +10 (assuming perfect luck):
 | Attack interval | 1.5s | 15 ticks between attacks |
 | HP regen duration | 2.5s | After kill, full HP restore |
 | Autosave | 30s | |
-| Update check | 30 min +/- 5 min | |
+| Update check | 15 min +/- 5 min | |
 
 ### Damage Formula
 

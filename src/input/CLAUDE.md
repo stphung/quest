@@ -28,7 +28,7 @@ Keyboard input routing for the Game screen, dispatching to overlay handlers, min
 
 `handle_game_input()` processes input through a strict numbered priority chain:
 
-1. **Step 0**: Dismiss-on-any-key modals (offline welcome, Leviathan encounter/miss)
+1. **Step 0**: Dismiss-on-any-key modals (offline welcome); Enter-dismiss modals (Leviathan encounter at step 0.25, Leviathan catch-miss at step 0.26)
 2. **Step 0.5**: Achievement browser overlay (with nested title browser)
 3. **Step 0.8**: Bug report overlay and browser link fallback modal
 4. **Step 0.85**: Time Vault overlay (delegates to `time_vault_input`)

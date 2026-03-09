@@ -270,7 +270,7 @@ pub enum InfrastructureBuildError {
 /// Validates preconditions (cleared, not duplicate) then mutates the record.
 /// The Warband Marks cost check and deduction must be handled by the caller.
 ///
-/// If the built infrastructure is a Watchtower, immediately applies the +25
+/// If the built infrastructure is a Watchtower, immediately applies the +40
 /// familiarity bonus.
 pub fn build_infrastructure(
     record: &mut LayerRecord,
