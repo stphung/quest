@@ -71,7 +71,7 @@ Launch game
 
 The splash screen shows achievement score badge (if > 0), character journey badges for discovered systems (zones, challenges, fishing), and the character select list below.
 
-Update checks run every 30 minutes (`UPDATE_CHECK_INTERVAL_SECONDS = 1800`).
+Update checks run every 15 minutes (`UPDATE_CHECK_INTERVAL_SECONDS = 900`).
 
 ### Update Command Flow
 
