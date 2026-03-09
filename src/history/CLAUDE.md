@@ -7,13 +7,13 @@ Git-based save versioning system. Every meaningful game event creates a git comm
 | File | Purpose |
 |------|---------|
 | `mod.rs` | Public re-exports: `HistoryRepo`, `HistoryError`, `validate_branch_name`, `SaveEvent`, `CommitInfo`, `TimelineInfo` |
-| `types.rs` | `SaveEvent` enum (18 variants), `CommitInfo` struct, `TimelineInfo` struct, commit message formatting and suffix parsing |
+| `types.rs` | `SaveEvent` enum (21 variants), `CommitInfo` struct, `TimelineInfo` struct, commit message formatting and suffix parsing |
 | `git.rs` | `HistoryRepo` struct wrapping `git2::Repository`; all local git operations (init, commit, list branches/commits, restore, fork, switch, delete) |
 | `cloud.rs` | GitHub cloud sync: `CloudConfig`, `CloudStatus`, `CloudOpResult`; PAT validation, repo creation, push/pull, divergence detection and resolution |
 
 ## Key Types
 
-- **`SaveEvent`**: Describes why a commit was made. 18 variants covering milestone progression (LevelUp, PrestigeRank, ZoneBossDefeated, etc.), state-changing actions (HavenRoomBuilt, ChallengeWon, etc.), Chrono Surge, and manual/auto saves. Each variant produces a human-readable `description()` and a full `commit_message()` with encoded metadata suffix.
+- **`SaveEvent`**: Describes why a commit was made. 21 variants covering milestone progression (LevelUp, PrestigeRank, ZoneBossDefeated, ZoneUnlocked, DungeonCompleted, FishingRankUp, StormLeviathanCaught, AchievementUnlocked), state-changing actions (HavenRoomBuilt, HavenRoomUpgraded, SoulforgeEnhanced, SoulforgeFailed, ChallengeWon, GodItemForged, CharacterCreated, CharacterDeleted, EquipmentUpgrade, StormSigilActivated), ChronoSurge, and manual/auto saves (ManualSave, AutoSave). Each variant produces a human-readable `description()` and a full `commit_message()` with encoded metadata suffix.
 - **`CommitInfo`**: Metadata extracted from a single history commit -- short SHA (`id`), full `message`, Unix `timestamp`, and parsed snapshot fields (`level`, `prestige`, `zone`, `playtime`).
 - **`TimelineInfo`**: Summary of a git branch -- `name`, `is_active` flag, and optional `head_commit`.
 - **`HistoryRepo`**: Wrapper around `git2::Repository` providing high-level save versioning operations.
