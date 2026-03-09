@@ -138,7 +138,7 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - **Boss item drops**: Guaranteed, can include Legendary (2% normal boss, 5% Zone 10 final boss)
 - **Item level**: ilvl = zone_id x 10 (Zone 1 = ilvl 10, Zone 10 = ilvl 100)
 - **Item tier**: T0-T9 quality roll (exponential curve: T0 38%, T9 0.1%). Stat multiplier: T0 0.40x to T9 1.00x
-- **Boss spawn**: After 10 kills in subzone (5 kills to retry after boss death)
+- **Boss spawn**: After 10 kills in subzone (kills reset to 0 after boss death)
 - **Haven discovery**: requires P10+, base chance 0.000014/tick + 0.000007 per rank above 10
 - **Challenge discovery**: ~2hr avg per challenge (requires P1+)
 - **Soulforge discovery**: requires P15+, base chance 0.000014/tick + 0.000007 per rank above 15

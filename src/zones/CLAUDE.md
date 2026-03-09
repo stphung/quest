@@ -101,7 +101,7 @@ Methods: `start_zone_id()`, `end_zone_id()`, `unlock_layer()`, `from_layer()`, `
 4. On boss defeat, `on_boss_defeated()` handles advancement:
    - Subzone boss: advance to next subzone
    - Zone boss (final subzone): advance to next zone (if prestige allows)
-5. On player death to boss: `kills_in_subzone` set to `KILLS_FOR_BOSS - KILLS_FOR_BOSS_RETRY` (5), so only 5 more kills needed to retry (not full 10)
+5. On player death to boss: `kills_in_subzone` reset to 0 (full 10 kills needed to retry)
 
 Helper methods:
 - `should_spawn_boss()` -- check without mutating state

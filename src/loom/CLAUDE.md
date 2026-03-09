@@ -52,9 +52,9 @@ Instead of discrete pipe objects, shuttles pull directly from their declared sou
 **Intake caps** (`tier_intake_cap(tier)` in `logic.rs`):
 | Tier | Max intake per input slot (units/hour) |
 |------|---------------------------------------|
-| T1   | 2.0 |
-| T2   | 3.0 |
-| T3   | 4.0 |
+| T1   | 20.0 |
+| T2   | 30.0 |
+| T3   | 40.0 |
 
 The actual pull per source is `min(intake_cap, share)`, summed across all sources for that input slot.
 
@@ -78,9 +78,9 @@ Shuttles are recipe-locked processing nodes that create multi-step production ch
 **Tiers and gating**:
 | Tier | Pattern gate | Resource cost |
 |------|-------------|---------------|
-| T1 | 1 pattern complete | 25 of input_a resource |
-| T2 | 8 patterns complete | 15 of input_a resource |
-| T3 | 15 patterns complete | 10 of input_a resource |
+| T1 | 1 pattern complete | 250 of input_a resource |
+| T2 | 8 patterns complete | 150 of input_a resource |
+| T3 | 15 patterns complete | 100 of input_a resource |
 
 **Shuttle limit**: Max shuttles = number of completed Woven Patterns (max 28).
 

@@ -40,7 +40,7 @@ Enum with 213 variants covering all trackable milestones. Organized by domain:
 
 ### `AchievementCategory` (`types.rs`)
 
-Eight categories for browsing: `Combat`, `Level`, `Prestige`, `Progression`, `Challenges`, `Exploration`, `Deep`, `Stats`.
+Nine categories for browsing: `Combat`, `Level`, `Prestige`, `Progression`, `Challenges`, `Exploration`, `Deep`, `Loom`, `Stats`.
 
 ### `AchievementDef` (`data.rs`)
 

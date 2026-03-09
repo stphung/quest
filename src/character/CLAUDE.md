@@ -36,7 +36,7 @@ Six core RPG attributes stored as `u32` values:
 - **WIS** (Wisdom): XP gain (+5% per modifier)
 - **CHA** (Charisma): Prestige multiplier bonus (+10% per modifier)
 
-**Modifier formula**: `(value - 10) / 2` (integer division, minimum 0)
+**Modifier formula**: `(value - 10) / 2` (integer division, can be negative for values below 10)
 
 **Attribute caps**: `20 + (5 × prestige_rank)`. Enforced in `attributes.rs`.
 

@@ -54,7 +54,7 @@ State machine for combat flow:
 5. **Critical hits**: Chance from DEX modifier + prestige crit bonus (capped at 15%), deals 2x damage
 6. **Enemy death**: Awards XP, triggers item drop roll, enters Regen state
 7. **Player death**:
-   - In zone: Sets `kills_in_subzone = KILLS_FOR_BOSS - KILLS_FOR_BOSS_RETRY` (only 5 more kills needed), preserves prestige
+   - In zone: Resets `kills_in_subzone = 0`, preserves prestige
    - In dungeon: Exits dungeon, no prestige loss
 
 ## Enemy Generation (Zone-Based Static Scaling)
@@ -120,7 +120,7 @@ See "Unified Combat Bonuses" below for the full field-level breakdown of `Combat
 - After 10 kills in a subzone, the next enemy is the subzone boss
 - Boss defined in `zones/data.rs` with specific stats
 - Defeating boss advances to next subzone
-- Death to boss sets `kills_in_subzone = KILLS_FOR_BOSS - KILLS_FOR_BOSS_RETRY` (only 5 more kills to retry, not 10)
+- Death to boss resets `kills_in_subzone = 0` (full 10 kills needed to retry)
 - Zone 10 final boss requires Stormbreaker weapon (checked via `TheStormbreaker` achievement in `zones/progression.rs`)
 - **Boss enrage timer**: After 60 seconds of fighting a boss, it enrages and instantly kills the player. Emits a `BossEnrage` combat event (mapped to `TickEvent::BossEnrage`)
 
