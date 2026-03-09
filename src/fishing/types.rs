@@ -30,11 +30,11 @@ pub struct CaughtFish {
 /// Current phase of the fishing process.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FishingPhase {
-    /// Casting the line (1s delay)
+    /// Casting the line (0.5-1.5s)
     Casting,
-    /// Waiting for a bite (2-4s random)
+    /// Waiting for a bite (1-8s)
     Waiting,
-    /// Fish is biting, reeling in (1-2s)
+    /// Fish is biting, reeling in (0.5-3s)
     Reeling,
 }
 

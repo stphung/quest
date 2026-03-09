@@ -74,6 +74,11 @@ pub struct GameState {
     pub game_over_shown_at: Option<Instant>,
     pub cached_power_rating: f64,             // Cached power rating (sqrt DPS x eHP)
     pub cached_fracture_zone_cap: u32,        // Cached fracture zone cap from Deep
+    pub cached_loom_zone_cap: u32,            // Cached Loom zone cap from completed patterns
+    pub cached_haven_bonuses: HavenBonuses,   // Cached merged Haven bonuses (recomputed when bonuses_dirty)
+    pub cached_sigil_bonuses: SigilBonuses,   // Cached merged Sigil bonuses (recomputed when bonuses_dirty)
+    pub bonuses_dirty: bool,                  // Set when Haven rooms, Storm Sigils, or prestige rank change
+    pub debug_force_overcharge: bool,         // Debug: force next Chrono Surge to be overcharged
 }
 ```
 
