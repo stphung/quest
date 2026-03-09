@@ -102,7 +102,7 @@ Zone 11 has dramatically higher stats than Zone 10 (~6.2x HP, ~4.6x DMG, ~4.8x D
 
 **Other**:
 - **ascension_multiplier**: Also applied to player max HP in `core/tick.rs` (default 1.0x, up to 64x+ at Ascension VI)
-- **flat_hp**: Applied to `combat_state.player_max_hp` in `core/tick.rs`
+- **flat_hp** (from `PrestigeCombatBonuses`): Applied to `combat_state.player_max_hp` in `core/tick.rs`
 - **attack_speed_percent**: Windborne + sigils
 - **hp_regen_percent**, **hp_regen_delay_reduction**, **regen_reduction_percent**: Regen modifiers from Haven, sigils, Sleipnir
 
@@ -143,7 +143,7 @@ Called from `core/tick.rs` each tick. Takes a generic `R: Rng` and a single unif
 
 ## Integration Points
 
-- **Core** (`core/tick.rs`): Drives the per-tick game loop, builds unified `CombatBonuses` from all sources, applies `flat_hp` to combat HP
+- **Core** (`core/tick.rs`): Drives the per-tick game loop, builds unified `CombatBonuses` from all sources, applies `flat_hp` (from `PrestigeCombatBonuses`) to combat HP
 - **Core** (`core/game_logic.rs`): Enemy spawning via zone-based generators, XP calculation, level-up logic
 - **Character** (`character/derived_stats.rs`): Player base damage, defense, HP, crit stats
 - **Character** (`character/combat_bonuses.rs`): `PrestigeCombatBonuses` struct with `from_rank()` constructor
@@ -160,5 +160,5 @@ Called from `core/tick.rs` each tick. Takes a generic `R: Rng` and a single unif
 - Enemy attack intervals: 2.0s (normal), 1.8s (boss), 1.5s (zone boss), 1.6s (dungeon elite), 1.4s (dungeon boss)
 - HP regen duration: 2.5s after kill
 - XP per kill: 200-400 ticks of passive XP
-- Boss kill tracking: 10 kills per subzone to trigger boss, 5 kills to retry after death
+- Boss kill tracking: 10 kills per subzone to trigger boss, 10 kills to retry after death
 - Boss stat multipliers: Subzone (3.0/1.5/1.8), Zone (5.0/1.8/2.5), Dungeon Elite (2.2/1.5/1.6), Dungeon Boss (3.5/1.8/2.0)

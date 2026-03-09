@@ -276,11 +276,11 @@ Challenges are discovered randomly (~2hr average). The `CHALLENGE_TABLE` in `men
 | Minesweeper | 28 | ~18% | Fast puzzle |
 | Snake | 22 | ~14% | Quick action |
 | Flappy Bird | 20 | ~13% | Moderate action |
+| Sigil Surge | 20 | ~13% | Moderate action-puzzle |
 | JezzBall | 18 | ~11% | Moderate action |
 | Gomoku | 15 | ~9% | Medium-length strategy |
 | Morris | 12 | ~8% | Longer strategy |
 | Chess | 8 | ~5% | Long commitment |
-| Sigil Surge | 20 | ~10% | Moderate action-puzzle |
 | Go | 7 | ~4% | Longest game |
 
 When adding a new challenge, add it to `CHALLENGE_TABLE` with an appropriate weight.
