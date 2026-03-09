@@ -7,7 +7,7 @@ Zone and subzone progression with prestige-gated tiers, boss encounters, the Sto
 ```
 src/zones/
 ├── mod.rs          # Public re-exports (Zone, Subzone, ZoneProgression, BossDefeatResult, FractureRegion)
-├── data.rs         # Zone/subzone definitions (30 zones), boss data, lookup functions
+├── data.rs         # Zone/subzone definitions (50 zones), boss data, lookup functions
 ├── progression.rs  # Progression state, kill tracking, prestige reset
 ├── advancement.rs  # Zone/subzone advancement logic, travel_to(), advance_to_next_subzone()
 ├── boss_defeat.rs  # BossDefeatResult enum, on_boss_defeated(), on_boss_defeated_with_cap()
@@ -21,8 +21,9 @@ src/zones/
 ### `Zone` (`data.rs`)
 ```rust
 pub struct Zone {
-    pub id: u32,                        // 1-30
+    pub id: u32,                        // 1-50
     pub name: &'static str,
+    pub description: &'static str,      // Short flavor text
     pub subzones: Vec<Subzone>,
     pub prestige_requirement: u32,      // Minimum prestige rank to unlock
     pub min_level: u32,
@@ -35,9 +36,10 @@ pub struct Zone {
 ### `Subzone` (`data.rs`)
 ```rust
 pub struct Subzone {
-    pub id: u32,        // 1-based within zone
+    pub id: u32,                    // 1-based within zone
     pub name: &'static str,
-    pub depth: u32,     // Same as id, used for scaling
+    pub description: &'static str,  // Short flavor text
+    pub depth: u32,                 // Same as id, used for scaling
     pub boss: SubzoneBoss,
 }
 ```
@@ -201,7 +203,7 @@ Twenty zones across five chapters, triple-gated by pattern completion, ascension
 
 ## Lookup Functions (`data.rs`)
 
-- `get_all_zones()` -- returns all 30 zones (static slice, no allocation)
+- `get_all_zones()` -- returns all 50 zones (static slice, no allocation)
 - `get_zone(zone_id)` -- find by ID
 - `get_subzone(zone_id, subzone_id)` -- returns `(Zone, Subzone)` pair
 

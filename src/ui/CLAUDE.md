@@ -156,7 +156,7 @@ pub fn render_newgame_scene(frame: &mut Frame, area: Rect, game: &NewGameGame) {
     }
 
     // 2. Create standardized layout
-    let layout = create_game_layout(frame, area, " Title ", Color::Cyan, 15, 22);
+    let layout = create_game_layout(frame, area, " Title ", Color::Cyan, 15, 22, ctx);
 
     // 3. Render board/content
     render_board(frame, layout.content, game);
