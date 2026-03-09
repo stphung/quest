@@ -181,7 +181,7 @@ Twenty zones across five chapters, triple-gated by pattern completion, ascension
 **Progression semantics:**
 - `LoomZoneCycle` boss defeat result: cap zone bosses cycle back to subzone 1 (same pattern as `FractureCycle`)
 - Stat scaling: 1.25x per zone from Zone 30 base
-- Unlock function: `loom_zone_cap_for_ascension(patterns) -> u32`
+- Unlock function: `loom_zone_cap_for_patterns(completed_patterns: usize) -> u32`
 - Ascension gate checked in `sync_account_zone_unlocks()` per zone range
 
 ## Zone Access Sync (`access.rs`)
@@ -220,5 +220,5 @@ Twenty zones across five chapters, triple-gated by pattern completion, ascension
 - **Haven** (`haven/types.rs`): Storm Forge room enables Stormbreaker creation
 - **Ascension** (`ascension/`): Ascension multiplier provides the combat power to progress through fracture zones
 - **Deep** (`deep/types.rs`): `DeepPersistent.fracture_zone_cap` and `pending_fracture_region_unlock` control zone access
-- **Loom** (`loom/logic.rs`): `loom_zone_cap_for_ascension()` controls Loom Zone 31-50 access based on completed pattern count
+- **Loom** (`loom/logic.rs`): `loom_zone_cap_for_patterns()` controls Loom Zone 31-50 access based on completed pattern count
 - **UI** (`ui/stats_panel.rs`): Displays current zone/subzone names, kill progress, and POST row for zones 12-30

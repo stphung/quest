@@ -9,7 +9,7 @@ src/achievements/
 ├── mod.rs            # Public re-exports
 ├── types.rs          # Data structures, AchievementId enum, Achievements state struct
 ├── data.rs           # Static achievement definitions (ALL_ACHIEVEMENTS constant)
-├── handlers.rs       # Event handlers (on_enemy_killed, on_boss_killed, on_level_up, etc.), sync_* methods
+├── handlers.rs       # Event handlers (on_enemy_killed, on_level_up, on_prestige, on_loom_discovered, etc.), sync_* methods
 ├── milestones.rs     # MinigameType, MinigameDifficulty enums, milestone threshold arrays (SLAYER, BOSS_HUNTER, etc.)
 ├── modal.rs          # Modal notification queue, 500ms accumulation window management
 ├── notifications.rs  # Pending notification state, category-based notification counts
@@ -73,7 +73,7 @@ achievements.on_enemy_killed(is_boss, Some(&state.character_name));
 achievements.on_level_up(new_level, Some(&state.character_name));
 ```
 
-Event handlers: `on_enemy_killed`, `on_level_up`, `on_prestige`, `on_zone_fully_cleared`, `on_storms_end`, `on_dungeon_completed`, `on_minigame_won`, `on_fish_caught`, `on_fishing_rank_up`, `on_storm_leviathan_caught`, `on_haven_discovered`, `on_haven_all_t1`, `on_haven_all_t2`, `on_haven_architect`, `on_soulforge_discovered`, `on_enhancement_upgraded`, `on_deep_discovered`, `on_deep_breakthrough`, `on_deep_guild_rank_up`, `on_deep_mission_complete`, `on_deep_merc_lost`, `on_deep_gateway_opened`, `on_fracture_boss_defeated`, `on_ascended`.
+Event handlers: `on_enemy_killed`, `on_level_up`, `on_prestige`, `on_zone_fully_cleared`, `on_storms_end`, `on_dungeon_completed`, `on_minigame_won`, `on_fish_caught`, `on_fishing_rank_up`, `on_storm_leviathan_caught`, `on_haven_discovered`, `on_haven_all_t1`, `on_haven_all_t2`, `on_haven_architect`, `on_soulforge_discovered`, `on_enhancement_upgraded`, `on_deep_discovered`, `on_deep_breakthrough`, `on_deep_guild_rank_up`, `on_deep_mission_complete`, `on_deep_merc_lost`, `on_deep_gateway_opened`, `on_ascended`, `on_loom_discovered`, `on_loom_pattern_completed`.
 
 ### Unlock Flow
 
@@ -123,7 +123,7 @@ Additionally, `newly_unlocked` is drained each tick by `collect_achievement_even
 
 Titles are display names earned by unlocking specific achievements. Players can select one title to display after their character name (e.g., "Hero, Godslayer"). Titles are account-wide and persist in `selected_title` on the `Achievements` struct.
 
-- `ALL_TITLES`: const slice of `TitleDef { achievement_id, title_text }` — 63 curated titles across level, prestige, combat, challenges, exploration, enhancement, fracture, and Deep categories
+- `ALL_TITLES`: const slice of `TitleDef { achievement_id, title_text }` — 64 curated titles across level, prestige, combat, challenges, exploration, enhancement, fracture, and Deep categories
 - `get_title_text(id)`: returns the title text for an achievement, if it grants a title
 - `get_unlocked_titles(achievements)`: returns all titles the player has earned, in display order
 - `validate_selected_title(achievements)`: clears `selected_title` if the achievement isn't unlocked or doesn't grant a title (called on load)
