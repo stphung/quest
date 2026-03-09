@@ -241,7 +241,7 @@ fn test_dungeon_boss_completion_triggers_achievement() {
     let mut r = rng(42);
 
     let mut all_events = Vec::new();
-    for _ in 0..10_000 {
+    for _ in 0..5_000 {
         let result = game_tick(
             &mut state,
             &mut tc,

@@ -504,7 +504,7 @@ fn test_zone_advancement_subzone_to_subzone() {
     // Kill enemies and bosses through combat until subzone advances
     let mut boss_defeated = false;
     let mut defeat_result = None;
-    for _ in 0..20_000 {
+    for _ in 0..10_000 {
         let events = simulate_tick_with_rng(&mut state, &mut rng);
         for event in &events {
             match event {
@@ -566,7 +566,7 @@ fn test_zone_advancement_full_zone_clear() {
 
         // Run combat until boss is defeated (handles kills, boss spawn, and boss death)
         let mut subzone_boss_defeated = false;
-        for _ in 0..10_000 {
+        for _ in 0..5_000 {
             let events = simulate_tick_with_rng(&mut state, &mut rng);
             for event in &events {
                 match event {
