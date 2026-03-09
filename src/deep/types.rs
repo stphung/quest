@@ -164,15 +164,15 @@ pub enum MercStatus {
 /// Type of mission.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MissionType {
-    /// 2–4h, no risk, cleared layers only.  Resource farming and safe merc XP.
+    /// 1–6h, no risk, cleared layers only.  Resource farming and safe merc XP.
     SupplyRun,
-    /// 4–8h, low risk, frontier layer.  Builds familiarity, reveals check-in events.
+    /// 1–10h, low risk, frontier layer.  Builds familiarity, reveals check-in events.
     Recon,
-    /// 8–16h, medium risk, frontier layer.  Primary progression missions.
+    /// 3–30h, medium risk, frontier layer.  Primary progression missions.
     Expedition,
-    /// 18–24h, high risk, frontier layer (once per layer).  Unlocks the next layer.
+    /// 4–40h, high risk, frontier layer (once per layer).  Unlocks the next layer.
     Breakthrough,
-    /// 4–8h, no risk, cleared layers only.  Builds infrastructure.
+    /// 2–20h, no risk, cleared layers only.  Builds infrastructure.
     Construction(Infrastructure),
     /// 24h, Layer 30 only.  Opens the Gateway.  One-time mission.
     GatewayExpedition,
