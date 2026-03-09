@@ -135,10 +135,11 @@ pub fn update_combat<R: Rng>(
     achievements: &mut Achievements,
     derived: &DerivedStats,
     fracture_zone_cap: u32,
+    loom_zone_cap: u32,
 ) -> Vec<CombatEvent>
 ```
 
-Called from `core/tick.rs` each tick. Takes a generic `R: Rng` and a single unified `&CombatBonuses` that aggregates Haven, prestige, god item, sigil, and ascension bonuses. The `fracture_zone_cap` parameter controls boss defeat cycling for fracture zones (passed through to `on_boss_defeated_with_cap()`). Returns `Vec<CombatEvent>` that tick.rs maps to `TickEvent` variants.
+Called from `core/tick.rs` each tick. Takes a generic `R: Rng` and a single unified `&CombatBonuses` that aggregates Haven, prestige, god item, sigil, and ascension bonuses. The `fracture_zone_cap` and `loom_zone_cap` parameters control boss defeat cycling for their respective zone ranges (passed through to `on_boss_defeated_with_cap()`). Returns `Vec<CombatEvent>` that tick.rs maps to `TickEvent` variants.
 
 ## Integration Points
 
