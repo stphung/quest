@@ -234,9 +234,14 @@ impl CharacterRenameScreen {
         let input_text = {
             let char_count = self.new_name_input.chars().count();
             if self.cursor_position < char_count {
-                let chars: Vec<char> = self.new_name_input.chars().collect();
-                let before: String = chars[..self.cursor_position].iter().collect();
-                let after: String = chars[self.cursor_position..].iter().collect();
+                let byte_pos = self
+                    .new_name_input
+                    .char_indices()
+                    .nth(self.cursor_position)
+                    .map(|(i, _)| i)
+                    .unwrap_or(self.new_name_input.len());
+                let before = &self.new_name_input[..byte_pos];
+                let after = &self.new_name_input[byte_pos..];
                 format!("{}{}{}", before, "_", after)
             } else {
                 format!("{}_", self.new_name_input)
@@ -309,20 +314,26 @@ impl CharacterRenameScreen {
     }
 
     pub fn handle_char_input(&mut self, c: char) {
-        let chars: Vec<char> = self.new_name_input.chars().collect();
-        let before: String = chars[..self.cursor_position].iter().collect();
-        let after: String = chars[self.cursor_position..].iter().collect();
-        self.new_name_input = format!("{}{}{}", before, c, after);
+        let byte_pos = self
+            .new_name_input
+            .char_indices()
+            .nth(self.cursor_position)
+            .map(|(i, _)| i)
+            .unwrap_or(self.new_name_input.len());
+        self.new_name_input.insert(byte_pos, c);
         self.cursor_position += 1;
         self.validate();
     }
 
     pub fn handle_backspace(&mut self) {
         if self.cursor_position > 0 {
-            let chars: Vec<char> = self.new_name_input.chars().collect();
-            let before: String = chars[..self.cursor_position - 1].iter().collect();
-            let after: String = chars[self.cursor_position..].iter().collect();
-            self.new_name_input = format!("{}{}", before, after);
+            let byte_pos = self
+                .new_name_input
+                .char_indices()
+                .nth(self.cursor_position - 1)
+                .map(|(i, _)| i)
+                .unwrap_or(self.new_name_input.len());
+            self.new_name_input.remove(byte_pos);
             self.cursor_position -= 1;
             self.validate();
         }

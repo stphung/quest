@@ -216,9 +216,14 @@ impl CharacterCreationScreen {
         let input_text = {
             let char_count = self.name_input.chars().count();
             if self.cursor_position < char_count {
-                let chars: Vec<char> = self.name_input.chars().collect();
-                let before: String = chars[..self.cursor_position].iter().collect();
-                let after: String = chars[self.cursor_position..].iter().collect();
+                let byte_pos = self
+                    .name_input
+                    .char_indices()
+                    .nth(self.cursor_position)
+                    .map(|(i, _)| i)
+                    .unwrap_or(self.name_input.len());
+                let before = &self.name_input[..byte_pos];
+                let after = &self.name_input[byte_pos..];
                 format!("{}{}{}", before, "_", after)
             } else {
                 format!("{}_", self.name_input)
@@ -253,20 +258,26 @@ impl CharacterCreationScreen {
     }
 
     pub fn handle_char_input(&mut self, c: char) {
-        let chars: Vec<char> = self.name_input.chars().collect();
-        let before: String = chars[..self.cursor_position].iter().collect();
-        let after: String = chars[self.cursor_position..].iter().collect();
-        self.name_input = format!("{}{}{}", before, c, after);
+        let byte_pos = self
+            .name_input
+            .char_indices()
+            .nth(self.cursor_position)
+            .map(|(i, _)| i)
+            .unwrap_or(self.name_input.len());
+        self.name_input.insert(byte_pos, c);
         self.cursor_position += 1;
         self.validate();
     }
 
     pub fn handle_backspace(&mut self) {
         if self.cursor_position > 0 {
-            let chars: Vec<char> = self.name_input.chars().collect();
-            let before: String = chars[..self.cursor_position - 1].iter().collect();
-            let after: String = chars[self.cursor_position..].iter().collect();
-            self.name_input = format!("{}{}", before, after);
+            let byte_pos = self
+                .name_input
+                .char_indices()
+                .nth(self.cursor_position - 1)
+                .map(|(i, _)| i)
+                .unwrap_or(self.name_input.len());
+            self.name_input.remove(byte_pos);
             self.cursor_position -= 1;
             self.validate();
         }
