@@ -297,10 +297,10 @@ All functions above are re-exported through `game_logic.rs` for backward compati
 | `HAVEN_DISCOVERY_BASE_CHANCE` | 0.000014 | Per tick |
 | `HAVEN_DISCOVERY_RANK_BONUS` | 0.000007 | Per rank above 10 |
 | `HAVEN_MIN_PRESTIGE_RANK` | 10 | |
-| `SOULFORGE_DISCOVERY_BASE_CHANCE` | 0.000014 | Per tick (in `enhancement/types.rs`) |
-| `SOULFORGE_DISCOVERY_RANK_BONUS` | 0.000007 | Per rank above 15 (in `enhancement/types.rs`) |
-| `SOULFORGE_MIN_PRESTIGE_RANK` | 15 | (in `enhancement/types.rs`) |
-| `DEEP_MIN_PRESTIGE_RANK` | 15 | (in `deep/types.rs`) |
+| `SOULFORGE_DISCOVERY_BASE_CHANCE` | 0.000014 | Per tick |
+| `SOULFORGE_DISCOVERY_RANK_BONUS` | 0.000007 | Per rank above 15 |
+| `SOULFORGE_MIN_PRESTIGE_RANK` | 15 | |
+| `DEEP_MIN_PRESTIGE_RANK` | 15 | |
 
 ### Zone Enemy Stats
 | Constant | Value | Notes |

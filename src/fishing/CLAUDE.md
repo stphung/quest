@@ -152,7 +152,7 @@ Progressive 10-encounter hunt, only available at rank 40 on legendary fish catch
 ### rank.rs
 - `get_max_fishing_rank(fishing_rank_bonus) -> u32` -- Base 30 + bonus, capped at 40
 - `check_rank_up_with_max(fishing_state, max_rank) -> Option<String>` -- Rank-up check with configurable cap
-- `check_rank_up(fishing_state) -> Option<String>` -- Legacy rank-up (cap 30)
+- `check_rank_up(fishing_state) -> Option<String>` -- Legacy rank-up (cap 40)
 
 ### drops.rs
 - `try_fishing_item_drop(rarity, zone_id, rng) -> Option<Item>` -- Item drop roll based on fish rarity
