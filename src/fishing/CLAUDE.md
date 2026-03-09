@@ -119,8 +119,8 @@ Fish rarity maps to item rarity: Common->Common, Uncommon->Magic, Rare->Rare, Ep
 
 Progressive 10-encounter hunt, only available at rank 40 on legendary fish catches:
 
-1. Each legendary catch at rank 40+ rolls against decreasing encounter chances:
-   - Encounters 1-10: 8%, 6%, 5%, 4%, 3%, 2%, 1.5%, 1%, 0.5%, 0.25%
+1. Each legendary catch at rank 40+ rolls against a narrative encounter chance sequence:
+   - Encounters 1-10: 5%, 3%, 4%, 5%, 4%, 3%, 2%, 1.5%, 1%, 0.8% (not monotonically decreasing — mirrors narrative arc)
 2. On encounter: Leviathan escapes, encounter counter increments
 3. After 10 encounters: 25% catch chance per legendary fish
 4. Catching awards 10,000-15,000 XP and enables Stormbreaker forging at Storm Forge

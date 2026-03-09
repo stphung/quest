@@ -51,7 +51,7 @@ Combat stats calculated from attributes and enhancement levels. Recalculated whe
 Named tiers from Bronze through Eternal with diminishing-returns XP multipliers.
 
 **Formula**: `multiplier = 1.0 + 0.5 × rank^0.7`
-- P0: 1.0x, P1 (Bronze): 1.5x, P5: ~2.7x, P10: ~3.5x, P20: ~5.1x, P100: ~13.3x
+- P0: 1.0x, P1 (Bronze): 1.5x, P5: ~2.5x, P10: ~3.5x, P20: ~5.1x, P100: ~13.6x
 
 ## Character Persistence (`manager.rs` + `persistence.rs`)
 
