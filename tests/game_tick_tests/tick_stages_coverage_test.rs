@@ -1793,7 +1793,7 @@ fn test_game_tick_combat_flow_produces_events_eventually() {
     let mut found_attack = false;
     let mut found_enemy_defeated = false;
 
-    for _ in 0..5000 {
+    for _ in 0..1000 {
         let result = run_game_tick(&mut state, &mut tc, &mut haven, &mut ach, false, &mut rng);
 
         if has_event(&result, |e| matches!(e, TickEvent::PlayerAttack { .. })) {

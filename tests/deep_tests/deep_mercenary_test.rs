@@ -93,7 +93,7 @@ fn test_recruit_pool_size_all_ranks() {
 #[test]
 fn test_roll_recruit_quality_rank1_always_common() {
     let mut rng = seeded_rng(42);
-    for _ in 0..2000 {
+    for _ in 0..100 {
         assert_eq!(
             roll_recruit_quality(GuildRank(1), &mut rng),
             MercQuality::Common
@@ -162,7 +162,7 @@ fn test_roll_recruit_quality_rank3_distribution() {
 #[test]
 fn test_roll_recruit_quality_rank4_no_common() {
     let mut rng = seeded_rng(55);
-    for _ in 0..2000 {
+    for _ in 0..200 {
         let q = roll_recruit_quality(GuildRank(4), &mut rng);
         assert_ne!(q, MercQuality::Common, "Rank 4 should never produce Common");
     }

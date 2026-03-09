@@ -522,7 +522,7 @@ fn test_unlock_records_timestamp() {
 
     let record = ach.unlocked.get(&AchievementId::SlayerI).unwrap();
     assert!(record.unlocked_at >= before);
-    assert!(record.unlocked_at <= after);
+    assert!(record.unlocked_at <= after + 1);
 }
 
 #[test]

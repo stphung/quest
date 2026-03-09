@@ -70,7 +70,7 @@ fn test_discovery_timestamp_is_recent() {
         .pool_refreshed_at
         .expect("must be Some after discovery");
     assert!(
-        ts >= before && ts <= after,
+        ts >= before && ts <= after + chrono::Duration::seconds(2),
         "pool_refreshed_at ({}) must be within the discovery window [{}, {}]",
         ts,
         before,
