@@ -14,13 +14,13 @@ src/core/
 ├── game_state.rs    # GameState struct
 ├── offline.rs       # Offline XP progression (calculate_offline_xp, process_offline_progression)
 ├── recent_drops.rs  # RecentDrop struct, recent drops deque management
-├── tick.rs          # game_tick() orchestration — coordinates all stages
+├── tick.rs          # game_tick_with_context() orchestration — coordinates all stages; game_tick() is deprecated
 ├── tick_stages.rs   # Tick processing stages 4-6 and helper functions
 ├── tick_types.rs    # TickEvent enum (48 variants) and TickResult struct
 ├── ticker.rs        # Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
 ├── xp.rs            # XP curves, leveling, combat kill XP, distribute_level_up_points
 ├── power_rating.rs  # Character power rating (sqrt of DPS x eHP)
-├── tick_context.rs  # TickContext struct — bundles all mutable references (state, haven, deep, etc.) for game_tick()
+├── tick_context.rs  # TickContext struct — bundles all mutable references (state, haven, deep, loom, etc.) for game_tick_with_context()
 ├── game_state_serde.rs # FlatGameState intermediate for backward-compatible JSON serialization during sub-struct migration
 ├── discovery_facade.rs # DiscoveryInput/DiscoveryResult structs and roll_discoveries_facade() for decoupled discovery rolls
 └── paths.rs             # Centralized save path resolution for ~/.quest/ directory
@@ -161,20 +161,26 @@ pub struct TickResult {
 }
 ```
 
-## game_tick() Architecture
+## game_tick_with_context() Architecture
+
+The primary entry point is `game_tick_with_context()`, which takes a `TickContext` bundling all mutable state:
 
 ```rust
-pub fn game_tick<R: Rng>(
-    state: &mut GameState,
-    tick_counter: &mut u32,
-    haven: &mut Haven,
-    enhancement: &mut crate::enhancement::EnhancementProgress,
-    deep: &mut crate::deep::DeepState,
-    achievements: &mut Achievements,
-    debug_mode: bool,
-    rng: &mut R,
-) -> TickResult
+pub struct TickContext<'a> {
+    pub state: &'a mut GameState,
+    pub tick_counter: &'a mut u32,
+    pub haven: &'a mut Haven,
+    pub enhancement: &'a mut EnhancementProgress,
+    pub deep: &'a mut DeepState,
+    pub achievements: &'a mut Achievements,
+    pub loom: &'a mut LoomState,
+    pub debug_mode: bool,
+}
+
+pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> TickResult
 ```
+
+The old `game_tick()` function with individual parameters is `#[deprecated]` — use `game_tick_with_context()` instead.
 
 **Why generic `<R: Rng>`**: The `rand::Rng` trait is not dyn-compatible, so we use a generic parameter. Pass `&mut rand::rng()` in production, or a seeded `ChaCha8Rng` in tests for deterministic behavior.
 
@@ -368,7 +374,7 @@ Zone 11 (The Expanse) is an endgame wall: `(5000, 400, 500, 80, 250, 30)` — ro
 - **zones**: `ZoneProgression`
 
 ### Other modules depend on core
-- **main.rs**: Calls `game_tick()`, processes `TickResult`, handles IO (save, visual effects, log entries)
+- **main.rs**: Calls `game_tick_with_context()`, processes `TickResult`, handles IO (save, visual effects, log entries)
 - **character/manager.rs**: Creates/loads `GameState`, calls `process_offline_progression()`
 - **UI modules**: Read `GameState` fields for display (read-only)
 
