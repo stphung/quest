@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Push branch, create PR with automerge, and watch until merged. Use when work is done and ready to land — "ship it", "push and merge", "land this".
+description: Push branch, create PR with automerge, and watch until merged. Only use when explicitly asked to "ship" or invoked via /ship. Do NOT trigger on generic phrases like "push", "merge", or "land".
 ---
 
 # Ship
