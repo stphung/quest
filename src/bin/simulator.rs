@@ -520,7 +520,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState, Option
     });
 
     for tick in 0..config.ticks {
-        let result = if tick_profile.is_some() {
+        let result = if let Some(ref mut profile) = tick_profile {
             let start = std::time::Instant::now();
             let r = game_tick(
                 &mut state,
@@ -532,10 +532,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState, Option
                 false,
                 &mut rng,
             );
-            tick_profile
-                .as_mut()
-                .unwrap()
-                .record(start.elapsed().as_nanos());
+            profile.record(start.elapsed().as_nanos());
             r
         } else {
             game_tick(
