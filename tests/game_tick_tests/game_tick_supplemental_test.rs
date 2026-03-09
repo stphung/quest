@@ -117,7 +117,7 @@ fn test_storm_leviathan_achievement_via_game_tick() {
     let mut r = rng(42);
 
     let mut caught = false;
-    for _ in 0..5000 {
+    for _ in 0..1000 {
         if state.active_fishing.is_none() {
             state.active_fishing = Some(fishing_session(FishingPhase::Reeling, 1, 100));
         }

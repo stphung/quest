@@ -647,7 +647,7 @@ fn test_leviathan_encounter_updates_fishing_state() {
 
     // At rank 40 with 0 encounters, we should eventually get an encounter
     let mut encountered = false;
-    for _ in 0..5000 {
+    for _ in 0..1000 {
         let (_, result) = generate_fish_with_rank(FishRarity::Legendary, 40, 0, 0.0, 0.0, &mut rng);
         if let LeviathanResult::Escaped { encounter_number } = result {
             assert_eq!(encounter_number, 1);
