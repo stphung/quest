@@ -116,11 +116,26 @@ mod tests {
 
     #[test]
     fn test_difficulty_enum_impl() {
-        assert_eq!(ShardFusionDifficulty::from_index(0), ShardFusionDifficulty::Novice);
-        assert_eq!(ShardFusionDifficulty::from_index(1), ShardFusionDifficulty::Apprentice);
-        assert_eq!(ShardFusionDifficulty::from_index(2), ShardFusionDifficulty::Journeyman);
-        assert_eq!(ShardFusionDifficulty::from_index(3), ShardFusionDifficulty::Master);
-        assert_eq!(ShardFusionDifficulty::from_index(99), ShardFusionDifficulty::Novice);
+        assert_eq!(
+            ShardFusionDifficulty::from_index(0),
+            ShardFusionDifficulty::Novice
+        );
+        assert_eq!(
+            ShardFusionDifficulty::from_index(1),
+            ShardFusionDifficulty::Apprentice
+        );
+        assert_eq!(
+            ShardFusionDifficulty::from_index(2),
+            ShardFusionDifficulty::Journeyman
+        );
+        assert_eq!(
+            ShardFusionDifficulty::from_index(3),
+            ShardFusionDifficulty::Master
+        );
+        assert_eq!(
+            ShardFusionDifficulty::from_index(99),
+            ShardFusionDifficulty::Novice
+        );
         assert_eq!(ShardFusionDifficulty::ALL.len(), 4);
     }
 
