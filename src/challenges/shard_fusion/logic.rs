@@ -427,18 +427,18 @@ impl crate::challenges::menu::DifficultyInfo for ShardFusionDifficulty {
     fn reward(&self) -> crate::challenges::menu::ChallengeReward {
         match self {
             ShardFusionDifficulty::Novice => crate::challenges::menu::ChallengeReward {
-                prestige_ranks: 1,
-                stormglass: 1_000,
+                prestige_ranks: 0,
+                stormglass: 800,
                 fishing_ranks: 0,
             },
             ShardFusionDifficulty::Apprentice => crate::challenges::menu::ChallengeReward {
-                prestige_ranks: 1,
-                stormglass: 2_500,
+                prestige_ranks: 0,
+                stormglass: 2_000,
                 fishing_ranks: 0,
             },
             ShardFusionDifficulty::Journeyman => crate::challenges::menu::ChallengeReward {
                 prestige_ranks: 1,
-                stormglass: 5_000,
+                stormglass: 4_000,
                 fishing_ranks: 0,
             },
             ShardFusionDifficulty::Master => crate::challenges::menu::ChallengeReward {

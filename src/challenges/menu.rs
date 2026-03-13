@@ -437,7 +437,7 @@ const CHALLENGE_TABLE: &[ChallengeWeight] = &[
     },
     ChallengeWeight {
         challenge_type: ChallengeType::ShardFusion,
-        weight: 20, // ~12% - moderate puzzle
+        weight: 20, // ~10% - moderate puzzle
     },
 ];
 
