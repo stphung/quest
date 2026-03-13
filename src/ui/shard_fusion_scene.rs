@@ -7,20 +7,30 @@ use super::game_common::{
 use crate::challenges::menu::DifficultyInfo;
 use crate::challenges::shard_fusion::{ShardFusionAnimState, ShardFusionGame, ShardFusionResult};
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Rect},
     style::{Color, Style},
+    symbols::Marker,
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{
+        canvas::{Canvas, Painter, Shape},
+        Paragraph,
+    },
     Frame,
 };
 
-/// Fixed tile dimensions (terminal chars are ~2:1 col:row, so 3 rows × 6 cols ≈ square).
-const CELL_ROWS: u16 = 3;
-const CELL_COLS: u16 = 7; // 7 gives inner width of 5, comfortable for "4096"
+/// Tile size in halfblock pixels (width in columns = height in halfblock rows → visually square).
+const TILE_PX: usize = 6;
+/// Gap between tiles in pixels.
+const GAP_PX: usize = 2;
+/// Pixel stride per tile slot (tile + gap).
+const STRIDE: usize = TILE_PX + GAP_PX;
 
-/// Total board pixel dimensions.
-const BOARD_ROWS: u16 = CELL_ROWS * 4;
-const BOARD_COLS: u16 = CELL_COLS * 4;
+/// Total board size in pixels (4 tiles + 3 gaps).
+const BOARD_PX: usize = 4 * TILE_PX + 3 * GAP_PX;
+/// Board width in terminal columns (1 pixel = 1 column).
+const BOARD_TERM_W: u16 = BOARD_PX as u16;
+/// Board height in terminal rows (2 halfblock pixels = 1 terminal row).
+const BOARD_TERM_H: u16 = (BOARD_PX / 2) as u16;
 
 /// Center a fixed-size rect inside a larger area.
 fn center_rect(width: u16, height: u16, area: Rect) -> Rect {
@@ -34,7 +44,7 @@ fn center_rect(width: u16, height: u16, area: Rect) -> Rect {
     }
 }
 
-/// Map a tile value to its display color.
+/// Map a tile value to its text overlay color.
 fn tile_color(value: u32) -> Color {
     match value {
         0 => Color::DarkGray,
@@ -44,6 +54,57 @@ fn tile_color(value: u32) -> Color {
         128 | 256 => Color::LightCyan,
         512 | 1024 => Color::LightMagenta,
         _ => Color::LightRed, // 2048+
+    }
+}
+
+/// Map a tile value to its canvas background color.
+fn tile_bg_color(value: u32) -> Color {
+    match value {
+        0 => Color::Rgb(30, 30, 45),
+        2 => Color::Rgb(55, 80, 120),
+        4 => Color::Rgb(45, 100, 145),
+        8 => Color::Rgb(35, 140, 110),
+        16 => Color::Rgb(45, 160, 80),
+        32 => Color::Rgb(140, 160, 35),
+        64 => Color::Rgb(180, 130, 25),
+        128 => Color::Rgb(185, 80, 30),
+        256 => Color::Rgb(185, 50, 50),
+        512 => Color::Rgb(155, 30, 110),
+        1024 => Color::Rgb(115, 30, 165),
+        2048 => Color::Rgb(65, 30, 165),
+        _ => Color::Rgb(40, 20, 120), // 4096+
+    }
+}
+
+/// Canvas shape that renders the 4×4 Shard Fusion board as filled pixel rectangles.
+struct BoardShape<'a> {
+    game: &'a ShardFusionGame,
+}
+
+impl<'a> Shape for BoardShape<'a> {
+    fn draw(&self, painter: &mut Painter) {
+        let is_flashing = matches!(self.game.anim_state, ShardFusionAnimState::Flashing(_));
+
+        for r in 0..4usize {
+            for c in 0..4usize {
+                let value = self.game.board[r][c];
+                let flash = is_flashing && self.game.merged_cells.contains(&(r, c));
+                let color = if flash {
+                    Color::Rgb(255, 230, 100)
+                } else {
+                    tile_bg_color(value)
+                };
+
+                let px_x = c * STRIDE;
+                let px_y = r * STRIDE;
+
+                for dy in 0..TILE_PX {
+                    for dx in 0..TILE_PX {
+                        painter.paint(px_x + dx, px_y + dy, color);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -61,9 +122,8 @@ pub fn render_shard_fusion_scene(
         return;
     }
 
-    // Board is BOARD_ROWS tall + 2 for status bar + 2 for outer border.
-    let min_height = BOARD_ROWS + 4;
-    let min_width = BOARD_COLS + 26; // board + info panel
+    let min_height = BOARD_TERM_H + 4;
+    let min_width = BOARD_TERM_W + 26;
     if area.width < min_width || area.height < min_height {
         render_minigame_too_small(frame, area, "Shard Fusion", min_width, min_height);
         return;
@@ -74,7 +134,7 @@ pub fn render_shard_fusion_scene(
         area,
         " Shard Fusion ",
         Color::Yellow,
-        BOARD_ROWS,
+        BOARD_TERM_H,
         24,
         ctx,
     );
@@ -84,68 +144,73 @@ pub fn render_shard_fusion_scene(
     render_info_panel(frame, layout.info_panel, game);
 }
 
-/// Render the 4×4 game board.
-///
-/// Tiles are fixed-size squares centered within the content area. The board
-/// reflects the post-slide state; slide_moves is reserved for future animation
-/// work. The Flashing phase provides merge visual feedback.
+/// Render the 4×4 game board using Canvas HalfBlock pixel art with number overlays.
 fn render_board(frame: &mut Frame, area: Rect, game: &ShardFusionGame) {
-    // Center the fixed-size board grid in the available content area.
-    let board_area = center_rect(BOARD_COLS, BOARD_ROWS, area);
+    let canvas_area = center_rect(BOARD_TERM_W, BOARD_TERM_H, area);
 
-    let row_constraints = [Constraint::Length(CELL_ROWS); 4];
-    let rows = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(row_constraints)
-        .split(board_area);
+    let canvas = Canvas::default()
+        .x_bounds([0.0, BOARD_PX as f64])
+        .y_bounds([0.0, (BOARD_TERM_H * 2) as f64])
+        .marker(Marker::HalfBlock)
+        .background_color(Color::Rgb(15, 15, 25))
+        .paint(|ctx| {
+            ctx.draw(&BoardShape { game });
+        });
+    frame.render_widget(canvas, canvas_area);
 
-    let col_constraints = [Constraint::Length(CELL_COLS); 4];
+    overlay_tile_numbers(frame, canvas_area, game);
+}
+
+/// Overlay tile numbers as Paragraph widgets on top of the canvas.
+fn overlay_tile_numbers(frame: &mut Frame, canvas_area: Rect, game: &ShardFusionGame) {
+    let is_flashing = matches!(game.anim_state, ShardFusionAnimState::Flashing(_));
+    let tile_term_h = (TILE_PX / 2) as u16;
+    let text_row = tile_term_h as usize / 2;
 
     for r in 0..4usize {
-        let cols = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(col_constraints)
-            .split(rows[r]);
-
         for c in 0..4usize {
             let value = game.board[r][c];
+            if value == 0 {
+                continue;
+            }
 
-            // During flash phase, merged cells glow white.
-            let fg_color = if matches!(game.anim_state, ShardFusionAnimState::Flashing(_))
-                && game.merged_cells.contains(&(r, c))
+            let px_x = c * STRIDE;
+            let px_y = r * STRIDE;
+            let term_x = canvas_area.x + px_x as u16;
+            let term_y = canvas_area.y + (px_y / 2) as u16;
+
+            if term_x >= canvas_area.x + canvas_area.width
+                || term_y >= canvas_area.y + canvas_area.height
             {
+                continue;
+            }
+
+            let avail_w = (canvas_area.x + canvas_area.width).saturating_sub(term_x);
+            let text_area = Rect {
+                x: term_x,
+                y: term_y,
+                width: (TILE_PX as u16).min(avail_w),
+                height: tile_term_h,
+            };
+
+            let fg_color = if is_flashing && game.merged_cells.contains(&(r, c)) {
                 Color::White
             } else {
                 tile_color(value)
             };
 
-            let border_color = if value == 0 {
-                Color::DarkGray
-            } else {
-                fg_color
-            };
-
-            let block = Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(border_color));
-
-            // Vertically center the number: inner height = CELL_ROWS - 2 (borders).
-            // Pad with blank lines above so the number sits in the middle row.
-            let inner_height = (CELL_ROWS.saturating_sub(2)) as usize;
-            let text_row = inner_height / 2;
-            let mut lines: Vec<Line> = (0..inner_height).map(|_| Line::from("")).collect();
-            if value != 0 && text_row < inner_height {
+            let mut lines: Vec<Line> = (0..tile_term_h as usize).map(|_| Line::from("")).collect();
+            if text_row < lines.len() {
                 lines[text_row] = Line::from(Span::styled(
                     value.to_string(),
                     Style::default().fg(fg_color),
                 ));
             }
 
-            let para = Paragraph::new(lines)
-                .block(block)
-                .alignment(Alignment::Center);
-
-            frame.render_widget(para, cols[c]);
+            frame.render_widget(
+                Paragraph::new(lines).alignment(Alignment::Center),
+                text_area,
+            );
         }
     }
 }
@@ -203,8 +268,7 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &ShardFusionGame) {
         ]),
     ];
 
-    let text = Paragraph::new(lines);
-    frame.render_widget(text, inner);
+    frame.render_widget(Paragraph::new(lines), inner);
 }
 
 /// Render the game over overlay.
