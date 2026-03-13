@@ -2,7 +2,7 @@
 
 use super::game_common::{
     create_game_layout, render_forfeit_status_bar, render_game_over_overlay,
-    render_info_panel_frame, render_status_bar, GameResultType,
+    render_info_panel_frame, render_minigame_too_small, render_status_bar, GameResultType,
 };
 use crate::challenges::menu::DifficultyInfo;
 use crate::challenges::shard_fusion::{ShardFusionAnimState, ShardFusionGame, ShardFusionResult};
@@ -41,6 +41,13 @@ pub fn render_shard_fusion_scene(
         return;
     }
 
+    const MIN_WIDTH: u16 = 22;
+    const MIN_HEIGHT: u16 = 14;
+    if area.width < MIN_WIDTH || area.height < MIN_HEIGHT {
+        render_minigame_too_small(frame, area, "Shard Fusion", MIN_WIDTH, MIN_HEIGHT);
+        return;
+    }
+
     // Each cell needs ~3 rows (1 content + top/bottom borders); 4 rows = ~12.
     // Add 2 for padding comfort.
     let layout = create_game_layout(frame, area, " Shard Fusion ", Color::Yellow, 14, 24, ctx);
@@ -51,6 +58,10 @@ pub fn render_shard_fusion_scene(
 }
 
 /// Render the 4×4 game board.
+///
+/// The board already reflects the post-slide state; we don't interpolate
+/// tile positions during Sliding — the Flashing phase provides the visual
+/// feedback for merges. slide_moves is used only for future animation work.
 fn render_board(frame: &mut Frame, area: Rect, game: &ShardFusionGame) {
     // Split into 4 equal rows.
     let row_constraints = [
@@ -135,6 +146,9 @@ fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &ShardFusionGa
 
 /// Render the info panel on the right side.
 fn render_info_panel(frame: &mut Frame, area: Rect, game: &ShardFusionGame) {
+    if area.width < 2 || area.height < 2 {
+        return;
+    }
     let inner = render_info_panel_frame(frame, area);
 
     let target = game.difficulty.target_value();
