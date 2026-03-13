@@ -14,6 +14,26 @@ use ratatui::{
     Frame,
 };
 
+/// Fixed tile dimensions (terminal chars are ~2:1 col:row, so 3 rows × 6 cols ≈ square).
+const CELL_ROWS: u16 = 3;
+const CELL_COLS: u16 = 7; // 7 gives inner width of 5, comfortable for "4096"
+
+/// Total board pixel dimensions.
+const BOARD_ROWS: u16 = CELL_ROWS * 4;
+const BOARD_COLS: u16 = CELL_COLS * 4;
+
+/// Center a fixed-size rect inside a larger area.
+fn center_rect(width: u16, height: u16, area: Rect) -> Rect {
+    let x = area.x + area.width.saturating_sub(width) / 2;
+    let y = area.y + area.height.saturating_sub(height) / 2;
+    Rect {
+        x,
+        y,
+        width: width.min(area.width),
+        height: height.min(area.height),
+    }
+}
+
 /// Map a tile value to its display color.
 fn tile_color(value: u32) -> Color {
     match value {
@@ -41,16 +61,23 @@ pub fn render_shard_fusion_scene(
         return;
     }
 
-    const MIN_WIDTH: u16 = 22;
-    const MIN_HEIGHT: u16 = 14;
-    if area.width < MIN_WIDTH || area.height < MIN_HEIGHT {
-        render_minigame_too_small(frame, area, "Shard Fusion", MIN_WIDTH, MIN_HEIGHT);
+    // Board is BOARD_ROWS tall + 2 for status bar + 2 for outer border.
+    let min_height = BOARD_ROWS + 4;
+    let min_width = BOARD_COLS + 26; // board + info panel
+    if area.width < min_width || area.height < min_height {
+        render_minigame_too_small(frame, area, "Shard Fusion", min_width, min_height);
         return;
     }
 
-    // Each cell needs ~3 rows (1 content + top/bottom borders); 4 rows = ~12.
-    // Add 2 for padding comfort.
-    let layout = create_game_layout(frame, area, " Shard Fusion ", Color::Yellow, 14, 24, ctx);
+    let layout = create_game_layout(
+        frame,
+        area,
+        " Shard Fusion ",
+        Color::Yellow,
+        BOARD_ROWS,
+        24,
+        ctx,
+    );
 
     render_board(frame, layout.content, game);
     render_status_bar_content(frame, layout.status_bar, game);
@@ -59,29 +86,20 @@ pub fn render_shard_fusion_scene(
 
 /// Render the 4×4 game board.
 ///
-/// The board already reflects the post-slide state; we don't interpolate
-/// tile positions during Sliding — the Flashing phase provides the visual
-/// feedback for merges. slide_moves is used only for future animation work.
+/// Tiles are fixed-size squares centered within the content area. The board
+/// reflects the post-slide state; slide_moves is reserved for future animation
+/// work. The Flashing phase provides merge visual feedback.
 fn render_board(frame: &mut Frame, area: Rect, game: &ShardFusionGame) {
-    // Split into 4 equal rows.
-    let row_constraints = [
-        Constraint::Ratio(1, 4),
-        Constraint::Ratio(1, 4),
-        Constraint::Ratio(1, 4),
-        Constraint::Ratio(1, 4),
-    ];
+    // Center the fixed-size board grid in the available content area.
+    let board_area = center_rect(BOARD_COLS, BOARD_ROWS, area);
+
+    let row_constraints = [Constraint::Length(CELL_ROWS); 4];
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints(row_constraints)
-        .split(area);
+        .split(board_area);
 
-    // Split each row into 4 equal columns.
-    let col_constraints = [
-        Constraint::Ratio(1, 4),
-        Constraint::Ratio(1, 4),
-        Constraint::Ratio(1, 4),
-        Constraint::Ratio(1, 4),
-    ];
+    let col_constraints = [Constraint::Length(CELL_COLS); 4];
 
     for r in 0..4usize {
         let cols = Layout::default()
@@ -107,22 +125,25 @@ fn render_board(frame: &mut Frame, area: Rect, game: &ShardFusionGame) {
                 fg_color
             };
 
-            let content = if value == 0 {
-                String::new()
-            } else {
-                value.to_string()
-            };
-
             let block = Block::default()
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(border_color));
 
-            let para = Paragraph::new(Line::from(Span::styled(
-                content,
-                Style::default().fg(fg_color),
-            )))
-            .block(block)
-            .alignment(Alignment::Center);
+            // Vertically center the number: inner height = CELL_ROWS - 2 (borders).
+            // Pad with blank lines above so the number sits in the middle row.
+            let inner_height = (CELL_ROWS.saturating_sub(2)) as usize;
+            let text_row = inner_height / 2;
+            let mut lines: Vec<Line> = (0..inner_height).map(|_| Line::from("")).collect();
+            if value != 0 && text_row < inner_height {
+                lines[text_row] = Line::from(Span::styled(
+                    value.to_string(),
+                    Style::default().fg(fg_color),
+                ));
+            }
+
+            let para = Paragraph::new(lines)
+                .block(block)
+                .alignment(Alignment::Center);
 
             frame.render_widget(para, cols[c]);
         }
