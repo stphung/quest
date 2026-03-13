@@ -30,6 +30,7 @@ enum DebugAction {
     TriggerJezzballChallenge,
     TriggerSnakeChallenge,
     TriggerRunicShiftChallenge,
+    TriggerShardFusionChallenge,
     TriggerHavenDiscovery,
     TriggerSoulforgeDiscovery,
     TriggerForgeStormbreaker,
@@ -79,6 +80,7 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerJezzballChallenge,
     DebugAction::TriggerSnakeChallenge,
     DebugAction::TriggerRunicShiftChallenge,
+    DebugAction::TriggerShardFusionChallenge,
     DebugAction::TriggerHavenDiscovery,
     DebugAction::TriggerSoulforgeDiscovery,
     DebugAction::TriggerForgeStormbreaker,
@@ -196,6 +198,7 @@ const CHALLENGE_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerJezzballChallenge,
     DebugAction::TriggerSnakeChallenge,
     DebugAction::TriggerRunicShiftChallenge,
+    DebugAction::TriggerShardFusionChallenge,
 ];
 const WORLD_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerDungeon,
@@ -345,7 +348,8 @@ impl DebugAction {
             Self::TriggerJezzballChallenge => 9,
             Self::TriggerSnakeChallenge => 10,
             Self::TriggerRunicShiftChallenge => 11,
-            Self::TriggerHavenDiscovery => 12,
+            Self::TriggerShardFusionChallenge => 12,
+            Self::TriggerHavenDiscovery => 13,
             Self::TriggerSoulforgeDiscovery => 13,
             Self::TriggerForgeStormbreaker => 14,
             Self::TriggerForgeAsprika => 15,
@@ -412,6 +416,7 @@ impl DebugAction {
             Self::TriggerJezzballChallenge => "Trigger JezzBall Challenge",
             Self::TriggerSnakeChallenge => "Trigger Snake Challenge",
             Self::TriggerRunicShiftChallenge => "Trigger Sigil Surge Challenge",
+            Self::TriggerShardFusionChallenge => "Trigger Shard Fusion Challenge",
             Self::TriggerHavenDiscovery => "Trigger Haven Discovery",
             Self::TriggerSoulforgeDiscovery => "Trigger Soulforge Discovery",
             Self::TriggerForgeStormbreaker => "Forge Stormbreaker",
@@ -552,6 +557,7 @@ impl DebugAction {
             Self::TriggerJezzballChallenge => trigger_jezzball_challenge(state),
             Self::TriggerSnakeChallenge => trigger_snake_challenge(state),
             Self::TriggerRunicShiftChallenge => trigger_runic_shift_challenge(state),
+            Self::TriggerShardFusionChallenge => trigger_shard_fusion_challenge(state),
             Self::TriggerHavenDiscovery => trigger_haven_discovery(haven),
             Self::TriggerSoulforgeDiscovery => trigger_soulforge_discovery(enhancement),
             Self::TriggerForgeStormbreaker => trigger_forge_stormbreaker(achievements),
@@ -1063,6 +1069,19 @@ fn trigger_runic_shift_challenge(state: &mut GameState) -> &'static str {
         .challenge_menu
         .add_challenge(create_challenge(&ChallengeType::RunicShift));
     "Sigil Surge challenge added!"
+}
+
+fn trigger_shard_fusion_challenge(state: &mut GameState) -> &'static str {
+    if state
+        .challenge_menu
+        .has_challenge(&ChallengeType::ShardFusion)
+    {
+        return "Shard Fusion challenge already pending!";
+    }
+    state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::ShardFusion));
+    "Shard Fusion challenge added!"
 }
 
 fn trigger_haven_discovery(haven: &mut Haven) -> &'static str {
