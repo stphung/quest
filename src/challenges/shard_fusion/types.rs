@@ -52,6 +52,7 @@ pub const FLASH_TICKS: u32 = 3;
 
 /// Records one tile's movement for slide rendering.
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub struct TileMove {
     /// Source cell (row, col).
     pub from: (usize, usize),
@@ -97,6 +98,7 @@ impl ShardFusionGame {
     }
 
     /// Returns the number of empty cells on the board.
+    #[allow(dead_code)]
     pub fn empty_count(&self) -> usize {
         self.board.iter().flatten().filter(|&&v| v == 0).count()
     }
