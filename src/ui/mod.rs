@@ -1352,6 +1352,9 @@ fn draw_right_content(
                 sg_discovered,
             );
         }
+        Some(ActiveMinigame::ShardFusion(_game)) => {
+            // TODO(Task 6): render shard_fusion_scene
+        }
         None => {
             if game_state.challenge_menu.is_open {
                 challenge_menu_scene::render_challenge_menu(

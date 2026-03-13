@@ -302,6 +302,7 @@ impl Achievements {
             (MinigameType::RunicShift, MinigameDifficulty::Master) => {
                 Some(AchievementId::SigilSurgeMaster)
             }
+            (MinigameType::ShardFusion, _) => None,
         };
 
         if let Some(id) = achievement {

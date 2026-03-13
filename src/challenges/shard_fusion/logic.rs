@@ -8,7 +8,7 @@ use super::types::{
     FLASH_TICKS, SLIDE_TICKS,
 };
 use crate::challenges::ActiveMinigame;
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 /// Cardinal directions for board sliding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -419,6 +419,39 @@ pub fn process_input<R: Rng>(game: &mut ShardFusionGame, input: ShardFusionInput
     }
 }
 
+impl crate::challenges::menu::DifficultyInfo for ShardFusionDifficulty {
+    fn name(&self) -> &'static str {
+        ShardFusionDifficulty::name(self)
+    }
+
+    fn reward(&self) -> crate::challenges::menu::ChallengeReward {
+        match self {
+            ShardFusionDifficulty::Novice => crate::challenges::menu::ChallengeReward {
+                stormglass: 600,
+                ..Default::default()
+            },
+            ShardFusionDifficulty::Apprentice => crate::challenges::menu::ChallengeReward {
+                stormglass: 1_500,
+                ..Default::default()
+            },
+            ShardFusionDifficulty::Journeyman => crate::challenges::menu::ChallengeReward {
+                prestige_ranks: 1,
+                stormglass: 3_000,
+                ..Default::default()
+            },
+            ShardFusionDifficulty::Master => crate::challenges::menu::ChallengeReward {
+                prestige_ranks: 2,
+                stormglass: 6_000,
+                fishing_ranks: 1,
+            },
+        }
+    }
+
+    fn extra_info(&self) -> Option<String> {
+        Some(format!("Reach {} to win", self.target_value()))
+    }
+}
+
 /// Start a new Shard Fusion game and return it as an `ActiveMinigame`.
 /// Spawns 2 initial tiles.
 pub fn start_shard_fusion_game<R: Rng>(
@@ -428,14 +461,14 @@ pub fn start_shard_fusion_game<R: Rng>(
     let mut game = ShardFusionGame::new(difficulty);
     spawn_tile(&mut game.board, rng);
     spawn_tile(&mut game.board, rng);
-    ActiveMinigame::ShardFusion(Box::new(game))
+    ActiveMinigame::ShardFusion(game)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::SeedableRng;
     use rand::rngs::SmallRng;
+    use rand::SeedableRng;
 
     #[test]
     fn test_slide_left_basic_merge() {
@@ -469,12 +502,7 @@ mod tests {
 
     #[test]
     fn test_has_valid_moves_full_no_adjacent() {
-        let b = [
-            [2u32, 4, 2, 4],
-            [4, 2, 4, 2],
-            [2, 4, 2, 4],
-            [4, 2, 4, 2],
-        ];
+        let b = [[2u32, 4, 2, 4], [4, 2, 4, 2], [2, 4, 2, 4], [4, 2, 4, 2]];
         assert!(!has_valid_moves(&b));
     }
 
@@ -562,12 +590,7 @@ mod tests {
     #[test]
     fn test_loss_detected_when_no_moves() {
         let mut game = ShardFusionGame::new(ShardFusionDifficulty::Novice);
-        game.board = [
-            [2, 4, 2, 4],
-            [4, 2, 4, 2],
-            [2, 4, 2, 4],
-            [4, 2, 4, 2],
-        ];
+        game.board = [[2, 4, 2, 4], [4, 2, 4, 2], [2, 4, 2, 4], [4, 2, 4, 2]];
         check_game_over(&mut game);
         assert_eq!(game.game_result, Some(ShardFusionResult::Loss));
     }
@@ -630,19 +653,19 @@ mod tests {
         let mut board = [[0u32; 4]; 4];
         let mut rng = SmallRng::seed_from_u64(42);
         spawn_tile(&mut board, &mut rng);
-        let non_zero: Vec<u32> = board.iter().flatten().filter(|&&v| v != 0).copied().collect();
+        let non_zero: Vec<u32> = board
+            .iter()
+            .flatten()
+            .filter(|&&v| v != 0)
+            .copied()
+            .collect();
         assert_eq!(non_zero.len(), 1);
         assert!(non_zero[0] == 2 || non_zero[0] == 4);
     }
 
     #[test]
     fn test_spawn_tile_noop_on_full_board() {
-        let mut board = [
-            [2u32, 4, 2, 4],
-            [4, 2, 4, 2],
-            [2, 4, 2, 4],
-            [4, 2, 4, 2],
-        ];
+        let mut board = [[2u32, 4, 2, 4], [4, 2, 4, 2], [2, 4, 2, 4], [4, 2, 4, 2]];
         let original = board;
         let mut rng = SmallRng::seed_from_u64(0);
         spawn_tile(&mut board, &mut rng);
@@ -740,12 +763,7 @@ mod tests {
         let mut game = ShardFusionGame::new(ShardFusionDifficulty::Novice);
         game.game_result = Some(ShardFusionResult::Win);
         // Full board with no moves — would normally be Loss but Win takes precedence
-        game.board = [
-            [2, 4, 2, 4],
-            [4, 2, 4, 2],
-            [2, 4, 2, 4],
-            [4, 2, 4, 2],
-        ];
+        game.board = [[2, 4, 2, 4], [4, 2, 4, 2], [2, 4, 2, 4], [4, 2, 4, 2]];
         check_game_over(&mut game);
         // Should remain Win, not be overwritten
         assert_eq!(game.game_result, Some(ShardFusionResult::Win));

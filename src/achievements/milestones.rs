@@ -26,6 +26,7 @@ pub enum MinigameType {
     Snake,
     Jezzball,
     RunicShift,
+    ShardFusion,
 }
 
 /// Type-safe difficulty level shared by all minigames.
