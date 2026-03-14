@@ -302,6 +302,18 @@ impl Achievements {
             (MinigameType::RunicShift, MinigameDifficulty::Master) => {
                 Some(AchievementId::SigilSurgeMaster)
             }
+            (MinigameType::ShardFusion, MinigameDifficulty::Novice) => {
+                Some(AchievementId::ShardFusionNovice)
+            }
+            (MinigameType::ShardFusion, MinigameDifficulty::Apprentice) => {
+                Some(AchievementId::ShardFusionApprentice)
+            }
+            (MinigameType::ShardFusion, MinigameDifficulty::Journeyman) => {
+                Some(AchievementId::ShardFusionJourneyman)
+            }
+            (MinigameType::ShardFusion, MinigameDifficulty::Master) => {
+                Some(AchievementId::ShardFusionMaster)
+            }
         };
 
         if let Some(id) = achievement {

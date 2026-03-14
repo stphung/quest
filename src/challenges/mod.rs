@@ -129,6 +129,7 @@ pub mod minesweeper;
 pub mod morris;
 pub mod rune;
 pub mod runic_shift;
+pub mod shard_fusion;
 pub mod snake;
 
 pub use chess::{ChessDifficulty, ChessGame, ChessResult};
@@ -150,6 +151,10 @@ pub use runic_shift::{
     RunicShiftGame, RunicShiftResult, GRID_COLS as RUNIC_SHIFT_GRID_COLS,
     GRID_ROWS as RUNIC_SHIFT_GRID_ROWS,
 };
+pub use shard_fusion::{
+    ShardFusionAnimState, ShardFusionDifficulty, ShardFusionGame, ShardFusionResult, TileMove,
+    FLASH_TICKS, SLIDE_TICKS,
+};
 pub use snake::{SnakeDifficulty, SnakeGame, SnakeResult};
 
 /// A currently active challenge minigame. Only one can be active at a time.
@@ -162,6 +167,7 @@ pub enum ActiveMinigame {
     Minesweeper(MinesweeperGame),
     Rune(RuneGame),
     RunicShift(RunicShiftGame),
+    ShardFusion(ShardFusionGame),
     Go(GoGame),
     Jezzball(JezzballGame),
     Snake(SnakeGame),
@@ -178,6 +184,7 @@ impl ActiveMinigame {
             ActiveMinigame::Minesweeper(g) => g.game_result.is_some(),
             ActiveMinigame::Rune(g) => g.game_result.is_some(),
             ActiveMinigame::RunicShift(g) => g.game_result.is_some(),
+            ActiveMinigame::ShardFusion(g) => g.game_result.is_some(),
             ActiveMinigame::Go(g) => g.game_result.is_some(),
             ActiveMinigame::Jezzball(g) => g.game_result.is_some(),
             ActiveMinigame::Snake(g) => g.game_result.is_some(),

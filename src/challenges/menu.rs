@@ -15,6 +15,7 @@ use super::morris::{MorrisDifficulty, MorrisGame};
 use super::rune::{RuneDifficulty, RuneGame};
 use super::runic_shift::logic::start_runic_shift_game;
 use super::runic_shift::RunicShiftDifficulty;
+use super::shard_fusion::{start_shard_fusion_game, ShardFusionDifficulty};
 use super::snake::logic::start_snake_game;
 use super::snake::SnakeDifficulty;
 use super::ActiveMinigame;
@@ -114,6 +115,10 @@ fn accept_selected_challenge(state: &mut GameState) {
             ChallengeType::RunicShift => {
                 let d = RunicShiftDifficulty::from_index(difficulty_index);
                 start_runic_shift_game(d)
+            }
+            ChallengeType::ShardFusion => {
+                let d = ShardFusionDifficulty::from_index(difficulty_index);
+                start_shard_fusion_game(d, &mut rand::rng())
             }
         };
         state.active_minigame = Some(minigame);
@@ -430,6 +435,10 @@ const CHALLENGE_TABLE: &[ChallengeWeight] = &[
         challenge_type: ChallengeType::Go,
         weight: 7, // ~4% - longest game
     },
+    ChallengeWeight {
+        challenge_type: ChallengeType::ShardFusion,
+        weight: 20, // ~10% - moderate puzzle
+    },
 ];
 
 /// A single pending challenge in the menu
@@ -454,6 +463,7 @@ pub enum ChallengeType {
     Rune,
     Go,
     Snake,
+    ShardFusion,
 }
 
 impl ChallengeType {
@@ -470,6 +480,7 @@ impl ChallengeType {
             ChallengeType::Rune => "ᚱ",
             ChallengeType::Go => "◉",
             ChallengeType::Snake => "~",
+            ChallengeType::ShardFusion => "\u{25C6}",
         }
     }
 
@@ -493,6 +504,9 @@ impl ChallengeType {
             ChallengeType::Go => "An ancient master beckons from beneath a gnarled tree...",
             ChallengeType::Snake => {
                 "A serpentine trail of glowing runes appears on the dungeon floor..."
+            }
+            ChallengeType::ShardFusion => {
+                "A glowing grid of crystal shards materializes before you, waiting to be merged..."
             }
         }
     }
@@ -743,6 +757,16 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
                 own trail. The path is narrow, and the serpent is hungry.\""
                 .to_string(),
         },
+        ChallengeType::ShardFusion => PendingChallenge {
+            challenge_type: ChallengeType::ShardFusion,
+            title: "Shard Fusion".to_string(),
+            icon: "\u{25C6}",
+            description: "A glowing grid of crystal shards materializes before you. Each tile \
+                pulses with arcane energy, and the air hums with potential. A spectral voice \
+                intones: \"Merge the shards, seeker. Slide them together. Combine like with like, \
+                and grow the crystals ever larger. Reach the pinnacle, and claim your reward.\""
+                .to_string(),
+        },
     }
 }
 
@@ -773,6 +797,7 @@ mod tests {
         assert!(!ChallengeType::Rune.icon().is_empty());
         assert!(!ChallengeType::Go.icon().is_empty());
         assert!(!ChallengeType::Snake.icon().is_empty());
+        assert!(!ChallengeType::ShardFusion.icon().is_empty());
     }
 
     #[test]
@@ -787,6 +812,7 @@ mod tests {
         assert!(!ChallengeType::Rune.discovery_flavor().is_empty());
         assert!(!ChallengeType::Go.discovery_flavor().is_empty());
         assert!(!ChallengeType::Snake.discovery_flavor().is_empty());
+        assert!(!ChallengeType::ShardFusion.discovery_flavor().is_empty());
     }
 
     #[test]
@@ -802,6 +828,7 @@ mod tests {
             ChallengeType::Rune.icon(),
             ChallengeType::Go.icon(),
             ChallengeType::Snake.icon(),
+            ChallengeType::ShardFusion.icon(),
         ];
         // Check all pairs are different
         for i in 0..icons.len() {

@@ -44,6 +44,7 @@ pub mod responsive;
 pub mod rune_scene;
 pub mod runic_shift_scene;
 mod scene_fx;
+pub mod shard_fusion_scene;
 pub mod snake_scene;
 mod soulforge_effects;
 pub mod soulforge_scene;
@@ -1344,6 +1345,16 @@ fn draw_right_content(
         }
         Some(ActiveMinigame::RunicShift(game)) => {
             runic_shift_scene::render_runic_shift_scene(
+                frame,
+                area,
+                game,
+                ctx,
+                show_dismiss_hint,
+                sg_discovered,
+            );
+        }
+        Some(ActiveMinigame::ShardFusion(game)) => {
+            shard_fusion_scene::render_shard_fusion_scene(
                 frame,
                 area,
                 game,

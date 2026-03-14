@@ -1271,6 +1271,41 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         points: 100,
     },
     // ═══════════════════════════════════════════════════════════════
+    // CHALLENGE ACHIEVEMENTS - SHARD FUSION
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::ShardFusionNovice,
+        name: "Shard Fusion Novice",
+        description: "Merge the crystal shards to 512 on Novice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "◆",
+        points: 10,
+    },
+    AchievementDef {
+        id: AchievementId::ShardFusionApprentice,
+        name: "Shard Fusion Apprentice",
+        description: "Merge the crystal shards to 1024 on Apprentice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "◆",
+        points: 25,
+    },
+    AchievementDef {
+        id: AchievementId::ShardFusionJourneyman,
+        name: "Shard Fusion Journeyman",
+        description: "Merge the crystal shards to 2048 on Journeyman difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "◆",
+        points: 50,
+    },
+    AchievementDef {
+        id: AchievementId::ShardFusionMaster,
+        name: "Shard Fusion Master",
+        description: "Merge the crystal shards to 4096 on Master difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "◆",
+        points: 100,
+    },
+    // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - META
     // ═══════════════════════════════════════════════════════════════
     AchievementDef {
@@ -2139,6 +2174,10 @@ mod tests {
             AchievementId::SigilSurgeApprentice,
             AchievementId::SigilSurgeJourneyman,
             AchievementId::SigilSurgeMaster,
+            AchievementId::ShardFusionNovice,
+            AchievementId::ShardFusionApprentice,
+            AchievementId::ShardFusionJourneyman,
+            AchievementId::ShardFusionMaster,
             AchievementId::GrandChampion,
             AchievementId::GoneFishing,
             AchievementId::FishermanI,
@@ -2396,6 +2435,15 @@ mod tests {
                     AchievementId::SigilSurgeApprentice,
                     AchievementId::SigilSurgeJourneyman,
                     AchievementId::SigilSurgeMaster,
+                ],
+            ),
+            (
+                "Shard Fusion",
+                vec![
+                    AchievementId::ShardFusionNovice,
+                    AchievementId::ShardFusionApprentice,
+                    AchievementId::ShardFusionJourneyman,
+                    AchievementId::ShardFusionMaster,
                 ],
             ),
         ];
