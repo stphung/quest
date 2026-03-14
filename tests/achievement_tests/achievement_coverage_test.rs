@@ -771,14 +771,34 @@ const MINIGAME_ACHIEVEMENT_TABLE: &[(MinigameType, MinigameDifficulty, Achieveme
         MinigameDifficulty::Master,
         AchievementId::SigilSurgeMaster,
     ),
+    (
+        MinigameType::ShardFusion,
+        MinigameDifficulty::Novice,
+        AchievementId::ShardFusionNovice,
+    ),
+    (
+        MinigameType::ShardFusion,
+        MinigameDifficulty::Apprentice,
+        AchievementId::ShardFusionApprentice,
+    ),
+    (
+        MinigameType::ShardFusion,
+        MinigameDifficulty::Journeyman,
+        AchievementId::ShardFusionJourneyman,
+    ),
+    (
+        MinigameType::ShardFusion,
+        MinigameDifficulty::Master,
+        AchievementId::ShardFusionMaster,
+    ),
 ];
 
 #[test]
 fn test_minigame_win_unlocks_correct_achievement() {
     assert_eq!(
         MINIGAME_ACHIEVEMENT_TABLE.len(),
-        40,
-        "Table should cover all 10 game types x 4 difficulties"
+        44,
+        "Table should cover all 11 game types x 4 difficulties"
     );
 
     for &(game_type, difficulty, expected) in MINIGAME_ACHIEVEMENT_TABLE {
