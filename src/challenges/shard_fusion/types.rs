@@ -46,7 +46,7 @@ pub enum ShardFusionAnimState {
 }
 
 /// Duration of the slide animation in game ticks (100ms each).
-pub const SLIDE_TICKS: u32 = 1;
+pub const SLIDE_TICKS: u32 = 3;
 /// Duration of the merge flash animation in game ticks.
 pub const FLASH_TICKS: u32 = 1;
 
@@ -68,6 +68,8 @@ pub struct ShardFusionGame {
     pub difficulty: ShardFusionDifficulty,
     /// Current board state (0 = empty).
     pub board: [[u32; 4]; 4],
+    /// Board snapshot captured immediately before the last slide, used for animation.
+    pub pre_slide_board: [[u32; 4]; 4],
     pub anim_state: ShardFusionAnimState,
     /// Tile movements for slide animation rendering.
     pub slide_moves: Vec<TileMove>,
@@ -83,6 +85,7 @@ impl ShardFusionGame {
         Self {
             difficulty,
             board: [[0; 4]; 4],
+            pre_slide_board: [[0; 4]; 4],
             anim_state: ShardFusionAnimState::Idle,
             slide_moves: Vec::new(),
             merged_cells: Vec::new(),

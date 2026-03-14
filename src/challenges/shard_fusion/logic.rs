@@ -281,7 +281,8 @@ pub fn apply_slide(game: &mut ShardFusionGame, direction: Direction) -> bool {
         })
         .collect();
 
-    // Apply the changes
+    // Apply the changes (snapshot pre-slide board for animation)
+    game.pre_slide_board = game.board;
     game.board = new_board;
     game.score += total_score;
     game.slide_moves = slide_moves;
