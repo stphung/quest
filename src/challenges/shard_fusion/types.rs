@@ -46,7 +46,7 @@ pub enum ShardFusionAnimState {
 }
 
 /// Duration of the slide animation in game ticks (100ms each).
-pub const SLIDE_TICKS: u32 = 12;
+pub const SLIDE_TICKS: u32 = 1;
 /// Duration of the merge flash animation in game ticks.
 pub const FLASH_TICKS: u32 = 1;
 
