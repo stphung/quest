@@ -190,6 +190,10 @@ pub const ALL_TITLES: &[TitleDef] = &[
         achievement_id: AchievementId::SigilSurgeMaster,
         title_text: "Sigil Savant",
     },
+    TitleDef {
+        achievement_id: AchievementId::SigilMatrixMaster,
+        title_text: "Logician",
+    },
     // Exploration
     TitleDef {
         achievement_id: AchievementId::FishCatcherVIII,
