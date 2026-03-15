@@ -12,7 +12,11 @@ Constant drift detection (code vs docs vs wiki) is explicitly out of scope — h
 
 ## Approach
 
-Extend the existing simulator binary (Approach A). No new binary — the simulator already runs `game_tick_with_context()` with seeded RNG, CSV export, multi-run support, and Haven auto-building. We generalize the Haven strategy pattern to cover all interactive systems.
+Extend the existing simulator binary (Approach A). No new binary — the simulator already runs the game's tick loop with seeded RNG, CSV export, multi-run support, and Haven auto-building. We generalize the Haven strategy pattern to cover all interactive systems.
+
+### Prerequisite: Migrate to `game_tick_with_context()`
+
+The current simulator calls the deprecated `game_tick()` function, which internally creates a throwaway `LoomState` each tick. This means Loom state (patterns, shuttles, WR→PR conversion, zone unlocks) is never accumulated. Before adding strategy profiles, the simulator must be migrated to `game_tick_with_context()` with a persistent `TickContext` that includes a real `LoomState` alongside the existing `Haven`, `EnhancementProgress`, and `DeepState` allocations.
 
 ## Design
 
@@ -35,9 +39,9 @@ Each profile defines:
 - **Haven**: Room build priority order (replaces the old `--haven` flag)
 - **Soulforge**: Prestige rank thresholds for enhancement, target levels per slot
 - **Challenges**: Win rate (challenges won per simulated hour), difficulty distribution
-- **Stormglass**: Spending pattern (hoard vs spend on sigils)
-- **Ascension**: When to ascend (e.g., "ascend when affordable and gates met")
-- **Prestige**: Auto-prestige trigger (e.g., "prestige when stuck for N ticks with no zone progress")
+- **Stormglass**: Spending pattern (see Stormglass section below for per-profile tables)
+- **Ascension**: When to ascend — call `ascension::logic::ascend()` when affordable and gates met
+- **Prestige**: Auto-prestige trigger with per-profile stuck thresholds (see Prestige section below)
 
 ### 2. Outcome Injection
 
@@ -45,15 +49,37 @@ Each tick, after `game_tick_with_context()` returns, the simulator runs an `inje
 
 #### Injection Mechanics Per System
 
-- **Challenge wins**: Every N ticks (profile-configured), set `state.last_minigame_win = Some(MinigameWinInfo { ... })` with a difficulty from the profile's distribution. The achievement system picks it up naturally on the next tick.
-- **Soulforge enhancement**: When prestige rank crosses a profile threshold, directly set `enhancement.levels[slot] = target_level`. Tests progression curves, not enhancement RNG.
-- **Stormglass spending**: When balance exceeds a profile threshold, directly apply sigil bonuses by setting sigil state.
-- **Ascension**: When prestige rank and pattern gates are met per profile rules, set `state.ascension_level += 1` and apply the multiplier.
-- **Prestige**: When the character is stuck (no zone progress for N ticks), trigger prestige by calling the same prestige logic the game uses (reset level/zone, increment rank).
+**Challenge wins**: Every N ticks (profile-configured), call `achievements.on_minigame_won(game_type, difficulty, character_name)` directly. This is the correct injection site — `last_minigame_win` is a transient field consumed by `main.rs` between ticks, not by the tick engine. Also apply the challenge rewards (PR and Stormglass) directly to `state.prestige_rank` and `state.stormglass` to keep economy metrics accurate.
+
+**Soulforge enhancement**: When prestige rank crosses a profile threshold, directly set `enhancement.levels[slot] = target_level`. Tests progression curves, not enhancement RNG.
+
+**Stormglass sigil spending**: When `state.stormglass` exceeds a profile threshold, etch sigils by setting `state.storm_sigils.slots_unlocked` and populating `state.storm_sigils.sigils` with concrete `Sigil { effect, value, grade }` entries, then deduct the equivalent Stormglass cost from `state.stormglass`. Use `roll_sigil(effect, deterministic_roll)` with a fixed roll value per grade tier to produce representative `value` fields, or construct `Sigil` structs directly with values from the grade's expected range midpoint.
+
+Per-profile sigil tables (using actual `SigilEffectType` and `SigilGrade` enum variants):
+
+| Profile | Threshold | Effects | Grade | Cost deducted |
+|---|---|---|---|---|
+| `casual` | 5000 SG | `DamagePercent`, `DamageReductionPercent` | `C` | 2000 SG |
+| `optimal` | 3000 SG | `DamagePercent`, `DamageReductionPercent`, `CritChancePercent` | `A` | 3000 SG |
+| `speedrun` | 1500 SG | `DamagePercent`, `CritChancePercent`, `MaxHpPercent` | `SPlus` | 4000 SG |
+
+(The `SigilGrade` enum uses a letter-grade system: `FMinus` through `SPlus`. The `SigilEffectType` enum has percent-based variants: `XpPercent`, `DamagePercent`, `DamageReductionPercent`, `CritChancePercent`, `DropRatePercent`, `MaxHpPercent`, `FishingSpeedPercent`, `OfflineXpPercent`, `AttackSpeedPercent`, `DoubleStrikePercent`, `RegenDelayPercent`, `ChronoOverchargePercent`. Exact effect choices per profile may be adjusted during implementation.)
+
+**Ascension**: When prestige rank and pattern gates are met per profile rules, call `ascension::logic::ascend(state, deepest_layer, completed_patterns)` — the public function that handles PR deduction and level increment. After `ascend()` returns, the caller must also call `zones::access::sync_account_zone_unlocks()` to update Loom/fracture zone caps, since `ascend()` itself does not perform this sync. Do not mutate `ascension_level` directly.
+
+**Prestige**: When the character is stuck, call `perform_prestige(state)` (non-vault variant, since the simulator has no vault state). "Stuck" is defined as: no new `zone_id` entered in the last N ticks AND `can_prestige(state)` returns true.
+
+Per-profile stuck thresholds:
+
+| Profile | N (ticks) | Equivalent time |
+|---|---|---|
+| `casual` | 18000 | 30 minutes |
+| `optimal` | 9000 | 15 minutes |
+| `speedrun` | 3600 | 6 minutes |
 
 #### Key Principle
 
-Inject at the state level, not the input level. We say "the player made this decision" and let real game logic handle downstream effects. No simulated keypresses, no AI players for minigames.
+Inject at the state level, not the input level. Use the game's own public functions (`ascend()`, `perform_prestige()`, `on_minigame_won()`) wherever they exist. Only fall back to direct state mutation when no public function exists (enhancement levels, sigils).
 
 ### 3. Assertions and Output
 
@@ -68,6 +94,8 @@ Extends the existing report with new sections:
 - **System Activations**: When each system was discovered/activated, what was injected and when
 
 CSV export gets new columns: `ascension_level`, `enhancement_avg`, `stormglass_balance`, `challenges_won`, `pr_earned`, `pr_spent`
+
+**PR tracking strategy**: Use a single unified approach — snapshot `state.prestige_rank` before and after each tick (including `inject_outcomes()`) to derive the delta. Positive deltas accumulate into `pr_earned`, negative deltas into `pr_spent`. This captures all PR sources (challenge rewards, Power Cores, WR→PR conversion) and all PR sinks (Haven builds, Ascension) without needing to enumerate individual `TickEvent` variants or separately track injection costs. The `inject_outcomes()` function does NOT separately track its own PR costs — the snapshot delta handles everything uniformly.
 
 #### Assertions (`--assertions` flag)
 
@@ -104,6 +132,7 @@ Cargo produces a `simulator` binary from `src/bin/simulator/main.rs` — same bi
 ### Breaking Changes
 
 - `--haven <strategy>` flag removed. Use `--strategy optimal` (or `casual`/`speedrun`) instead. All three profiles include Haven room priorities.
+- Any CI workflow steps referencing `--haven` must be updated to `--strategy` before this lands. The old Haven strategies (`combat`, `qol`, `balanced`, `full`) are folded into the three new profiles — `balanced` maps to `optimal`, `full` maps to `speedrun`, `combat`/`qol` map to `casual` with different Haven room priorities.
 
 ### CLI Summary
 
