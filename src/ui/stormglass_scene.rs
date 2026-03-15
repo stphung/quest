@@ -515,6 +515,7 @@ fn render_exchange_menu_items(
             format!("{} SG", format_number(STORM_LURE_COST)),
             state.stormglass >= STORM_LURE_COST
                 && !state.fishing.storm_lure_active
+                && !state.fishing.leviathan_caught
                 && state.fishing.rank >= 40,
         ),
     ];

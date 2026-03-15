@@ -53,10 +53,15 @@ pub fn generate_trial_options<R: Rng>(rng: &mut R, exclude: &[ChallengeType]) ->
 }
 
 /// Check if the player can purchase a Storm Lure.
-/// Requirements: has enough SG, not already active, fishing rank >= 40.
+/// Requirements: has enough SG, not already active, leviathan not yet caught, fishing rank >= 40.
 #[allow(dead_code)]
-pub fn can_purchase_storm_lure(stormglass: u64, lure_active: bool, fishing_rank: u32) -> bool {
-    stormglass >= STORM_LURE_COST && !lure_active && fishing_rank >= 40
+pub fn can_purchase_storm_lure(
+    stormglass: u64,
+    lure_active: bool,
+    leviathan_caught: bool,
+    fishing_rank: u32,
+) -> bool {
+    stormglass >= STORM_LURE_COST && !lure_active && !leviathan_caught && fishing_rank >= 40
 }
 
 /// Full display name for a challenge type (matches challenge menu titles).

@@ -86,6 +86,9 @@ pub struct FishingState {
     /// Only active when storm_lure_active is true.
     #[serde(default, skip_serializing_if = "is_zero_f64")]
     pub lure_tracking_bonus: f64,
+    /// Whether the Storm Leviathan has been caught. Disables Storm Lure purchases.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub leviathan_caught: bool,
 }
 
 impl Default for FishingState {
@@ -99,6 +102,7 @@ impl Default for FishingState {
             storm_lure_active: false,
             lure_miss_ramp: 0.0,
             lure_tracking_bonus: 0.0,
+            leviathan_caught: false,
         }
     }
 }

@@ -228,24 +228,24 @@ fn test_lure_inactive_by_default() {
 #[test]
 fn test_cannot_have_two_lures() {
     // If lure is already active, cannot purchase another
-    assert!(!can_purchase_storm_lure(1_000_000, true, 40));
+    assert!(!can_purchase_storm_lure(1_000_000, true, false, 40));
 }
 
 #[test]
 fn test_cannot_purchase_lure_below_rank_40() {
-    assert!(!can_purchase_storm_lure(1_000_000, false, 39));
-    assert!(!can_purchase_storm_lure(1_000_000, false, 1));
+    assert!(!can_purchase_storm_lure(1_000_000, false, false, 39));
+    assert!(!can_purchase_storm_lure(1_000_000, false, false, 1));
 }
 
 #[test]
 fn test_cannot_purchase_lure_without_enough_stormglass() {
-    assert!(!can_purchase_storm_lure(49_999, false, 40));
-    assert!(!can_purchase_storm_lure(0, false, 40));
+    assert!(!can_purchase_storm_lure(49_999, false, false, 40));
+    assert!(!can_purchase_storm_lure(0, false, false, 40));
 }
 
 #[test]
 fn test_can_purchase_lure_at_exact_cost() {
-    assert!(can_purchase_storm_lure(STORM_LURE_COST, false, 40));
+    assert!(can_purchase_storm_lure(STORM_LURE_COST, false, false, 40));
 }
 
 #[test]
@@ -609,6 +609,7 @@ fn test_fishing_state_lure_fields_serialize() {
         storm_lure_active: true,
         lure_miss_ramp: 0.035,
         lure_tracking_bonus: 0.075,
+        leviathan_caught: false,
     };
 
     let json = serde_json::to_string(&state).unwrap();
@@ -638,6 +639,7 @@ fn test_fishing_state_lure_fields_skip_when_default() {
         storm_lure_active: false,
         lure_miss_ramp: 0.0,
         lure_tracking_bonus: 0.0,
+        leviathan_caught: false,
         ..Default::default()
     };
 
