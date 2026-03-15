@@ -338,6 +338,18 @@ impl Achievements {
             (MinigameType::RunicLights, MinigameDifficulty::Master) => {
                 Some(AchievementId::RunicLightsMaster)
             }
+            (MinigameType::VaultWarden, MinigameDifficulty::Novice) => {
+                Some(AchievementId::VaultWardenNovice)
+            }
+            (MinigameType::VaultWarden, MinigameDifficulty::Apprentice) => {
+                Some(AchievementId::VaultWardenApprentice)
+            }
+            (MinigameType::VaultWarden, MinigameDifficulty::Journeyman) => {
+                Some(AchievementId::VaultWardenJourneyman)
+            }
+            (MinigameType::VaultWarden, MinigameDifficulty::Master) => {
+                Some(AchievementId::VaultWardenMaster)
+            }
         };
 
         if let Some(id) = achievement {

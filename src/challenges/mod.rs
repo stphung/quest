@@ -133,6 +133,7 @@ pub mod runic_shift;
 pub mod shard_fusion;
 pub mod snake;
 pub mod sudoku;
+pub mod vault_warden;
 
 pub use chess::{ChessDifficulty, ChessGame, ChessResult};
 pub use flappy::{FlappyBirdDifficulty, FlappyBirdGame, FlappyBirdResult};
@@ -160,6 +161,7 @@ pub use shard_fusion::{
 };
 pub use snake::{SnakeDifficulty, SnakeGame, SnakeResult};
 pub use sudoku::{SudokuDifficulty, SudokuGame, SudokuInput, SudokuResult};
+pub use vault_warden::{VaultWardenDifficulty, VaultWardenGame, VaultWardenResult};
 
 /// A currently active challenge minigame. Only one can be active at a time.
 #[derive(Debug, Clone)]
@@ -177,6 +179,7 @@ pub enum ActiveMinigame {
     Jezzball(JezzballGame),
     Snake(SnakeGame),
     Sudoku(SudokuGame),
+    VaultWarden(VaultWardenGame),
 }
 
 impl ActiveMinigame {
@@ -196,6 +199,7 @@ impl ActiveMinigame {
             ActiveMinigame::Jezzball(g) => g.game_result.is_some(),
             ActiveMinigame::Snake(g) => g.game_result.is_some(),
             ActiveMinigame::Sudoku(g) => g.game_result.is_some(),
+            ActiveMinigame::VaultWarden(g) => g.game_result.is_some(),
         }
     }
 }

@@ -42,6 +42,9 @@ use crate::challenges::snake::logic::{
 use crate::challenges::sudoku::{
     apply_game_result as apply_sudoku_result, process_sudoku_input, SudokuInput,
 };
+use crate::challenges::vault_warden::{
+    apply_vault_warden_result, process_input as process_vault_warden_input, VaultWardenInput,
+};
 use crate::challenges::{ActiveMinigame, MinigameWinInfo};
 use crate::core::game_state::GameState;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
@@ -295,6 +298,22 @@ pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResu
                     _ => RunicLightsInput::Other,
                 };
                 process_runic_lights_input(game, input);
+            }
+            ActiveMinigame::VaultWarden(game) => {
+                if game.game_result.is_some() {
+                    state.last_minigame_win = apply_vault_warden_result(state);
+                    return result_for_challenge(&state.last_minigame_win);
+                }
+                let input = match key.code {
+                    KeyCode::Up => VaultWardenInput::Up,
+                    KeyCode::Down => VaultWardenInput::Down,
+                    KeyCode::Left => VaultWardenInput::Left,
+                    KeyCode::Right => VaultWardenInput::Right,
+                    KeyCode::Char('r') | KeyCode::Char('R') => VaultWardenInput::Restart,
+                    KeyCode::Esc => VaultWardenInput::Forfeit,
+                    _ => VaultWardenInput::Other,
+                };
+                process_vault_warden_input(game, input);
             }
         }
     }

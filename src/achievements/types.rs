@@ -236,6 +236,11 @@ pub enum AchievementId {
     RunicLightsApprentice,
     RunicLightsJourneyman,
     RunicLightsMaster,
+    // Challenge achievements - Vault Warden
+    VaultWardenNovice,
+    VaultWardenApprentice,
+    VaultWardenJourneyman,
+    VaultWardenMaster,
     // Challenge achievements - Meta
     GrandChampion,
 
@@ -339,7 +344,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 236;
+    pub const VARIANT_COUNT: usize = 240;
 }
 
 /// Static definition of an achievement.

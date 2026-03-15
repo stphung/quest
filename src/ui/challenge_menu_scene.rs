@@ -14,6 +14,7 @@ use crate::challenges::runic_shift::RunicShiftDifficulty;
 use crate::challenges::shard_fusion::ShardFusionDifficulty;
 use crate::challenges::snake::SnakeDifficulty;
 use crate::challenges::sudoku::SudokuDifficulty;
+use crate::challenges::vault_warden::VaultWardenDifficulty;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -270,6 +271,15 @@ fn render_detail_view(
                 stormglass_discovered,
             );
         }
+        ChallengeType::VaultWarden => {
+            render_difficulty_selector(
+                frame,
+                chunks[2],
+                &VaultWardenDifficulty::ALL,
+                menu.selected_difficulty,
+                stormglass_discovered,
+            );
+        }
     }
 
     // Outcomes
@@ -300,6 +310,7 @@ fn preferred_difficulty_height(challenge_type: &ChallengeType) -> u16 {
         ChallengeType::Sudoku => SudokuDifficulty::ALL.len(),
         ChallengeType::ShardFusion => ShardFusionDifficulty::ALL.len(),
         ChallengeType::RunicLights => RunicLightsDifficulty::ALL.len(),
+        ChallengeType::VaultWarden => VaultWardenDifficulty::ALL.len(),
     };
 
     // 1 title line + 2 lines per option (name + reward), no blank spacer rows.

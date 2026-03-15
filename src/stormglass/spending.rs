@@ -12,7 +12,7 @@ pub fn chrono_surge_cost(option_index: usize) -> Option<(u64, u64, &'static str)
 }
 
 /// All challenge types available for Invoke Challenge.
-const TRIAL_CHALLENGE_TYPES: [ChallengeType; 12] = [
+const TRIAL_CHALLENGE_TYPES: [ChallengeType; 13] = [
     ChallengeType::Chess,
     ChallengeType::Morris,
     ChallengeType::Gomoku,
@@ -25,6 +25,7 @@ const TRIAL_CHALLENGE_TYPES: [ChallengeType; 12] = [
     ChallengeType::RunicShift,
     ChallengeType::Sudoku,
     ChallengeType::ShardFusion,
+    ChallengeType::VaultWarden,
 ];
 
 /// Number of trial options presented when invoking a trial.
@@ -89,5 +90,6 @@ fn challenge_type_name(ct: &ChallengeType) -> &'static str {
         ChallengeType::Sudoku => "Sigil Matrix: Arcane Grid",
         ChallengeType::ShardFusion => "Shard Fusion",
         ChallengeType::RunicLights => "Runic Lights",
+        ChallengeType::VaultWarden => "Vault Warden",
     }
 }
