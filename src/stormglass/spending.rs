@@ -12,7 +12,7 @@ pub fn chrono_surge_cost(option_index: usize) -> Option<(u64, u64, &'static str)
 }
 
 /// All challenge types available for Invoke Challenge.
-const TRIAL_CHALLENGE_TYPES: [ChallengeType; 11] = [
+const TRIAL_CHALLENGE_TYPES: [ChallengeType; 12] = [
     ChallengeType::Chess,
     ChallengeType::Morris,
     ChallengeType::Gomoku,
@@ -23,11 +23,20 @@ const TRIAL_CHALLENGE_TYPES: [ChallengeType; 11] = [
     ChallengeType::Snake,
     ChallengeType::Jezzball,
     ChallengeType::RunicShift,
+    ChallengeType::Sudoku,
     ChallengeType::ShardFusion,
 ];
 
 /// Number of trial options presented when invoking a trial.
-const TRIAL_OPTION_COUNT: usize = 3;
+pub const TRIAL_OPTION_COUNT: usize = 3;
+
+/// Returns how many challenge types are available for invoke (not already pending).
+pub fn available_trial_types(exclude: &[ChallengeType]) -> usize {
+    TRIAL_CHALLENGE_TYPES
+        .iter()
+        .filter(|ct| !exclude.contains(ct))
+        .count()
+}
 
 /// Generate 3 unique trial options with different challenge types.
 /// Excludes any challenge types already pending in the player's challenge menu.
