@@ -326,6 +326,18 @@ impl Achievements {
             (MinigameType::ShardFusion, MinigameDifficulty::Master) => {
                 Some(AchievementId::ShardFusionMaster)
             }
+            (MinigameType::RunicLights, MinigameDifficulty::Novice) => {
+                Some(AchievementId::RunicLightsNovice)
+            }
+            (MinigameType::RunicLights, MinigameDifficulty::Apprentice) => {
+                Some(AchievementId::RunicLightsApprentice)
+            }
+            (MinigameType::RunicLights, MinigameDifficulty::Journeyman) => {
+                Some(AchievementId::RunicLightsJourneyman)
+            }
+            (MinigameType::RunicLights, MinigameDifficulty::Master) => {
+                Some(AchievementId::RunicLightsMaster)
+            }
         };
 
         if let Some(id) = achievement {

@@ -42,6 +42,7 @@ pub mod overlay_layout;
 pub mod prestige_confirm;
 pub mod responsive;
 pub mod rune_scene;
+pub mod runic_lights_scene;
 pub mod runic_shift_scene;
 mod scene_fx;
 pub mod shard_fusion_scene;
@@ -1366,6 +1367,9 @@ fn draw_right_content(
                 show_dismiss_hint,
                 sg_discovered,
             );
+        }
+        Some(ActiveMinigame::RunicLights(game)) => {
+            runic_lights_scene::render_runic_lights(frame, area, game, ctx, show_dismiss_hint);
         }
         None => {
             if game_state.challenge_menu.is_open {

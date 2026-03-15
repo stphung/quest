@@ -512,7 +512,7 @@ pub(super) fn draw_zone_info(
     achievements: &crate::achievements::Achievements,
     _ctx: &LayoutContext,
 ) {
-    use super::scene_fx::{put_text_centered, render_buffer, SceneCell};
+    use super::scene_fx::{put_text_centered, put_text_centered_wrap, render_buffer, SceneCell};
     let prog = &game_state.zone_progression;
 
     let zone = crate::zones::get_zone(prog.current_zone_id);
@@ -567,14 +567,12 @@ pub(super) fn draw_zone_info(
         }
     }
 
-    // --- Row 2: Subzone description ---
+    // --- Row 2+: Subzone description (wraps if too wide) ---
     if height > 2 {
         if let Some(sz) = subzone {
-            put_text_centered(&mut buffer, 2, width, sz.description, description_color);
+            put_text_centered_wrap(&mut buffer, 2, width, sz.description, description_color);
         }
     }
-
-    // --- Row 3: Empty (weather particles visible) ---
 
     render_buffer(frame, area, &buffer);
 

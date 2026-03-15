@@ -128,6 +128,7 @@ pub mod menu;
 pub mod minesweeper;
 pub mod morris;
 pub mod rune;
+pub mod runic_lights;
 pub mod runic_shift;
 pub mod shard_fusion;
 pub mod snake;
@@ -147,6 +148,7 @@ pub use morris::{
     MorrisDifficulty, MorrisGame, MorrisPhase, MorrisResult, Player as MorrisPlayer, ADJACENCIES,
 };
 pub use rune::{FeedbackMark, RuneDifficulty, RuneGame, RuneResult, RUNE_SYMBOLS};
+pub use runic_lights::{RunicLightsDifficulty, RunicLightsGame, RunicLightsResult};
 pub use runic_shift::{
     Block as RunicShiftBlock, BlockState as RunicShiftBlockState, RuneColor, RunicShiftDifficulty,
     RunicShiftGame, RunicShiftResult, GRID_COLS as RUNIC_SHIFT_GRID_COLS,
@@ -168,6 +170,7 @@ pub enum ActiveMinigame {
     Gomoku(GomokuGame),
     Minesweeper(MinesweeperGame),
     Rune(RuneGame),
+    RunicLights(RunicLightsGame),
     RunicShift(RunicShiftGame),
     ShardFusion(ShardFusionGame),
     Go(GoGame),
@@ -186,6 +189,7 @@ impl ActiveMinigame {
             ActiveMinigame::Gomoku(g) => g.game_result.is_some(),
             ActiveMinigame::Minesweeper(g) => g.game_result.is_some(),
             ActiveMinigame::Rune(g) => g.game_result.is_some(),
+            ActiveMinigame::RunicLights(g) => g.game_result.is_some(),
             ActiveMinigame::RunicShift(g) => g.game_result.is_some(),
             ActiveMinigame::ShardFusion(g) => g.game_result.is_some(),
             ActiveMinigame::Go(g) => g.game_result.is_some(),

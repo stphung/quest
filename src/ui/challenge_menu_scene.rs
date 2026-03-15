@@ -9,6 +9,7 @@ use crate::challenges::menu::{ChallengeMenu, ChallengeType, DifficultyInfo};
 use crate::challenges::minesweeper::MinesweeperDifficulty;
 use crate::challenges::morris::MorrisDifficulty;
 use crate::challenges::rune::RuneDifficulty;
+use crate::challenges::runic_lights::RunicLightsDifficulty;
 use crate::challenges::runic_shift::RunicShiftDifficulty;
 use crate::challenges::shard_fusion::ShardFusionDifficulty;
 use crate::challenges::snake::SnakeDifficulty;
@@ -260,6 +261,15 @@ fn render_detail_view(
                 stormglass_discovered,
             );
         }
+        ChallengeType::RunicLights => {
+            render_difficulty_selector(
+                frame,
+                chunks[2],
+                &RunicLightsDifficulty::ALL,
+                menu.selected_difficulty,
+                stormglass_discovered,
+            );
+        }
     }
 
     // Outcomes
@@ -289,6 +299,7 @@ fn preferred_difficulty_height(challenge_type: &ChallengeType) -> u16 {
         ChallengeType::Snake => SnakeDifficulty::ALL.len(),
         ChallengeType::Sudoku => SudokuDifficulty::ALL.len(),
         ChallengeType::ShardFusion => ShardFusionDifficulty::ALL.len(),
+        ChallengeType::RunicLights => RunicLightsDifficulty::ALL.len(),
     };
 
     // 1 title line + 2 lines per option (name + reward), no blank spacer rows.

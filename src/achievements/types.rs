@@ -231,6 +231,11 @@ pub enum AchievementId {
     ShardFusionApprentice,
     ShardFusionJourneyman,
     ShardFusionMaster,
+    // Challenge achievements - Runic Lights
+    RunicLightsNovice,
+    RunicLightsApprentice,
+    RunicLightsJourneyman,
+    RunicLightsMaster,
     // Challenge achievements - Meta
     GrandChampion,
 
@@ -334,7 +339,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 232;
+    pub const VARIANT_COUNT: usize = 236;
 }
 
 /// Static definition of an achievement.

@@ -31,6 +31,7 @@ enum DebugAction {
     TriggerSnakeChallenge,
     TriggerRunicShiftChallenge,
     TriggerShardFusionChallenge,
+    TriggerRunicLightsChallenge,
     TriggerHavenDiscovery,
     TriggerSoulforgeDiscovery,
     TriggerForgeStormbreaker,
@@ -187,6 +188,7 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::LoomBuildTestShuttleT2,
     DebugAction::LoomClearShuttles,
     DebugAction::TriggerSudokuChallenge,
+    DebugAction::TriggerRunicLightsChallenge,
 ];
 
 const CHALLENGE_ACTIONS: &[DebugAction] = &[
@@ -202,6 +204,7 @@ const CHALLENGE_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerRunicShiftChallenge,
     DebugAction::TriggerSudokuChallenge,
     DebugAction::TriggerShardFusionChallenge,
+    DebugAction::TriggerRunicLightsChallenge,
 ];
 const WORLD_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerDungeon,
@@ -403,6 +406,7 @@ impl DebugAction {
             Self::LoomBuildTestShuttleT2 => 111,
             Self::LoomClearShuttles => 112,
             Self::TriggerSudokuChallenge => 113,
+            Self::TriggerRunicLightsChallenge => 114,
         }
     }
 
@@ -535,6 +539,7 @@ impl DebugAction {
             Self::LoomBuildTestShuttleT2 => "Build T2 Shuttle (FrgLt+Refl\u{2192}EchoGlass)",
             Self::LoomClearShuttles => "Clear All Shuttles",
             Self::TriggerSudokuChallenge => "Trigger Sigil Matrix Challenge",
+            Self::TriggerRunicLightsChallenge => "Trigger Runic Lights Challenge",
         }
     }
 
@@ -564,6 +569,7 @@ impl DebugAction {
             Self::TriggerRunicShiftChallenge => trigger_runic_shift_challenge(state),
             Self::TriggerSudokuChallenge => trigger_sudoku_challenge(state),
             Self::TriggerShardFusionChallenge => trigger_shard_fusion_challenge(state),
+            Self::TriggerRunicLightsChallenge => trigger_runic_lights_challenge(state),
             Self::TriggerHavenDiscovery => trigger_haven_discovery(haven),
             Self::TriggerSoulforgeDiscovery => trigger_soulforge_discovery(enhancement),
             Self::TriggerForgeStormbreaker => trigger_forge_stormbreaker(achievements),
@@ -1100,6 +1106,19 @@ fn trigger_shard_fusion_challenge(state: &mut GameState) -> &'static str {
     "Shard Fusion challenge added!"
 }
 
+fn trigger_runic_lights_challenge(state: &mut GameState) -> &'static str {
+    if state
+        .challenge_menu
+        .has_challenge(&ChallengeType::RunicLights)
+    {
+        return "Runic Lights challenge already pending!";
+    }
+    state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::RunicLights));
+    "Runic Lights challenge added!"
+}
+
 fn trigger_haven_discovery(haven: &mut Haven) -> &'static str {
     if haven.discovered {
         return "Haven already discovered!";
@@ -1616,7 +1635,7 @@ mod tests {
             menu.navigate_down();
         }
         assert_eq!(menu.selected_index, CHALLENGE_ACTIONS.len() - 1);
-        assert_eq!(menu.selected_option_global_index(), 12);
+        assert_eq!(menu.selected_option_global_index(), 114);
 
         // Can't go past end
         menu.navigate_down();

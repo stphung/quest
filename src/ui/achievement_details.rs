@@ -571,7 +571,7 @@ fn build_stats_right_lines(
             ],
         ),
         (
-            "Minesweeper",
+            "Trap Detection",
             [
                 AchievementId::MinesweeperNovice,
                 AchievementId::MinesweeperApprentice,
@@ -580,7 +580,7 @@ fn build_stats_right_lines(
             ],
         ),
         (
-            "Rune",
+            "Rune Deciphering",
             [
                 AchievementId::RuneNovice,
                 AchievementId::RuneApprentice,
@@ -598,7 +598,7 @@ fn build_stats_right_lines(
             ],
         ),
         (
-            "Skyward",
+            "Skyward Gauntlet",
             [
                 AchievementId::FlappyNovice,
                 AchievementId::FlappyApprentice,
@@ -607,7 +607,7 @@ fn build_stats_right_lines(
             ],
         ),
         (
-            "Serpent",
+            "Serpent's Path",
             [
                 AchievementId::SnakeNovice,
                 AchievementId::SnakeApprentice,
@@ -616,7 +616,7 @@ fn build_stats_right_lines(
             ],
         ),
         (
-            "Breach",
+            "Containment Breach",
             [
                 AchievementId::ContainmentBreachNovice,
                 AchievementId::ContainmentBreachApprentice,
@@ -625,7 +625,7 @@ fn build_stats_right_lines(
             ],
         ),
         (
-            "Surge",
+            "Sigil Surge",
             [
                 AchievementId::SigilSurgeNovice,
                 AchievementId::SigilSurgeApprentice,
@@ -634,7 +634,7 @@ fn build_stats_right_lines(
             ],
         ),
         (
-            "Matrix",
+            "Sigil Matrix",
             [
                 AchievementId::SigilMatrixNovice,
                 AchievementId::SigilMatrixApprentice,
@@ -651,13 +651,22 @@ fn build_stats_right_lines(
                 AchievementId::ShardFusionMaster,
             ],
         ),
+        (
+            "Runic Lights",
+            [
+                AchievementId::RunicLightsNovice,
+                AchievementId::RunicLightsApprentice,
+                AchievementId::RunicLightsJourneyman,
+                AchievementId::RunicLightsMaster,
+            ],
+        ),
     ];
 
     let diff_labels = ["Nov", "App", "Jou", "Mas"];
 
     for (name, ids) in challenge_games {
         let mut spans = vec![Span::styled(
-            format!("  {name:<12}"),
+            format!("  {name:<19}"),
             Style::default().fg(Color::DarkGray),
         )];
         for (i, id) in ids.iter().enumerate() {
@@ -674,7 +683,7 @@ fn build_stats_right_lines(
 
     lines.push(Line::from(vec![
         Span::styled(
-            format!("  {:<12}", "Total Wins"),
+            format!("  {:<19}", "Total Wins"),
             Style::default().fg(Color::DarkGray),
         ),
         Span::styled(
