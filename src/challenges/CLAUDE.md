@@ -85,7 +85,7 @@ pub fn tick_game(game: &mut NewGameGame) {
 
 ### `impl_apply_game_result!` Macro (`mod.rs`)
 
-All 10 challenge types use the `impl_apply_game_result!` macro in `mod.rs` to generate their `apply_game_result()` function. Instead of manually implementing reward logic, invoke the macro:
+All 12 challenge types use the `impl_apply_game_result!` macro in `mod.rs` to generate their `apply_game_result()` function. Instead of manually implementing reward logic, invoke the macro:
 
 ```rust
 impl_apply_game_result! {
@@ -276,12 +276,14 @@ Challenges are discovered randomly (~2hr average). The `CHALLENGE_TABLE` in `men
 | Minesweeper | 28 | ~18% | Fast puzzle |
 | Snake | 22 | ~14% | Quick action |
 | Flappy Bird | 20 | ~13% | Moderate action |
-| Sigil Surge | 20 | ~13% | Moderate action-puzzle |
-| JezzBall | 18 | ~11% | Moderate action |
-| Gomoku | 15 | ~9% | Medium-length strategy |
-| Morris | 12 | ~8% | Longer strategy |
-| Chess | 8 | ~5% | Long commitment |
-| Go | 7 | ~4% | Longest game |
+| Sigil Surge | 20 | ~8% | Moderate action-puzzle |
+| Shard Fusion | 20 | ~8% | Moderate puzzle (2048-style) |
+| JezzBall | 18 | ~7% | Moderate action |
+| Sudoku | 18 | ~7% | Moderate puzzle |
+| Gomoku | 15 | ~6% | Medium-length strategy |
+| Morris | 12 | ~5% | Longer strategy |
+| Chess | 8 | ~3% | Long commitment |
+| Go | 7 | ~3% | Longest game |
 
 When adding a new challenge, add it to `CHALLENGE_TABLE` with an appropriate weight.
 
@@ -305,3 +307,5 @@ Winning a minigame emits a `MinigameWinInfo` (defined in `mod.rs`) with `game_ty
 | Flappy Bird (Skyward Gauntlet) | 50×18 area | N/A (action) | Real-time ~60 FPS, gravity/flap physics, pipe obstacles with gap sizes (7→4 rows), 3 lives, 4 difficulties, requires P1+ |
 | JezzBall (Containment Breach) | 34×22 grid | N/A (action) | Real-time ~60 FPS, ball physics, wall-building to capture area, 3 lives, 2-5 balls (Novice→Master), target 60-84%, 4 difficulties, requires P1+ |
 | Sigil Surge (Runic Shift) | 6×12 grid | N/A (action-puzzle) | Real-time ~60 FPS, panel-matching with 5 rune colors, 3 lives, rising blocks (7000-3000ms interval), chain combos, 4 difficulties, requires P1+ |
+| Sudoku (Sigil Matrix) | 9×9 grid | N/A (puzzle) | Classic Sudoku with 4 difficulties, pencil marks, cursor navigation, requires P1+ |
+| Shard Fusion | 4×4 grid | N/A (puzzle) | 2048-style tile merging, target values (512-4096 by difficulty), slide animations, 4 difficulties, requires P1+ |

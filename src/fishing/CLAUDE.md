@@ -52,6 +52,7 @@ pub struct FishingState {
     pub storm_lure_active: bool,     // Stormglass consumable for guaranteed Leviathan encounters
     pub lure_miss_ramp: f64,         // +0.5% per legendary miss, caps at 10%; resets on encounter/catch
     pub lure_tracking_bonus: f64,    // +1.5% per completed encounter, permanent; active when lure is on
+    pub leviathan_caught: bool,      // Whether the Storm Leviathan has been caught; disables Storm Lure purchases
 }
 ```
 

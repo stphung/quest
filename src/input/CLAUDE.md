@@ -9,7 +9,7 @@ Keyboard input routing for the Game screen, dispatching to overlay handlers, min
 | `mod.rs` | Top-level dispatcher (`handle_game_input`) with numbered priority chain; modal dismiss handlers; debug menu routing; base game hotkeys |
 | `types.rs` | `GameOverlay` enum (20 variants), `InputResult` enum (23 variants), `HavenUiState` struct, `HavenConfirmation` enum |
 | `loom_input.rs` | Loom of Worlds overlay input: FlowView navigation, shuttle build/demolish, Codex browsing |
-| `minigame_input.rs` | Dispatches keyboard events to all 10 challenge minigame input handlers; game-over cooldown (2s) logic |
+| `minigame_input.rs` | Dispatches keyboard events to all 12 challenge minigame input handlers; game-over cooldown (2s) logic |
 | `haven_input.rs` | Haven overlay input: room selection, build confirmation, Storm Forge confirmation |
 | `prestige_input.rs` | Prestige confirmation dialog and Vault item selection (equipment preservation across prestige) |
 | `soulforge_input.rs` | Soulforge enhancement overlay: slot selection, confirm/cancel, Soul Tithe toggle, hammering animation phase |
@@ -47,7 +47,7 @@ Keyboard input routing for the Game screen, dispatching to overlay handlers, min
 
 ## Minigame Input Pattern
 
-Each of the 10 minigames follows the same structure in `minigame_input.rs`:
+Each of the 12 minigames follows the same structure in `minigame_input.rs`:
 1. Check if game result exists -- if so, apply result and dismiss after 2s cooldown
 2. Map `KeyCode` to minigame-specific input enum (e.g., `ChessInput::Up`)
 3. Call the minigame's `process_input()` function
@@ -56,6 +56,6 @@ The **forfeit pattern** (first Esc sets `forfeit_pending`, second Esc confirms) 
 
 ## Integration Points
 
-- **Imports from**: `challenges/` (menu processing, all 10 minigame input handlers), `character/prestige` (can_prestige, perform_prestige), `haven/` (try_build_room, can_forge_stormbreaker), `enhancement/` (roll_enhancement, costs), `deep/` (mission management, guild rank), `stormglass/` (sigils, spending), `achievements/` (browser, titles, sync), `ascension/` (ascend), `zones/` (sync_account_zone_unlocks), `utils/debug_menu` (DebugMenu), `history/` (SaveEvent)
+- **Imports from**: `challenges/` (menu processing, all 12 minigame input handlers), `character/prestige` (can_prestige, perform_prestige), `haven/` (try_build_room, can_forge_stormbreaker), `enhancement/` (roll_enhancement, costs), `deep/` (mission management, guild rank), `stormglass/` (sigils, spending), `achievements/` (browser, titles, sync), `ascension/` (ascend), `zones/` (sync_account_zone_unlocks), `utils/debug_menu` (DebugMenu), `history/` (SaveEvent)
 - **Consumed by**: `main.rs` and `main_helpers/input_routing.rs` call `handle_game_input()` and route the `InputResult`
 - **UI coupling**: References `ui::achievement_browser_scene`, `ui::title_browser_scene`, `ui::time_vault_scene`, `ui::stats_prestige` for type imports only (no rendering)
