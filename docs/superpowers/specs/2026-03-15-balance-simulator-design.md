@@ -16,7 +16,7 @@ Extend the existing simulator binary (Approach A). No new binary — the simulat
 
 ### Prerequisite: Migrate to `game_tick_with_context()`
 
-The current simulator calls the deprecated `game_tick()` function, which internally creates a throwaway `LoomState` each tick. This means Loom state (patterns, shuttles, WR→PR conversion, zone unlocks) is never accumulated. Before adding strategy profiles, the simulator must be migrated to `game_tick_with_context()` with a persistent `TickContext` that includes a real `LoomState` alongside the existing `Haven`, `EnhancementProgress`, and `DeepState` allocations.
+The current simulator calls the deprecated `game_tick()` function, which internally creates a throwaway `LoomState` each tick. This means Loom state (patterns, shuttles, WR→PR conversion, zone unlocks) is never accumulated. Before adding strategy profiles, the simulator must be migrated to `game_tick_with_context()` with a persistent `TickContext` that includes a real `LoomState` alongside the existing `Haven`, `EnhancementProgress`, `DeepState`, and `Achievements` allocations.
 
 ## Design
 
@@ -49,11 +49,11 @@ Each tick, after `game_tick_with_context()` returns, the simulator runs an `inje
 
 #### Injection Mechanics Per System
 
-**Challenge wins**: Every N ticks (profile-configured), call `achievements.on_minigame_won(game_type, difficulty, character_name)` directly. This is the correct injection site — `last_minigame_win` is a transient field consumed by `main.rs` between ticks, not by the tick engine. Also apply the challenge rewards (PR and Stormglass) directly to `state.prestige_rank` and `state.stormglass` to keep economy metrics accurate.
+**Challenge wins**: Every N ticks (profile-configured), call `achievements.on_minigame_won(game_type, difficulty, Some("Simulator"))` directly (the third parameter is `Option<&str>`). This is the correct injection site — `last_minigame_win` is a transient field consumed by `main.rs` between ticks, not by the tick engine. Also apply the challenge rewards (PR and Stormglass) directly to `state.prestige_rank` and `state.stormglass` to keep economy metrics accurate.
 
 **Soulforge enhancement**: When prestige rank crosses a profile threshold, directly set `enhancement.levels[slot] = target_level`. Tests progression curves, not enhancement RNG.
 
-**Stormglass sigil spending**: When `state.stormglass` exceeds a profile threshold, etch sigils by setting `state.storm_sigils.slots_unlocked` and populating `state.storm_sigils.sigils` with concrete `Sigil { effect, value, grade }` entries, then deduct the equivalent Stormglass cost from `state.stormglass`. Use `roll_sigil(effect, deterministic_roll)` with a fixed roll value per grade tier to produce representative `value` fields, or construct `Sigil` structs directly with values from the grade's expected range midpoint.
+**Stormglass sigil spending**: When `state.stormglass` exceeds a profile threshold, etch sigils by setting `state.storm_sigils.slots_unlocked` and populating `state.storm_sigils.sigils` with `Some(Sigil { effect, value, grade })` entries (the field type is `Vec<Option<Sigil>>`), then deduct the equivalent Stormglass cost from `state.stormglass`. Use `roll_sigil(effect, deterministic_roll)` with a fixed roll value per grade tier to produce representative `value` fields, or construct `Sigil` structs directly with values from the grade's expected range midpoint.
 
 Per-profile sigil tables (using actual `SigilEffectType` and `SigilGrade` enum variants):
 
