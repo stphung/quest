@@ -41,7 +41,7 @@ pub fn render_runic_lights(
         " Runic Lights ",
         Color::Cyan,
         (game.size as u16) + 2,
-        22,
+        26,
         ctx,
     );
 

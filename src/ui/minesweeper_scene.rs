@@ -35,7 +35,7 @@ pub fn render_minesweeper(
     }
 
     // Use shared layout
-    let layout = create_game_layout(frame, area, " Trap Detection ", Color::Yellow, 10, 24, ctx);
+    let layout = create_game_layout(frame, area, " Trap Detection ", Color::Yellow, 10, 26, ctx);
 
     render_grid(frame, layout.content, game);
     render_status_bar_content(frame, layout.status_bar, game);

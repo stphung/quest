@@ -62,7 +62,7 @@ pub fn render_snake_scene(
         " Serpent's Path ",
         Color::LightGreen,
         20,
-        16,
+        26,
         ctx,
     );
 

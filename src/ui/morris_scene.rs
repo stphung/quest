@@ -46,7 +46,7 @@ pub fn render_morris_scene(
     }
 
     // Use shared layout
-    let layout = create_game_layout(frame, area, " Nine Men's Morris ", Color::Cyan, 13, 24, ctx);
+    let layout = create_game_layout(frame, area, " Nine Men's Morris ", Color::Cyan, 13, 26, ctx);
 
     render_board(frame, layout.content, game, false);
     render_status(frame, layout.status_bar, game);
@@ -553,7 +553,7 @@ fn render_morris_game_over(
     frame.render_widget(Clear, area);
 
     // Create layout matching normal game
-    let layout = create_game_layout(frame, area, " Nine Men's Morris ", Color::Cyan, 13, 24, ctx);
+    let layout = create_game_layout(frame, area, " Nine Men's Morris ", Color::Cyan, 13, 26, ctx);
 
     // Render board with last move highlighted
     render_board(frame, layout.content, game, true);

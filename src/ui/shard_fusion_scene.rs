@@ -179,7 +179,7 @@ pub fn render_shard_fusion_scene(
         " Shard Fusion ",
         Color::Yellow,
         BOARD_TERM_H,
-        24,
+        26,
         ctx,
     );
 
