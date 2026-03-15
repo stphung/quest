@@ -83,7 +83,7 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &SudokuGame) {
             }
         }
 
-        // Row content
+        // Row content: "│ X X X │ X X X │ X X X │" = 25 chars
         let mut spans = Vec::new();
         for col in 0..9 {
             // Left border or box separator
@@ -129,10 +129,15 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &SudokuGame) {
             }
 
             spans.push(Span::styled(text, style));
+
+            // Trailing space after last digit in each 3-cell box
+            if col == 2 || col == 5 || col == 8 {
+                spans.push(Span::raw(" "));
+            }
         }
         // Right border
         spans.push(Span::styled(
-            " \u{2502}",
+            "\u{2502}",
             Style::default().fg(Color::DarkGray),
         ));
 
