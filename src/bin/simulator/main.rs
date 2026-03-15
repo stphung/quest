@@ -17,6 +17,7 @@
 
 mod report;
 mod stats;
+mod strategy;
 
 use quest::achievements::Achievements;
 use quest::character::derived_stats::DerivedStats;
