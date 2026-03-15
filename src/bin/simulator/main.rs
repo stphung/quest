@@ -21,10 +21,11 @@ mod stats;
 use quest::achievements::Achievements;
 use quest::character::derived_stats::DerivedStats;
 use quest::core::game_state::GameState;
-#[allow(deprecated)]
-use quest::core::tick::game_tick;
+use quest::core::tick::game_tick_with_context;
+use quest::core::tick_context::TickContext;
 use quest::enhancement::EnhancementProgress;
 use quest::haven::{try_build_room, Haven, HavenRoomId};
+use quest::loom::LoomState;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::io::Write;
@@ -252,7 +253,6 @@ fn auto_build_haven(
 
 // ── Core Simulation Loop ─────────────────────────────────────────────
 
-#[allow(deprecated)]
 fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState, Option<TickProfile>) {
     let mut state = GameState::new("Simulator".to_string(), 0);
     state.prestige_rank = config.prestige;
@@ -271,6 +271,8 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState, Option
     let mut enhancement = EnhancementProgress::new();
     let mut deep_state = quest::deep::DeepState::new();
     let mut achievements = Achievements::default();
+    let mut loom = LoomState::new();
+
     // Force-unlock Stormbreaker achievement if requested
     if config.stormbreaker {
         use quest::achievements::AchievementId;
@@ -309,31 +311,25 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState, Option
     });
 
     for tick in 0..config.ticks {
-        let result = if let Some(ref mut profile) = tick_profile {
-            let start = std::time::Instant::now();
-            let r = game_tick(
-                &mut state,
-                &mut tick_counter,
-                &mut haven,
-                &mut enhancement,
-                &mut deep_state,
-                &mut achievements,
-                false,
-                &mut rng,
-            );
-            profile.record(start.elapsed().as_nanos());
-            r
-        } else {
-            game_tick(
-                &mut state,
-                &mut tick_counter,
-                &mut haven,
-                &mut enhancement,
-                &mut deep_state,
-                &mut achievements,
-                false,
-                &mut rng,
-            )
+        let result = {
+            let mut ctx = TickContext {
+                state: &mut state,
+                tick_counter: &mut tick_counter,
+                haven: &mut haven,
+                enhancement: &mut enhancement,
+                deep: &mut deep_state,
+                achievements: &mut achievements,
+                loom: &mut loom,
+                debug_mode: false,
+            };
+            if let Some(ref mut profile) = tick_profile {
+                let start = std::time::Instant::now();
+                let r = game_tick_with_context(&mut ctx, &mut rng);
+                profile.record(start.elapsed().as_nanos());
+                r
+            } else {
+                game_tick_with_context(&mut ctx, &mut rng)
+            }
         };
 
         // Detect zone changes
