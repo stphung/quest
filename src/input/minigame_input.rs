@@ -293,7 +293,7 @@ pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResu
                     KeyCode::Down => RunicLightsInput::Down,
                     KeyCode::Left => RunicLightsInput::Left,
                     KeyCode::Right => RunicLightsInput::Right,
-                    KeyCode::Enter => RunicLightsInput::Toggle,
+                    KeyCode::Char(' ') => RunicLightsInput::Toggle,
                     KeyCode::Esc => RunicLightsInput::Forfeit,
                     _ => RunicLightsInput::Other,
                 };

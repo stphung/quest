@@ -113,7 +113,7 @@ fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &RunicLightsGa
         Color::Cyan,
         &[
             ("[Arrows]", "Move"),
-            ("[Enter]", "Toggle"),
+            ("[Space]", "Toggle"),
             ("[Esc]", "Forfeit"),
         ],
     );
