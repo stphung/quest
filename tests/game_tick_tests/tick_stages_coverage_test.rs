@@ -716,6 +716,7 @@ fn test_subzone_boss_defeated_zone_complete() {
         xp_gained: 1200,
         result: BossDefeatResult::ZoneComplete {
             old_zone: "Meadow",
+            old_zone_id: 1,
             new_zone_id: 2,
         },
     }];
@@ -762,6 +763,7 @@ fn test_subzone_boss_defeated_zone_gated() {
         xp_gained: 1500,
         result: BossDefeatResult::ZoneCompleteButGated {
             zone_name: "Dark Forest",
+            old_zone_id: 2,
             required_prestige: 5,
         },
     }];
@@ -1266,6 +1268,7 @@ fn test_zone_complete_triggers_zone_achievement() {
         xp_gained: 1200,
         result: BossDefeatResult::ZoneComplete {
             old_zone: "Meadow",
+            old_zone_id: 1,
             new_zone_id: 2,
         },
     }];

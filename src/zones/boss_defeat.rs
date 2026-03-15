@@ -14,11 +14,13 @@ pub enum BossDefeatResult {
     /// Completed zone and moved to next zone
     ZoneComplete {
         old_zone: &'static str,
+        old_zone_id: u32,
         new_zone_id: u32,
     },
     /// Completed zone but next zone requires higher prestige
     ZoneCompleteButGated {
         zone_name: &'static str,
+        old_zone_id: u32,
         required_prestige: u32,
     },
     /// Completed the final zone (Zone 10)
@@ -93,6 +95,7 @@ impl ZoneProgression {
             if self.advance_to_next_zone(prestige_rank) {
                 return BossDefeatResult::ZoneComplete {
                     old_zone: zone.name,
+                    old_zone_id: zone_id,
                     new_zone_id: self.current_zone_id,
                 };
             }
@@ -102,6 +105,7 @@ impl ZoneProgression {
             if let Some(next) = next_zone {
                 return BossDefeatResult::ZoneCompleteButGated {
                     zone_name: zone.name,
+                    old_zone_id: zone_id,
                     required_prestige: next.prestige_requirement,
                 };
             }
@@ -183,6 +187,7 @@ impl ZoneProgression {
                 self.current_subzone_id = 1;
                 return BossDefeatResult::ZoneComplete {
                     old_zone: zone.name,
+                    old_zone_id: zone_id,
                     new_zone_id: next,
                 };
             }
@@ -202,6 +207,7 @@ impl ZoneProgression {
                 self.kills_in_subzone = 0;
                 return BossDefeatResult::ZoneComplete {
                     old_zone: zone.name,
+                    old_zone_id: zone_id,
                     new_zone_id: next,
                 };
             }
@@ -222,6 +228,7 @@ impl ZoneProgression {
         if self.advance_to_next_zone(prestige_rank) {
             return BossDefeatResult::ZoneComplete {
                 old_zone: zone.name,
+                old_zone_id: zone_id,
                 new_zone_id: self.current_zone_id,
             };
         }
@@ -232,6 +239,7 @@ impl ZoneProgression {
             if let Some(next) = next_zone {
                 return BossDefeatResult::ZoneCompleteButGated {
                     zone_name: zone.name,
+                    old_zone_id: zone_id,
                     required_prestige: next.prestige_requirement,
                 };
             }
@@ -304,6 +312,7 @@ mod tests {
             BossDefeatResult::ZoneComplete {
                 old_zone,
                 new_zone_id,
+                ..
             } => {
                 assert_eq!(old_zone, "Meadow");
                 assert_eq!(new_zone_id, 2);
@@ -341,6 +350,7 @@ mod tests {
             BossDefeatResult::ZoneCompleteButGated {
                 zone_name,
                 required_prestige,
+                ..
             } => {
                 assert_eq!(zone_name, "Dark Forest");
                 assert_eq!(required_prestige, 5);

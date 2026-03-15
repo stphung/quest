@@ -8,6 +8,7 @@ use crate::character::prestige::PrestigeCombatBonuses;
 use crate::combat::types::CombatState;
 use crate::dungeon::types::Dungeon;
 use crate::fishing::types::{FishingSession, FishingState};
+use crate::god_items::CachedGodItemBonuses;
 use crate::haven::HavenBonuses;
 use crate::items::equipment::Equipment;
 use crate::items::types::Rarity;
@@ -121,6 +122,8 @@ pub struct GameState {
     pub cached_sigil_bonuses: SigilBonuses,
     /// Dirty flag: set when Haven rooms, Storm Sigils, or prestige rank change
     pub bonuses_dirty: bool,
+    /// Cached god item bonuses — recomputed when equipment changes (derived_stats_dirty)
+    pub cached_god_item_bonuses: CachedGodItemBonuses,
 }
 
 impl GameState {
@@ -174,6 +177,7 @@ impl GameState {
             cached_haven_bonuses: HavenBonuses::default(),
             cached_sigil_bonuses: SigilBonuses::default(),
             bonuses_dirty: true,
+            cached_god_item_bonuses: CachedGodItemBonuses::default(),
             chrono_surge_active: false,
             debug_force_overcharge: false,
         }

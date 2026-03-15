@@ -70,8 +70,7 @@ pub fn process_dungeon_events<R: Rng>(
         return;
     }
 
-    let god_item_dungeon_speed =
-        crate::god_items::equipped_god_item_dungeon_speed_percent(&state.equipment);
+    let god_item_dungeon_speed = state.cached_god_item_bonuses.dungeon_speed_percent;
     let dungeon_events = update_dungeon(state, delta_time, god_item_dungeon_speed);
     for event in dungeon_events {
         match event {
@@ -186,8 +185,7 @@ pub fn process_fishing_tick<R: Rng>(
         double_fish_chance_percent: haven_bonuses.double_fish_chance,
         max_fishing_rank_bonus: haven_bonuses.max_fishing_rank_bonus,
     };
-    let god_item_fishing_reduction =
-        crate::god_items::equipped_god_item_fishing_reduction_percent(&state.equipment);
+    let god_item_fishing_reduction = state.cached_god_item_bonuses.fishing_reduction_percent;
     let fishing_result =
         tick_fishing_with_haven_result(state, rng, &haven_fishing, god_item_fishing_reduction);
     let level_before = state.character_level;
@@ -628,17 +626,17 @@ pub(super) fn process_zone_achievements(
     character_name: &str,
 ) {
     match defeat_result {
-        BossDefeatResult::ZoneComplete { old_zone, .. }
+        BossDefeatResult::ZoneComplete {
+            old_zone_id,
+            old_zone: _,
+            ..
+        }
         | BossDefeatResult::ZoneCompleteButGated {
-            zone_name: old_zone,
+            old_zone_id,
+            zone_name: _,
             ..
         } => {
-            if let Some(zone) = crate::zones::get_all_zones()
-                .iter()
-                .find(|z| z.name == *old_zone)
-            {
-                achievements.on_zone_fully_cleared(zone.id, Some(character_name));
-            }
+            achievements.on_zone_fully_cleared(*old_zone_id, Some(character_name));
         }
         BossDefeatResult::StormsEnd => {
             achievements.on_zone_fully_cleared(10, Some(character_name));
@@ -727,6 +725,8 @@ pub(super) fn sync_derived_stats(
     if state.derived_stats_dirty {
         state.recalculate_derived_stats(&enhancement.levels);
         state.recalculate_prestige_bonuses();
+        state.cached_god_item_bonuses =
+            crate::god_items::CachedGodItemBonuses::compute(&state.equipment);
     }
     let derived = state.cached_derived_stats;
     let mut max_hp = derived.max_hp;
@@ -803,16 +803,14 @@ pub(super) fn run_combat<R: Rng>(
         double_strike_chance: haven_bonuses.double_strike_chance
             + sigil_bonuses.double_strike_percent,
         xp_gain_percent: haven_bonuses.xp_gain_percent + sigil_bonuses.xp_percent,
-        // God item bonuses
-        early_damage_percent: crate::god_items::equipped_god_item_damage_percent(&state.equipment),
-        damage_reduction_percent: crate::god_items::equipped_god_item_dr(&state.equipment)
+        // God item bonuses (cached, recomputed only when equipment changes)
+        early_damage_percent: state.cached_god_item_bonuses.damage_percent,
+        damage_reduction_percent: state.cached_god_item_bonuses.damage_reduction_percent
             + sigil_bonuses.damage_reduction_percent,
-        attack_speed_percent: crate::god_items::equipped_god_item_attack_speed_percent(
-            &state.equipment,
-        ) + sigil_bonuses.attack_speed_percent,
-        regen_reduction_percent: crate::god_items::equipped_god_item_regen_reduction_percent(
-            &state.equipment,
-        ) + sigil_bonuses.regen_delay_percent,
+        attack_speed_percent: state.cached_god_item_bonuses.attack_speed_percent
+            + sigil_bonuses.attack_speed_percent,
+        regen_reduction_percent: state.cached_god_item_bonuses.regen_reduction_percent
+            + sigil_bonuses.regen_delay_percent,
         // Prestige flat bonuses
         flat_damage: prestige_combat.flat_damage,
         flat_defense: prestige_combat.flat_defense,

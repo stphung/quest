@@ -158,6 +158,61 @@ pub fn get_god_item_definition(id: GodItemId) -> GodItemDefinition {
     }
 }
 
+/// Cached god item bonuses, computed once when equipment changes.
+/// Avoids 4+ per-tick linear scans through equipment slots.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CachedGodItemBonuses {
+    /// Divine Bulwark damage reduction %
+    pub damage_reduction_percent: f64,
+    /// Windborne attack speed %
+    pub attack_speed_percent: f64,
+    /// Giant's Might damage %
+    pub damage_percent: f64,
+    /// Swiftstrider regen reduction %
+    pub regen_reduction_percent: f64,
+    /// Swiftfoot dungeon speed %
+    pub dungeon_speed_percent: f64,
+    /// NimbleHands fishing timer reduction %
+    pub fishing_reduction_percent: f64,
+}
+
+impl CachedGodItemBonuses {
+    /// Compute all god item bonuses in a single pass over equipped items.
+    pub fn compute(equipment: &crate::items::Equipment) -> Self {
+        let mut bonuses = Self::default();
+        for item in equipment.iter_equipped() {
+            if let Some(id) = item.god_item_id {
+                let def = get_god_item_definition(id);
+                match def.passive {
+                    GodItemPassive::DivineBulwark {
+                        damage_reduction_percent,
+                    } => bonuses.damage_reduction_percent = damage_reduction_percent,
+                    GodItemPassive::Windborne {
+                        attack_speed_percent,
+                    } => bonuses.attack_speed_percent = attack_speed_percent,
+                    GodItemPassive::GiantsMight { damage_percent } => {
+                        bonuses.damage_percent = damage_percent
+                    }
+                }
+                for bonus in &def.bonuses {
+                    match bonus {
+                        GodItemBonus::Swiftstrider {
+                            regen_reduction_percent,
+                        } => bonuses.regen_reduction_percent = *regen_reduction_percent,
+                        GodItemBonus::Swiftfoot {
+                            dungeon_speed_percent,
+                        } => bonuses.dungeon_speed_percent = *dungeon_speed_percent,
+                        GodItemBonus::NimbleHands {
+                            fishing_reduction_percent,
+                        } => bonuses.fishing_reduction_percent = *fishing_reduction_percent,
+                    }
+                }
+            }
+        }
+        bonuses
+    }
+}
+
 /// Returns the god item damage reduction percent from equipped items, if any.
 pub fn equipped_god_item_dr(equipment: &crate::items::Equipment) -> f64 {
     for item in equipment.iter_equipped() {

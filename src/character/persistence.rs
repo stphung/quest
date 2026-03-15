@@ -93,6 +93,7 @@ impl CharacterManager {
             cached_haven_bonuses: Default::default(),
             cached_sigil_bonuses: Default::default(),
             bonuses_dirty: true,
+            cached_god_item_bonuses: Default::default(),
             stormglass: save_data.stormglass,
             stormglass_discovered: save_data.stormglass_discovered,
             storm_sigils: save_data.storm_sigils,

@@ -588,6 +588,7 @@ fn test_zone_achievements_zone_complete_but_gated() {
         xp_gained: 1500,
         result: BossDefeatResult::ZoneCompleteButGated {
             zone_name: "Dark Forest",
+            old_zone_id: 2,
             required_prestige: 5,
         },
     }];
