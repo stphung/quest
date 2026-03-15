@@ -49,11 +49,11 @@ Each tick, after `game_tick_with_context()` returns, the simulator runs an `inje
 
 #### Injection Mechanics Per System
 
-**Challenge wins**: Every N ticks (profile-configured), call `achievements.on_minigame_won(game_type, difficulty, Some("Simulator"))` directly (the third parameter is `Option<&str>`). This is the correct injection site — `last_minigame_win` is a transient field consumed by `main.rs` between ticks, not by the tick engine. Also apply the challenge rewards (PR and Stormglass) directly to `state.prestige_rank` and `state.stormglass` to keep economy metrics accurate.
+**Challenge wins**: Every N ticks (profile-configured), call `achievements.on_minigame_won(game_type, difficulty, Some("Simulator"))` directly, where `game_type: MinigameType` and `difficulty: MinigameDifficulty` are enums from `achievements::milestones`. This is the correct injection site — `last_minigame_win` is a transient field consumed by `main.rs` between ticks, not by the tick engine. Also apply the challenge rewards (PR and Stormglass) directly to `state.prestige_rank` and `state.stormglass` to keep economy metrics accurate.
 
 **Soulforge enhancement**: When prestige rank crosses a profile threshold, directly set `enhancement.levels[slot] = target_level`. Tests progression curves, not enhancement RNG.
 
-**Stormglass sigil spending**: When `state.stormglass` exceeds a profile threshold, etch sigils by setting `state.storm_sigils.slots_unlocked` and populating `state.storm_sigils.sigils` with `Some(Sigil { effect, value, grade })` entries (the field type is `Vec<Option<Sigil>>`), then deduct the equivalent Stormglass cost from `state.stormglass`. Use `roll_sigil(effect, deterministic_roll)` with a fixed roll value per grade tier to produce representative `value` fields, or construct `Sigil` structs directly with values from the grade's expected range midpoint.
+**Stormglass sigil spending**: When `state.stormglass` exceeds a profile threshold, etch sigils by setting `state.storm_sigils.slots_unlocked` and populating `state.storm_sigils.sigils` with `Some(Sigil { effect, value, grade })` entries (the field type is `Vec<Option<Sigil>>`), then deduct the equivalent Stormglass cost from `state.stormglass`. Use `stormglass::sigils::roll_sigil(effect, uniform_roll)` with a fixed `uniform_roll: f64` value per grade tier to produce representative `value` fields, or construct `Sigil` structs directly with values from the grade's expected range midpoint.
 
 Per-profile sigil tables (using actual `SigilEffectType` and `SigilGrade` enum variants):
 
@@ -65,7 +65,7 @@ Per-profile sigil tables (using actual `SigilEffectType` and `SigilGrade` enum v
 
 (The `SigilGrade` enum uses a letter-grade system: `FMinus` through `SPlus`. The `SigilEffectType` enum has percent-based variants: `XpPercent`, `DamagePercent`, `DamageReductionPercent`, `CritChancePercent`, `DropRatePercent`, `MaxHpPercent`, `FishingSpeedPercent`, `OfflineXpPercent`, `AttackSpeedPercent`, `DoubleStrikePercent`, `RegenDelayPercent`, `ChronoOverchargePercent`. Exact effect choices per profile may be adjusted during implementation.)
 
-**Ascension**: When prestige rank and pattern gates are met per profile rules, call `ascension::logic::ascend(state, deepest_layer, completed_patterns)` — the public function that handles PR deduction and level increment. After `ascend()` returns, the caller must also call `zones::access::sync_account_zone_unlocks()` to update Loom/fracture zone caps, since `ascend()` itself does not perform this sync. Do not mutate `ascension_level` directly.
+**Ascension**: When prestige rank and pattern gates are met per profile rules, call `ascension::logic::ascend(state, deepest_layer, completed_patterns)` — the public function that handles PR deduction and level increment. Use `ascension::logic::can_ascend(ascension_level, prestige_rank, deepest_layer, completed_patterns)` as the guard before calling `ascend()`. After `ascend()` returns, the caller must also call `zones::sync_account_zone_unlocks(prog, storms_end_unlocked, fracture_zone_cap, prestige_rank, loom_zone_cap, ascension_level)` to update Loom/fracture zone caps, since `ascend()` itself does not perform this sync. Do not mutate `ascension_level` directly.
 
 **Prestige**: When the character is stuck, call `perform_prestige(state)` (non-vault variant, since the simulator has no vault state). "Stuck" is defined as: no new `zone_id` entered in the last N ticks AND `can_prestige(state)` returns true.
 
