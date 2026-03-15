@@ -12,7 +12,7 @@ chess-engine = "0.1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
 rand = "0.10"
 dirs = "6.0"
-uuid = { version = "1.21", features = ["v4", "serde"] }
+uuid = { version = "1.22", features = ["v4", "serde"] }
 ureq = { version = "3.2", features = ["json"] }
 flate2 = "1.1"
 git2 = { version = "0.20", default-features = false, features = ["vendored-openssl", "https"] }
