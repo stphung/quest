@@ -154,6 +154,7 @@ impl InjectionState {
 
 /// Run outcome injection after each game tick.
 /// Checks milestone triggers per profile and mutates state directly.
+#[allow(clippy::too_many_arguments)]
 pub fn inject_outcomes(
     profile: &StrategyProfile,
     state: &mut GameState,

@@ -440,7 +440,7 @@ fn main() {
         let pass = if config.runs == 1 {
             assertions::run_assertions(&all_stats[0])
         } else {
-            all_stats.iter().all(|s| assertions::run_assertions(s))
+            all_stats.iter().all(assertions::run_assertions)
         };
         if !pass {
             std::process::exit(1);

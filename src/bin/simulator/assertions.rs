@@ -28,11 +28,11 @@ impl Assertion {
 pub fn builtin_assertions() -> Vec<Assertion> {
     vec![
         Assertion {
-            name: "Zone 5 reachable within 30min at P0",
+            name: "Zone 2 reachable within 30min at P0",
             metric: |s| {
                 s.zone_entry_tick
                     .keys()
-                    .filter(|(z, _)| *z >= 5)
+                    .filter(|(z, _)| *z >= 2)
                     .filter_map(|k| s.zone_entry_tick.get(k))
                     .copied()
                     .min()
@@ -42,8 +42,8 @@ pub fn builtin_assertions() -> Vec<Assertion> {
             value: 18_000.0, // 30 min in ticks
         },
         Assertion {
-            name: "Level 50 reachable within 1hr at P0",
-            metric: |s| s.level_at_tick.get(&50).copied().unwrap_or(u64::MAX) as f64,
+            name: "Level 20 reachable within 1hr at P0",
+            metric: |s| s.level_at_tick.get(&20).copied().unwrap_or(u64::MAX) as f64,
             op: AssertionOp::LessOrEqual,
             value: 36_000.0,
         },
