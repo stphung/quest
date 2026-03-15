@@ -272,17 +272,17 @@ Challenges are discovered randomly (~2hr average). The `CHALLENGE_TABLE` in `men
 
 | Challenge | Weight | ~Probability | Rationale |
 |-----------|--------|--------------|-----------|
-| Rune | 30 | ~19% | Fastest (~2 min) |
-| Minesweeper | 28 | ~18% | Fast puzzle |
-| Snake | 22 | ~14% | Quick action |
-| Flappy Bird | 20 | ~13% | Moderate action |
-| Sigil Surge | 20 | ~8% | Moderate action-puzzle |
-| Shard Fusion | 20 | ~8% | Moderate puzzle (2048-style) |
-| JezzBall | 18 | ~7% | Moderate action |
-| Sudoku | 18 | ~7% | Moderate puzzle |
-| Gomoku | 15 | ~6% | Medium-length strategy |
-| Morris | 12 | ~5% | Longer strategy |
-| Chess | 8 | ~3% | Long commitment |
+| Rune | 30 | ~14% | Fastest (~2 min) |
+| Minesweeper | 28 | ~13% | Fast puzzle |
+| Snake | 22 | ~10% | Quick action |
+| Flappy Bird | 20 | ~9% | Moderate action |
+| Sigil Surge | 20 | ~9% | Moderate action-puzzle |
+| Shard Fusion | 20 | ~9% | Moderate puzzle (2048-style) |
+| JezzBall | 18 | ~8% | Moderate action |
+| Sudoku | 18 | ~8% | Moderate puzzle |
+| Gomoku | 15 | ~7% | Medium-length strategy |
+| Morris | 12 | ~6% | Longer strategy |
+| Chess | 8 | ~4% | Long commitment |
 | Go | 7 | ~3% | Longest game |
 
 When adding a new challenge, add it to `CHALLENGE_TABLE` with an appropriate weight.

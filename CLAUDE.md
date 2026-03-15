@@ -86,7 +86,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 | God Items | `src/god_items/` | [CLAUDE.md](src/god_items/CLAUDE.md) | 3 Norse mythology endgame items |
 | Haven | `src/haven/` | [CLAUDE.md](src/haven/CLAUDE.md) | Account-level base building |
 | Achievements | `src/achievements/` | [CLAUDE.md](src/achievements/CLAUDE.md) | Achievement tracking, titles, scores |
-| Challenges | `src/challenges/` | [CLAUDE.md](src/challenges/CLAUDE.md) | 10 challenge minigames |
+| Challenges | `src/challenges/` | [CLAUDE.md](src/challenges/CLAUDE.md) | 12 challenge minigames |
 | History | `src/history/` | [CLAUDE.md](src/history/CLAUDE.md) | Git-based save versioning (Time Vault) |
 | Input | `src/input/` | [CLAUDE.md](src/input/CLAUDE.md) | Keyboard input routing |
 | UI | `src/ui/` | [CLAUDE.md](src/ui/CLAUDE.md) | Terminal UI components (Ratatui) |
@@ -167,4 +167,4 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 
 ## Dependencies
 
-Ratatui 0.30, Serde (JSON), serde_json 1.0, Rand 0.10, Rand_chacha 0.10 (seeded RNG for simulator), Chrono, dirs 6.0, Chess-engine 0.1, ureq 3.2, flate2 1.1, zip 8.0, unicode-width 0.2, git2 0.20 (vendored-openssl), tar 0.4, uuid 1.21, tempfile 3 (dev)
+Ratatui 0.30, Serde (JSON), serde_json 1.0, Rand 0.10, Rand_chacha 0.10 (seeded RNG for simulator), Chrono, dirs 6.0, Chess-engine 0.1, ureq 3.2, flate2 1.1, zip 8.0, unicode-width 0.2, git2 0.20 (vendored-openssl), tar 0.4, uuid 1.21, tempfile 3 (dev), criterion 0.5 (dev/bench)

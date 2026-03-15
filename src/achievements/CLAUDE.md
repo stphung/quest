@@ -27,7 +27,7 @@ Enum with 232 variants covering all trackable milestones. Organized by domain:
 
 - **Combat**: `SlayerI`..`SlayerXV` (100 to 1B kills), `BossHunterI`..`BossHunterXV` (1 to 10M bosses)
 - **Level**: `Level10`..`Level100000` (18 milestones)
-- **Prestige**: `FirstPrestige`..`Prestige10000` (P1, P150, P200, P300, P500, P700, P1000, P10000 — 8 milestones)
+- **Prestige**: `FirstPrestige`..`Prestige10000` (P1, P5, P10, P15, P20, P25, P30, P40, P50, P70, P90, P150, P200, P300, P500, P700, P1000, P10000 — 18 milestones)
 - **Zones**: `Zone1Complete`..`Zone10Complete`, `TheStormbreaker`, `StormsEnd`, `BeyondInfinity`, `FractureZone12`..`FractureZone30` (19 fracture zone completions)
 - **Ascension**: `AscensionI`..`AscensionX` (10 milestone achievements, one per level I-X)
 - **Power Cores**: `PowerCoreI`..`PowerCoreVI` (6 milestone achievements, unlocked at Deep Layers 3/7/12/18/25/30)
@@ -37,6 +37,7 @@ Enum with 232 variants covering all trackable milestones. Organized by domain:
 - **Dungeons**: `DungeonDiver`, `DungeonMasterI`..`DungeonMasterX` (10 to 1M dungeons)
 - **Haven**: `HavenDiscovered`, `HavenBuilderI`..`HavenBuilderII`, `HavenArchitect`
 - **Deep**: Discovery, first mission, mission count milestones (10/25/50/100), first breakthrough, layer milestones (Layers 5/10/15/20/25), VoidExplorer (Layer 26), guild rank milestones, first merc lost, gateway opened
+- **Loom**: `LoomDiscovered`, `LoomPattern1`..`LoomPattern28` (7 milestones: discovery + pattern completion at 1/4/8/16/22/28 patterns)
 
 ### `AchievementCategory` (`types.rs`)
 

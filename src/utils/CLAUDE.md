@@ -25,7 +25,7 @@ Development and operational utilities: compile-time build metadata, self-update 
 
 Activated with the `--debug` CLI flag. Press backtick (`) to toggle the overlay.
 
-**10 categories with 114+ options:**
+**10 categories with 120+ options:**
 
 | Category | Actions |
 |----------|---------|
