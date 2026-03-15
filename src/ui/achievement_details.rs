@@ -640,7 +640,7 @@ fn build_stats_right_lines(
             ],
         ),
         (
-            "Sigil",
+            "Surge",
             [
                 AchievementId::SigilSurgeNovice,
                 AchievementId::SigilSurgeApprentice,
