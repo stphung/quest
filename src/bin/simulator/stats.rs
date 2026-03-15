@@ -28,6 +28,11 @@ pub struct SimStats {
     pub haven_rooms_built: u32,
     pub haven_prestige_spent: u32,
     pub haven_final_tiers: Vec<(String, u8)>,
+    pub pr_earned: u64,
+    pub pr_spent: u64,
+    pub ascension_level: u32,
+    pub challenges_won: u64,
+    pub stormglass_balance: u64,
     // Final state snapshot
     pub final_level: u32,
     pub final_xp: u64,
@@ -63,6 +68,11 @@ impl Default for SimStats {
             haven_rooms_built: 0,
             haven_prestige_spent: 0,
             haven_final_tiers: Vec::new(),
+            pr_earned: 0,
+            pr_spent: 0,
+            ascension_level: 0,
+            challenges_won: 0,
+            stormglass_balance: 0,
             final_level: 1,
             final_xp: 0,
             final_prestige: 0,
@@ -212,6 +222,8 @@ impl SimStats {
             state.zone_progression.current_subzone_id,
         );
         self.final_fishing_rank = state.fishing.rank;
+        self.ascension_level = state.ascension_level;
+        self.stormglass_balance = state.stormglass;
 
         for attr in AttributeType::all() {
             self.final_attributes[attr.index()] = state.attributes.get(attr);

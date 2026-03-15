@@ -80,7 +80,7 @@ pub fn print_summary(stats: &SimStats, seed: u64, config: &SimConfig) {
     if config.quiet {
         let total_items: u64 = stats.items_by_rarity.iter().sum();
         println!(
-            "seed={seed} ticks={} level={} zone={}-{} kills={} deaths={} items={} achievements={} haven_built={} haven_spent={}",
+            "seed={seed} ticks={} level={} zone={}-{} kills={} deaths={} items={} achievements={} haven_built={} haven_spent={} pr_earned={} pr_spent={} challenges_won={}",
             stats.total_ticks,
             stats.final_level,
             stats.final_zone.0,
@@ -91,6 +91,9 @@ pub fn print_summary(stats: &SimStats, seed: u64, config: &SimConfig) {
             stats.achievements_unlocked,
             stats.haven_rooms_built,
             stats.haven_prestige_spent,
+            stats.pr_earned,
+            stats.pr_spent,
+            stats.challenges_won,
         );
         return;
     }
@@ -202,9 +205,9 @@ pub fn print_summary(stats: &SimStats, seed: u64, config: &SimConfig) {
     }
 
     // Haven build progress
-    if let Some(ref strategy) = config.haven_strategy {
+    if let Some(ref strat) = config.strategy {
         println!("--- Haven ---");
-        println!("Strategy: {}", strategy.name());
+        println!("Strategy: {}", strat.name());
         println!(
             "Rooms built: {}  |  Prestige spent: {}",
             stats.haven_rooms_built, stats.haven_prestige_spent
@@ -216,6 +219,27 @@ pub fn print_summary(stats: &SimStats, seed: u64, config: &SimConfig) {
                 .map(|(name, tier)| format!("{name} T{tier}"))
                 .collect();
             println!("Final state: {}", tier_strs.join(", "));
+        }
+        println!();
+    }
+
+    // Economy Flow
+    if stats.pr_earned > 0 || stats.pr_spent > 0 {
+        println!("--- Economy Flow ---");
+        println!(
+            "PR earned: {}  |  PR spent: {}  |  Net: {}",
+            stats.pr_earned,
+            stats.pr_spent,
+            stats.pr_earned as i64 - stats.pr_spent as i64
+        );
+        if stats.ascension_level > 0 {
+            println!("Ascension level: {}", stats.ascension_level);
+        }
+        if stats.challenges_won > 0 {
+            println!("Challenges won: {}", stats.challenges_won);
+        }
+        if stats.stormglass_balance > 0 {
+            println!("Stormglass balance: {}", stats.stormglass_balance);
         }
         println!();
     }
@@ -373,6 +397,36 @@ pub fn print_multi_run_summary(all_stats: &[SimStats]) {
             hsmin,
             avg(&haven_spent),
             hsmax
+        );
+    }
+
+    let pr_earned: Vec<u64> = all_stats.iter().map(|s| s.pr_earned).collect();
+    let pr_spent: Vec<u64> = all_stats.iter().map(|s| s.pr_spent).collect();
+    let challenges_won: Vec<u64> = all_stats.iter().map(|s| s.challenges_won).collect();
+    if pr_earned.iter().any(|&v| v > 0) || pr_spent.iter().any(|&v| v > 0) {
+        let (pemin, pemax) = min_max(&pr_earned);
+        let (psmin, psmax) = min_max(&pr_spent);
+        let (cwmin, cwmax) = min_max(&challenges_won);
+        println!(
+            "{:<20} {:>10} {:>10.1} {:>10}",
+            "PR Earned",
+            pemin,
+            avg(&pr_earned),
+            pemax
+        );
+        println!(
+            "{:<20} {:>10} {:>10.1} {:>10}",
+            "PR Spent",
+            psmin,
+            avg(&pr_spent),
+            psmax
+        );
+        println!(
+            "{:<20} {:>10} {:>10.1} {:>10}",
+            "Challenges Won",
+            cwmin,
+            avg(&challenges_won),
+            cwmax
         );
     }
     println!();
