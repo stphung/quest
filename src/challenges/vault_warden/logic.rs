@@ -52,7 +52,6 @@ pub fn parse_level(level: &VaultWardenLevel, difficulty: VaultWardenDifficulty) 
         grid.push(grid_row);
     }
 
-    let undos_max = difficulty.max_undos();
     let attempts_max = difficulty.max_attempts();
 
     VaultWardenGame {
@@ -66,11 +65,8 @@ pub fn parse_level(level: &VaultWardenLevel, difficulty: VaultWardenDifficulty) 
         crate_positions: crate_positions.clone(),
         goal_positions,
         moves: 0,
-        undos_remaining: undos_max,
-        undos_max,
         attempts_remaining: attempts_max,
         attempts_max,
-        move_history: Vec::new(),
         initial_player_pos: player_pos,
         initial_crate_positions: crate_positions,
     }
@@ -120,7 +116,6 @@ pub fn process_input(game: &mut VaultWardenGame, input: VaultWardenInput) {
         VaultWardenInput::Down => try_move(game, 1, 0),
         VaultWardenInput::Left => try_move(game, 0, -1),
         VaultWardenInput::Right => try_move(game, 0, 1),
-        VaultWardenInput::Undo => undo_move(game),
         VaultWardenInput::Restart => restart_level(game),
         VaultWardenInput::Forfeit => {
             crate::challenges::handle_forfeit(
@@ -152,7 +147,7 @@ fn try_move(game: &mut VaultWardenGame, dr: i32, dc: i32) {
     }
 
     // Check if pushing a crate
-    let pushed_crate = if game.has_crate_at(new_pos) {
+    if game.has_crate_at(new_pos) {
         let crate_new_r = new_pos.0 as i32 + dr;
         let crate_new_c = new_pos.1 as i32 + dc;
 
@@ -175,20 +170,7 @@ fn try_move(game: &mut VaultWardenGame, dr: i32, dc: i32) {
         if let Some(idx) = game.crate_positions.iter().position(|&c| c == new_pos) {
             game.crate_positions[idx] = crate_new_pos;
         }
-
-        Some(CratePush {
-            from: new_pos,
-            to: crate_new_pos,
-        })
-    } else {
-        None
-    };
-
-    // Record move for undo
-    game.move_history.push(MoveRecord {
-        player_from: game.player_pos,
-        pushed_crate,
-    });
+    }
 
     // Move player
     game.player_pos = new_pos;
@@ -198,25 +180,6 @@ fn try_move(game: &mut VaultWardenGame, dr: i32, dc: i32) {
     if game.crates_on_goals() == game.total_crates() {
         game.game_result = Some(VaultWardenResult::Win);
     }
-}
-
-/// Undo the last move.
-fn undo_move(game: &mut VaultWardenGame) {
-    if game.undos_remaining == 0 || game.move_history.is_empty() {
-        return;
-    }
-
-    let record = game.move_history.pop().unwrap();
-    game.player_pos = record.player_from;
-
-    if let Some(push) = record.pushed_crate {
-        if let Some(idx) = game.crate_positions.iter().position(|&c| c == push.to) {
-            game.crate_positions[idx] = push.from;
-        }
-    }
-
-    game.undos_remaining -= 1;
-    // Note: moves counter is NOT decremented (per spec)
 }
 
 /// Restart the level from scratch, consuming one attempt.
@@ -229,8 +192,6 @@ fn restart_level(game: &mut VaultWardenGame) {
     game.player_pos = game.initial_player_pos;
     game.crate_positions = game.initial_crate_positions.clone();
     game.moves = 0;
-    game.undos_remaining = game.undos_max;
-    game.move_history.clear();
 }
 
 /// Check if a crate is deadlocked (in a non-goal corner or against a dead wall).
@@ -377,11 +338,7 @@ impl crate::challenges::menu::DifficultyInfo for VaultWardenDifficulty {
     }
 
     fn extra_info(&self) -> Option<String> {
-        Some(format!(
-            "{} attempts, {} undos",
-            self.max_attempts(),
-            self.max_undos()
-        ))
+        Some(format!("{} restart attempts", self.max_attempts()))
     }
 }
 
@@ -409,7 +366,6 @@ mod tests {
         assert_eq!(game.player_pos, (4, 1));
         assert_eq!(game.crate_positions, vec![(2, 2)]);
         assert_eq!(game.goal_positions, vec![(2, 3)]);
-        assert_eq!(game.undos_remaining, 5);
         assert_eq!(game.attempts_remaining, 5);
     }
 
@@ -481,68 +437,6 @@ mod tests {
     }
 
     #[test]
-    fn test_undo() {
-        let level = VaultWardenLevel {
-            data: "\
-######
-#@  .#
-# $  #
-######",
-        };
-        let mut game = parse_level(&level, VaultWardenDifficulty::Novice);
-        let orig_player = game.player_pos;
-
-        process_input(&mut game, VaultWardenInput::Right);
-        assert_eq!(game.moves, 1);
-
-        process_input(&mut game, VaultWardenInput::Undo);
-        assert_eq!(game.player_pos, orig_player);
-        assert_eq!(game.moves, 1); // NOT decremented
-        assert_eq!(game.undos_remaining, 4);
-    }
-
-    #[test]
-    fn test_undo_with_crate_push() {
-        let level = VaultWardenLevel {
-            data: "\
-######
-#@$ .#
-######",
-        };
-        let mut game = parse_level(&level, VaultWardenDifficulty::Novice);
-        let orig_player = game.player_pos;
-        let orig_crate = game.crate_positions[0];
-
-        process_input(&mut game, VaultWardenInput::Right);
-        assert_ne!(game.crate_positions[0], orig_crate);
-
-        process_input(&mut game, VaultWardenInput::Undo);
-        assert_eq!(game.player_pos, orig_player);
-        assert_eq!(game.crate_positions[0], orig_crate);
-    }
-
-    #[test]
-    fn test_undo_budget_exhaustion() {
-        let level = VaultWardenLevel {
-            data: "\
-######
-#@  .#
-# $  #
-######",
-        };
-        let mut game = parse_level(&level, VaultWardenDifficulty::Master); // 1 undo
-
-        process_input(&mut game, VaultWardenInput::Right);
-        process_input(&mut game, VaultWardenInput::Undo);
-        assert_eq!(game.undos_remaining, 0);
-
-        process_input(&mut game, VaultWardenInput::Right);
-        let pos_before = game.player_pos;
-        process_input(&mut game, VaultWardenInput::Undo);
-        assert_eq!(game.player_pos, pos_before); // Can't undo
-    }
-
-    #[test]
     fn test_restart() {
         let level = make_test_level();
         let mut game = parse_level(&level, VaultWardenDifficulty::Novice);
@@ -558,8 +452,6 @@ mod tests {
         assert_eq!(game.player_pos, orig_player);
         assert_eq!(game.crate_positions, orig_crates);
         assert_eq!(game.moves, 0);
-        assert_eq!(game.undos_remaining, game.undos_max);
-        assert!(game.move_history.is_empty());
         assert_eq!(game.attempts_remaining, orig_attempts - 1);
     }
 

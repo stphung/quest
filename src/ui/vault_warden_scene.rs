@@ -111,7 +111,6 @@ fn render_status_bar_content(frame: &mut Frame, area: Rect, game: &VaultWardenGa
         BORDER_COLOR,
         &[
             ("[Arrows]", "Move"),
-            ("[Z]", "Undo"),
             ("[R]", "Restart"),
             ("[Esc]", "Forfeit"),
         ],
@@ -163,18 +162,6 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &VaultWardenGame) {
                     Color::Red
                 } else if game.attempts_remaining <= 1 {
                     Color::Yellow
-                } else {
-                    Color::White
-                }),
-            ),
-        ]),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("Undos   ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                format!(" {}/{}", game.undos_remaining, game.undos_max),
-                Style::default().fg(if game.undos_remaining == 0 {
-                    Color::Red
                 } else {
                     Color::White
                 }),

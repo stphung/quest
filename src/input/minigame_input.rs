@@ -309,7 +309,6 @@ pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResu
                     KeyCode::Down => VaultWardenInput::Down,
                     KeyCode::Left => VaultWardenInput::Left,
                     KeyCode::Right => VaultWardenInput::Right,
-                    KeyCode::Char('z') | KeyCode::Char('Z') => VaultWardenInput::Undo,
                     KeyCode::Char('r') | KeyCode::Char('R') => VaultWardenInput::Restart,
                     KeyCode::Esc => VaultWardenInput::Forfeit,
                     _ => VaultWardenInput::Other,

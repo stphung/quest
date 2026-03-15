@@ -11,16 +11,6 @@ pub enum VaultWardenDifficulty {
 difficulty_enum_impl!(VaultWardenDifficulty);
 
 impl VaultWardenDifficulty {
-    /// Number of undos available at this difficulty.
-    pub fn max_undos(&self) -> u8 {
-        match self {
-            Self::Novice => 5,
-            Self::Apprentice => 3,
-            Self::Journeyman => 2,
-            Self::Master => 1,
-        }
-    }
-
     /// Number of restart attempts (same for all difficulties).
     pub fn max_attempts(&self) -> u8 {
         5
@@ -39,7 +29,6 @@ pub enum VaultWardenInput {
     Down,
     Left,
     Right,
-    Undo,
     Restart,
     Forfeit,
     Other,
@@ -50,19 +39,6 @@ pub enum VaultWardenInput {
 pub enum Cell {
     Wall,
     Floor,
-}
-
-/// Record of a single move for undo support.
-#[derive(Debug, Clone)]
-pub struct MoveRecord {
-    pub player_from: (usize, usize),
-    pub pushed_crate: Option<CratePush>,
-}
-
-#[derive(Debug, Clone)]
-pub struct CratePush {
-    pub from: (usize, usize),
-    pub to: (usize, usize),
 }
 
 #[derive(Debug, Clone)]
@@ -77,11 +53,8 @@ pub struct VaultWardenGame {
     pub crate_positions: Vec<(usize, usize)>,
     pub goal_positions: Vec<(usize, usize)>,
     pub moves: u16,
-    pub undos_remaining: u8,
-    pub undos_max: u8,
     pub attempts_remaining: u8,
     pub attempts_max: u8,
-    pub move_history: Vec<MoveRecord>,
     // Snapshot of initial state for restart
     pub initial_player_pos: (usize, usize),
     pub initial_crate_positions: Vec<(usize, usize)>,
@@ -134,14 +107,6 @@ mod tests {
     }
 
     #[test]
-    fn test_max_undos() {
-        assert_eq!(VaultWardenDifficulty::Novice.max_undos(), 5);
-        assert_eq!(VaultWardenDifficulty::Apprentice.max_undos(), 3);
-        assert_eq!(VaultWardenDifficulty::Journeyman.max_undos(), 2);
-        assert_eq!(VaultWardenDifficulty::Master.max_undos(), 1);
-    }
-
-    #[test]
     fn test_max_attempts() {
         assert_eq!(VaultWardenDifficulty::Novice.max_attempts(), 5);
         assert_eq!(VaultWardenDifficulty::Master.max_attempts(), 5);
@@ -159,11 +124,8 @@ mod tests {
             crate_positions: vec![(1, 1), (2, 2)],
             goal_positions: vec![(1, 1), (3, 3)],
             moves: 0,
-            undos_remaining: 5,
-            undos_max: 5,
             attempts_remaining: 5,
             attempts_max: 5,
-            move_history: vec![],
             initial_player_pos: (0, 0),
             initial_crate_positions: vec![(1, 1), (2, 2)],
         }
