@@ -194,6 +194,7 @@ pub fn process_fishing_tick<R: Rng>(
 
     // Storm Leviathan caught -> achievement
     if fishing_result.caught_storm_leviathan {
+        state.fishing.leviathan_caught = true;
         achievements.on_storm_leviathan_caught(Some(&state.character_name));
         result.events.push(TickEvent::StormLeviathanCaught);
         if !debug_mode {

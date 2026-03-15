@@ -49,32 +49,32 @@ fn test_exchange_menu_items_is_4() {
 
 #[test]
 fn test_can_purchase_storm_lure_all_conditions_met() {
-    assert!(can_purchase_storm_lure(50_000, false, 40));
+    assert!(can_purchase_storm_lure(50_000, false, false, 40));
 }
 
 #[test]
 fn test_cannot_purchase_storm_lure_insufficient_sg() {
-    assert!(!can_purchase_storm_lure(49_999, false, 40));
+    assert!(!can_purchase_storm_lure(49_999, false, false, 40));
 }
 
 #[test]
 fn test_cannot_purchase_storm_lure_already_active() {
-    assert!(!can_purchase_storm_lure(100_000, true, 40));
+    assert!(!can_purchase_storm_lure(100_000, true, false, 40));
 }
 
 #[test]
 fn test_cannot_purchase_storm_lure_rank_below_40() {
-    assert!(!can_purchase_storm_lure(100_000, false, 39));
+    assert!(!can_purchase_storm_lure(100_000, false, false, 39));
 }
 
 #[test]
 fn test_can_purchase_storm_lure_exact_cost() {
-    assert!(can_purchase_storm_lure(STORM_LURE_COST, false, 40));
+    assert!(can_purchase_storm_lure(STORM_LURE_COST, false, false, 40));
 }
 
 #[test]
 fn test_cannot_purchase_storm_lure_all_conditions_fail() {
-    assert!(!can_purchase_storm_lure(0, true, 1));
+    assert!(!can_purchase_storm_lure(0, true, false, 1));
 }
 
 // =========================================================================
@@ -560,6 +560,7 @@ fn test_fishing_state_serde_roundtrip_with_lure() {
         storm_lure_active: true,
         lure_miss_ramp: 0.045,
         lure_tracking_bonus: 0.105,
+        leviathan_caught: false,
     };
 
     let json = serde_json::to_string(&state).unwrap();
@@ -625,6 +626,7 @@ fn test_fishing_state_roundtrip_preserves_all_fields() {
         storm_lure_active: false,
         lure_miss_ramp: 0.035,
         lure_tracking_bonus: 0.075,
+        leviathan_caught: false,
     };
 
     let json = serde_json::to_string_pretty(&original).unwrap();

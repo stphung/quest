@@ -91,6 +91,7 @@ fn handle_menu(
                     // Storm Lure — show confirmation
                     if state.stormglass >= STORM_LURE_COST
                         && !state.fishing.storm_lure_active
+                        && !state.fishing.leviathan_caught
                         && state.fishing.rank >= 40
                     {
                         exchange_ui.set_phase(ExchangePhase::StormLureConfirm);
@@ -451,7 +452,10 @@ fn handle_storm_lure_confirm(
 ) -> InputResult {
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
-            if state.stormglass >= STORM_LURE_COST && !state.fishing.storm_lure_active {
+            if state.stormglass >= STORM_LURE_COST
+                && !state.fishing.storm_lure_active
+                && !state.fishing.leviathan_caught
+            {
                 state.stormglass -= STORM_LURE_COST;
                 state.fishing.storm_lure_active = true;
                 state.fishing.lure_miss_ramp = 0.0;

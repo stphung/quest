@@ -190,7 +190,7 @@ fn test_generate_trial_options_display_names_nonempty() {
 #[test]
 fn test_can_purchase_storm_lure_rank_exactly_40() {
     assert!(
-        spending::can_purchase_storm_lure(STORM_LURE_COST, false, 40),
+        spending::can_purchase_storm_lure(STORM_LURE_COST, false, false, 40),
         "Rank 40 exactly should allow purchase"
     );
 }
@@ -199,7 +199,7 @@ fn test_can_purchase_storm_lure_rank_exactly_40() {
 fn test_can_purchase_storm_lure_rank_41() {
     // Rank above 40 should also work
     assert!(
-        spending::can_purchase_storm_lure(STORM_LURE_COST, false, 41),
+        spending::can_purchase_storm_lure(STORM_LURE_COST, false, false, 41),
         "Rank 41 should allow purchase"
     );
 }
@@ -207,7 +207,7 @@ fn test_can_purchase_storm_lure_rank_41() {
 #[test]
 fn test_cannot_purchase_storm_lure_rank_39() {
     assert!(
-        !spending::can_purchase_storm_lure(STORM_LURE_COST, false, 39),
+        !spending::can_purchase_storm_lure(STORM_LURE_COST, false, false, 39),
         "Rank 39 should not allow purchase"
     );
 }
@@ -215,7 +215,7 @@ fn test_cannot_purchase_storm_lure_rank_39() {
 #[test]
 fn test_cannot_purchase_storm_lure_one_sg_short() {
     assert!(
-        !spending::can_purchase_storm_lure(STORM_LURE_COST - 1, false, 40),
+        !spending::can_purchase_storm_lure(STORM_LURE_COST - 1, false, false, 40),
         "One SG short should not allow purchase"
     );
 }
@@ -223,7 +223,7 @@ fn test_cannot_purchase_storm_lure_one_sg_short() {
 #[test]
 fn test_cannot_purchase_storm_lure_zero_balance() {
     assert!(
-        !spending::can_purchase_storm_lure(0, false, 40),
+        !spending::can_purchase_storm_lure(0, false, false, 40),
         "Zero balance should not allow purchase"
     );
 }
@@ -231,12 +231,12 @@ fn test_cannot_purchase_storm_lure_zero_balance() {
 #[test]
 fn test_cannot_purchase_storm_lure_all_three_conditions_failing() {
     // All three conditions wrong: insufficient SG, already active, rank too low
-    assert!(!spending::can_purchase_storm_lure(0, true, 1));
+    assert!(!spending::can_purchase_storm_lure(0, true, false, 1));
 }
 
 #[test]
 fn test_can_purchase_storm_lure_well_above_cost() {
-    assert!(spending::can_purchase_storm_lure(1_000_000, false, 40));
+    assert!(spending::can_purchase_storm_lure(1_000_000, false, false, 40));
 }
 
 // ── Spending: chrono surge cost edge cases ───────────────────────────────
