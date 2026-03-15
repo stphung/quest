@@ -19,10 +19,10 @@ impl ShardFusionDifficulty {
     /// The tile value the player must reach to win.
     pub fn target_value(&self) -> u32 {
         match self {
-            Self::Novice => 512,
-            Self::Apprentice => 1024,
-            Self::Journeyman => 2048,
-            Self::Master => 4096,
+            Self::Novice => 256,
+            Self::Apprentice => 512,
+            Self::Journeyman => 1024,
+            Self::Master => 2048,
         }
     }
 }
@@ -113,10 +113,10 @@ mod tests {
 
     #[test]
     fn test_difficulty_targets() {
-        assert_eq!(ShardFusionDifficulty::Novice.target_value(), 512);
-        assert_eq!(ShardFusionDifficulty::Apprentice.target_value(), 1024);
-        assert_eq!(ShardFusionDifficulty::Journeyman.target_value(), 2048);
-        assert_eq!(ShardFusionDifficulty::Master.target_value(), 4096);
+        assert_eq!(ShardFusionDifficulty::Novice.target_value(), 256);
+        assert_eq!(ShardFusionDifficulty::Apprentice.target_value(), 512);
+        assert_eq!(ShardFusionDifficulty::Journeyman.target_value(), 1024);
+        assert_eq!(ShardFusionDifficulty::Master.target_value(), 2048);
     }
 
     #[test]
