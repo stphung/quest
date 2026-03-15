@@ -17,6 +17,7 @@ use super::runic_shift::logic::start_runic_shift_game;
 use super::runic_shift::RunicShiftDifficulty;
 use super::snake::logic::start_snake_game;
 use super::snake::SnakeDifficulty;
+use super::sudoku::SudokuDifficulty;
 use super::ActiveMinigame;
 use crate::core::constants::CHALLENGE_DISCOVERY_CHANCE;
 use crate::core::game_state::GameState;
@@ -114,6 +115,11 @@ fn accept_selected_challenge(state: &mut GameState) {
             ChallengeType::RunicShift => {
                 let d = RunicShiftDifficulty::from_index(difficulty_index);
                 start_runic_shift_game(d)
+            }
+            ChallengeType::Sudoku => {
+                let d = SudokuDifficulty::from_index(difficulty_index);
+                let mut rng = rand::rng();
+                ActiveMinigame::Sudoku(crate::challenges::sudoku::generate_puzzle(d, &mut rng))
             }
         };
         state.active_minigame = Some(minigame);
@@ -430,6 +436,10 @@ const CHALLENGE_TABLE: &[ChallengeWeight] = &[
         challenge_type: ChallengeType::Go,
         weight: 7, // ~4% - longest game
     },
+    ChallengeWeight {
+        challenge_type: ChallengeType::Sudoku,
+        weight: 18,
+    },
 ];
 
 /// A single pending challenge in the menu
@@ -454,6 +464,7 @@ pub enum ChallengeType {
     Rune,
     Go,
     Snake,
+    Sudoku,
 }
 
 impl ChallengeType {
@@ -470,6 +481,7 @@ impl ChallengeType {
             ChallengeType::Rune => "ᚱ",
             ChallengeType::Go => "◉",
             ChallengeType::Snake => "~",
+            ChallengeType::Sudoku => "\u{2B21}",
         }
     }
 
@@ -493,6 +505,9 @@ impl ChallengeType {
             ChallengeType::Go => "An ancient master beckons from beneath a gnarled tree...",
             ChallengeType::Snake => {
                 "A serpentine trail of glowing runes appears on the dungeon floor..."
+            }
+            ChallengeType::Sudoku => {
+                "A grid of ancient sigils materializes, pulsing with arcane energy..."
             }
         }
     }
@@ -743,6 +758,12 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
                 own trail. The path is narrow, and the serpent is hungry.\""
                 .to_string(),
         },
+        ChallengeType::Sudoku => PendingChallenge {
+            challenge_type: ChallengeType::Sudoku,
+            title: "Sigil Matrix: Arcane Grid".to_string(),
+            icon: "\u{2B21}",
+            description: "A grid of ancient sigils pulses with arcane energy. Each row, column, and section demands a unique symbol \u{2014} one wrong placement and the matrix destabilizes.".to_string(),
+        },
     }
 }
 
@@ -773,6 +794,7 @@ mod tests {
         assert!(!ChallengeType::Rune.icon().is_empty());
         assert!(!ChallengeType::Go.icon().is_empty());
         assert!(!ChallengeType::Snake.icon().is_empty());
+        assert!(!ChallengeType::Sudoku.icon().is_empty());
     }
 
     #[test]
@@ -787,6 +809,7 @@ mod tests {
         assert!(!ChallengeType::Rune.discovery_flavor().is_empty());
         assert!(!ChallengeType::Go.discovery_flavor().is_empty());
         assert!(!ChallengeType::Snake.discovery_flavor().is_empty());
+        assert!(!ChallengeType::Sudoku.discovery_flavor().is_empty());
     }
 
     #[test]
@@ -802,6 +825,7 @@ mod tests {
             ChallengeType::Rune.icon(),
             ChallengeType::Go.icon(),
             ChallengeType::Snake.icon(),
+            ChallengeType::Sudoku.icon(),
         ];
         // Check all pairs are different
         for i in 0..icons.len() {

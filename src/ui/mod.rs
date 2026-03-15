@@ -1352,6 +1352,14 @@ fn draw_right_content(
                 sg_discovered,
             );
         }
+        Some(ActiveMinigame::Sudoku(_game)) => {
+            // Sudoku scene placeholder — will be implemented in Task 8
+            let block = ratatui::widgets::Block::default()
+                .borders(ratatui::widgets::Borders::ALL)
+                .title(" Sigil Matrix ")
+                .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Cyan));
+            frame.render_widget(block, area);
+        }
         None => {
             if game_state.challenge_menu.is_open {
                 challenge_menu_scene::render_challenge_menu(

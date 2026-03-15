@@ -71,5 +71,6 @@ fn challenge_type_name(ct: &ChallengeType) -> &'static str {
         ChallengeType::Snake => "Serpent's Path",
         ChallengeType::Jezzball => "Containment Breach",
         ChallengeType::RunicShift => "Sigil Surge",
+        ChallengeType::Sudoku => "Sigil Matrix: Arcane Grid",
     }
 }

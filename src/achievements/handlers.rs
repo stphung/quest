@@ -302,6 +302,18 @@ impl Achievements {
             (MinigameType::RunicShift, MinigameDifficulty::Master) => {
                 Some(AchievementId::SigilSurgeMaster)
             }
+            (MinigameType::SigilMatrix, MinigameDifficulty::Novice) => {
+                Some(AchievementId::SigilMatrixNovice)
+            }
+            (MinigameType::SigilMatrix, MinigameDifficulty::Apprentice) => {
+                Some(AchievementId::SigilMatrixApprentice)
+            }
+            (MinigameType::SigilMatrix, MinigameDifficulty::Journeyman) => {
+                Some(AchievementId::SigilMatrixJourneyman)
+            }
+            (MinigameType::SigilMatrix, MinigameDifficulty::Master) => {
+                Some(AchievementId::SigilMatrixMaster)
+            }
         };
 
         if let Some(id) = achievement {

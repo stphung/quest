@@ -35,7 +35,8 @@ pub use challenges::{
     FlappyBirdResult, GoDifficulty, GoGame, GoResult, GomokuDifficulty, GomokuGame, GomokuResult,
     JezzballDifficulty, JezzballGame, JezzballResult, MinesweeperDifficulty, MinesweeperGame,
     MinesweeperResult, MorrisDifficulty, MorrisGame, MorrisPhase, MorrisResult, RuneDifficulty,
-    RuneGame, RuneResult, RunicShiftDifficulty, RunicShiftGame, RunicShiftResult,
+    RuneGame, RuneResult, RunicShiftDifficulty, RunicShiftGame, RunicShiftResult, SudokuDifficulty,
+    SudokuGame, SudokuResult,
 };
 pub use character::{Attributes, DerivedStats, PrestigeTier};
 pub use combat::{CombatState, Enemy};

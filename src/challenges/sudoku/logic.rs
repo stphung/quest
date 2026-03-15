@@ -34,13 +34,21 @@ pub fn process_sudoku_input(game: &mut SudokuGame, input: SudokuInput) -> bool {
 
     match input {
         SudokuInput::Up => {
-            game.cursor_row = if game.cursor_row == 0 { 8 } else { game.cursor_row - 1 };
+            game.cursor_row = if game.cursor_row == 0 {
+                8
+            } else {
+                game.cursor_row - 1
+            };
         }
         SudokuInput::Down => {
             game.cursor_row = (game.cursor_row + 1) % 9;
         }
         SudokuInput::Left => {
-            game.cursor_col = if game.cursor_col == 0 { 8 } else { game.cursor_col - 1 };
+            game.cursor_col = if game.cursor_col == 0 {
+                8
+            } else {
+                game.cursor_col - 1
+            };
         }
         SudokuInput::Right => {
             game.cursor_col = (game.cursor_col + 1) % 9;

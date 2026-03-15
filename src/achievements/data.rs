@@ -1271,6 +1271,41 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         points: 100,
     },
     // ═══════════════════════════════════════════════════════════════
+    // CHALLENGE ACHIEVEMENTS - SIGIL MATRIX
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::SigilMatrixNovice,
+        name: "Matrix Initiate",
+        description: "Win a Novice Sigil Matrix",
+        category: AchievementCategory::Challenges,
+        icon: "\u{2B21}",
+        points: 10,
+    },
+    AchievementDef {
+        id: AchievementId::SigilMatrixApprentice,
+        name: "Matrix Adept",
+        description: "Win an Apprentice Sigil Matrix",
+        category: AchievementCategory::Challenges,
+        icon: "\u{2B21}",
+        points: 25,
+    },
+    AchievementDef {
+        id: AchievementId::SigilMatrixJourneyman,
+        name: "Matrix Weaver",
+        description: "Win a Journeyman Sigil Matrix",
+        category: AchievementCategory::Challenges,
+        icon: "\u{2B21}",
+        points: 50,
+    },
+    AchievementDef {
+        id: AchievementId::SigilMatrixMaster,
+        name: "Matrix Sovereign",
+        description: "Win a Master Sigil Matrix",
+        category: AchievementCategory::Challenges,
+        icon: "\u{2B21}",
+        points: 100,
+    },
+    // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - META
     // ═══════════════════════════════════════════════════════════════
     AchievementDef {
@@ -2139,6 +2174,10 @@ mod tests {
             AchievementId::SigilSurgeApprentice,
             AchievementId::SigilSurgeJourneyman,
             AchievementId::SigilSurgeMaster,
+            AchievementId::SigilMatrixNovice,
+            AchievementId::SigilMatrixApprentice,
+            AchievementId::SigilMatrixJourneyman,
+            AchievementId::SigilMatrixMaster,
             AchievementId::GrandChampion,
             AchievementId::GoneFishing,
             AchievementId::FishermanI,
@@ -2396,6 +2435,15 @@ mod tests {
                     AchievementId::SigilSurgeApprentice,
                     AchievementId::SigilSurgeJourneyman,
                     AchievementId::SigilSurgeMaster,
+                ],
+            ),
+            (
+                "Sigil Matrix",
+                vec![
+                    AchievementId::SigilMatrixNovice,
+                    AchievementId::SigilMatrixApprentice,
+                    AchievementId::SigilMatrixJourneyman,
+                    AchievementId::SigilMatrixMaster,
                 ],
             ),
         ];

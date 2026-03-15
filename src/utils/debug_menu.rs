@@ -64,6 +64,7 @@ enum DebugAction {
     LoomBuildTestShuttleT1,
     LoomBuildTestShuttleT2,
     LoomClearShuttles,
+    TriggerSudokuChallenge,
 }
 
 const DEBUG_ACTIONS: &[DebugAction] = &[
@@ -183,6 +184,7 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::LoomBuildTestShuttleT1,
     DebugAction::LoomBuildTestShuttleT2,
     DebugAction::LoomClearShuttles,
+    DebugAction::TriggerSudokuChallenge,
 ];
 
 const CHALLENGE_ACTIONS: &[DebugAction] = &[
@@ -196,6 +198,7 @@ const CHALLENGE_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerJezzballChallenge,
     DebugAction::TriggerSnakeChallenge,
     DebugAction::TriggerRunicShiftChallenge,
+    DebugAction::TriggerSudokuChallenge,
 ];
 const WORLD_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerDungeon,
@@ -395,6 +398,7 @@ impl DebugAction {
             Self::LoomBuildTestShuttleT1 => 109,
             Self::LoomBuildTestShuttleT2 => 110,
             Self::LoomClearShuttles => 111,
+            Self::TriggerSudokuChallenge => 112,
         }
     }
 
@@ -525,6 +529,7 @@ impl DebugAction {
             Self::LoomBuildTestShuttleT1 => "Build T1 Shuttle (Ember+Void\u{2192}ForgedLight)",
             Self::LoomBuildTestShuttleT2 => "Build T2 Shuttle (FrgLt+Refl\u{2192}EchoGlass)",
             Self::LoomClearShuttles => "Clear All Shuttles",
+            Self::TriggerSudokuChallenge => "Trigger Sigil Matrix Challenge",
         }
     }
 
@@ -552,6 +557,7 @@ impl DebugAction {
             Self::TriggerJezzballChallenge => trigger_jezzball_challenge(state),
             Self::TriggerSnakeChallenge => trigger_snake_challenge(state),
             Self::TriggerRunicShiftChallenge => trigger_runic_shift_challenge(state),
+            Self::TriggerSudokuChallenge => trigger_sudoku_challenge(state),
             Self::TriggerHavenDiscovery => trigger_haven_discovery(haven),
             Self::TriggerSoulforgeDiscovery => trigger_soulforge_discovery(enhancement),
             Self::TriggerForgeStormbreaker => trigger_forge_stormbreaker(achievements),
@@ -1063,6 +1069,16 @@ fn trigger_runic_shift_challenge(state: &mut GameState) -> &'static str {
         .challenge_menu
         .add_challenge(create_challenge(&ChallengeType::RunicShift));
     "Sigil Surge challenge added!"
+}
+
+fn trigger_sudoku_challenge(state: &mut GameState) -> &'static str {
+    if state.challenge_menu.has_challenge(&ChallengeType::Sudoku) {
+        return "Sigil Matrix challenge already pending!";
+    }
+    state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::Sudoku));
+    "Sigil Matrix challenge added!"
 }
 
 fn trigger_haven_discovery(haven: &mut Haven) -> &'static str {

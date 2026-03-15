@@ -1,5 +1,3 @@
-use crate::challenges::difficulty_enum_impl;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SudokuDifficulty {
     Novice,

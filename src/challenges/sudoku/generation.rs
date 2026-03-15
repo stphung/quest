@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 use super::types::{SudokuDifficulty, SudokuGame};
 
@@ -108,7 +108,7 @@ fn remove_cells<R: Rng>(
     let mut given = [[true; 9]; 9];
 
     let (min_remove, max_remove) = difficulty.cells_to_remove_range();
-    let target = rng.gen_range(min_remove..=max_remove);
+    let target = rng.random_range(min_remove..=max_remove);
 
     // Create a shuffled list of all cell positions
     let mut positions: Vec<(usize, usize)> = Vec::with_capacity(81);
@@ -188,7 +188,7 @@ fn count_solutions(board: &mut [[u8; 9]; 9], count: &mut u32, limit: u32) {
 /// Fisher-Yates shuffle
 fn shuffle<T, R: Rng>(slice: &mut Vec<T>, rng: &mut R) {
     for i in (1..slice.len()).rev() {
-        let j = rng.gen_range(0..=i);
+        let j = rng.random_range(0..=i);
         slice.swap(i, j);
     }
 }
