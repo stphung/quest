@@ -53,6 +53,7 @@ mod stats_equipment;
 mod stats_panel;
 pub(crate) mod stats_prestige;
 pub mod stormglass_scene;
+pub mod sudoku_scene;
 pub(crate) mod throbber;
 pub mod ticker;
 pub mod time_vault_scene;
@@ -1352,13 +1353,8 @@ fn draw_right_content(
                 sg_discovered,
             );
         }
-        Some(ActiveMinigame::Sudoku(_game)) => {
-            // Sudoku scene placeholder — will be implemented in Task 8
-            let block = ratatui::widgets::Block::default()
-                .borders(ratatui::widgets::Borders::ALL)
-                .title(" Sigil Matrix ")
-                .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Cyan));
-            frame.render_widget(block, area);
+        Some(ActiveMinigame::Sudoku(game)) => {
+            sudoku_scene::render_sudoku(frame, area, game, ctx, show_dismiss_hint, sg_discovered);
         }
         None => {
             if game_state.challenge_menu.is_open {

@@ -185,3 +185,115 @@ impl_apply_game_result! {
     icon: "\u{2B21}";
     win_message: "The sigil matrix hums with power! Pattern complete.";
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::challenges::sudoku::types::SudokuGame;
+
+    fn make_test_game() -> SudokuGame {
+        let solution = [
+            [5, 3, 4, 6, 7, 8, 9, 1, 2],
+            [6, 7, 2, 1, 9, 5, 3, 4, 8],
+            [1, 9, 8, 3, 4, 2, 5, 6, 7],
+            [8, 5, 9, 7, 6, 1, 4, 2, 3],
+            [4, 2, 6, 8, 5, 3, 7, 9, 1],
+            [7, 1, 3, 9, 2, 4, 8, 5, 6],
+            [9, 6, 1, 5, 3, 7, 2, 8, 4],
+            [2, 8, 7, 4, 1, 9, 6, 3, 5],
+            [3, 4, 5, 2, 8, 6, 1, 7, 9],
+        ];
+        let mut board = solution;
+        let mut given = [[true; 9]; 9];
+        board[0][2] = 0;
+        given[0][2] = false;
+        board[1][1] = 0;
+        given[1][1] = false;
+        board[4][4] = 0;
+        given[4][4] = false;
+        SudokuGame::new(SudokuDifficulty::Novice, board, solution, given)
+    }
+
+    #[test]
+    fn test_cursor_wrapping() {
+        let mut game = make_test_game();
+        game.cursor_row = 0;
+        process_sudoku_input(&mut game, SudokuInput::Up);
+        assert_eq!(game.cursor_row, 8);
+        game.cursor_col = 8;
+        process_sudoku_input(&mut game, SudokuInput::Right);
+        assert_eq!(game.cursor_col, 0);
+    }
+
+    #[test]
+    fn test_cannot_modify_given_cell() {
+        let mut game = make_test_game();
+        game.cursor_row = 0;
+        game.cursor_col = 0;
+        process_sudoku_input(&mut game, SudokuInput::Place(9));
+        assert_eq!(game.board[0][0], 5);
+    }
+
+    #[test]
+    fn test_place_and_clear() {
+        let mut game = make_test_game();
+        game.cursor_row = 0;
+        game.cursor_col = 2;
+        process_sudoku_input(&mut game, SudokuInput::Place(4));
+        assert_eq!(game.board[0][2], 4);
+        process_sudoku_input(&mut game, SudokuInput::Clear);
+        assert_eq!(game.board[0][2], 0);
+    }
+
+    #[test]
+    fn test_conflict_detection() {
+        let mut game = make_test_game();
+        game.cursor_row = 0;
+        game.cursor_col = 2;
+        process_sudoku_input(&mut game, SudokuInput::Place(5));
+        assert!(game.conflicts[0][2]);
+        assert!(game.conflicts[0][0]);
+    }
+
+    #[test]
+    fn test_win_condition() {
+        let mut game = make_test_game();
+        game.cursor_row = 0;
+        game.cursor_col = 2;
+        process_sudoku_input(&mut game, SudokuInput::Place(4));
+        assert!(game.game_result.is_none());
+        game.cursor_row = 1;
+        game.cursor_col = 1;
+        process_sudoku_input(&mut game, SudokuInput::Place(7));
+        assert!(game.game_result.is_none());
+        game.cursor_row = 4;
+        game.cursor_col = 4;
+        process_sudoku_input(&mut game, SudokuInput::Place(5));
+        assert_eq!(game.game_result, Some(SudokuResult::Win));
+    }
+
+    #[test]
+    fn test_forfeit_double_esc() {
+        let mut game = make_test_game();
+        process_sudoku_input(&mut game, SudokuInput::Forfeit);
+        assert!(game.forfeit_pending);
+        assert!(game.game_result.is_none());
+        process_sudoku_input(&mut game, SudokuInput::Up);
+        assert!(!game.forfeit_pending);
+        process_sudoku_input(&mut game, SudokuInput::Forfeit);
+        assert!(game.forfeit_pending);
+        process_sudoku_input(&mut game, SudokuInput::Forfeit);
+        assert_eq!(game.game_result, Some(SudokuResult::Loss));
+    }
+
+    #[test]
+    fn test_difficulty_rewards() {
+        assert_eq!(SudokuDifficulty::Novice.reward().stormglass, 400);
+        assert_eq!(SudokuDifficulty::Novice.reward().prestige_ranks, 0);
+        assert_eq!(SudokuDifficulty::Apprentice.reward().stormglass, 1_200);
+        assert_eq!(SudokuDifficulty::Journeyman.reward().stormglass, 3_000);
+        assert_eq!(SudokuDifficulty::Journeyman.reward().prestige_ranks, 1);
+        assert_eq!(SudokuDifficulty::Master.reward().stormglass, 6_000);
+        assert_eq!(SudokuDifficulty::Master.reward().prestige_ranks, 2);
+    }
+}

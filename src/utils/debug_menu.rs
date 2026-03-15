@@ -1588,7 +1588,7 @@ mod tests {
             menu.navigate_down();
         }
         assert_eq!(menu.selected_index, CHALLENGE_ACTIONS.len() - 1);
-        assert_eq!(menu.selected_option_global_index(), 11);
+        assert_eq!(menu.selected_option_global_index(), 112);
 
         // Can't go past end
         menu.navigate_down();

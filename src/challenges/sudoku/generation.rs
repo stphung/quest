@@ -19,9 +19,9 @@ fn generate_solved_board<R: Rng>(rng: &mut R) -> [[u8; 9]; 9] {
         let mut digits: Vec<u8> = (1..=9).collect();
         shuffle(&mut digits, rng);
         let mut idx = 0;
-        for r in start..start + 3 {
-            for c in start..start + 3 {
-                board[r][c] = digits[idx];
+        for row in board.iter_mut().skip(start).take(3) {
+            for cell in row.iter_mut().skip(start).take(3) {
+                *cell = digits[idx];
                 idx += 1;
             }
         }
@@ -36,9 +36,9 @@ fn generate_solved_board<R: Rng>(rng: &mut R) -> [[u8; 9]; 9] {
 fn solve_board<R: Rng>(board: &mut [[u8; 9]; 9], rng: &mut R) -> bool {
     // Find next empty cell
     let mut empty = None;
-    'outer: for r in 0..9 {
-        for c in 0..9 {
-            if board[r][c] == 0 {
+    'outer: for (r, row) in board.iter().enumerate() {
+        for (c, &cell) in row.iter().enumerate() {
+            if cell == 0 {
                 empty = Some((r, c));
                 break 'outer;
             }
@@ -70,25 +70,21 @@ fn solve_board<R: Rng>(board: &mut [[u8; 9]; 9], rng: &mut R) -> bool {
 /// Check if placing `digit` at (row, col) is valid.
 fn is_valid_placement(board: &[[u8; 9]; 9], row: usize, col: usize, digit: u8) -> bool {
     // Check row
-    for c in 0..9 {
-        if board[row][c] == digit {
-            return false;
-        }
+    if board[row].contains(&digit) {
+        return false;
     }
 
     // Check column
-    for r in 0..9 {
-        if board[r][col] == digit {
-            return false;
-        }
+    if board.iter().any(|r| r[col] == digit) {
+        return false;
     }
 
     // Check 3x3 box
     let box_row = (row / 3) * 3;
     let box_col = (col / 3) * 3;
-    for r in box_row..box_row + 3 {
-        for c in box_col..box_col + 3 {
-            if board[r][c] == digit {
+    for r in &board[box_row..box_row + 3] {
+        for &cell in &r[box_col..box_col + 3] {
+            if cell == digit {
                 return false;
             }
         }
@@ -156,9 +152,9 @@ fn count_solutions(board: &mut [[u8; 9]; 9], count: &mut u32, limit: u32) {
 
     // Find next empty cell
     let mut empty = None;
-    'outer: for r in 0..9 {
-        for c in 0..9 {
-            if board[r][c] == 0 {
+    'outer: for (r, row) in board.iter().enumerate() {
+        for (c, &cell) in row.iter().enumerate() {
+            if cell == 0 {
                 empty = Some((r, c));
                 break 'outer;
             }
@@ -186,9 +182,111 @@ fn count_solutions(board: &mut [[u8; 9]; 9], count: &mut u32, limit: u32) {
 }
 
 /// Fisher-Yates shuffle
-fn shuffle<T, R: Rng>(slice: &mut Vec<T>, rng: &mut R) {
+fn shuffle<T, R: Rng>(slice: &mut [T], rng: &mut R) {
     for i in (1..slice.len()).rev() {
         let j = rng.random_range(0..=i);
         slice.swap(i, j);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    #[test]
+    fn test_generate_solved_board_is_valid() {
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
+        let board = generate_solved_board(&mut rng);
+
+        for row in &board {
+            for &cell in row {
+                assert!((1..=9).contains(&cell));
+            }
+        }
+
+        // Each row has 1-9
+        for row in &board {
+            let mut seen = [false; 10];
+            for &cell in row {
+                let v = cell as usize;
+                assert!(!seen[v]);
+                seen[v] = true;
+            }
+        }
+
+        // Each col has 1-9
+        for c in 0..9 {
+            let mut seen = [false; 10];
+            for row in &board {
+                let v = row[c] as usize;
+                assert!(!seen[v]);
+                seen[v] = true;
+            }
+        }
+
+        // Each 3x3 box has 1-9
+        for box_r in 0..3 {
+            for box_c in 0..3 {
+                let mut seen = [false; 10];
+                for r in 0..3 {
+                    for c in 0..3 {
+                        let v = board[box_r * 3 + r][box_c * 3 + c] as usize;
+                        assert!(!seen[v]);
+                        seen[v] = true;
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_generate_puzzle_has_unique_solution() {
+        let mut rng = ChaCha8Rng::seed_from_u64(123);
+        let game = generate_puzzle(SudokuDifficulty::Novice, &mut rng);
+        assert_ne!(game.board, game.solution);
+        assert!(has_unique_solution(&game.board));
+
+        for r in 0..9 {
+            for c in 0..9 {
+                if game.given[r][c] {
+                    assert_eq!(game.board[r][c], game.solution[r][c]);
+                } else {
+                    assert_eq!(game.board[r][c], 0);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_difficulty_given_counts() {
+        let mut rng = ChaCha8Rng::seed_from_u64(456);
+        for difficulty in SudokuDifficulty::ALL {
+            let game = generate_puzzle(difficulty, &mut rng);
+            let given: usize = game.given.iter().flatten().filter(|&&g| g).count();
+            let (min_remove, max_remove) = difficulty.cells_to_remove_range();
+            let min_given = 81 - max_remove;
+            let max_given = 81 - min_remove;
+            assert!(
+                given >= min_given && given <= max_given,
+                "{:?}: expected {}-{} givens, got {}",
+                difficulty,
+                min_given,
+                max_given,
+                given
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_valid_placement() {
+        let mut board = [[0u8; 9]; 9];
+        board[0][0] = 5;
+        assert!(!is_valid_placement(&board, 0, 4, 5)); // same row
+        assert!(!is_valid_placement(&board, 4, 0, 5)); // same col
+        assert!(!is_valid_placement(&board, 1, 1, 5)); // same box
+        assert!(is_valid_placement(&board, 4, 4, 5)); // different
+        assert!(is_valid_placement(&board, 0, 1, 3)); // different digit
     }
 }
