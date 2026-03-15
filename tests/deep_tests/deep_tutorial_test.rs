@@ -977,7 +977,11 @@ fn test_initial_descent_is_first_mission() {
     );
     deep.prestige.roster = starter.into_iter().map(|m| (m.id, m)).collect();
 
-    let pool = quest::deep::generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
+    let pool = quest::deep::generate_mission_pool(
+        &deep.persistent,
+        &deep.prestige.active_missions,
+        &mut rng,
+    );
     assert!(!pool.is_empty(), "Mission pool should not be empty");
 
     // First mission should be a SupplyRun on Layer 1
@@ -996,7 +1000,11 @@ fn test_expanded_options_after_clearing_layer() {
     deep.persistent.layer_record_mut(1).cleared = true;
     deep.persistent.deepest_layer_reached = 1;
 
-    let pool = quest::deep::generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
+    let pool = quest::deep::generate_mission_pool(
+        &deep.persistent,
+        &deep.prestige.active_missions,
+        &mut rng,
+    );
     assert!(pool.len() >= 2, "Should have at least 2 missions at Rank 2");
 
     let has_supply = pool
@@ -1028,7 +1036,8 @@ fn test_supply_runs_are_always_safe() {
         deep.prestige.roster = starter.into_iter().map(|m| (m.id, m)).collect();
         deep.prestige.warband_marks = 1000;
 
-        let pool = generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
+        let pool =
+            generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
         let supply_run = pool
             .iter()
             .find(|m| m.mission_type == MissionType::SupplyRun)

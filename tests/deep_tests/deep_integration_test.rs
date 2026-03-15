@@ -410,7 +410,8 @@ fn test_prestige_preserves_available_missions() {
     // Populate available_missions pool.
     let mut rng = seeded_rng();
     mark_layer_cleared(&mut deep.persistent, 1);
-    deep.prestige.available_missions = generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
+    deep.prestige.available_missions =
+        generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
     let count = deep.prestige.available_missions.len();
     assert!(count > 0);
 
