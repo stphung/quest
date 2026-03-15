@@ -13,6 +13,7 @@ use ratatui::{
     Frame,
 };
 
+use super::game_common::format_number;
 use super::scene_fx::{
     current_millis, display_width, hash2d, lerp_rgb, put_cell, put_text, put_text_centered,
     render_buffer, SceneCell,
@@ -496,7 +497,7 @@ fn render_exchange_menu_items(
     let items: [(&str, String, bool); 4] = [
         (
             "\u{1F3B2} Invoke Challenge", // 🎲 (2-wide) + 1 space
-            format!("{} SG", INVOKE_TRIAL_COST),
+            format!("{} SG", format_number(INVOKE_TRIAL_COST)),
             state.stormglass >= INVOKE_TRIAL_COST,
         ),
         (
@@ -511,7 +512,7 @@ fn render_exchange_menu_items(
         ),
         (
             "\u{26A1} Storm Lure", // ⚡ (1-wide) + 1 space
-            format!("{} SG", STORM_LURE_COST),
+            format!("{} SG", format_number(STORM_LURE_COST)),
             state.stormglass >= STORM_LURE_COST
                 && !state.fishing.storm_lure_active
                 && state.fishing.rank >= 40,
@@ -677,13 +678,13 @@ fn render_invoke_trial_confirm(frame: &mut Frame, area: Rect, state: &GameState)
     let balance = state.stormglass;
     let after = balance.saturating_sub(INVOKE_TRIAL_COST);
 
-    let balance_str = format!("Balance:  {} SG", balance);
+    let balance_str = format!("Balance:  {} SG", format_number(balance));
     put_text(&mut buffer, 4, 4, &balance_str, Color::White);
 
-    let cost_str = format!("Cost:    -{} SG", INVOKE_TRIAL_COST);
+    let cost_str = format!("Cost:    -{} SG", format_number(INVOKE_TRIAL_COST));
     put_text(&mut buffer, 5, 4, &cost_str, Color::LightRed);
 
-    let after_str = format!("After:    {} SG", after);
+    let after_str = format!("After:    {} SG", format_number(after));
     put_text(&mut buffer, 6, 4, &after_str, ELECTRIC_BLUE);
 
     // Description
@@ -1208,7 +1209,7 @@ fn render_chrono_surge_select(
         };
         put_text(&mut buffer, row, col, label, name_fg);
 
-        let cost_str = format!("{} SG", cost);
+        let cost_str = format!("{} SG", format_number(*cost));
         let cost_fg = if affordable {
             ELECTRIC_BLUE
         } else {
@@ -1589,17 +1590,17 @@ pub fn render_chrono_surge_banner(
     let stats_spans = vec![
         Span::styled("\u{2694} ", Style::default().fg(stats_color)),
         Span::styled(
-            format!("{} kills", surge.kills),
+            format!("{} kills", format_number(surge.kills)),
             Style::default().fg(stats_color),
         ),
         Span::styled("  \u{2B06} ", Style::default().fg(stats_color)),
         Span::styled(
-            format!("+{} levels", surge.levels_gained),
+            format!("+{} levels", format_number(surge.levels_gained as u64)),
             Style::default().fg(stats_color),
         ),
         Span::styled("  \u{1F528} ", Style::default().fg(stats_color)),
         Span::styled(
-            format!("{} equipped", surge.items_equipped),
+            format!("{} equipped", format_number(surge.items_equipped as u64)),
             Style::default().fg(stats_color),
         ),
         Span::styled("  \u{23F3} ", Style::default().fg(stats_color)),
@@ -1727,14 +1728,20 @@ pub fn render_chrono_surge_summary(
 
     // Stats
     let mut stats: Vec<String> = vec![
-        format!("\u{2694}  Kills: {}", summary.kills),
-        format!("\u{2B06}  Levels gained: +{}", summary.levels_gained),
-        format!("\u{1F528} Items equipped: {}", summary.items_equipped),
+        format!("\u{2694}  Kills: {}", format_number(summary.kills)),
+        format!(
+            "\u{2B06}  Levels gained: +{}",
+            format_number(summary.levels_gained as u64)
+        ),
+        format!(
+            "\u{1F528} Items equipped: {}",
+            format_number(summary.items_equipped as u64)
+        ),
     ];
     if summary.missions_completed > 0 {
         stats.push(format!(
             "\u{1F4DC} Missions completed: {}",
-            summary.missions_completed
+            format_number(summary.missions_completed as u64)
         ));
     }
 
@@ -1961,7 +1968,7 @@ fn render_sigils_list(
         } else if i == sigils.slots_unlocked as usize {
             // Next unlockable slot
             if let Some(cost) = sigils.next_unlock_cost() {
-                let lock_text = format!("\u{1F512} Unlock: {} SG", cost);
+                let lock_text = format!("\u{1F512} Unlock: {} SG", format_number(cost));
                 let affordable = state.stormglass >= cost;
                 let fg = if affordable {
                     ELECTRIC_BLUE
@@ -2109,21 +2116,21 @@ fn render_sigil_unlock_confirm(frame: &mut Frame, area: Rect, state: &GameState)
         &mut buffer,
         4,
         4,
-        &format!("Balance:  {} SG", balance),
+        &format!("Balance:  {} SG", format_number(balance)),
         Color::White,
     );
     put_text(
         &mut buffer,
         5,
         4,
-        &format!("Cost:    -{} SG", cost),
+        &format!("Cost:    -{} SG", format_number(cost)),
         Color::LightRed,
     );
     put_text(
         &mut buffer,
         6,
         4,
-        &format!("After:    {} SG", after),
+        &format!("After:    {} SG", format_number(after)),
         ELECTRIC_BLUE,
     );
 
@@ -2232,21 +2239,21 @@ fn render_sigil_etch_confirm(frame: &mut Frame, area: Rect, state: &GameState) {
         &mut buffer,
         4,
         4,
-        &format!("Balance:  {} SG", balance),
+        &format!("Balance:  {} SG", format_number(balance)),
         Color::White,
     );
     put_text(
         &mut buffer,
         5,
         4,
-        &format!("Cost:    -{} SG", cost),
+        &format!("Cost:    -{} SG", format_number(cost)),
         Color::LightRed,
     );
     put_text(
         &mut buffer,
         6,
         4,
-        &format!("After:    {} SG", after),
+        &format!("After:    {} SG", format_number(after)),
         ELECTRIC_BLUE,
     );
 
@@ -2373,21 +2380,21 @@ fn render_sigil_reroll_confirm(
         &mut buffer,
         4,
         4,
-        &format!("Balance:  {} SG", balance),
+        &format!("Balance:  {} SG", format_number(balance)),
         Color::White,
     );
     put_text(
         &mut buffer,
         5,
         4,
-        &format!("Cost:    -{} SG", cost),
+        &format!("Cost:    -{} SG", format_number(cost)),
         Color::LightRed,
     );
     put_text(
         &mut buffer,
         6,
         4,
-        &format!("After:    {} SG", after),
+        &format!("After:    {} SG", format_number(after)),
         ELECTRIC_BLUE,
     );
 
@@ -3045,13 +3052,13 @@ fn render_storm_lure_confirm(frame: &mut Frame, area: Rect, state: &GameState) {
     let balance = state.stormglass;
     let after = balance.saturating_sub(STORM_LURE_COST);
 
-    let balance_str = format!("Balance:  {} SG", balance);
+    let balance_str = format!("Balance:  {} SG", format_number(balance));
     put_text(&mut buffer, 4, 4, &balance_str, Color::White);
 
-    let cost_str = format!("Cost:    -{} SG", STORM_LURE_COST);
+    let cost_str = format!("Cost:    -{} SG", format_number(STORM_LURE_COST));
     put_text(&mut buffer, 5, 4, &cost_str, Color::LightRed);
 
-    let after_str = format!("After:    {} SG", after);
+    let after_str = format!("After:    {} SG", format_number(after));
     put_text(&mut buffer, 6, 4, &after_str, ELECTRIC_BLUE);
 
     // Tracking / Miss bonus (row 8)
