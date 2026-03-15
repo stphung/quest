@@ -1311,7 +1311,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     AchievementDef {
         id: AchievementId::ShardFusionNovice,
         name: "Shard Fusion Novice",
-        description: "Merge the crystal shards to 512 on Novice difficulty",
+        description: "Merge the crystal shards to 256 on Novice difficulty",
         category: AchievementCategory::Challenges,
         icon: "◆",
         points: 10,
@@ -1319,7 +1319,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     AchievementDef {
         id: AchievementId::ShardFusionApprentice,
         name: "Shard Fusion Apprentice",
-        description: "Merge the crystal shards to 1024 on Apprentice difficulty",
+        description: "Merge the crystal shards to 512 on Apprentice difficulty",
         category: AchievementCategory::Challenges,
         icon: "◆",
         points: 25,
@@ -1327,7 +1327,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     AchievementDef {
         id: AchievementId::ShardFusionJourneyman,
         name: "Shard Fusion Journeyman",
-        description: "Merge the crystal shards to 2048 on Journeyman difficulty",
+        description: "Merge the crystal shards to 1024 on Journeyman difficulty",
         category: AchievementCategory::Challenges,
         icon: "◆",
         points: 50,
@@ -1335,7 +1335,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     AchievementDef {
         id: AchievementId::ShardFusionMaster,
         name: "Shard Fusion Master",
-        description: "Merge the crystal shards to 4096 on Master difficulty",
+        description: "Merge the crystal shards to 2048 on Master difficulty",
         category: AchievementCategory::Challenges,
         icon: "◆",
         points: 100,

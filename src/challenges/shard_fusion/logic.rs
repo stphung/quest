@@ -583,9 +583,9 @@ mod tests {
 
     #[test]
     fn test_win_detected_after_slide() {
-        let mut game = ShardFusionGame::new(ShardFusionDifficulty::Novice); // target = 512
-        game.board[0][0] = 256;
-        game.board[0][1] = 256;
+        let mut game = ShardFusionGame::new(ShardFusionDifficulty::Novice); // target = 256
+        game.board[0][0] = 128;
+        game.board[0][1] = 128;
         apply_slide(&mut game, Direction::Left);
         assert_eq!(game.game_result, Some(ShardFusionResult::Win));
     }
