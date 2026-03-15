@@ -224,6 +224,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     BossDefeatResult::ZoneComplete {
                         old_zone,
                         new_zone_id,
+                        ..
                     } => {
                         let new_zone = crate::zones::get_zone(*new_zone_id)
                             .map(|z| z.name)
@@ -236,6 +237,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     BossDefeatResult::ZoneCompleteButGated {
                         zone_name,
                         required_prestige,
+                        ..
                     } => {
                         format!(
                             "\u{1f451} {} conquered! +{} XP \u{2014} Next zone requires Prestige {}.",
@@ -284,6 +286,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     BossDefeatResult::ZoneComplete {
                         old_zone: _,
                         new_zone_id,
+                        ..
                     } => {
                         let zone_name = crate::zones::get_zone(*new_zone_id)
                             .map(|z| z.name)
@@ -299,6 +302,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     BossDefeatResult::ZoneCompleteButGated {
                         zone_name,
                         required_prestige,
+                        ..
                     } => {
                         game_state.ticker.push(TickerEntry {
                             icon: "\u{1F512}",

@@ -603,6 +603,7 @@ fn test_chapter_boundary_z14_to_z15_when_cap_is_17() {
         BossDefeatResult::ZoneComplete {
             old_zone,
             new_zone_id,
+            ..
         } => {
             assert_eq!(
                 new_zone_id, 15,

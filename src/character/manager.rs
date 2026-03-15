@@ -144,6 +144,7 @@ mod tests {
             cached_haven_bonuses: Default::default(),
             cached_sigil_bonuses: Default::default(),
             bonuses_dirty: true,
+            cached_god_item_bonuses: Default::default(),
             stormglass: 0,
             stormglass_discovered: false,
             storm_sigils: crate::stormglass::sigils::StormSigils::new(),

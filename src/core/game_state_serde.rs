@@ -117,6 +117,7 @@ impl FlatGameState {
             cached_haven_bonuses: Default::default(),
             cached_sigil_bonuses: Default::default(),
             bonuses_dirty: true,
+            cached_god_item_bonuses: Default::default(),
         }
     }
 }

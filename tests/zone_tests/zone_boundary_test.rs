@@ -467,6 +467,7 @@ fn test_zone_complete_result_moves_to_next_zone() {
                 BossDefeatResult::ZoneComplete {
                     old_zone,
                     new_zone_id,
+                    ..
                 } => {
                     assert_eq!(old_zone, "Meadow");
                     assert_eq!(new_zone_id, 2);
@@ -506,6 +507,7 @@ fn test_zone_complete_but_gated_result_at_p4() {
                 BossDefeatResult::ZoneCompleteButGated {
                     zone_name,
                     required_prestige,
+                    ..
                 } => {
                     assert_eq!(zone_name, "Dark Forest");
                     assert_eq!(required_prestige, 5);
