@@ -20,6 +20,11 @@ impl VaultWardenDifficulty {
             Self::Master => 1,
         }
     }
+
+    /// Number of restart attempts (same for all difficulties).
+    pub fn max_attempts(&self) -> u8 {
+        5
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,10 +77,10 @@ pub struct VaultWardenGame {
     pub crate_positions: Vec<(usize, usize)>,
     pub goal_positions: Vec<(usize, usize)>,
     pub moves: u16,
-    pub move_limit: u16,
-    pub par: u16,
     pub undos_remaining: u8,
     pub undos_max: u8,
+    pub attempts_remaining: u8,
+    pub attempts_max: u8,
     pub move_history: Vec<MoveRecord>,
     // Snapshot of initial state for restart
     pub initial_player_pos: (usize, usize),
@@ -136,6 +141,12 @@ mod tests {
         assert_eq!(VaultWardenDifficulty::Master.max_undos(), 1);
     }
 
+    #[test]
+    fn test_max_attempts() {
+        assert_eq!(VaultWardenDifficulty::Novice.max_attempts(), 5);
+        assert_eq!(VaultWardenDifficulty::Master.max_attempts(), 5);
+    }
+
     fn make_test_game() -> VaultWardenGame {
         VaultWardenGame {
             difficulty: VaultWardenDifficulty::Novice,
@@ -148,10 +159,10 @@ mod tests {
             crate_positions: vec![(1, 1), (2, 2)],
             goal_positions: vec![(1, 1), (3, 3)],
             moves: 0,
-            move_limit: 20,
-            par: 8,
             undos_remaining: 5,
             undos_max: 5,
+            attempts_remaining: 5,
+            attempts_max: 5,
             move_history: vec![],
             initial_player_pos: (0, 0),
             initial_crate_positions: vec![(1, 1), (2, 2)],

@@ -53,7 +53,7 @@ pub fn parse_level(level: &VaultWardenLevel, difficulty: VaultWardenDifficulty) 
     }
 
     let undos_max = difficulty.max_undos();
-    let move_limit = ((level.optimal_moves as f64) * 2.5).ceil() as u16;
+    let attempts_max = difficulty.max_attempts();
 
     VaultWardenGame {
         difficulty,
@@ -66,10 +66,10 @@ pub fn parse_level(level: &VaultWardenLevel, difficulty: VaultWardenDifficulty) 
         crate_positions: crate_positions.clone(),
         goal_positions,
         moves: 0,
-        move_limit,
-        par: level.optimal_moves,
         undos_remaining: undos_max,
         undos_max,
+        attempts_remaining: attempts_max,
+        attempts_max,
         move_history: Vec::new(),
         initial_player_pos: player_pos,
         initial_crate_positions: crate_positions,
@@ -194,11 +194,9 @@ fn try_move(game: &mut VaultWardenGame, dr: i32, dc: i32) {
     game.player_pos = new_pos;
     game.moves += 1;
 
-    // Check win/loss
+    // Check win
     if game.crates_on_goals() == game.total_crates() {
         game.game_result = Some(VaultWardenResult::Win);
-    } else if game.moves >= game.move_limit {
-        game.game_result = Some(VaultWardenResult::Loss);
     }
 }
 
@@ -221,8 +219,13 @@ fn undo_move(game: &mut VaultWardenGame) {
     // Note: moves counter is NOT decremented (per spec)
 }
 
-/// Restart the level from scratch.
+/// Restart the level from scratch, consuming one attempt.
 fn restart_level(game: &mut VaultWardenGame) {
+    if game.attempts_remaining == 0 {
+        game.game_result = Some(VaultWardenResult::Loss);
+        return;
+    }
+    game.attempts_remaining -= 1;
     game.player_pos = game.initial_player_pos;
     game.crate_positions = game.initial_crate_positions.clone();
     game.moves = 0;
@@ -374,8 +377,11 @@ impl crate::challenges::menu::DifficultyInfo for VaultWardenDifficulty {
     }
 
     fn extra_info(&self) -> Option<String> {
-        let undos = self.max_undos();
-        Some(format!("{} undos", undos))
+        Some(format!(
+            "{} attempts, {} undos",
+            self.max_attempts(),
+            self.max_undos()
+        ))
     }
 }
 
@@ -391,7 +397,6 @@ mod tests {
 # $.#
 #   #
 #@###",
-            optimal_moves: 3,
         }
     }
 
@@ -404,9 +409,8 @@ mod tests {
         assert_eq!(game.player_pos, (4, 1));
         assert_eq!(game.crate_positions, vec![(2, 2)]);
         assert_eq!(game.goal_positions, vec![(2, 3)]);
-        assert_eq!(game.par, 3);
-        assert_eq!(game.move_limit, 8); // ceil(3 * 2.5) = 8
         assert_eq!(game.undos_remaining, 5);
+        assert_eq!(game.attempts_remaining, 5);
     }
 
     #[test]
@@ -417,7 +421,6 @@ mod tests {
 #####
 #@$.#
 #####",
-            optimal_moves: 1,
         };
         let mut game = parse_level(&level, VaultWardenDifficulty::Novice);
 
@@ -435,7 +438,6 @@ mod tests {
 #####
 #@$##
 #####",
-            optimal_moves: 10,
         };
         let mut game = parse_level(&level, VaultWardenDifficulty::Novice);
         let orig_crate = game.crate_positions[0];
@@ -452,7 +454,6 @@ mod tests {
 ######
 #@$$.#
 ######",
-            optimal_moves: 10,
         };
         let mut game = parse_level(&level, VaultWardenDifficulty::Novice);
 
@@ -470,7 +471,6 @@ mod tests {
 #@  .#
 # $  #
 ######",
-            optimal_moves: 10,
         };
         let mut game = parse_level(&level, VaultWardenDifficulty::Novice);
 
@@ -488,7 +488,6 @@ mod tests {
 #@  .#
 # $  #
 ######",
-            optimal_moves: 10,
         };
         let mut game = parse_level(&level, VaultWardenDifficulty::Novice);
         let orig_player = game.player_pos;
@@ -509,7 +508,6 @@ mod tests {
 ######
 #@$ .#
 ######",
-            optimal_moves: 10,
         };
         let mut game = parse_level(&level, VaultWardenDifficulty::Novice);
         let orig_player = game.player_pos;
@@ -531,7 +529,6 @@ mod tests {
 #@  .#
 # $  #
 ######",
-            optimal_moves: 10,
         };
         let mut game = parse_level(&level, VaultWardenDifficulty::Master); // 1 undo
 
@@ -551,6 +548,7 @@ mod tests {
         let mut game = parse_level(&level, VaultWardenDifficulty::Novice);
         let orig_player = game.player_pos;
         let orig_crates = game.crate_positions.clone();
+        let orig_attempts = game.attempts_remaining;
 
         process_input(&mut game, VaultWardenInput::Up);
         assert_ne!(game.player_pos, orig_player);
@@ -562,6 +560,7 @@ mod tests {
         assert_eq!(game.moves, 0);
         assert_eq!(game.undos_remaining, game.undos_max);
         assert!(game.move_history.is_empty());
+        assert_eq!(game.attempts_remaining, orig_attempts - 1);
     }
 
     #[test]
@@ -584,23 +583,19 @@ mod tests {
     }
 
     #[test]
-    fn test_move_limit_loss() {
-        let level = VaultWardenLevel {
-            data: "\
-#####
-#   #
-# @.#
-# $ #
-#####",
-            optimal_moves: 1, // move_limit = 3
-        };
+    fn test_attempts_exhaustion_loss() {
+        let level = make_test_level();
         let mut game = parse_level(&level, VaultWardenDifficulty::Novice);
-        assert_eq!(game.move_limit, 3);
+        assert_eq!(game.attempts_remaining, 5);
 
-        process_input(&mut game, VaultWardenInput::Up);
-        process_input(&mut game, VaultWardenInput::Down);
-        process_input(&mut game, VaultWardenInput::Up);
-        assert_eq!(game.moves, 3);
+        for _ in 0..5 {
+            process_input(&mut game, VaultWardenInput::Restart);
+            assert!(game.game_result.is_none());
+        }
+        assert_eq!(game.attempts_remaining, 0);
+
+        // Next restart triggers loss
+        process_input(&mut game, VaultWardenInput::Restart);
         assert_eq!(game.game_result, Some(VaultWardenResult::Loss));
     }
 
@@ -613,7 +608,6 @@ mod tests {
 # $ #
 #@  #
 #####",
-            optimal_moves: 10,
         };
         let game = parse_level(&level, VaultWardenDifficulty::Novice);
 
@@ -639,7 +633,6 @@ mod tests {
 #@ #
 # *#
 ####",
-            optimal_moves: 5,
         };
         let game = parse_level(&level, VaultWardenDifficulty::Novice);
         assert!(game.crate_positions.contains(&(2, 2)));
@@ -654,7 +647,6 @@ mod tests {
 # $#
 #+.#
 ####",
-            optimal_moves: 3,
         };
         let game = parse_level(&level, VaultWardenDifficulty::Novice);
         assert_eq!(game.player_pos, (2, 1));
@@ -709,7 +701,6 @@ mod tests {
 #####
 #@$.#
 #####",
-            optimal_moves: 1,
         };
         let mut game = parse_level(&level, VaultWardenDifficulty::Novice);
 

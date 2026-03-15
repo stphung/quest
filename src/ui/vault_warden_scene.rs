@@ -131,7 +131,7 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &VaultWardenGame) {
         ]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("Grid   ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Grid    ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 format!("{}×{}", game.width, game.height),
                 Style::default().fg(Color::White),
@@ -139,23 +139,7 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &VaultWardenGame) {
         ]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("Moves  ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                format!("{}/{}", game.moves, game.move_limit),
-                Style::default().fg(if game.moves > game.par {
-                    Color::Yellow
-                } else {
-                    Color::White
-                }),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("Par    ", Style::default().fg(Color::DarkGray)),
-            Span::styled(format!("{}", game.par), Style::default().fg(Color::Green)),
-        ]),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("Placed ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Placed  ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 format!("{}/{}", game.crates_on_goals(), game.total_crates()),
                 Style::default().fg(if game.crates_on_goals() == game.total_crates() {
@@ -167,9 +151,28 @@ fn render_info_panel(frame: &mut Frame, area: Rect, game: &VaultWardenGame) {
         ]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("Undos  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Moves   ", Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("{}", game.moves), Style::default().fg(Color::White)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Restarts", Style::default().fg(Color::DarkGray)),
             Span::styled(
-                format!("{}/{}", game.undos_remaining, game.undos_max),
+                format!(" {}/{}", game.attempts_remaining, game.attempts_max),
+                Style::default().fg(if game.attempts_remaining == 0 {
+                    Color::Red
+                } else if game.attempts_remaining <= 1 {
+                    Color::Yellow
+                } else {
+                    Color::White
+                }),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Undos   ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(" {}/{}", game.undos_remaining, game.undos_max),
                 Style::default().fg(if game.undos_remaining == 0 {
                     Color::Red
                 } else {
@@ -200,22 +203,17 @@ fn render_game_over(
             } else {
                 format!("+{} Stormglass", r.stormglass)
             };
-            let msg = if game.moves <= game.par {
-                format!("Solved in {} moves (par {}) \u{2605}", game.moves, game.par)
-            } else {
-                format!("Solved in {} moves (par {})", game.moves, game.par)
-            };
             (
                 GameResultType::Win,
                 "VAULT SEALED!".to_string(),
-                msg,
+                format!("Solved in {} moves", game.moves),
                 reward_text,
             )
         }
         _ => (
             GameResultType::Loss,
             "VAULT BREACHED!".to_string(),
-            format!("Exceeded move limit ({}/{})", game.moves, game.move_limit),
+            "Out of restart attempts!".to_string(),
             "No penalty incurred.".to_string(),
         ),
     };
