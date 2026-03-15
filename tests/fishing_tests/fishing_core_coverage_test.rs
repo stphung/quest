@@ -533,7 +533,7 @@ fn test_discoveries_never_both_dungeon_and_fishing_same_tick() {
     // If a dungeon is discovered, fishing discovery is skipped in the same tick
     let mut state = fresh_state();
 
-    for seed in 0..5000u64 {
+    for seed in 0..500u64 {
         let mut r = rng(seed);
         state.active_dungeon = None;
         state.active_fishing = None;

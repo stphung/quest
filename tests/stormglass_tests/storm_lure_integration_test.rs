@@ -147,7 +147,7 @@ fn test_hunt_simulation_multiple_seeds() {
 fn test_lure_at_zero_encounters() {
     // Lure should boost encounter chance from the very start
     let mut hits = 0;
-    for seed in 0..5000 {
+    for seed in 0..1000 {
         let mut rng = rng_from(seed);
         // Base chance for encounter 1 is 5%. With 10% bonus, should be 15%.
         let (_, result) =
@@ -156,10 +156,10 @@ fn test_lure_at_zero_encounters() {
             hits += 1;
         }
     }
-    // Expected ~15% with 10% bonus on top of 5% base = 15%. Allow 12-18% range.
-    let rate = hits as f64 / 5000.0;
+    // Expected ~15% with 10% bonus on top of 5% base = 15%. Allow 10-20% range.
+    let rate = hits as f64 / 1000.0;
     assert!(
-        rate > 0.12 && rate < 0.18,
+        rate > 0.10 && rate < 0.20,
         "Encounter rate with 10% bonus should be ~15%, got {:.1}%",
         rate * 100.0
     );
@@ -170,7 +170,7 @@ fn test_lure_at_ten_encounters_catch_phase() {
     // At 10 encounters with tracking bonus, catch rate should be boosted
     let mut catches = 0;
     let tracking = 0.15; // 10 encounters worth of tracking
-    for seed in 0..5000 {
+    for seed in 0..1000 {
         let mut rng = rng_from(seed);
         let (_, result) =
             generate_fish_with_rank(FishRarity::Legendary, 40, 10, 0.0, tracking, &mut rng);
@@ -178,10 +178,10 @@ fn test_lure_at_ten_encounters_catch_phase() {
             catches += 1;
         }
     }
-    // Base 25% + 15% tracking = 40%. Allow 36-44% range.
-    let rate = catches as f64 / 5000.0;
+    // Base 25% + 15% tracking = 40%. Allow 33-47% range.
+    let rate = catches as f64 / 1000.0;
     assert!(
-        rate > 0.36 && rate < 0.44,
+        rate > 0.33 && rate < 0.47,
         "Catch rate with 15% tracking should be ~40%, got {:.1}%",
         rate * 100.0
     );

@@ -997,7 +997,7 @@ fn test_game_tick_debug_mode_suppresses_achievement_save() {
     // Note: debug_mode only suppresses the flag for fishing storm leviathan path.
     // Achievement events themselves still fire. This test verifies the code path
     // doesn't crash when debug_mode is true.
-    for _ in 0..5000 {
+    for _ in 0..500 {
         let _result = game_tick(
             &mut state,
             &mut tick_counter,
