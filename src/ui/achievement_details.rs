@@ -17,22 +17,7 @@ use ratatui::{
 };
 
 use super::achievement_browser_scene::AchievementBrowserState;
-
-/// Format a number with commas (e.g., 12847 -> "12,847").
-pub(super) fn format_number(n: u64) -> String {
-    if n < 1000 {
-        return n.to_string();
-    }
-    let s = n.to_string();
-    let mut result = String::new();
-    for (i, c) in s.chars().rev().enumerate() {
-        if i > 0 && i % 3 == 0 {
-            result.push(',');
-        }
-        result.push(c);
-    }
-    result.chars().rev().collect()
-}
+use super::game_common::format_number;
 
 /// Create a stat line with dot-leaders: "  Label .... Value"
 fn stat_line(

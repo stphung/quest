@@ -149,6 +149,21 @@ pub struct ChallengeReward {
     pub fishing_ranks: u32,
 }
 
+fn format_with_commas(n: u64) -> String {
+    if n < 1000 {
+        return n.to_string();
+    }
+    let s = n.to_string();
+    let mut result = String::new();
+    for (i, c) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            result.push(',');
+        }
+        result.push(c);
+    }
+    result.chars().rev().collect()
+}
+
 impl ChallengeReward {
     /// Generate display text from structured data
     /// Order: Prestige -> Fishing -> Stormglass/XP
@@ -170,7 +185,10 @@ impl ChallengeReward {
 
         if self.stormglass > 0 {
             if stormglass_discovered {
-                parts.push(format!("\u{1F48E}+{} Stormglass", self.stormglass));
+                parts.push(format!(
+                    "\u{1F48E}+{} Stormglass",
+                    format_with_commas(self.stormglass)
+                ));
             } else {
                 let xp_percent = self.stormglass / 10;
                 parts.push(format!("+{}% level XP", xp_percent));
@@ -1003,7 +1021,7 @@ mod tests {
         };
         assert_eq!(
             reward.description(true),
-            "Win: +2 Prestige Ranks, +1 Fish Rank, \u{1F48E}+1000 Stormglass"
+            "Win: +2 Prestige Ranks, +1 Fish Rank, \u{1F48E}+1,000 Stormglass"
         );
     }
 

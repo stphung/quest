@@ -27,7 +27,7 @@ pub fn draw_ticker(frame: &mut Frame, area: Rect, ticker: &Ticker, stormglass: O
     let sg_prefix: Vec<Span<'static>> = if let Some(sg) = stormglass {
         vec![
             Span::styled(
-                format!("\u{1F48E}{} SG", sg),
+                format!("\u{1F48E}{} SG", super::game_common::format_number(sg)),
                 Style::default()
                     .fg(Color::Rgb(100, 180, 255))
                     .add_modifier(Modifier::BOLD),

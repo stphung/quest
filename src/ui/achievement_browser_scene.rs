@@ -3,7 +3,7 @@
 //! Displays a browsable list of achievements organized by category,
 //! with a detail panel showing description and unlock status.
 
-use super::achievement_details::format_number;
+use super::game_common::format_number;
 use crate::achievements::{get_achievement_def, AchievementCategory, AchievementId, Achievements};
 use crate::enhancement::EnhancementProgress;
 use ratatui::{
@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn test_format_number() {
-        use super::super::achievement_details::format_number;
+        use super::super::game_common::format_number;
         assert_eq!(format_number(0), "0");
         assert_eq!(format_number(999), "999");
         assert_eq!(format_number(1000), "1,000");

@@ -453,6 +453,22 @@ pub fn format_number_short(n: u64) -> String {
     n.to_string()
 }
 
+/// Format a number with comma separators (e.g., 12847 → "12,847").
+pub fn format_number(n: u64) -> String {
+    if n < 1000 {
+        return n.to_string();
+    }
+    let s = n.to_string();
+    let mut result = String::new();
+    for (i, c) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            result.push(',');
+        }
+        result.push(c);
+    }
+    result.chars().rev().collect()
+}
+
 /// Forfeit confirmation status text.
 pub const FORFEIT_STATUS_TEXT: &str = "Forfeit game?";
 
