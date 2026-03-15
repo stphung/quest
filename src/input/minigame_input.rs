@@ -1,4 +1,4 @@
-//! Minigame input handling for all 10 challenge types.
+//! Minigame input handling for all 11 challenge types.
 
 use super::InputResult;
 use crate::challenges::chess::logic::{
