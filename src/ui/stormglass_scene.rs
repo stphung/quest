@@ -1581,10 +1581,33 @@ pub fn render_chrono_surge_banner(
 
     let ticks_left_label = chrono_ticks_to_duration_label(surge.ticks_remaining);
 
-    let stats_line = format!(
-        "\u{2694}{} kills  \u{2B06}+{} levels  \u{1F528}{} equipped  \u{23F3} {} left",
-        surge.kills, surge.levels_gained, surge.items_equipped, ticks_left_label,
-    );
+    let stats_color = if surge.overcharged {
+        Color::Rgb(255, 220, 160)
+    } else {
+        Color::Rgb(180, 210, 240)
+    };
+    let stats_spans = vec![
+        Span::styled("\u{2694} ", Style::default().fg(stats_color)),
+        Span::styled(
+            format!("{} kills", surge.kills),
+            Style::default().fg(stats_color),
+        ),
+        Span::styled("  \u{2B06} ", Style::default().fg(stats_color)),
+        Span::styled(
+            format!("+{} levels", surge.levels_gained),
+            Style::default().fg(stats_color),
+        ),
+        Span::styled("  \u{1F528} ", Style::default().fg(stats_color)),
+        Span::styled(
+            format!("{} equipped", surge.items_equipped),
+            Style::default().fg(stats_color),
+        ),
+        Span::styled("  \u{23F3} ", Style::default().fg(stats_color)),
+        Span::styled(
+            format!("{} left", ticks_left_label),
+            Style::default().fg(stats_color),
+        ),
+    ];
 
     let (title_text, title_color) = if surge.overcharged {
         ("\u{26A1} OVERCHARGE", Color::Rgb(255, 215, 0)) // ⚡ gold
@@ -1637,17 +1660,7 @@ pub fn render_chrono_surge_banner(
         (TIMEWARP_MID, TIMEWARP_DEEP)
     };
 
-    let lines = vec![
-        Line::from(first_line_spans),
-        Line::from(Span::styled(
-            stats_line,
-            Style::default().fg(if surge.overcharged {
-                Color::Rgb(255, 220, 160)
-            } else {
-                Color::Rgb(180, 210, 240)
-            }),
-        )),
-    ];
+    let lines = vec![Line::from(first_line_spans), Line::from(stats_spans)];
 
     let paragraph = Paragraph::new(lines).alignment(Alignment::Center).block(
         Block::default()
