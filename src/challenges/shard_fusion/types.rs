@@ -25,6 +25,17 @@ impl ShardFusionDifficulty {
             Self::Master => 2048,
         }
     }
+
+    /// Chance (out of 100) that a spawned tile is a 4 instead of a 2.
+    /// Higher values make the game harder by disrupting merge chains.
+    pub fn four_spawn_chance(&self) -> u32 {
+        match self {
+            Self::Novice => 5,
+            Self::Apprentice => 10,
+            Self::Journeyman => 15,
+            Self::Master => 20,
+        }
+    }
 }
 
 /// Result of a Shard Fusion game.
@@ -117,6 +128,14 @@ mod tests {
         assert_eq!(ShardFusionDifficulty::Apprentice.target_value(), 512);
         assert_eq!(ShardFusionDifficulty::Journeyman.target_value(), 1024);
         assert_eq!(ShardFusionDifficulty::Master.target_value(), 2048);
+    }
+
+    #[test]
+    fn test_four_spawn_chance() {
+        assert_eq!(ShardFusionDifficulty::Novice.four_spawn_chance(), 5);
+        assert_eq!(ShardFusionDifficulty::Apprentice.four_spawn_chance(), 10);
+        assert_eq!(ShardFusionDifficulty::Journeyman.four_spawn_chance(), 15);
+        assert_eq!(ShardFusionDifficulty::Master.four_spawn_chance(), 20);
     }
 
     #[test]

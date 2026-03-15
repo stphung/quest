@@ -295,9 +295,10 @@ pub fn apply_slide(game: &mut ShardFusionGame, direction: Direction) -> bool {
     true
 }
 
-/// Spawn a new tile in a random empty cell. 90% chance of value 2, 10% chance of 4.
+/// Spawn a new tile in a random empty cell.
+/// `four_chance` is the percentage (0-100) that the tile is a 4 instead of a 2.
 /// No-op if the board is full.
-pub fn spawn_tile<R: Rng>(board: &mut [[u32; 4]; 4], rng: &mut R) {
+pub fn spawn_tile<R: Rng>(board: &mut [[u32; 4]; 4], rng: &mut R, four_chance: u32) {
     let empty_cells: Vec<(usize, usize)> = (0..4)
         .flat_map(|r| (0..4).map(move |c| (r, c)))
         .filter(|&(r, c)| board[r][c] == 0)
@@ -309,7 +310,11 @@ pub fn spawn_tile<R: Rng>(board: &mut [[u32; 4]; 4], rng: &mut R) {
 
     let idx = rng.random_range(0..empty_cells.len());
     let (r, c) = empty_cells[idx];
-    board[r][c] = if rng.random_range(0u32..10) < 9 { 2 } else { 4 };
+    board[r][c] = if rng.random_range(0u32..100) >= four_chance {
+        2
+    } else {
+        4
+    };
 }
 
 /// Check win/loss conditions and update `game.game_result`.
@@ -340,7 +345,7 @@ pub fn check_game_over(game: &mut ShardFusionGame) {
 pub fn tick_shard_fusion<R: Rng>(game: &mut ShardFusionGame, rng: &mut R) {
     match game.anim_state {
         ShardFusionAnimState::Sliding(1) => {
-            spawn_tile(&mut game.board, rng);
+            spawn_tile(&mut game.board, rng, game.difficulty.four_spawn_chance());
             check_game_over(game);
             game.slide_moves.clear();
             if game.merged_cells.is_empty() {
@@ -462,8 +467,9 @@ pub fn start_shard_fusion_game<R: Rng>(
     rng: &mut R,
 ) -> ActiveMinigame {
     let mut game = ShardFusionGame::new(difficulty);
-    spawn_tile(&mut game.board, rng);
-    spawn_tile(&mut game.board, rng);
+    let four_chance = difficulty.four_spawn_chance();
+    spawn_tile(&mut game.board, rng, four_chance);
+    spawn_tile(&mut game.board, rng, four_chance);
     ActiveMinigame::ShardFusion(game)
 }
 
@@ -655,7 +661,7 @@ mod tests {
     fn test_spawn_tile_places_on_empty_board() {
         let mut board = [[0u32; 4]; 4];
         let mut rng = SmallRng::seed_from_u64(42);
-        spawn_tile(&mut board, &mut rng);
+        spawn_tile(&mut board, &mut rng, 10);
         let non_zero: Vec<u32> = board
             .iter()
             .flatten()
@@ -671,7 +677,7 @@ mod tests {
         let mut board = [[2u32, 4, 2, 4], [4, 2, 4, 2], [2, 4, 2, 4], [4, 2, 4, 2]];
         let original = board;
         let mut rng = SmallRng::seed_from_u64(0);
-        spawn_tile(&mut board, &mut rng);
+        spawn_tile(&mut board, &mut rng, 10);
         assert_eq!(board, original);
     }
 
