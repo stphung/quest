@@ -27,6 +27,7 @@ pub enum MinigameType {
     Jezzball,
     RunicShift,
     SigilMatrix,
+    ShardFusion,
 }
 
 /// Type-safe difficulty level shared by all minigames.

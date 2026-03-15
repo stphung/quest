@@ -226,6 +226,11 @@ pub enum AchievementId {
     SigilMatrixApprentice,
     SigilMatrixJourneyman,
     SigilMatrixMaster,
+    // Challenge achievements - Shard Fusion
+    ShardFusionNovice,
+    ShardFusionApprentice,
+    ShardFusionJourneyman,
+    ShardFusionMaster,
     // Challenge achievements - Meta
     GrandChampion,
 
@@ -329,7 +334,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 228;
+    pub const VARIANT_COUNT: usize = 232;
 }
 
 /// Static definition of an achievement.

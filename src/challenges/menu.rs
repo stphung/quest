@@ -15,6 +15,7 @@ use super::morris::{MorrisDifficulty, MorrisGame};
 use super::rune::{RuneDifficulty, RuneGame};
 use super::runic_shift::logic::start_runic_shift_game;
 use super::runic_shift::RunicShiftDifficulty;
+use super::shard_fusion::{start_shard_fusion_game, ShardFusionDifficulty};
 use super::snake::logic::start_snake_game;
 use super::snake::SnakeDifficulty;
 use super::sudoku::SudokuDifficulty;
@@ -120,6 +121,10 @@ fn accept_selected_challenge(state: &mut GameState) {
                 let d = SudokuDifficulty::from_index(difficulty_index);
                 let mut rng = rand::rng();
                 ActiveMinigame::Sudoku(crate::challenges::sudoku::generate_puzzle(d, &mut rng))
+            }
+            ChallengeType::ShardFusion => {
+                let d = ShardFusionDifficulty::from_index(difficulty_index);
+                start_shard_fusion_game(d, &mut rand::rng())
             }
         };
         state.active_minigame = Some(minigame);
@@ -440,6 +445,10 @@ const CHALLENGE_TABLE: &[ChallengeWeight] = &[
         challenge_type: ChallengeType::Sudoku,
         weight: 18,
     },
+    ChallengeWeight {
+        challenge_type: ChallengeType::ShardFusion,
+        weight: 20, // ~10% - moderate puzzle
+    },
 ];
 
 /// A single pending challenge in the menu
@@ -465,6 +474,7 @@ pub enum ChallengeType {
     Go,
     Snake,
     Sudoku,
+    ShardFusion,
 }
 
 impl ChallengeType {
@@ -482,6 +492,7 @@ impl ChallengeType {
             ChallengeType::Go => "◉",
             ChallengeType::Snake => "~",
             ChallengeType::Sudoku => "\u{2B21}",
+            ChallengeType::ShardFusion => "\u{25C6}",
         }
     }
 
@@ -508,6 +519,9 @@ impl ChallengeType {
             }
             ChallengeType::Sudoku => {
                 "A grid of ancient sigils materializes, pulsing with arcane energy..."
+            }
+            ChallengeType::ShardFusion => {
+                "A glowing grid of crystal shards materializes before you, waiting to be merged..."
             }
         }
     }
@@ -764,6 +778,16 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
             icon: "\u{2B21}",
             description: "A grid of ancient sigils pulses with arcane energy. Each row, column, and section demands a unique symbol \u{2014} one wrong placement and the matrix destabilizes.".to_string(),
         },
+        ChallengeType::ShardFusion => PendingChallenge {
+            challenge_type: ChallengeType::ShardFusion,
+            title: "Shard Fusion".to_string(),
+            icon: "\u{25C6}",
+            description: "A glowing grid of crystal shards materializes before you. Each tile \
+                pulses with arcane energy, and the air hums with potential. A spectral voice \
+                intones: \"Merge the shards, seeker. Slide them together. Combine like with like, \
+                and grow the crystals ever larger. Reach the pinnacle, and claim your reward.\""
+                .to_string(),
+        },
     }
 }
 
@@ -795,6 +819,7 @@ mod tests {
         assert!(!ChallengeType::Go.icon().is_empty());
         assert!(!ChallengeType::Snake.icon().is_empty());
         assert!(!ChallengeType::Sudoku.icon().is_empty());
+        assert!(!ChallengeType::ShardFusion.icon().is_empty());
     }
 
     #[test]
@@ -810,6 +835,7 @@ mod tests {
         assert!(!ChallengeType::Go.discovery_flavor().is_empty());
         assert!(!ChallengeType::Snake.discovery_flavor().is_empty());
         assert!(!ChallengeType::Sudoku.discovery_flavor().is_empty());
+        assert!(!ChallengeType::ShardFusion.discovery_flavor().is_empty());
     }
 
     #[test]
@@ -826,6 +852,7 @@ mod tests {
             ChallengeType::Go.icon(),
             ChallengeType::Snake.icon(),
             ChallengeType::Sudoku.icon(),
+            ChallengeType::ShardFusion.icon(),
         ];
         // Check all pairs are different
         for i in 0..icons.len() {

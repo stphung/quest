@@ -681,6 +681,9 @@ pub(super) fn tick_challenge_ai<R: Rng>(state: &mut GameState, rng: &mut R) {
         Some(ActiveMinigame::Go(game)) => {
             crate::challenges::go::process_ai_thinking(game, rng);
         }
+        Some(ActiveMinigame::ShardFusion(game)) => {
+            crate::challenges::shard_fusion::tick_shard_fusion(game, rng);
+        }
         _ => {}
     }
 }

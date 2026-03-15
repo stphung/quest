@@ -933,6 +933,7 @@ fn test_minigame_won_all_types_master_unlocks_correct_achievement() {
             AchievementId::ContainmentBreachMaster,
         ),
         (MinigameType::RunicShift, AchievementId::SigilSurgeMaster),
+        (MinigameType::ShardFusion, AchievementId::ShardFusionMaster),
     ];
     for (game_type, expected_id) in cases {
         let mut ach = Achievements::default();

@@ -657,6 +657,15 @@ fn build_stats_right_lines(
                 AchievementId::SigilMatrixMaster,
             ],
         ),
+        (
+            "Shard Fusion",
+            [
+                AchievementId::ShardFusionNovice,
+                AchievementId::ShardFusionApprentice,
+                AchievementId::ShardFusionJourneyman,
+                AchievementId::ShardFusionMaster,
+            ],
+        ),
     ];
 
     let diff_labels = ["Nov", "App", "Jou", "Mas"];

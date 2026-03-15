@@ -30,6 +30,7 @@ enum DebugAction {
     TriggerJezzballChallenge,
     TriggerSnakeChallenge,
     TriggerRunicShiftChallenge,
+    TriggerShardFusionChallenge,
     TriggerHavenDiscovery,
     TriggerSoulforgeDiscovery,
     TriggerForgeStormbreaker,
@@ -80,6 +81,7 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerJezzballChallenge,
     DebugAction::TriggerSnakeChallenge,
     DebugAction::TriggerRunicShiftChallenge,
+    DebugAction::TriggerShardFusionChallenge,
     DebugAction::TriggerHavenDiscovery,
     DebugAction::TriggerSoulforgeDiscovery,
     DebugAction::TriggerForgeStormbreaker,
@@ -199,6 +201,7 @@ const CHALLENGE_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerSnakeChallenge,
     DebugAction::TriggerRunicShiftChallenge,
     DebugAction::TriggerSudokuChallenge,
+    DebugAction::TriggerShardFusionChallenge,
 ];
 const WORLD_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerDungeon,
@@ -348,57 +351,58 @@ impl DebugAction {
             Self::TriggerJezzballChallenge => 9,
             Self::TriggerSnakeChallenge => 10,
             Self::TriggerRunicShiftChallenge => 11,
-            Self::TriggerHavenDiscovery => 12,
-            Self::TriggerSoulforgeDiscovery => 13,
-            Self::TriggerForgeStormbreaker => 14,
-            Self::TriggerForgeAsprika => 15,
-            Self::TriggerForgeSleipnir => 16,
-            Self::TriggerForgeMegingjord => 17,
-            Self::TriggerGrantStormglass => 18,
-            Self::TriggerDiscoverStormglass => 19,
-            Self::TriggerGrant100kStormglass => 20,
-            Self::TriggerEtchRandomSigils => 21,
-            Self::TriggerEtchSPlusSigil => 22,
-            Self::TriggerForceOvercharge => 23,
-            Self::TriggerDeepDiscovery => 24,
-            Self::TriggerDeepGrantMarks => 25,
-            Self::TriggerDeepRefreshMissionPool => 26,
-            Self::TriggerDeepRefreshRecruits => 27,
-            Self::TriggerDeepClearFrontierLayer => 28,
-            Self::TriggerDeepCompleteActiveMissions => 29,
+            Self::TriggerShardFusionChallenge => 12,
+            Self::TriggerHavenDiscovery => 13,
+            Self::TriggerSoulforgeDiscovery => 14,
+            Self::TriggerForgeStormbreaker => 15,
+            Self::TriggerForgeAsprika => 16,
+            Self::TriggerForgeSleipnir => 17,
+            Self::TriggerForgeMegingjord => 18,
+            Self::TriggerGrantStormglass => 19,
+            Self::TriggerDiscoverStormglass => 20,
+            Self::TriggerGrant100kStormglass => 21,
+            Self::TriggerEtchRandomSigils => 22,
+            Self::TriggerEtchSPlusSigil => 23,
+            Self::TriggerForceOvercharge => 24,
+            Self::TriggerDeepDiscovery => 25,
+            Self::TriggerDeepGrantMarks => 26,
+            Self::TriggerDeepRefreshMissionPool => 27,
+            Self::TriggerDeepRefreshRecruits => 28,
+            Self::TriggerDeepClearFrontierLayer => 29,
+            Self::TriggerDeepCompleteActiveMissions => 30,
             Self::UnlockDeepLayer(layer) => match layer {
-                3 => 30,
-                7 => 31,
-                12 => 32,
-                18 => 33,
-                25 => 34,
-                _ => 35, // 30
+                3 => 31,
+                7 => 32,
+                12 => 33,
+                18 => 34,
+                25 => 35,
+                _ => 36, // 30
             },
-            Self::TravelToZone(zone_id) => 36 + zone_id as usize - 1, // 36-65
-            Self::SetPrestige(amount) => 66 + set_value_index(amount),
-            Self::SetLevel(amount) => 76 + set_value_index(amount),
-            Self::MaxAttributes => 86,
-            Self::SetEnhancement(level) => 87 + level as usize,
-            // Loom actions: 98–108
-            Self::TriggerLoomDiscovery => 98,
+            Self::TravelToZone(zone_id) => 37 + zone_id as usize - 1, // 37-66
+            Self::SetPrestige(amount) => 67 + set_value_index(amount),
+            Self::SetLevel(amount) => 77 + set_value_index(amount),
+            Self::MaxAttributes => 87,
+            Self::SetEnhancement(level) => 88 + level as usize,
+            // Loom actions: 99–109
+            Self::TriggerLoomDiscovery => 99,
             Self::LoomSelectArchetype(a) => match a {
-                LoomArchetype::BurnBright => 99,
-                LoomArchetype::ReachWide => 100,
-                LoomArchetype::RunDeep => 101,
+                LoomArchetype::BurnBright => 100,
+                LoomArchetype::ReachWide => 101,
+                LoomArchetype::RunDeep => 102,
             },
-            Self::LoomUnlockAllNodes => 102,
-            Self::LoomGrantResources => 103,
-            Self::LoomCompletePattern => 104,
+            Self::LoomUnlockAllNodes => 103,
+            Self::LoomGrantResources => 104,
+            Self::LoomCompletePattern => 105,
             Self::LoomAdvanceToPattern(n) => match n {
-                0 => 105,
-                5 => 106,
-                10 => 107,
-                _ => 108, // 17
+                0 => 106,
+                5 => 107,
+                10 => 108,
+                _ => 109, // 17
             },
-            Self::LoomBuildTestShuttleT1 => 109,
-            Self::LoomBuildTestShuttleT2 => 110,
-            Self::LoomClearShuttles => 111,
-            Self::TriggerSudokuChallenge => 112,
+            Self::LoomBuildTestShuttleT1 => 110,
+            Self::LoomBuildTestShuttleT2 => 111,
+            Self::LoomClearShuttles => 112,
+            Self::TriggerSudokuChallenge => 113,
         }
     }
 
@@ -416,6 +420,7 @@ impl DebugAction {
             Self::TriggerJezzballChallenge => "Trigger JezzBall Challenge",
             Self::TriggerSnakeChallenge => "Trigger Snake Challenge",
             Self::TriggerRunicShiftChallenge => "Trigger Sigil Surge Challenge",
+            Self::TriggerShardFusionChallenge => "Trigger Shard Fusion Challenge",
             Self::TriggerHavenDiscovery => "Trigger Haven Discovery",
             Self::TriggerSoulforgeDiscovery => "Trigger Soulforge Discovery",
             Self::TriggerForgeStormbreaker => "Forge Stormbreaker",
@@ -558,6 +563,7 @@ impl DebugAction {
             Self::TriggerSnakeChallenge => trigger_snake_challenge(state),
             Self::TriggerRunicShiftChallenge => trigger_runic_shift_challenge(state),
             Self::TriggerSudokuChallenge => trigger_sudoku_challenge(state),
+            Self::TriggerShardFusionChallenge => trigger_shard_fusion_challenge(state),
             Self::TriggerHavenDiscovery => trigger_haven_discovery(haven),
             Self::TriggerSoulforgeDiscovery => trigger_soulforge_discovery(enhancement),
             Self::TriggerForgeStormbreaker => trigger_forge_stormbreaker(achievements),
@@ -1081,6 +1087,19 @@ fn trigger_sudoku_challenge(state: &mut GameState) -> &'static str {
     "Sigil Matrix challenge added!"
 }
 
+fn trigger_shard_fusion_challenge(state: &mut GameState) -> &'static str {
+    if state
+        .challenge_menu
+        .has_challenge(&ChallengeType::ShardFusion)
+    {
+        return "Shard Fusion challenge already pending!";
+    }
+    state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::ShardFusion));
+    "Shard Fusion challenge added!"
+}
+
 fn trigger_haven_discovery(haven: &mut Haven) -> &'static str {
     if haven.discovered {
         return "Haven already discovered!";
@@ -1588,7 +1607,7 @@ mod tests {
             menu.navigate_down();
         }
         assert_eq!(menu.selected_index, CHALLENGE_ACTIONS.len() - 1);
-        assert_eq!(menu.selected_option_global_index(), 112);
+        assert_eq!(menu.selected_option_global_index(), 12);
 
         // Can't go past end
         menu.navigate_down();

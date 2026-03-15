@@ -30,6 +30,9 @@ use crate::challenges::runic_shift::logic::{
     apply_game_result as apply_runic_shift_result, process_input as process_runic_shift_input,
     RunicShiftInput,
 };
+use crate::challenges::shard_fusion::{
+    apply_shard_fusion_result, process_input as process_shard_fusion_input, ShardFusionInput,
+};
 use crate::challenges::snake::logic::{
     apply_game_result as apply_snake_result, process_input as process_snake_input, SnakeInput,
 };
@@ -257,6 +260,22 @@ pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResu
                     _ => SudokuInput::Other,
                 };
                 process_sudoku_input(sudoku_game, input);
+            }
+            ActiveMinigame::ShardFusion(shard_fusion_game) => {
+                if shard_fusion_game.game_result.is_some() {
+                    state.last_minigame_win = apply_shard_fusion_result(state);
+                    return result_for_challenge(&state.last_minigame_win);
+                }
+                let input = match key.code {
+                    KeyCode::Left => ShardFusionInput::Left,
+                    KeyCode::Right => ShardFusionInput::Right,
+                    KeyCode::Up => ShardFusionInput::Up,
+                    KeyCode::Down => ShardFusionInput::Down,
+                    KeyCode::Esc => ShardFusionInput::Forfeit,
+                    _ => ShardFusionInput::Other,
+                };
+                let mut rng = rand::rng();
+                process_shard_fusion_input(shard_fusion_game, input, &mut rng);
             }
         }
     }
