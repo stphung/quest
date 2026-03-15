@@ -33,6 +33,10 @@ pub struct SimStats {
     pub ascension_level: u32,
     pub challenges_won: u64,
     pub stormglass_balance: u64,
+    pub deep_layers_reached: u32,
+    pub fracture_zone_cap: u32,
+    pub loom_patterns_completed: usize,
+    pub loom_zone_cap: u32,
     // Final state snapshot
     pub final_level: u32,
     pub final_xp: u64,
@@ -73,6 +77,10 @@ impl Default for SimStats {
             ascension_level: 0,
             challenges_won: 0,
             stormglass_balance: 0,
+            deep_layers_reached: 0,
+            fracture_zone_cap: 11,
+            loom_patterns_completed: 0,
+            loom_zone_cap: 0,
             final_level: 1,
             final_xp: 0,
             final_prestige: 0,
@@ -213,7 +221,12 @@ impl SimStats {
         }
     }
 
-    pub fn finalize(&mut self, state: &GameState) {
+    pub fn finalize(
+        &mut self,
+        state: &GameState,
+        deep: &quest::deep::DeepState,
+        loom: &quest::loom::LoomState,
+    ) {
         self.final_level = state.character_level;
         self.final_xp = state.character_xp;
         self.final_prestige = state.prestige_rank;
@@ -224,6 +237,10 @@ impl SimStats {
         self.final_fishing_rank = state.fishing.rank;
         self.ascension_level = state.ascension_level;
         self.stormglass_balance = state.stormglass;
+        self.deep_layers_reached = deep.persistent.deepest_layer_reached;
+        self.fracture_zone_cap = deep.persistent.fracture_zone_cap;
+        self.loom_patterns_completed = loom.persistent.completed_pattern_count();
+        self.loom_zone_cap = quest::loom::loom_zone_cap_for_patterns(self.loom_patterns_completed);
 
         for attr in AttributeType::all() {
             self.final_attributes[attr.index()] = state.attributes.get(attr);

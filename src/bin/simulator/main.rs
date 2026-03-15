@@ -232,7 +232,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState, Option
         w
     });
 
-    let mut injection_state = strategy::InjectionState::new();
+    let mut injection_state = strategy::InjectionState::new(config.prestige);
 
     for tick in 0..config.ticks {
         let pr_before = state.prestige_rank;
@@ -293,7 +293,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState, Option
                 &mut enhancement,
                 &mut deep_state,
                 &mut achievements,
-                &loom,
+                &mut loom,
                 &mut injection_state,
                 tick,
                 config.verbose,
@@ -367,7 +367,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState, Option
         }
     }
 
-    stats.finalize(&state);
+    stats.finalize(&state, &deep_state, &loom);
     (stats, state, tick_profile)
 }
 

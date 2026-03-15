@@ -223,6 +223,26 @@ pub fn print_summary(stats: &SimStats, seed: u64, config: &SimConfig) {
         println!();
     }
 
+    // Deep
+    if stats.deep_layers_reached > 0 {
+        println!("--- The Deep ---");
+        println!(
+            "Deepest layer: {}  |  Fracture zone cap: Z{}",
+            stats.deep_layers_reached, stats.fracture_zone_cap
+        );
+        println!();
+    }
+
+    // Loom
+    if stats.loom_patterns_completed > 0 {
+        println!("--- Loom of Worlds ---");
+        println!(
+            "Patterns completed: {}/28  |  Loom zone cap: Z{}",
+            stats.loom_patterns_completed, stats.loom_zone_cap
+        );
+        println!();
+    }
+
     // Economy Flow
     if stats.pr_earned > 0 || stats.pr_spent > 0 {
         println!("--- Economy Flow ---");
