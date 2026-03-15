@@ -1275,7 +1275,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     // ═══════════════════════════════════════════════════════════════
     AchievementDef {
         id: AchievementId::SigilMatrixNovice,
-        name: "Matrix Initiate",
+        name: "Sigil Matrix Novice",
         description: "Win a Novice Sigil Matrix",
         category: AchievementCategory::Challenges,
         icon: "\u{2B21}",
@@ -1283,7 +1283,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     },
     AchievementDef {
         id: AchievementId::SigilMatrixApprentice,
-        name: "Matrix Adept",
+        name: "Sigil Matrix Apprentice",
         description: "Win an Apprentice Sigil Matrix",
         category: AchievementCategory::Challenges,
         icon: "\u{2B21}",
@@ -1291,7 +1291,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     },
     AchievementDef {
         id: AchievementId::SigilMatrixJourneyman,
-        name: "Matrix Weaver",
+        name: "Sigil Matrix Journeyman",
         description: "Win a Journeyman Sigil Matrix",
         category: AchievementCategory::Challenges,
         icon: "\u{2B21}",
@@ -1299,7 +1299,7 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
     },
     AchievementDef {
         id: AchievementId::SigilMatrixMaster,
-        name: "Matrix Sovereign",
+        name: "Sigil Matrix Master",
         description: "Win a Master Sigil Matrix",
         category: AchievementCategory::Challenges,
         icon: "\u{2B21}",
