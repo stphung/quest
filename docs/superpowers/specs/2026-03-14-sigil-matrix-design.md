@@ -14,25 +14,39 @@ Sigil Matrix is a classic Sudoku puzzle challenge for Quest. The player fills a 
 
 ## Difficulty Tiers
 
-| Tier | Given Cells | Cells to Remove | Rewards |
-|------|-------------|-----------------|---------|
-| Novice | 38-42 | 39-43 | 400 Stormglass |
-| Apprentice | 30-34 | 47-51 | 1,200 Stormglass |
-| Journeyman | 26-28 | 53-55 | 3,000 Stormglass + 1 PR |
-| Master | 22-24 | 57-59 | 6,000 Stormglass + 2 PR |
+| Tier | Given Cells | Cells to Remove | Stormglass | Prestige Ranks | Fishing Ranks |
+|------|-------------|-----------------|------------|----------------|---------------|
+| Novice | 38-42 | 39-43 | 400 | 0 | 0 |
+| Apprentice | 30-34 | 47-51 | 1,200 | 0 | 0 |
+| Journeyman | 26-28 | 53-55 | 3,000 | 1 | 0 |
+| Master | 22-24 | 57-59 | 6,000 | 2 | 0 |
 
 Stormglass fallback (if not yet discovered): Stormglass / 10 = XP % toward next level.
 
 ## Game State
 
 ```rust
+// Derives: Debug, Clone, Copy, PartialEq, Eq
 pub enum SudokuDifficulty {
     Novice,
     Apprentice,
     Journeyman,
     Master,
 }
+// Generated via: difficulty_enum_impl!(SudokuDifficulty);  (in types.rs)
 
+// DifficultyInfo trait impl (in logic.rs) provides:
+//   name() -> "Novice" / "Apprentice" / "Journeyman" / "Master"
+//   reward() -> ChallengeReward with values from Difficulty Tiers table
+//   extra_info() -> Some("38-42 sigils given") etc.
+
+// Derives: Debug, Clone, Copy, PartialEq, Eq
+pub enum SudokuResult {
+    Win,
+    Loss, // forfeit only
+}
+
+// Derives: Debug, Clone
 pub struct SudokuGame {
     pub difficulty: SudokuDifficulty,
     pub board: [[u8; 9]; 9],          // Current state (0 = empty)
@@ -44,12 +58,9 @@ pub struct SudokuGame {
     pub game_result: Option<SudokuResult>,
     pub forfeit_pending: bool,
 }
-
-pub enum SudokuResult {
-    Win,
-    Loss, // forfeit only
-}
 ```
+
+No `tick_game()` function is needed — Sigil Matrix is a pure logic puzzle with no AI or real-time elements (same as Rune and Minesweeper).
 
 ## Puzzle Generation
 
@@ -90,7 +101,7 @@ pub enum SudokuInput {
 }
 ```
 
-After every `Place` or `Clear`, recalculate `conflicts` for the entire board (check row, column, and 3x3 box for duplicates). When all 81 cells are filled with no conflicts, set `game_result = Some(Win)`.
+After every `Place` or `Clear`, recalculate `conflicts` for the entire board (check row, column, and 3x3 box for duplicates). When all 81 cells are filled and `board == solution`, set `game_result = Some(Win)`.
 
 ## Error Handling
 
@@ -143,8 +154,12 @@ src/challenges/sudoku/
 
 ### Challenge System (`src/challenges/`)
 
-- **`mod.rs`:** Add `Sudoku` to `ChallengeType` enum. Add to `CHALLENGE_TABLE` with weight 18. Register `difficulty_enum_impl!` and `impl_apply_game_result!` macros.
+- **`mod.rs`:** Add `pub mod sudoku;` and re-export types. Add `Sudoku` to `ChallengeType` enum. Add to `CHALLENGE_TABLE` with weight 18. Add `ActiveMinigame::Sudoku(SudokuGame)` variant. Invoke `difficulty_enum_impl!(SudokuDifficulty)` in `types.rs`. Invoke `impl_apply_game_result!` in `logic.rs`. Implement `DifficultyInfo` trait for `SudokuDifficulty` in `logic.rs`.
 - **`menu.rs`:** Add `ChallengeType::Sudoku` arm in `create_challenge()` with flavor text and ⬡ icon.
+
+### Debug Menu (`src/utils/debug_menu.rs`)
+
+Add "Trigger Sigil Matrix Challenge" entry to the debug menu for testing.
 
 ### Input (`src/input/minigame_input.rs`)
 
@@ -168,9 +183,11 @@ Add `ActiveMinigame::Sudoku(SudokuGame)` match arm. Map key codes to `SudokuInpu
 
 ### Stats
 
-- Add `SigilMatrixStats` struct: `games_played: u32`, `games_won: u32`, `games_lost: u32`
-- Add field to `GameState` (persisted per character)
-- Display in achievement browser Stats category tab
+Sigil Matrix wins are tracked via the existing `total_minigame_wins` counter in the `Achievements` struct (account-wide). No per-game stats struct is needed — the other puzzle challenges (Rune, Minesweeper) don't have dedicated stats either. The achievement browser's Stats category tab already displays `total_minigame_wins`.
+
+### Library Crate (`src/lib.rs`)
+
+Re-export `SudokuDifficulty`, `SudokuGame`, and `SudokuResult` alongside the other challenge types.
 
 ### UI (`src/ui/`)
 
