@@ -326,6 +326,10 @@ impl Achievements {
             (MinigameType::ShardFusion, MinigameDifficulty::Master) => {
                 Some(AchievementId::ShardFusionMaster)
             }
+            (MinigameType::RunicLights, _) => {
+                // Runic Lights achievements not yet wired
+                None
+            }
         };
 
         if let Some(id) = achievement {

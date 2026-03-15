@@ -1367,6 +1367,9 @@ fn draw_right_content(
                 sg_discovered,
             );
         }
+        Some(ActiveMinigame::RunicLights(_game)) => {
+            // TODO: Runic Lights scene not yet implemented
+        }
         None => {
             if game_state.challenge_menu.is_open {
                 challenge_menu_scene::render_challenge_menu(

@@ -277,6 +277,9 @@ pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResu
                 let mut rng = rand::rng();
                 process_shard_fusion_input(shard_fusion_game, input, &mut rng);
             }
+            ActiveMinigame::RunicLights(_game) => {
+                // TODO: Runic Lights input handling not yet wired
+            }
         }
     }
     InputResult::Continue
