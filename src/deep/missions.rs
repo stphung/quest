@@ -56,11 +56,12 @@ pub fn available_mission_count(guild_rank: GuildRank) -> usize {
 /// - Fills remaining slots with Recon/Expedition on the frontier.
 pub fn generate_mission_pool(
     persistent: &DeepPersistent,
+    active_missions: &[Mission],
     rng: &mut impl Rng,
 ) -> Vec<AvailableMission> {
     let count = available_mission_count(persistent.guild_rank);
     let mut pool = Vec::with_capacity(count);
-    replenish_mission_pool(&mut pool, persistent, count, rng);
+    replenish_mission_pool(&mut pool, persistent, active_missions, count, rng);
     pool
 }
 
@@ -345,6 +346,7 @@ fn is_valid_construction_mission(mission: &AvailableMission, persistent: &DeepPe
 fn prune_invalid_pool_missions(
     pool: &mut Vec<AvailableMission>,
     persistent: &DeepPersistent,
+    active_missions: &[Mission],
 ) -> bool {
     let before = pool.len();
     let mut seen: std::collections::HashSet<(u32, MissionType)> = std::collections::HashSet::new();
@@ -359,6 +361,18 @@ fn prune_invalid_pool_missions(
             let cleared = persistent.layer_record(m.layer).is_some_and(|r| r.cleared);
             if cleared {
                 return false;
+            }
+        }
+        // Construction missions are invalid if the same type is already in progress on the same layer.
+        if let MissionType::Construction(target_infra) = m.mission_type {
+            for active in active_missions {
+                if active.layer == m.layer {
+                    if let MissionType::Construction(active_infra) = active.mission_type {
+                        if active_infra == target_infra {
+                            return false;
+                        }
+                    }
+                }
             }
         }
         let key = (m.layer, m.mission_type);
@@ -403,10 +417,11 @@ fn layer_filler_candidate(
 fn replenish_mission_pool(
     pool: &mut Vec<AvailableMission>,
     persistent: &DeepPersistent,
+    active_missions: &[Mission],
     count: usize,
     rng: &mut impl Rng,
 ) -> bool {
-    let mut changed = prune_invalid_pool_missions(pool, persistent);
+    let mut changed = prune_invalid_pool_missions(pool, persistent, active_missions);
 
     if !pool_has_role(pool, MissionPoolRole::Progression) {
         if let Some(candidate) = progression_candidate(persistent, rng) {
@@ -580,17 +595,23 @@ pub fn maybe_refresh_mission_pool(
     };
 
     let mut changed = if pool_empty || pool_stale {
-        prestige.available_missions = generate_mission_pool(persistent, rng);
+        prestige.available_missions =
+            generate_mission_pool(persistent, &prestige.active_missions, rng);
         prestige.pool_refreshed_at = Some(now);
         true
     } else {
         let mut changed = false;
-        if prune_invalid_pool_missions(&mut prestige.available_missions, persistent) {
+        if prune_invalid_pool_missions(
+            &mut prestige.available_missions,
+            persistent,
+            &prestige.active_missions,
+        ) {
             changed = true;
         }
         if replenish_mission_pool(
             &mut prestige.available_missions,
             persistent,
+            &prestige.active_missions,
             target_count,
             rng,
         ) {
@@ -1901,7 +1922,7 @@ mod tests {
     fn test_generate_mission_pool_respects_unique_mission_constraints() {
         let mut rng = seeded_rng();
         let persistent = DeepPersistent::new();
-        let pool = generate_mission_pool(&persistent, &mut rng);
+        let pool = generate_mission_pool(&persistent, &[], &mut rng);
 
         // At initial frontier (layer 1), valid unique missions are:
         // Supply Run, Recon, Expedition, Breakthrough.
@@ -1918,7 +1939,7 @@ mod tests {
     fn test_generate_mission_pool_includes_supply_run() {
         let mut rng = seeded_rng();
         let persistent = DeepPersistent::new();
-        let pool = generate_mission_pool(&persistent, &mut rng);
+        let pool = generate_mission_pool(&persistent, &[], &mut rng);
         assert!(
             pool.iter()
                 .any(|m| m.mission_type == MissionType::SupplyRun),
@@ -1930,7 +1951,7 @@ mod tests {
     fn test_generate_mission_pool_all_have_positive_duration() {
         let mut rng = seeded_rng();
         let persistent = DeepPersistent::new();
-        let pool = generate_mission_pool(&persistent, &mut rng);
+        let pool = generate_mission_pool(&persistent, &[], &mut rng);
         for mission in &pool {
             assert!(
                 mission.duration_secs > 0,
@@ -1956,7 +1977,7 @@ mod tests {
             }
         }
 
-        let pool = generate_mission_pool(&persistent, &mut rng);
+        let pool = generate_mission_pool(&persistent, &[], &mut rng);
         for mission in &pool {
             let tier = LayerTier::from_layer(mission.layer);
             let expected =
@@ -1979,7 +2000,7 @@ mod tests {
             record.cleared = layer < 5;
         }
 
-        let pool = generate_mission_pool(&persistent, &mut rng);
+        let pool = generate_mission_pool(&persistent, &[], &mut rng);
         assert!(
             pool.iter().all(|m| (3..=5).contains(&m.layer)),
             "Mission pool should only include frontier and up to 2 prior layers"
@@ -1995,7 +2016,7 @@ mod tests {
             record.cleared = layer < 5;
         }
 
-        let pool = generate_mission_pool(&persistent, &mut rng);
+        let pool = generate_mission_pool(&persistent, &[], &mut rng);
         for layer in 3..=5 {
             assert!(
                 pool.iter().any(|m| m.layer == layer),
@@ -2021,7 +2042,7 @@ mod tests {
             .infrastructure
             .push(Infrastructure::Outpost);
 
-        let pool = generate_mission_pool(&persistent, &mut rng);
+        let pool = generate_mission_pool(&persistent, &[], &mut rng);
         for layer in [3u32, 4u32] {
             assert!(
                 pool.iter()
@@ -2069,7 +2090,7 @@ mod tests {
             record.cleared = layer < 5;
         }
 
-        let pool = generate_mission_pool(&persistent, &mut rng);
+        let pool = generate_mission_pool(&persistent, &[], &mut rng);
         let mut seen: Vec<(u32, MissionType)> = Vec::new();
         for mission in pool {
             let key = (mission.layer, mission.mission_type);
@@ -2087,7 +2108,7 @@ mod tests {
     fn test_generate_mission_pool_rank1_includes_breakthrough() {
         let mut rng = seeded_rng();
         let persistent = DeepPersistent::new();
-        let pool = generate_mission_pool(&persistent, &mut rng);
+        let pool = generate_mission_pool(&persistent, &[], &mut rng);
         assert!(
             pool.iter()
                 .any(|m| matches!(m.mission_type, MissionType::Breakthrough)),
@@ -2102,7 +2123,7 @@ mod tests {
         persistent.layer_record_mut(1).cleared = true;
         persistent.deepest_layer_reached = 1;
 
-        let pool = generate_mission_pool(&persistent, &mut rng);
+        let pool = generate_mission_pool(&persistent, &[], &mut rng);
         assert!(
             pool.iter()
                 .any(|m| matches!(m.mission_type, MissionType::Construction(_))),
@@ -2117,7 +2138,7 @@ mod tests {
         persistent.layer_record_mut(1).cleared = true;
         persistent.deepest_layer_reached = 1;
 
-        let pool = generate_mission_pool(&persistent, &mut rng);
+        let pool = generate_mission_pool(&persistent, &[], &mut rng);
         assert!(
             pool.iter().any(|m| {
                 matches!(

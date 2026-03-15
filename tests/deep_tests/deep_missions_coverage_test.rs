@@ -149,7 +149,7 @@ fn test_mission_pool_with_cleared_layer_includes_construction() {
     // Guild rank 3 gives a 4-slot pool, which has room for Construction.
     persistent.guild_rank = GuildRank(3);
 
-    let pool = generate_mission_pool(&persistent, &mut rng);
+    let pool = generate_mission_pool(&persistent, &[], &mut rng);
 
     // At rank 3 the pool has 4 entries. With a cleared layer available, the pool
     // should include a Construction mission when infra slots remain.
@@ -180,7 +180,7 @@ fn test_mission_pool_with_all_infra_built_no_construction() {
     record.infrastructure = Infrastructure::ALL.to_vec();
     persistent.guild_rank = GuildRank(4); // 4-slot pool
 
-    let pool = generate_mission_pool(&persistent, &mut rng);
+    let pool = generate_mission_pool(&persistent, &[], &mut rng);
 
     // With all infrastructure built, Construction cannot appear.
     let has_construction = pool
@@ -200,7 +200,7 @@ fn test_mission_pool_size_rank_4_respects_unique_constraints_at_frontier() {
     let mut persistent = DeepPersistent::new();
     persistent.guild_rank = GuildRank(4);
 
-    let pool = generate_mission_pool(&persistent, &mut rng);
+    let pool = generate_mission_pool(&persistent, &[], &mut rng);
     assert_eq!(
         pool.len(),
         4,
@@ -218,7 +218,7 @@ fn test_mission_pool_size_rank_5_is_5() {
     persistent.layer_record_mut(1).cleared = true;
     persistent.deepest_layer_reached = 1;
 
-    let pool = generate_mission_pool(&persistent, &mut rng);
+    let pool = generate_mission_pool(&persistent, &[], &mut rng);
     assert!(
         pool.len() >= available_mission_count(GuildRank(5)),
         "Rank 5 pool should provide at least baseline mission count"
@@ -234,7 +234,7 @@ fn test_mission_pool_safe_mission_targets_cleared_layer() {
     persistent.layer_record_mut(2).cleared = true;
     let _ = persistent.layer_record_mut(3); // ensure layer 3 exists as frontier
 
-    let pool = generate_mission_pool(&persistent, &mut rng);
+    let pool = generate_mission_pool(&persistent, &[], &mut rng);
 
     // Pool should have Supply Runs on cleared layers AND the frontier.
     let supply_runs: Vec<u32> = pool
@@ -277,7 +277,7 @@ fn test_mission_pool_breakthrough_absent_when_all_cleared() {
     // Frontier is now layer 4 (uncleared).
     persistent.guild_rank = GuildRank(5);
 
-    let pool = generate_mission_pool(&persistent, &mut rng);
+    let pool = generate_mission_pool(&persistent, &[], &mut rng);
     // Breakthrough on layer 4 should be present (frontier is uncleared).
     let bt_count = pool
         .iter()

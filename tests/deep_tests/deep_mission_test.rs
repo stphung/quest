@@ -1296,7 +1296,7 @@ fn make_prestige_with_merc(merc: Mercenary) -> DeepPrestige {
 fn test_mission_pool_always_includes_supply_run() {
     let mut rng = seeded_rng(1);
     let persistent = DeepPersistent::new();
-    let pool = generate_mission_pool(&persistent, &mut rng);
+    let pool = generate_mission_pool(&persistent, &[], &mut rng);
     assert!(
         pool.iter()
             .any(|m| m.mission_type == MissionType::SupplyRun),
@@ -1310,7 +1310,7 @@ fn test_mission_pool_size_matches_guild_rank() {
     for rank in 1u8..=5 {
         let mut persistent = DeepPersistent::new();
         persistent.guild_rank = GuildRank(rank);
-        let pool = generate_mission_pool(&persistent, &mut rng);
+        let pool = generate_mission_pool(&persistent, &[], &mut rng);
         assert!(
             !pool.is_empty() && pool.len() <= 7,
             "Rank {rank} pool size {} out of expected range",
@@ -1323,7 +1323,7 @@ fn test_mission_pool_size_matches_guild_rank() {
 fn test_mission_pool_at_most_one_breakthrough() {
     let mut rng = seeded_rng(3);
     let persistent = DeepPersistent::new();
-    let pool = generate_mission_pool(&persistent, &mut rng);
+    let pool = generate_mission_pool(&persistent, &[], &mut rng);
     let bt_count = pool
         .iter()
         .filter(|m| m.mission_type == MissionType::Breakthrough)
@@ -1337,7 +1337,7 @@ fn test_mission_pool_no_breakthrough_when_frontier_cleared() {
     let mut persistent = DeepPersistent::new();
     // Layer 1 is both the frontier and cleared — no valid Breakthrough target.
     persistent.layer_record_mut(1).cleared = true;
-    let pool = generate_mission_pool(&persistent, &mut rng);
+    let pool = generate_mission_pool(&persistent, &[], &mut rng);
     let bt_count = pool
         .iter()
         .filter(|m| m.mission_type == MissionType::Breakthrough)
@@ -1351,7 +1351,7 @@ fn test_mission_pool_no_breakthrough_when_frontier_cleared() {
 fn test_mission_pool_all_have_positive_duration() {
     let mut rng = seeded_rng(5);
     let persistent = DeepPersistent::new();
-    let pool = generate_mission_pool(&persistent, &mut rng);
+    let pool = generate_mission_pool(&persistent, &[], &mut rng);
     for m in &pool {
         assert!(
             m.duration_secs > 0,
@@ -1364,7 +1364,7 @@ fn test_mission_pool_all_have_positive_duration() {
 fn test_mission_pool_all_have_descriptions() {
     let mut rng = seeded_rng(6);
     let persistent = DeepPersistent::new();
-    let pool = generate_mission_pool(&persistent, &mut rng);
+    let pool = generate_mission_pool(&persistent, &[], &mut rng);
     for m in &pool {
         assert!(
             !m.description.is_empty(),

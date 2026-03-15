@@ -1253,8 +1253,11 @@ fn trigger_deep_refresh_mission_pool(deep: &mut DeepState) -> &'static str {
         return "Discover The Deep first!";
     }
     let mut rng = rand::rng();
-    deep.prestige.available_missions =
-        crate::deep::generate_mission_pool(&deep.persistent, &mut rng);
+    deep.prestige.available_missions = crate::deep::generate_mission_pool(
+        &deep.persistent,
+        &deep.prestige.active_missions,
+        &mut rng,
+    );
     deep.prestige.pool_refreshed_at = Some(Utc::now());
     "Deep mission pool refreshed!"
 }
@@ -1277,8 +1280,11 @@ fn trigger_deep_clear_frontier_layer(deep: &mut DeepState) -> &'static str {
     let frontier = deep.persistent.frontier_layer();
     crate::deep::mark_layer_cleared(&mut deep.persistent, frontier);
     let mut rng = rand::rng();
-    deep.prestige.available_missions =
-        crate::deep::generate_mission_pool(&deep.persistent, &mut rng);
+    deep.prestige.available_missions = crate::deep::generate_mission_pool(
+        &deep.persistent,
+        &deep.prestige.active_missions,
+        &mut rng,
+    );
     deep.prestige.pool_refreshed_at = Some(Utc::now());
     "Cleared current Deep frontier layer!"
 }
@@ -1342,8 +1348,11 @@ fn trigger_unlock_deep_layer(
 
     // Refresh mission pool for new layers
     let mut rng = rand::rng();
-    deep.prestige.available_missions =
-        crate::deep::generate_mission_pool(&deep.persistent, &mut rng);
+    deep.prestige.available_missions = crate::deep::generate_mission_pool(
+        &deep.persistent,
+        &deep.prestige.active_missions,
+        &mut rng,
+    );
     deep.prestige.pool_refreshed_at = Some(Utc::now());
 
     match target_layer {
