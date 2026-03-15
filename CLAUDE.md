@@ -96,7 +96,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 
 ### Simulators
 
-**Game Simulator** (`src/bin/simulator.rs`): Headless game balance simulator calling `game_tick()` with no UI/delay. Supports `--ticks`, `--seed`, `--prestige`, `--runs`, `--haven <strategy>`, `--stormbreaker`. Only exercises combat/zone loop (no interactive systems).
+**Game Simulator** (`src/bin/simulator/`): Headless game balance simulator calling `game_tick_with_context()` with no UI/delay. Supports `--ticks`, `--seed`, `--prestige`, `--runs`, `--strategy <profile>` (casual/optimal/speedrun), `--stormbreaker`, `--assertions`. Strategy profiles inject challenge wins, enhancement, sigils, ascension, and auto-prestige.
 
 **Deep Simulator** (`src/bin/deep_simulator.rs`): Headless Deep expedition simulator. Supports `--hours`, `--seed`, `--strategy` (rush/balanced/infrastructure), `--guild-rank`.
 
