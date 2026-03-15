@@ -640,12 +640,21 @@ fn build_stats_right_lines(
             ],
         ),
         (
-            "Sigil",
+            "Surge",
             [
                 AchievementId::SigilSurgeNovice,
                 AchievementId::SigilSurgeApprentice,
                 AchievementId::SigilSurgeJourneyman,
                 AchievementId::SigilSurgeMaster,
+            ],
+        ),
+        (
+            "Matrix",
+            [
+                AchievementId::SigilMatrixNovice,
+                AchievementId::SigilMatrixApprentice,
+                AchievementId::SigilMatrixJourneyman,
+                AchievementId::SigilMatrixMaster,
             ],
         ),
         (

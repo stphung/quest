@@ -12,6 +12,7 @@ use crate::challenges::rune::RuneDifficulty;
 use crate::challenges::runic_shift::RunicShiftDifficulty;
 use crate::challenges::shard_fusion::ShardFusionDifficulty;
 use crate::challenges::snake::SnakeDifficulty;
+use crate::challenges::sudoku::SudokuDifficulty;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -241,6 +242,15 @@ fn render_detail_view(
                 stormglass_discovered,
             );
         }
+        ChallengeType::Sudoku => {
+            render_difficulty_selector(
+                frame,
+                chunks[2],
+                &SudokuDifficulty::ALL,
+                menu.selected_difficulty,
+                stormglass_discovered,
+            );
+        }
         ChallengeType::ShardFusion => {
             render_difficulty_selector(
                 frame,
@@ -277,6 +287,7 @@ fn preferred_difficulty_height(challenge_type: &ChallengeType) -> u16 {
         ChallengeType::RunicShift => RunicShiftDifficulty::ALL.len(),
         ChallengeType::Jezzball => JezzballDifficulty::ALL.len(),
         ChallengeType::Snake => SnakeDifficulty::ALL.len(),
+        ChallengeType::Sudoku => SudokuDifficulty::ALL.len(),
         ChallengeType::ShardFusion => ShardFusionDifficulty::ALL.len(),
     };
 

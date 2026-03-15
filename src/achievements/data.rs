@@ -1271,6 +1271,41 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         points: 100,
     },
     // ═══════════════════════════════════════════════════════════════
+    // CHALLENGE ACHIEVEMENTS - SIGIL MATRIX
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::SigilMatrixNovice,
+        name: "Sigil Matrix Novice",
+        description: "Win a Novice Sigil Matrix",
+        category: AchievementCategory::Challenges,
+        icon: "\u{2B21}",
+        points: 10,
+    },
+    AchievementDef {
+        id: AchievementId::SigilMatrixApprentice,
+        name: "Sigil Matrix Apprentice",
+        description: "Win an Apprentice Sigil Matrix",
+        category: AchievementCategory::Challenges,
+        icon: "\u{2B21}",
+        points: 25,
+    },
+    AchievementDef {
+        id: AchievementId::SigilMatrixJourneyman,
+        name: "Sigil Matrix Journeyman",
+        description: "Win a Journeyman Sigil Matrix",
+        category: AchievementCategory::Challenges,
+        icon: "\u{2B21}",
+        points: 50,
+    },
+    AchievementDef {
+        id: AchievementId::SigilMatrixMaster,
+        name: "Sigil Matrix Master",
+        description: "Win a Master Sigil Matrix",
+        category: AchievementCategory::Challenges,
+        icon: "\u{2B21}",
+        points: 100,
+    },
+    // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - SHARD FUSION
     // ═══════════════════════════════════════════════════════════════
     AchievementDef {
@@ -2174,6 +2209,10 @@ mod tests {
             AchievementId::SigilSurgeApprentice,
             AchievementId::SigilSurgeJourneyman,
             AchievementId::SigilSurgeMaster,
+            AchievementId::SigilMatrixNovice,
+            AchievementId::SigilMatrixApprentice,
+            AchievementId::SigilMatrixJourneyman,
+            AchievementId::SigilMatrixMaster,
             AchievementId::ShardFusionNovice,
             AchievementId::ShardFusionApprentice,
             AchievementId::ShardFusionJourneyman,
@@ -2435,6 +2474,15 @@ mod tests {
                     AchievementId::SigilSurgeApprentice,
                     AchievementId::SigilSurgeJourneyman,
                     AchievementId::SigilSurgeMaster,
+                ],
+            ),
+            (
+                "Sigil Matrix",
+                vec![
+                    AchievementId::SigilMatrixNovice,
+                    AchievementId::SigilMatrixApprentice,
+                    AchievementId::SigilMatrixJourneyman,
+                    AchievementId::SigilMatrixMaster,
                 ],
             ),
             (

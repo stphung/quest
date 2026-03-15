@@ -18,6 +18,7 @@ use super::runic_shift::RunicShiftDifficulty;
 use super::shard_fusion::{start_shard_fusion_game, ShardFusionDifficulty};
 use super::snake::logic::start_snake_game;
 use super::snake::SnakeDifficulty;
+use super::sudoku::SudokuDifficulty;
 use super::ActiveMinigame;
 use crate::core::constants::CHALLENGE_DISCOVERY_CHANCE;
 use crate::core::game_state::GameState;
@@ -115,6 +116,11 @@ fn accept_selected_challenge(state: &mut GameState) {
             ChallengeType::RunicShift => {
                 let d = RunicShiftDifficulty::from_index(difficulty_index);
                 start_runic_shift_game(d)
+            }
+            ChallengeType::Sudoku => {
+                let d = SudokuDifficulty::from_index(difficulty_index);
+                let mut rng = rand::rng();
+                ActiveMinigame::Sudoku(crate::challenges::sudoku::generate_puzzle(d, &mut rng))
             }
             ChallengeType::ShardFusion => {
                 let d = ShardFusionDifficulty::from_index(difficulty_index);
@@ -436,6 +442,10 @@ const CHALLENGE_TABLE: &[ChallengeWeight] = &[
         weight: 7, // ~4% - longest game
     },
     ChallengeWeight {
+        challenge_type: ChallengeType::Sudoku,
+        weight: 18,
+    },
+    ChallengeWeight {
         challenge_type: ChallengeType::ShardFusion,
         weight: 20, // ~10% - moderate puzzle
     },
@@ -463,6 +473,7 @@ pub enum ChallengeType {
     Rune,
     Go,
     Snake,
+    Sudoku,
     ShardFusion,
 }
 
@@ -480,6 +491,7 @@ impl ChallengeType {
             ChallengeType::Rune => "ᚱ",
             ChallengeType::Go => "◉",
             ChallengeType::Snake => "~",
+            ChallengeType::Sudoku => "\u{2B21}",
             ChallengeType::ShardFusion => "\u{25C6}",
         }
     }
@@ -504,6 +516,9 @@ impl ChallengeType {
             ChallengeType::Go => "An ancient master beckons from beneath a gnarled tree...",
             ChallengeType::Snake => {
                 "A serpentine trail of glowing runes appears on the dungeon floor..."
+            }
+            ChallengeType::Sudoku => {
+                "A grid of ancient sigils materializes, pulsing with arcane energy..."
             }
             ChallengeType::ShardFusion => {
                 "A glowing grid of crystal shards materializes before you, waiting to be merged..."
@@ -757,6 +772,12 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
                 own trail. The path is narrow, and the serpent is hungry.\""
                 .to_string(),
         },
+        ChallengeType::Sudoku => PendingChallenge {
+            challenge_type: ChallengeType::Sudoku,
+            title: "Sigil Matrix: Arcane Grid".to_string(),
+            icon: "\u{2B21}",
+            description: "A grid of ancient sigils pulses with arcane energy. Each row, column, and section demands a unique symbol \u{2014} one wrong placement and the matrix destabilizes.".to_string(),
+        },
         ChallengeType::ShardFusion => PendingChallenge {
             challenge_type: ChallengeType::ShardFusion,
             title: "Shard Fusion".to_string(),
@@ -797,6 +818,7 @@ mod tests {
         assert!(!ChallengeType::Rune.icon().is_empty());
         assert!(!ChallengeType::Go.icon().is_empty());
         assert!(!ChallengeType::Snake.icon().is_empty());
+        assert!(!ChallengeType::Sudoku.icon().is_empty());
         assert!(!ChallengeType::ShardFusion.icon().is_empty());
     }
 
@@ -812,6 +834,7 @@ mod tests {
         assert!(!ChallengeType::Rune.discovery_flavor().is_empty());
         assert!(!ChallengeType::Go.discovery_flavor().is_empty());
         assert!(!ChallengeType::Snake.discovery_flavor().is_empty());
+        assert!(!ChallengeType::Sudoku.discovery_flavor().is_empty());
         assert!(!ChallengeType::ShardFusion.discovery_flavor().is_empty());
     }
 
@@ -828,6 +851,7 @@ mod tests {
             ChallengeType::Rune.icon(),
             ChallengeType::Go.icon(),
             ChallengeType::Snake.icon(),
+            ChallengeType::Sudoku.icon(),
             ChallengeType::ShardFusion.icon(),
         ];
         // Check all pairs are different

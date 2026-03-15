@@ -54,6 +54,7 @@ mod stats_equipment;
 mod stats_panel;
 pub(crate) mod stats_prestige;
 pub mod stormglass_scene;
+pub mod sudoku_scene;
 pub(crate) mod throbber;
 pub mod ticker;
 pub mod time_vault_scene;
@@ -1352,6 +1353,9 @@ fn draw_right_content(
                 show_dismiss_hint,
                 sg_discovered,
             );
+        }
+        Some(ActiveMinigame::Sudoku(game)) => {
+            sudoku_scene::render_sudoku(frame, area, game, ctx, show_dismiss_hint, sg_discovered);
         }
         Some(ActiveMinigame::ShardFusion(game)) => {
             shard_fusion_scene::render_shard_fusion_scene(

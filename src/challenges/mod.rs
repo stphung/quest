@@ -1,4 +1,4 @@
-//! Challenge minigames: Chess, Gomoku, Minesweeper, Morris, Rune, Sigil Surge, Go, JezzBall.
+//! Challenge minigames: Chess, Gomoku, Minesweeper, Morris, Rune, Sigil Surge, Go, JezzBall, Snake, Flappy Bird, Sigil Matrix.
 
 #![allow(unused_imports)]
 
@@ -131,6 +131,7 @@ pub mod rune;
 pub mod runic_shift;
 pub mod shard_fusion;
 pub mod snake;
+pub mod sudoku;
 
 pub use chess::{ChessDifficulty, ChessGame, ChessResult};
 pub use flappy::{FlappyBirdDifficulty, FlappyBirdGame, FlappyBirdResult};
@@ -156,6 +157,7 @@ pub use shard_fusion::{
     FLASH_TICKS, SLIDE_TICKS,
 };
 pub use snake::{SnakeDifficulty, SnakeGame, SnakeResult};
+pub use sudoku::{SudokuDifficulty, SudokuGame, SudokuInput, SudokuResult};
 
 /// A currently active challenge minigame. Only one can be active at a time.
 #[derive(Debug, Clone)]
@@ -171,6 +173,7 @@ pub enum ActiveMinigame {
     Go(GoGame),
     Jezzball(JezzballGame),
     Snake(SnakeGame),
+    Sudoku(SudokuGame),
 }
 
 impl ActiveMinigame {
@@ -188,6 +191,7 @@ impl ActiveMinigame {
             ActiveMinigame::Go(g) => g.game_result.is_some(),
             ActiveMinigame::Jezzball(g) => g.game_result.is_some(),
             ActiveMinigame::Snake(g) => g.game_result.is_some(),
+            ActiveMinigame::Sudoku(g) => g.game_result.is_some(),
         }
     }
 }

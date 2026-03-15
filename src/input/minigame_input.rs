@@ -1,4 +1,4 @@
-//! Minigame input handling for all 10 challenge types.
+//! Minigame input handling for all 11 challenge types.
 
 use super::InputResult;
 use crate::challenges::chess::logic::{
@@ -35,6 +35,9 @@ use crate::challenges::shard_fusion::{
 };
 use crate::challenges::snake::logic::{
     apply_game_result as apply_snake_result, process_input as process_snake_input, SnakeInput,
+};
+use crate::challenges::sudoku::{
+    apply_game_result as apply_sudoku_result, process_sudoku_input, SudokuInput,
 };
 use crate::challenges::{ActiveMinigame, MinigameWinInfo};
 use crate::core::game_state::GameState;
@@ -240,6 +243,23 @@ pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResu
                     _ => RunicShiftInput::Other,
                 };
                 process_runic_shift_input(runic_shift_game, input);
+            }
+            ActiveMinigame::Sudoku(sudoku_game) => {
+                if sudoku_game.game_result.is_some() {
+                    state.last_minigame_win = apply_sudoku_result(state);
+                    return result_for_challenge(&state.last_minigame_win);
+                }
+                let input = match key.code {
+                    KeyCode::Up => SudokuInput::Up,
+                    KeyCode::Down => SudokuInput::Down,
+                    KeyCode::Left => SudokuInput::Left,
+                    KeyCode::Right => SudokuInput::Right,
+                    KeyCode::Char(c @ '1'..='9') => SudokuInput::Place(c as u8 - b'0'),
+                    KeyCode::Backspace | KeyCode::Delete => SudokuInput::Clear,
+                    KeyCode::Esc => SudokuInput::Forfeit,
+                    _ => SudokuInput::Other,
+                };
+                process_sudoku_input(sudoku_game, input);
             }
             ActiveMinigame::ShardFusion(shard_fusion_game) => {
                 if shard_fusion_game.game_result.is_some() {

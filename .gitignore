@@ -16,3 +16,4 @@ Cargo.lock
 Thumbs.db
 .worktrees/
 .worktrees/
+.superpowers/
