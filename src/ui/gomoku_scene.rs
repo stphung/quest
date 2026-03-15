@@ -44,7 +44,7 @@ pub fn render_gomoku_scene(
     }
 
     // Use shared layout
-    let layout = create_game_layout(frame, area, " Gomoku ", Color::Cyan, 15, 22, ctx);
+    let layout = create_game_layout(frame, area, " Gomoku ", Color::Cyan, 15, 26, ctx);
 
     render_board(frame, layout.content, game);
     render_status_bar_content(frame, layout.status_bar, game);
@@ -238,7 +238,7 @@ fn render_gomoku_game_over(
     frame.render_widget(Clear, area);
 
     // Create layout matching normal game (but without status bar interaction)
-    let layout = create_game_layout(frame, area, " Gomoku ", Color::Cyan, 15, 22, ctx);
+    let layout = create_game_layout(frame, area, " Gomoku ", Color::Cyan, 15, 26, ctx);
 
     // Render board with winning line highlighted
     render_board_with_highlight(frame, layout.content, game, true);

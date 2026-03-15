@@ -72,7 +72,7 @@ pub fn render_runic_shift_scene(
         " Sigil Surge ",
         Color::LightMagenta,
         16,
-        24,
+        26,
         ctx,
     );
 

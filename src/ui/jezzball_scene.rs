@@ -71,7 +71,7 @@ pub fn render_jezzball_scene(
         " Containment Breach ",
         Color::Cyan,
         18,
-        22,
+        26,
         ctx,
     );
 

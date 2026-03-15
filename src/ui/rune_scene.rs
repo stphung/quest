@@ -42,7 +42,7 @@ pub fn render_rune(
         " Rune Deciphering ",
         Color::Magenta,
         6,
-        22,
+        26,
         ctx,
     );
 

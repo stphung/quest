@@ -36,7 +36,7 @@ pub fn render_chess_scene(
     }
 
     // Use shared layout (content needs 19 lines: 1 for move history + 18 for board)
-    let layout = create_game_layout(frame, area, " Chess ", Color::Cyan, 19, 22, ctx);
+    let layout = create_game_layout(frame, area, " Chess ", Color::Cyan, 19, 26, ctx);
 
     // Split content area: move history on top, board below
     let content_chunks = Layout::default()
@@ -371,7 +371,7 @@ fn render_chess_game_over(
     frame.render_widget(Clear, area);
 
     // Create layout matching normal game
-    let layout = create_game_layout(frame, area, " Chess ", Color::Cyan, 19, 22, ctx);
+    let layout = create_game_layout(frame, area, " Chess ", Color::Cyan, 19, 26, ctx);
 
     // Split content area: move history on top, board below
     let content_chunks = Layout::default()

@@ -46,7 +46,7 @@ pub fn render_vault_warden(
         " Vault Warden ",
         BORDER_COLOR,
         grid_display_height,
-        22,
+        26,
         ctx,
     );
 

@@ -45,7 +45,7 @@ pub fn render_go_scene(
     }
 
     // Use shared layout - Go board needs width for box drawing chars
-    let layout = create_game_layout(frame, area, " Go ", Color::Green, 11, 24, ctx);
+    let layout = create_game_layout(frame, area, " Go ", Color::Green, 11, 26, ctx);
 
     render_board(frame, layout.content, game);
     render_status_bar_content(frame, layout.status_bar, game);
@@ -271,7 +271,7 @@ fn render_go_game_over(
     frame.render_widget(Clear, area);
 
     // Create layout matching normal game
-    let layout = create_game_layout(frame, area, " Go ", Color::Green, 11, 24, ctx);
+    let layout = create_game_layout(frame, area, " Go ", Color::Green, 11, 26, ctx);
 
     // Render board and info panel (territory will be visible)
     render_board(frame, layout.content, game);

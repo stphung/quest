@@ -42,7 +42,7 @@ pub fn render_sudoku(
         return;
     }
 
-    let layout = create_game_layout(frame, area, " Sigil Matrix ", Color::Magenta, 15, 22, ctx);
+    let layout = create_game_layout(frame, area, " Sigil Matrix ", Color::Magenta, 15, 26, ctx);
 
     render_grid(frame, layout.content, game);
     render_sudoku_status_bar(frame, layout.status_bar, game);

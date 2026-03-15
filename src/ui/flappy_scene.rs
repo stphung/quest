@@ -87,7 +87,7 @@ pub fn render_flappy_scene(
         " Skyward Gauntlet ",
         Color::LightCyan,
         15,
-        18,
+        26,
         ctx,
     );
 
