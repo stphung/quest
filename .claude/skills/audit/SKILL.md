@@ -1,11 +1,11 @@
 ---
 name: audit
-description: Run all audit skills — perf-audit, test-audit, doc-audit, wiki-audit — in sequence. Use when you want a full project health check or before a release.
+description: Run all audit skills — perf-audit, test-audit, doc-audit, wiki-audit — in parallel on isolated worktrees. Use when you want a full project health check or before a release.
 ---
 
 # Full Audit
 
-Run all 4 audit skills in sequence for a comprehensive project health check.
+Run all 4 audit skills in parallel on isolated git worktrees for a comprehensive project health check.
 
 ## When to Use
 
@@ -16,24 +16,48 @@ Run all 4 audit skills in sequence for a comprehensive project health check.
 
 ## Process
 
-Run each audit skill in order. Each skill creates its own branch, PR, and merges independently via `/ship`.
+Launch all 4 audit skills simultaneously, each on its own worktree. Each skill creates its own branch, PR, and merges independently via `/ship`.
 
-### Step 1: Performance Audit
+### Parallel Launch
 
-Invoke the `perf-audit` skill. Wait for it to complete and merge.
+Spawn 4 agents in a **single message** (so they run concurrently), each with `isolation: "worktree"` and `mode: "bypassPermissions"`. Each agent prompt should:
 
-### Step 2: Test Audit
+1. Read its corresponding skill file from the repo (e.g., `.claude/skills/perf-audit/SKILL.md`)
+2. Follow the skill instructions exactly
+3. Create a branch, commit fixes, push, create a PR with automerge, and wait for merge
+4. Return a summary of findings and the PR URL
 
-Invoke the `test-audit` skill. Wait for it to complete and merge.
+```
+Agent 1 — perf-audit   → Read .claude/skills/perf-audit/SKILL.md, execute it fully
+Agent 2 — test-audit   → Read .claude/skills/test-audit/SKILL.md, execute it fully
+Agent 3 — doc-audit    → Read .claude/skills/doc-audit/SKILL.md, execute it fully
+Agent 4 — wiki-audit   → Read .claude/skills/wiki-audit/SKILL.md, execute it fully
+```
 
-### Step 3: Documentation Audit
+**Important**: Since agents run on isolated worktrees, they won't conflict with each other even if they touch overlapping files. Each PR merges independently.
 
-Invoke the `doc-audit` skill. Wait for it to complete and merge.
+### Agent Prompt Template
 
-### Step 4: Wiki Audit
+Each agent should receive a prompt like:
 
-Invoke the `wiki-audit` skill. Wait for it to complete and merge.
+> You are running a full audit of the Quest codebase. Read the skill file at `.claude/skills/{name}/SKILL.md` and follow its instructions completely. You are working in an isolated git worktree.
+>
+> Key requirements:
+> - Follow every phase described in the skill file
+> - Create a branch named `{name}-YYYYMMDD` (use today's date)
+> - Commit all changes with a descriptive message
+> - Push the branch and create a PR with automerge enabled (`gh pr merge --auto --squash`)
+> - Wait for CI to pass and the PR to merge
+> - If CI fails, fix the issues and push again
+> - Return: (1) summary of findings, (2) fixes applied, (3) PR URL and merge status
 
 ## Output
 
-Report a summary of all 4 audit results when done.
+After all 4 agents complete, compile and report a summary table:
+
+| Audit | Findings | Fixes | PR | Status |
+|-------|----------|-------|----|--------|
+| perf-audit | ... | ... | #N | merged/pending |
+| test-audit | ... | ... | #N | merged/pending |
+| doc-audit | ... | ... | #N | merged/pending |
+| wiki-audit | ... | ... | #N | merged/pending |
