@@ -757,22 +757,24 @@ Exactly one Elite and one Boss room per dungeon.
 
 ## Challenge Minigames
 
-All challenges require P1+ to discover. Discovery is random (~2hr average per challenge). 10 challenge types with 4 difficulty levels each.
+All challenges require P1+ to discover. Discovery is random (~2hr average per challenge). 12 challenge types with 4 difficulty levels each.
 
 ### Discovery Weights
 
 | Challenge | Weight | ~Probability |
 |-----------|--------|--------------|
-| Rune (Rune Deciphering) | 30 | ~17% |
-| Minesweeper (Trap Detection) | 28 | ~16% |
-| Snake (Serpent's Path) | 22 | ~12% |
-| Flappy Bird (Skyward Gauntlet) | 20 | ~11% |
-| Sigil Surge (Runic Shift) | 20 | ~11% |
-| JezzBall (Containment Breach) | 18 | ~10% |
-| Gomoku (Five in a Row) | 15 | ~8% |
-| Morris (Nine Men's Morris) | 12 | ~7% |
+| Rune (Rune Deciphering) | 30 | ~14% |
+| Minesweeper (Trap Detection) | 28 | ~13% |
+| Snake (Serpent's Path) | 22 | ~10% |
+| Flappy Bird (Skyward Gauntlet) | 20 | ~9% |
+| Sigil Surge (Runic Shift) | 20 | ~9% |
+| Shard Fusion | 20 | ~9% |
+| JezzBall (Containment Breach) | 18 | ~8% |
+| Sudoku (Sigil Matrix) | 18 | ~8% |
+| Gomoku (Five in a Row) | 15 | ~7% |
+| Morris (Nine Men's Morris) | 12 | ~6% |
 | Chess | 8 | ~4% |
-| Go (Territory Control) | 7 | ~4% |
+| Go (Territory Control) | 7 | ~3% |
 
 ### Challenge Rewards
 
@@ -865,6 +867,24 @@ All challenges require P1+ to discover. Discovery is random (~2hr average per ch
 | Apprentice | 6000ms | +100% level XP |
 | Journeyman | 5000ms | +1 Prestige Rank, +75% level XP |
 | Master | 3000ms | +2 Prestige Ranks, +150% level XP, +1 Fish Rank |
+
+**Sudoku** (Sigil Matrix, 9x9 grid, pencil marks):
+
+| Difficulty | Given Cells | Reward |
+|------------|------------|--------|
+| Novice | 38-42 | 400 SG |
+| Apprentice | 30-34 | 1,200 SG |
+| Journeyman | 26-28 | +1 Prestige Rank, 3,000 SG |
+| Master | 22-24 | +2 Prestige Ranks, 6,000 SG |
+
+**Shard Fusion** (4x4 grid, 2048-style tile merging):
+
+| Difficulty | Target Value | Reward |
+|------------|-------------|--------|
+| Novice | 512 | 800 SG |
+| Apprentice | 1,024 | 2,000 SG |
+| Journeyman | 2,048 | +1 Prestige Rank, 4,000 SG |
+| Master | 4,096 | +2 Prestige Ranks, 10,000 SG |
 
 ---
 

@@ -360,7 +360,7 @@ Account-level achievement system that persists across all characters. Stored in 
 - Ascension milestones: AscensionI through AscensionVI
 
 **Challenges:**
-- Per-game per-difficulty wins: ChessNovice through ChessMaster, MorrisNovice through MorrisMaster, etc. for all 10 challenge types (chess, morris, gomoku, minesweeper, rune, go, flappy_bird, snake, jezzball, runic_shift)
+- Per-game per-difficulty wins: ChessNovice through ChessMaster, MorrisNovice through MorrisMaster, etc. for all 12 challenge types (chess, morris, gomoku, minesweeper, rune, go, flappy_bird, snake, jezzball, runic_shift, sudoku, shard_fusion)
 - GrandChampion: 100 total minigame wins
 
 **Exploration:**

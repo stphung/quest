@@ -242,7 +242,7 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 **Decision**: Introduce `impl_apply_game_result!` macro and extract remaining AI submodules.
 
 **What changed**:
-- Added `impl_apply_game_result!` macro in `src/challenges/mod.rs` to standardize reward application across all 10 challenge minigames
+- Added `impl_apply_game_result!` macro in `src/challenges/mod.rs` to standardize reward application across all 12 challenge minigames
 - Extracted `morris/ai.rs` and `gomoku/ai.rs` as separate AI submodules
 - Extracted `combat/enemy_generation.rs` for zone/dungeon enemy generators
 
