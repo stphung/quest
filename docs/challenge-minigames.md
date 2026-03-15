@@ -1,6 +1,6 @@
 # Challenge Minigames Design
 
-This document describes the 10 challenge minigames as implemented. All challenges share a common framework: discovery via RNG, difficulty selection, prestige/XP rewards, and a forfeit pattern (double-Esc to quit).
+This document describes the 12 challenge minigames as implemented. All challenges share a common framework: discovery via RNG, difficulty selection, prestige/XP rewards, and a forfeit pattern (double-Esc to quit).
 
 ## Common Framework
 
@@ -13,16 +13,18 @@ This document describes the 10 challenge minigames as implemented. All challenge
 
 | Challenge | Weight | ~Probability |
 |-----------|--------|--------------|
-| Rune | 30 | ~17% |
-| Minesweeper | 28 | ~16% |
-| Snake | 22 | ~12% |
-| Flappy Bird | 20 | ~11% |
-| Sigil Surge | 20 | ~11% |
-| JezzBall | 18 | ~10% |
-| Gomoku | 15 | ~8% |
-| Morris | 12 | ~7% |
+| Rune | 30 | ~14% |
+| Minesweeper | 28 | ~13% |
+| Snake | 22 | ~10% |
+| Flappy Bird | 20 | ~9% |
+| Sigil Surge | 20 | ~9% |
+| Shard Fusion | 20 | ~9% |
+| JezzBall | 18 | ~8% |
+| Sudoku | 18 | ~8% |
+| Gomoku | 15 | ~7% |
+| Morris | 12 | ~6% |
 | Chess | 8 | ~4% |
-| Go | 7 | ~4% |
+| Go | 7 | ~3% |
 
 ### Difficulty Tiers
 
@@ -59,6 +61,8 @@ The `impl_apply_game_result!` macro in `src/challenges/mod.rs` standardizes rewa
 | Flappy Bird | +50% XP | +100% XP | +1 PR, +75% XP | +2 PR, +150% XP, +1 FR |
 | JezzBall | +25% XP | +75% XP | +1 PR, +100% XP | +2 PR, +100% XP |
 | Sigil Surge | +50% XP | +100% XP | +1 PR, +75% XP | +2 PR, +150% XP, +1 FR |
+| Sudoku | SG only | SG only | +1 PR | +2 PR |
+| Shard Fusion | SG only | SG only | +1 PR | +2 PR |
 
 PR = Prestige Rank, FR = Fishing Rank, XP% = percentage of current level's XP requirement. Challenge wins also award Stormglass currency (gated behind P15+), which can be spent on Storm Sigils for passive bonuses.
 
@@ -76,6 +80,8 @@ PR = Prestige Rank, FR = Fishing Rank, XP% = percentage of current level's XP re
 | Flappy Bird | 500 | 1,200 | 2,500 | 4,000 |
 | JezzBall | 500 | 1,200 | 2,500 | 4,000 |
 | Sigil Surge | 500 | 1,200 | 2,500 | 4,000 |
+| Sudoku | 400 | 1,200 | 3,000 | 6,000 |
+| Shard Fusion | 800 | 2,000 | 4,000 | 10,000 |
 
 If Stormglass has not been discovered yet, the SG reward falls back to XP instead.
 
@@ -433,6 +439,64 @@ Real-time action-puzzle inspired by panel-matching games. Rune blocks fill a 6×
 ### Controls
 
 Arrow keys to move cursor, Space/Enter to swap (horizontal), Space to start game, double-Esc to forfeit.
+
+---
+
+## Sudoku (Sigil Matrix)
+
+**Theme**: "A grid of ancient sigils glows faintly on a stone tablet..."
+
+### Rules
+
+Classic 9x9 Sudoku puzzle. Fill in the missing numbers so each row, column, and 3x3 box contains the digits 1-9 exactly once.
+
+- 9x9 grid
+- Turn-based puzzle (no time pressure)
+- Pencil marks for noting candidates
+- Win: correctly fill all empty cells
+- Loss: forfeit only (no wrong-answer penalty)
+
+### Difficulty
+
+| Difficulty | Given Cells | Reward |
+|------------|------------|--------|
+| Novice | 38-42 | 400 SG |
+| Apprentice | 30-34 | 1,200 SG |
+| Journeyman | 26-28 | +1 PR, 3,000 SG |
+| Master | 22-24 | +2 PR, 6,000 SG |
+
+### Controls
+
+Arrow keys to move cursor, 1-9 to place digit, Backspace/Delete to clear, P to toggle pencil marks, double-Esc to forfeit.
+
+---
+
+## Shard Fusion
+
+**Theme**: "Crystalline shards hover in a 4x4 grid, pulsing with dormant energy..."
+
+### Rules
+
+2048-style tile merging puzzle. Slide tiles in four directions; identical adjacent tiles merge into the next value. Reach the target tile value to win.
+
+- 4x4 grid
+- Turn-based puzzle
+- Slide animations
+- Win: create a tile with the target value
+- Loss: no valid moves remaining
+
+### Difficulty
+
+| Difficulty | Target Value | Reward |
+|------------|-------------|--------|
+| Novice | 512 | 800 SG |
+| Apprentice | 1,024 | 2,000 SG |
+| Journeyman | 2,048 | +1 PR, 4,000 SG |
+| Master | 4,096 | +2 PR, 10,000 SG |
+
+### Controls
+
+Arrow keys to slide tiles, double-Esc to forfeit.
 
 ---
 

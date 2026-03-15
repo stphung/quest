@@ -612,7 +612,7 @@ Endgame system gated at P15+. Players recruit and manage a mercenary company, se
 - 0.000014 per tick (~2 hour average)
 - Requires P1+ (not in dungeon, fishing, or another minigame)
 - Haven Library bonus: up to +50%
-- Weighted distribution (total weight 180): 10 challenge types with weights favoring quick games (Rune 30, Minesweeper 28, Snake 22, Flappy Bird 20, Sigil Surge 20, JezzBall 18, Gomoku 15, Morris 12, Chess 8, Go 7)
+- Weighted distribution (total weight 218): 12 challenge types with weights favoring quick games (Rune 30, Minesweeper 28, Snake 22, Flappy Bird 20, Sigil Surge 20, Shard Fusion 20, JezzBall 18, Sudoku 18, Gomoku 15, Morris 12, Chess 8, Go 7)
 
 ### Games & AI
 
@@ -627,7 +627,9 @@ Endgame system gated at P15+. Players recruit and manage a mercenary company, se
 | Snake | N/A (action) | 10-25 food, 200-90ms |
 | Flappy Bird | N/A (action) | Gap 7-4 rows, 3 lives |
 | JezzBall | N/A (action) | 2-5 balls, 3 lives |
-| Sigil Surge | N/A (action-puzzle) | 6×12 grid, 5 colors, 3 lives |
+| Sigil Surge | N/A (action-puzzle) | 6x12 grid, 5 colors, 3 lives |
+| Sudoku | N/A (puzzle) | 9x9 grid, pencil marks |
+| Shard Fusion | N/A (puzzle) | 4x4 grid, 2048-style |
 
 All challenges use 4 difficulty levels: Novice, Apprentice, Journeyman, Master.
 
@@ -645,6 +647,8 @@ All challenges use 4 difficulty levels: Novice, Apprentice, Journeyman, Master.
 | Flappy Bird | +50% XP | +100% XP | +1 PR, +75% XP | +2 PR, +150% XP, +1 FR |
 | JezzBall | +25% XP | +75% XP | +1 PR, +100% XP | +2 PR, +100% XP |
 | Sigil Surge | +50% XP | +100% XP | +1 PR, +75% XP | +2 PR, +150% XP, +1 FR |
+| Sudoku | SG only | SG only | +1 PR | +2 PR |
+| Shard Fusion | SG only | SG only | +1 PR | +2 PR |
 
 PR = Prestige Rank, FR = Fishing Rank, XP% = percentage of current level's XP requirement. Challenge wins also award Stormglass currency (see [Secondary Systems](secondary-systems.md#stormglass-system)).
 
