@@ -9,7 +9,7 @@ use crate::challenges::ActiveMinigame;
 use rand::{Rng, RngExt};
 
 /// Toggle a cell and its orthogonal neighbors (cross pattern).
-pub fn toggle_cell(board: &mut Vec<Vec<bool>>, row: usize, col: usize) {
+pub fn toggle_cell(board: &mut [Vec<bool>], row: usize, col: usize) {
     let size = board.len();
     board[row][col] = !board[row][col];
     if row > 0 {
