@@ -26,6 +26,9 @@ use crate::challenges::morris::logic::{
 use crate::challenges::rune::logic::{
     apply_game_result as apply_rune_result, process_input as process_rune_input, RuneInput,
 };
+use crate::challenges::runic_lights::{
+    apply_runic_lights_result, process_input as process_runic_lights_input, RunicLightsInput,
+};
 use crate::challenges::runic_shift::logic::{
     apply_game_result as apply_runic_shift_result, process_input as process_runic_shift_input,
     RunicShiftInput,
@@ -277,8 +280,21 @@ pub(super) fn handle_minigame(key: KeyEvent, state: &mut GameState) -> InputResu
                 let mut rng = rand::rng();
                 process_shard_fusion_input(shard_fusion_game, input, &mut rng);
             }
-            ActiveMinigame::RunicLights(_game) => {
-                // TODO: Runic Lights input handling not yet wired
+            ActiveMinigame::RunicLights(game) => {
+                if game.game_result.is_some() {
+                    state.last_minigame_win = apply_runic_lights_result(state);
+                    return result_for_challenge(&state.last_minigame_win);
+                }
+                let input = match key.code {
+                    KeyCode::Up => RunicLightsInput::Up,
+                    KeyCode::Down => RunicLightsInput::Down,
+                    KeyCode::Left => RunicLightsInput::Left,
+                    KeyCode::Right => RunicLightsInput::Right,
+                    KeyCode::Enter => RunicLightsInput::Toggle,
+                    KeyCode::Esc => RunicLightsInput::Forfeit,
+                    _ => RunicLightsInput::Other,
+                };
+                process_runic_lights_input(game, input);
             }
         }
     }

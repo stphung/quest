@@ -326,9 +326,17 @@ impl Achievements {
             (MinigameType::ShardFusion, MinigameDifficulty::Master) => {
                 Some(AchievementId::ShardFusionMaster)
             }
-            (MinigameType::RunicLights, _) => {
-                // Runic Lights achievements not yet wired
-                None
+            (MinigameType::RunicLights, MinigameDifficulty::Novice) => {
+                Some(AchievementId::RunicLightsNovice)
+            }
+            (MinigameType::RunicLights, MinigameDifficulty::Apprentice) => {
+                Some(AchievementId::RunicLightsApprentice)
+            }
+            (MinigameType::RunicLights, MinigameDifficulty::Journeyman) => {
+                Some(AchievementId::RunicLightsJourneyman)
+            }
+            (MinigameType::RunicLights, MinigameDifficulty::Master) => {
+                Some(AchievementId::RunicLightsMaster)
             }
         };
 

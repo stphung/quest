@@ -1341,6 +1341,41 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         points: 100,
     },
     // ═══════════════════════════════════════════════════════════════
+    // CHALLENGE ACHIEVEMENTS - RUNIC LIGHTS
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::RunicLightsNovice,
+        name: "Runic Lights Novice",
+        description: "Extinguish all runes on Novice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "\u{25C7}",
+        points: 10,
+    },
+    AchievementDef {
+        id: AchievementId::RunicLightsApprentice,
+        name: "Runic Lights Apprentice",
+        description: "Extinguish all runes on Apprentice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "\u{25C7}",
+        points: 25,
+    },
+    AchievementDef {
+        id: AchievementId::RunicLightsJourneyman,
+        name: "Runic Lights Journeyman",
+        description: "Extinguish all runes on Journeyman difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "\u{25C7}",
+        points: 50,
+    },
+    AchievementDef {
+        id: AchievementId::RunicLightsMaster,
+        name: "Runic Lights Master",
+        description: "Extinguish all runes on Master difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "\u{25C7}",
+        points: 100,
+    },
+    // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - META
     // ═══════════════════════════════════════════════════════════════
     AchievementDef {
@@ -2217,6 +2252,10 @@ mod tests {
             AchievementId::ShardFusionApprentice,
             AchievementId::ShardFusionJourneyman,
             AchievementId::ShardFusionMaster,
+            AchievementId::RunicLightsNovice,
+            AchievementId::RunicLightsApprentice,
+            AchievementId::RunicLightsJourneyman,
+            AchievementId::RunicLightsMaster,
             AchievementId::GrandChampion,
             AchievementId::GoneFishing,
             AchievementId::FishermanI,
@@ -2492,6 +2531,15 @@ mod tests {
                     AchievementId::ShardFusionApprentice,
                     AchievementId::ShardFusionJourneyman,
                     AchievementId::ShardFusionMaster,
+                ],
+            ),
+            (
+                "Runic Lights",
+                vec![
+                    AchievementId::RunicLightsNovice,
+                    AchievementId::RunicLightsApprentice,
+                    AchievementId::RunicLightsJourneyman,
+                    AchievementId::RunicLightsMaster,
                 ],
             ),
         ];

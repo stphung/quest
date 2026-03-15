@@ -13,6 +13,7 @@ use super::jezzball::JezzballDifficulty;
 use super::minesweeper::{MinesweeperDifficulty, MinesweeperGame};
 use super::morris::{MorrisDifficulty, MorrisGame};
 use super::rune::{RuneDifficulty, RuneGame};
+use super::runic_lights::{start_runic_lights_game, RunicLightsDifficulty};
 use super::runic_shift::logic::start_runic_shift_game;
 use super::runic_shift::RunicShiftDifficulty;
 use super::shard_fusion::{start_shard_fusion_game, ShardFusionDifficulty};
@@ -125,6 +126,10 @@ fn accept_selected_challenge(state: &mut GameState) {
             ChallengeType::ShardFusion => {
                 let d = ShardFusionDifficulty::from_index(difficulty_index);
                 start_shard_fusion_game(d, &mut rand::rng())
+            }
+            ChallengeType::RunicLights => {
+                let d = RunicLightsDifficulty::from_index(difficulty_index);
+                start_runic_lights_game(d, &mut rand::rng())
             }
         };
         state.active_minigame = Some(minigame);
@@ -467,6 +472,10 @@ const CHALLENGE_TABLE: &[ChallengeWeight] = &[
         challenge_type: ChallengeType::ShardFusion,
         weight: 20, // ~10% - moderate puzzle
     },
+    ChallengeWeight {
+        challenge_type: ChallengeType::RunicLights,
+        weight: 20,
+    },
 ];
 
 /// A single pending challenge in the menu
@@ -493,6 +502,7 @@ pub enum ChallengeType {
     Snake,
     Sudoku,
     ShardFusion,
+    RunicLights,
 }
 
 impl ChallengeType {
@@ -511,6 +521,7 @@ impl ChallengeType {
             ChallengeType::Snake => "~",
             ChallengeType::Sudoku => "\u{2B21}",
             ChallengeType::ShardFusion => "\u{25C6}",
+            ChallengeType::RunicLights => "\u{25C7}",
         }
     }
 
@@ -540,6 +551,9 @@ impl ChallengeType {
             }
             ChallengeType::ShardFusion => {
                 "A glowing grid of crystal shards materializes before you, waiting to be merged..."
+            }
+            ChallengeType::RunicLights => {
+                "A grid of glowing runes pulses on the wall, each connected to its neighbors by threads of light..."
             }
         }
     }
@@ -806,6 +820,15 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
                 and grow the crystals ever larger. Reach the pinnacle, and claim your reward.\""
                 .to_string(),
         },
+        ChallengeType::RunicLights => PendingChallenge {
+            challenge_type: ChallengeType::RunicLights,
+            title: "Runic Lights".to_string(),
+            icon: "\u{25C7}",
+            description: "A grid of glowing runes pulses on the dungeon wall. Each rune is bound \
+                to its neighbors by threads of arcane light. Touching one rune shifts the light of \
+                all connected runes. Extinguish every rune to break the ward."
+                .to_string(),
+        },
     }
 }
 
@@ -838,6 +861,7 @@ mod tests {
         assert!(!ChallengeType::Snake.icon().is_empty());
         assert!(!ChallengeType::Sudoku.icon().is_empty());
         assert!(!ChallengeType::ShardFusion.icon().is_empty());
+        assert!(!ChallengeType::RunicLights.icon().is_empty());
     }
 
     #[test]
@@ -854,6 +878,7 @@ mod tests {
         assert!(!ChallengeType::Snake.discovery_flavor().is_empty());
         assert!(!ChallengeType::Sudoku.discovery_flavor().is_empty());
         assert!(!ChallengeType::ShardFusion.discovery_flavor().is_empty());
+        assert!(!ChallengeType::RunicLights.discovery_flavor().is_empty());
     }
 
     #[test]
@@ -871,6 +896,7 @@ mod tests {
             ChallengeType::Snake.icon(),
             ChallengeType::Sudoku.icon(),
             ChallengeType::ShardFusion.icon(),
+            ChallengeType::RunicLights.icon(),
         ];
         // Check all pairs are different
         for i in 0..icons.len() {
