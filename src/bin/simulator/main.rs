@@ -15,6 +15,7 @@
 //!   --csv FILE      Write time-series CSV
 //!   --quiet         Only final summary line
 
+mod assertions;
 mod report;
 mod stats;
 mod strategy;
@@ -433,5 +434,16 @@ fn main() {
     if config.runs > 1 {
         println!();
         print_multi_run_summary(&all_stats);
+    }
+
+    if config.assertions {
+        let pass = if config.runs == 1 {
+            assertions::run_assertions(&all_stats[0])
+        } else {
+            all_stats.iter().all(|s| assertions::run_assertions(s))
+        };
+        if !pass {
+            std::process::exit(1);
+        }
     }
 }
