@@ -1376,6 +1376,41 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         points: 100,
     },
     // ═══════════════════════════════════════════════════════════════
+    // Vault Warden
+    // ═══════════════════════════════════════════════════════════════
+    AchievementDef {
+        id: AchievementId::VaultWardenNovice,
+        name: "Vault Warden Novice",
+        description: "Seal the vault on Novice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "\u{25C7}",
+        points: 5,
+    },
+    AchievementDef {
+        id: AchievementId::VaultWardenApprentice,
+        name: "Vault Warden Apprentice",
+        description: "Seal the vault on Apprentice difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "\u{25C7}",
+        points: 10,
+    },
+    AchievementDef {
+        id: AchievementId::VaultWardenJourneyman,
+        name: "Vault Warden Journeyman",
+        description: "Seal the vault on Journeyman difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "\u{25C7}",
+        points: 15,
+    },
+    AchievementDef {
+        id: AchievementId::VaultWardenMaster,
+        name: "Vault Warden Master",
+        description: "Seal the vault on Master difficulty",
+        category: AchievementCategory::Challenges,
+        icon: "\u{25C7}",
+        points: 25,
+    },
+    // ═══════════════════════════════════════════════════════════════
     // CHALLENGE ACHIEVEMENTS - META
     // ═══════════════════════════════════════════════════════════════
     AchievementDef {
@@ -2331,6 +2366,10 @@ mod tests {
             AchievementId::LoomPattern16,
             AchievementId::LoomPattern22,
             AchievementId::LoomPattern28,
+            AchievementId::VaultWardenNovice,
+            AchievementId::VaultWardenApprentice,
+            AchievementId::VaultWardenJourneyman,
+            AchievementId::VaultWardenMaster,
         ];
 
         // Sanity-check: the slice above must itself be up-to-date.

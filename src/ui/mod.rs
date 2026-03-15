@@ -60,6 +60,7 @@ pub(crate) mod throbber;
 pub mod ticker;
 pub mod time_vault_scene;
 pub mod title_browser_scene;
+pub mod vault_warden_scene;
 mod zone_bg;
 
 use crate::challenges::ActiveMinigame;
@@ -1370,6 +1371,9 @@ fn draw_right_content(
         }
         Some(ActiveMinigame::RunicLights(game)) => {
             runic_lights_scene::render_runic_lights(frame, area, game, ctx, show_dismiss_hint);
+        }
+        Some(ActiveMinigame::VaultWarden(game)) => {
+            vault_warden_scene::render_vault_warden(frame, area, game, ctx, show_dismiss_hint);
         }
         None => {
             if game_state.challenge_menu.is_open {

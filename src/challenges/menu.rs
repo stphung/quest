@@ -20,6 +20,7 @@ use super::shard_fusion::{start_shard_fusion_game, ShardFusionDifficulty};
 use super::snake::logic::start_snake_game;
 use super::snake::SnakeDifficulty;
 use super::sudoku::SudokuDifficulty;
+use super::vault_warden::{start_vault_warden_game, VaultWardenDifficulty};
 use super::ActiveMinigame;
 use crate::core::constants::CHALLENGE_DISCOVERY_CHANCE;
 use crate::core::game_state::GameState;
@@ -130,6 +131,10 @@ fn accept_selected_challenge(state: &mut GameState) {
             ChallengeType::RunicLights => {
                 let d = RunicLightsDifficulty::from_index(difficulty_index);
                 start_runic_lights_game(d, &mut rand::rng())
+            }
+            ChallengeType::VaultWarden => {
+                let d = VaultWardenDifficulty::from_index(difficulty_index);
+                start_vault_warden_game(d, &mut rand::rng())
             }
         };
         state.active_minigame = Some(minigame);
@@ -476,6 +481,10 @@ const CHALLENGE_TABLE: &[ChallengeWeight] = &[
         challenge_type: ChallengeType::RunicLights,
         weight: 20,
     },
+    ChallengeWeight {
+        challenge_type: ChallengeType::VaultWarden,
+        weight: 18,
+    },
 ];
 
 /// A single pending challenge in the menu
@@ -503,6 +512,7 @@ pub enum ChallengeType {
     Sudoku,
     ShardFusion,
     RunicLights,
+    VaultWarden,
 }
 
 impl ChallengeType {
@@ -522,6 +532,7 @@ impl ChallengeType {
             ChallengeType::Sudoku => "\u{2B21}",
             ChallengeType::ShardFusion => "\u{25C6}",
             ChallengeType::RunicLights => "\u{25C7}",
+            ChallengeType::VaultWarden => "\u{1F512}",
         }
     }
 
@@ -554,6 +565,9 @@ impl ChallengeType {
             }
             ChallengeType::RunicLights => {
                 "A grid of glowing runes pulses on the wall, each connected to its neighbors by threads of light..."
+            }
+            ChallengeType::VaultWarden => {
+                "You discover a sealed vault deep in the dungeon. Stone pedestals await their relics..."
             }
         }
     }
@@ -827,6 +841,15 @@ pub fn create_challenge(ct: &ChallengeType) -> PendingChallenge {
             description: "A grid of glowing runes pulses on the dungeon wall. Each rune is bound \
                 to its neighbors by threads of arcane light. Touching one rune shifts the light of \
                 all connected runes. Extinguish every rune to break the ward."
+                .to_string(),
+        },
+        ChallengeType::VaultWarden => PendingChallenge {
+            challenge_type: ChallengeType::VaultWarden,
+            title: "Vault Warden".to_string(),
+            icon: "\u{1F512}",
+            description: "A sealed chamber with stone pedestals — push each relic onto its \
+                pedestal to complete the lock. But beware: relics can only be pushed, never \
+                pulled. Plan your moves carefully."
                 .to_string(),
         },
     }

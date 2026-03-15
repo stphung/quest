@@ -660,6 +660,15 @@ fn build_stats_right_lines(
                 AchievementId::RunicLightsMaster,
             ],
         ),
+        (
+            "Vault Warden",
+            [
+                AchievementId::VaultWardenNovice,
+                AchievementId::VaultWardenApprentice,
+                AchievementId::VaultWardenJourneyman,
+                AchievementId::VaultWardenMaster,
+            ],
+        ),
     ];
 
     let diff_labels = ["Nov", "App", "Jou", "Mas"];

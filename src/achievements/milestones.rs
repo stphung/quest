@@ -29,6 +29,7 @@ pub enum MinigameType {
     SigilMatrix,
     ShardFusion,
     RunicLights,
+    VaultWarden,
 }
 
 /// Type-safe difficulty level shared by all minigames.
