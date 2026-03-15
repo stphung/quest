@@ -1,11 +1,11 @@
 ---
 name: audit
-description: Run all audit skills — perf-audit, test-audit, doc-audit, wiki-audit — in parallel on isolated worktrees. Use when you want a full project health check or before a release.
+description: Run all audit skills — perf-audit, test-audit, doc-audit, wiki-audit, dependency-audit — in parallel on isolated worktrees. Use when you want a full project health check or before a release.
 ---
 
 # Full Audit
 
-Run all 4 audit skills in parallel on isolated git worktrees for a comprehensive project health check.
+Run all 5 audit skills in parallel on isolated git worktrees for a comprehensive project health check.
 
 ## When to Use
 
@@ -16,11 +16,11 @@ Run all 4 audit skills in parallel on isolated git worktrees for a comprehensive
 
 ## Process
 
-Launch all 4 audit skills simultaneously, each on its own worktree. Each skill creates its own branch, PR, and merges independently via `/ship`.
+Launch all 5 audit skills simultaneously, each on its own worktree. Each skill creates its own branch, PR, and merges independently via `/ship`.
 
 ### Parallel Launch
 
-Spawn 4 agents in a **single message** (so they run concurrently), each with `isolation: "worktree"` and `mode: "bypassPermissions"`. Each agent prompt should:
+Spawn 5 agents in a **single message** (so they run concurrently), each with `isolation: "worktree"` and `mode: "bypassPermissions"`. Each agent prompt should:
 
 1. Read its corresponding skill file from the repo (e.g., `.claude/skills/perf-audit/SKILL.md`)
 2. Follow the skill instructions exactly
@@ -32,6 +32,7 @@ Agent 1 — perf-audit   → Read .claude/skills/perf-audit/SKILL.md, execute it
 Agent 2 — test-audit   → Read .claude/skills/test-audit/SKILL.md, execute it fully
 Agent 3 — doc-audit    → Read .claude/skills/doc-audit/SKILL.md, execute it fully
 Agent 4 — wiki-audit   → Read .claude/skills/wiki-audit/SKILL.md, execute it fully
+Agent 5 — dependency-audit → Read .claude/skills/dependency-audit/SKILL.md, execute it fully
 ```
 
 **Important**: Since agents run on isolated worktrees, they won't conflict with each other even if they touch overlapping files. Each PR merges independently.
@@ -53,7 +54,7 @@ Each agent should receive a prompt like:
 
 ## Output
 
-After all 4 agents complete, compile and report a summary table:
+After all 5 agents complete, compile and report a summary table:
 
 | Audit | Findings | Fixes | PR | Status |
 |-------|----------|-------|----|--------|
@@ -61,3 +62,4 @@ After all 4 agents complete, compile and report a summary table:
 | test-audit | ... | ... | #N | merged/pending |
 | doc-audit | ... | ... | #N | merged/pending |
 | wiki-audit | ... | ... | #N | merged/pending |
+| dependency-audit | ... | ... | #N | merged/pending |
