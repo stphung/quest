@@ -374,7 +374,8 @@ fn initialize_state(
     };
 
     // Generate initial mission pool.
-    prestige.available_missions = generate_mission_pool(&persistent, &mut rng);
+    prestige.available_missions =
+        generate_mission_pool(&persistent, &prestige.active_missions, &mut rng);
 
     // Generate initial recruit pool.
     prestige.recruit_pool = generate_recruit_pool(
@@ -950,7 +951,8 @@ fn run_simulation(config: &DeepSimConfig, seed: u64) -> DeepSimStats {
 
         // 3. Regenerate mission pool if empty or stale.
         if prestige.available_missions.is_empty() {
-            prestige.available_missions = generate_mission_pool(&persistent, &mut rng);
+            prestige.available_missions =
+                generate_mission_pool(&persistent, &prestige.active_missions, &mut rng);
         }
         ensure_breakthrough_in_pool(&persistent, &mut prestige, config.strategy);
         ensure_construction_in_pool(&persistent, &mut prestige, config.strategy);
@@ -975,7 +977,8 @@ fn run_simulation(config: &DeepSimConfig, seed: u64) -> DeepSimStats {
             && prestige.active_mission_count() == 0
             && !prestige.available_missions.is_empty()
         {
-            prestige.available_missions = generate_mission_pool(&persistent, &mut rng);
+            prestige.available_missions =
+                generate_mission_pool(&persistent, &prestige.active_missions, &mut rng);
             ensure_breakthrough_in_pool(&persistent, &mut prestige, config.strategy);
             ensure_construction_in_pool(&persistent, &mut prestige, config.strategy);
 

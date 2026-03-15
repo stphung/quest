@@ -57,7 +57,7 @@ fn make_persistent_with_frontier(frontier_layer: u32) -> DeepPersistent {
 fn prestige_with_pool_age(now: chrono::DateTime<Utc>, secs_ago: i64) -> DeepPrestige {
     let mut prestige = DeepPrestige::new();
     let persistent = make_persistent_with_frontier(1);
-    prestige.available_missions = generate_mission_pool(&persistent, &mut seeded_rng());
+    prestige.available_missions = generate_mission_pool(&persistent, &[], &mut seeded_rng());
     prestige.pool_refreshed_at = Some(now - chrono::Duration::seconds(secs_ago));
     // Keep affordability out of these timing-focused tests so emergency
     // fallback insertion does not mutate the pool.
@@ -209,7 +209,7 @@ fn fresh_pool_five_hours_59_minutes_old_does_not_refresh() {
     let now = t0();
     let mut prestige = DeepPrestige::new();
     prestige.warband_marks = 10_000;
-    prestige.available_missions = generate_mission_pool(&persistent, &mut seeded_rng());
+    prestige.available_missions = generate_mission_pool(&persistent, &[], &mut seeded_rng());
     // 5h 59m old = 21540 seconds — just under the 6h = 21600s threshold.
     prestige.pool_refreshed_at =
         Some(now - chrono::Duration::seconds(POOL_REFRESH_INTERVAL_SECS - 60));
@@ -353,7 +353,7 @@ fn pool_refreshed_at_non_none_roundtrip_with_missions() {
     let mut prestige = DeepPrestige::new();
     prestige.pool_refreshed_at = Some(ts);
     prestige.available_missions =
-        generate_mission_pool(&make_persistent_with_frontier(1), &mut seeded_rng());
+        generate_mission_pool(&make_persistent_with_frontier(1), &[], &mut seeded_rng());
 
     let json = serde_json::to_string(&prestige).expect("serialize");
     let loaded: DeepPrestige = serde_json::from_str(&json).expect("deserialize");
@@ -477,7 +477,7 @@ fn on_prestige_preserves_available_missions() {
 
     // Populate the pool.
     state.prestige.available_missions =
-        generate_mission_pool(&state.persistent.clone(), &mut seeded_rng());
+        generate_mission_pool(&state.persistent.clone(), &[], &mut seeded_rng());
     let count = state.prestige.available_missions.len();
     assert!(count > 0);
 

@@ -977,7 +977,7 @@ fn test_initial_descent_is_first_mission() {
     );
     deep.prestige.roster = starter.into_iter().map(|m| (m.id, m)).collect();
 
-    let pool = quest::deep::generate_mission_pool(&deep.persistent, &mut rng);
+    let pool = quest::deep::generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
     assert!(!pool.is_empty(), "Mission pool should not be empty");
 
     // First mission should be a SupplyRun on Layer 1
@@ -996,7 +996,7 @@ fn test_expanded_options_after_clearing_layer() {
     deep.persistent.layer_record_mut(1).cleared = true;
     deep.persistent.deepest_layer_reached = 1;
 
-    let pool = quest::deep::generate_mission_pool(&deep.persistent, &mut rng);
+    let pool = quest::deep::generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
     assert!(pool.len() >= 2, "Should have at least 2 missions at Rank 2");
 
     let has_supply = pool
@@ -1028,7 +1028,7 @@ fn test_supply_runs_are_always_safe() {
         deep.prestige.roster = starter.into_iter().map(|m| (m.id, m)).collect();
         deep.prestige.warband_marks = 1000;
 
-        let pool = generate_mission_pool(&deep.persistent, &mut rng);
+        let pool = generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
         let supply_run = pool
             .iter()
             .find(|m| m.mission_type == MissionType::SupplyRun)
@@ -1085,7 +1085,7 @@ fn test_squad_assignment_validation() {
     );
     deep.prestige.roster = starter.into_iter().map(|m| (m.id, m)).collect();
 
-    let pool = generate_mission_pool(&deep.persistent, &mut rng);
+    let pool = generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
     let mission = &pool[0];
 
     // Empty squad should fail
@@ -1117,7 +1117,7 @@ fn test_concurrent_mission_cap() {
     deep.prestige.roster = starter.into_iter().map(|m| (m.id, m)).collect();
     deep.prestige.warband_marks = 5000;
 
-    let pool = generate_mission_pool(&deep.persistent, &mut rng);
+    let pool = generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
     let first_mission = &pool[0];
 
     // Start first mission (use first merc) and push to active list
@@ -1140,7 +1140,7 @@ fn test_concurrent_mission_cap() {
     assert_eq!(deep.persistent.guild_rank.concurrent_missions(), 1);
 
     // Try to start second mission — should hit concurrent limit
-    let pool2 = generate_mission_pool(&deep.persistent, &mut rng);
+    let pool2 = generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
     assert!(!pool2.is_empty(), "Pool should have missions");
     let merc2_id = roster_ids[1];
     let result = validate_squad_assignment(

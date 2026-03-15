@@ -17,8 +17,11 @@ pub fn complete_discovery<R: Rng>(deep: &mut DeepState, rng: &mut R) {
     deep.prestige
         .roster
         .extend(starters.into_iter().map(|m| (m.id, m)));
-    deep.prestige.available_missions =
-        super::missions::generate_mission_pool(&deep.persistent, rng);
+    deep.prestige.available_missions = super::missions::generate_mission_pool(
+        &deep.persistent,
+        &deep.prestige.active_missions,
+        rng,
+    );
     deep.prestige.recruit_pool = generate_recruit_pool(
         deep.persistent.guild_rank,
         || deep.persistent.next_merc_id(),

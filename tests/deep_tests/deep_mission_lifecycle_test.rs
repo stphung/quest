@@ -1648,7 +1648,7 @@ fn test_generate_mission_pool_size() {
 
     for rank in 1u8..=5 {
         state.persistent.guild_rank = GuildRank(rank);
-        let pool = generate_mission_pool(&state.persistent, &mut rng);
+        let pool = generate_mission_pool(&state.persistent, &state.prestige.active_missions, &mut rng);
         let expected = available_mission_count(GuildRank(rank));
         assert!(
             pool.len() <= expected,
