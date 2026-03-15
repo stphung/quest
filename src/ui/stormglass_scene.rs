@@ -1,6 +1,7 @@
 //! Stormglass Exchange UI rendering: storm-themed modal overlay.
 
 use crate::core::game_state::GameState;
+use crate::stormglass::spending::{available_trial_types, TRIAL_OPTION_COUNT};
 use crate::stormglass::types::{
     ChronoSurgeState, ChronoSurgeSummary, ExchangePhase, ExchangeUiState, CHRONO_SURGE_OPTIONS,
     INVOKE_TRIAL_COST, STORM_LURE_COST,
@@ -498,7 +499,15 @@ fn render_exchange_menu_items(
         (
             "\u{1F3B2} Invoke Challenge", // 🎲 (2-wide) + 1 space
             format!("{} SG", format_number(INVOKE_TRIAL_COST)),
-            state.stormglass >= INVOKE_TRIAL_COST,
+            state.stormglass >= INVOKE_TRIAL_COST && {
+                let pending: Vec<_> = state
+                    .challenge_menu
+                    .challenges
+                    .iter()
+                    .map(|c| c.challenge_type.clone())
+                    .collect();
+                available_trial_types(&pending) >= TRIAL_OPTION_COUNT
+            },
         ),
         (
             "\u{231B} Chrono Surge", // ⌛ (2-wide) + 1 space

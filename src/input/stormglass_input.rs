@@ -4,7 +4,9 @@ use crate::challenges::menu::create_challenge;
 use crate::core::game_state::GameState;
 use crate::input::InputResult;
 use crate::stormglass::sigils::ETCH_COST;
-use crate::stormglass::spending::{chrono_surge_cost, generate_trial_options};
+use crate::stormglass::spending::{
+    available_trial_types, chrono_surge_cost, generate_trial_options, TRIAL_OPTION_COUNT,
+};
 use crate::stormglass::types::{
     ExchangePhase, ExchangeUiState, CHRONO_SURGE_OPTIONS, EXCHANGE_MENU_ITEMS, INVOKE_TRIAL_COST,
     STORM_LURE_COST,
@@ -70,8 +72,14 @@ fn handle_menu(
                 0 => {
                     // Invoke Challenge — show confirmation first
                     if state.stormglass >= INVOKE_TRIAL_COST {
-                        // Guard: if all 10 challenge types are already pending, do nothing
-                        if state.challenge_menu.challenges.len() >= 10 {
+                        // Guard: need at least 3 available types for meaningful pick-1-of-3
+                        let pending: Vec<_> = state
+                            .challenge_menu
+                            .challenges
+                            .iter()
+                            .map(|c| c.challenge_type.clone())
+                            .collect();
+                        if available_trial_types(&pending) < TRIAL_OPTION_COUNT {
                             return InputResult::Continue;
                         }
                         exchange_ui.set_phase(ExchangePhase::InvokeTrialConfirm);
