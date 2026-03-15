@@ -183,8 +183,12 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
 
     // Sync cached zone caps for UI rendering
     ctx.state.cached_fracture_zone_cap = ctx.deep.persistent.fracture_zone_cap;
-    ctx.state.cached_loom_zone_cap =
-        crate::loom::loom_zone_cap_for_patterns(ctx.loom.persistent.completed_pattern_count());
+    // Only recompute loom zone cap when loom state changed this tick;
+    // the value is already updated by tick_loom() and milestone consumption above.
+    if result.loom_changed {
+        ctx.state.cached_loom_zone_cap =
+            crate::loom::loom_zone_cap_for_patterns(ctx.loom.persistent.completed_pattern_count());
+    }
 
     // ── 12a. Power Cores tick ─────────────────────────────────────
     crate::power_cores::tick::tick_power_cores(ctx.state, ctx.deep, ctx.achievements, &mut result);
