@@ -53,8 +53,8 @@ pub fn render_runic_lights(
 /// Render the grid of runes.
 fn render_grid(frame: &mut Frame, area: Rect, game: &RunicLightsGame) {
     let size = game.size;
-    // Each cell: 3 chars wide ("◆◆ " or "◇◇ "), 1 char tall
-    let cell_width = 3u16;
+    // Each cell: 2 chars wide ("● " or "○ "), 1 char tall
+    let cell_width = 2u16;
     let grid_width = size as u16 * cell_width;
     let grid_height = size as u16;
 
@@ -69,17 +69,12 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &RunicLightsGame) {
             let lit = game.board[row][col];
             let is_cursor = game.cursor == (row, col);
 
-            let symbol = if lit {
-                "\u{25C6}\u{25C6}"
-            } else {
-                "\u{25C7}\u{25C7}"
-            };
-            let pad = " ";
+            let symbol = if lit { "\u{25CF} " } else { "\u{25CB} " };
 
             let base_color = if lit {
                 Color::Rgb(100, 200, 255) // Bright cyan for lit
             } else {
-                Color::Rgb(50, 50, 65) // Dim for dark
+                Color::Rgb(90, 90, 105) // Visible gray for dark
             };
 
             let mut style = Style::default().fg(base_color);
@@ -92,7 +87,6 @@ fn render_grid(frame: &mut Frame, area: Rect, game: &RunicLightsGame) {
             }
 
             spans.push(Span::styled(symbol, style));
-            spans.push(Span::raw(pad));
         }
 
         let line = Line::from(spans);

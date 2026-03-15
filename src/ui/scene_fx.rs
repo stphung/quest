@@ -139,6 +139,58 @@ pub fn put_text_centered(
     put_text(buffer, row, col.max(0), text, fg);
 }
 
+/// Write a string centered, wrapping onto multiple rows if it exceeds `width`.
+/// Wraps at word boundaries when possible. Returns the number of rows used.
+pub fn put_text_centered_wrap(
+    buffer: &mut [Vec<SceneCell>],
+    start_row: i32,
+    width: usize,
+    text: &str,
+    fg: Color,
+) -> usize {
+    if width == 0 {
+        return 0;
+    }
+    let lines = wrap_text(text, width);
+    for (i, line) in lines.iter().enumerate() {
+        put_text_centered(buffer, start_row + i as i32, width, line, fg);
+    }
+    lines.len()
+}
+
+/// Word-wrap text to fit within `max_width` display columns.
+fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+    let mut current_width = 0usize;
+
+    for word in text.split_whitespace() {
+        let word_width = display_width(word);
+        if current_width == 0 {
+            // First word on line — always take it even if it's too wide
+            current_line.push_str(word);
+            current_width = word_width;
+        } else if current_width + 1 + word_width <= max_width {
+            // Fits with a space
+            current_line.push(' ');
+            current_line.push_str(word);
+            current_width += 1 + word_width;
+        } else {
+            // Doesn't fit — start a new line
+            lines.push(current_line);
+            current_line = word.to_string();
+            current_width = word_width;
+        }
+    }
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+    lines
+}
+
 /// Flushes a scene buffer to the frame with run-length style batching by color.
 /// Continuation cells (after wide characters) are skipped so the terminal
 /// renders wide chars at their correct 2-column width.
