@@ -188,22 +188,26 @@ The old `game_tick()` function with individual parameters is `#[deprecated]` —
 
 | Stage | What it does |
 |-------|-------------|
-| 1. Challenge AI | Ticks AI thinking for active Chess, Morris, Gomoku, or Go games |
-| 2. Challenge discovery | Rolls for new challenge discovery (P1+ required, Haven bonus applied) |
+| 0. Merged bonuses | Computes merged Haven + Sigil bonuses for the tick |
+| 1. Challenge AI | Ticks AI thinking for active minigames |
+| 2. Challenge discovery | Rolls for new challenge discovery (P1+ required, Haven bonus applied, skipped during Chrono Surge) |
 | 3. Sync player HP | Recalculates `DerivedStats` (with `enhancement.levels`), builds unified `CombatBonuses` (prestige, Haven, god items, sigils, ascension multiplier), applies `flat_hp` and ascension multiplier to `combat_state.player_max_hp` |
 | 4. Dungeon exploration | Calls `update_dungeon()`, processes room entry, treasure, keys, boss unlock, completion/failure |
 | 5. Fishing | If fishing active: ticks session, handles catches/items/rank-ups/Leviathan, updates play time, **returns early** (skips combat) |
-| 6. Combat | Calls `update_combat(rng, state, dt, &bonuses, achievements, derived, fracture_zone_cap)`, maps `CombatEvent` to `TickEvent`, applies XP, handles kills/deaths, processes item drops and discoveries |
+| 6. Combat | Calls `run_combat()`, maps `CombatEvent` to `TickEvent`, applies XP, handles kills/deaths, processes item drops and discoveries |
+| 6b. HUD decay | Decays combat HUD flash timers |
 | 7. Enemy spawn | Calls `spawn_enemy_if_needed()` if no enemy and not regenerating |
 | 8. Play time | Increments tick counter; at 10 ticks, increments `play_time_seconds` |
 | 9. Achievement collection | Drains newly unlocked achievements into `TickResult.events` |
 | 10. Haven discovery | Rolls for Haven discovery (P10+, no active content) |
 | 11. Soulforge discovery | Rolls for Soulforge discovery (P15+, no active content), emits `SoulforgeDiscovered`, sets `enhancement_changed` |
-| 12. Deep discovery hook | No per-tick roll; discovery is triggered during Stage 6 combat processing on first Expanse cycle boss kill at P15+ |
-| 13. Deep event check | Checks for pending Deep check-in events on active missions |
-| 13b. Deep mission tick | Ticks Deep missions (check-ins, completions, breakthroughs triggering fracture region unlocks) |
-| 13c. Fracture region unlock | Consumes `pending_fracture_region_unlock`, calls `sync_account_zone_unlocks`, emits `FractureRegionUnlocked` |
-| 14. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display |
+| 11b. Deep discovery | No per-tick roll; discovery is triggered during Stage 6 combat processing on first Expanse cycle boss kill at P15+ |
+| 11c. Deep mission tick | Ticks Deep missions (check-ins, completions, breakthroughs triggering fracture region unlocks) |
+| 11d. Fracture region unlock | Consumes `pending_fracture_region_unlock`, calls `sync_account_zone_unlocks`, emits `FractureRegionUnlocked` |
+| 11e. Loom discovery | Checks Loom of Worlds discovery and pattern milestone consumption |
+| 11f. Pattern milestones | Consumes pending pattern milestones, syncs zone unlocks, emits `PatternMilestoneReached` |
+| 12a. Power Cores | Ticks Power Cores for passive PR generation |
+| 12. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display |
 
 **Important**: Stage 5 (fishing) returns early, skipping stages 6-7. Fishing and combat are mutually exclusive.
 
