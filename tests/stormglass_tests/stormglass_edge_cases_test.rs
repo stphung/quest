@@ -236,7 +236,9 @@ fn test_cannot_purchase_storm_lure_all_three_conditions_failing() {
 
 #[test]
 fn test_can_purchase_storm_lure_well_above_cost() {
-    assert!(spending::can_purchase_storm_lure(1_000_000, false, false, 40));
+    assert!(spending::can_purchase_storm_lure(
+        1_000_000, false, false, 40
+    ));
 }
 
 // ── Spending: chrono surge cost edge cases ───────────────────────────────
