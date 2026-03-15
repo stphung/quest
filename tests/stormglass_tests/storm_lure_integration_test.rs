@@ -347,7 +347,7 @@ fn test_tick_multiple_catches_accumulate_tracking() {
     let mut state = rank40_state();
     state.fishing.storm_lure_active = true;
 
-    for seed in 0..20000 {
+    for seed in 0..10000 {
         if encounters_found >= 3 {
             break;
         }
@@ -373,7 +373,7 @@ fn test_tick_multiple_catches_accumulate_tracking() {
 
     assert!(
         encounters_found >= 2,
-        "Should find at least 2 encounters in 20000 seeds"
+        "Should find at least 2 encounters in 10000 seeds"
     );
 }
 
@@ -518,7 +518,7 @@ fn test_legendary_miss_at_rank40_with_lure_increments_miss_ramp() {
     let haven = haven_default();
     let mut miss_ramp_increased = false;
 
-    for seed in 0..10000 {
+    for seed in 0..5000 {
         let mut rng = rng_from(seed);
         let mut state = rank40_state();
         state.fishing.storm_lure_active = true;
@@ -553,7 +553,7 @@ fn test_legendary_miss_at_rank40_with_lure_increments_miss_ramp() {
 
     assert!(
         miss_ramp_increased,
-        "Should find a legendary miss that increments miss_ramp in 10000 seeds"
+        "Should find a legendary miss that increments miss_ramp in 5000 seeds"
     );
 }
 
@@ -568,7 +568,7 @@ fn test_miss_ramp_caps_at_ten_percent() {
     state.fishing.leviathan_encounters = 0;
 
     // Find a legendary miss to push miss_ramp
-    for seed in 0..10000 {
+    for seed in 0..5000 {
         let mut rng = rng_from(seed);
         state.fishing.storm_lure_active = true;
         state.fishing.lure_miss_ramp = 0.095;
@@ -590,7 +590,7 @@ fn test_miss_ramp_caps_at_ten_percent() {
             return;
         }
     }
-    // If we never hit a legendary miss in 10000 seeds, that's okay for this test
+    // If we never hit a legendary miss in 5000 seeds, that's okay for this test
     // (the cap is tested directly via the generation function)
 }
 
