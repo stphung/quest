@@ -164,10 +164,19 @@ pub fn node_upgrade_cost(loom: &LoomState, node_id: NodeId) -> f64 {
     (base_cost * multiplier).round()
 }
 
+/// Maximum extractor node level.
+pub const MAX_NODE_LEVEL: u32 = 20;
+
 /// Attempt to upgrade a node's level.
 /// Costs `node_upgrade_cost()` units of the node's native resource from the node's buffer.
+/// Capped at `MAX_NODE_LEVEL` (level 20 = 525/hr).
 /// Returns true if the upgrade succeeded.
 pub fn try_upgrade_node(loom: &mut LoomState, node_id: NodeId) -> bool {
+    let node = &loom.persistent.nodes[node_id.index()];
+    if node.level >= MAX_NODE_LEVEL {
+        return false;
+    }
+
     let cost = node_upgrade_cost(loom, node_id);
 
     let node = &mut loom.persistent.nodes[node_id.index()];

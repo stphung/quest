@@ -20,7 +20,7 @@ pub use logic::{
     tick_neighbor_unlocking, tick_shuttle_construction, tick_shuttle_pull,
     tick_shuttle_stall_detection, tick_stall_detection, try_upgrade_node, unlocked_tiers,
     upgrade_shuttle, wr_to_pr_per_day, LoomExternalBonuses, ShuttleError, ShuttleUpgradeError,
-    SECOND_NODE_UNLOCK_SECONDS, SHUTTLE_CONSTRUCTION_TICKS,
+    MAX_NODE_LEVEL, SECOND_NODE_UNLOCK_SECONDS, SHUTTLE_CONSTRUCTION_TICKS,
 };
 pub use milestones::PatternMilestone;
 #[allow(unused_imports)]

@@ -147,18 +147,16 @@ cargo run --bin simulator -- [OPTIONS]
 | `--csv FILE` | none | Write time-series CSV (snapshot every 100 ticks) |
 | `--quiet` | off | Only final summary line |
 | `--stormbreaker` | off | Force-unlock TheStormbreaker achievement for Zone 10+ testing |
-| `--haven STR` | none | Haven auto-build strategy: `combat`, `qol`, `balanced`, `full` |
+| `--strategy STR` | none | Strategy profile: `casual`, `optimal`, `speedrun` |
+| `--assertions` | off | Enable balance assertions (fail on threshold violations) |
 
-### Haven Auto-Building
+### Strategy Profiles
 
-`--haven <strategy>` enables automatic Haven room construction during simulation. When enabled, Haven is force-discovered at start and prestige ranks are spent on rooms each tick following the strategy's priority order:
+`--strategy <profile>` enables automatic progression decisions during simulation. Each profile injects challenge wins, enhancement, sigils, ascension, Haven building, and auto-prestige at appropriate milestones:
 
-- **combat**: Armory/damage path (Hearthstone → Armory → Training Yard → Trophy Hall → Watchtower → Alchemy Lab → War Room)
-- **qol**: Bedroom/fishing path (Hearthstone → Bedroom → Garden → Library → Fishing Dock → Workshop → Vault)
-- **balanced**: Both branches interleaved
-- **full**: Everything including StormForge
-
-This models the real gameplay trade-off between investing prestige in Haven vs keeping it for combat bonuses.
+- **casual**: Conservative progression, minimal risk
+- **optimal**: Balanced progression following efficient milestone ordering
+- **speedrun**: Aggressive progression, maximum speed
 
 ### Tracked Metrics
 

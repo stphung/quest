@@ -40,9 +40,9 @@ fn calc_zone_enemy_stats(zone_id: u32, subzone_depth: u32) -> (u32, u32, u32) {
     let (base_hp, hp_step, base_dmg, dmg_step, base_def, def_step) = zone_base_stats(zone_id);
 
     let depth_offset = subzone_depth.saturating_sub(1);
-    let raw_hp = base_hp + depth_offset * hp_step;
-    let raw_dmg = base_dmg + depth_offset * dmg_step;
-    let raw_def = base_def + depth_offset * def_step;
+    let raw_hp = base_hp.saturating_add(depth_offset.saturating_mul(hp_step));
+    let raw_dmg = base_dmg.saturating_add(depth_offset.saturating_mul(dmg_step));
+    let raw_def = base_def.saturating_add(depth_offset.saturating_mul(def_step));
 
     let hp_var = rng.random_range(ENEMY_STAT_VARIANCE_MIN..ENEMY_STAT_VARIANCE_MAX);
     let dmg_var = rng.random_range(ENEMY_STAT_VARIANCE_MIN..ENEMY_STAT_VARIANCE_MAX);
