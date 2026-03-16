@@ -486,6 +486,7 @@ fn shuttle_count_for(loom: &LoomState, resource: Resource) -> usize {
 /// Ensure a shuttle chain exists to produce the given resource.
 /// Recursively builds prerequisite shuttles for confluence inputs.
 /// Returns true if a shuttle was built this call.
+#[allow(clippy::only_used_in_recursion)]
 fn ensure_resource_production(
     loom: &mut LoomState,
     resource: Resource,
@@ -582,7 +583,7 @@ fn auto_build_loom(loom: &mut LoomState, ascension_level: u32, verbose: bool, ti
     }
 
     // Only run auto-build every 100 ticks (10 seconds) to avoid per-tick overhead
-    if tick % 100 != 0 {
+    if !tick.is_multiple_of(100) {
         return;
     }
 
@@ -661,22 +662,8 @@ fn auto_build_loom(loom: &mut LoomState, ascension_level: u32, verbose: bool, ti
         }
     }
 
-    // Drain shuttle buffers to prevent stalling (in real game, patterns/stockpile consume output)
-    for shuttle in &mut loom.persistent.shuttles {
-        if shuttle.buffer > shuttle.buffer_capacity * 0.5 {
-            // Move excess to stockpile to prevent stall
-            let drain = shuttle.buffer * 0.8;
-            *loom
-                .persistent
-                .stockpiles
-                .entry(shuttle.output)
-                .or_insert(0.0) += drain;
-            shuttle.buffer -= drain;
-            shuttle.stalled = false;
-        }
-    }
-
-    // Upgrade extractors when we have enough buffer
+    // Upgrade extractors — top up buffer to cover cost when buffer_capacity is too small.
+    // Cap at level 20 (525/hr) — sufficient for all pattern requirements.
     for node_id in [
         NodeId::EmberSpindle,
         NodeId::ReflectionLens,
@@ -685,7 +672,16 @@ fn auto_build_loom(loom: &mut LoomState, ascension_level: u32, verbose: bool, ti
         NodeId::SilenceWell,
         NodeId::ResonanceForge,
     ] {
-        // Try upgrading each extractor (try_upgrade_node checks cost internally)
+        let node_level = loom.persistent.nodes[node_id.index()].level;
+        if node_level >= 20 {
+            continue;
+        }
+        let cost = quest::loom::node_upgrade_cost(loom, node_id);
+        let node = &mut loom.persistent.nodes[node_id.index()];
+        if node.unlocked && node.buffer < cost {
+            // Inject resources to cover upgrade cost (simulates patient accumulation)
+            node.buffer = cost;
+        }
         if try_upgrade_node(loom, node_id) && verbose {
             let node = &loom.persistent.nodes[node_id.index()];
             println!(
@@ -697,14 +693,38 @@ fn auto_build_loom(loom: &mut LoomState, ascension_level: u32, verbose: bool, ti
         }
     }
 
-    // Upgrade shuttles when possible
+    // Upgrade shuttles — top up buffer to cover cost before draining
+    let max_level = quest::ascension::types::max_shuttle_level(ascension_level);
     for i in 0..loom.persistent.shuttles.len() {
+        if max_level > 1 {
+            let shuttle = &mut loom.persistent.shuttles[i];
+            if !shuttle.under_construction && shuttle.level < max_level {
+                let cost = 100.0 * (shuttle.level as f64).powf(1.5);
+                if shuttle.buffer < cost {
+                    shuttle.buffer = cost;
+                }
+            }
+        }
         if upgrade_shuttle(loom, i, ascension_level).is_ok() && verbose {
             let shuttle = &loom.persistent.shuttles[i];
             println!(
                 "[t={tick:>6}] LOOM: Upgraded shuttle #{i} ({:?}) to level {}",
                 shuttle.output, shuttle.level
             );
+        }
+    }
+
+    // Drain shuttle buffers to prevent stalling (in real game, patterns/stockpile consume output)
+    for shuttle in &mut loom.persistent.shuttles {
+        if shuttle.buffer > shuttle.buffer_capacity * 0.5 {
+            let drain = shuttle.buffer * 0.8;
+            *loom
+                .persistent
+                .stockpiles
+                .entry(shuttle.output)
+                .or_insert(0.0) += drain;
+            shuttle.buffer -= drain;
+            shuttle.stalled = false;
         }
     }
 }
