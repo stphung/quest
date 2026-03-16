@@ -144,12 +144,9 @@ impl StrategyProfile {
     }
 
     /// Maximum Deep layer this strategy profile will reach.
+    /// Always 30 — all strategies eventually clear the full Deep.
     pub fn deep_max_layer(&self) -> u32 {
-        match self {
-            Self::Casual => 12,
-            Self::Optimal => 25,
-            Self::Speedrun => 30,
-        }
+        30
     }
 
     /// PR threshold before Deep injection begins (simulates P15+ discovery gate).
