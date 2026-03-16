@@ -70,6 +70,10 @@ pub fn print_tick_events(tick: u64, result: &TickResult) {
             TickEvent::FishingRankUp { .. } => "Fishing rank up!".to_string(),
             TickEvent::AchievementUnlocked { name, .. } => format!("Achievement: {name}"),
             TickEvent::HavenDiscovered => "Haven discovered!".to_string(),
+            TickEvent::LoomDiscovered => "Loom of Worlds discovered!".to_string(),
+            TickEvent::PatternMilestoneReached { message, .. } => {
+                format!("Loom: {message}")
+            }
             _ => return,
         };
         println!("[t={tick:>6}] {label}");

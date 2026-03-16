@@ -8,7 +8,10 @@ use quest::core::game_state::GameState;
 use quest::deep::DeepState;
 use quest::enhancement::EnhancementProgress;
 use quest::haven::HavenRoomId;
-use quest::loom::LoomState;
+use quest::loom::{
+    build_shuttle, eligible_sources_for_tier, try_upgrade_node, upgrade_shuttle, LoomState, NodeId,
+    Resource,
+};
 use quest::stormglass::sigils::{roll_sigil, SigilEffectType, SigilGrade};
 use quest::zones::{sync_account_zone_unlocks, FractureRegion};
 
@@ -158,25 +161,7 @@ impl StrategyProfile {
         }
     }
 
-    /// Tick interval between Loom pattern completions.
-    pub fn loom_pattern_interval_ticks(&self) -> u64 {
-        match self {
-            Self::Casual => 108_000,  // 3 hours per pattern
-            Self::Optimal => 54_000,  // 1.5 hours per pattern
-            Self::Speedrun => 27_000, // 45 min per pattern
-        }
-    }
-
-    /// Maximum Loom patterns this strategy will complete.
-    pub fn loom_max_patterns(&self) -> usize {
-        match self {
-            Self::Casual => 8,
-            Self::Optimal => 22,
-            Self::Speedrun => 28,
-        }
-    }
-
-    /// PR threshold before Loom injection begins.
+    /// PR threshold before Loom auto-build begins.
     pub fn loom_pr_threshold(&self) -> u32 {
         match self {
             Self::Casual => 25,
@@ -196,8 +181,6 @@ pub struct InjectionState {
     pub deep_layers_injected: u32,
     pub last_deep_layer_tick: u64,
     pub deep_started: bool,
-    pub loom_patterns_injected: usize,
-    pub last_loom_pattern_tick: u64,
     pub loom_started: bool,
     /// Starting prestige rank (doesn't reset on auto-prestige).
     pub starting_prestige: u32,
@@ -214,8 +197,6 @@ impl InjectionState {
             deep_layers_injected: 0,
             last_deep_layer_tick: 0,
             deep_started: false,
-            loom_patterns_injected: 0,
-            last_loom_pattern_tick: 0,
             loom_started: false,
             starting_prestige,
         }
@@ -347,55 +328,32 @@ pub fn inject_outcomes(
         }
     }
 
-    // -- Loom pattern completions --
+    // -- Loom auto-build --
     if effective_pr >= profile.loom_pr_threshold() {
         if !injection.loom_started {
             injection.loom_started = true;
-            injection.last_loom_pattern_tick = tick;
             quest::loom::complete_discovery(loom);
-        }
-
-        if injection.loom_patterns_injected < profile.loom_max_patterns()
-            && tick - injection.last_loom_pattern_tick >= profile.loom_pattern_interval_ticks()
-        {
-            let idx = injection.loom_patterns_injected;
-            injection.loom_patterns_injected += 1;
-            injection.last_loom_pattern_tick = tick;
-
-            // Mark pattern and all its requirements as completed
-            if idx < loom.persistent.patterns.len() {
-                for req in &mut loom.persistent.patterns[idx].requirements {
-                    req.completed = true;
-                    req.sustained_secs = req.sustain_duration_secs;
-                }
-                loom.persistent.patterns[idx].completed = true;
+            // Force-unlock all 6 extractors immediately (skip neighbor unlock cascade)
+            for node in &mut loom.persistent.nodes {
+                node.unlocked = true;
             }
-
-            let completed = loom.persistent.completed_pattern_count();
-
-            // Sync zone unlocks with new pattern count
-            let storms_end_unlocked =
-                achievements.is_unlocked(quest::achievements::AchievementId::TheStormbreaker);
-            let loom_zone_cap = quest::loom::loom_zone_cap_for_patterns(completed);
-            sync_account_zone_unlocks(
-                &mut state.zone_progression,
-                storms_end_unlocked,
-                deep.persistent.fracture_zone_cap,
-                state.prestige_rank,
-                loom_zone_cap,
-                state.ascension_level,
-            );
-            state.invalidate_bonuses();
-
+            // Seed stockpiles for shuttle construction costs
+            for res in [
+                Resource::Ember,
+                Resource::Reflection,
+                Resource::VoidEssence,
+                Resource::Memory,
+                Resource::Silence,
+                Resource::Resonance,
+            ] {
+                *loom.persistent.stockpiles.entry(res).or_insert(0.0) += 10000.0;
+            }
             if verbose {
-                println!(
-                    "[t={tick:>6}] INJECT: Loom pattern {} completed ({completed}/{} total, zone cap -> Z{})",
-                    idx + 1,
-                    loom.persistent.patterns.len(),
-                    loom_zone_cap
-                );
+                println!("[t={tick:>6}] INJECT: Loom discovered, all extractors unlocked");
             }
         }
+
+        auto_build_loom(loom, state.ascension_level, verbose, tick);
     }
 
     // -- Ascension --
@@ -464,6 +422,290 @@ fn challenge_reward_for_difficulty(diff: &MinigameDifficulty) -> (u32, u64) {
         MinigameDifficulty::Apprentice => (0, 1500),
         MinigameDifficulty::Journeyman => (1, 3000),
         MinigameDifficulty::Master => (1, 6000),
+    }
+}
+
+// ── Loom Auto-Build ──────────────────────────────────────────────────────
+
+/// Best recipe to produce each non-base resource, preferring highest yield at lowest tier.
+fn best_recipe_for(
+    resource: Resource,
+    completed_patterns: usize,
+) -> Option<quest::loom::recipes::Recipe> {
+    let mut candidates = quest::loom::recipes::recipes_producing(resource);
+    // Filter to unlocked tiers (T1=1 pattern, T2=8, T3=15)
+    candidates.retain(|r| completed_patterns >= tier_unlock_threshold(r.tier));
+    // Prefer lowest tier first (simpler chains), then highest amount
+    candidates.sort_by(|a, b| {
+        a.tier.cmp(&b.tier).then(
+            b.amount
+                .partial_cmp(&a.amount)
+                .unwrap_or(std::cmp::Ordering::Equal),
+        )
+    });
+    candidates.into_iter().next()
+}
+
+fn tier_unlock_threshold(tier: u8) -> usize {
+    match tier {
+        1 => 1,
+        2 => 8,
+        _ => 15,
+    }
+}
+
+fn is_base_resource(r: Resource) -> bool {
+    matches!(
+        r,
+        Resource::Ember
+            | Resource::Reflection
+            | Resource::VoidEssence
+            | Resource::Memory
+            | Resource::Silence
+            | Resource::Resonance
+    )
+}
+
+/// Returns true if there's already a shuttle producing this resource (not under construction).
+fn has_shuttle_producing(loom: &LoomState, resource: Resource) -> bool {
+    loom.persistent
+        .shuttles
+        .iter()
+        .any(|s| s.output == resource && !s.under_construction)
+}
+
+/// Count shuttles producing a specific resource.
+fn shuttle_count_for(loom: &LoomState, resource: Resource) -> usize {
+    loom.persistent
+        .shuttles
+        .iter()
+        .filter(|s| s.output == resource)
+        .count()
+}
+
+/// Ensure a shuttle chain exists to produce the given resource.
+/// Recursively builds prerequisite shuttles for confluence inputs.
+/// Returns true if a shuttle was built this call.
+fn ensure_resource_production(
+    loom: &mut LoomState,
+    resource: Resource,
+    ascension_level: u32,
+    verbose: bool,
+    tick: u64,
+) -> bool {
+    if is_base_resource(resource) {
+        return false;
+    }
+    if has_shuttle_producing(loom, resource) {
+        return false;
+    }
+
+    let completed = loom.persistent.completed_pattern_count();
+    let max_shuttles = completed.max(1); // at least 1 after discovery
+    if loom.persistent.shuttles.len() >= max_shuttles {
+        return false;
+    }
+
+    let recipe = match best_recipe_for(resource, completed) {
+        Some(r) => r,
+        None => return false,
+    };
+
+    // Recursively ensure inputs are available (for T2/T3 recipes needing confluences)
+    if !is_base_resource(recipe.input_a) {
+        ensure_resource_production(loom, recipe.input_a, ascension_level, verbose, tick);
+    }
+    if !is_base_resource(recipe.input_b) {
+        ensure_resource_production(loom, recipe.input_b, ascension_level, verbose, tick);
+    }
+
+    // Check shuttle capacity again (recursive calls may have built some)
+    let completed = loom.persistent.completed_pattern_count();
+    let max_shuttles = completed.max(1);
+    if loom.persistent.shuttles.len() >= max_shuttles {
+        return false;
+    }
+
+    // Ensure stockpile has build cost
+    let cost = match recipe.tier {
+        1 => 250.0,
+        2 => 150.0,
+        _ => 100.0,
+    };
+    let stockpile = loom
+        .persistent
+        .stockpiles
+        .entry(recipe.input_a)
+        .or_insert(0.0);
+    if *stockpile < cost {
+        *stockpile += cost; // Top up if needed
+    }
+
+    let sources_a = eligible_sources_for_tier(loom, recipe.tier, recipe.input_a);
+    let sources_b = eligible_sources_for_tier(loom, recipe.tier, recipe.input_b);
+
+    if sources_a.is_empty() || sources_b.is_empty() {
+        return false;
+    }
+
+    match build_shuttle(
+        loom,
+        recipe.input_a,
+        recipe.input_b,
+        recipe.node_nature,
+        sources_a,
+        sources_b,
+    ) {
+        Ok(idx) => {
+            // Skip construction delay — make shuttle immediately operational
+            let shuttle = &mut loom.persistent.shuttles[idx];
+            shuttle.under_construction = false;
+            shuttle.construction_ticks_remaining = 0;
+
+            if verbose {
+                println!(
+                    "[t={tick:>6}] LOOM: Built T{} shuttle #{idx} ({:?}+{:?}->{:?}, amount={:.1})",
+                    recipe.tier, recipe.input_a, recipe.input_b, recipe.output, recipe.amount
+                );
+            }
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+/// Auto-build Loom infrastructure: build shuttles for active pattern requirements,
+/// upgrade extractors and shuttles for throughput.
+fn auto_build_loom(loom: &mut LoomState, ascension_level: u32, verbose: bool, tick: u64) {
+    if !loom.persistent.discovered {
+        return;
+    }
+
+    // Only run auto-build every 100 ticks (10 seconds) to avoid per-tick overhead
+    if tick % 100 != 0 {
+        return;
+    }
+
+    let active_idx = loom.persistent.active_pattern;
+    if active_idx >= loom.persistent.patterns.len() {
+        return;
+    }
+    if loom.persistent.patterns[active_idx].completed {
+        return;
+    }
+
+    // Collect required resources from active pattern
+    let needed: Vec<Resource> = loom.persistent.patterns[active_idx]
+        .requirements
+        .iter()
+        .filter(|r| !r.completed)
+        .map(|r| r.resource)
+        .collect();
+
+    // Ensure production chains exist for each needed resource
+    for resource in &needed {
+        ensure_resource_production(loom, *resource, ascension_level, verbose, tick);
+    }
+
+    // For high-rate requirements, build additional shuttles for the same resource.
+    // Collect requirement data first to avoid borrow conflict.
+    let high_rate_needs: Vec<(Resource, f64)> = loom.persistent.patterns[active_idx]
+        .requirements
+        .iter()
+        .filter(|r| !r.completed && !is_base_resource(r.resource) && r.required_rate > 20.0)
+        .map(|r| (r.resource, r.required_rate))
+        .collect();
+
+    for (resource, required_rate) in high_rate_needs {
+        let completed = loom.persistent.completed_pattern_count();
+        let max_shuttles = completed.max(1);
+        let current_count = shuttle_count_for(loom, resource);
+        if current_count < 3 && loom.persistent.shuttles.len() < max_shuttles {
+            if let Some(recipe) = best_recipe_for(resource, completed) {
+                let cost = match recipe.tier {
+                    1 => 250.0,
+                    2 => 150.0,
+                    _ => 100.0,
+                };
+                let stockpile = loom
+                    .persistent
+                    .stockpiles
+                    .entry(recipe.input_a)
+                    .or_insert(0.0);
+                if *stockpile < cost {
+                    *stockpile += cost;
+                }
+                let sources_a = eligible_sources_for_tier(loom, recipe.tier, recipe.input_a);
+                let sources_b = eligible_sources_for_tier(loom, recipe.tier, recipe.input_b);
+                if !sources_a.is_empty() && !sources_b.is_empty() {
+                    if let Ok(idx) = build_shuttle(
+                        loom,
+                        recipe.input_a,
+                        recipe.input_b,
+                        recipe.node_nature,
+                        sources_a,
+                        sources_b,
+                    ) {
+                        let shuttle = &mut loom.persistent.shuttles[idx];
+                        shuttle.under_construction = false;
+                        shuttle.construction_ticks_remaining = 0;
+                        if verbose {
+                            println!(
+                                "[t={tick:>6}] LOOM: Built extra T{} shuttle #{idx} for {:?} (rate target: {:.0}/hr)",
+                                recipe.tier, recipe.output, required_rate
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Drain shuttle buffers to prevent stalling (in real game, patterns/stockpile consume output)
+    for shuttle in &mut loom.persistent.shuttles {
+        if shuttle.buffer > shuttle.buffer_capacity * 0.5 {
+            // Move excess to stockpile to prevent stall
+            let drain = shuttle.buffer * 0.8;
+            *loom
+                .persistent
+                .stockpiles
+                .entry(shuttle.output)
+                .or_insert(0.0) += drain;
+            shuttle.buffer -= drain;
+            shuttle.stalled = false;
+        }
+    }
+
+    // Upgrade extractors when we have enough buffer
+    for node_id in [
+        NodeId::EmberSpindle,
+        NodeId::ReflectionLens,
+        NodeId::VoidCondenser,
+        NodeId::MemoryArchive,
+        NodeId::SilenceWell,
+        NodeId::ResonanceForge,
+    ] {
+        // Try upgrading each extractor (try_upgrade_node checks cost internally)
+        if try_upgrade_node(loom, node_id) && verbose {
+            let node = &loom.persistent.nodes[node_id.index()];
+            println!(
+                "[t={tick:>6}] LOOM: Upgraded {:?} to level {} ({:.0}/hr)",
+                node_id,
+                node.level,
+                node.base_rate * quest::loom::node_level_multiplier(node.level)
+            );
+        }
+    }
+
+    // Upgrade shuttles when possible
+    for i in 0..loom.persistent.shuttles.len() {
+        if upgrade_shuttle(loom, i, ascension_level).is_ok() && verbose {
+            let shuttle = &loom.persistent.shuttles[i];
+            println!(
+                "[t={tick:>6}] LOOM: Upgraded shuttle #{i} ({:?}) to level {}",
+                shuttle.output, shuttle.level
+            );
+        }
     }
 }
 
