@@ -10,33 +10,23 @@ use super::scene_fx::{put_cell, put_text, put_text_centered, SceneCell};
 
 /// Infer quality tier glyph + color from base stats vs archetype baseline.
 pub(super) fn quality_glyph(merc: &Mercenary) -> (char, Color) {
-    let (bp, br, be) = merc.archetype.base_stats();
-    let base_total = bp + br + be;
-    let actual_total = merc.power + merc.resilience + merc.expertise;
-    if actual_total >= base_total + 20 {
-        ('\u{2726}', Color::Rgb(255, 215, 0)) // ✦ Elite (gold)
-    } else if actual_total >= base_total + 10 {
-        ('\u{2605}', Color::Yellow) // ★ Rare
-    } else if actual_total >= base_total + 5 {
-        ('\u{25c9}', Color::Green) // ◉ Uncommon
-    } else {
-        ('\u{25cf}', Color::White) // ● Common
+    use crate::deep::MercQuality;
+    match merc.quality {
+        MercQuality::Elite => ('\u{2726}', Color::Rgb(255, 215, 0)), // ✦ gold
+        MercQuality::Rare => ('\u{2605}', Color::Yellow),            // ★
+        MercQuality::Uncommon => ('\u{25c9}', Color::Green),         // ◉
+        MercQuality::Common => ('\u{25cf}', Color::White),           // ●
     }
 }
 
 /// Quality tier label text.
 fn quality_label(merc: &Mercenary) -> (&'static str, Color) {
-    let (bp, br, be) = merc.archetype.base_stats();
-    let base_total = bp + br + be;
-    let actual_total = merc.power + merc.resilience + merc.expertise;
-    if actual_total >= base_total + 20 {
-        ("Elite", Color::Rgb(255, 215, 0))
-    } else if actual_total >= base_total + 10 {
-        ("Rare", Color::Yellow)
-    } else if actual_total >= base_total + 5 {
-        ("Uncommon", Color::Green)
-    } else {
-        ("Common", Color::White)
+    use crate::deep::MercQuality;
+    match merc.quality {
+        MercQuality::Elite => ("Elite", Color::Rgb(255, 215, 0)),
+        MercQuality::Rare => ("Rare", Color::Yellow),
+        MercQuality::Uncommon => ("Uncommon", Color::Green),
+        MercQuality::Common => ("Common", Color::White),
     }
 }
 
