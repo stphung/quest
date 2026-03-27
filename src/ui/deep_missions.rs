@@ -103,6 +103,15 @@ fn quality_display_color(q: MercQuality) -> Color {
     }
 }
 
+fn quality_display_glyph(q: MercQuality) -> char {
+    match q {
+        MercQuality::Common => '\u{25cf}',   // ●
+        MercQuality::Uncommon => '\u{25c9}', // ◉
+        MercQuality::Rare => '\u{2605}',     // ★
+        MercQuality::Elite => '\u{2726}',    // ✦
+    }
+}
+
 fn risk_label(tier: u8) -> &'static str {
     match tier {
         0 => "Safe",
@@ -488,6 +497,8 @@ fn render_hub_roster(
                 col += cur_name.len() as i32 + 1;
                 put_text(buffer, row, col, "\u{2192}", Color::DarkGray);
                 col += 2; // arrow + space
+                put_cell(buffer, row, col, quality_display_glyph(target), tar_color);
+                col += 2; // glyph + space
                 put_text(buffer, row, col, tar_name, tar_color);
                 row += 1;
 
