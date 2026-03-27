@@ -167,6 +167,19 @@ pub fn can_promote(
     Ok((target, cost))
 }
 
+/// Apply promotion stat deltas to a merc and update its quality tier.
+fn apply_promotion_stats(merc: &mut Mercenary, target: MercQuality) {
+    let flat_delta = target.flat_bonus() - merc.quality.flat_bonus();
+    let primary_delta = target.primary_bonus() - merc.quality.primary_bonus();
+    let (p_primary, r_primary, e_primary) = archetype_primary_flags(merc.archetype);
+
+    merc.power += flat_delta + if p_primary { primary_delta } else { 0 };
+    merc.resilience += flat_delta + if r_primary { primary_delta } else { 0 };
+    merc.expertise += flat_delta + if e_primary { primary_delta } else { 0 };
+
+    merc.quality = target;
+}
+
 /// Promote a merc to the next quality tier.
 ///
 /// Validates eligibility, deducts marks, applies stat deltas, and updates quality.
@@ -177,22 +190,41 @@ pub fn promote_mercenary(
     guild_rank: GuildRank,
 ) -> Result<u32, PromotionError> {
     let (target, cost) = can_promote(merc, guild_rank, prestige.warband_marks)?;
-
-    // Deduct marks
     prestige.spend_marks(cost);
-
-    // Apply stat deltas
-    let flat_delta = target.flat_bonus() - merc.quality.flat_bonus();
-    let primary_delta = target.primary_bonus() - merc.quality.primary_bonus();
-    let (p_primary, r_primary, e_primary) = archetype_primary_flags(merc.archetype);
-
-    merc.power += flat_delta + if p_primary { primary_delta } else { 0 };
-    merc.resilience += flat_delta + if r_primary { primary_delta } else { 0 };
-    merc.expertise += flat_delta + if e_primary { primary_delta } else { 0 };
-
-    merc.quality = target;
-
+    apply_promotion_stats(merc, target);
     Ok(cost)
+}
+
+/// Promote a merc by id, working around the borrow-checker constraint where
+/// the merc lives inside `prestige.roster`.
+///
+/// Returns `(merc_name, quality_name, cost)` on success for UI display.
+pub fn promote_merc_by_id(
+    merc_id: u64,
+    prestige: &mut DeepPrestige,
+    guild_rank: GuildRank,
+) -> Result<(String, &'static str, u32), PromotionError> {
+    // Validate with immutable borrow first
+    let (target, cost) = {
+        let merc = prestige
+            .find_merc(merc_id)
+            .ok_or(PromotionError::AlreadyElite)?;
+        can_promote(merc, guild_rank, prestige.warband_marks)?
+    };
+
+    // Now mutate
+    prestige.spend_marks(cost);
+    let merc = prestige.find_merc_mut(merc_id).unwrap();
+    apply_promotion_stats(merc, target);
+
+    let name = merc.name.clone();
+    let quality_name = match merc.quality {
+        MercQuality::Common => "Common",
+        MercQuality::Uncommon => "Uncommon",
+        MercQuality::Rare => "Rare",
+        MercQuality::Elite => "Elite",
+    };
+    Ok((name, quality_name, cost))
 }
 
 // ── Guild-Rank Quality Tables ─────────────────────────────────────────────────
@@ -1568,5 +1600,31 @@ mod tests {
         assert_eq!(merc.power, pre_power + 4); // flat only
         assert_eq!(merc.resilience, pre_resilience + 4); // flat only
         assert_eq!(merc.expertise, pre_expertise + 4 + 2); // flat + primary
+    }
+
+    #[test]
+    fn test_promote_mercenary_uncommon_to_rare() {
+        use crate::deep::types::DeepPrestige;
+        let mut rng = seeded_rng(1);
+        let mut merc = generate_mercenary(1, MercArchetype::Scout, MercQuality::Uncommon, &mut rng);
+        merc.missions_completed = 10;
+        let pre_power = merc.power;
+        let pre_resilience = merc.resilience;
+        let pre_expertise = merc.expertise;
+
+        let mut prestige = DeepPrestige {
+            warband_marks: 1000,
+            ..Default::default()
+        };
+
+        let result = promote_mercenary(&mut merc, &mut prestige, GuildRank(3));
+        assert!(result.is_ok());
+        assert_eq!(merc.quality, MercQuality::Rare);
+
+        // Scout primaries: resilience + expertise
+        // Uncommon→Rare: flat_delta = 4-2 = 2, primary_delta = 2-2 = 0
+        assert_eq!(merc.power, pre_power + 2); // flat only
+        assert_eq!(merc.resilience, pre_resilience + 2); // flat only (primary delta is 0)
+        assert_eq!(merc.expertise, pre_expertise + 2); // flat only (primary delta is 0)
     }
 }

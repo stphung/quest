@@ -6,7 +6,6 @@
 
 use super::types::InputResult;
 use crate::core::game_state::GameState;
-use crate::deep::mercenaries::MercQuality;
 use crate::deep::types::{
     DeepState, DeepUiState, DeepView, MercStatus, MissionStatus, MissionType,
 };
@@ -138,9 +137,7 @@ fn handle_roster(
     if deep_ui.promotion_pending {
         match key.code {
             KeyCode::Enter => {
-                // Extract id + available marks before any mutable borrow.
                 let guild_rank = deep_state.persistent.guild_rank;
-                let available_marks = deep_state.prestige.warband_marks;
                 let merc_id = deep_state
                     .prestige
                     .roster
@@ -148,42 +145,15 @@ fn handle_roster(
                     .filter(|m| !matches!(m.status, MercStatus::Lost))
                     .nth(deep_ui.selected_index)
                     .map(|m| m.id);
+                deep_ui.promotion_pending = false;
                 if let Some(id) = merc_id {
-                    // Validate using immutable merc ref (borrows only prestige.roster).
-                    let check_result = {
-                        let merc = deep_state.prestige.find_merc_mut(id).unwrap();
-                        crate::deep::can_promote(merc, guild_rank, available_marks)
-                    };
-                    match check_result {
-                        Ok((_, cost)) => {
-                            // Deduct marks and apply stat deltas.
-                            deep_state.prestige.spend_marks(cost);
-                            let merc = deep_state.prestige.find_merc_mut(id).unwrap();
-                            let target = merc.quality.next().unwrap();
-                            use crate::deep::mercenaries::archetype_primary_flags;
-                            let flat_delta = target.flat_bonus() - merc.quality.flat_bonus();
-                            let primary_delta =
-                                target.primary_bonus() - merc.quality.primary_bonus();
-                            let (p_primary, r_primary, e_primary) =
-                                archetype_primary_flags(merc.archetype);
-                            merc.power += flat_delta + if p_primary { primary_delta } else { 0 };
-                            merc.resilience +=
-                                flat_delta + if r_primary { primary_delta } else { 0 };
-                            merc.expertise +=
-                                flat_delta + if e_primary { primary_delta } else { 0 };
-                            merc.quality = target;
-                            let name = merc.name.clone();
-                            let quality_name = match merc.quality {
-                                MercQuality::Common => "Common",
-                                MercQuality::Uncommon => "Uncommon",
-                                MercQuality::Rare => "Rare",
-                                MercQuality::Elite => "Elite",
-                            };
+                    match crate::deep::promote_merc_by_id(id, &mut deep_state.prestige, guild_rank)
+                    {
+                        Ok((name, quality_name, cost)) => {
                             deep_ui.flash_message = Some(format!(
                                 "{} promoted to {}! (-{} Marks)",
                                 name, quality_name, cost,
                             ));
-                            deep_ui.promotion_pending = false;
                             return InputResult::NeedsSave;
                         }
                         Err(e) => {
@@ -202,12 +172,10 @@ fn handle_roster(
                                 }
                             };
                             deep_ui.flash_message = Some(msg);
-                            deep_ui.promotion_pending = false;
                             return InputResult::Continue;
                         }
                     }
                 }
-                deep_ui.promotion_pending = false;
                 return InputResult::Continue;
             }
             _ => {
