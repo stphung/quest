@@ -232,6 +232,7 @@ fn test_merc_with_power(id: u64, mission_id: u64, power: u32) -> Mercenary {
         id,
         name: format!("TestMerc{}", id),
         archetype: MercArchetype::Vanguard,
+        quality: quest::deep::MercQuality::Common,
         power,
         resilience: power,
         expertise: 100,

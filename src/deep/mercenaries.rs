@@ -22,8 +22,9 @@ use std::collections::HashMap;
 
 /// Internal quality tier for a generated mercenary.
 /// Determines stat bonuses above the archetype base and recruit cost range.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum MercQuality {
+    #[default]
     /// Basic recruit. Available at all guild ranks.
     Common,
     /// Above-average recruit. Available at Rank 2+.
@@ -74,12 +75,6 @@ impl MercQuality {
             MercQuality::Rare => Some(MercQuality::Elite),
             MercQuality::Elite => None,
         }
-    }
-}
-
-impl Default for MercQuality {
-    fn default() -> Self {
-        MercQuality::Common
     }
 }
 
@@ -294,7 +289,7 @@ fn available_archetypes(guild_rank: GuildRank) -> &'static [MercArchetype] {
 
 /// Returns (power_is_primary, resilience_is_primary, expertise_is_primary).
 /// Used to apply `MercQuality::primary_bonus()` to the right stats.
-fn archetype_primary_flags(archetype: MercArchetype) -> (bool, bool, bool) {
+pub fn archetype_primary_flags(archetype: MercArchetype) -> (bool, bool, bool) {
     match archetype {
         // Vanguard: STR/CON → high Power + Resilience
         MercArchetype::Vanguard => (true, true, false),
@@ -1422,7 +1417,7 @@ mod tests {
             "Same merc id + tier should always give same cost"
         );
         assert!(
-            cost1 >= 160 && cost1 <= 260,
+            (160..=260).contains(&cost1),
             "Uncommon cost out of range: {}",
             cost1
         );
@@ -1434,21 +1429,21 @@ mod tests {
         for id in 0..100u64 {
             let u = promotion_cost(id, MercQuality::Uncommon);
             assert!(
-                u >= 160 && u <= 260,
+                (160..=260).contains(&u),
                 "Uncommon cost {} out of range for id {}",
                 u,
                 id
             );
             let r = promotion_cost(id, MercQuality::Rare);
             assert!(
-                r >= 260 && r <= 400,
+                (260..=400).contains(&r),
                 "Rare cost {} out of range for id {}",
                 r,
                 id
             );
             let e = promotion_cost(id, MercQuality::Elite);
             assert!(
-                e >= 400 && e <= 600,
+                (400..=600).contains(&e),
                 "Elite cost {} out of range for id {}",
                 e,
                 id
@@ -1529,8 +1524,10 @@ mod tests {
         let pre_resilience = merc.resilience;
         let pre_expertise = merc.expertise;
 
-        let mut prestige = DeepPrestige::default();
-        prestige.warband_marks = 1000;
+        let mut prestige = DeepPrestige {
+            warband_marks: 1000,
+            ..Default::default()
+        };
 
         let result = promote_mercenary(&mut merc, &mut prestige, GuildRank(2));
         assert!(result.is_ok());
@@ -1557,8 +1554,10 @@ mod tests {
         let pre_resilience = merc.resilience;
         let pre_expertise = merc.expertise;
 
-        let mut prestige = DeepPrestige::default();
-        prestige.warband_marks = 1000;
+        let mut prestige = DeepPrestige {
+            warband_marks: 1000,
+            ..Default::default()
+        };
 
         let result = promote_mercenary(&mut merc, &mut prestige, GuildRank(4));
         assert!(result.is_ok());

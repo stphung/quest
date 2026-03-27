@@ -6,6 +6,7 @@
 
 use super::types::InputResult;
 use crate::core::game_state::GameState;
+use crate::deep::mercenaries::MercQuality;
 use crate::deep::types::{
     DeepState, DeepUiState, DeepView, MercStatus, MissionStatus, MissionType,
 };
@@ -133,7 +134,127 @@ fn handle_roster(
     _game_state: &mut GameState,
     _achievements: &mut crate::achievements::Achievements,
 ) -> InputResult {
+    // ── Promotion confirmation mode ──
+    if deep_ui.promotion_pending {
+        match key.code {
+            KeyCode::Enter => {
+                // Extract id + available marks before any mutable borrow.
+                let guild_rank = deep_state.persistent.guild_rank;
+                let available_marks = deep_state.prestige.warband_marks;
+                let merc_id = deep_state
+                    .prestige
+                    .roster
+                    .values()
+                    .filter(|m| !matches!(m.status, MercStatus::Lost))
+                    .nth(deep_ui.selected_index)
+                    .map(|m| m.id);
+                if let Some(id) = merc_id {
+                    // Validate using immutable merc ref (borrows only prestige.roster).
+                    let check_result = {
+                        let merc = deep_state.prestige.find_merc_mut(id).unwrap();
+                        crate::deep::can_promote(merc, guild_rank, available_marks)
+                    };
+                    match check_result {
+                        Ok((_, cost)) => {
+                            // Deduct marks and apply stat deltas.
+                            deep_state.prestige.spend_marks(cost);
+                            let merc = deep_state.prestige.find_merc_mut(id).unwrap();
+                            let target = merc.quality.next().unwrap();
+                            use crate::deep::mercenaries::archetype_primary_flags;
+                            let flat_delta = target.flat_bonus() - merc.quality.flat_bonus();
+                            let primary_delta =
+                                target.primary_bonus() - merc.quality.primary_bonus();
+                            let (p_primary, r_primary, e_primary) =
+                                archetype_primary_flags(merc.archetype);
+                            merc.power += flat_delta + if p_primary { primary_delta } else { 0 };
+                            merc.resilience +=
+                                flat_delta + if r_primary { primary_delta } else { 0 };
+                            merc.expertise +=
+                                flat_delta + if e_primary { primary_delta } else { 0 };
+                            merc.quality = target;
+                            let name = merc.name.clone();
+                            let quality_name = match merc.quality {
+                                MercQuality::Common => "Common",
+                                MercQuality::Uncommon => "Uncommon",
+                                MercQuality::Rare => "Rare",
+                                MercQuality::Elite => "Elite",
+                            };
+                            deep_ui.flash_message = Some(format!(
+                                "{} promoted to {}! (-{} Marks)",
+                                name, quality_name, cost,
+                            ));
+                            deep_ui.promotion_pending = false;
+                            return InputResult::NeedsSave;
+                        }
+                        Err(e) => {
+                            let msg = match e {
+                                crate::deep::PromotionError::AlreadyElite => {
+                                    "Already at Elite quality.".to_string()
+                                }
+                                crate::deep::PromotionError::InsufficientMissions {
+                                    need, ..
+                                } => format!("Need {} missions completed.", need),
+                                crate::deep::PromotionError::InsufficientRank { need, .. } => {
+                                    format!("Need Guild Rank {}.", need)
+                                }
+                                crate::deep::PromotionError::InsufficientMarks { need, have } => {
+                                    format!("Need {} Marks (have {}).", need, have)
+                                }
+                            };
+                            deep_ui.flash_message = Some(msg);
+                            deep_ui.promotion_pending = false;
+                            return InputResult::Continue;
+                        }
+                    }
+                }
+                deep_ui.promotion_pending = false;
+                return InputResult::Continue;
+            }
+            _ => {
+                deep_ui.promotion_pending = false;
+                return InputResult::Continue;
+            }
+        }
+    }
+
     match key.code {
+        KeyCode::Char('p') | KeyCode::Char('P') => {
+            if let Some(merc) = deep_state
+                .prestige
+                .roster
+                .values()
+                .filter(|m| !matches!(m.status, MercStatus::Lost))
+                .nth(deep_ui.selected_index)
+            {
+                match crate::deep::can_promote(
+                    merc,
+                    deep_state.persistent.guild_rank,
+                    deep_state.prestige.warband_marks,
+                ) {
+                    Ok(_) => {
+                        deep_ui.promotion_pending = true;
+                    }
+                    Err(e) => {
+                        let msg = match e {
+                            crate::deep::PromotionError::AlreadyElite => {
+                                "Already at Elite quality.".to_string()
+                            }
+                            crate::deep::PromotionError::InsufficientMissions { need, have } => {
+                                format!("Need {} missions (have {}).", need, have)
+                            }
+                            crate::deep::PromotionError::InsufficientRank { need, .. } => {
+                                format!("Need Guild Rank {}.", need)
+                            }
+                            crate::deep::PromotionError::InsufficientMarks { need, have } => {
+                                format!("Need {} Marks (have {}).", need, have)
+                            }
+                        };
+                        deep_ui.flash_message = Some(msg);
+                    }
+                }
+            }
+            InputResult::Continue
+        }
         KeyCode::Char('g') | KeyCode::Char('G') => {
             match crate::deep::try_upgrade_guild_rank(
                 &mut deep_state.persistent,
@@ -172,13 +293,20 @@ fn handle_roster(
         }
         KeyCode::Up => {
             deep_ui.selected_index = deep_ui.selected_index.saturating_sub(1);
+            deep_ui.promotion_pending = false;
             InputResult::Continue
         }
         KeyCode::Down => {
-            let count = deep_state.prestige.roster.len();
+            let count = deep_state
+                .prestige
+                .roster
+                .values()
+                .filter(|m| !matches!(m.status, MercStatus::Lost))
+                .count();
             if count > 0 && deep_ui.selected_index + 1 < count {
                 deep_ui.selected_index += 1;
             }
+            deep_ui.promotion_pending = false;
             InputResult::Continue
         }
         KeyCode::Esc | KeyCode::Char('d') | KeyCode::Char('D') => {
@@ -688,6 +816,7 @@ fn switch_view_with_deep(ui: &mut DeepUiState, target: DeepView, deep: &DeepStat
     }
     ui.staged_squad.clear();
     ui.show_help = false;
+    ui.promotion_pending = false;
     match target {
         DeepView::Active => ui.hub_visit_count = ui.hub_visit_count.saturating_add(1),
         DeepView::NewMission => ui.mission_visit_count = ui.mission_visit_count.saturating_add(1),
@@ -742,6 +871,7 @@ mod tests {
             id,
             name: format!("Lost {}", id),
             archetype: MercArchetype::Vanguard,
+            quality: crate::deep::MercQuality::Common,
             power: 10,
             resilience: 10,
             expertise: 10,

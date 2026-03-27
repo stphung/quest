@@ -17,7 +17,8 @@
 
 use quest::deep::{
     CheckInEvent, DeepPersistent, DeepPrestige, DeepState, DeepUiState, DeepView, EventChoice,
-    GuildRank, Infrastructure, Layer, LayerTier, MercArchetype, MercStatus, Mercenary, MissionType,
+    GuildRank, Infrastructure, Layer, LayerTier, MercArchetype, MercQuality, MercStatus, Mercenary,
+    MissionType,
 };
 
 // =============================================================================
@@ -122,6 +123,7 @@ fn test_deep_prestige_preserves_operational_state() {
             id: 1,
             name: "TestMerc".to_string(),
             archetype: MercArchetype::Vanguard,
+            quality: MercQuality::Common,
             power: 14,
             resilience: 12,
             expertise: 4,
@@ -295,6 +297,7 @@ fn test_mercenary_availability() {
         id: 1,
         name: "Test".to_string(),
         archetype: MercArchetype::Scout,
+        quality: MercQuality::Common,
         power: 10,
         resilience: 10,
         expertise: 10,
@@ -333,6 +336,7 @@ fn test_mercenary_effective_stats_scale() {
         id: 1,
         name: "Test".to_string(),
         archetype: MercArchetype::Vanguard,
+        quality: MercQuality::Common,
         power: 14,
         resilience: 12,
         expertise: 4,
@@ -622,6 +626,7 @@ fn test_prestige_find_merc() {
             id: 42,
             name: "FindMe".to_string(),
             archetype: MercArchetype::Scout,
+            quality: MercQuality::Common,
             power: 10,
             resilience: 10,
             expertise: 10,
@@ -644,6 +649,7 @@ fn test_prestige_available_merc_count() {
         id: 0,
         name: "M".to_string(),
         archetype: MercArchetype::Vanguard,
+        quality: MercQuality::Common,
         power: 10,
         resilience: 10,
         expertise: 10,
@@ -845,6 +851,7 @@ fn test_mercenary_serde_roundtrip() {
         id: 42,
         name: "Rodgar".to_string(),
         archetype: MercArchetype::Vanguard,
+        quality: MercQuality::Common,
         power: 14,
         resilience: 12,
         expertise: 4,

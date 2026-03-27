@@ -26,6 +26,7 @@
 
 use chrono::{Duration, TimeZone, Utc};
 use quest::deep::types::*;
+use quest::deep::MercQuality;
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -40,6 +41,7 @@ fn make_merc(id: u64, archetype: MercArchetype, status: MercStatus) -> Mercenary
         id,
         name: format!("Merc-{id}"),
         archetype,
+        quality: MercQuality::Common,
         power,
         resilience,
         expertise,
