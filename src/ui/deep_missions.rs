@@ -476,18 +476,19 @@ fn render_hub_roster(
                 render_section_rule(buffer, row, width, "PROMOTE", None);
                 row += 1;
 
-                // Title: Current → Target with glyphs
+                // Title: Current → Target with glyphs (render each piece separately)
                 let (cur_glyph, cur_color) = super::deep_roster::quality_glyph(merc);
                 let cur_name = quality_display_name(merc.quality);
                 let tar_name = quality_display_name(target);
                 let tar_color = quality_display_color(target);
-                let title = format!("{} {} \u{2192} {}", cur_glyph, cur_name, tar_name);
-                put_text(buffer, row, 2, &title, Color::DarkGray);
-                // Recolor current quality glyph
-                put_cell(buffer, row, 2, cur_glyph, cur_color);
-                // Recolor target name
-                let tar_start = 2 + title.find(tar_name).unwrap_or(0) as i32;
-                put_text(buffer, row, tar_start, tar_name, tar_color);
+                let mut col = 2i32;
+                put_cell(buffer, row, col, cur_glyph, cur_color);
+                col += 2; // glyph + space
+                put_text(buffer, row, col, cur_name, Color::DarkGray);
+                col += cur_name.len() as i32 + 1;
+                put_text(buffer, row, col, "\u{2192}", Color::DarkGray);
+                col += 2; // arrow + space
+                put_text(buffer, row, col, tar_name, tar_color);
                 row += 1;
 
                 // Requirements line
