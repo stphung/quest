@@ -648,8 +648,32 @@ pub(super) fn render_roster(
     if let Some(msg) = &ui.flash_message {
         put_text(buffer, height as i32 - 2, 1, msg, Color::LightRed);
     }
+    if ui.promotion_pending {
+        if let Some(merc) = deep
+            .prestige
+            .roster
+            .values()
+            .filter(|m| !matches!(m.status, crate::deep::MercStatus::Lost))
+            .nth(ui.selected_index)
+        {
+            if let Some(target) = merc.quality.next() {
+                let target_name = match target {
+                    crate::deep::MercQuality::Common => "Common",
+                    crate::deep::MercQuality::Uncommon => "Uncommon",
+                    crate::deep::MercQuality::Rare => "Rare",
+                    crate::deep::MercQuality::Elite => "Elite",
+                };
+                let cost = crate::deep::promotion_cost(merc.id, target);
+                let confirm_msg = format!(
+                    "Promote {} to {}? ({} Marks) [Enter] Confirm  [Any] Cancel",
+                    merc.name, target_name, cost,
+                );
+                put_text(buffer, height as i32 - 2, 1, &confirm_msg, Color::Yellow);
+            }
+        }
+    }
     let footer =
-        "[\u{2190}/\u{2192}] Switch  [\u{2191}/\u{2193}] Navigate  [G] Guild Rank  [Esc] Close";
+        "[\u{2190}/\u{2192}] Switch  [\u{2191}/\u{2193}] Navigate  [P] Promote  [G] Guild Rank  [Esc] Close";
     put_text(buffer, height as i32 - 1, 1, footer, Color::DarkGray);
     let help_hint = "[?] Help";
     let help_col = (width as i32 - help_hint.len() as i32 - 1).max(footer.len() as i32 + 2);
