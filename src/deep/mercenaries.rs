@@ -65,12 +65,65 @@ impl MercQuality {
             MercQuality::Elite => (200, 300),
         }
     }
+
+    /// Returns the next quality tier, or `None` if already Elite.
+    pub fn next(self) -> Option<MercQuality> {
+        match self {
+            MercQuality::Common => Some(MercQuality::Uncommon),
+            MercQuality::Uncommon => Some(MercQuality::Rare),
+            MercQuality::Rare => Some(MercQuality::Elite),
+            MercQuality::Elite => None,
+        }
+    }
 }
 
 impl Default for MercQuality {
     fn default() -> Self {
         MercQuality::Common
     }
+}
+
+// ── Promotion ────────────────────────────────────────────────────────────────
+
+/// Missions a merc must have completed before being eligible for promotion
+/// from the given quality tier.
+pub fn promotion_missions_required(from: MercQuality) -> u32 {
+    match from {
+        MercQuality::Common => 3,
+        MercQuality::Uncommon => 6,
+        MercQuality::Rare => 12,
+        MercQuality::Elite => u32::MAX, // can't promote from Elite
+    }
+}
+
+/// Guild rank required to promote *to* the given quality tier.
+pub fn promotion_guild_rank_required(to: MercQuality) -> u8 {
+    match to {
+        MercQuality::Common => 1, // unreachable in practice
+        MercQuality::Uncommon => 2,
+        MercQuality::Rare => 3,
+        MercQuality::Elite => 4,
+    }
+}
+
+/// Deterministic promotion cost for a merc (based on id) to the given tier.
+/// Returns Warband Marks cost, rounded to nearest 5.
+pub fn promotion_cost(merc_id: u64, to: MercQuality) -> u32 {
+    let (min, max) = match to {
+        MercQuality::Common => (0, 0), // unreachable
+        MercQuality::Uncommon => (160, 260),
+        MercQuality::Rare => (260, 400),
+        MercQuality::Elite => (400, 600),
+    };
+    let range = max - min;
+    if range == 0 {
+        return 0;
+    }
+    // Simple hash: spread merc ids across the cost range
+    let hash = (merc_id.wrapping_mul(2654435761) >> 16) as u32;
+    let raw = min + hash % (range + 1);
+    // Round to nearest 5
+    ((raw + 2) / 5) * 5
 }
 
 // ── Guild-Rank Quality Tables ─────────────────────────────────────────────────
@@ -1262,5 +1315,70 @@ mod tests {
         let mut rng = seeded_rng(42);
         let merc = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Rare, &mut rng);
         assert_eq!(merc.quality, MercQuality::Rare);
+    }
+
+    #[test]
+    fn test_merc_quality_next() {
+        assert_eq!(MercQuality::Common.next(), Some(MercQuality::Uncommon));
+        assert_eq!(MercQuality::Uncommon.next(), Some(MercQuality::Rare));
+        assert_eq!(MercQuality::Rare.next(), Some(MercQuality::Elite));
+        assert_eq!(MercQuality::Elite.next(), None);
+    }
+
+    #[test]
+    fn test_promotion_missions_required() {
+        assert_eq!(promotion_missions_required(MercQuality::Common), 3);
+        assert_eq!(promotion_missions_required(MercQuality::Uncommon), 6);
+        assert_eq!(promotion_missions_required(MercQuality::Rare), 12);
+    }
+
+    #[test]
+    fn test_promotion_guild_rank_required() {
+        assert_eq!(promotion_guild_rank_required(MercQuality::Uncommon), 2);
+        assert_eq!(promotion_guild_rank_required(MercQuality::Rare), 3);
+        assert_eq!(promotion_guild_rank_required(MercQuality::Elite), 4);
+    }
+
+    #[test]
+    fn test_promotion_cost_deterministic() {
+        let cost1 = promotion_cost(42, MercQuality::Uncommon);
+        let cost2 = promotion_cost(42, MercQuality::Uncommon);
+        assert_eq!(
+            cost1, cost2,
+            "Same merc id + tier should always give same cost"
+        );
+        assert!(
+            cost1 >= 160 && cost1 <= 260,
+            "Uncommon cost out of range: {}",
+            cost1
+        );
+        assert_eq!(cost1 % 5, 0, "Cost should be rounded to nearest 5");
+    }
+
+    #[test]
+    fn test_promotion_cost_ranges() {
+        for id in 0..100u64 {
+            let u = promotion_cost(id, MercQuality::Uncommon);
+            assert!(
+                u >= 160 && u <= 260,
+                "Uncommon cost {} out of range for id {}",
+                u,
+                id
+            );
+            let r = promotion_cost(id, MercQuality::Rare);
+            assert!(
+                r >= 260 && r <= 400,
+                "Rare cost {} out of range for id {}",
+                r,
+                id
+            );
+            let e = promotion_cost(id, MercQuality::Elite);
+            assert!(
+                e >= 400 && e <= 600,
+                "Elite cost {} out of range for id {}",
+                e,
+                id
+            );
+        }
     }
 }
