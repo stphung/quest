@@ -1860,6 +1860,7 @@ pub fn is_daily_supply_run_available(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::deep::mercenaries::MercQuality;
     use crate::deep::types::{
         DeepPersistent, DeepPrestige, GuildRank, MercArchetype, MercStatus, Mercenary,
         MissionOutcome, MissionStatus, MissionType,
@@ -1882,6 +1883,7 @@ mod tests {
             expertise: 8,
             level: 1,
             missions_completed: 0,
+            quality: MercQuality::Common,
             status: MercStatus::Available,
         }
     }

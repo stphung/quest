@@ -10,6 +10,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use super::mercenaries::MercQuality;
+
 /// Serde helper: serialize `HashMap<u64, Mercenary>` as `Vec<Mercenary>` for
 /// backward-compatible JSON saves.
 mod roster_serde {
@@ -335,6 +337,9 @@ pub struct Mercenary {
     pub level: u32,
     /// Total missions this merc has completed (informational).
     pub missions_completed: u32,
+    /// Quality tier assigned at recruitment. Used for promotion eligibility.
+    #[serde(default)]
+    pub quality: MercQuality,
     pub status: MercStatus,
 }
 
@@ -1460,6 +1465,7 @@ mod tests {
             expertise: 4,
             level: 3,
             missions_completed: 0,
+            quality: MercQuality::Common,
             status: MercStatus::Available,
         };
         assert!(m.effective_power() > m.power);
@@ -1477,6 +1483,7 @@ mod tests {
             expertise: 4,
             level: 1,
             missions_completed: 0,
+            quality: MercQuality::Common,
             status: MercStatus::Available,
         };
         assert!(base.is_available());

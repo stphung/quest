@@ -15,13 +15,14 @@
 use super::types::{GuildRank, MercArchetype, MercStatus, Mercenary, RecruitPool};
 use chrono::Utc;
 use rand::{Rng, RngExt};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // ── Quality Tiers ─────────────────────────────────────────────────────────────
 
 /// Internal quality tier for a generated mercenary.
 /// Determines stat bonuses above the archetype base and recruit cost range.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MercQuality {
     /// Basic recruit. Available at all guild ranks.
     Common,
@@ -63,6 +64,12 @@ impl MercQuality {
             MercQuality::Rare => (130, 200),
             MercQuality::Elite => (200, 300),
         }
+    }
+}
+
+impl Default for MercQuality {
+    fn default() -> Self {
+        MercQuality::Common
     }
 }
 
@@ -366,6 +373,7 @@ pub fn generate_mercenary(
         expertise,
         level: Mercenary::BASE_LEVEL,
         missions_completed: 0,
+        quality,
         status: MercStatus::Available,
     }
 }
@@ -1229,5 +1237,30 @@ mod tests {
             elite_avg,
             common_avg
         );
+    }
+
+    #[test]
+    fn test_merc_quality_serde_default() {
+        // Simulate a legacy save without quality field
+        let json = r#"{
+            "id": 1,
+            "name": "Test",
+            "archetype": "Vanguard",
+            "power": 14,
+            "resilience": 12,
+            "expertise": 4,
+            "level": 1,
+            "missions_completed": 0,
+            "status": "Available"
+        }"#;
+        let merc: Mercenary = serde_json::from_str(json).unwrap();
+        assert_eq!(merc.quality, MercQuality::Common);
+    }
+
+    #[test]
+    fn test_merc_quality_stored_on_generation() {
+        let mut rng = seeded_rng(42);
+        let merc = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Rare, &mut rng);
+        assert_eq!(merc.quality, MercQuality::Rare);
     }
 }
