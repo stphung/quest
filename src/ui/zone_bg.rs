@@ -1345,22 +1345,29 @@ fn overlay_hollow_echo(buffer: &mut [Vec<SceneCell>], millis: f64) {
 }
 
 fn overlay_reality_tear(buffer: &mut [Vec<SceneCell>], millis: f64) {
-    let phase = (millis / 200.0) as usize;
+    // Slow travelling wave that subtly warps colours per-row, giving an
+    // unstable-reality feel without the jarring flashing bars.
+    let time = millis * 0.001; // seconds
 
     for (row_idx, row_cells) in buffer.iter_mut().enumerate() {
-        // Only affect certain rows, cycling rapidly
-        let affected = hash2d(row_idx + phase, phase + 17).is_multiple_of(7);
-        if !affected {
-            continue;
+        // Two overlapping sine waves at different speeds create organic drift
+        let wave1 = (row_idx as f64 * 0.35 + time * 0.8).sin() * 0.5 + 0.5; // 0..1
+        let wave2 = (row_idx as f64 * 0.17 - time * 0.5).sin() * 0.5 + 0.5; // 0..1
+        let intensity = wave1 * wave2; // 0..1, peaks where both waves align
+
+        // Shift: push red/blue toward complement proportional to intensity
+        let shift = (intensity * 30.0) as i16;
+
+        if shift < 3 {
+            continue; // negligible — skip for perf
         }
 
         for cell in row_cells.iter_mut() {
             if let Color::Rgb(r, g, b) = cell.bg {
-                // Partial inversion: shift toward complement
                 cell.bg = Color::Rgb(
-                    clamp_u8(255i16 - r as i16 * 2 / 3 - 85),
-                    clamp_u8(g as i16), // keep green stable for less nausea
-                    clamp_u8(255i16 - b as i16 * 2 / 3 - 85),
+                    clamp_u8(r as i16 + shift - (b as i16 * shift / 128)),
+                    clamp_u8(g as i16 - shift / 4), // slight desaturation
+                    clamp_u8(b as i16 + shift - (r as i16 * shift / 128)),
                 );
             }
         }
