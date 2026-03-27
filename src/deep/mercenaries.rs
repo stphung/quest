@@ -12,7 +12,7 @@
 //! All functions take `rng: &mut impl Rng` — no local RNG is created internally.
 //! Follows the Haven bonus injection pattern: no global state, all context passed as params.
 
-use super::types::{GuildRank, MercArchetype, MercStatus, Mercenary, RecruitPool};
+use super::types::{DeepPrestige, GuildRank, MercArchetype, MercStatus, Mercenary, RecruitPool};
 use chrono::Utc;
 use rand::{Rng, RngExt};
 use serde::{Deserialize, Serialize};
@@ -124,6 +124,80 @@ pub fn promotion_cost(merc_id: u64, to: MercQuality) -> u32 {
     let raw = min + hash % (range + 1);
     // Round to nearest 5
     ((raw + 2) / 5) * 5
+}
+
+// ── Promotion Eligibility & Application ──────────────────────────────────────
+
+/// Error type for merc promotion attempts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PromotionError {
+    AlreadyElite,
+    InsufficientMissions { have: u32, need: u32 },
+    InsufficientRank { have: u8, need: u8 },
+    InsufficientMarks { have: u32, need: u32 },
+}
+
+/// Check whether a merc can be promoted. Returns (target quality, mark cost) on success.
+pub fn can_promote(
+    merc: &Mercenary,
+    guild_rank: GuildRank,
+    available_marks: u32,
+) -> Result<(MercQuality, u32), PromotionError> {
+    let target = merc.quality.next().ok_or(PromotionError::AlreadyElite)?;
+
+    let missions_needed = promotion_missions_required(merc.quality);
+    if merc.missions_completed < missions_needed {
+        return Err(PromotionError::InsufficientMissions {
+            have: merc.missions_completed,
+            need: missions_needed,
+        });
+    }
+
+    let rank_needed = promotion_guild_rank_required(target);
+    if guild_rank.0 < rank_needed {
+        return Err(PromotionError::InsufficientRank {
+            have: guild_rank.0,
+            need: rank_needed,
+        });
+    }
+
+    let cost = promotion_cost(merc.id, target);
+    if available_marks < cost {
+        return Err(PromotionError::InsufficientMarks {
+            have: available_marks,
+            need: cost,
+        });
+    }
+
+    Ok((target, cost))
+}
+
+/// Promote a merc to the next quality tier.
+///
+/// Validates eligibility, deducts marks, applies stat deltas, and updates quality.
+/// Returns the mark cost on success.
+pub fn promote_mercenary(
+    merc: &mut Mercenary,
+    prestige: &mut DeepPrestige,
+    guild_rank: GuildRank,
+) -> Result<u32, PromotionError> {
+    let (target, cost) = can_promote(merc, guild_rank, prestige.warband_marks)?;
+
+    // Deduct marks
+    prestige.spend_marks(cost);
+
+    // Apply stat deltas
+    let flat_delta = target.flat_bonus() - merc.quality.flat_bonus();
+    let primary_delta = target.primary_bonus() - merc.quality.primary_bonus();
+    let (p_primary, r_primary, e_primary) = archetype_primary_flags(merc.archetype);
+
+    merc.power += flat_delta + if p_primary { primary_delta } else { 0 };
+    merc.resilience += flat_delta + if r_primary { primary_delta } else { 0 };
+    merc.expertise += flat_delta + if e_primary { primary_delta } else { 0 };
+
+    merc.quality = target;
+
+    Ok(cost)
 }
 
 // ── Guild-Rank Quality Tables ─────────────────────────────────────────────────
@@ -1380,5 +1454,120 @@ mod tests {
                 id
             );
         }
+    }
+
+    // ── Promotion Eligibility ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_can_promote_common_merc() {
+        let mut rng = seeded_rng(1);
+        let mut merc =
+            generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+        merc.missions_completed = 5;
+        let cost = promotion_cost(1, MercQuality::Uncommon);
+        let result = can_promote(&merc, GuildRank(2), cost + 100);
+        assert!(result.is_ok());
+        let (target, mark_cost) = result.unwrap();
+        assert_eq!(target, MercQuality::Uncommon);
+        assert_eq!(mark_cost, cost);
+    }
+
+    #[test]
+    fn test_can_promote_blocked_by_missions() {
+        let mut rng = seeded_rng(1);
+        let merc = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+        let result = can_promote(&merc, GuildRank(2), 9999);
+        assert!(matches!(
+            result,
+            Err(PromotionError::InsufficientMissions { .. })
+        ));
+    }
+
+    #[test]
+    fn test_can_promote_blocked_by_rank() {
+        let mut rng = seeded_rng(1);
+        let mut merc =
+            generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+        merc.missions_completed = 5;
+        let result = can_promote(&merc, GuildRank(1), 9999);
+        assert!(matches!(
+            result,
+            Err(PromotionError::InsufficientRank { .. })
+        ));
+    }
+
+    #[test]
+    fn test_can_promote_blocked_by_marks() {
+        let mut rng = seeded_rng(1);
+        let mut merc =
+            generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+        merc.missions_completed = 5;
+        let result = can_promote(&merc, GuildRank(2), 0);
+        assert!(matches!(
+            result,
+            Err(PromotionError::InsufficientMarks { .. })
+        ));
+    }
+
+    #[test]
+    fn test_can_promote_blocked_for_elite() {
+        let mut rng = seeded_rng(1);
+        let mut merc = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Elite, &mut rng);
+        merc.missions_completed = 100;
+        let result = can_promote(&merc, GuildRank(5), 9999);
+        assert!(matches!(result, Err(PromotionError::AlreadyElite)));
+    }
+
+    #[test]
+    fn test_promote_mercenary_applies_stat_deltas() {
+        use crate::deep::types::DeepPrestige;
+        let mut rng = seeded_rng(1);
+        let mut merc =
+            generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+        merc.missions_completed = 5;
+        let pre_power = merc.power;
+        let pre_resilience = merc.resilience;
+        let pre_expertise = merc.expertise;
+
+        let mut prestige = DeepPrestige::default();
+        prestige.warband_marks = 1000;
+
+        let result = promote_mercenary(&mut merc, &mut prestige, GuildRank(2));
+        assert!(result.is_ok());
+        assert_eq!(merc.quality, MercQuality::Uncommon);
+
+        // Vanguard primaries: power + resilience
+        // Common→Uncommon: flat +2, primary +2
+        assert_eq!(merc.power, pre_power + 2 + 2); // flat + primary
+        assert_eq!(merc.resilience, pre_resilience + 2 + 2); // flat + primary
+        assert_eq!(merc.expertise, pre_expertise + 2); // flat only
+
+        // Marks deducted
+        let cost = promotion_cost(1, MercQuality::Uncommon);
+        assert_eq!(prestige.warband_marks, 1000 - cost);
+    }
+
+    #[test]
+    fn test_promote_mercenary_rare_to_elite() {
+        use crate::deep::types::DeepPrestige;
+        let mut rng = seeded_rng(1);
+        let mut merc = generate_mercenary(1, MercArchetype::Arcanist, MercQuality::Rare, &mut rng);
+        merc.missions_completed = 15;
+        let pre_power = merc.power;
+        let pre_resilience = merc.resilience;
+        let pre_expertise = merc.expertise;
+
+        let mut prestige = DeepPrestige::default();
+        prestige.warband_marks = 1000;
+
+        let result = promote_mercenary(&mut merc, &mut prestige, GuildRank(4));
+        assert!(result.is_ok());
+        assert_eq!(merc.quality, MercQuality::Elite);
+
+        // Arcanist primary: expertise only
+        // Rare→Elite: flat_delta = 8-4 = 4, primary_delta = 4-2 = 2
+        assert_eq!(merc.power, pre_power + 4); // flat only
+        assert_eq!(merc.resilience, pre_resilience + 4); // flat only
+        assert_eq!(merc.expertise, pre_expertise + 4 + 2); // flat + primary
     }
 }
