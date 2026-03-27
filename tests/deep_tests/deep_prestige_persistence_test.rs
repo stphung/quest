@@ -18,7 +18,7 @@ use quest::deep::{
     is_safe_layer, mark_layer_cleared, try_upgrade_guild_rank, FamiliarityLevel,
 };
 use quest::deep::{
-    DeepPersistent, DeepState, GuildRank, Infrastructure, MercArchetype, MercStatus,
+    DeepPersistent, DeepState, GuildRank, Infrastructure, MercArchetype, MercQuality, MercStatus,
     MissionOutcome, MissionType,
 };
 use rand::SeedableRng;
@@ -700,6 +700,7 @@ fn test_prestige_with_full_roster_preserves() {
             id,
             name: "Extra".to_string(),
             archetype: MercArchetype::Vanguard,
+            quality: MercQuality::Common,
             power: 14,
             resilience: 12,
             expertise: 4,

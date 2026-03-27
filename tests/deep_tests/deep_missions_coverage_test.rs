@@ -22,8 +22,9 @@ use chrono::{Duration, TimeZone, Utc};
 use quest::deep::{
     available_mission_count, generate_mission_pool, resolve_mission, resolve_offline_missions,
     start_mission, tick_all_missions, tick_mission, validate_squad_assignment, AvailableMission,
-    DeepPersistent, DeepPrestige, GuildRank, Infrastructure, MercArchetype, MercStatus, Mercenary,
-    Mission, MissionOutcome, MissionStatus, MissionType, SquadAssignmentError,
+    DeepPersistent, DeepPrestige, GuildRank, Infrastructure, MercArchetype, MercQuality,
+    MercStatus, Mercenary, Mission, MissionOutcome, MissionStatus, MissionType,
+    SquadAssignmentError,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -47,6 +48,7 @@ fn make_merc(id: u64, archetype: MercArchetype, power: u32) -> Mercenary {
         id,
         name: format!("Merc_{}", id),
         archetype,
+        quality: MercQuality::Common,
         power,
         resilience: 10,
         expertise: 8,
@@ -66,6 +68,7 @@ fn make_merc_resilient(
         id,
         name: format!("Merc_{}", id),
         archetype,
+        quality: MercQuality::Common,
         power,
         resilience,
         expertise: 8,

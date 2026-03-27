@@ -1,8 +1,10 @@
 //! The Deep — Hub and New Mission sub-view rendering.
 
 use crate::deep::{
-    base_marks_earned, event_trigger_points, familiarity_gain, AvailableMission, DeepState,
-    DeepUiState, LayerTier, MercArchetype, MercStatus, Mission, MissionStatus, MissionType,
+    base_marks_earned, event_trigger_points, familiarity_gain, promotion_cost,
+    promotion_guild_rank_required, promotion_missions_required, AvailableMission, DeepState,
+    DeepUiState, LayerTier, MercArchetype, MercQuality, MercStatus, Mission, MissionStatus,
+    MissionType,
 };
 use chrono::Utc;
 use ratatui::style::Color;
@@ -80,6 +82,33 @@ pub(super) fn archetype_color(a: MercArchetype) -> Color {
         MercArchetype::Arcanist => Color::Magenta,
         MercArchetype::Medic => Color::Green,
         MercArchetype::Saboteur => Color::Yellow,
+    }
+}
+
+fn quality_display_name(q: MercQuality) -> &'static str {
+    match q {
+        MercQuality::Common => "Common",
+        MercQuality::Uncommon => "Uncommon",
+        MercQuality::Rare => "Rare",
+        MercQuality::Elite => "Elite",
+    }
+}
+
+fn quality_display_color(q: MercQuality) -> Color {
+    match q {
+        MercQuality::Common => Color::White,
+        MercQuality::Uncommon => Color::Green,
+        MercQuality::Rare => Color::Yellow,
+        MercQuality::Elite => Color::Rgb(255, 215, 0),
+    }
+}
+
+fn quality_display_glyph(q: MercQuality) -> char {
+    match q {
+        MercQuality::Common => '\u{25cf}',   // ●
+        MercQuality::Uncommon => '\u{25c9}', // ◉
+        MercQuality::Rare => '\u{2605}',     // ★
+        MercQuality::Elite => '\u{2726}',    // ✦
     }
 }
 
@@ -441,6 +470,97 @@ fn render_hub_roster(
         }
     }
 
+    // ── Promotion info for selected merc ──
+    if !roster.is_empty() && row + 5 < roster_bottom {
+        if let Some(merc) = roster
+            .values()
+            .filter(|m| !matches!(m.status, MercStatus::Lost))
+            .nth(ui.selected_index)
+        {
+            if let Some(target) = merc.quality.next() {
+                let guild_rank = deep.persistent.guild_rank;
+                let marks = deep.prestige.warband_marks;
+
+                row += 1;
+                render_section_rule(buffer, row, width, "PROMOTE", None);
+                row += 1;
+
+                // Title: Current → Target with glyphs (render each piece separately)
+                let (cur_glyph, cur_color) = super::deep_roster::quality_glyph(merc);
+                let cur_name = quality_display_name(merc.quality);
+                let tar_name = quality_display_name(target);
+                let tar_color = quality_display_color(target);
+                let mut col = 2i32;
+                put_cell(buffer, row, col, cur_glyph, cur_color);
+                col += 2; // glyph + space
+                put_text(buffer, row, col, cur_name, Color::DarkGray);
+                col += cur_name.len() as i32 + 1;
+                put_text(buffer, row, col, "\u{2192}", Color::DarkGray);
+                col += 2; // arrow + space
+                put_cell(buffer, row, col, quality_display_glyph(target), tar_color);
+                col += 2; // glyph + space
+                put_text(buffer, row, col, tar_name, tar_color);
+                row += 1;
+
+                // Requirements line
+                let missions_needed = promotion_missions_required(merc.quality);
+                let missions_ok = merc.missions_completed >= missions_needed;
+                let rank_needed = promotion_guild_rank_required(target);
+                let rank_ok = guild_rank.0 >= rank_needed;
+                let cost = promotion_cost(merc.id, target);
+                let marks_ok = marks >= cost;
+
+                let m_check = if missions_ok { "\u{2713}" } else { "\u{2717}" };
+                let m_color = if missions_ok {
+                    Color::Green
+                } else {
+                    Color::LightRed
+                };
+                let r_check = if rank_ok { "\u{2713}" } else { "\u{2717}" };
+                let r_color = if rank_ok {
+                    Color::Green
+                } else {
+                    Color::LightRed
+                };
+                let c_check = if marks_ok { "\u{2713}" } else { "\u{2717}" };
+                let c_color = if marks_ok {
+                    Color::Green
+                } else {
+                    Color::LightRed
+                };
+
+                let missions_str = format!(
+                    "{} Missions: {}/{}",
+                    m_check, merc.missions_completed, missions_needed
+                );
+                let rank_str = format!("{} Rank: {}/{}", r_check, guild_rank.0, rank_needed);
+                let cost_str = format!("{} Cost: {} Marks", c_check, cost);
+
+                put_text(buffer, row, 2, &missions_str, m_color);
+                let col2 = 2 + missions_str.len() as i32 + 3;
+                put_text(buffer, row, col2, &rank_str, r_color);
+                let col3 = col2 + rank_str.len() as i32 + 3;
+                put_text(buffer, row, col3, &cost_str, c_color);
+                row += 1;
+
+                // Stat preview line
+                let flat_delta = target.flat_bonus() - merc.quality.flat_bonus();
+                let primary_delta = target.primary_bonus() - merc.quality.primary_bonus();
+                let (p_pri, r_pri, e_pri) = crate::deep::archetype_primary_flags(merc.archetype);
+                let dp = flat_delta + if p_pri { primary_delta } else { 0 };
+                let dr = flat_delta + if r_pri { primary_delta } else { 0 };
+                let de = flat_delta + if e_pri { primary_delta } else { 0 };
+
+                let stats_str = format!(
+                    "Stats: +{} Power  +{} Resilience  +{} Expertise",
+                    dp, dr, de
+                );
+                put_text(buffer, row, 2, &stats_str, Color::Rgb(100, 140, 180));
+                row += 1;
+            }
+        }
+    }
+
     // ── Warband log (below roster) ──
     let log = &deep.prestige.warband_log;
     if !log.is_empty() && row + 3 < roster_bottom {
@@ -648,8 +768,32 @@ pub(super) fn render_roster(
     if let Some(msg) = &ui.flash_message {
         put_text(buffer, height as i32 - 2, 1, msg, Color::LightRed);
     }
+    if ui.promotion_pending {
+        if let Some(merc) = deep
+            .prestige
+            .roster
+            .values()
+            .filter(|m| !matches!(m.status, crate::deep::MercStatus::Lost))
+            .nth(ui.selected_index)
+        {
+            if let Some(target) = merc.quality.next() {
+                let target_name = match target {
+                    crate::deep::MercQuality::Common => "Common",
+                    crate::deep::MercQuality::Uncommon => "Uncommon",
+                    crate::deep::MercQuality::Rare => "Rare",
+                    crate::deep::MercQuality::Elite => "Elite",
+                };
+                let cost = crate::deep::promotion_cost(merc.id, target);
+                let confirm_msg = format!(
+                    "Promote {} to {}? ({} Marks) [Enter] Confirm  [Any] Cancel",
+                    merc.name, target_name, cost,
+                );
+                put_text(buffer, height as i32 - 2, 1, &confirm_msg, Color::Yellow);
+            }
+        }
+    }
     let footer =
-        "[\u{2190}/\u{2192}] Switch  [\u{2191}/\u{2193}] Navigate  [G] Guild Rank  [Esc] Close";
+        "[\u{2190}/\u{2192}] Switch  [\u{2191}/\u{2193}] Navigate  [P] Promote  [G] Guild Rank  [Esc] Close";
     put_text(buffer, height as i32 - 1, 1, footer, Color::DarkGray);
     let help_hint = "[?] Help";
     let help_col = (width as i32 - help_hint.len() as i32 - 1).max(footer.len() as i32 + 2);

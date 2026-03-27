@@ -10,6 +10,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use super::mercenaries::MercQuality;
+
 /// Serde helper: serialize `HashMap<u64, Mercenary>` as `Vec<Mercenary>` for
 /// backward-compatible JSON saves.
 mod roster_serde {
@@ -335,6 +337,9 @@ pub struct Mercenary {
     pub level: u32,
     /// Total missions this merc has completed (informational).
     pub missions_completed: u32,
+    /// Quality tier assigned at recruitment. Used for promotion eligibility.
+    #[serde(default)]
+    pub quality: MercQuality,
     pub status: MercStatus,
 }
 
@@ -1070,6 +1075,8 @@ pub struct DeepUiState {
     pub event_modal_open: bool,
     /// Whether [?] help reference panel is shown.
     pub show_help: bool,
+    /// Whether the player is confirming a merc promotion.
+    pub promotion_pending: bool,
     /// Mercs from last prestige shown in farewell screen: (name, level, missions_completed).
     pub farewell_mercs: Vec<(String, u32, u32)>,
 }
@@ -1093,6 +1100,7 @@ impl DeepUiState {
             recruit_visit_count: 0,
             event_modal_open: false,
             show_help: false,
+            promotion_pending: false,
             farewell_mercs: Vec::new(),
         }
     }
@@ -1460,6 +1468,7 @@ mod tests {
             expertise: 4,
             level: 3,
             missions_completed: 0,
+            quality: MercQuality::Common,
             status: MercStatus::Available,
         };
         assert!(m.effective_power() > m.power);
@@ -1477,6 +1486,7 @@ mod tests {
             expertise: 4,
             level: 1,
             missions_completed: 0,
+            quality: MercQuality::Common,
             status: MercStatus::Available,
         };
         assert!(base.is_available());

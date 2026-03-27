@@ -26,7 +26,7 @@ use quest::deep::{
     available_mission_count, daily_supply_run_resets_at, generate_mission_pool,
     is_daily_supply_run_available, resolve_offline_missions, start_mission, tick_all_missions,
     validate_squad_assignment, AvailableMission, DeepState, GuildRank, Infrastructure,
-    MercArchetype, MercStatus, Mercenary, MissionOutcome, MissionStatus, MissionType,
+    MercArchetype, MercQuality, MercStatus, Mercenary, MissionOutcome, MissionStatus, MissionType,
     SquadAssignmentError,
 };
 use rand::SeedableRng;
@@ -50,6 +50,7 @@ fn make_merc(id: u64, archetype: MercArchetype, power: u32) -> Mercenary {
         id,
         name: format!("Merc-{id}"),
         archetype,
+        quality: MercQuality::Common,
         power,
         resilience,
         expertise,

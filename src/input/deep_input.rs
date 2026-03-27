@@ -133,7 +133,96 @@ fn handle_roster(
     _game_state: &mut GameState,
     _achievements: &mut crate::achievements::Achievements,
 ) -> InputResult {
+    // ── Promotion confirmation mode ──
+    if deep_ui.promotion_pending {
+        match key.code {
+            KeyCode::Enter => {
+                let guild_rank = deep_state.persistent.guild_rank;
+                let merc_id = deep_state
+                    .prestige
+                    .roster
+                    .values()
+                    .filter(|m| !matches!(m.status, MercStatus::Lost))
+                    .nth(deep_ui.selected_index)
+                    .map(|m| m.id);
+                deep_ui.promotion_pending = false;
+                if let Some(id) = merc_id {
+                    match crate::deep::promote_merc_by_id(id, &mut deep_state.prestige, guild_rank)
+                    {
+                        Ok((name, quality_name, cost)) => {
+                            deep_ui.flash_message = Some(format!(
+                                "{} promoted to {}! (-{} Marks)",
+                                name, quality_name, cost,
+                            ));
+                            return InputResult::NeedsSave;
+                        }
+                        Err(e) => {
+                            let msg = match e {
+                                crate::deep::PromotionError::AlreadyElite => {
+                                    "Already at Elite quality.".to_string()
+                                }
+                                crate::deep::PromotionError::InsufficientMissions {
+                                    need, ..
+                                } => format!("Need {} missions completed.", need),
+                                crate::deep::PromotionError::InsufficientRank { need, .. } => {
+                                    format!("Need Guild Rank {}.", need)
+                                }
+                                crate::deep::PromotionError::InsufficientMarks { need, have } => {
+                                    format!("Need {} Marks (have {}).", need, have)
+                                }
+                            };
+                            deep_ui.flash_message = Some(msg);
+                            return InputResult::Continue;
+                        }
+                    }
+                }
+                return InputResult::Continue;
+            }
+            _ => {
+                deep_ui.promotion_pending = false;
+                return InputResult::Continue;
+            }
+        }
+    }
+
     match key.code {
+        KeyCode::Char('p') | KeyCode::Char('P') => {
+            if let Some(merc) = deep_state
+                .prestige
+                .roster
+                .values()
+                .filter(|m| !matches!(m.status, MercStatus::Lost))
+                .nth(deep_ui.selected_index)
+            {
+                match crate::deep::can_promote(
+                    merc,
+                    deep_state.persistent.guild_rank,
+                    deep_state.prestige.warband_marks,
+                ) {
+                    Ok(_) => {
+                        deep_ui.promotion_pending = true;
+                    }
+                    Err(e) => {
+                        let msg = match e {
+                            crate::deep::PromotionError::AlreadyElite => {
+                                "Already at Elite quality.".to_string()
+                            }
+                            crate::deep::PromotionError::InsufficientMissions { need, have } => {
+                                format!("Need {} missions (have {}).", need, have)
+                            }
+                            crate::deep::PromotionError::InsufficientRank { need, .. } => {
+                                format!("Need Guild Rank {}.", need)
+                            }
+                            crate::deep::PromotionError::InsufficientMarks { need, have } => {
+                                format!("Need {} Marks (have {}).", need, have)
+                            }
+                        };
+                        deep_ui.flash_message = Some(msg);
+                    }
+                }
+            }
+            InputResult::Continue
+        }
         KeyCode::Char('g') | KeyCode::Char('G') => {
             match crate::deep::try_upgrade_guild_rank(
                 &mut deep_state.persistent,
@@ -172,13 +261,20 @@ fn handle_roster(
         }
         KeyCode::Up => {
             deep_ui.selected_index = deep_ui.selected_index.saturating_sub(1);
+            deep_ui.promotion_pending = false;
             InputResult::Continue
         }
         KeyCode::Down => {
-            let count = deep_state.prestige.roster.len();
+            let count = deep_state
+                .prestige
+                .roster
+                .values()
+                .filter(|m| !matches!(m.status, MercStatus::Lost))
+                .count();
             if count > 0 && deep_ui.selected_index + 1 < count {
                 deep_ui.selected_index += 1;
             }
+            deep_ui.promotion_pending = false;
             InputResult::Continue
         }
         KeyCode::Esc | KeyCode::Char('d') | KeyCode::Char('D') => {
@@ -688,6 +784,7 @@ fn switch_view_with_deep(ui: &mut DeepUiState, target: DeepView, deep: &DeepStat
     }
     ui.staged_squad.clear();
     ui.show_help = false;
+    ui.promotion_pending = false;
     match target {
         DeepView::Active => ui.hub_visit_count = ui.hub_visit_count.saturating_add(1),
         DeepView::NewMission => ui.mission_visit_count = ui.mission_visit_count.saturating_add(1),
@@ -742,6 +839,7 @@ mod tests {
             id,
             name: format!("Lost {}", id),
             archetype: MercArchetype::Vanguard,
+            quality: crate::deep::MercQuality::Common,
             power: 10,
             resilience: 10,
             expertise: 10,
