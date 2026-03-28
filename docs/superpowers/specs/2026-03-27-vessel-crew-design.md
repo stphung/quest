@@ -106,16 +106,42 @@ Base crew capacity: 2. Increased by Life Support room (+1 per level, base level 
 
 ## Recruitment
 
-Crew are found during the voyage, not recruited from a pool:
+Crew are found during the voyage through narrative moments, not recruited from a pool. Every recruitment is a story event with a cost or risk.
 
-- **Decision events** — "Distress signal from a drifting pod. Investigate?" → rescue a crew member
-- **Trading posts** — hire a crew member for salvage
-- **Derelict exploration** — find a survivor
-- **Boss rewards** — defeating a Norse boss may yield a legendary crew member with higher starting skill
+### Sources
 
-Each recruited crew member has randomly generated name, specialty, ship trait, and room trait. The player sees their full profile before accepting.
+- **Rescue events** — "A drifting pod pings your sensors. Investigate? (costs 20 supplies)" → find a survivor
+- **Trading posts** — hire a crew member for salvage (scaling cost with distance)
+- **Derelict exploration** — explore a wreck, find someone in stasis
+- **Boss rewards** — defeating a Norse boss may trigger a recruitment event with a higher starting skill crew member
 
-You can **dismiss** crew to free capacity (they're gone forever). No recruitment pool or refresh — crew are precious finds.
+### Frequency
+
+Random with pity timer: recruitment events appear organically but with a guarantee of at least one opportunity every 1,500 ly. First opportunity appears within ~200 ly or the first few hours. Total available across the full 10,000 ly voyage: ~8-10 opportunities, so the player can be somewhat selective.
+
+### Information Reveal
+
+On recruitment, the player sees the crew member's **name and specialty only**. Traits are hidden and reveal over time:
+
+- **Ship trait:** reveals after 1 day aboard the ship
+- **Room trait:** reveals after 3 days stationed in any room
+
+Until revealed, traits show as "???" in the crew panel. This creates a "getting to know your crew" arc.
+
+### Capacity and Hard Choices
+
+Recruitment is gated by Life Support crew capacity. If the ship is at capacity when a recruitment event fires:
+
+- The player sees the new person's name and specialty
+- They must choose: **dismiss an existing crew member** to make room, or **let the new person go**
+- Dismissed crew are gone forever
+- This creates meaningful "is this person better than who I have?" decisions
+
+If the ship is below capacity, the player can simply accept or decline.
+
+### Dismissal
+
+Crew can be dismissed at any time from the crew management screen to free capacity. Dismissed crew are gone forever — no undo, no re-recruitment.
 
 ## Injuries and Loss
 
