@@ -17,8 +17,8 @@ Reuses the existing combat pipeline with ship stats mapped to hero stats:
 | Firepower | Player attack power | Damage dealt per volley |
 | Hull (current) | Player HP | Damage absorbed before drift |
 | Hull (max) | Player max HP | Total survivability |
-| Engines | Evasion (new) | Chance to dodge enemy volleys |
-| Sensors | — | No direct combat role (discovery only) |
+| Engines | Evasion | Chance to dodge enemy volleys |
+| Sensors | Crit chance | Higher Sensors = more crits |
 
 ### Attack Timing
 
@@ -28,15 +28,21 @@ Same tick-based intervals as Act 1:
 
 ### Damage Pipeline
 
+Full pipeline defined in the Room System & Ship Stats spec (`vessel-rooms-stats-design.md`). Summary:
+
 ```
 Ship damage to enemy:
-  Firepower → enemy defense → min 1 → crit check → final damage
+  Final Firepower + Rune Array flat bonus (optional) → - enemy defense → min 1 → crit check (Sensors-based) → final damage
 
 Enemy damage to ship:
-  Enemy attack → ship Hull defense → Engines evasion check → min 1 → final damage
+  Enemy attack → - Hull defense → min 1 → Engines evasion check → final damage to Hull HP
 ```
 
-Evasion from Engines: `dodge_chance = Engines / (Engines + enemy_accuracy)`, capped at 50%. A dodge negates the entire volley.
+**Crit:** `chance = 5% + (Sensors / (Sensors + enemy_stealth)) × 25%`, capped at 30%. Base crit multiplier: 2.0x (components can increase).
+
+**Evasion:** `dodge_chance = Engines / (Engines + enemy_accuracy)`, capped at 50%. A dodge negates the entire volley.
+
+**Rune Array:** If the Rune Array room is built, old-world Transmissions convert into a flat Firepower bonus added before enemy defense. This is optional — costs a room slot and power budget.
 
 ### HP and Regen
 

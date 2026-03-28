@@ -6,21 +6,66 @@
 
 ## Overview
 
-The ship's power comes from three multiplicative layers: base ship stats (from XP/leveling), room bonuses (from built and upgraded rooms), and crew assignments (from stationed crew members). Rooms are the core build system — ~20 types unlocked at distance milestones, built into slots, upgraded with levels and components, constrained by Reactor power.
+The ship's power comes from four multiplicative layers: base ship stats (from XP/leveling), room bonuses (from built and upgraded rooms), crew assignments (from stationed crew members), and component bonuses (from items installed in room slots). Rooms are the core build system — ~20 types unlocked at distance milestones, built into slots, upgraded with levels and components, constrained by Reactor power.
+
+There is no free scaling from distance — all power is earned through rooms, crew, components, and ship XP. The Rune Array room can optionally convert old-world Transmissions into combat bonuses, but this costs a room slot.
+
+## Ship Stats
+
+| Stat | Combat Role | Non-Combat Role |
+|------|------------|-----------------|
+| Firepower | Damage dealt to enemies | — |
+| Hull | HP pool + defense value | — |
+| Engines | Evasion (dodge chance) | Distance traveled per day |
+| Sensors | Crit chance | Detection range for encounters/derelicts |
 
 ## Ship Stat Formula
 
+Each stat is computed independently through the same pipeline:
+
 ```
-Final stat = base_stat × room_multiplier × crew_multiplier
+Final stat = base_stat × room_multiplier × crew_multiplier × component_multiplier
 ```
 
-- **base_stat**: From ship level (gained via combat XP). Starts at 10 for each stat, grows ~2 per level.
-- **room_multiplier**: Sum of all active room contributions for that stat, expressed as 1.0 + bonuses. A level 5 Weapons Bay might give +0.5 Firepower multiplier.
-- **crew_multiplier**: 1.0 + crew bonus. A matched-specialty crew member (e.g. Gunner in Weapons Bay) adds a larger multiplier than a mismatched one.
+- **base_stat**: From ship level (gained via combat XP). Starts at 10, grows per level.
+- **room_multiplier**: `1.0 + sum of all active room contributions for that stat`. A level 5 Weapons Bay adds +0.50 to the Firepower room multiplier.
+- **crew_multiplier**: `1.0 + crew bonus`. Based on specialty match and skill level of crew assigned to relevant rooms.
+- **component_multiplier**: `1.0 + sum of stat component bonuses` from component slots in relevant rooms.
 
-Example: Base Firepower 30 × Weapons Bay multiplier 1.8 × Gunner crew multiplier 1.3 = 70 Firepower.
+Example: Base Firepower 30 × Room 1.5 × Crew 1.3 × Components 1.2 = 70 Firepower.
 
-All four stats (Firepower, Hull, Engines, Sensors) use this formula independently. Rooms and crew only contribute to stats relevant to them.
+## Combat Pipelines
+
+### Attack Pipeline (ship → enemy)
+
+```
+1. Final Firepower (base × room × crew × component)
+2. + Rune Array flat bonus (if built; converts Transmissions to flat damage)
+3. - Enemy defense
+4. Min 1
+5. Crit check: chance = 5% + (Sensors / (Sensors + enemy_stealth)) × 25%
+   Cap: 30%. Crit multiplier: 2.0x (components can increase)
+6. Apply damage to enemy HP
+```
+
+### Defense Pipeline (enemy → ship)
+
+```
+1. Enemy base damage
+2. - Hull defense (Final Hull stat used as defense value)
+3. Min 1
+4. Evasion check: dodge_chance = Engines / (Engines + enemy_accuracy)
+   Cap: 50%. Dodge negates entire attack.
+5. Apply damage to current Hull HP
+```
+
+### Key Differences from Act 1
+
+- **No prestige/ascension multiplier** — clean break, ship earns all power
+- **No hull regen between fights** — damage persists, must be repaired via Workshop/events
+- **Evasion replaces damage reduction** — Engines-based dodge instead of flat DR
+- **Sensors drive crits** — gives exploration stat a combat role
+- **Rune Array is optional** — old-world Transmissions only become combat power if you invest a room slot
 
 ## Ship Leveling
 
