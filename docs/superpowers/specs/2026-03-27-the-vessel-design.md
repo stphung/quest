@@ -184,6 +184,18 @@ Drift is a setback, not permadeath. It creates tension without punishment.
 
 The destination — the living branch — grows clearer on sensors as you approach. What you find there is Act 3.
 
+## Sub-Project Specs
+
+| Sub-Project | Spec | Status |
+|-------------|------|--------|
+| 1. Launch Gate & Vessel Overlay | [vessel-launch-gate-design.md](2026-03-27-vessel-launch-gate-design.md) | Designed |
+| 2. Mode Transition & Basic Voyage Shell | — | Not started |
+| 3. Room System & Ship Stats | — | Not started |
+| 4. Auto-Combat | — | Not started |
+| 5. Crew System | — | Not started |
+| 6. Decision Events | — | Not started |
+| 7. Supply Line | — | Not started |
+
 ## Future: Act 3 (Colony/Settlement)
 
 Not designed yet. The destination is the gate. Arriving at the living branch opens a new phase: building a settlement, establishing a foothold, discovering a new world. The ship becomes the seed of a colony. This is future content — the Vessel spec only covers the voyage.
