@@ -4,7 +4,7 @@
 
 ## Overview
 
-After completing all 28 Woven Patterns, reaching Ascension X, and conquering Zone 50, the player discovers that their branch of Yggdrasil is dying. A beacon on a distant living branch calls to them. The Loom's woven reality becomes the hull of a ship — the Vessel — and the player launches into the void between worlds. This begins Act 2: the game shifts from zone-based combat to a voyage through cosmic space, with the ship as the new "character."
+After completing all 28 Woven Patterns, reaching Ascension X, conquering Zone 50, and spending 100,000 PR, the player discovers that their branch of Yggdrasil is dying. A beacon on a distant living branch calls to them. The Loom's woven reality becomes the hull of a ship — the Vessel — and the player launches into the void between worlds. This begins Act 2: the game shifts from zone-based combat to a voyage through cosmic space, with the ship as the new "character."
 
 ## Narrative Foundation
 
@@ -33,11 +33,15 @@ At endgame PR generation (~750-1,400 PR/day from WR->PR + Power Cores), this rep
 
 Launching the Vessel is an **alternate game mode**. The player is no longer fighting in zones. The entire UI shifts to the voyage. The old world runs in the background as a supply line but is not directly playable.
 
+**Act 1 carryover:** Clean break. Only PR transmissions carry over. The 100,000 PR IS the carryover — everything the player built was consumed to create the ship. No God Items, Haven bonuses, or Ascension multipliers transfer. The Vessel is a fresh start.
+
 ## The Vessel as Character
 
 The ship replaces the hero as the thing you grow and upgrade.
 
 ### Ship Stats
+
+Stats come from three sources that stack: base ship level (XP from combat), room bonuses, and crew assignments.
 
 | Stat | Analogue | Governs |
 |------|----------|---------|
@@ -46,9 +50,36 @@ The ship replaces the hero as the thing you grow and upgrade.
 | Engines | Speed | Distance traveled per day, evasion in combat |
 | Sensors | Discovery | Detection range for encounters, derelicts, resources |
 
+**Stat growth layers:**
+1. **Base stats** — the ship gains XP from combat encounters and levels up, increasing base stats (like the hero)
+2. **Room bonuses** — each built and upgraded room adds to relevant stats (Weapons Bay adds Firepower, Hull Plating adds Hull, etc.)
+3. **Crew assignments** — crew members stationed in a room boost its output based on their skills. A gunner in an upgraded Weapons Bay significantly amplifies Firepower.
+
+### Crew (5-8 members)
+
+The Vessel carries a small, tight-knit crew. Every member matters — losing one is significant.
+
+**Recruitment:** Crew are found during the voyage — at trading posts, rescued from derelicts, discovered in anomalies. You don't start with a full crew.
+
+**Crew members have:**
+- A name and background (generated)
+- A role/specialty (Gunner, Engineer, Navigator, Medic, Scholar, etc.)
+- A skill level that improves with time stationed in a room
+- Status: Active, Injured, or Lost
+
+**Assignment:** Each room can have one crew member assigned. A crew member's specialty determines how much they boost the room. A Gunner in Weapons Bay gives a large bonus; a Gunner in the Garden gives a small one. Unassigned rooms still function at base level.
+
+**Crew needs:** Supplies drain proportional to crew count. Quarters provide rest (morale). Medbay recovers injured crew. Losing crew to events or combat is permanent — replacement requires finding someone new.
+
 ### Ship Rooms (~20 total)
 
-Room slots unlock at distance milestones. What you build in each slot is your choice.
+Room slots unlock at distance milestones (~1 every 500 ly). What you build in each slot is your choice.
+
+**Room upgrade system:** Two axes of improvement:
+1. **Levels (1-10)** — spend salvage/materials to level up a room. Each level increases its base stat contribution. Straightforward resource investment.
+2. **Component slots (2-3 per room)** — each room has slots for components found from encounters, derelicts, and events. Components modify what the room does — add effects, boost specific stats, enable new capabilities. Discovery-driven, not grindy.
+
+Levels are the floor (reliable growth from resources), components are the ceiling (exciting finds that change how a room works).
 
 **Core Systems:**
 - **Reactor** — power generation, limits how many rooms can be active
@@ -59,10 +90,10 @@ Room slots unlock at distance milestones. What you build in each slot is your ch
 **Survival:**
 - **Fuel Refinery** — converts raw void matter into fuel, slowing the drain
 - **Cargo Hold** — resource storage capacity
-- **Life Support** — crew capacity and efficiency
+- **Life Support** — crew capacity ceiling and efficiency
 
 **Exploration:**
-- **Sensors** — detection range for encounters, derelicts, resources
+- **Sensors Array** — detection range for encounters, derelicts, resources
 - **Shuttle Bay** — send smaller craft to investigate things you pass
 - **Cartography Deck** — maps ahead, reveals what's coming
 
@@ -72,7 +103,7 @@ Room slots unlock at distance milestones. What you build in each slot is your ch
 - **Shrine** — Norse themed, provides blessings/buffs (mythology tie-in)
 
 **Production:**
-- **Forge** — craft upgrades from salvage
+- **Forge** — craft upgrades and components from salvage
 - **Garden/Hydroponics** — passive supply generation
 - **Workshop** — repair hull over time
 
@@ -87,28 +118,28 @@ Three layers running simultaneously, at different rhythms:
 
 ### Layer 1: Auto-Combat (distance-based)
 
-The ship encounters hostiles in the void and fights them automatically, like zone combat. Frequency scales with distance traveled — faster engines mean more encounters per day. Enemies scale with distance from origin. Loot is salvage and materials for ship upgrades.
+The ship encounters hostiles in the void and fights them automatically, like zone combat. Frequency scales with distance traveled — faster engines mean more encounters per day. Enemies scale with distance from origin. Loot is salvage, materials, and occasionally components for room upgrades. The ship gains XP from combat, leveling up base stats.
 
 ### Layer 2: Resource Management (continuous)
 
 Three resources drain over time:
 - **Fuel** — consumed by engines. Run out = drift.
 - **Hull integrity** — degrades from combat and void hazards. Reaches 0 = drift.
-- **Supplies** — consumed by crew. Run out = efficiency penalties.
+- **Supplies** — consumed by crew (proportional to crew count). Run out = efficiency penalties, morale drop.
 
 Resources are replenished by harvesting (void matter), salvaging (combat loot), and production rooms (Refinery, Garden, Workshop).
 
 ### Layer 3: Decision Events (time-based, wall-clock)
 
 Every few hours, a narrative event fires regardless of distance:
-- Derelict ships to explore
-- Distress signals to answer or ignore
-- Spatial anomalies to study or avoid
+- Derelict ships to explore (loot, components, sometimes crew)
+- Distress signals to answer or ignore (risk/reward)
+- Spatial anomalies to study or avoid (Sensors reveal hidden options)
 - Trading posts / wayfarers to barter with
 - Crew morale situations
 - Norse mythological encounters (echoes of the old world)
 
-Choices depend on ship capabilities (Sensors reveal hidden options, Shuttle Bay enables boarding, Shrine provides blessings). Auto-resolve picks the safe path if the player doesn't respond.
+Choices depend on ship capabilities (Sensors reveal hidden options, Shuttle Bay enables boarding, Shrine provides blessings). Auto-resolve picks the safe path if the player doesn't respond — the safe path always avoids resource loss but may miss rewards.
 
 ## Distance and Progression
 
