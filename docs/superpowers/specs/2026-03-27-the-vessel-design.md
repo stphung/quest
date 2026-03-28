@@ -189,7 +189,7 @@ The destination — the living branch — grows clearer on sensors as you approa
 | Sub-Project | Spec | Status |
 |-------------|------|--------|
 | 1. Launch Gate & Vessel Overlay | [vessel-launch-gate-design.md](2026-03-27-vessel-launch-gate-design.md) | Designed |
-| 2. Mode Transition & Basic Voyage Shell | — | Not started |
+| 2. Mode Transition & Basic Voyage Shell | [vessel-mode-transition-design.md](2026-03-27-vessel-mode-transition-design.md) | Designed |
 | 3. Room System & Ship Stats | — | Not started |
 | 4. Auto-Combat | — | Not started |
 | 5. Crew System | — | Not started |
