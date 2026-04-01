@@ -28,7 +28,7 @@ use super::mercenaries::{
 use super::types::{
     effective_concurrent_missions, AvailableMission, DeepPersistent, DeepPrestige, GuildRank,
     Infrastructure, LayerTier, MercArchetype, MercStatus, Mission, MissionOutcome, MissionResult,
-    MissionStatus, MissionType, WarbandLogEntry,
+    MissionStatus, MissionType, WarbandLogEntry, GATEWAY_LAYER,
 };
 
 // ── Mission Pool Generation ────────────────────────────────────────────────────
@@ -232,6 +232,18 @@ fn progression_candidate(
     persistent: &DeepPersistent,
     rng: &mut impl Rng,
 ) -> Option<AvailableMission> {
+    // Once the player has reached Layer 30 (GATEWAY_LAYER), the Gateway Expedition
+    // permanently pins itself as the progression mission until completed, regardless
+    // of how deep the frontier has advanced beyond it.
+    if persistent.frontier_layer() >= GATEWAY_LAYER && !persistent.gateway_opened {
+        return Some(generate_available_mission(
+            MissionType::GatewayExpedition,
+            GATEWAY_LAYER,
+            persistent,
+            rng,
+        ));
+    }
+
     let frontier = persistent.frontier_layer();
     if frontier_is_uncleared(persistent, frontier) {
         Some(generate_available_mission(
@@ -818,6 +830,11 @@ pub fn effective_duration_secs(
     layer: u32,
     persistent: &DeepPersistent,
 ) -> u64 {
+    // Gateway Expedition is always exactly 3 days — no infrastructure or familiarity reductions.
+    if mission_type == MissionType::GatewayExpedition {
+        return mission_duration_secs(tier, mission_type);
+    }
+
     let base = mission_duration_secs(tier, mission_type) as f64;
 
     // Familiarity: Unknown 1.0, Mapped 0.85, Familiar 0.70, Mastered 0.55.

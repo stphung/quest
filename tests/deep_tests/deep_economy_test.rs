@@ -857,10 +857,10 @@ fn mission_durations_match_s2_table() {
         144_000
     );
 
-    // GatewayExpedition is always 48h (172800s) regardless of tier.
+    // GatewayExpedition is always 72h (259200s) regardless of tier.
     assert_eq!(
         mission_duration_secs(LayerTier::Void, MissionType::GatewayExpedition),
-        172800
+        259200
     );
 }
 
