@@ -191,8 +191,8 @@ pub fn mission_power_threshold(layer: u32, mission_type: MissionType) -> u32 {
 /// This is the final duration — no modifiers, no minimums, no base/effective split.
 pub fn mission_duration_secs(tier: LayerTier, mission_type: MissionType) -> u64 {
     match (tier, mission_type) {
-        // Gateway Expedition — fixed 72h (3 days), unmodified by infrastructure or familiarity
-        (_, MissionType::GatewayExpedition) => 259_200,
+        // Gateway Expedition — fixed 48h, unmodified by infrastructure or familiarity
+        (_, MissionType::GatewayExpedition) => 172_800,
         // Shallows (Recon 1h base: Construction 2h, Expedition 3h, Breakthrough 4h)
         (LayerTier::Shallows, MissionType::SupplyRun) => 3_600,
         (LayerTier::Shallows, MissionType::Recon) => 3_600,
@@ -537,12 +537,12 @@ mod tests {
     fn test_gateway_duration() {
         assert_eq!(
             mission_duration_secs(LayerTier::Void, MissionType::GatewayExpedition),
-            259_200 // 72h / 3 days
+            172_800 // 48h
         );
         // Gateway is the same regardless of tier
         assert_eq!(
             mission_duration_secs(LayerTier::Shallows, MissionType::GatewayExpedition),
-            259_200 // 72h / 3 days
+            172_800 // 48h
         );
     }
 

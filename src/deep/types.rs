@@ -210,7 +210,7 @@ impl MissionType {
             MissionType::Expedition => (10800, 108000),         // 3h-30h
             MissionType::Breakthrough => (14400, 144000),       // 4h-40h
             MissionType::Construction(_) => (7200, 72000),      // 2h-20h
-            MissionType::GatewayExpedition => (259200, 259200), // 72h / 3 days
+            MissionType::GatewayExpedition => (172800, 172800), // 48h
         }
     }
 
