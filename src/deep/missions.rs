@@ -363,6 +363,11 @@ fn prune_invalid_pool_missions(
     let before = pool.len();
     let mut seen: std::collections::HashSet<(u32, MissionType)> = std::collections::HashSet::new();
     pool.retain(|m| {
+        // Gateway Expedition is exempt from window pruning — it pins at Layer 30
+        // until completed, regardless of how far the frontier has advanced.
+        if matches!(m.mission_type, MissionType::GatewayExpedition) {
+            return true;
+        }
         let valid =
             layer_in_window(m.layer, persistent) && is_valid_construction_mission(m, persistent);
         if !valid {
@@ -435,7 +440,18 @@ fn replenish_mission_pool(
 ) -> bool {
     let mut changed = prune_invalid_pool_missions(pool, persistent, active_missions);
 
-    if !pool_has_role(pool, MissionPoolRole::Progression) {
+    // Gateway Expedition must always be present when conditions are met, even if
+    // another Progression-role mission (Breakthrough) already exists in the pool.
+    if persistent.frontier_layer() >= GATEWAY_LAYER
+        && !persistent.gateway_opened
+        && !has_type(pool, MissionType::GatewayExpedition)
+    {
+        let candidate = progression_candidate(persistent, rng)
+            .expect("progression_candidate must return GatewayExpedition when conditions are met");
+        changed |= push_or_replace_for_role(pool, count, candidate, |m| {
+            mission_pool_role(m.mission_type) != MissionPoolRole::Progression
+        });
+    } else if !pool_has_role(pool, MissionPoolRole::Progression) {
         if let Some(candidate) = progression_candidate(persistent, rng) {
             changed |= push_or_replace_for_role(pool, count, candidate, |m| {
                 mission_pool_role(m.mission_type) != MissionPoolRole::Progression
