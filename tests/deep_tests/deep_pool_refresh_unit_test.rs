@@ -21,7 +21,7 @@
 use chrono::{Duration, TimeZone, Utc};
 use quest::deep::{
     available_mission_count, generate_mission_pool, maybe_refresh_mission_pool, AvailableMission,
-    DeepPersistent, DeepPrestige, DeepState, GuildRank, Infrastructure, MissionType,
+    DeepPersistent, DeepPrestige, DeepState, GuildRank, Infrastructure, MissionType, GATEWAY_LAYER,
     POOL_REFRESH_INTERVAL_SECS,
 };
 use rand::SeedableRng;
@@ -772,4 +772,98 @@ fn all_pool_missions_have_positive_duration() {
             mission.layer
         );
     }
+}
+
+// =========================================================================
+// 9. Gateway Expedition survives rolling rebalance when frontier passes L30
+// =========================================================================
+
+#[test]
+fn gateway_expedition_survives_rolling_rebalance_past_layer_30() {
+    // Regression: when frontier advances 3+ layers past GATEWAY_LAYER, the gate
+    // expedition at L30 falls outside layer_window() and was pruned. A Breakthrough
+    // at the current frontier filled the Progression role, so the gate was never
+    // re-added.
+    let frontier = GATEWAY_LAYER + 5; // L35 — well outside window of (33..=35)
+    let mut persistent = make_persistent_with_frontier(frontier);
+    persistent.guild_rank = GuildRank(5);
+    // Gateway not yet opened — gate expedition should be pinned.
+    persistent.gateway_opened = false;
+
+    let now = t0();
+
+    // 1. Full refresh: gate expedition should appear.
+    let mut prestige = DeepPrestige::new();
+    prestige.warband_marks = 100_000;
+    maybe_refresh_mission_pool(&mut prestige, &persistent, now, &mut seeded_rng());
+
+    let has_gate = |p: &DeepPrestige| {
+        p.available_missions
+            .iter()
+            .any(|m| matches!(m.mission_type, MissionType::GatewayExpedition))
+    };
+    assert!(
+        has_gate(&prestige),
+        "full refresh must include GatewayExpedition when gateway not opened"
+    );
+
+    // 2. Rolling rebalance (pool is fresh, not stale): gate must survive.
+    let shortly_after = now + Duration::seconds(1);
+    maybe_refresh_mission_pool(&mut prestige, &persistent, shortly_after, &mut seeded_rng());
+
+    assert!(
+        has_gate(&prestige),
+        "GatewayExpedition must survive rolling rebalance when frontier is past L30"
+    );
+
+    // 3. Multiple successive ticks: gate must persist.
+    for tick in 2..=10 {
+        let t = now + Duration::seconds(tick);
+        maybe_refresh_mission_pool(&mut prestige, &persistent, t, &mut seeded_rng());
+    }
+    assert!(
+        has_gate(&prestige),
+        "GatewayExpedition must persist across multiple rolling rebalance ticks"
+    );
+}
+
+#[test]
+fn gateway_expedition_injected_into_pool_missing_it_on_load() {
+    // Simulates loading a save where the pool has a Breakthrough but no gate
+    // expedition (e.g., save from before the pinning fix was added). The rolling
+    // rebalance must inject the gate even though another Progression mission exists.
+    let frontier = GATEWAY_LAYER + 5;
+    let mut persistent = make_persistent_with_frontier(frontier);
+    persistent.guild_rank = GuildRank(5);
+    persistent.gateway_opened = false;
+
+    let now = t0();
+
+    // Manually build a pool with a Breakthrough (Progression role) but no gate.
+    let mut prestige = DeepPrestige::new();
+    prestige.warband_marks = 100_000;
+    prestige.available_missions = vec![AvailableMission {
+        mission_type: MissionType::Breakthrough,
+        layer: frontier,
+        duration_secs: 86400,
+        min_squad_power: 500,
+        marks_cost: 0,
+        required_archetype: None,
+        recommended_archetype: None,
+        description: String::new(),
+    }];
+    prestige.pool_refreshed_at = Some(now - Duration::seconds(10));
+
+    // Rolling rebalance (pool is fresh and non-empty).
+    maybe_refresh_mission_pool(&mut prestige, &persistent, now, &mut seeded_rng());
+
+    let has_gate = prestige
+        .available_missions
+        .iter()
+        .any(|m| matches!(m.mission_type, MissionType::GatewayExpedition));
+
+    assert!(
+        has_gate,
+        "rolling rebalance must inject GatewayExpedition even when Breakthrough fills Progression role"
+    );
 }
