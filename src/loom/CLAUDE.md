@@ -13,6 +13,8 @@ src/loom/
 ├── patterns.rs     — Woven Pattern sustain timer and completion tracking
 ├── discovery.rs    — 28 woven patterns defined in create_pattern_sequence()
 ├── milestones.rs   — Pattern milestone types and helpers for key pattern completion modals
+├── graph.rs        — petgraph DAG construction, rebuild logic, ghost nodes, rate updates
+├── layout.rs       — Sugiyama layout engine: layer assignment, crossing minimization, coordinate assignment
 └── persistence.rs  — Save/load from ~/.quest/loom.json
 ```
 
@@ -23,12 +25,16 @@ src/loom/
 | `NodeId` | Enum of 6 fixed extractor identities (EmberSpindle, VoidCondenser, etc.) |
 | `LoomNodeRef` | Unified addressing: `Extractor(NodeId)` or `Shuttle(usize)` — used in shuttle source fields |
 | `LoomNode` | Extractor state: level, buffers per resource, nature, stall flag, unlocked status |
-| `Shuttle` | Recipe-locked processing node: input_a/b, nature, output, amount, tier, buffer, sources_a/sources_b, construction state |
+| `Shuttle` | Recipe-locked processing node: input_a/b, nature, output, amount, tier, buffer, sources_a/sources_b, construction state; `output_rate_tracker: RateTracker` (transient, not serialized) |
 | `Resource` | Enum of all resources: 6 base + confluence + reaction products |
 | `WovenPattern` | Pattern with resource requirements (sustained rate thresholds and durations), completion state |
 | `RateTracker` | 60-second rolling window rate measurement (transient, not serialized) |
 | `LoomState` | Top-level state: `persistent` (saved) + `ui_state` (transient) |
 | `LoomPersistent` | Saved state: nodes, shuttles, stockpile, codex, patterns |
+| `LoomGraphNode` | Graph node enum: `Extractor(NodeId)`, `Shuttle(usize)`, `PatternSink(usize)` |
+| `LoomEdge` | Edge weight: resource type, current_rate, max_rate |
+| `LoomGraph` | `StableDiGraph` wrapper with reverse lookup maps |
+| `LoomLayout` | Computed node positions (x, y) and dummy node paths for long edges |
 
 ## Node Addressing with LoomNodeRef
 
@@ -82,7 +88,7 @@ Shuttles are recipe-locked processing nodes that create multi-step production ch
 | T2 | 8 patterns complete | 150 of input_a resource |
 | T3 | 15 patterns complete | 100 of input_a resource |
 
-**Shuttle limit**: Max shuttles = number of completed Woven Patterns (max 28).
+**Shuttle limit**: Governed by a milestone curve (`MAX_SHUTTLES = 12`). Capacity unlocks at specific pattern completion milestones rather than scaling 1:1 with pattern count.
 
 **Construction**: Shuttles have a 50-tick construction period. `tick_shuttle_construction()` decrements timers and marks them ready.
 
@@ -116,17 +122,17 @@ Extractor (base production) → [direct pull] → Shuttle (recipe processing) �
 3. Shuttles consume input resources and produce output resources into their buffer
 4. `tick_pattern_sustain()` draws from stockpiles and shuttle output to advance pattern requirements
 
-## UI (in `src/ui/loom_scene.rs`)
+## UI (in `src/ui/loom_scene.rs` and `src/ui/loom_graph.rs`)
 
 Two views controlled by `LoomView` enum:
-- **FlowView**: 2D grid with extractors in top 3x2 grid, shuttles in scrollable processing area below (2 columns). Shows source connections in detail panel.
+- **GraphView**: Canvas-based DAG visualization using petgraph. Nodes arranged in layers — extractors (layer 0), T1/T2/T3 shuttles (layers 1–3), pattern sinks (layer 4). Animated edges with particles and glow propagation reflecting live flow rates. Bottom panel shows node detail, build flow, or pattern info depending on selection. Layout computed by `layout.rs` (Sugiyama algorithm).
 - **Codex**: Recipe codex showing discovered and undiscovered recipes.
 
-Shuttle boxes show: recipe name, tier badge, construction progress, buffer levels, stall indicator.
+Shuttle nodes show: recipe name, tier badge, construction progress, buffer levels, stall indicator.
 
 ## Input (in `src/input/loom_input.rs`)
 
-FlowView navigation: arrow keys move a 2D cursor across extractors (indices 0-5) and shuttles (indices 6+). Key bindings:
+GraphView navigation: arrow keys follow graph topology — moving to adjacent nodes along edges rather than a fixed 2D grid. Key bindings:
 - `B` — build shuttle (opens recipe selection)
 - `D` — demolish selected shuttle
 - `Enter` — select/interact with node
@@ -181,8 +187,9 @@ When all 28 Woven Patterns are complete, the Loom converts Weave Rate (WR) into 
 
 - **Ticked by**: `src/core/tick_stages.rs` `tick_loom()` — calls base production, `tick_shuttle_pull`, shuttle construction, stall detection, pattern sustain
 - **Input from**: `src/input/loom_input.rs` dispatches keyboard events
-- **Rendered by**: `src/ui/loom_scene.rs` renders FlowView and Codex views
+- **Rendered by**: `src/ui/loom_scene.rs` + `src/ui/loom_graph.rs` render GraphView and Codex views
 - **Persisted to**: `~/.quest/loom.json` via `persistence.rs`
 - **Discovery**: Triggered by pattern completion milestones
 - **Ascension** (`ascension/types.rs`): `ascension_pattern_gate()` checks pattern count for VII-X eligibility; `max_shuttle_level()` gates shuttle upgrades by Ascension tier
 - **Zones** (`zones/`): `loom_zone_cap_for_patterns()` unlocks Loom Zones 31-50 based on completed pattern count
+- **petgraph 0.7**: DAG construction and traversal in `graph.rs`; layout computed in `layout.rs`
