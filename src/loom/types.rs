@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
+/// Maximum number of shuttles a player can build (balance cap).
+pub const MAX_SHUTTLES: usize = 12;
+
 /// Which archetype the player chose at Loom unlock.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LoomArchetype {
@@ -147,6 +150,9 @@ pub struct Shuttle {
     /// Sources for input B — extractors or lower-tier shuttles.
     #[serde(default)]
     pub sources_b: Vec<LoomNodeRef>,
+    /// Per-shuttle output rate tracker (transient, not serialized).
+    #[serde(skip)]
+    pub output_rate_tracker: RateTracker,
 }
 
 impl Shuttle {
@@ -176,6 +182,7 @@ impl Shuttle {
             construction_ticks_remaining: 0,
             sources_a,
             sources_b,
+            output_rate_tracker: RateTracker::new(),
         }
     }
 }
@@ -317,9 +324,20 @@ impl LoomPersistent {
     }
 
     /// Maximum number of Shuttles the player can build.
-    /// Equal to the number of completed Woven Patterns.
+    /// Scales with completed Woven Patterns up to MAX_SHUTTLES.
     pub fn max_shuttles(&self) -> usize {
-        self.completed_pattern_count()
+        let patterns = self.completed_pattern_count();
+        let slots = match patterns {
+            0 => 0,
+            1..=2 => 1,
+            3..=5 => 2,
+            6..=9 => 4,
+            10..=14 => 6,
+            15..=20 => 8,
+            21..=27 => 10,
+            _ => MAX_SHUTTLES,
+        };
+        slots.min(MAX_SHUTTLES)
     }
 }
 
@@ -355,6 +373,9 @@ pub struct LoomState {
     /// Debug time warp multiplier (1.0 = normal, 10/100/1000 = accelerated). Not saved.
     #[serde(skip, default = "default_time_warp")]
     pub time_warp: f64,
+    /// Signals the UI to rebuild the graph layout (set by tick-path logic, consumed by UI).
+    #[serde(skip)]
+    pub graph_dirty: bool,
 }
 
 impl LoomState {
@@ -363,6 +384,7 @@ impl LoomState {
             persistent: LoomPersistent::default(),
             rate_trackers: HashMap::new(),
             time_warp: 1.0,
+            graph_dirty: false,
         }
     }
 }
@@ -376,7 +398,7 @@ impl Default for LoomState {
 /// Which view the Loom UI is showing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LoomView {
-    FlowView,
+    GraphView,
     Codex,
 }
 
@@ -419,7 +441,10 @@ pub struct BuildState {
 pub struct LoomUiState {
     pub open: bool,
     pub view: LoomView,
-    pub selected_node: usize,
+    /// Currently selected node in the graph view (None = no selection).
+    pub selected_graph_node: Option<petgraph::stable_graph::NodeIndex>,
+    /// Per-edge animation phase for flowing particle effects.
+    pub particle_phases: HashMap<petgraph::stable_graph::EdgeIndex, f64>,
     /// Codex graph cursor: column (0=Base, 1=Confluence, 2=Terminal).
     pub codex_column: usize,
     /// Codex graph cursor: row within current column.
@@ -434,8 +459,9 @@ impl LoomUiState {
     pub fn new() -> Self {
         Self {
             open: false,
-            view: LoomView::FlowView,
-            selected_node: 0,
+            view: LoomView::GraphView,
+            selected_graph_node: None,
+            particle_phases: HashMap::new(),
             codex_column: 0,
             codex_row: 0,
             throbber_frame: 0,
@@ -445,6 +471,18 @@ impl LoomUiState {
 
     pub fn open(&mut self) {
         self.open = true;
+    }
+
+    /// Bridge helper: get the legacy selected_node index from selected_graph_node.
+    /// Returns 0 when no node is selected (will be removed once graph navigation is complete).
+    pub fn selected_node(&self) -> usize {
+        self.selected_graph_node.map(|n| n.index()).unwrap_or(0)
+    }
+
+    /// Bridge helper: set selected_graph_node from a legacy usize index.
+    /// Will be removed once graph navigation is complete.
+    pub fn set_selected_node(&mut self, idx: usize) {
+        self.selected_graph_node = Some(petgraph::stable_graph::NodeIndex::new(idx));
     }
 }
 

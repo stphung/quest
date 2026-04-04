@@ -23,7 +23,7 @@ pub(super) fn handle_loom(
         }
         KeyCode::Tab => {
             loom_ui.view = cycle_view(loom_ui.view);
-            loom_ui.selected_node = 0;
+            loom_ui.set_selected_node(0);
             loom_ui.codex_column = 0;
             loom_ui.codex_row = 0;
             InputResult::Continue
@@ -33,10 +33,10 @@ pub(super) fn handle_loom(
                 LoomView::Codex => {
                     loom_ui.codex_row = loom_ui.codex_row.saturating_sub(1);
                 }
-                LoomView::FlowView => {
+                LoomView::GraphView => {
                     // Diamond layout: 0=ES, 1=RL, 2=RF, 3=VC, 4=SW, 5=MA, 6+=shuttles
                     // Up moves to the previous row, preserving left/right position.
-                    loom_ui.selected_node = match loom_ui.selected_node {
+                    let new = match loom_ui.selected_node() {
                         0 => 0,              // ES: stay
                         1 | 2 => 0,          // RL/RF → ES
                         3 => 1,              // VC → RL
@@ -46,6 +46,7 @@ pub(super) fn handle_loom(
                         n if n > 6 => n - 1, // shuttle list: move up one
                         n => n,
                     };
+                    loom_ui.set_selected_node(new);
                 }
             }
             InputResult::Continue
@@ -58,10 +59,10 @@ pub(super) fn handle_loom(
                         loom_ui.codex_row += 1;
                     }
                 }
-                LoomView::FlowView => {
+                LoomView::GraphView => {
                     // Diamond layout: down moves to the next row.
                     let total_nodes = 6 + loom_state.persistent.shuttles.len();
-                    loom_ui.selected_node = match loom_ui.selected_node {
+                    let new = match loom_ui.selected_node() {
                         0 => 1,     // ES → RL (default left)
                         1 => 3,     // RL → VC
                         2 => 4,     // RF → SW
@@ -84,6 +85,7 @@ pub(super) fn handle_loom(
                         }
                         n => n,
                     };
+                    loom_ui.set_selected_node(new);
                 }
             }
             InputResult::Continue
@@ -108,26 +110,26 @@ pub(super) fn handle_loom(
             }
             InputResult::Continue
         }
-        KeyCode::Left if loom_ui.view == LoomView::FlowView => {
+        KeyCode::Left if loom_ui.view == LoomView::GraphView => {
             // Diamond layout: left toggles to left node on pair rows.
-            match loom_ui.selected_node {
-                2 => loom_ui.selected_node = 1, // RF → RL
-                4 => loom_ui.selected_node = 3, // SW → VC
+            match loom_ui.selected_node() {
+                2 => loom_ui.set_selected_node(1), // RF → RL
+                4 => loom_ui.set_selected_node(3), // SW → VC
                 _ => {}
             }
             InputResult::Continue
         }
-        KeyCode::Right if loom_ui.view == LoomView::FlowView => {
+        KeyCode::Right if loom_ui.view == LoomView::GraphView => {
             // Diamond layout: right toggles to right node on pair rows.
-            match loom_ui.selected_node {
-                1 => loom_ui.selected_node = 2, // RL → RF
-                3 => loom_ui.selected_node = 4, // VC → SW
+            match loom_ui.selected_node() {
+                1 => loom_ui.set_selected_node(2), // RL → RF
+                3 => loom_ui.set_selected_node(4), // VC → SW
                 _ => {}
             }
             InputResult::Continue
         }
         KeyCode::Char('u') | KeyCode::Char('U')
-            if loom_ui.view == LoomView::FlowView && loom_ui.selected_node < 6 =>
+            if loom_ui.view == LoomView::GraphView && loom_ui.selected_node() < 6 =>
         {
             // Diamond layout grid_ids: 0=ES, 1=RL, 2=RF, 3=VC, 4=SW, 5=MA
             let grid_ids = [
@@ -138,7 +140,7 @@ pub(super) fn handle_loom(
                 crate::loom::types::NodeId::SilenceWell,
                 crate::loom::types::NodeId::MemoryArchive,
             ];
-            let node_id = grid_ids[loom_ui.selected_node];
+            let node_id = grid_ids[loom_ui.selected_node()];
             if crate::loom::try_upgrade_node(loom_state, node_id) {
                 InputResult::NeedsSave
             } else {
@@ -146,20 +148,20 @@ pub(super) fn handle_loom(
             }
         }
         KeyCode::Enter => InputResult::Continue,
-        KeyCode::Char('b') | KeyCode::Char('B') if loom_ui.view == LoomView::FlowView => {
+        KeyCode::Char('b') | KeyCode::Char('B') if loom_ui.view == LoomView::GraphView => {
             start_build(loom_state, loom_ui);
             InputResult::Continue
         }
         KeyCode::Char('d') | KeyCode::Char('D')
-            if loom_ui.view == LoomView::FlowView && loom_ui.selected_node >= 6 =>
+            if loom_ui.view == LoomView::GraphView && loom_ui.selected_node() >= 6 =>
         {
-            let shuttle_idx = loom_ui.selected_node - 6;
+            let shuttle_idx = loom_ui.selected_node() - 6;
             if shuttle_idx < loom_state.persistent.shuttles.len() {
                 crate::loom::demolish_shuttle(loom_state, shuttle_idx);
                 // Clamp selection if we deleted the last item.
                 let total = 6 + loom_state.persistent.shuttles.len();
-                if loom_ui.selected_node >= total && total > 0 {
-                    loom_ui.selected_node = total - 1;
+                if loom_ui.selected_node() >= total && total > 0 {
+                    loom_ui.set_selected_node(total - 1);
                 }
                 InputResult::NeedsSave
             } else {
@@ -413,8 +415,8 @@ fn codex_column_len(col: usize) -> usize {
 /// Cycle through views.
 fn cycle_view(current: LoomView) -> LoomView {
     match current {
-        LoomView::FlowView => LoomView::Codex,
-        LoomView::Codex => LoomView::FlowView,
+        LoomView::GraphView => LoomView::Codex,
+        LoomView::Codex => LoomView::GraphView,
     }
 }
 
@@ -436,7 +438,7 @@ mod tests {
     #[test]
     fn esc_closes_overlay() {
         let mut state = LoomState::new();
-        let mut ui = make_ui(LoomView::FlowView);
+        let mut ui = make_ui(LoomView::GraphView);
         ui.open = true;
 
         handle_loom(key(KeyCode::Esc), &mut state, &mut ui);
@@ -446,21 +448,21 @@ mod tests {
     #[test]
     fn tab_cycles_views() {
         let mut state = LoomState::new();
-        let mut ui = make_ui(LoomView::FlowView);
+        let mut ui = make_ui(LoomView::GraphView);
 
         handle_loom(key(KeyCode::Tab), &mut state, &mut ui);
         assert_eq!(ui.view, LoomView::Codex);
 
         handle_loom(key(KeyCode::Tab), &mut state, &mut ui);
-        assert_eq!(ui.view, LoomView::FlowView);
+        assert_eq!(ui.view, LoomView::GraphView);
     }
 
     #[test]
     fn left_right_no_op_outside_flow_view() {
         let mut state = LoomState::new();
-        let mut ui = make_ui(LoomView::FlowView);
+        let mut ui = make_ui(LoomView::GraphView);
 
-        // Left/Right in FlowView should not be handled as ratio adjustment.
+        // Left/Right in GraphView should not be handled as ratio adjustment.
         // It falls through to the catch-all Continue branch.
         let result = handle_loom(key(KeyCode::Left), &mut state, &mut ui);
         assert!(matches!(result, InputResult::Continue));
@@ -490,16 +492,16 @@ mod tests {
                     crate::loom::types::NodeId::VoidCondenser,
                 )],
             ));
-        let mut ui = make_ui(LoomView::FlowView);
-        ui.selected_node = 4; // SW in diamond layout
+        let mut ui = make_ui(LoomView::GraphView);
+        ui.set_selected_node(4); // SW in diamond layout
 
         handle_loom(key(KeyCode::Down), &mut state, &mut ui);
-        assert_eq!(ui.selected_node, 5, "SW → MA");
+        assert_eq!(ui.selected_node(), 5, "SW → MA");
 
         handle_loom(key(KeyCode::Down), &mut state, &mut ui);
-        assert_eq!(ui.selected_node, 6, "MA → shuttle area");
+        assert_eq!(ui.selected_node(), 6, "MA → shuttle area");
 
         handle_loom(key(KeyCode::Up), &mut state, &mut ui);
-        assert_eq!(ui.selected_node, 5, "shuttle → MA");
+        assert_eq!(ui.selected_node(), 5, "shuttle → MA");
     }
 }

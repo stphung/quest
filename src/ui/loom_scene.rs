@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 //!
 //! Dispatches to different view renderers based on `LoomUiState::view`:
-//!   - FlowView:           pipeline diagram with extractors and shuttles
+//!   - GraphView:           pipeline diagram with extractors and shuttles
 //!   - Codex:              recipe codex
 
 use crate::loom::patterns::all_patterns_complete;
@@ -142,7 +142,7 @@ pub fn render_loom_overlay(
     frame.render_widget(Clear, area);
 
     let view_name = match ui.view {
-        LoomView::FlowView => "Flow View",
+        LoomView::GraphView => "Graph View",
         LoomView::Codex => "Recipe Codex",
     };
 
@@ -168,7 +168,7 @@ pub fn render_loom_overlay(
     }
 
     match ui.view {
-        LoomView::FlowView => {
+        LoomView::GraphView => {
             render_flow_view(frame, inner, loom_state, ui);
         }
         LoomView::Codex => {
@@ -639,7 +639,7 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
     use crate::loom::types::NodeId;
 
     // If selected_node >= 6, show shuttle detail instead of extractor detail.
-    if ui.selected_node >= 6 {
+    if ui.selected_node() >= 6 {
         render_flow_sidebar_shuttle(frame, area, loom_state, ui);
         return;
     }
@@ -654,7 +654,7 @@ fn render_flow_sidebar(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui
         NodeId::SilenceWell,
         NodeId::MemoryArchive,
     ];
-    let selected_id = grid_order[ui.selected_node.min(grid_order.len() - 1)];
+    let selected_id = grid_order[ui.selected_node().min(grid_order.len() - 1)];
     let node = match loom_state
         .persistent
         .nodes
@@ -908,7 +908,7 @@ fn render_flow_sidebar_shuttle(
     loom_state: &LoomState,
     ui: &LoomUiState,
 ) {
-    let shuttle_idx = ui.selected_node - 6;
+    let shuttle_idx = ui.selected_node() - 6;
     let shuttles = &loom_state.persistent.shuttles;
 
     let title = if shuttle_idx < shuttles.len() {
@@ -1274,7 +1274,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
         NodeId::SilenceWell,    // 4: right branch tier 2
         NodeId::MemoryArchive,  // 5: bottom center
     ];
-    let selected_id = grid_ids[ui.selected_node.min(5)];
+    let selected_id = grid_ids[ui.selected_node().min(5)];
 
     // Determine shuttle section height.
     let shuttles = &loom_state.persistent.shuttles;
@@ -1364,7 +1364,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
             es_rect,
             node,
             loom_state,
-            ui.selected_node < 6 && selected_id == NodeId::EmberSpindle,
+            ui.selected_node() < 6 && selected_id == NodeId::EmberSpindle,
         );
     }
 
@@ -1381,7 +1381,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
             rl_rect,
             node,
             loom_state,
-            ui.selected_node < 6 && selected_id == NodeId::ReflectionLens,
+            ui.selected_node() < 6 && selected_id == NodeId::ReflectionLens,
         );
     }
     if let Some(node) = loom_state
@@ -1395,7 +1395,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
             rf_rect,
             node,
             loom_state,
-            ui.selected_node < 6 && selected_id == NodeId::ResonanceForge,
+            ui.selected_node() < 6 && selected_id == NodeId::ResonanceForge,
         );
     }
 
@@ -1412,7 +1412,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
             vc_rect,
             node,
             loom_state,
-            ui.selected_node < 6 && selected_id == NodeId::VoidCondenser,
+            ui.selected_node() < 6 && selected_id == NodeId::VoidCondenser,
         );
     }
     if let Some(node) = loom_state
@@ -1426,7 +1426,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
             sw_rect,
             node,
             loom_state,
-            ui.selected_node < 6 && selected_id == NodeId::SilenceWell,
+            ui.selected_node() < 6 && selected_id == NodeId::SilenceWell,
         );
     }
 
@@ -1443,7 +1443,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
             ma_rect,
             node,
             loom_state,
-            ui.selected_node < 6 && selected_id == NodeId::MemoryArchive,
+            ui.selected_node() < 6 && selected_id == NodeId::MemoryArchive,
         );
     }
 
@@ -1621,7 +1621,7 @@ fn render_flow_view(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &
                     if y >= section_end {
                         break;
                     }
-                    let is_sel = ui.selected_node >= 6 && (ui.selected_node - 6) == i;
+                    let is_sel = ui.selected_node() >= 6 && (ui.selected_node() - 6) == i;
 
                     let ea = resource_emoji(&shuttle.input_a);
                     let eb = resource_emoji(&shuttle.input_b);
@@ -2730,7 +2730,7 @@ fn render_nav_hints(frame: &mut Frame, area: Rect, ui: &LoomUiState) {
 
     let hints = if ui.build.is_some() {
         " [Up/Down] Select  [Space] Toggle  [Enter] Confirm  [Esc] Cancel "
-    } else if ui.view == LoomView::FlowView {
+    } else if ui.view == LoomView::GraphView {
         " [Tab] Switch View  [Arrows] Navigate  [U] Upgrade  [B] Build  [D] Demolish  [Esc] Close "
     } else {
         " [Tab] Switch View  [Up/Down] Navigate  [Esc] Close "
