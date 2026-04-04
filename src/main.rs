@@ -1201,6 +1201,7 @@ fn main() -> io::Result<()> {
                                     && !haven_ui.showing
                                     && !soulforge_ui.open
                                     && !exchange_ui.open
+                                    && !loom_ui.open
                                 {
                                     overlay = pending_overlays.pop_front().unwrap();
                                 }

@@ -1036,11 +1036,16 @@ pub(super) fn tick_loom(
         return;
     }
 
-    const TICK_SECONDS: f64 = 0.1; // 100ms tick interval
+    let warp = if loom.time_warp > 0.0 {
+        loom.time_warp
+    } else {
+        1.0
+    };
+    let tick_seconds: f64 = 0.1 * warp; // 100ms tick interval × debug time warp
 
     // Tick staggered second-node unlock.
     if loom.persistent.second_node_unlock_elapsed.is_some() {
-        let unlocked = crate::loom::tick_loom_staggered_unlock(loom, TICK_SECONDS);
+        let unlocked = crate::loom::tick_loom_staggered_unlock(loom, tick_seconds);
         if unlocked {
             result.loom_changed = true;
         }
@@ -1053,7 +1058,7 @@ pub(super) fn tick_loom(
     }
 
     // Tick direct-pull shuttle processing.
-    let shuttle_produced = crate::loom::tick_shuttle_pull(loom, TICK_SECONDS);
+    let shuttle_produced = crate::loom::tick_shuttle_pull(loom, tick_seconds);
 
     // Update stall flags for UI display.
     crate::loom::tick_stall_detection(loom);
@@ -1062,7 +1067,7 @@ pub(super) fn tick_loom(
     crate::loom::tick_shuttle_stall_detection(loom);
 
     // Tick base production for all unlocked nodes.
-    let mut produced = crate::loom::tick_base_production(loom, TICK_SECONDS);
+    let mut produced = crate::loom::tick_base_production(loom, tick_seconds);
 
     // Merge shuttle production into base production map for pattern sustain.
     for (resource, amount) in shuttle_produced {
@@ -1070,17 +1075,19 @@ pub(super) fn tick_loom(
     }
 
     // Tick neighbor unlocking.
-    let newly_unlocked = crate::loom::tick_neighbor_unlocking(loom, TICK_SECONDS);
+    let newly_unlocked = crate::loom::tick_neighbor_unlocking(loom, tick_seconds);
     if !newly_unlocked.is_empty() {
         result.loom_changed = true;
     }
 
     // Push per-tick production amounts into rate trackers.
+    // Divide by time_warp so the rolling-window rate reflects the logical (un-warped)
+    // production rate. The actual buffers already received the full warped amount.
     for (resource, &amount) in &produced {
         loom.rate_trackers
             .entry(*resource)
             .or_default()
-            .push(amount);
+            .push(amount / warp);
     }
     // Push 0.0 for resources not produced this tick (so their rate decays naturally).
     let all_resources = [
@@ -1112,7 +1119,7 @@ pub(super) fn tick_loom(
         .collect();
 
     let pattern_completed =
-        crate::loom::tick_pattern_sustain(&mut loom.persistent, &rates, TICK_SECONDS);
+        crate::loom::tick_pattern_sustain(&mut loom.persistent, &rates, tick_seconds);
     if pattern_completed {
         result.loom_changed = true;
         let completed_count = loom.persistent.completed_pattern_count();

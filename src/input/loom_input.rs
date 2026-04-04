@@ -37,15 +37,13 @@ pub(super) fn handle_loom(
                     // Diamond layout: 0=ES, 1=RL, 2=RF, 3=VC, 4=SW, 5=MA, 6+=shuttles
                     // Up moves to the previous row, preserving left/right position.
                     loom_ui.selected_node = match loom_ui.selected_node {
-                        0 => 0,     // ES: stay
-                        1 | 2 => 0, // RL/RF → ES
-                        3 => 1,     // VC → RL
-                        4 => 2,     // SW → RF
-                        5 => 3,     // MA → VC (default left)
-                        n if n >= 6 => {
-                            // Shuttles → MA
-                            5
-                        }
+                        0 => 0,              // ES: stay
+                        1 | 2 => 0,          // RL/RF → ES
+                        3 => 1,              // VC → RL
+                        4 => 2,              // SW → RF
+                        5 => 3,              // MA → VC (default left)
+                        6 => 5,              // first shuttle → MA
+                        n if n > 6 => n - 1, // shuttle list: move up one
                         n => n,
                     };
                 }
@@ -77,9 +75,9 @@ pub(super) fn handle_loom(
                             }
                         }
                         n if n >= 6 => {
-                            // Navigate within shuttles (2-col grid)
-                            if n + 2 < total_nodes {
-                                n + 2
+                            // Shuttle list: move down one
+                            if n + 1 < total_nodes {
+                                n + 1
                             } else {
                                 n
                             }
@@ -111,29 +109,26 @@ pub(super) fn handle_loom(
             InputResult::Continue
         }
         KeyCode::Left if loom_ui.view == LoomView::FlowView => {
-            // Diamond layout: left toggles to left node on pair rows, or moves in shuttle grid.
+            // Diamond layout: left toggles to left node on pair rows.
             match loom_ui.selected_node {
-                2 => loom_ui.selected_node = 1,                          // RF → RL
-                4 => loom_ui.selected_node = 3,                          // SW → VC
-                n if n >= 6 && n % 2 == 1 => loom_ui.selected_node -= 1, // shuttle right → left
+                2 => loom_ui.selected_node = 1, // RF → RL
+                4 => loom_ui.selected_node = 3, // SW → VC
                 _ => {}
             }
             InputResult::Continue
         }
         KeyCode::Right if loom_ui.view == LoomView::FlowView => {
             // Diamond layout: right toggles to right node on pair rows.
-            let total_nodes = 6 + loom_state.persistent.shuttles.len();
             match loom_ui.selected_node {
                 1 => loom_ui.selected_node = 2, // RL → RF
                 3 => loom_ui.selected_node = 4, // VC → SW
-                n if n >= 6 && n % 2 == 0 && n + 1 < total_nodes => {
-                    loom_ui.selected_node += 1; // shuttle left → right
-                }
                 _ => {}
             }
             InputResult::Continue
         }
-        KeyCode::Char('u') | KeyCode::Char('U') if loom_ui.view == LoomView::FlowView => {
+        KeyCode::Char('u') | KeyCode::Char('U')
+            if loom_ui.view == LoomView::FlowView && loom_ui.selected_node < 6 =>
+        {
             // Diamond layout grid_ids: 0=ES, 1=RL, 2=RF, 3=VC, 4=SW, 5=MA
             let grid_ids = [
                 crate::loom::types::NodeId::EmberSpindle,
@@ -143,7 +138,7 @@ pub(super) fn handle_loom(
                 crate::loom::types::NodeId::SilenceWell,
                 crate::loom::types::NodeId::MemoryArchive,
             ];
-            let node_id = grid_ids[loom_ui.selected_node.min(5)];
+            let node_id = grid_ids[loom_ui.selected_node];
             if crate::loom::try_upgrade_node(loom_state, node_id) {
                 InputResult::NeedsSave
             } else {
@@ -250,6 +245,29 @@ fn handle_build_input(
         BuildStep::SelectRecipe { cursor } => {
             let recipes = crate::loom::recipes::all_recipes();
             match key.code {
+                KeyCode::Tab | KeyCode::BackTab => {
+                    // Cycle through unlocked tiers.
+                    let tiers = crate::loom::unlocked_tiers(loom_state);
+                    if tiers.len() > 1 {
+                        let current_pos = tiers.iter().position(|&t| t == build.tier).unwrap_or(0);
+                        let next_pos = if key.code == KeyCode::Tab {
+                            (current_pos + 1) % tiers.len()
+                        } else {
+                            (current_pos + tiers.len() - 1) % tiers.len()
+                        };
+                        build.tier = tiers[next_pos];
+                        build.available_recipes = recipes
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, r)| r.tier == build.tier)
+                            .map(|(i, _)| i)
+                            .collect();
+                        *cursor = 0;
+                        if !build.available_recipes.is_empty() {
+                            build.recipe_index = build.available_recipes[0];
+                        }
+                    }
+                }
                 KeyCode::Up => {
                     *cursor = cursor.saturating_sub(1);
                 }

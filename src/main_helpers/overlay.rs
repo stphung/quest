@@ -109,30 +109,9 @@ pub fn draw_game_overlays(
     let layout_ctx: &ui::responsive::LayoutContext = extras.layout_ctx;
 
     let area = frame.area();
+
+    // Full-screen GameOverlay variants (render before other overlays).
     match overlay {
-        GameOverlay::OfflineWelcome { report } => {
-            ui::game_common::render_offline_welcome(frame, area, report, layout_ctx);
-        }
-        GameOverlay::PrestigeConfirm => {
-            ui::prestige_confirm::draw_prestige_confirm(frame, state, layout_ctx);
-        }
-        GameOverlay::HavenDiscovery => {
-            ui::haven_scene::render_haven_discovery_modal(frame, area, layout_ctx);
-        }
-        GameOverlay::SoulforgeDiscovery => {
-            ui::soulforge_scene::render_soulforge_discovery_modal(frame, area, layout_ctx);
-        }
-        GameOverlay::StormglassDiscovery => {
-            ui::stormglass_scene::render_stormglass_discovery_modal(frame, area, layout_ctx);
-        }
-        GameOverlay::AchievementUnlocked { ref achievements } => {
-            ui::achievement_browser_scene::render_achievement_unlocked_modal(
-                frame,
-                area,
-                achievements,
-                layout_ctx,
-            );
-        }
         GameOverlay::VaultSelection {
             selected_index,
             ref selected_slots,
@@ -174,32 +153,6 @@ pub fn draw_game_overlays(
                 );
             }
         }
-        GameOverlay::LeviathanEncounter {
-            encounter_number,
-            lure_consumed,
-        } => {
-            ui::fishing_scene::render_leviathan_encounter_modal(
-                frame,
-                area,
-                *encounter_number,
-                *lure_consumed,
-                layout_ctx,
-            );
-        }
-        GameOverlay::LeviathanCatchMiss { lure_consumed } => {
-            ui::fishing_scene::render_leviathan_catch_miss_modal(
-                frame,
-                area,
-                *lure_consumed,
-                layout_ctx,
-            );
-        }
-        GameOverlay::QuitConfirm => {
-            draw_quit_confirm(frame, state.challenge_menu.challenges.len(), layout_ctx);
-        }
-        GameOverlay::BrowserLink { ref url } => {
-            ui::bug_report_scene::draw_browser_link_modal(frame, url, layout_ctx);
-        }
         GameOverlay::BugReport {
             ref summary,
             clipboard_ready,
@@ -216,36 +169,7 @@ pub fn draw_game_overlays(
         GameOverlay::TimeVault { ref browser } => {
             ui::time_vault_scene::draw_time_vault(frame, area, browser, layout_ctx);
         }
-        GameOverlay::DeepDiscovery => {
-            ui::deep_scene::render_deep_discovery_modal(frame, area, layout_ctx);
-        }
-        GameOverlay::FractureRegionUnlock { region } => {
-            ui::combat_scene::render_fracture_region_unlock_modal(
-                frame,
-                area,
-                *region,
-                state.ascension_level,
-                layout_ctx,
-            );
-        }
-        GameOverlay::AscensionConfirm => {
-            ui::ascension_scene::render_ascension_confirm(
-                frame, area, state, deep_state, loom_state, layout_ctx,
-            );
-        }
-        GameOverlay::LoomDiscovery => {
-            ui::loom_scene::render_loom_discovery_modal(frame, area, layout_ctx);
-        }
-        GameOverlay::PatternMilestoneUnlock { milestone } => {
-            ui::combat_scene::render_pattern_milestone_modal(
-                frame,
-                area,
-                *milestone,
-                state.ascension_level,
-                layout_ctx,
-            );
-        }
-        GameOverlay::None => {}
+        _ => {} // Small modals render after all overlays below.
     }
 
     // Haven screen overlay
@@ -316,6 +240,89 @@ pub fn draw_game_overlays(
     // Loom of Worlds overlay
     if ctx.loom_ui.open {
         ui::loom_scene::render_loom_overlay(frame, area, ctx.loom_state, ctx.loom_ui);
+    }
+
+    // Small modals render on top of all overlays (Haven, Deep, Loom, etc.)
+    match overlay {
+        GameOverlay::OfflineWelcome { report } => {
+            ui::game_common::render_offline_welcome(frame, area, report, layout_ctx);
+        }
+        GameOverlay::PrestigeConfirm => {
+            ui::prestige_confirm::draw_prestige_confirm(frame, state, layout_ctx);
+        }
+        GameOverlay::HavenDiscovery => {
+            ui::haven_scene::render_haven_discovery_modal(frame, area, layout_ctx);
+        }
+        GameOverlay::SoulforgeDiscovery => {
+            ui::soulforge_scene::render_soulforge_discovery_modal(frame, area, layout_ctx);
+        }
+        GameOverlay::StormglassDiscovery => {
+            ui::stormglass_scene::render_stormglass_discovery_modal(frame, area, layout_ctx);
+        }
+        GameOverlay::AchievementUnlocked { ref achievements } => {
+            ui::achievement_browser_scene::render_achievement_unlocked_modal(
+                frame,
+                area,
+                achievements,
+                layout_ctx,
+            );
+        }
+        GameOverlay::LeviathanEncounter {
+            encounter_number,
+            lure_consumed,
+        } => {
+            ui::fishing_scene::render_leviathan_encounter_modal(
+                frame,
+                area,
+                *encounter_number,
+                *lure_consumed,
+                layout_ctx,
+            );
+        }
+        GameOverlay::LeviathanCatchMiss { lure_consumed } => {
+            ui::fishing_scene::render_leviathan_catch_miss_modal(
+                frame,
+                area,
+                *lure_consumed,
+                layout_ctx,
+            );
+        }
+        GameOverlay::QuitConfirm => {
+            draw_quit_confirm(frame, state.challenge_menu.challenges.len(), layout_ctx);
+        }
+        GameOverlay::BrowserLink { ref url } => {
+            ui::bug_report_scene::draw_browser_link_modal(frame, url, layout_ctx);
+        }
+        GameOverlay::DeepDiscovery => {
+            ui::deep_scene::render_deep_discovery_modal(frame, area, layout_ctx);
+        }
+        GameOverlay::FractureRegionUnlock { region } => {
+            ui::combat_scene::render_fracture_region_unlock_modal(
+                frame,
+                area,
+                *region,
+                state.ascension_level,
+                layout_ctx,
+            );
+        }
+        GameOverlay::AscensionConfirm => {
+            ui::ascension_scene::render_ascension_confirm(
+                frame, area, state, deep_state, loom_state, layout_ctx,
+            );
+        }
+        GameOverlay::LoomDiscovery => {
+            ui::loom_scene::render_loom_discovery_modal(frame, area, layout_ctx);
+        }
+        GameOverlay::PatternMilestoneUnlock { milestone } => {
+            ui::combat_scene::render_pattern_milestone_modal(
+                frame,
+                area,
+                *milestone,
+                state.ascension_level,
+                layout_ctx,
+            );
+        }
+        _ => {} // Full-screen overlays and None already handled above.
     }
 
     // Chrono Surge active: status banner at bottom

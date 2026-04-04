@@ -169,7 +169,7 @@ impl Shuttle {
             amount,
             tier,
             buffer: 0.0,
-            buffer_capacity: 200.0,
+            buffer_capacity: 500.0,
             level: 1,
             stalled: false,
             under_construction: false,
@@ -207,11 +207,15 @@ fn default_node_level() -> u32 {
 }
 
 fn default_buffer_capacity() -> f64 {
-    200.0
+    500.0
 }
 
 fn default_base_rate() -> f64 {
     50.0
+}
+
+fn default_time_warp() -> f64 {
+    1.0
 }
 
 impl LoomNode {
@@ -221,7 +225,7 @@ impl LoomNode {
             level: 1,
             unlocked: false,
             buffer: 0.0,
-            buffer_capacity: 200.0, // 4 hours at 50/hr base
+            buffer_capacity: 500.0, // 10 hours at 50/hr base
             base_rate: 50.0,
             stalled: false,
             unlock_progress: 0.0,
@@ -289,8 +293,9 @@ pub struct LoomPersistent {
     pub active_pattern: usize,
     #[serde(default)]
     pub patterns: Vec<WovenPattern>,
-    #[serde(default)]
-    pub stockpiles: HashMap<Resource, f64>,
+    /// Legacy field — previously held global resource stockpiles. Kept for serde compat.
+    #[serde(default, skip_serializing)]
+    pub _stockpiles_legacy: HashMap<Resource, f64>,
     #[serde(default)]
     pub second_node_unlock_elapsed: Option<f64>,
     /// Player-built shuttles (recipe-locked processing nodes).
@@ -331,7 +336,7 @@ impl Default for LoomPersistent {
             codex: Vec::new(),
             active_pattern: 0,
             patterns: Vec::new(),
-            stockpiles: HashMap::new(),
+            _stockpiles_legacy: HashMap::new(),
             second_node_unlock_elapsed: None,
             shuttles: Vec::new(),
             wr_pr_last_granted_at: 0,
@@ -347,6 +352,9 @@ pub struct LoomState {
     /// Per-resource rolling rate trackers (transient, not serialized).
     #[serde(skip)]
     pub rate_trackers: HashMap<Resource, RateTracker>,
+    /// Debug time warp multiplier (1.0 = normal, 10/100/1000 = accelerated). Not saved.
+    #[serde(skip, default = "default_time_warp")]
+    pub time_warp: f64,
 }
 
 impl LoomState {
@@ -354,6 +362,7 @@ impl LoomState {
         Self {
             persistent: LoomPersistent::default(),
             rate_trackers: HashMap::new(),
+            time_warp: 1.0,
         }
     }
 }
@@ -450,7 +459,7 @@ impl Default for LoomUiState {
 /// Uses a circular buffer of 600 ticks (at 100ms/tick = 60 seconds).
 /// The running sum gives O(1) per-tick updates. Not serialized — on load,
 /// it starts empty and ramps up over 60 seconds.
-const RATE_WINDOW_SIZE: usize = 600;
+const RATE_WINDOW_SIZE: usize = 200;
 const TICKS_PER_HOUR: f64 = 36_000.0;
 
 #[derive(Debug, Clone)]
@@ -479,8 +488,14 @@ impl RateTracker {
     }
 
     /// Returns the estimated production rate per hour based on the rolling window.
+    /// Divides by actual sample count (not window capacity) to avoid suppressed rates
+    /// during cold start / ramp-up.
     pub fn rate_per_hour(&self) -> f64 {
-        (self.sum / RATE_WINDOW_SIZE as f64) * TICKS_PER_HOUR
+        let count = self.buffer.len();
+        if count == 0 {
+            return 0.0;
+        }
+        (self.sum / count as f64) * TICKS_PER_HOUR
     }
 }
 
@@ -536,7 +551,7 @@ mod tests {
         assert_eq!(r.tier, 1);
         assert!(!r.stalled);
         assert!((r.buffer - 0.0).abs() < 0.001);
-        assert!((r.buffer_capacity - 200.0).abs() < 0.001);
+        assert!((r.buffer_capacity - 500.0).abs() < 0.001);
         assert_eq!(r.level, 1);
         assert_eq!(r.sources_a.len(), 1);
         assert_eq!(r.sources_b.len(), 1);
@@ -635,7 +650,8 @@ mod tests {
         let mut tracker = RateTracker::new();
         tracker.push(1.0);
         let rate = tracker.rate_per_hour();
-        assert!((rate - 60.0).abs() < 1e-6, "rate was {}", rate);
+        // 1 sample of 1.0 unit per tick → 1.0 * 36000 ticks/hr = 36000/hr
+        assert!((rate - 36000.0).abs() < 1e-6, "rate was {}", rate);
     }
 
     #[test]

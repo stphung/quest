@@ -66,6 +66,7 @@ enum DebugAction {
     LoomBuildTestShuttleT1,
     LoomBuildTestShuttleT2,
     LoomClearShuttles,
+    LoomTimeWarp,
     TriggerSudokuChallenge,
     TriggerVaultWardenChallenge,
 }
@@ -188,6 +189,7 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::LoomBuildTestShuttleT1,
     DebugAction::LoomBuildTestShuttleT2,
     DebugAction::LoomClearShuttles,
+    DebugAction::LoomTimeWarp,
     DebugAction::TriggerSudokuChallenge,
     DebugAction::TriggerRunicLightsChallenge,
     DebugAction::TriggerVaultWardenChallenge,
@@ -313,19 +315,8 @@ const SOULFORGE_ACTIONS: &[DebugAction] = &[
 ];
 const LOOM_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerLoomDiscovery,
-    DebugAction::LoomSelectArchetype(LoomArchetype::BurnBright),
-    DebugAction::LoomSelectArchetype(LoomArchetype::ReachWide),
-    DebugAction::LoomSelectArchetype(LoomArchetype::RunDeep),
-    DebugAction::LoomUnlockAllNodes,
-    DebugAction::LoomGrantResources,
     DebugAction::LoomCompletePattern,
-    DebugAction::LoomAdvanceToPattern(0),
-    DebugAction::LoomAdvanceToPattern(5),
-    DebugAction::LoomAdvanceToPattern(10),
-    DebugAction::LoomAdvanceToPattern(17),
-    DebugAction::LoomBuildTestShuttleT1,
-    DebugAction::LoomBuildTestShuttleT2,
-    DebugAction::LoomClearShuttles,
+    DebugAction::LoomTimeWarp,
 ];
 const BORDER_OPTION_START_INDEX: usize = DEBUG_ACTIONS.len();
 
@@ -408,9 +399,10 @@ impl DebugAction {
             Self::LoomBuildTestShuttleT1 => 110,
             Self::LoomBuildTestShuttleT2 => 111,
             Self::LoomClearShuttles => 112,
-            Self::TriggerSudokuChallenge => 113,
-            Self::TriggerRunicLightsChallenge => 114,
-            Self::TriggerVaultWardenChallenge => 115,
+            Self::LoomTimeWarp => 113,
+            Self::TriggerSudokuChallenge => 114,
+            Self::TriggerRunicLightsChallenge => 115,
+            Self::TriggerVaultWardenChallenge => 116,
         }
     }
 
@@ -542,6 +534,7 @@ impl DebugAction {
             Self::LoomBuildTestShuttleT1 => "Build T1 Shuttle (Ember+Void\u{2192}ForgedLight)",
             Self::LoomBuildTestShuttleT2 => "Build T2 Shuttle (FrgLt+Refl\u{2192}EchoGlass)",
             Self::LoomClearShuttles => "Clear All Shuttles",
+            Self::LoomTimeWarp => "Loom: Toggle Time Warp (10000x)",
             Self::TriggerSudokuChallenge => "Trigger Sigil Matrix Challenge",
             Self::TriggerRunicLightsChallenge => "Trigger Runic Lights Challenge",
             Self::TriggerVaultWardenChallenge => "Trigger Vault Warden Challenge",
@@ -606,6 +599,7 @@ impl DebugAction {
             Self::SetEnhancement(level) => trigger_set_enhancement(state, enhancement, level),
             Self::TriggerLoomDiscovery => {
                 crate::loom::complete_discovery(loom);
+                loom_ui.open = true;
                 "Loom discovered."
             }
             Self::LoomSelectArchetype(archetype) => {
@@ -729,6 +723,18 @@ impl DebugAction {
             Self::LoomClearShuttles => {
                 loom.persistent.shuttles.clear();
                 "All shuttles cleared."
+            }
+            Self::LoomTimeWarp => {
+                // Clear rate trackers so they recalculate at the new speed
+                // instead of blending old samples for 20 seconds.
+                loom.rate_trackers.clear();
+                if loom.time_warp > 1.0 {
+                    loom.time_warp = 1.0;
+                    "Time Warp: OFF (1x speed)"
+                } else {
+                    loom.time_warp = 10000.0;
+                    "Time Warp: 10000x speed"
+                }
             }
         }
     }
@@ -1654,7 +1660,7 @@ mod tests {
             menu.navigate_down();
         }
         assert_eq!(menu.selected_index, CHALLENGE_ACTIONS.len() - 1);
-        assert_eq!(menu.selected_option_global_index(), 115);
+        assert_eq!(menu.selected_option_global_index(), 116);
 
         // Can't go past end
         menu.navigate_down();

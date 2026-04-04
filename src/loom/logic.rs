@@ -112,7 +112,7 @@ pub fn node_effective_rate(loom: &LoomState, node: &LoomNode) -> f64 {
 /// `delta_seconds` is the wall-clock time elapsed since the last tick (typically 0.1s).
 /// Each unlocked node produces its native resource at its effective rate and stores
 /// the output in the node's buffer (capped at buffer_capacity).
-/// Full buffers auto-drain (excess is discarded); extractors never stall.
+/// Full buffers cap at buffer_capacity; extractors never stall.
 ///
 /// Returns a map of resource → total produced this tick (for pattern rate tracking).
 pub fn tick_base_production(
@@ -156,10 +156,10 @@ pub fn tick_base_production(
 // ── Phase 3: Node Upgrading ───────────────────────────────────────────────────
 
 /// Returns the upgrade cost (in the node's native resource) for going from current level to next.
-/// Base cost: 10 * level^1.5, rounded. Silence Well gets 25% discount at levels 1-5.
+/// Base cost: 100 * level^1.2, rounded. Silence Well gets 25% discount at levels 1-5.
 pub fn node_upgrade_cost(loom: &LoomState, node_id: NodeId) -> f64 {
     let node = &loom.persistent.nodes[node_id.index()];
-    let base_cost = 100.0 * (node.level as f64).powf(1.5);
+    let base_cost = 100.0 * (node.level as f64).powf(1.2);
     let multiplier = node_upgrade_cost_multiplier(loom, node_id);
     (base_cost * multiplier).round()
 }
@@ -167,28 +167,29 @@ pub fn node_upgrade_cost(loom: &LoomState, node_id: NodeId) -> f64 {
 /// Maximum extractor node level.
 pub const MAX_NODE_LEVEL: u32 = 20;
 
+/// Buffer capacity multiplier: 10 hours of production at current level's rate.
+const BUFFER_HOURS: f64 = 10.0;
+
 /// Attempt to upgrade a node's level.
 /// Costs `node_upgrade_cost()` units of the node's native resource from the node's buffer.
 /// Capped at `MAX_NODE_LEVEL` (level 20 = 525/hr).
 /// Returns true if the upgrade succeeded.
 pub fn try_upgrade_node(loom: &mut LoomState, node_id: NodeId) -> bool {
     let node = &loom.persistent.nodes[node_id.index()];
-    if node.level >= MAX_NODE_LEVEL {
+    if node.level >= MAX_NODE_LEVEL || !node.unlocked {
         return false;
     }
 
     let cost = node_upgrade_cost(loom, node_id);
 
     let node = &mut loom.persistent.nodes[node_id.index()];
-
-    if !node.unlocked || node.buffer < cost {
+    if node.buffer < cost {
         return false;
     }
-
     node.buffer -= cost;
+
     node.level += 1;
-    // Buffer capacity scales with level: 4 hours of production at new level's rate.
-    node.buffer_capacity = node.base_rate * node_level_multiplier(node.level) * 4.0;
+    node.buffer_capacity = node.base_rate * node_level_multiplier(node.level) * BUFFER_HOURS;
 
     true
 }
@@ -331,8 +332,9 @@ pub enum ShuttleUpgradeError {
     InsufficientBuffer { needed: f64, have: f64 },
 }
 
-/// Upgrade a shuttle's level. Cost: 100 × level^1.5 from shuttle buffer.
+/// Upgrade a shuttle's level. Cost: 100 × level^1.2 from the shuttle's own buffer.
 /// Max level capped by Ascension level via max_shuttle_level().
+/// Buffer capacity scales with level after upgrade.
 pub fn upgrade_shuttle(
     loom: &mut LoomState,
     shuttle_idx: usize,
@@ -356,7 +358,7 @@ pub fn upgrade_shuttle(
         return Err(ShuttleUpgradeError::AtMaxLevel);
     }
 
-    let cost = 100.0 * (shuttle.level as f64).powf(1.5);
+    let cost = 100.0 * (shuttle.level as f64).powf(1.2);
     if shuttle.buffer < cost {
         return Err(ShuttleUpgradeError::InsufficientBuffer {
             needed: cost,
@@ -367,6 +369,7 @@ pub fn upgrade_shuttle(
     let shuttle = loom.persistent.shuttles.get_mut(shuttle_idx).unwrap();
     shuttle.buffer -= cost;
     shuttle.level += 1;
+    shuttle.buffer_capacity = 500.0 * node_level_multiplier(shuttle.level);
     Ok(())
 }
 
@@ -483,17 +486,13 @@ pub fn tick_shuttle_pull(
             let output_rate = pull_a.min(pull_b) * r.amount;
             shuttle_output_rates[idx] = output_rate;
 
-            // Add to buffer.
+            // Add to buffer (capped); excess is discarded but still counted for rate tracking.
             let output_this_tick = output_rate * delta_hours;
             if output_this_tick > 0.0 {
                 let r = &mut loom.persistent.shuttles[idx];
-                let space = (r.buffer_capacity - r.buffer).max(0.0);
-                let actual = output_this_tick.min(space);
-                r.buffer += actual;
-                r.stalled = r.buffer >= r.buffer_capacity;
-                if actual > 0.0 {
-                    *produced.entry(r.output).or_insert(0.0) += actual;
-                }
+                r.buffer = (r.buffer + output_this_tick).min(r.buffer_capacity);
+                r.stalled = false;
+                *produced.entry(r.output).or_insert(0.0) += output_this_tick;
             }
         }
     }
@@ -629,6 +628,47 @@ pub enum ShuttleError {
     InvalidSource,
 }
 
+/// Deduct `amount` from the buffer that holds `resource`.
+/// Checks extractors first (for base resources), then shuttle buffers (for confluence/reaction).
+/// Returns true if the deduction succeeded.
+fn deduct_from_resource_buffer(
+    persistent: &mut super::types::LoomPersistent,
+    resource: Resource,
+    amount: f64,
+) -> bool {
+    // Check extractors.
+    for node in &mut persistent.nodes {
+        if node.unlocked && node_native_resource(node.id) == resource && node.buffer >= amount {
+            node.buffer -= amount;
+            return true;
+        }
+    }
+    // Check shuttle buffers.
+    for shuttle in &mut persistent.shuttles {
+        if !shuttle.under_construction && shuttle.output == resource && shuttle.buffer >= amount {
+            shuttle.buffer -= amount;
+            return true;
+        }
+    }
+    false
+}
+
+/// Returns the available amount of a resource across all buffers (for UI display).
+pub fn available_resource(loom: &LoomState, resource: Resource) -> f64 {
+    let mut total = 0.0;
+    for node in &loom.persistent.nodes {
+        if node.unlocked && node_native_resource(node.id) == resource {
+            total += node.buffer;
+        }
+    }
+    for shuttle in &loom.persistent.shuttles {
+        if !shuttle.under_construction && shuttle.output == resource {
+            total += shuttle.buffer;
+        }
+    }
+    total
+}
+
 fn shuttle_build_cost(tier: u8) -> f64 {
     match tier {
         1 => 250.0,
@@ -735,11 +775,12 @@ pub fn build_shuttle(
     }
 
     let cost = shuttle_build_cost(recipe.tier);
-    let stockpile = loom.persistent.stockpiles.entry(input_a).or_insert(0.0);
-    if *stockpile < cost {
+    // Draw build cost from the buffer that holds the input_a resource.
+    // For base resources: the matching extractor's buffer.
+    // For confluence/reaction resources: a shuttle buffer that outputs it.
+    if !deduct_from_resource_buffer(&mut loom.persistent, input_a, cost) {
         return Err(ShuttleError::InsufficientResources);
     }
-    *stockpile -= cost;
 
     let mut r = Shuttle::new(
         recipe.input_a,
@@ -760,12 +801,13 @@ pub fn build_shuttle(
 /// Tick construction for all shuttles under construction.
 /// Returns indices of shuttles that completed this tick.
 pub fn tick_shuttle_construction(loom: &mut LoomState) -> Vec<usize> {
+    let warp = (loom.time_warp as u32).max(1);
     let mut completed = Vec::new();
     for (i, r) in loom.persistent.shuttles.iter_mut().enumerate() {
         if !r.under_construction {
             continue;
         }
-        r.construction_ticks_remaining = r.construction_ticks_remaining.saturating_sub(1);
+        r.construction_ticks_remaining = r.construction_ticks_remaining.saturating_sub(warp);
         if r.construction_ticks_remaining == 0 {
             r.under_construction = false;
             completed.push(i);
@@ -1096,21 +1138,15 @@ mod tests {
     fn test_upgrade_cost_level1() {
         let loom = LoomState::new();
         let cost = node_upgrade_cost(&loom, NodeId::EmberSpindle);
-        assert_eq!(cost, 100.0); // 100 * 1^1.5 = 100
+        assert_eq!(cost, 100.0); // 100 * 1^1.2 = 100
     }
 
     #[test]
-    fn test_upgrade_succeeds_with_sufficient_buffer() {
+    fn test_upgrade_succeeds_with_sufficient_stockpile() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
 
-        let ember = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap();
-        ember.buffer = 500.0;
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
 
         let result = try_upgrade_node(&mut loom, NodeId::EmberSpindle);
         assert!(result);
@@ -1125,7 +1161,7 @@ mod tests {
     }
 
     #[test]
-    fn test_upgrade_fails_with_insufficient_buffer() {
+    fn test_upgrade_fails_with_insufficient_stockpile() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
 
@@ -1144,13 +1180,7 @@ mod tests {
     #[test]
     fn test_upgrade_fails_for_locked_node() {
         let mut loom = LoomState::new();
-        let void_n = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::VoidCondenser)
-            .unwrap();
-        void_n.buffer = 100.0;
+        loom.persistent.nodes[NodeId::VoidCondenser.index()].buffer = 500.0;
 
         let result = try_upgrade_node(&mut loom, NodeId::VoidCondenser);
         assert!(!result);
@@ -1162,7 +1192,7 @@ mod tests {
         initialize_loom(&mut loom);
 
         // No archetype discount — cost is base cost * 1.0
-        let base_cost = 100.0_f64 * 1.0_f64.powf(1.5);
+        let base_cost = 100.0_f64 * 1.0_f64.powf(1.2);
         let expected = (base_cost * 1.0).round();
         let cost = node_upgrade_cost(&loom, NodeId::SilenceWell);
         assert_eq!(cost, expected);
@@ -1740,13 +1770,7 @@ mod tests {
             .unwrap()
             .buffer_capacity;
 
-        let ember = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap();
-        ember.buffer = 500.0;
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
         try_upgrade_node(&mut loom, NodeId::EmberSpindle);
 
         let new_capacity = loom
@@ -1765,28 +1789,16 @@ mod tests {
     }
 
     #[test]
-    fn test_upgrade_node_deducts_cost_from_buffer() {
+    fn test_upgrade_node_deducts_cost_from_stockpile() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
         let cost = node_upgrade_cost(&loom, NodeId::EmberSpindle);
         let starting_buffer = cost + 5.0;
 
-        let ember = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap();
-        ember.buffer = starting_buffer;
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = starting_buffer;
         try_upgrade_node(&mut loom, NodeId::EmberSpindle);
 
-        let remaining = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap()
-            .buffer;
+        let remaining = loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer;
         assert!(
             (remaining - 5.0).abs() < 0.001,
             "expected 5.0 remaining, got {}",
@@ -2311,11 +2323,7 @@ mod external_bonus_tests {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
         setup_patterns(&mut loom, 1);
-        *loom
-            .persistent
-            .stockpiles
-            .entry(Resource::Ember)
-            .or_insert(0.0) += 500.0;
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
 
         let result = build_shuttle(
             &mut loom,
@@ -2370,11 +2378,7 @@ mod external_bonus_tests {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
         setup_patterns(&mut loom, 1);
-        *loom
-            .persistent
-            .stockpiles
-            .entry(Resource::Ember)
-            .or_insert(0.0) += 50.0;
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 50.0;
 
         let result = build_shuttle(
             &mut loom,
@@ -2393,16 +2397,7 @@ mod external_bonus_tests {
         initialize_loom(&mut loom);
         // Only 1 completed pattern; Tier 2 recipes require 8 → TierLocked.
         setup_patterns(&mut loom, 1);
-        *loom
-            .persistent
-            .stockpiles
-            .entry(Resource::ForgedLight)
-            .or_insert(0.0) += 50.0;
-        *loom
-            .persistent
-            .stockpiles
-            .entry(Resource::EchoGlass)
-            .or_insert(0.0) += 50.0;
+        // Resources don't matter — tier check fails first (T2 needs 8 patterns).
 
         let result = build_shuttle(
             &mut loom,
@@ -2519,11 +2514,7 @@ mod external_bonus_tests {
         for node in loom.persistent.nodes.iter_mut() {
             node.unlocked = true;
         }
-        *loom
-            .persistent
-            .stockpiles
-            .entry(Resource::Ember)
-            .or_insert(0.0) += 500.0;
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
         let _ = build_shuttle(
             &mut loom,
             Resource::Ember,
@@ -2532,8 +2523,9 @@ mod external_bonus_tests {
             vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         );
-        loom.persistent.shuttles[0].buffer = 500.0;
         loom.persistent.shuttles[0].under_construction = false;
+        // Upgrade costs come from shuttle's own buffer
+        loom.persistent.shuttles[0].buffer = 500.0;
 
         let result = upgrade_shuttle(&mut loom, 0, 7);
         assert!(result.is_ok());
@@ -2548,11 +2540,7 @@ mod external_bonus_tests {
         for node in loom.persistent.nodes.iter_mut() {
             node.unlocked = true;
         }
-        *loom
-            .persistent
-            .stockpiles
-            .entry(Resource::Ember)
-            .or_insert(0.0) += 500.0;
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
         let _ = build_shuttle(
             &mut loom,
             Resource::Ember,
@@ -2561,9 +2549,9 @@ mod external_bonus_tests {
             vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         );
-        loom.persistent.shuttles[0].buffer = 5000.0;
         loom.persistent.shuttles[0].under_construction = false;
         loom.persistent.shuttles[0].level = 3;
+        loom.persistent.shuttles[0].buffer = 5000.0;
 
         let result = upgrade_shuttle(&mut loom, 0, 7); // max for Asc VII is 3
         assert!(result.is_err());
@@ -2577,11 +2565,7 @@ mod external_bonus_tests {
         for node in loom.persistent.nodes.iter_mut() {
             node.unlocked = true;
         }
-        *loom
-            .persistent
-            .stockpiles
-            .entry(Resource::Ember)
-            .or_insert(0.0) += 500.0;
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
         let _ = build_shuttle(
             &mut loom,
             Resource::Ember,
@@ -2590,8 +2574,8 @@ mod external_bonus_tests {
             vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         );
-        loom.persistent.shuttles[0].buffer = 5000.0;
         loom.persistent.shuttles[0].under_construction = false;
+        loom.persistent.shuttles[0].buffer = 5000.0;
 
         let result = upgrade_shuttle(&mut loom, 0, 6); // Asc VI, no shuttle upgrades
         assert!(result.is_err());

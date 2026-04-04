@@ -337,16 +337,9 @@ pub fn inject_outcomes(
             for node in &mut loom.persistent.nodes {
                 node.unlocked = true;
             }
-            // Seed stockpiles for shuttle construction costs
-            for res in [
-                Resource::Ember,
-                Resource::Reflection,
-                Resource::VoidEssence,
-                Resource::Memory,
-                Resource::Silence,
-                Resource::Resonance,
-            ] {
-                *loom.persistent.stockpiles.entry(res).or_insert(0.0) += 10000.0;
+            // Seed extractor buffers for shuttle construction costs
+            for node in &mut loom.persistent.nodes {
+                node.buffer = node.buffer_capacity;
             }
             if verbose {
                 println!("[t={tick:>6}] INJECT: Loom discovered, all extractors unlocked");
@@ -527,20 +520,13 @@ fn ensure_resource_production(
         return false;
     }
 
-    // Ensure stockpile has build cost
+    // Ensure buffer has build cost
     let cost = match recipe.tier {
         1 => 250.0,
         2 => 150.0,
         _ => 100.0,
     };
-    let stockpile = loom
-        .persistent
-        .stockpiles
-        .entry(recipe.input_a)
-        .or_insert(0.0);
-    if *stockpile < cost {
-        *stockpile += cost; // Top up if needed
-    }
+    inject_resource_to_buffer(loom, recipe.input_a, cost);
 
     let sources_a = eligible_sources_for_tier(loom, recipe.tier, recipe.input_a);
     let sources_b = eligible_sources_for_tier(loom, recipe.tier, recipe.input_b);
@@ -628,14 +614,7 @@ fn auto_build_loom(loom: &mut LoomState, ascension_level: u32, verbose: bool, ti
                     2 => 150.0,
                     _ => 100.0,
                 };
-                let stockpile = loom
-                    .persistent
-                    .stockpiles
-                    .entry(recipe.input_a)
-                    .or_insert(0.0);
-                if *stockpile < cost {
-                    *stockpile += cost;
-                }
+                inject_resource_to_buffer(loom, recipe.input_a, cost);
                 let sources_a = eligible_sources_for_tier(loom, recipe.tier, recipe.input_a);
                 let sources_b = eligible_sources_for_tier(loom, recipe.tier, recipe.input_b);
                 if !sources_a.is_empty() && !sources_b.is_empty() {
@@ -693,13 +672,13 @@ fn auto_build_loom(loom: &mut LoomState, ascension_level: u32, verbose: bool, ti
         }
     }
 
-    // Upgrade shuttles — top up buffer to cover cost before draining
+    // Upgrade shuttles — top up buffer to cover cost
     let max_level = quest::ascension::types::max_shuttle_level(ascension_level);
     for i in 0..loom.persistent.shuttles.len() {
         if max_level > 1 {
             let shuttle = &mut loom.persistent.shuttles[i];
             if !shuttle.under_construction && shuttle.level < max_level {
-                let cost = 100.0 * (shuttle.level as f64).powf(1.5);
+                let cost = 100.0 * (shuttle.level as f64).powf(1.2);
                 if shuttle.buffer < cost {
                     shuttle.buffer = cost;
                 }
@@ -713,23 +692,31 @@ fn auto_build_loom(loom: &mut LoomState, ascension_level: u32, verbose: bool, ti
             );
         }
     }
+}
 
-    // Drain shuttle buffers to prevent stalling (in real game, patterns/stockpile consume output)
+/// Etch sigils per profile spec.
+/// Ensure a resource buffer has at least `amount` available (for simulator injection).
+fn inject_resource_to_buffer(loom: &mut LoomState, resource: Resource, amount: f64) {
+    // Try extractor first.
+    for node in &mut loom.persistent.nodes {
+        if node.unlocked && quest::loom::logic::node_native_resource(node.id) == resource {
+            if node.buffer < amount {
+                node.buffer = amount.min(node.buffer_capacity);
+            }
+            return;
+        }
+    }
+    // Try shuttle buffer.
     for shuttle in &mut loom.persistent.shuttles {
-        if shuttle.buffer > shuttle.buffer_capacity * 0.5 {
-            let drain = shuttle.buffer * 0.8;
-            *loom
-                .persistent
-                .stockpiles
-                .entry(shuttle.output)
-                .or_insert(0.0) += drain;
-            shuttle.buffer -= drain;
-            shuttle.stalled = false;
+        if !shuttle.under_construction && shuttle.output == resource {
+            if shuttle.buffer < amount {
+                shuttle.buffer = amount.min(shuttle.buffer_capacity);
+            }
+            return;
         }
     }
 }
 
-/// Etch sigils per profile spec.
 fn inject_sigils(profile: &StrategyProfile, state: &mut GameState) {
     use SigilEffectType::*;
     use SigilGrade::*;
