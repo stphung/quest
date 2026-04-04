@@ -1122,6 +1122,7 @@ pub(super) fn tick_loom(
         crate::loom::tick_pattern_sustain(&mut loom.persistent, &rates, tick_seconds);
     if pattern_completed {
         result.loom_changed = true;
+        loom.graph_dirty = true;
         let completed_count = loom.persistent.completed_pattern_count();
         achievements.on_loom_pattern_completed(completed_count, Some(&state.character_name));
         // Sync Loom zone unlocks on pattern completion

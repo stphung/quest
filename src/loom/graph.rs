@@ -5,8 +5,9 @@
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use std::collections::HashMap;
 
+use super::layout::compute_layout;
 use super::logic::{node_native_resource, shuttle_effective_intake_cap};
-use super::types::{LoomState, NodeId, Resource};
+use super::types::{LoomState, LoomUiState, NodeId, Resource};
 
 /// A node in the Loom production graph.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -37,6 +38,64 @@ pub struct LoomGraph {
     pub graph: StableDiGraph<LoomGraphNode, LoomEdge>,
     /// Reverse lookup from graph node identity to petgraph NodeIndex.
     pub node_indices: HashMap<LoomGraphNode, NodeIndex>,
+}
+
+/// Rebuild the graph and layout if dirty, then update edge rates and particle phases.
+pub fn refresh_graph(
+    ui: &mut LoomUiState,
+    loom: &mut LoomState,
+    canvas_width: f64,
+    canvas_height: f64,
+) {
+    // Check if rebuild needed (from either UI flag or tick-path flag)
+    let needs_rebuild = ui.graph_dirty || loom.graph_dirty || ui.loom_graph.is_none();
+
+    if needs_rebuild {
+        let graph = build_graph(loom);
+        let layout = compute_layout(&graph, loom, canvas_width, canvas_height);
+
+        // Preserve selected node if it still exists
+        if let Some(selected) = ui.selected_graph_node {
+            if graph.graph.node_weight(selected).is_none() {
+                ui.selected_graph_node = None;
+            }
+        }
+        // Default selection if none
+        if ui.selected_graph_node.is_none() {
+            ui.selected_graph_node = graph.graph.node_indices().next();
+        }
+
+        // Reset particle phases for new edges
+        ui.particle_phases.clear();
+        for edge_idx in graph.graph.edge_indices() {
+            ui.particle_phases.insert(edge_idx, 0.0);
+        }
+
+        ui.loom_graph = Some(graph);
+        ui.loom_layout = Some(layout);
+        ui.graph_dirty = false;
+        loom.graph_dirty = false;
+    }
+
+    // Update rates every tick
+    if let Some(ref mut graph) = ui.loom_graph {
+        update_edge_rates(graph, loom);
+    }
+
+    // Advance particle phases
+    if let Some(ref graph) = ui.loom_graph {
+        for edge_idx in graph.graph.edge_indices() {
+            let edge = &graph.graph[edge_idx];
+            let speed = if edge.max_rate > 0.0 {
+                edge.current_rate / edge.max_rate
+            } else {
+                0.0
+            };
+            if let Some(phase) = ui.particle_phases.get_mut(&edge_idx) {
+                *phase = (*phase + 0.05 * speed) % 1.0;
+            }
+        }
+    }
 }
 
 /// Build the full production graph from current Loom state.

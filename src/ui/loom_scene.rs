@@ -135,7 +135,7 @@ fn visible_recipe_tier(completed_patterns: usize) -> u8 {
 pub fn render_loom_overlay(
     frame: &mut Frame,
     area: Rect,
-    loom_state: &LoomState,
+    loom_state: &mut LoomState,
     ui: &mut LoomUiState,
 ) {
     ui.throbber_frame = ui.throbber_frame.wrapping_add(1);
@@ -165,6 +165,13 @@ pub fn render_loom_overlay(
 
     if inner.height == 0 || inner.width == 0 {
         return;
+    }
+
+    // Refresh graph data before rendering if we're in graph view.
+    if ui.view == LoomView::GraphView {
+        let canvas_width = inner.width as f64;
+        let canvas_height = (inner.height as f64 * 0.7) * 2.0;
+        crate::loom::graph::refresh_graph(ui, loom_state, canvas_width, canvas_height);
     }
 
     match ui.view {

@@ -99,7 +99,6 @@ pub fn draw_game_overlays(
     let deep_ui: &DeepUiState = ctx.deep_ui;
     let enhancement: &enhancement::EnhancementProgress = ctx.enhancement;
     let global_achievements: &achievements::Achievements = ctx.achievements;
-    let loom_state: &crate::loom::LoomState = ctx.loom_state;
     let debug_mode: bool = ctx.debug_mode;
     let debug_menu: &utils::debug_menu::DebugMenu = ctx.debug_menu;
     let last_save_instant: Option<Instant> = extras.last_save_instant;
@@ -307,7 +306,12 @@ pub fn draw_game_overlays(
         }
         GameOverlay::AscensionConfirm => {
             ui::ascension_scene::render_ascension_confirm(
-                frame, area, state, deep_state, loom_state, layout_ctx,
+                frame,
+                area,
+                state,
+                deep_state,
+                ctx.loom_state,
+                layout_ctx,
             );
         }
         GameOverlay::LoomDiscovery => {

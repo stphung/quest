@@ -370,6 +370,7 @@ pub fn upgrade_shuttle(
     shuttle.buffer -= cost;
     shuttle.level += 1;
     shuttle.buffer_capacity = 500.0 * node_level_multiplier(shuttle.level);
+    loom.graph_dirty = true;
     Ok(())
 }
 
@@ -798,6 +799,7 @@ pub fn build_shuttle(
     r.under_construction = true;
     r.construction_ticks_remaining = SHUTTLE_CONSTRUCTION_TICKS;
     loom.persistent.shuttles.push(r);
+    loom.graph_dirty = true;
     Ok(loom.persistent.shuttles.len() - 1)
 }
 
@@ -834,6 +836,7 @@ pub fn demolish_shuttle(loom: &mut LoomState, idx: usize) {
         reindex_sources(&mut r.sources_a, idx);
         reindex_sources(&mut r.sources_b, idx);
     }
+    loom.graph_dirty = true;
 }
 
 fn reindex_sources(sources: &mut Vec<LoomNodeRef>, removed_idx: usize) {

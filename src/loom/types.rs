@@ -457,6 +457,8 @@ pub struct LoomUiState {
     pub loom_graph: Option<super::graph::LoomGraph>,
     /// Cached layout for the production graph.
     pub loom_layout: Option<super::layout::LoomLayout>,
+    /// UI-side dirty flag for graph rebuild (e.g., after window resize).
+    pub graph_dirty: bool,
 }
 
 impl LoomUiState {
@@ -472,6 +474,7 @@ impl LoomUiState {
             build: None,
             loom_graph: None,
             loom_layout: None,
+            graph_dirty: false,
         }
     }
 
