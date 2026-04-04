@@ -493,6 +493,9 @@ pub fn tick_shuttle_pull(
                 r.buffer = (r.buffer + output_this_tick).min(r.buffer_capacity);
                 r.stalled = false;
                 *produced.entry(r.output).or_insert(0.0) += output_this_tick;
+                r.output_rate_tracker.push(output_this_tick);
+            } else {
+                loom.persistent.shuttles[idx].output_rate_tracker.push(0.0);
             }
         }
     }
@@ -2579,5 +2582,34 @@ mod external_bonus_tests {
 
         let result = upgrade_shuttle(&mut loom, 0, 6); // Asc VI, no shuttle upgrades
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_shuttle_output_rate_tracker_updates_per_tick() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        for node in &mut loom.persistent.nodes {
+            node.unlocked = true;
+            node.buffer = 100.0;
+        }
+        setup_patterns(&mut loom, 1);
+        loom.persistent.shuttles.push(Shuttle::new(
+            Resource::Ember,
+            Resource::Reflection,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::ReflectionLens)],
+        ));
+        for _ in 0..10 {
+            tick_shuttle_pull(&mut loom, 0.1);
+        }
+        let tracker = &loom.persistent.shuttles[0].output_rate_tracker;
+        assert!(
+            tracker.rate_per_hour() > 0.0,
+            "Shuttle rate tracker should record production"
+        );
     }
 }
