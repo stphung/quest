@@ -453,6 +453,10 @@ pub struct LoomUiState {
     pub throbber_frame: u32,
     /// Active build flow state, if any.
     pub build: Option<BuildState>,
+    /// Cached production graph (rebuilt when graph_dirty flag is set).
+    pub loom_graph: Option<super::graph::LoomGraph>,
+    /// Cached layout for the production graph.
+    pub loom_layout: Option<super::layout::LoomLayout>,
 }
 
 impl LoomUiState {
@@ -466,6 +470,8 @@ impl LoomUiState {
             codex_row: 0,
             throbber_frame: 0,
             build: None,
+            loom_graph: None,
+            loom_layout: None,
         }
     }
 

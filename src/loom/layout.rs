@@ -10,6 +10,7 @@ use super::graph::{LoomGraph, LoomGraphNode};
 use super::types::LoomState;
 
 /// Computed layout positions for every node in a LoomGraph.
+#[derive(Debug)]
 pub struct LoomLayout {
     /// Map from petgraph NodeIndex to (x, y) position in layout space.
     pub node_positions: HashMap<NodeIndex, (f64, f64)>,

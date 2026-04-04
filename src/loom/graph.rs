@@ -31,6 +31,7 @@ pub struct LoomEdge {
 }
 
 /// The complete Loom production graph.
+#[derive(Debug)]
 pub struct LoomGraph {
     /// The underlying directed graph.
     pub graph: StableDiGraph<LoomGraphNode, LoomEdge>,

@@ -169,7 +169,33 @@ pub fn render_loom_overlay(
 
     match ui.view {
         LoomView::GraphView => {
-            render_flow_view(frame, inner, loom_state, ui);
+            // Split: top 70% graph canvas, bottom 30% detail panel.
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
+                .split(inner);
+
+            // Render graph canvas if graph and layout are cached.
+            if let (Some(ref graph), Some(ref layout_data)) = (&ui.loom_graph, &ui.loom_layout) {
+                crate::ui::loom_graph::render_graph_canvas(
+                    frame,
+                    chunks[0],
+                    graph,
+                    layout_data,
+                    ui,
+                    loom_state,
+                );
+            } else {
+                // Fallback: render the legacy flow view until graph is built.
+                render_flow_view(frame, chunks[0], loom_state, ui);
+            }
+
+            // Bottom panel — stub for now, detail rendering comes in Task 8.
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .title(" Detail ")
+                .border_style(Style::default().fg(LOOM_BORDER_COLOR));
+            frame.render_widget(block, chunks[1]);
         }
         LoomView::Codex => {
             render_codex(frame, inner, loom_state, ui);
