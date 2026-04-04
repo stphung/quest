@@ -121,6 +121,22 @@ pub fn render_graph_canvas(
         })
         .collect();
 
+    // Pre-compute pattern progress for fill bars inside pattern sink nodes.
+    let pattern_progress: Vec<(NodeIndex, f64)> = node_info
+        .iter()
+        .filter_map(|&(ni, _, _, _)| {
+            if let Some(LoomGraphNode::PatternSink(pat_idx)) = loom_graph.graph.node_weight(ni) {
+                if let Some(pattern) = loom.persistent.patterns.get(*pat_idx) {
+                    let progress = compute_pattern_progress(pattern);
+                    if progress > 0.0 {
+                        return Some((ni, progress));
+                    }
+                }
+            }
+            None
+        })
+        .collect();
+
     // Build and render the canvas.
     let canvas = Canvas::default()
         .x_bounds([0.0, canvas_width])
@@ -150,6 +166,17 @@ pub fn render_graph_canvas(
                 let selected = ui.selected_graph_node == Some(ni);
                 let border_color = if selected { Color::White } else { color };
                 draw_node_rect(ctx, cx, cy, border_color);
+            }
+
+            // 2b. Draw pattern progress fill bars inside pattern sink nodes.
+            for &(ni, progress) in &pattern_progress {
+                if let Some(&(_, (cx, cy), _, _)) = node_info.iter().find(|&&(n, _, _, _)| n == ni)
+                {
+                    let x0 = cx - NODE_HALF_W + 0.5;
+                    let x1 = x0 + (2.0 * NODE_HALF_W - 1.0) * progress.min(1.0);
+                    let y0 = cy - NODE_HALF_H + 0.5;
+                    ctx.draw(&CanvasLine::new(x0, y0, x1, y0, Color::Rgb(255, 200, 60)));
+                }
             }
 
             // 3. Draw node labels via ctx.print.
@@ -359,6 +386,30 @@ fn short_resource_name(resource: Resource) -> &'static str {
         Resource::StillbornSong => "SSong",
         _ => "???",
     }
+}
+
+/// Compute overall pattern progress as a fraction (0.0..1.0).
+///
+/// Each requirement contributes 1.0 when completed, or partial progress
+/// based on sustained_secs / sustain_duration_secs when in progress.
+fn compute_pattern_progress(pattern: &crate::loom::types::WovenPattern) -> f64 {
+    if pattern.requirements.is_empty() {
+        return 0.0;
+    }
+    let total: f64 = pattern
+        .requirements
+        .iter()
+        .map(|r| {
+            if r.completed {
+                1.0
+            } else if r.sustain_duration_secs > 0.0 {
+                (r.sustained_secs / r.sustain_duration_secs).min(1.0)
+            } else {
+                0.0
+            }
+        })
+        .sum();
+    total / pattern.requirements.len() as f64
 }
 
 /// Map a resource to its display color.

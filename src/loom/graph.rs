@@ -227,6 +227,33 @@ pub fn build_graph(loom: &LoomState) -> LoomGraph {
                     }
                 }
             }
+
+            // Also add extractor→pattern edges for base resources not covered by shuttles
+            let shuttle_covers = loom
+                .persistent
+                .shuttles
+                .iter()
+                .any(|s| s.output == req.resource);
+            if !shuttle_covers {
+                // Find extractors that natively produce this resource
+                for node in &loom.persistent.nodes {
+                    if node.unlocked && node_native_resource(node.id) == req.resource {
+                        if let Some(&extractor_ni) =
+                            node_indices.get(&LoomGraphNode::Extractor(node.id))
+                        {
+                            graph.add_edge(
+                                extractor_ni,
+                                sink_ni,
+                                LoomEdge {
+                                    resource: req.resource,
+                                    current_rate: 0.0,
+                                    max_rate: 0.0,
+                                },
+                            );
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -341,6 +368,7 @@ pub fn update_edge_rates(lg: &mut LoomGraph, loom: &LoomState) {
 mod tests {
     use super::*;
     use crate::loom::types::*;
+    use petgraph::visit::EdgeRef;
 
     /// Helper: create a minimal LoomState with N unlocked extractors.
     fn loom_with_unlocked_extractors(count: usize) -> LoomState {
@@ -451,6 +479,99 @@ mod tests {
             .collect();
         assert_eq!(incoming.len(), 1);
         assert_eq!(incoming[0].weight().resource, Resource::ForgedLight);
+    }
+
+    #[test]
+    fn test_extractor_pattern_edge_for_base_resource() {
+        let mut loom = loom_with_unlocked_extractors(6);
+
+        // Pattern requiring Ember (a base resource) with no shuttle producing Ember
+        loom.persistent.patterns.push(WovenPattern {
+            index: 0,
+            name: "Base Test".to_string(),
+            requirements: vec![PatternRequirement {
+                resource: Resource::Ember,
+                required_rate: 5.0,
+                sustain_duration_secs: 1800.0,
+                sustained_secs: 0.0,
+                completed: false,
+                amount: 0.0,
+                accumulated: 0.0,
+            }],
+            completed: false,
+        });
+        loom.persistent.active_pattern = 0;
+
+        let lg = build_graph(&loom);
+
+        // 6 extractors + 1 pattern sink = 7 nodes
+        assert_eq!(lg.graph.node_count(), 7, "should have 7 nodes");
+
+        // 1 inferred edge from EmberSpindle extractor to pattern sink
+        assert_eq!(
+            lg.graph.edge_count(),
+            1,
+            "should have 1 extractor->pattern edge"
+        );
+
+        let sink_ni = lg.node_indices[&LoomGraphNode::PatternSink(0)];
+        let incoming: Vec<_> = lg
+            .graph
+            .edges_directed(sink_ni, petgraph::Direction::Incoming)
+            .collect();
+        assert_eq!(incoming.len(), 1);
+        assert_eq!(incoming[0].weight().resource, Resource::Ember);
+    }
+
+    #[test]
+    fn test_extractor_pattern_edge_not_added_when_shuttle_covers() {
+        let mut loom = loom_with_unlocked_extractors(6);
+
+        // Add a shuttle that produces Ember
+        let shuttle = Shuttle::new(
+            Resource::Reflection,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::Ember, // shuttle output is Ember
+            1.0,
+            1,
+            vec![LoomNodeRef::Extractor(NodeId::ReflectionLens)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        loom.persistent.shuttles.push(shuttle);
+
+        // Pattern requiring Ember — shuttle covers it, so no extractor edge
+        loom.persistent.patterns.push(WovenPattern {
+            index: 0,
+            name: "Covered Test".to_string(),
+            requirements: vec![PatternRequirement {
+                resource: Resource::Ember,
+                required_rate: 5.0,
+                sustain_duration_secs: 1800.0,
+                sustained_secs: 0.0,
+                completed: false,
+                amount: 0.0,
+                accumulated: 0.0,
+            }],
+            completed: false,
+        });
+        loom.persistent.active_pattern = 0;
+
+        let lg = build_graph(&loom);
+
+        let sink_ni = lg.node_indices[&LoomGraphNode::PatternSink(0)];
+        let incoming: Vec<_> = lg
+            .graph
+            .edges_directed(sink_ni, petgraph::Direction::Incoming)
+            .collect();
+        // Only the shuttle->pattern edge, no extractor->pattern edge
+        assert_eq!(incoming.len(), 1);
+        assert_eq!(incoming[0].weight().resource, Resource::Ember);
+
+        // Verify it comes from shuttle, not extractor
+        let source_ni = incoming[0].source();
+        let source_node = lg.graph.node_weight(source_ni).unwrap();
+        assert!(matches!(source_node, LoomGraphNode::Shuttle(0)));
     }
 
     #[test]
