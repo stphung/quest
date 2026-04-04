@@ -24,6 +24,8 @@ pub enum LoomGraphNode {
 #[derive(Debug, Clone)]
 pub struct LoomEdge {
     /// Which resource flows along this edge.
+    /// Retained for future rendering features (edge labels, filtering by resource type).
+    #[allow(dead_code)]
     pub resource: Resource,
     /// Current measured flow rate (units/hr).
     pub current_rate: f64,
@@ -267,6 +269,8 @@ pub fn visible_pattern_indices(loom: &LoomState) -> Vec<usize> {
 
 /// Insert a temporary ghost node for build preview.
 /// Uses usize::MAX as sentinel index to indicate a not-yet-built shuttle.
+/// Called by `loom_input` build flow once the ghost-node TODO is implemented.
+#[allow(dead_code)]
 pub fn insert_ghost_node(
     lg: &mut LoomGraph,
     _tier: u8,
@@ -299,6 +303,7 @@ pub fn insert_ghost_node(
 }
 
 /// Remove the ghost node and its edges.
+#[allow(dead_code)]
 pub fn remove_ghost_node(lg: &mut LoomGraph, ghost_idx: NodeIndex) {
     lg.graph.remove_node(ghost_idx);
     lg.node_indices.retain(|_, &mut v| v != ghost_idx);
@@ -521,10 +526,7 @@ mod tests {
         loom.persistent.shuttles.push(shuttle);
 
         // Populate rate tracker for Ember
-        let tracker = loom
-            .rate_trackers
-            .entry(Resource::Ember)
-            .or_insert_with(RateTracker::new);
+        let tracker = loom.rate_trackers.entry(Resource::Ember).or_default();
         // Push enough to get a non-zero rate
         for _ in 0..10 {
             tracker.push(1.0);

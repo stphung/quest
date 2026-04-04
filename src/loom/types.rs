@@ -481,18 +481,6 @@ impl LoomUiState {
     pub fn open(&mut self) {
         self.open = true;
     }
-
-    /// Bridge helper: get the legacy selected_node index from selected_graph_node.
-    /// Returns 0 when no node is selected (will be removed once graph navigation is complete).
-    pub fn selected_node(&self) -> usize {
-        self.selected_graph_node.map(|n| n.index()).unwrap_or(0)
-    }
-
-    /// Bridge helper: set selected_graph_node from a legacy usize index.
-    /// Will be removed once graph navigation is complete.
-    pub fn set_selected_node(&mut self, idx: usize) {
-        self.selected_graph_node = Some(petgraph::stable_graph::NodeIndex::new(idx));
-    }
 }
 
 impl Default for LoomUiState {

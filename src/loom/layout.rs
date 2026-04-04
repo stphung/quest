@@ -317,7 +317,7 @@ mod tests {
         let lg = build_graph(&loom);
         let layout = compute_layout(&lg, &loom, width, height);
 
-        for (_, &(x, y)) in &layout.node_positions {
+        for &(x, y) in layout.node_positions.values() {
             assert!(
                 x >= 0.0 && x <= width,
                 "x={} out of bounds [0, {}]",

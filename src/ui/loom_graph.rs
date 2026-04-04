@@ -267,7 +267,7 @@ fn compute_glowing_edges(lg: &LoomGraph, loom: &LoomState) -> HashSet<EdgeIndex>
 
     // Find glowing pattern sinks.
     let mut queue: Vec<NodeIndex> = Vec::new();
-    for (&ref gn, &ni) in &lg.node_indices {
+    for (gn, &ni) in &lg.node_indices {
         if let LoomGraphNode::PatternSink(pat_idx) = gn {
             if *pat_idx < loom.persistent.patterns.len() {
                 let pat = &loom.persistent.patterns[*pat_idx];
