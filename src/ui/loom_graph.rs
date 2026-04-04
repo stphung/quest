@@ -25,7 +25,7 @@ use crate::loom::logic::node_native_resource;
 use crate::loom::types::{LoomState, LoomUiState, Resource};
 
 /// Half-width/height of a node rectangle in canvas coordinates.
-const NODE_HALF_W: f64 = 3.0;
+const NODE_HALF_W: f64 = 9.0;
 const NODE_HALF_H: f64 = 2.0;
 
 /// Render the Loom production graph onto a Canvas widget.
@@ -155,7 +155,9 @@ pub fn render_graph_canvas(
             // 3. Draw node labels via ctx.print.
             for &(_, (cx, cy), ref label, color) in &node_info {
                 let line = Line::from(Span::styled(label.clone(), Style::default().fg(color)));
-                ctx.print(cx - 1.0, cy, line);
+                // Approximate centering: offset by half the label's character width.
+                let half_label_w = label.len() as f64 / 2.0;
+                ctx.print(cx - half_label_w, cy, line);
             }
         });
 
@@ -298,17 +300,17 @@ fn compute_glowing_edges(lg: &LoomGraph, loom: &LoomState) -> HashSet<EdgeIndex>
     glowing
 }
 
-/// Returns a 2-letter label and color for a graph node.
+/// Returns a descriptive label and color for a graph node.
 fn node_label_color(node: &LoomGraphNode, loom: &LoomState) -> (String, Color) {
     match node {
         LoomGraphNode::Extractor(id) => {
             let label = match id {
-                crate::loom::types::NodeId::EmberSpindle => "ES",
-                crate::loom::types::NodeId::ReflectionLens => "RL",
-                crate::loom::types::NodeId::VoidCondenser => "VC",
-                crate::loom::types::NodeId::MemoryArchive => "MA",
-                crate::loom::types::NodeId::SilenceWell => "SW",
-                crate::loom::types::NodeId::ResonanceForge => "RF",
+                crate::loom::types::NodeId::EmberSpindle => "Ember",
+                crate::loom::types::NodeId::ReflectionLens => "Reflect",
+                crate::loom::types::NodeId::VoidCondenser => "Void",
+                crate::loom::types::NodeId::MemoryArchive => "Memory",
+                crate::loom::types::NodeId::SilenceWell => "Silence",
+                crate::loom::types::NodeId::ResonanceForge => "Reson",
             };
             let resource = node_native_resource(*id);
             (label.to_string(), resource_color(resource))
@@ -318,18 +320,44 @@ fn node_label_color(node: &LoomGraphNode, loom: &LoomState) -> (String, Color) {
             if *idx == usize::MAX {
                 return ("NEW".to_string(), Color::Rgb(100, 100, 100));
             }
-            let label = format!("S{}", idx);
-            let color = if *idx < loom.persistent.shuttles.len() {
-                resource_color(loom.persistent.shuttles[*idx].output)
+            let (label, color) = if *idx < loom.persistent.shuttles.len() {
+                let shuttle = &loom.persistent.shuttles[*idx];
+                let out_name = short_resource_name(shuttle.output);
+                (
+                    format!("S{} \u{2192}{}", idx, out_name),
+                    resource_color(shuttle.output),
+                )
             } else {
-                Color::Rgb(180, 180, 180)
+                (format!("S{}", idx), Color::Rgb(180, 180, 180))
             };
             (label, color)
         }
         LoomGraphNode::PatternSink(idx) => {
-            let label = format!("P{}", idx);
-            (label, Color::Rgb(220, 200, 255))
+            // Active pattern sink — render with a star and gold/amber color.
+            let name = if *idx < loom.persistent.patterns.len() {
+                &loom.persistent.patterns[*idx].name
+            } else {
+                "Pattern"
+            };
+            let label = format!("\u{2605} {}", name);
+            (label, Color::Rgb(255, 200, 60))
         }
+    }
+}
+
+/// Short display name for a resource (used in shuttle labels).
+fn short_resource_name(resource: Resource) -> &'static str {
+    match resource {
+        Resource::Ember => "Ember",
+        Resource::Reflection => "Reflect",
+        Resource::VoidEssence => "Void",
+        Resource::Memory => "Memory",
+        Resource::Silence => "Silence",
+        Resource::Resonance => "Reson",
+        Resource::ForgedLight => "FLight",
+        Resource::EchoGlass => "EGlass",
+        Resource::StillbornSong => "SSong",
+        _ => "???",
     }
 }
 

@@ -238,33 +238,18 @@ pub fn build_graph(loom: &LoomState) -> LoomGraph {
 
 /// Returns indices of patterns visible in the graph view.
 ///
-/// Shows the active pattern (if not completed) plus the next 1-2 incomplete patterns,
-/// up to a maximum of 3 total visible patterns.
+/// Shows only the active pattern (if not completed) — at most 1 sink node.
 pub fn visible_pattern_indices(loom: &LoomState) -> Vec<usize> {
     let patterns = &loom.persistent.patterns;
     if patterns.is_empty() {
         return Vec::new();
     }
-
-    let mut result = Vec::new();
     let active = loom.persistent.active_pattern;
-
-    // Active pattern always shown if valid and not completed
     if active < patterns.len() && !patterns[active].completed {
-        result.push(active);
+        vec![active]
+    } else {
+        Vec::new()
     }
-
-    // Next 1-2 incomplete patterns after the active one
-    for (i, pat) in patterns.iter().enumerate().skip(active + 1) {
-        if result.len() >= 3 {
-            break;
-        }
-        if !pat.completed {
-            result.push(i);
-        }
-    }
-
-    result
 }
 
 /// Insert a temporary ghost node for build preview.
@@ -475,7 +460,7 @@ mod tests {
     }
 
     #[test]
-    fn test_visible_pattern_indices_max_three() {
+    fn test_visible_pattern_indices_only_active() {
         let mut loom = LoomState::new();
         for i in 0..5 {
             loom.persistent.patterns.push(WovenPattern {
@@ -487,8 +472,8 @@ mod tests {
         }
         loom.persistent.active_pattern = 0;
         let visible = visible_pattern_indices(&loom);
-        assert_eq!(visible.len(), 3);
-        assert_eq!(visible, vec![0, 1, 2]);
+        assert_eq!(visible.len(), 1, "only active pattern shown");
+        assert_eq!(visible, vec![0]);
     }
 
     #[test]
@@ -503,10 +488,9 @@ mod tests {
             });
         }
         loom.persistent.active_pattern = 0;
-        // active (0) is completed so not shown; next 3 incomplete are 1, 2, 3
+        // active (0) is completed so not shown; no sink nodes visible
         let visible = visible_pattern_indices(&loom);
-        assert_eq!(visible.len(), 3);
-        assert_eq!(visible, vec![1, 2, 3]);
+        assert!(visible.is_empty(), "completed active pattern not shown");
     }
 
     #[test]

@@ -28,11 +28,37 @@ fn siblings_in_layer(
 }
 
 /// Navigate right: nearest downstream neighbor by y-position.
-fn navigate_right(graph: &LoomGraph, layout: &LoomLayout, current: NodeIndex) -> Option<NodeIndex> {
+/// Falls back to the nearest node in the next layer if no outgoing edges exist.
+fn navigate_right(
+    graph: &LoomGraph,
+    layout: &LoomLayout,
+    loom: &LoomState,
+    current: NodeIndex,
+) -> Option<NodeIndex> {
     let current_y = layout.node_positions[&current].1;
-    graph
+
+    // First try: follow an outgoing edge to the nearest neighbor.
+    let via_edge = graph
         .graph
         .neighbors_directed(current, Direction::Outgoing)
+        .min_by(|a, b| {
+            let da = (layout.node_positions[a].1 - current_y).abs();
+            let db = (layout.node_positions[b].1 - current_y).abs();
+            da.partial_cmp(&db).unwrap()
+        });
+
+    if via_edge.is_some() {
+        return via_edge;
+    }
+
+    // Fallback: jump to nearest node in the next layer (by y-position).
+    let current_layer = node_layer(&graph.graph[current], loom);
+    let next_layer = current_layer + 1;
+
+    graph
+        .graph
+        .node_indices()
+        .filter(|&idx| node_layer(&graph.graph[idx], loom) == next_layer)
         .min_by(|a, b| {
             let da = (layout.node_positions[a].1 - current_y).abs();
             let db = (layout.node_positions[b].1 - current_y).abs();
@@ -41,11 +67,40 @@ fn navigate_right(graph: &LoomGraph, layout: &LoomLayout, current: NodeIndex) ->
 }
 
 /// Navigate left: nearest upstream neighbor by y-position.
-fn navigate_left(graph: &LoomGraph, layout: &LoomLayout, current: NodeIndex) -> Option<NodeIndex> {
+/// Falls back to the nearest node in the previous layer if no incoming edges exist.
+fn navigate_left(
+    graph: &LoomGraph,
+    layout: &LoomLayout,
+    loom: &LoomState,
+    current: NodeIndex,
+) -> Option<NodeIndex> {
     let current_y = layout.node_positions[&current].1;
-    graph
+
+    // First try: follow an incoming edge to the nearest neighbor.
+    let via_edge = graph
         .graph
         .neighbors_directed(current, Direction::Incoming)
+        .min_by(|a, b| {
+            let da = (layout.node_positions[a].1 - current_y).abs();
+            let db = (layout.node_positions[b].1 - current_y).abs();
+            da.partial_cmp(&db).unwrap()
+        });
+
+    if via_edge.is_some() {
+        return via_edge;
+    }
+
+    // Fallback: jump to nearest node in the previous layer (by y-position).
+    let current_layer = node_layer(&graph.graph[current], loom);
+    if current_layer == 0 {
+        return None;
+    }
+    let prev_layer = current_layer - 1;
+
+    graph
+        .graph
+        .node_indices()
+        .filter(|&idx| node_layer(&graph.graph[idx], loom) == prev_layer)
         .min_by(|a, b| {
             let da = (layout.node_positions[a].1 - current_y).abs();
             let db = (layout.node_positions[b].1 - current_y).abs();
@@ -147,7 +202,7 @@ pub(super) fn handle_loom(
                 &loom_ui.loom_layout,
                 loom_ui.selected_graph_node,
             ) {
-                if let Some(next) = navigate_left(graph, layout, current) {
+                if let Some(next) = navigate_left(graph, layout, loom_state, current) {
                     loom_ui.selected_graph_node = Some(next);
                 }
             }
@@ -159,7 +214,7 @@ pub(super) fn handle_loom(
                 &loom_ui.loom_layout,
                 loom_ui.selected_graph_node,
             ) {
-                if let Some(next) = navigate_right(graph, layout, current) {
+                if let Some(next) = navigate_right(graph, layout, loom_state, current) {
                     loom_ui.selected_graph_node = Some(next);
                 }
             }
