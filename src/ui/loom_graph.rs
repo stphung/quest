@@ -314,6 +314,10 @@ fn node_label_color(node: &LoomGraphNode, loom: &LoomState) -> (String, Color) {
             (label.to_string(), resource_color(resource))
         }
         LoomGraphNode::Shuttle(idx) => {
+            // Ghost node: sentinel index usize::MAX means a not-yet-built preview shuttle
+            if *idx == usize::MAX {
+                return ("NEW".to_string(), Color::Rgb(100, 100, 100));
+            }
             let label = format!("S{}", idx);
             let color = if *idx < loom.persistent.shuttles.len() {
                 resource_color(loom.persistent.shuttles[*idx].output)

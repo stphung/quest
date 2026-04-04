@@ -338,6 +338,12 @@ fn handle_build_input(
                         return InputResult::Continue;
                     }
                     let toggle = vec![false; sources_a.len()];
+                    // TODO(ghost-node): After sources are confirmed and recipe selected,
+                    // insert a ghost node into loom_ui.loom_graph here to preview the
+                    // new shuttle during SelectSourcesA/B steps. Call
+                    // loom::graph::insert_ghost_node() with the selected sources and
+                    // recipe output resource, store the returned NodeIndex in BuildState,
+                    // then call remove_ghost_node() on cancel (Esc) or build completion.
                     build.step = BuildStep::SelectSourcesA { cursor: 0, toggle };
                 }
                 _ => {}
