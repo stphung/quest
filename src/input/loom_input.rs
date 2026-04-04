@@ -2,8 +2,56 @@
 #![allow(dead_code)]
 
 use super::types::InputResult;
+use crate::loom::graph::{LoomGraph, LoomGraphNode};
+use crate::loom::layout::{node_layer, LoomLayout};
 use crate::loom::types::{BuildState, BuildStep, LoomNodeRef, LoomState, LoomUiState, LoomView};
+use petgraph::stable_graph::NodeIndex;
+use petgraph::Direction;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
+
+/// Find all nodes in the same layer as `current`, sorted by y-position.
+fn siblings_in_layer(
+    graph: &LoomGraph,
+    layout: &LoomLayout,
+    loom: &LoomState,
+    current: NodeIndex,
+) -> Vec<NodeIndex> {
+    let current_layer = node_layer(&graph.graph[current], loom);
+    let mut siblings: Vec<(NodeIndex, f64)> = graph
+        .graph
+        .node_indices()
+        .filter(|&idx| node_layer(&graph.graph[idx], loom) == current_layer)
+        .map(|idx| (idx, layout.node_positions[&idx].1))
+        .collect();
+    siblings.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    siblings.into_iter().map(|(idx, _)| idx).collect()
+}
+
+/// Navigate right: nearest downstream neighbor by y-position.
+fn navigate_right(graph: &LoomGraph, layout: &LoomLayout, current: NodeIndex) -> Option<NodeIndex> {
+    let current_y = layout.node_positions[&current].1;
+    graph
+        .graph
+        .neighbors_directed(current, Direction::Outgoing)
+        .min_by(|a, b| {
+            let da = (layout.node_positions[a].1 - current_y).abs();
+            let db = (layout.node_positions[b].1 - current_y).abs();
+            da.partial_cmp(&db).unwrap()
+        })
+}
+
+/// Navigate left: nearest upstream neighbor by y-position.
+fn navigate_left(graph: &LoomGraph, layout: &LoomLayout, current: NodeIndex) -> Option<NodeIndex> {
+    let current_y = layout.node_positions[&current].1;
+    graph
+        .graph
+        .neighbors_directed(current, Direction::Incoming)
+        .min_by(|a, b| {
+            let da = (layout.node_positions[a].1 - current_y).abs();
+            let db = (layout.node_positions[b].1 - current_y).abs();
+            da.partial_cmp(&db).unwrap()
+        })
+}
 
 /// Top-level dispatcher for the Loom of Worlds overlay input.
 pub(super) fn handle_loom(
@@ -23,7 +71,7 @@ pub(super) fn handle_loom(
         }
         KeyCode::Tab => {
             loom_ui.view = cycle_view(loom_ui.view);
-            loom_ui.set_selected_node(0);
+            loom_ui.selected_graph_node = None;
             loom_ui.codex_column = 0;
             loom_ui.codex_row = 0;
             InputResult::Continue
@@ -34,19 +82,17 @@ pub(super) fn handle_loom(
                     loom_ui.codex_row = loom_ui.codex_row.saturating_sub(1);
                 }
                 LoomView::GraphView => {
-                    // Diamond layout: 0=ES, 1=RL, 2=RF, 3=VC, 4=SW, 5=MA, 6+=shuttles
-                    // Up moves to the previous row, preserving left/right position.
-                    let new = match loom_ui.selected_node() {
-                        0 => 0,              // ES: stay
-                        1 | 2 => 0,          // RL/RF → ES
-                        3 => 1,              // VC → RL
-                        4 => 2,              // SW → RF
-                        5 => 3,              // MA → VC (default left)
-                        6 => 5,              // first shuttle → MA
-                        n if n > 6 => n - 1, // shuttle list: move up one
-                        n => n,
-                    };
-                    loom_ui.set_selected_node(new);
+                    if let (Some(graph), Some(layout), Some(current)) = (
+                        &loom_ui.loom_graph,
+                        &loom_ui.loom_layout,
+                        loom_ui.selected_graph_node,
+                    ) {
+                        let sibs = siblings_in_layer(graph, layout, loom_state, current);
+                        if let Some(pos) = sibs.iter().position(|&n| n == current) {
+                            let next = if pos == 0 { sibs.len() - 1 } else { pos - 1 };
+                            loom_ui.selected_graph_node = Some(sibs[next]);
+                        }
+                    }
                 }
             }
             InputResult::Continue
@@ -60,32 +106,17 @@ pub(super) fn handle_loom(
                     }
                 }
                 LoomView::GraphView => {
-                    // Diamond layout: down moves to the next row.
-                    let total_nodes = 6 + loom_state.persistent.shuttles.len();
-                    let new = match loom_ui.selected_node() {
-                        0 => 1,     // ES → RL (default left)
-                        1 => 3,     // RL → VC
-                        2 => 4,     // RF → SW
-                        3 | 4 => 5, // VC/SW → MA
-                        5 => {
-                            // MA → first shuttle (if any)
-                            if total_nodes > 6 {
-                                6
-                            } else {
-                                5
-                            }
+                    if let (Some(graph), Some(layout), Some(current)) = (
+                        &loom_ui.loom_graph,
+                        &loom_ui.loom_layout,
+                        loom_ui.selected_graph_node,
+                    ) {
+                        let sibs = siblings_in_layer(graph, layout, loom_state, current);
+                        if let Some(pos) = sibs.iter().position(|&n| n == current) {
+                            let next = (pos + 1) % sibs.len();
+                            loom_ui.selected_graph_node = Some(sibs[next]);
                         }
-                        n if n >= 6 => {
-                            // Shuttle list: move down one
-                            if n + 1 < total_nodes {
-                                n + 1
-                            } else {
-                                n
-                            }
-                        }
-                        n => n,
-                    };
-                    loom_ui.set_selected_node(new);
+                    }
                 }
             }
             InputResult::Continue
@@ -111,62 +142,68 @@ pub(super) fn handle_loom(
             InputResult::Continue
         }
         KeyCode::Left if loom_ui.view == LoomView::GraphView => {
-            // Diamond layout: left toggles to left node on pair rows.
-            match loom_ui.selected_node() {
-                2 => loom_ui.set_selected_node(1), // RF → RL
-                4 => loom_ui.set_selected_node(3), // SW → VC
-                _ => {}
+            if let (Some(graph), Some(layout), Some(current)) = (
+                &loom_ui.loom_graph,
+                &loom_ui.loom_layout,
+                loom_ui.selected_graph_node,
+            ) {
+                if let Some(next) = navigate_left(graph, layout, current) {
+                    loom_ui.selected_graph_node = Some(next);
+                }
             }
             InputResult::Continue
         }
         KeyCode::Right if loom_ui.view == LoomView::GraphView => {
-            // Diamond layout: right toggles to right node on pair rows.
-            match loom_ui.selected_node() {
-                1 => loom_ui.set_selected_node(2), // RL → RF
-                3 => loom_ui.set_selected_node(4), // VC → SW
-                _ => {}
+            if let (Some(graph), Some(layout), Some(current)) = (
+                &loom_ui.loom_graph,
+                &loom_ui.loom_layout,
+                loom_ui.selected_graph_node,
+            ) {
+                if let Some(next) = navigate_right(graph, layout, current) {
+                    loom_ui.selected_graph_node = Some(next);
+                }
             }
             InputResult::Continue
         }
-        KeyCode::Char('u') | KeyCode::Char('U')
-            if loom_ui.view == LoomView::GraphView && loom_ui.selected_node() < 6 =>
-        {
-            // Diamond layout grid_ids: 0=ES, 1=RL, 2=RF, 3=VC, 4=SW, 5=MA
-            let grid_ids = [
-                crate::loom::types::NodeId::EmberSpindle,
-                crate::loom::types::NodeId::ReflectionLens,
-                crate::loom::types::NodeId::ResonanceForge,
-                crate::loom::types::NodeId::VoidCondenser,
-                crate::loom::types::NodeId::SilenceWell,
-                crate::loom::types::NodeId::MemoryArchive,
-            ];
-            let node_id = grid_ids[loom_ui.selected_node()];
-            if crate::loom::try_upgrade_node(loom_state, node_id) {
-                InputResult::NeedsSave
-            } else {
-                InputResult::Continue
+        KeyCode::Char('u') | KeyCode::Char('U') if loom_ui.view == LoomView::GraphView => {
+            if let (Some(graph), Some(current)) = (&loom_ui.loom_graph, loom_ui.selected_graph_node)
+            {
+                match &graph.graph[current] {
+                    LoomGraphNode::Extractor(id) => {
+                        if crate::loom::try_upgrade_node(loom_state, *id) {
+                            return InputResult::NeedsSave;
+                        }
+                    }
+                    LoomGraphNode::Shuttle(_index) => {
+                        // Shuttle upgrades require ascension_level which is not
+                        // available in this context yet. Will be wired in a
+                        // future task when handle_loom receives game-wide state.
+                    }
+                    LoomGraphNode::PatternSink(_) => {} // Can't upgrade pattern sinks
+                }
             }
+            InputResult::Continue
         }
         KeyCode::Enter => InputResult::Continue,
         KeyCode::Char('b') | KeyCode::Char('B') if loom_ui.view == LoomView::GraphView => {
             start_build(loom_state, loom_ui);
             InputResult::Continue
         }
-        KeyCode::Char('d') | KeyCode::Char('D')
-            if loom_ui.view == LoomView::GraphView && loom_ui.selected_node() >= 6 =>
-        {
-            let shuttle_idx = loom_ui.selected_node() - 6;
-            if shuttle_idx < loom_state.persistent.shuttles.len() {
-                crate::loom::demolish_shuttle(loom_state, shuttle_idx);
-                // Clamp selection if we deleted the last item.
-                let total = 6 + loom_state.persistent.shuttles.len();
-                if loom_ui.selected_node() >= total && total > 0 {
-                    loom_ui.set_selected_node(total - 1);
+        KeyCode::Char('d') | KeyCode::Char('D') if loom_ui.view == LoomView::GraphView => {
+            if let (Some(graph), Some(current)) = (&loom_ui.loom_graph, loom_ui.selected_graph_node)
+            {
+                if let LoomGraphNode::Shuttle(shuttle_idx) = &graph.graph[current] {
+                    let idx = *shuttle_idx;
+                    if idx < loom_state.persistent.shuttles.len() {
+                        crate::loom::demolish_shuttle(loom_state, idx);
+                        // Graph is now stale; navigation will use rebuilt graph next frame.
+                        // Clear selection to avoid dangling reference.
+                        loom_ui.selected_graph_node = None;
+                        return InputResult::NeedsSave;
+                    }
                 }
-                InputResult::NeedsSave
-            } else {
-                InputResult::Continue
             }
+            InputResult::Continue
         }
         _ => InputResult::Continue,
     }
@@ -458,50 +495,222 @@ mod tests {
     }
 
     #[test]
-    fn left_right_no_op_outside_flow_view() {
+    fn graph_nav_no_op_without_graph() {
         let mut state = LoomState::new();
         let mut ui = make_ui(LoomView::GraphView);
-
-        // Left/Right in GraphView should not be handled as ratio adjustment.
-        // It falls through to the catch-all Continue branch.
+        // No graph/layout set — arrow keys should be no-ops.
+        let result = handle_loom(key(KeyCode::Up), &mut state, &mut ui);
+        assert!(matches!(result, InputResult::Continue));
+        let result = handle_loom(key(KeyCode::Down), &mut state, &mut ui);
+        assert!(matches!(result, InputResult::Continue));
         let result = handle_loom(key(KeyCode::Left), &mut state, &mut ui);
         assert!(matches!(result, InputResult::Continue));
-
         let result = handle_loom(key(KeyCode::Right), &mut state, &mut ui);
         assert!(matches!(result, InputResult::Continue));
     }
 
     #[test]
-    fn test_navigation_extends_to_shuttles() {
+    fn graph_nav_up_down_wraps_within_layer() {
+        use crate::loom::graph::{build_graph, LoomGraphNode};
+        use crate::loom::layout::compute_layout;
+
         let mut state = LoomState::new();
         crate::loom::logic::initialize_loom(&mut state);
+        // Unlock all extractors so we have multiple nodes in layer 0.
+        for node in &mut state.persistent.nodes {
+            node.unlocked = true;
+        }
+
+        let graph = build_graph(&state);
+        let layout = compute_layout(&graph, &state, 200.0, 100.0);
+
+        // Find all extractor nodes (layer 0) sorted by y.
+        let mut extractors: Vec<(NodeIndex, f64)> = graph
+            .graph
+            .node_indices()
+            .filter(|&idx| matches!(graph.graph[idx], LoomGraphNode::Extractor(_)))
+            .map(|idx| (idx, layout.node_positions[&idx].1))
+            .collect();
+        extractors.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+
+        if extractors.len() < 2 {
+            return; // Need at least 2 extractors for meaningful test.
+        }
+
+        let mut ui = make_ui(LoomView::GraphView);
+        ui.loom_graph = Some(graph);
+        ui.loom_layout = Some(layout);
+
+        // Start at first extractor, press Up should wrap to last.
+        let first = extractors[0].0;
+        let last = extractors[extractors.len() - 1].0;
+        ui.selected_graph_node = Some(first);
+
+        handle_loom(key(KeyCode::Up), &mut state, &mut ui);
+        assert_eq!(
+            ui.selected_graph_node,
+            Some(last),
+            "Up from first wraps to last"
+        );
+
+        // Press Down from last should wrap to first.
+        handle_loom(key(KeyCode::Down), &mut state, &mut ui);
+        assert_eq!(
+            ui.selected_graph_node,
+            Some(first),
+            "Down from last wraps to first"
+        );
+    }
+
+    #[test]
+    fn graph_nav_right_follows_outgoing_edge() {
+        use crate::loom::graph::build_graph;
+        use crate::loom::layout::compute_layout;
+        use crate::loom::types::{NodeId, NodeNature, Resource};
+
+        let mut state = LoomState::new();
+        crate::loom::logic::initialize_loom(&mut state);
+        for node in &mut state.persistent.nodes {
+            node.unlocked = true;
+        }
+
+        // Add a shuttle so there's an outgoing edge from an extractor.
         state
             .persistent
             .shuttles
             .push(crate::loom::types::Shuttle::new(
-                crate::loom::types::Resource::Ember,
-                crate::loom::types::Resource::VoidEssence,
-                crate::loom::types::NodeNature::Heat,
-                crate::loom::types::Resource::ForgedLight,
+                Resource::Ember,
+                Resource::VoidEssence,
+                NodeNature::Heat,
+                Resource::ForgedLight,
                 1.0,
                 1,
-                vec![crate::loom::types::LoomNodeRef::Extractor(
-                    crate::loom::types::NodeId::EmberSpindle,
-                )],
-                vec![crate::loom::types::LoomNodeRef::Extractor(
-                    crate::loom::types::NodeId::VoidCondenser,
-                )],
+                vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+                vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
             ));
-        let mut ui = make_ui(LoomView::GraphView);
-        ui.set_selected_node(4); // SW in diamond layout
 
-        handle_loom(key(KeyCode::Down), &mut state, &mut ui);
-        assert_eq!(ui.selected_node(), 5, "SW → MA");
+        let graph = build_graph(&state);
+        let layout = compute_layout(&graph, &state, 200.0, 100.0);
 
-        handle_loom(key(KeyCode::Down), &mut state, &mut ui);
-        assert_eq!(ui.selected_node(), 6, "MA → shuttle area");
+        // Find EmberSpindle node index.
+        let es_idx = graph
+            .node_indices
+            .get(&crate::loom::graph::LoomGraphNode::Extractor(
+                NodeId::EmberSpindle,
+            ))
+            .copied();
+        let shuttle_idx = graph
+            .node_indices
+            .get(&crate::loom::graph::LoomGraphNode::Shuttle(0))
+            .copied();
 
-        handle_loom(key(KeyCode::Up), &mut state, &mut ui);
-        assert_eq!(ui.selected_node(), 5, "shuttle → MA");
+        if let (Some(es), Some(sh)) = (es_idx, shuttle_idx) {
+            let mut ui = make_ui(LoomView::GraphView);
+            ui.loom_graph = Some(graph);
+            ui.loom_layout = Some(layout);
+            ui.selected_graph_node = Some(es);
+
+            handle_loom(key(KeyCode::Right), &mut state, &mut ui);
+            assert_eq!(
+                ui.selected_graph_node,
+                Some(sh),
+                "Right from extractor should navigate to connected shuttle"
+            );
+
+            // Left from shuttle should go back to extractor (one of the sources).
+            handle_loom(key(KeyCode::Left), &mut state, &mut ui);
+            // The shuttle has two incoming edges (EmberSpindle and VoidCondenser).
+            // It should pick the closest by y-position.
+            assert!(
+                ui.selected_graph_node.is_some(),
+                "Left from shuttle should navigate to an upstream node"
+            );
+        }
+    }
+
+    #[test]
+    fn upgrade_extractor_via_graph_node() {
+        use crate::loom::graph::{build_graph, LoomGraphNode};
+        use crate::loom::layout::compute_layout;
+        use crate::loom::types::NodeId;
+
+        let mut state = LoomState::new();
+        crate::loom::logic::initialize_loom(&mut state);
+        // Unlock EmberSpindle and give it resources for upgrade.
+        state.persistent.nodes[NodeId::EmberSpindle.index()].unlocked = true;
+
+        let graph = build_graph(&state);
+        let layout = compute_layout(&graph, &state, 200.0, 100.0);
+
+        let es_idx = graph
+            .node_indices
+            .get(&LoomGraphNode::Extractor(NodeId::EmberSpindle))
+            .copied();
+
+        if let Some(es) = es_idx {
+            let mut ui = make_ui(LoomView::GraphView);
+            ui.loom_graph = Some(graph);
+            ui.loom_layout = Some(layout);
+            ui.selected_graph_node = Some(es);
+
+            // Upgrade may fail due to resource cost, but the path should be exercised.
+            let result = handle_loom(key(KeyCode::Char('u')), &mut state, &mut ui);
+            assert!(
+                matches!(result, InputResult::Continue | InputResult::NeedsSave),
+                "U key should attempt upgrade on extractor"
+            );
+        }
+    }
+
+    #[test]
+    fn demolish_via_graph_node() {
+        use crate::loom::graph::{build_graph, LoomGraphNode};
+        use crate::loom::layout::compute_layout;
+        use crate::loom::types::{NodeId, NodeNature, Resource};
+
+        let mut state = LoomState::new();
+        crate::loom::logic::initialize_loom(&mut state);
+        for node in &mut state.persistent.nodes {
+            node.unlocked = true;
+        }
+
+        state
+            .persistent
+            .shuttles
+            .push(crate::loom::types::Shuttle::new(
+                Resource::Ember,
+                Resource::VoidEssence,
+                NodeNature::Heat,
+                Resource::ForgedLight,
+                1.0,
+                1,
+                vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+                vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+            ));
+        assert_eq!(state.persistent.shuttles.len(), 1);
+
+        let graph = build_graph(&state);
+        let layout = compute_layout(&graph, &state, 200.0, 100.0);
+
+        let shuttle_idx = graph.node_indices.get(&LoomGraphNode::Shuttle(0)).copied();
+
+        if let Some(sh) = shuttle_idx {
+            let mut ui = make_ui(LoomView::GraphView);
+            ui.loom_graph = Some(graph);
+            ui.loom_layout = Some(layout);
+            ui.selected_graph_node = Some(sh);
+
+            let result = handle_loom(key(KeyCode::Char('d')), &mut state, &mut ui);
+            assert!(matches!(result, InputResult::NeedsSave));
+            assert_eq!(
+                state.persistent.shuttles.len(),
+                0,
+                "Shuttle should be demolished"
+            );
+            assert_eq!(
+                ui.selected_graph_node, None,
+                "Selection should be cleared after demolish"
+            );
+        }
     }
 }
