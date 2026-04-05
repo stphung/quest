@@ -370,7 +370,11 @@ pub fn update_edge_rates(lg: &mut LoomGraph, loom: &LoomState) {
             }
         }
         for (i, shuttle) in persistent.shuttles.iter().enumerate() {
-            let rate = shuttle.output_rate_tracker.rate_per_hour() / warp;
+            let rate = if shuttle.under_construction {
+                0.0
+            } else {
+                shuttle.output_rate_tracker.rate_per_hour() / warp
+            };
             rates.insert(LoomNodeRef::Shuttle(i), rate);
         }
         rates
