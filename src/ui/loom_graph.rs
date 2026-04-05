@@ -158,9 +158,10 @@ pub fn render_graph_canvas(
             }
 
             // 2. Draw nodes as gauge bars via ctx.print (text-resolution, always crisp).
+            let has_selection = selected.is_some();
             for info in &node_info {
                 let is_selected = selected == Some(info.ni);
-                render_gauge_node(ctx, info, is_selected);
+                render_gauge_node(ctx, info, is_selected, has_selection);
             }
         });
 
@@ -322,13 +323,29 @@ fn build_node_render_info(
     }
 }
 
+/// Dim a color to ~40% brightness for unselected nodes.
+fn dim_color(c: Color) -> Color {
+    match c {
+        Color::Rgb(r, g, b) => Color::Rgb(
+            (r as f64 * 0.35) as u8,
+            (g as f64 * 0.35) as u8,
+            (b as f64 * 0.35) as u8,
+        ),
+        _ => Color::Rgb(60, 60, 60),
+    }
+}
+
 /// Render a node as two text lines at canvas coordinates:
-///   Line 1: `▸ Label ▰▰▰▰▱▱▱▱ ◂`
-///   Line 2: `    42/hr`  (centered, dimmed)
+///   Line 1: `▸ Label ▰▰▰▰▱▱▱▱ ◂`  (or without arrows if unselected)
+///   Line 2: `      42/hr`           (centered below gauge)
+///
+/// When `has_selection` is true and this node is NOT selected, it renders
+/// dimmed so the selected node stands out by contrast.
 fn render_gauge_node(
     ctx: &mut ratatui::widgets::canvas::Context<'_>,
     info: &NodeRenderInfo,
     is_selected: bool,
+    has_selection: bool,
 ) {
     let filled = (info.fill * info.gauge_width as f64).round() as usize;
     let empty = info.gauge_width.saturating_sub(filled);
@@ -338,35 +355,41 @@ fn render_gauge_node(
         .chain(std::iter::repeat(GAUGE_EMPTY).take(empty))
         .collect();
 
+    // Color scheme: selected = full bright white, unselected = dimmed when a selection exists.
+    let (label_color, gauge_color, rate_color) = if is_selected {
+        (
+            Color::White,
+            Color::Rgb(220, 200, 255),
+            Color::Rgb(180, 170, 200),
+        )
+    } else if has_selection {
+        (
+            dim_color(info.color),
+            dim_color(info.color),
+            Color::Rgb(50, 50, 60),
+        )
+    } else {
+        (info.color, info.color, Color::Rgb(100, 100, 120))
+    };
+
     // Line 1: [▸] label gauge [◂]
     let mut spans = Vec::new();
 
     if is_selected {
-        // Selected: white text on dim purple background for clear highlight.
-        let sel_bg = Color::Rgb(35, 25, 50);
-        spans.push(Span::styled(
-            SELECT_LEFT,
-            Style::default().fg(Color::White).bg(sel_bg),
-        ));
-        spans.push(Span::styled(
-            format!("{} ", info.label),
-            Style::default().fg(Color::White).bg(sel_bg),
-        ));
-        spans.push(Span::styled(
-            gauge_str,
-            Style::default().fg(Color::Rgb(200, 180, 255)).bg(sel_bg),
-        ));
+        spans.push(Span::styled(SELECT_LEFT, Style::default().fg(Color::White)));
+    }
+
+    spans.push(Span::styled(
+        format!("{} ", info.label),
+        Style::default().fg(label_color),
+    ));
+    spans.push(Span::styled(gauge_str, Style::default().fg(gauge_color)));
+
+    if is_selected {
         spans.push(Span::styled(
             SELECT_RIGHT,
-            Style::default().fg(Color::White).bg(sel_bg),
+            Style::default().fg(Color::White),
         ));
-    } else {
-        // Unselected: resource color, no background override (inherits canvas bg).
-        spans.push(Span::styled(
-            format!("{} ", info.label),
-            Style::default().fg(info.color),
-        ));
-        spans.push(Span::styled(gauge_str, Style::default().fg(info.color)));
     }
 
     let line1 = Line::from(spans);
@@ -374,12 +397,12 @@ fn render_gauge_node(
     let half_w = display_width as f64 / 2.0;
     ctx.print(info.cx - half_w, info.cy, line1);
 
-    // Line 2: rate text centered below (offset down by 1 text row = ~4 braille dots)
+    // Line 2: rate text centered below the gauge portion (not the full label+gauge).
+    // Offset down by 1 text row = ~4 braille dots.
     if !info.rate_text.is_empty() {
-        let dim = Color::Rgb(100, 100, 120);
         let line2 = Line::from(Span::styled(
             info.rate_text.clone(),
-            Style::default().fg(dim),
+            Style::default().fg(rate_color),
         ));
         let half_rate_w = info.rate_text.len() as f64 / 2.0;
         ctx.print(info.cx - half_rate_w, info.cy - 4.0, line2);
