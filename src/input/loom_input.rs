@@ -4,7 +4,7 @@
 use super::types::InputResult;
 use crate::loom::graph::{LoomGraph, LoomGraphNode};
 use crate::loom::layout::{node_layer, LoomLayout};
-use crate::loom::types::{BuildState, BuildStep, LoomNodeRef, LoomState, LoomUiState, LoomView};
+use crate::loom::types::{BuildState, BuildStep, LoomNodeRef, LoomState, LoomUiState};
 use petgraph::stable_graph::NodeIndex;
 use petgraph::Direction;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
@@ -132,79 +132,35 @@ pub(super) fn handle_loom(
             loom_ui.open = false;
             InputResult::Continue
         }
-        KeyCode::Tab => {
-            loom_ui.view = cycle_view(loom_ui.view);
-            loom_ui.selected_graph_node = None;
-            loom_ui.codex_column = 0;
-            loom_ui.codex_row = 0;
-            InputResult::Continue
-        }
         KeyCode::Up => {
-            match loom_ui.view {
-                LoomView::Codex => {
-                    loom_ui.codex_row = loom_ui.codex_row.saturating_sub(1);
-                }
-                LoomView::GraphView => {
-                    if let (Some(graph), Some(layout), Some(current)) = (
-                        &loom_ui.loom_graph,
-                        &loom_ui.loom_layout,
-                        loom_ui.selected_graph_node,
-                    ) {
-                        let sibs = siblings_in_layer(graph, layout, loom_state, current);
-                        if let Some(pos) = sibs.iter().position(|&n| n == current) {
-                            let next = if pos == 0 { sibs.len() - 1 } else { pos - 1 };
-                            loom_ui.selected_graph_node = Some(sibs[next]);
-                        }
-                    }
+            if let (Some(graph), Some(layout), Some(current)) = (
+                &loom_ui.loom_graph,
+                &loom_ui.loom_layout,
+                loom_ui.selected_graph_node,
+            ) {
+                let sibs = siblings_in_layer(graph, layout, loom_state, current);
+                if let Some(pos) = sibs.iter().position(|&n| n == current) {
+                    let next = if pos == 0 { sibs.len() - 1 } else { pos - 1 };
+                    loom_ui.selected_graph_node = Some(sibs[next]);
                 }
             }
             InputResult::Continue
         }
         KeyCode::Down => {
-            match loom_ui.view {
-                LoomView::Codex => {
-                    let max_row = codex_column_len(loom_ui.codex_column).saturating_sub(1);
-                    if loom_ui.codex_row < max_row {
-                        loom_ui.codex_row += 1;
-                    }
-                }
-                LoomView::GraphView => {
-                    if let (Some(graph), Some(layout), Some(current)) = (
-                        &loom_ui.loom_graph,
-                        &loom_ui.loom_layout,
-                        loom_ui.selected_graph_node,
-                    ) {
-                        let sibs = siblings_in_layer(graph, layout, loom_state, current);
-                        if let Some(pos) = sibs.iter().position(|&n| n == current) {
-                            let next = (pos + 1) % sibs.len();
-                            loom_ui.selected_graph_node = Some(sibs[next]);
-                        }
-                    }
+            if let (Some(graph), Some(layout), Some(current)) = (
+                &loom_ui.loom_graph,
+                &loom_ui.loom_layout,
+                loom_ui.selected_graph_node,
+            ) {
+                let sibs = siblings_in_layer(graph, layout, loom_state, current);
+                if let Some(pos) = sibs.iter().position(|&n| n == current) {
+                    let next = (pos + 1) % sibs.len();
+                    loom_ui.selected_graph_node = Some(sibs[next]);
                 }
             }
             InputResult::Continue
         }
-        KeyCode::Left if loom_ui.view == LoomView::Codex => {
-            if loom_ui.codex_column > 0 {
-                loom_ui.codex_column -= 1;
-                let max_row = codex_column_len(loom_ui.codex_column).saturating_sub(1);
-                if loom_ui.codex_row > max_row {
-                    loom_ui.codex_row = max_row;
-                }
-            }
-            InputResult::Continue
-        }
-        KeyCode::Right if loom_ui.view == LoomView::Codex => {
-            if loom_ui.codex_column < 2 {
-                loom_ui.codex_column += 1;
-                let max_row = codex_column_len(loom_ui.codex_column).saturating_sub(1);
-                if loom_ui.codex_row > max_row {
-                    loom_ui.codex_row = max_row;
-                }
-            }
-            InputResult::Continue
-        }
-        KeyCode::Left if loom_ui.view == LoomView::GraphView => {
+        KeyCode::Left => {
             if let (Some(graph), Some(layout), Some(current)) = (
                 &loom_ui.loom_graph,
                 &loom_ui.loom_layout,
@@ -216,7 +172,7 @@ pub(super) fn handle_loom(
             }
             InputResult::Continue
         }
-        KeyCode::Right if loom_ui.view == LoomView::GraphView => {
+        KeyCode::Right => {
             if let (Some(graph), Some(layout), Some(current)) = (
                 &loom_ui.loom_graph,
                 &loom_ui.loom_layout,
@@ -228,7 +184,7 @@ pub(super) fn handle_loom(
             }
             InputResult::Continue
         }
-        KeyCode::Char('u') | KeyCode::Char('U') if loom_ui.view == LoomView::GraphView => {
+        KeyCode::Char('u') | KeyCode::Char('U') => {
             if let (Some(graph), Some(current)) = (&loom_ui.loom_graph, loom_ui.selected_graph_node)
             {
                 match &graph.graph[current] {
@@ -248,11 +204,11 @@ pub(super) fn handle_loom(
             InputResult::Continue
         }
         KeyCode::Enter => InputResult::Continue,
-        KeyCode::Char('b') | KeyCode::Char('B') if loom_ui.view == LoomView::GraphView => {
+        KeyCode::Char('b') | KeyCode::Char('B') => {
             start_build(loom_state, loom_ui);
             InputResult::Continue
         }
-        KeyCode::Char('d') | KeyCode::Char('D') if loom_ui.view == LoomView::GraphView => {
+        KeyCode::Char('d') | KeyCode::Char('D') => {
             if let (Some(graph), Some(current)) = (&loom_ui.loom_graph, loom_ui.selected_graph_node)
             {
                 if let LoomGraphNode::Shuttle(shuttle_idx) = &graph.graph[current] {
@@ -531,24 +487,6 @@ fn handle_build_input(
     }
 }
 
-/// Number of resources in a codex column.
-fn codex_column_len(col: usize) -> usize {
-    match col {
-        0 => 6,
-        1 => 6,
-        2 => 1,
-        _ => 0,
-    }
-}
-
-/// Cycle through views.
-fn cycle_view(current: LoomView) -> LoomView {
-    match current {
-        LoomView::GraphView => LoomView::Codex,
-        LoomView::Codex => LoomView::GraphView,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -558,16 +496,14 @@ mod tests {
         KeyEvent::new(code, KeyModifiers::NONE)
     }
 
-    fn make_ui(view: LoomView) -> LoomUiState {
-        let mut ui = LoomUiState::new();
-        ui.view = view;
-        ui
+    fn make_ui() -> LoomUiState {
+        LoomUiState::new()
     }
 
     #[test]
     fn esc_closes_overlay() {
         let mut state = LoomState::new();
-        let mut ui = make_ui(LoomView::GraphView);
+        let mut ui = make_ui();
         ui.open = true;
 
         handle_loom(key(KeyCode::Esc), &mut state, &mut ui);
@@ -575,21 +511,9 @@ mod tests {
     }
 
     #[test]
-    fn tab_cycles_views() {
-        let mut state = LoomState::new();
-        let mut ui = make_ui(LoomView::GraphView);
-
-        handle_loom(key(KeyCode::Tab), &mut state, &mut ui);
-        assert_eq!(ui.view, LoomView::Codex);
-
-        handle_loom(key(KeyCode::Tab), &mut state, &mut ui);
-        assert_eq!(ui.view, LoomView::GraphView);
-    }
-
-    #[test]
     fn graph_nav_no_op_without_graph() {
         let mut state = LoomState::new();
-        let mut ui = make_ui(LoomView::GraphView);
+        let mut ui = make_ui();
         // No graph/layout set — arrow keys should be no-ops.
         let result = handle_loom(key(KeyCode::Up), &mut state, &mut ui);
         assert!(matches!(result, InputResult::Continue));
@@ -629,7 +553,7 @@ mod tests {
             return; // Need at least 2 extractors for meaningful test.
         }
 
-        let mut ui = make_ui(LoomView::GraphView);
+        let mut ui = make_ui();
         ui.loom_graph = Some(graph);
         ui.loom_layout = Some(layout);
 
@@ -697,7 +621,7 @@ mod tests {
             .copied();
 
         if let (Some(es), Some(sh)) = (es_idx, shuttle_idx) {
-            let mut ui = make_ui(LoomView::GraphView);
+            let mut ui = make_ui();
             ui.loom_graph = Some(graph);
             ui.loom_layout = Some(layout);
             ui.selected_graph_node = Some(es);
@@ -740,7 +664,7 @@ mod tests {
             .copied();
 
         if let Some(es) = es_idx {
-            let mut ui = make_ui(LoomView::GraphView);
+            let mut ui = make_ui();
             ui.loom_graph = Some(graph);
             ui.loom_layout = Some(layout);
             ui.selected_graph_node = Some(es);
@@ -787,7 +711,7 @@ mod tests {
         let shuttle_idx = graph.node_indices.get(&LoomGraphNode::Shuttle(0)).copied();
 
         if let Some(sh) = shuttle_idx {
-            let mut ui = make_ui(LoomView::GraphView);
+            let mut ui = make_ui();
             ui.loom_graph = Some(graph);
             ui.loom_layout = Some(layout);
             ui.selected_graph_node = Some(sh);

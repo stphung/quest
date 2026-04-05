@@ -124,9 +124,8 @@ Extractor (base production) → [direct pull] → Shuttle (recipe processing) �
 
 ## UI (in `src/ui/loom_scene.rs` and `src/ui/loom_graph.rs`)
 
-Two views controlled by `LoomView` enum:
+Single graph view:
 - **GraphView**: Canvas-based DAG visualization using petgraph. Nodes arranged in layers — extractors (layer 0), T1/T2/T3 shuttles (layers 1–3), pattern sinks (layer 4). Animated edges with particles and glow propagation reflecting live flow rates. Bottom panel shows node detail, build flow, or pattern info depending on selection. Layout computed by `layout.rs` (Sugiyama algorithm).
-- **Codex**: Recipe codex showing discovered and undiscovered recipes.
 
 Shuttle nodes show: recipe name, tier badge, construction progress, buffer levels, stall indicator.
 

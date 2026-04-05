@@ -395,13 +395,6 @@ impl Default for LoomState {
     }
 }
 
-/// Which view the Loom UI is showing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LoomView {
-    GraphView,
-    Codex,
-}
-
 /// Which step of the shuttle build flow the player is on.
 #[derive(Debug, Clone)]
 pub enum BuildStep {
@@ -440,15 +433,10 @@ pub struct BuildState {
 #[derive(Debug)]
 pub struct LoomUiState {
     pub open: bool,
-    pub view: LoomView,
     /// Currently selected node in the graph view (None = no selection).
     pub selected_graph_node: Option<petgraph::stable_graph::NodeIndex>,
     /// Per-edge animation phase for flowing particle effects.
     pub particle_phases: HashMap<petgraph::stable_graph::EdgeIndex, f64>,
-    /// Codex graph cursor: column (0=Base, 1=Confluence, 2=Terminal).
-    pub codex_column: usize,
-    /// Codex graph cursor: row within current column.
-    pub codex_row: usize,
     /// Frame counter for throbber animation (incremented each render call).
     pub throbber_frame: u32,
     /// Active build flow state, if any.
@@ -465,11 +453,8 @@ impl LoomUiState {
     pub fn new() -> Self {
         Self {
             open: false,
-            view: LoomView::GraphView,
             selected_graph_node: None,
             particle_phases: HashMap::new(),
-            codex_column: 0,
-            codex_row: 0,
             throbber_frame: 0,
             build: None,
             loom_graph: None,
