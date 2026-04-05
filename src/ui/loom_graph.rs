@@ -277,8 +277,10 @@ pub fn render_graph_canvas(
                 // 5. Draw pattern requirement lines below the node dot.
                 if !info.req_lines.is_empty() {
                     let dot_y = info.cy + NODE_DOT_Y_OFFSET;
+                    // Start 2 rows below the dot, then one row per requirement.
+                    let req_start_y = dot_y - 2.0 * row_h;
                     for (i, (text, color)) in info.req_lines.iter().enumerate() {
-                        let req_y = dot_y - (i as f64 + 1.0) * row_h;
+                        let req_y = req_start_y - (i as f64) * row_h;
                         let half_w = text.len() as f64 * char_w / 2.0;
                         let line =
                             Line::from(Span::styled(text.clone(), Style::default().fg(*color)));
