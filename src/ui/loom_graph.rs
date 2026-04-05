@@ -190,17 +190,35 @@ pub fn render_graph_canvas(
                 }
             }
 
-            // 3. Draw small filled square below each node's text (Braille layer).
-            // Positioned one row below the rate text line so it's always visible.
-            let dot_row_offset = -4.0; // 1 terminal row below center (where rate text is)
+            // 3. Draw node markers (Braille layer):
+            //    - Square at center (where edges connect)
+            //    - Short vertical stem down to a square below text (visible anchor)
             for info in &node_info {
                 let mut dot_coords: Vec<(f64, f64)> = Vec::new();
-                let (cx, cy) = (info.cx, info.cy + dot_row_offset);
+                let cx = info.cx;
+
+                // Center square (edge connection point).
                 for dx in -1..=1 {
                     for dy in -1..=1 {
-                        dot_coords.push((cx + dx as f64, cy + dy as f64));
+                        dot_coords.push((cx + dx as f64, info.cy + dy as f64));
                     }
                 }
+
+                // Below-text square (visible marker).
+                let below_y = info.cy - 4.0;
+                for dx in -1..=1 {
+                    for dy in -1..=1 {
+                        dot_coords.push((cx + dx as f64, below_y + dy as f64));
+                    }
+                }
+
+                // Vertical stem connecting center to below-text marker.
+                let steps = ((info.cy - below_y) / 0.5).round() as i32;
+                for s in 0..=steps {
+                    let y = below_y + s as f64 * 0.5;
+                    dot_coords.push((cx, y));
+                }
+
                 ctx.draw(&Points {
                     coords: &dot_coords,
                     color: info.color,
