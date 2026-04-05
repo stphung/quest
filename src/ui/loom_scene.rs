@@ -80,7 +80,7 @@ pub fn render_loom_overlay(
     } else {
         String::new()
     };
-    let title = format!(" LOOM OF WORLDS \u{2014} Graph View{}", warp_label);
+    let title = format!(" LOOM OF WORLDS {}", warp_label);
     let block = Block::default()
         .title(title)
         .borders(Borders::ALL)
