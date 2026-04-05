@@ -210,6 +210,8 @@ pub(super) fn handle_loom(
         KeyCode::Enter => InputResult::Continue,
         KeyCode::Char('b') | KeyCode::Char('B') => {
             start_build(loom_state, loom_ui);
+            // Clear graph selection during build mode to avoid mixed indicators.
+            loom_ui.selected_graph_node = None;
             InputResult::Continue
         }
         KeyCode::Char('d') | KeyCode::Char('D') => {
