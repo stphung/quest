@@ -24,6 +24,10 @@ use crate::loom::layout::LoomLayout;
 use crate::loom::logic::node_native_resource;
 use crate::loom::types::{LoomState, LoomUiState, Resource};
 
+/// Y-offset for node dot/edge connection point, below the text center.
+/// Text renders at cy (rate) and cy+4 (label); the dot sits one row below rate.
+const NODE_DOT_Y_OFFSET: f64 = -4.0;
+
 /// Render the Loom production graph onto a Canvas widget.
 pub fn render_graph_canvas(
     frame: &mut Frame,
@@ -81,6 +85,7 @@ pub fn render_graph_canvas(
             };
 
             // Build waypoint chain (source -> dummies -> target) in canvas coords.
+            // Offset endpoints to match the node dot position (below text).
             let mut points = Vec::new();
             let (sx, sy) = layout_to_canvas(
                 src_pos.0,
@@ -89,7 +94,7 @@ pub fn render_graph_canvas(
                 canvas_width,
                 canvas_height,
             );
-            points.push((sx, sy));
+            points.push((sx, sy + NODE_DOT_Y_OFFSET));
 
             if let Some(dummies) = layout.dummy_paths.get(&(src_ni, tgt_ni)) {
                 for &(dx, dy) in dummies {
@@ -106,7 +111,7 @@ pub fn render_graph_canvas(
                 canvas_width,
                 canvas_height,
             );
-            points.push((tx, ty));
+            points.push((tx, ty + NODE_DOT_Y_OFFSET));
 
             // Particle positions (3 dots along the edge path based on phase).
             let particles = if edge.current_rate > 0.0 {
@@ -190,35 +195,16 @@ pub fn render_graph_canvas(
                 }
             }
 
-            // 3. Draw node markers (Braille layer):
-            //    - Square at center (where edges connect)
-            //    - Short vertical stem down to a square below text (visible anchor)
+            // 3. Draw single node marker below text (Braille layer).
+            // This is where edges connect — see NODE_DOT_Y_OFFSET.
             for info in &node_info {
                 let mut dot_coords: Vec<(f64, f64)> = Vec::new();
-                let cx = info.cx;
-
-                // Center square (edge connection point).
+                let dot_y = info.cy + NODE_DOT_Y_OFFSET;
                 for dx in -1..=1 {
                     for dy in -1..=1 {
-                        dot_coords.push((cx + dx as f64, info.cy + dy as f64));
+                        dot_coords.push((info.cx + dx as f64, dot_y + dy as f64));
                     }
                 }
-
-                // Below-text square (visible marker).
-                let below_y = info.cy - 4.0;
-                for dx in -1..=1 {
-                    for dy in -1..=1 {
-                        dot_coords.push((cx + dx as f64, below_y + dy as f64));
-                    }
-                }
-
-                // Vertical stem connecting center to below-text marker.
-                let steps = ((info.cy - below_y) / 0.5).round() as i32;
-                for s in 0..=steps {
-                    let y = below_y + s as f64 * 0.5;
-                    dot_coords.push((cx, y));
-                }
-
                 ctx.draw(&Points {
                     coords: &dot_coords,
                     color: info.color,
