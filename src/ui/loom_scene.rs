@@ -179,24 +179,62 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
         let lines: Vec<Line> = match &build.step {
             crate::loom::BuildStep::SelectRecipe { cursor } => {
                 let all_recipes = crate::loom::recipes::all_recipes();
-                // Show compact grouped recipe list in the bottom panel.
                 let display_rows = build_recipe_display_rows(&build.available_recipes);
                 let cursor_row = cursor_to_display_row(&display_rows, *cursor);
-                let window_size: usize = (inner.height as usize).saturating_sub(2).min(6);
-                let half = window_size / 2;
+
+                // Header takes 1 line, footer hints take 1 line. Rest is for recipes.
+                let avail_h = inner.height as usize;
+                let list_height = avail_h.saturating_sub(2); // header + hint line
+                let total_rows = display_rows.len();
+
+                // Scrolling window uses full available height.
+                let half = list_height / 2;
                 let scroll_start = if cursor_row >= half {
-                    (cursor_row - half).min(display_rows.len().saturating_sub(window_size))
+                    (cursor_row - half).min(total_rows.saturating_sub(list_height))
                 } else {
                     0
                 };
-                let scroll_end = (scroll_start + window_size).min(display_rows.len());
+                let scroll_end = (scroll_start + list_height).min(total_rows);
                 let intake_cap = crate::loom::logic::shuttle_effective_intake_cap(build.tier, 1);
 
                 let mut lines: Vec<Line> = Vec::new();
-                lines.push(Line::from(Span::styled(
-                    format!(" Building Shuttle \u{2014} T{} recipes", build.tier),
-                    Style::default().fg(Color::Rgb(180, 140, 220)),
-                )));
+
+                // Header with tier tabs.
+                let tiers = crate::loom::unlocked_tiers(loom);
+                let mut tab_spans: Vec<Span> = vec![Span::raw(" ")];
+                for &t in &tiers {
+                    if t == build.tier {
+                        tab_spans.push(Span::styled(
+                            format!("[T{}]", t),
+                            Style::default()
+                                .fg(Color::White)
+                                .add_modifier(Modifier::BOLD),
+                        ));
+                    } else {
+                        tab_spans.push(Span::styled(
+                            format!(" T{} ", t),
+                            Style::default().fg(Color::Rgb(80, 70, 100)),
+                        ));
+                    }
+                    tab_spans.push(Span::raw(" "));
+                }
+                if tiers.len() > 1 {
+                    tab_spans.push(Span::styled(
+                        " [Tab] tiers",
+                        Style::default().fg(Color::Rgb(80, 70, 100)),
+                    ));
+                }
+                lines.push(Line::from(tab_spans));
+
+                // Scroll-up indicator.
+                if scroll_start > 0 {
+                    lines.push(Line::from(Span::styled(
+                        " \u{25b2} more above",
+                        Style::default().fg(Color::Rgb(80, 70, 100)),
+                    )));
+                }
+
+                // Recipe list.
                 for row in &display_rows[scroll_start..scroll_end] {
                     match row {
                         RecipeRowKind::Header(text) => {
@@ -211,7 +249,7 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                         } => {
                             let r = &all_recipes[*global_idx];
                             let is_selected = *recipe_list_idx == *cursor;
-                            let prefix = if is_selected { " > " } else { "   " };
+                            let prefix = if is_selected { " \u{25b6} " } else { "   " };
                             let style = if is_selected {
                                 Style::default()
                                     .fg(Color::White)
@@ -220,7 +258,7 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                                 Style::default().fg(Color::Rgb(120, 100, 150))
                             };
                             let label = format!(
-                                "{}{} {} + {} {}  ({:?})  cap: {:.0}/hr",
+                                "{}{} {} + {} {}  ({:?})  {:.0}/hr",
                                 prefix,
                                 resource_emoji(&r.input_a),
                                 resource_name(&r.input_a),
@@ -233,6 +271,15 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                         }
                     }
                 }
+
+                // Scroll-down indicator.
+                if scroll_end < total_rows {
+                    lines.push(Line::from(Span::styled(
+                        " \u{25bc} more below",
+                        Style::default().fg(Color::Rgb(80, 70, 100)),
+                    )));
+                }
+
                 lines
             }
             crate::loom::BuildStep::SelectSourcesA { .. } => {
