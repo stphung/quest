@@ -117,8 +117,8 @@ pub fn render_graph_canvas(
             };
 
             // Edge label: rate + resource emoji at midpoint.
-            let warp = loom.time_warp.max(1.0);
-            let rate = edge.current_rate / warp;
+            // current_rate is already un-warped (normalized in update_edge_rates).
+            let rate = edge.current_rate;
             let label = if rate > 0.5 {
                 format!("{:.0}{}/hr", rate, resource_emoji(edge.resource))
             } else {

@@ -329,7 +329,10 @@ pub fn remove_ghost_node(lg: &mut LoomGraph, ghost_idx: NodeIndex) {
 /// - Edges from extractors: use the resource's global rate tracker
 /// - Edges from shuttles: use the shuttle's output_rate_tracker
 /// - Edges from pattern sinks (if any): 0.0
+/// Update edge rates from source node trackers.
+/// All rates are normalized to un-warped values (real-time rates).
 pub fn update_edge_rates(lg: &mut LoomGraph, loom: &LoomState) {
+    let warp = loom.time_warp.max(1.0);
     let edge_indices: Vec<_> = lg.graph.edge_indices().collect();
     for edge_idx in edge_indices {
         let (source_ni, _target_ni) = match lg.graph.edge_endpoints(edge_idx) {
@@ -343,6 +346,7 @@ pub fn update_edge_rates(lg: &mut LoomGraph, loom: &LoomState) {
 
         let rate = match &source_node {
             LoomGraphNode::Extractor(node_id) => {
+                // rate_trackers already stores un-warped rates.
                 let resource = node_native_resource(*node_id);
                 loom.rate_trackers
                     .get(&resource)
@@ -350,10 +354,12 @@ pub fn update_edge_rates(lg: &mut LoomGraph, loom: &LoomState) {
                     .unwrap_or(0.0)
             }
             LoomGraphNode::Shuttle(idx) => {
+                // output_rate_tracker stores raw (warped) rates — normalize here.
                 if *idx < loom.persistent.shuttles.len() {
                     loom.persistent.shuttles[*idx]
                         .output_rate_tracker
                         .rate_per_hour()
+                        / warp
                 } else {
                     0.0
                 }
