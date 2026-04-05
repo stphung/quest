@@ -221,10 +221,10 @@ pub fn render_graph_canvas(
             }
 
             // 2. Draw edge labels (only for edges connected to selected node).
-            // Smooth sine-wave fade over ~3 second cycle for gentle pulsing.
-            let pulse = ((frame_count as f64 * 0.1).sin() * 0.5 + 0.5) as f64; // 0.0..1.0
-            let lo = (90.0, 80.0, 120.0);
-            let hi = (180.0, 170.0, 220.0);
+            // Smooth sine-wave fade over ~2 second cycle.
+            let pulse = ((frame_count as f64 * 0.15).sin() * 0.5 + 0.5) as f64; // 0.0..1.0
+            let lo = (60.0, 50.0, 80.0);
+            let hi = (220.0, 210.0, 255.0);
             let label_color = Color::Rgb(
                 (lo.0 + (hi.0 - lo.0) * pulse) as u8,
                 (lo.1 + (hi.1 - lo.1) * pulse) as u8,
