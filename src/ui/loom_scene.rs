@@ -5,7 +5,7 @@
 use crate::loom::types::{LoomState, LoomUiState};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Gauge, Paragraph},
     Frame,
@@ -183,17 +183,83 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
     if let Some(build) = &ui.build {
         let recipes = crate::loom::recipes::all_recipes();
         let lines: Vec<Line> = match &build.step {
-            crate::loom::BuildStep::SelectRecipe { .. } => {
-                vec![
-                    Line::from(Span::styled(
-                        " Building Shuttle...",
-                        Style::default().fg(Color::Rgb(180, 140, 220)),
-                    )),
-                    Line::from(Span::styled(
-                        format!(" Step 1/4: Select recipe (T{})", build.tier),
-                        Style::default().fg(Color::Rgb(140, 110, 170)),
-                    )),
-                ]
+            crate::loom::BuildStep::SelectRecipe { cursor } => {
+                let tiers = crate::loom::unlocked_tiers(loom);
+                // Build tier tab bar.
+                let mut tab_spans: Vec<Span> = Vec::new();
+                tab_spans.push(Span::raw(" "));
+                for &t in &tiers {
+                    let is_active = t == build.tier;
+                    if is_active {
+                        tab_spans.push(Span::styled(
+                            format!("[ T{} ]", t),
+                            Style::default()
+                                .fg(Color::White)
+                                .add_modifier(Modifier::BOLD),
+                        ));
+                    } else {
+                        tab_spans.push(Span::styled(
+                            format!("  T{}  ", t),
+                            Style::default().fg(Color::Rgb(80, 70, 100)),
+                        ));
+                    }
+                    tab_spans.push(Span::raw(" "));
+                }
+                // Right-align the Tab hint by padding.
+                tab_spans.push(Span::styled(
+                    "  [Tab] cycle tiers",
+                    Style::default().fg(Color::Rgb(80, 70, 100)),
+                ));
+                let tab_line = Line::from(tab_spans);
+
+                // Build recipe list (scrolling window, max 5 visible).
+                let all_recipes = crate::loom::recipes::all_recipes();
+                let window_size: usize = 5;
+                let total = build.available_recipes.len();
+                let scroll_start = if *cursor >= window_size {
+                    cursor.saturating_sub(window_size - 1)
+                } else {
+                    0
+                };
+                let scroll_end = (scroll_start + window_size).min(total);
+
+                let mut lines: Vec<Line> = Vec::new();
+                lines.push(Line::from(Span::styled(
+                    " Building Shuttle \u{2014} Step 1/4: Select recipe",
+                    Style::default().fg(Color::Rgb(180, 140, 220)),
+                )));
+                lines.push(tab_line);
+                for i in scroll_start..scroll_end {
+                    let recipe_idx = build.available_recipes[i];
+                    let r = &all_recipes[recipe_idx];
+                    let is_selected = i == *cursor;
+                    let prefix = if is_selected { " > " } else { "   " };
+                    let label = format!(
+                        "{}{} {} \u{2192} {}",
+                        prefix,
+                        resource_emoji(&r.input_a),
+                        resource_emoji(&r.input_b),
+                        resource_emoji(&r.output),
+                    );
+                    let suffix = if is_selected {
+                        "  [\u{2191}\u{2193}] select  [Enter] confirm"
+                    } else {
+                        ""
+                    };
+                    let style = if is_selected {
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default().fg(Color::Rgb(120, 100, 150))
+                    };
+                    let hint_style = Style::default().fg(Color::Rgb(80, 70, 100));
+                    lines.push(Line::from(vec![
+                        Span::styled(label, style),
+                        Span::styled(suffix.to_string(), hint_style),
+                    ]));
+                }
+                lines
             }
             crate::loom::BuildStep::SelectSourcesA { .. } => {
                 let r = &recipes[build.recipe_index];
