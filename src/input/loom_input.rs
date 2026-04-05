@@ -239,6 +239,27 @@ pub(super) fn handle_loom(
     }
 }
 
+/// Build a sorted list of recipe indices for a tier, grouped by output resource.
+fn sorted_recipes_for_tier(tier: u8) -> Vec<usize> {
+    let recipes = crate::loom::recipes::all_recipes();
+    let mut available: Vec<usize> = recipes
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.tier == tier)
+        .map(|(i, _)| i)
+        .collect();
+    // Sort by output resource name (groups same-output recipes together),
+    // then by input_a name as tiebreaker.
+    available.sort_by(|&a, &b| {
+        let ra = &recipes[a];
+        let rb = &recipes[b];
+        format!("{:?}", ra.output)
+            .cmp(&format!("{:?}", rb.output))
+            .then_with(|| format!("{:?}", ra.input_a).cmp(&format!("{:?}", rb.input_a)))
+    });
+    available
+}
+
 /// Start the build shuttle flow.
 fn start_build(loom_state: &LoomState, loom_ui: &mut LoomUiState) {
     use crate::loom::types::BuildStep;
@@ -293,12 +314,7 @@ fn start_build(loom_state: &LoomState, loom_ui: &mut LoomUiState) {
     }
     // Default to lowest unlocked tier.
     let tier = tiers[0];
-    let available: Vec<usize> = crate::loom::recipes::all_recipes()
-        .iter()
-        .enumerate()
-        .filter(|(_, r)| r.tier == tier)
-        .map(|(i, _)| i)
-        .collect();
+    let available = sorted_recipes_for_tier(tier);
     if available.is_empty() {
         return;
     }
@@ -348,12 +364,7 @@ fn handle_build_input(
                             (current_pos + tiers.len() - 1) % tiers.len()
                         };
                         build.tier = tiers[next_pos];
-                        build.available_recipes = recipes
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, r)| r.tier == build.tier)
-                            .map(|(i, _)| i)
-                            .collect();
+                        build.available_recipes = sorted_recipes_for_tier(build.tier);
                         *cursor = 0;
                         if !build.available_recipes.is_empty() {
                             build.recipe_index = build.available_recipes[0];
