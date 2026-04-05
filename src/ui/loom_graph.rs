@@ -70,7 +70,34 @@ pub fn render_graph_canvas(
             let src_pos = layout.node_positions.get(&src_ni)?;
             let tgt_pos = layout.node_positions.get(&tgt_ni)?;
 
-            let color = Color::Rgb(60, 70, 100); // uniform edge color
+            // V3: Gold edges into pattern sink when sustaining, dim otherwise.
+            let tgt_node = loom_graph.graph.node_weight(tgt_ni)?;
+            let color = if let LoomGraphNode::PatternSink(pat_idx) = tgt_node {
+                // Check if pattern is actively sustaining.
+                let is_sustaining = if *pat_idx < loom.persistent.patterns.len() {
+                    let pat = &loom.persistent.patterns[*pat_idx];
+                    let rates: std::collections::HashMap<_, _> = loom
+                        .rate_trackers
+                        .iter()
+                        .map(|(r, t)| (*r, t.rate_per_hour()))
+                        .collect();
+                    !pat.completed
+                        && pat.requirements.iter().all(|req| {
+                            req.completed
+                                || rates.get(&req.resource).copied().unwrap_or(0.0)
+                                    >= req.required_rate
+                        })
+                } else {
+                    false
+                };
+                if is_sustaining {
+                    Color::Rgb(255, 200, 60) // gold
+                } else {
+                    Color::Rgb(60, 70, 100) // dim
+                }
+            } else {
+                Color::Rgb(60, 70, 100) // dim for non-pattern edges
+            };
 
             // Particle color = source node's resource color.
             let src_node = loom_graph.graph.node_weight(src_ni)?;
@@ -241,9 +268,23 @@ pub fn render_graph_canvas(
 
             // 4. Draw nodes as gauge bars via ctx.print (text-resolution, always crisp).
             let has_selection = selected.is_some();
+            let char_w = 2.0_f64;
+            let row_h = 4.0_f64;
             for info in &node_info {
                 let is_selected = selected == Some(info.ni);
                 render_gauge_node(ctx, info, is_selected, has_selection, frame_count);
+
+                // 5. Draw pattern requirement lines below the node dot.
+                if !info.req_lines.is_empty() {
+                    let dot_y = info.cy + NODE_DOT_Y_OFFSET;
+                    for (i, (text, color)) in info.req_lines.iter().enumerate() {
+                        let req_y = dot_y - (i as f64 + 1.0) * row_h;
+                        let half_w = text.len() as f64 * char_w / 2.0;
+                        let line =
+                            Line::from(Span::styled(text.clone(), Style::default().fg(*color)));
+                        ctx.print(info.cx - half_w, req_y, line);
+                    }
+                }
             }
         });
 
@@ -267,6 +308,8 @@ struct NodeRenderInfo {
     gauge_width: usize,
     /// Whether this pattern node is actively sustaining (all requirements met).
     is_sustaining: bool,
+    /// Pattern requirement lines to render below the node (only for PatternSink).
+    req_lines: Vec<(String, Color)>,
 }
 
 /// Resource emoji for display.
@@ -366,6 +409,7 @@ fn build_node_render_info(
                 rate_text,
                 gauge_width,
                 is_sustaining: false,
+                req_lines: vec![],
             }
         }
         LoomGraphNode::Shuttle(idx) => {
@@ -381,6 +425,7 @@ fn build_node_render_info(
                     rate_text: String::new(),
                     gauge_width,
                     is_sustaining: false,
+                    req_lines: vec![],
                 };
             }
             if *idx < loom.persistent.shuttles.len() {
@@ -429,6 +474,7 @@ fn build_node_render_info(
                     rate_text,
                     gauge_width,
                     is_sustaining: false,
+                    req_lines: vec![],
                 }
             } else {
                 NodeRenderInfo {
@@ -442,6 +488,7 @@ fn build_node_render_info(
                     rate_text: String::new(),
                     gauge_width,
                     is_sustaining: false,
+                    req_lines: vec![],
                 }
             }
         }
@@ -473,6 +520,34 @@ fn build_node_render_info(
                 let label = format!("{} {}", status_icon, pat.name);
                 let label_display_width = display_width(&label);
                 let rate_text = format_pattern_status(pat);
+
+                // R2: Build requirement lines for display below the node.
+                let req_lines: Vec<(String, Color)> = pat
+                    .requirements
+                    .iter()
+                    .map(|req| {
+                        let emoji = resource_emoji(req.resource);
+                        let current = rates.get(&req.resource).copied().unwrap_or(0.0);
+                        let met = req.completed || current >= req.required_rate;
+                        let icon = if req.completed {
+                            "\u{2713}"
+                        } else if met {
+                            "\u{25cf}" // ●
+                        } else {
+                            "\u{25cb}" // ○
+                        };
+                        let color = if req.completed || met {
+                            Color::Rgb(80, 180, 100)
+                        } else {
+                            Color::Rgb(160, 60, 60)
+                        };
+                        (
+                            format!("{} {} {:.0}/hr", icon, emoji, req.required_rate),
+                            color,
+                        )
+                    })
+                    .collect();
+
                 NodeRenderInfo {
                     ni,
                     cx,
@@ -484,6 +559,7 @@ fn build_node_render_info(
                     rate_text,
                     gauge_width: 10,
                     is_sustaining,
+                    req_lines,
                 }
             } else {
                 NodeRenderInfo {
@@ -497,6 +573,7 @@ fn build_node_render_info(
                     rate_text: String::new(),
                     gauge_width: 10,
                     is_sustaining: false,
+                    req_lines: vec![],
                 }
             }
         }
