@@ -174,10 +174,10 @@ pub const MAX_NODE_LEVEL: u32 = 20;
 const BUFFER_HOURS: f64 = 10.0;
 
 /// Upgrade duration in seconds for going from current_level to next.
-/// L1->L2: 5 min, L2->L3: 10 min, L3->L4: 20 min, doubling each level.
+/// Linear 2h per level: L1→L2 = 2h, L2→L3 = 4h, L3→L4 = 6h, etc.
 /// Time warp accelerates this (delta_seconds includes warp).
 pub fn node_upgrade_duration(level: u32) -> f64 {
-    300.0 * 2.0_f64.powi(level.saturating_sub(1) as i32) // 5min, 10min, 20min, 40min...
+    7200.0 * level as f64 // 2h, 4h, 6h, 8h... (level * 2 hours)
 }
 
 /// Attempt to start upgrading a node's level.
