@@ -720,13 +720,23 @@ fn render_bottom_panel_pattern(frame: &mut Frame, area: Rect, loom: &LoomState, 
             Color::Rgb(80, 60, 110)
         };
 
-        let sustained_mins = req.sustained_secs / 60.0;
-        let total_mins = req.sustain_duration_secs / 60.0;
         let bar_width = 10usize;
         let filled = (progress * bar_width as f64).round() as usize;
         let bar_str: String = (0..bar_width)
             .map(|i| if i < filled { '\u{2588}' } else { '\u{2591}' })
             .collect();
+
+        let time_text = if req_completed {
+            "\u{2713}".to_string()
+        } else {
+            let remaining = (req.sustain_duration_secs - req.sustained_secs).max(0.0);
+            let pct = (progress * 100.0).round() as u32;
+            format!(
+                "{}% ({} left)",
+                pct,
+                crate::ui::loom_graph::format_duration(remaining)
+            )
+        };
 
         lines.push(Line::from(vec![
             Span::styled(format!(" {}{} ", re, rn), Style::default().fg(status_color)),
@@ -736,14 +746,9 @@ fn render_bottom_panel_pattern(frame: &mut Frame, area: Rect, loom: &LoomState, 
             ),
             Span::styled(bar_str, Style::default().fg(status_color)),
             Span::styled(
-                format!(" {:.0}/{:.0}m", sustained_mins, total_mins),
+                format!(" {}", time_text),
                 Style::default().fg(Color::Rgb(120, 100, 160)),
             ),
-            if req_completed {
-                Span::styled(" \u{2713}", Style::default().fg(Color::Rgb(100, 200, 120)))
-            } else {
-                Span::raw("")
-            },
         ]));
     }
 

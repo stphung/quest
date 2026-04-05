@@ -326,8 +326,7 @@ fn build_node_render_info(
                 let progress = compute_pattern_progress(pat);
                 let label = format!("\u{2b50} {}", pat.name); // ⭐
                 let label_display_width = display_width(&label);
-                let pct = (progress * 100.0).round() as u32;
-                let rate_text = format!("{}%", pct);
+                let rate_text = format_pattern_status(pat);
                 NodeRenderInfo {
                     ni,
                     cx,
@@ -594,5 +593,46 @@ fn resource_color_render(resource: Resource) -> Color {
         Resource::EmberEcho => Color::Rgb(220, 140, 80),
         Resource::PurifiedVoid => Color::Rgb(180, 100, 240),
         Resource::WovenReality => Color::Rgb(100, 200, 200),
+    }
+}
+
+/// Format seconds as human-friendly duration (e.g., "1h 18m", "42m", "5m").
+pub fn format_duration(secs: f64) -> String {
+    let total_mins = (secs / 60.0).round() as u64;
+    if total_mins == 0 {
+        return "<1m".to_string();
+    }
+    let hours = total_mins / 60;
+    let mins = total_mins % 60;
+    if hours > 0 && mins > 0 {
+        format!("{}h {}m", hours, mins)
+    } else if hours > 0 {
+        format!("{}h", hours)
+    } else {
+        format!("{}m", mins)
+    }
+}
+
+/// Format pattern progress as "X% (Yh Zm left)" or "100% ✓".
+pub fn format_pattern_status(pattern: &crate::loom::types::WovenPattern) -> String {
+    let progress = compute_pattern_progress(pattern);
+    let pct = (progress * 100.0).round() as u32;
+
+    if pct >= 100 {
+        return "100% \u{2713}".to_string();
+    }
+
+    // Compute remaining time from incomplete requirements.
+    let remaining_secs: f64 = pattern
+        .requirements
+        .iter()
+        .filter(|r| !r.completed)
+        .map(|r| (r.sustain_duration_secs - r.sustained_secs).max(0.0))
+        .sum();
+
+    if remaining_secs > 0.0 {
+        format!("{}% ({} left)", pct, format_duration(remaining_secs))
+    } else {
+        format!("{}%", pct)
     }
 }
