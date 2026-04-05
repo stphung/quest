@@ -107,16 +107,23 @@ pub fn render_loom_overlay(
 
     // Refresh graph data before rendering.
     // Layout bounds must match the canvas coordinate space used by the renderer
-    // (Braille: 2 dots/cell horizontal, 4 dots/cell vertical, on the 70% top area).
-    let graph_area_height = (inner.height as f64 * 0.7) as f64;
+    // (Braille: 2 dots/cell horizontal, 4 dots/cell vertical, on the top area).
+    let build_active = ui.build.is_some();
+    let graph_pct_f64 = if build_active { 0.5 } else { 0.7 };
+    let graph_area_height = (inner.height as f64 * graph_pct_f64) as f64;
     let canvas_width = (inner.width as f64) * 2.0; // Braille 2x horizontal
     let canvas_height = graph_area_height * 4.0; // Braille 4x vertical
     crate::loom::graph::refresh_graph(ui, loom_state, canvas_width, canvas_height);
 
-    // Split: top 70% graph canvas, bottom 30% detail panel.
+    // Split: graph canvas on top, detail panel on bottom.
+    // During a build flow the bottom panel expands to 50% for the recipe browser.
+    let (graph_pct, panel_pct) = if build_active { (50, 50) } else { (70, 30) };
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
+        .constraints([
+            Constraint::Percentage(graph_pct),
+            Constraint::Percentage(panel_pct),
+        ])
         .split(inner);
 
     // Render graph canvas if graph and layout are cached.
@@ -178,16 +185,24 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
         let recipes = crate::loom::recipes::all_recipes();
         let lines: Vec<Line> = match &build.step {
             crate::loom::BuildStep::SelectRecipe { cursor } => {
+                // Two-column layout: left = scrollable recipe list, right = detail sidebar.
+                let cols = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+                    .split(inner);
+                let left_area = cols[0];
+                let right_area = cols[1];
+
                 let all_recipes = crate::loom::recipes::all_recipes();
                 let display_rows = build_recipe_display_rows(&build.available_recipes);
                 let cursor_row = cursor_to_display_row(&display_rows, *cursor);
+                let intake_cap = crate::loom::logic::shuttle_effective_intake_cap(build.tier, 1);
 
-                // Header takes 1 line, footer hints take 1 line. Rest is for recipes.
-                let avail_h = inner.height as usize;
-                let list_height = avail_h.saturating_sub(2); // header + hint line
+                // ── Left column: tier tabs + scrollable recipe list ──
+                let avail_h = left_area.height as usize;
+                let list_height = avail_h.saturating_sub(2); // tier tab line + hint line
                 let total_rows = display_rows.len();
 
-                // Scrolling window uses full available height.
                 let half = list_height / 2;
                 let scroll_start = if cursor_row >= half {
                     (cursor_row - half).min(total_rows.saturating_sub(list_height))
@@ -195,11 +210,10 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                     0
                 };
                 let scroll_end = (scroll_start + list_height).min(total_rows);
-                let intake_cap = crate::loom::logic::shuttle_effective_intake_cap(build.tier, 1);
 
-                let mut lines: Vec<Line> = Vec::new();
+                let mut left_lines: Vec<Line> = Vec::new();
 
-                // Header with tier tabs.
+                // Tier tabs.
                 let tiers = crate::loom::unlocked_tiers(loom);
                 let mut tab_spans: Vec<Span> = vec![Span::raw(" ")];
                 for &t in &tiers {
@@ -224,23 +238,32 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                         Style::default().fg(Color::Rgb(80, 70, 100)),
                     ));
                 }
-                lines.push(Line::from(tab_spans));
+                left_lines.push(Line::from(tab_spans));
 
                 // Scroll-up indicator.
                 if scroll_start > 0 {
-                    lines.push(Line::from(Span::styled(
+                    left_lines.push(Line::from(Span::styled(
                         " \u{25b2} more above",
                         Style::default().fg(Color::Rgb(80, 70, 100)),
                     )));
                 }
 
-                // Recipe list.
+                // Recipe list rows.
                 for row in &display_rows[scroll_start..scroll_end] {
                     match row {
                         RecipeRowKind::Header(text) => {
-                            lines.push(Line::from(Span::styled(
+                            // Look up the output resource for this header to color it.
+                            let header_color = header_color_from_display_rows(
+                                &display_rows,
+                                row,
+                                all_recipes,
+                                &build.available_recipes,
+                            );
+                            left_lines.push(Line::from(Span::styled(
                                 format!(" {}", text),
-                                Style::default().fg(Color::Rgb(140, 110, 170)),
+                                Style::default()
+                                    .fg(header_color)
+                                    .add_modifier(Modifier::BOLD),
                             )));
                         }
                         RecipeRowKind::Recipe {
@@ -250,7 +273,6 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                             let r = &all_recipes[*global_idx];
                             let is_selected = *recipe_list_idx == *cursor;
 
-                            // Check if both inputs have eligible sources.
                             let sources_a =
                                 crate::loom::eligible_sources_for_tier(loom, build.tier, r.input_a);
                             let sources_b =
@@ -261,7 +283,6 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
 
                             let prefix = if is_selected { " \u{25b6} " } else { "   " };
                             let style = if !buildable {
-                                // Unbuildable: dim red
                                 Style::default().fg(Color::Rgb(80, 50, 60))
                             } else if is_selected {
                                 Style::default()
@@ -273,19 +294,17 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
 
                             let mut spans = vec![Span::styled(
                                 format!(
-                                    "{}{} {} + {} {}  ({:?})  {:.0}/hr",
+                                    "{}{} {} + {} {}  ({:?})",
                                     prefix,
                                     resource_emoji(&r.input_a),
                                     resource_name(&r.input_a),
                                     resource_emoji(&r.input_b),
                                     resource_name(&r.input_b),
                                     r.node_nature,
-                                    intake_cap,
                                 ),
                                 style,
                             )];
 
-                            // Show missing source indicator.
                             if missing_a && missing_b {
                                 spans.push(Span::styled(
                                     "  \u{2717} no sources",
@@ -303,20 +322,123 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                                 ));
                             }
 
-                            lines.push(Line::from(spans));
+                            left_lines.push(Line::from(spans));
                         }
                     }
                 }
 
                 // Scroll-down indicator.
                 if scroll_end < total_rows {
-                    lines.push(Line::from(Span::styled(
+                    left_lines.push(Line::from(Span::styled(
                         " \u{25bc} more below",
                         Style::default().fg(Color::Rgb(80, 70, 100)),
                     )));
                 }
 
-                lines
+                frame.render_widget(
+                    Paragraph::new(left_lines).style(Style::default().bg(LOOM_BG)),
+                    left_area,
+                );
+
+                // ── Right column: detail sidebar for selected recipe ──
+                let mut right_lines: Vec<Line> = Vec::new();
+
+                if let Some(&global_idx) = build.available_recipes.get(*cursor) {
+                    let r = &all_recipes[global_idx];
+                    let sources_a =
+                        crate::loom::eligible_sources_for_tier(loom, build.tier, r.input_a);
+                    let sources_b =
+                        crate::loom::eligible_sources_for_tier(loom, build.tier, r.input_b);
+
+                    // Recipe summary.
+                    right_lines.push(Line::from(Span::styled(
+                        format!(
+                            " {} {} + {} {} \u{2192} {} {}",
+                            resource_emoji(&r.input_a),
+                            resource_name(&r.input_a),
+                            resource_emoji(&r.input_b),
+                            resource_name(&r.input_b),
+                            resource_emoji(&r.output),
+                            resource_name(&r.output),
+                        ),
+                        Style::default().fg(Color::Rgb(180, 140, 220)),
+                    )));
+
+                    // Nature.
+                    right_lines.push(Line::from(Span::styled(
+                        format!(" Nature: {:?}", r.node_nature),
+                        Style::default().fg(Color::Rgb(140, 110, 170)),
+                    )));
+
+                    // Tier + intake cap.
+                    right_lines.push(Line::from(Span::styled(
+                        format!(" T{} \u{00b7} Intake cap: {:.0}/hr", r.tier, intake_cap),
+                        Style::default().fg(Color::Rgb(140, 110, 170)),
+                    )));
+
+                    // Output yield.
+                    right_lines.push(Line::from(Span::styled(
+                        format!(" Yield: {:.1}x", r.amount),
+                        Style::default().fg(Color::Rgb(140, 110, 170)),
+                    )));
+
+                    // Source availability.
+                    right_lines.push(Line::from(""));
+
+                    let count_a = sources_a.len();
+                    let (a_suffix, a_color) = if count_a > 0 {
+                        (
+                            format!("{} available \u{2713}", count_a),
+                            Color::Rgb(100, 200, 120),
+                        )
+                    } else {
+                        ("none \u{2717}".to_string(), Color::Rgb(200, 80, 80))
+                    };
+                    right_lines.push(Line::from(Span::styled(
+                        format!(
+                            " Source A ({} {}): {}",
+                            resource_emoji(&r.input_a),
+                            resource_name(&r.input_a),
+                            a_suffix,
+                        ),
+                        Style::default().fg(a_color),
+                    )));
+
+                    let count_b = sources_b.len();
+                    let (b_suffix, b_color) = if count_b > 0 {
+                        (
+                            format!("{} available \u{2713}", count_b),
+                            Color::Rgb(100, 200, 120),
+                        )
+                    } else {
+                        ("none \u{2717}".to_string(), Color::Rgb(200, 80, 80))
+                    };
+                    right_lines.push(Line::from(Span::styled(
+                        format!(
+                            " Source B ({} {}): {}",
+                            resource_emoji(&r.input_b),
+                            resource_name(&r.input_b),
+                            b_suffix,
+                        ),
+                        Style::default().fg(b_color),
+                    )));
+
+                    // Hints.
+                    right_lines.push(Line::from(""));
+                    right_lines.push(Line::from(Span::styled(
+                        " [Enter] next  [Esc] cancel",
+                        Style::default().fg(Color::Rgb(80, 70, 100)),
+                    )));
+                }
+
+                frame.render_widget(
+                    Paragraph::new(right_lines).style(Style::default().bg(LOOM_BG)),
+                    right_area,
+                );
+
+                // SelectRecipe renders directly into two columns; skip the
+                // shared single-Paragraph render below.
+                return;
             }
             crate::loom::BuildStep::SelectSourcesA { cursor, toggle } => {
                 let r = &recipes[build.recipe_index];
@@ -939,7 +1061,7 @@ fn render_bottom_panel_pattern(
                 "\u{25c6}" // ◆ filled (completed)
             } else if i == pat_idx {
                 // Slow blink: alternate filled/hollow every ~0.5s (5 frames at 10fps).
-                if (ui.throbber_frame / 5) % 2 == 0 {
+                if (ui.throbber_frame / 5).is_multiple_of(2) {
                     "\u{25c6}" // ◆ filled
                 } else {
                     "\u{25c7}" // ◇ hollow
@@ -1086,11 +1208,9 @@ fn build_recipe_display_rows(available: &[usize]) -> Vec<RecipeRowKind> {
     for (list_idx, &global_idx) in available.iter().enumerate() {
         let r = &all[global_idx];
         if !last_output.is_some_and(|prev| prev == r.output) {
-            let header = format!(
-                "\u{2500}\u{2500} {} {} ",
-                resource_emoji(&r.output),
-                resource_name(&r.output),
-            );
+            let emoji = resource_emoji(&r.output);
+            let name = resource_name(&r.output);
+            let header = format!("{e}{e} {n} {e}{e}", e = emoji, n = name,);
             rows.push(RecipeRowKind::Header(header));
             last_output = Some(r.output);
         }
@@ -1115,6 +1235,28 @@ fn cursor_to_display_row(rows: &[RecipeRowKind], cursor: usize) -> usize {
         }
     }
     0
+}
+
+/// Determine the color for a group header row by finding the first recipe
+/// that follows it and looking up its output resource color.
+fn header_color_from_display_rows(
+    display_rows: &[RecipeRowKind],
+    header_row: &RecipeRowKind,
+    all_recipes: &[crate::loom::recipes::Recipe],
+    available: &[usize],
+) -> Color {
+    // Find this header's position, then look at the next Recipe row.
+    let header_ptr = header_row as *const RecipeRowKind;
+    for (i, row) in display_rows.iter().enumerate() {
+        if std::ptr::eq(row, header_ptr) {
+            // Look at the next row for the recipe's output resource.
+            if let Some(RecipeRowKind::Recipe { global_idx, .. }) = display_rows.get(i + 1) {
+                let _ = available; // available not needed — global_idx is direct
+                return resource_color(&all_recipes[*global_idx].output);
+            }
+        }
+    }
+    Color::Rgb(140, 110, 170) // fallback
 }
 
 // ── Navigation hints ──────────────────────────────────────────────────────────
@@ -1161,6 +1303,26 @@ fn resource_name(resource: &crate::loom::types::Resource) -> &'static str {
         Resource::EmberEcho => "Ember Echo",
         Resource::PurifiedVoid => "Purified Void",
         Resource::WovenReality => "Woven Reality",
+    }
+}
+
+/// Color associated with each resource for UI highlights.
+fn resource_color(resource: &crate::loom::types::Resource) -> Color {
+    use crate::loom::types::Resource;
+    match resource {
+        Resource::Ember => Color::Rgb(255, 140, 50),
+        Resource::Reflection => Color::Rgb(80, 200, 220),
+        Resource::VoidEssence => Color::Rgb(160, 80, 220),
+        Resource::Memory => Color::Rgb(220, 200, 80),
+        Resource::Silence => Color::Rgb(140, 140, 160),
+        Resource::Resonance => Color::Rgb(80, 140, 255),
+        Resource::ForgedLight => Color::Rgb(255, 220, 100),
+        Resource::EchoGlass => Color::Rgb(180, 220, 240),
+        Resource::StillbornSong => Color::Rgb(180, 140, 220),
+        Resource::CondensedEmber => Color::Rgb(100, 180, 220),
+        Resource::EmberEcho => Color::Rgb(200, 180, 220),
+        Resource::PurifiedVoid => Color::Rgb(180, 100, 220),
+        Resource::WovenReality => Color::Rgb(100, 200, 180),
     }
 }
 
