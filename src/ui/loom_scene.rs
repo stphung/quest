@@ -113,9 +113,12 @@ pub fn render_loom_overlay(
     }
 
     // Refresh graph data before rendering if we're in graph view.
+    // Layout bounds must match the canvas coordinate space used by the renderer
+    // (Braille: 2 dots/cell horizontal, 4 dots/cell vertical, on the 70% top area).
     if ui.view == LoomView::GraphView {
-        let canvas_width = inner.width as f64;
-        let canvas_height = (inner.height as f64 * 0.7) * 2.0;
+        let graph_area_height = (inner.height as f64 * 0.7) as f64;
+        let canvas_width = (inner.width as f64) * 2.0; // Braille 2x horizontal
+        let canvas_height = graph_area_height * 4.0; // Braille 4x vertical
         crate::loom::graph::refresh_graph(ui, loom_state, canvas_width, canvas_height);
     }
 
@@ -286,16 +289,17 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
     let (graph, selected_ni) = match (&ui.loom_graph, ui.selected_graph_node) {
         (Some(g), Some(ni)) => (g, ni),
         _ => {
-            // Nothing selected — show guidance.
+            // Nothing selected — show context-aware guidance.
+            let msg = if loom.persistent.shuttles.is_empty() {
+                " Press [B] to build your first shuttle."
+            } else {
+                " Use arrow keys to navigate the graph."
+            };
             let lines = vec![
                 Line::from(""),
                 Line::from(Span::styled(
-                    " Press [B] to build your first shuttle.",
+                    msg,
                     Style::default().fg(Color::Rgb(140, 110, 170)),
-                )),
-                Line::from(Span::styled(
-                    " Use arrow keys to navigate the graph.",
-                    Style::default().fg(Color::Rgb(100, 80, 130)),
                 )),
             ];
             frame.render_widget(
