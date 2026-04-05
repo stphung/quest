@@ -631,18 +631,19 @@ fn resource_color_render(resource: Resource) -> Color {
 
 /// Format seconds as human-friendly duration (e.g., "1h 18m", "42m", "5m").
 pub fn format_duration(secs: f64) -> String {
-    let total_mins = (secs / 60.0).round() as u64;
-    if total_mins == 0 {
-        return "<1m".to_string();
+    let total_secs = secs.round() as u64;
+    if total_secs == 0 {
+        return "0s".to_string();
     }
-    let hours = total_mins / 60;
-    let mins = total_mins % 60;
-    if hours > 0 && mins > 0 {
-        format!("{}h {}m", hours, mins)
-    } else if hours > 0 {
-        format!("{}h", hours)
+    let hours = total_secs / 3600;
+    let mins = (total_secs % 3600) / 60;
+    let s = total_secs % 60;
+    if hours > 0 {
+        format!("{}h {:02}m {:02}s", hours, mins, s)
+    } else if mins > 0 {
+        format!("{}m {:02}s", mins, s)
     } else {
-        format!("{}m", mins)
+        format!("{}s", s)
     }
 }
 
