@@ -224,7 +224,7 @@ pub fn build_graph(loom: &LoomState) -> LoomGraph {
                             LoomEdge {
                                 resource: req.resource,
                                 current_rate: 0.0,
-                                max_rate: 0.0, // inferred edges have no intake cap
+                                max_rate: req.required_rate,
                             },
                         );
                     }
@@ -250,7 +250,7 @@ pub fn build_graph(loom: &LoomState) -> LoomGraph {
                                 LoomEdge {
                                     resource: req.resource,
                                     current_rate: 0.0,
-                                    max_rate: 0.0,
+                                    max_rate: req.required_rate,
                                 },
                             );
                         }
