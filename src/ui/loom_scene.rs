@@ -746,74 +746,119 @@ fn render_bottom_panel_pattern(frame: &mut Frame, area: Rect, loom: &LoomState, 
         None => return,
     };
 
-    let completed_marker = if pattern.completed { " \u{2713}" } else { "" };
     let title_color = if pattern.completed {
         Color::Rgb(100, 200, 120)
     } else {
         Color::Rgb(180, 140, 220)
     };
 
-    // First line: pattern name.
-    let mut lines: Vec<Line> = vec![Line::from(Span::styled(
-        format!(
-            " Pattern #{}: {}{}",
-            pat_idx + 1,
-            pattern.name,
-            completed_marker
-        ),
-        Style::default().fg(title_color),
-    ))];
+    // Overall progress — since all requirements advance simultaneously,
+    // use the minimum progress across all requirements as the single percentage.
+    let overall_progress = if pattern.completed {
+        1.0
+    } else {
+        pattern
+            .requirements
+            .iter()
+            .map(|r| {
+                if r.completed {
+                    1.0
+                } else if r.sustain_duration_secs > 0.0 {
+                    (r.sustained_secs / r.sustain_duration_secs).min(1.0)
+                } else {
+                    0.0
+                }
+            })
+            .fold(f64::INFINITY, f64::min)
+            .min(1.0)
+    };
+    let overall_pct = (overall_progress * 100.0).round() as u32;
 
-    // Split remaining area into requirement rows.
-    // Each requirement: resource emoji, name, required rate, sustained time progress.
+    // Remaining time (max across incomplete requirements, since they advance together).
+    let remaining_secs: f64 = pattern
+        .requirements
+        .iter()
+        .filter(|r| !r.completed)
+        .map(|r| (r.sustain_duration_secs - r.sustained_secs).max(0.0))
+        .fold(0.0_f64, f64::max);
+
+    let overall_bar_width = 15usize;
+    let overall_filled = (overall_progress * overall_bar_width as f64).round() as usize;
+    let overall_bar: String = (0..overall_bar_width)
+        .map(|i| {
+            if i < overall_filled {
+                '\u{2588}'
+            } else {
+                '\u{2591}'
+            }
+        })
+        .collect();
+
+    let progress_text = if pattern.completed {
+        "100% \u{2713}".to_string()
+    } else {
+        format!(
+            "{}% ({} left)",
+            overall_pct,
+            crate::ui::loom_graph::format_duration(remaining_secs)
+        )
+    };
+
+    // First line: pattern name + overall progress bar.
+    let mut lines: Vec<Line> = vec![Line::from(vec![
+        Span::styled(
+            format!(" Pattern #{}: {} ", pat_idx + 1, pattern.name),
+            Style::default().fg(title_color),
+        ),
+        Span::styled(overall_bar, Style::default().fg(title_color)),
+        Span::styled(
+            format!(" {}", progress_text),
+            Style::default().fg(Color::Rgb(140, 120, 180)),
+        ),
+    ])];
+
+    // Check if all requirements are currently being met (for status indicator).
+    let rates: std::collections::HashMap<_, _> = loom
+        .rate_trackers
+        .iter()
+        .map(|(r, t)| (*r, t.rate_per_hour()))
+        .collect();
+
+    // Per-requirement rows: show resource, required rate, and whether currently met.
     for req in &pattern.requirements {
         let re = resource_emoji(&req.resource);
         let rn = resource_name(&req.resource);
-        let req_completed = req.completed;
-        let progress = if req.sustain_duration_secs > 0.0 {
-            (req.sustained_secs / req.sustain_duration_secs).min(1.0)
-        } else if req_completed {
-            1.0
-        } else {
-            0.0
-        };
+        let current_rate = rates.get(&req.resource).copied().unwrap_or(0.0);
+        let is_met = current_rate >= req.required_rate;
 
-        let status_color = if req_completed {
-            Color::Rgb(100, 200, 120)
-        } else if progress > 0.0 {
-            Color::Rgb(220, 180, 60)
+        let status_icon = if req.completed {
+            ("\u{2713}", Color::Rgb(100, 200, 120)) // ✓ green
+        } else if is_met {
+            ("\u{25cf}", Color::Rgb(100, 200, 120)) // ● green (currently sustaining)
         } else {
-            Color::Rgb(80, 60, 110)
-        };
-
-        let bar_width = 10usize;
-        let filled = (progress * bar_width as f64).round() as usize;
-        let bar_str: String = (0..bar_width)
-            .map(|i| if i < filled { '\u{2588}' } else { '\u{2591}' })
-            .collect();
-
-        let time_text = if req_completed {
-            "\u{2713}".to_string()
-        } else {
-            let remaining = (req.sustain_duration_secs - req.sustained_secs).max(0.0);
-            let pct = (progress * 100.0).round() as u32;
-            format!(
-                "{}% ({} left)",
-                pct,
-                crate::ui::loom_graph::format_duration(remaining)
-            )
+            ("\u{25cb}", Color::Rgb(180, 60, 60)) // ○ red (not met)
         };
 
         lines.push(Line::from(vec![
-            Span::styled(format!(" {}{} ", re, rn), Style::default().fg(status_color)),
             Span::styled(
-                format!("{:.0}/hr ", req.required_rate),
-                Style::default().fg(Color::Rgb(140, 110, 170)),
+                format!(" {} ", status_icon.0),
+                Style::default().fg(status_icon.1),
             ),
-            Span::styled(bar_str, Style::default().fg(status_color)),
             Span::styled(
-                format!(" {}", time_text),
-                Style::default().fg(Color::Rgb(120, 100, 160)),
+                format!("{}{} ", re, rn),
+                Style::default().fg(Color::Rgb(140, 120, 180)),
+            ),
+            Span::styled(
+                format!("{:.0}/hr needed", req.required_rate),
+                Style::default().fg(Color::Rgb(100, 80, 140)),
+            ),
+            Span::styled(
+                format!("  ({:.0}/hr now)", current_rate),
+                Style::default().fg(if is_met {
+                    Color::Rgb(80, 160, 100)
+                } else {
+                    Color::Rgb(150, 60, 60)
+                }),
             ),
         ]));
     }
