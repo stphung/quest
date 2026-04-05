@@ -1,8 +1,8 @@
 //! Canvas-based graph renderer for the Loom DAG view.
 //!
-//! Renders the production graph onto a ratatui Canvas widget with:
-//! - Edges (lines/polylines) with glow propagation and particle animation
-//! - Nodes (rectangles with labels) colored by resource type
+//! Renders the production graph with:
+//! - Edges (Braille lines/polylines) with glow propagation and particle animation
+//! - Nodes rendered as ratatui Gauge widgets overlaid on the canvas
 //! - Selection highlighting
 
 use std::collections::HashSet;
@@ -12,10 +12,13 @@ use petgraph::visit::EdgeRef;
 use petgraph::Direction;
 use ratatui::{
     layout::Rect,
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     symbols::Marker,
-    text::{Line, Span},
-    widgets::canvas::{Canvas, Line as CanvasLine, Points},
+    text::Span,
+    widgets::{
+        canvas::{Canvas, Line as CanvasLine, Points},
+        Block, Borders, Gauge,
+    },
     Frame,
 };
 
@@ -24,7 +27,12 @@ use crate::loom::layout::LoomLayout;
 use crate::loom::logic::node_native_resource;
 use crate::loom::types::{LoomState, LoomUiState, NodeId, Resource};
 
-/// Render the Loom production graph onto a Canvas widget.
+/// Width of each node gauge in terminal columns.
+const NODE_WIDTH: u16 = 20;
+/// Height of each node gauge in terminal rows (1 for gauge + 1 for border).
+const NODE_HEIGHT: u16 = 3;
+
+/// Render the Loom production graph: Canvas edges + Gauge widget nodes.
 pub fn render_graph_canvas(
     frame: &mut Frame,
     area: Rect,
@@ -43,23 +51,21 @@ pub fn render_graph_canvas(
     // Pre-compute glow set (edges feeding active pattern sinks).
     let glowing_edges = compute_glowing_edges(loom_graph, loom);
 
-    // Pre-compute node rendering data: position, label, gauge fill, color.
+    // Pre-compute node info for gauge overlay positioning.
     let node_info: Vec<NodeRenderInfo> = layout
         .node_positions
         .iter()
         .filter_map(|(&ni, &(lx, ly))| {
             let node = loom_graph.graph.node_weight(ni)?;
-            let info = build_node_render_info(
+            Some(build_node_render_info(
                 ni,
                 node,
                 loom,
-                &layout.bounds,
-                canvas_width,
-                canvas_height,
                 lx,
                 ly,
-            );
-            Some(info)
+                &layout.bounds,
+                area,
+            ))
         })
         .collect();
 
@@ -80,7 +86,7 @@ pub fn render_graph_canvas(
                 Color::Rgb(60, 70, 100) // dim gray-blue
             };
 
-            // Build waypoint chain (source -> dummies -> target) in canvas coords.
+            // Build waypoint chain in canvas coords.
             let mut points = Vec::new();
             let (sx, sy) = layout_to_canvas(
                 src_pos.0,
@@ -108,7 +114,6 @@ pub fn render_graph_canvas(
             );
             points.push((tx, ty));
 
-            // Particle positions (3 dots along the edge path based on phase).
             let particles = if edge.current_rate > 0.0 {
                 let phase = ui.particle_phases.get(&ei).copied().unwrap_or(0.0);
                 compute_particles(&points, phase)
@@ -124,23 +129,19 @@ pub fn render_graph_canvas(
         })
         .collect();
 
-    let selected = ui.selected_graph_node;
-
-    // Build and render the canvas.
+    // 1. Render canvas with edges only.
     let canvas = Canvas::default()
         .x_bounds([0.0, canvas_width])
         .y_bounds([0.0, canvas_height])
         .marker(Marker::Braille)
         .background_color(Color::Rgb(10, 5, 18))
         .paint(|ctx| {
-            // 1. Draw edges (behind nodes).
             for seg in &edge_segments {
                 for pair in seg.points.windows(2) {
                     ctx.draw(&CanvasLine::new(
                         pair[0].0, pair[0].1, pair[1].0, pair[1].1, seg.color,
                     ));
                 }
-                // Draw particle dots — small cross clusters for visibility with Braille.
                 if !seg.particles.is_empty() {
                     let mut coords: Vec<(f64, f64)> = Vec::new();
                     for &(px, py) in &seg.particles {
@@ -156,51 +157,54 @@ pub fn render_graph_canvas(
                     });
                 }
             }
-
-            // 2. Draw nodes as gauge bars via ctx.print (text-resolution, always crisp).
-            for info in &node_info {
-                let is_selected = selected == Some(info.ni);
-                render_gauge_node(ctx, info, is_selected);
-            }
         });
-
     frame.render_widget(canvas, area);
+
+    // 2. Overlay Gauge widgets for each node on top of the canvas.
+    let selected = ui.selected_graph_node;
+    for info in &node_info {
+        let is_selected = selected == Some(info.ni);
+        render_node_gauge(frame, info, is_selected);
+    }
 }
 
 /// Pre-computed rendering data for a single graph node.
 struct NodeRenderInfo {
     ni: NodeIndex,
-    cx: f64,
-    cy: f64,
+    /// Terminal cell rect where this node's gauge renders.
+    rect: Rect,
     label: String,
     color: Color,
-    /// Buffer fill fraction (0.0..1.0). None for pattern sinks.
-    fill: Option<f64>,
-    /// Pattern progress fraction (0.0..1.0). Only for pattern sinks.
-    pattern_progress: Option<f64>,
-    /// Gauge width in characters.
-    gauge_width: usize,
+    /// Fill fraction (0.0..1.0) — buffer fill for extractors/shuttles, progress for patterns.
+    ratio: f64,
+    /// Whether this is a pattern sink (renders differently).
+    is_pattern: bool,
 }
-
-/// Gauge bar characters.
-const GAUGE_FULL: char = '▰';
-const GAUGE_EMPTY: char = '▱';
-/// Selection indicator.
-const SELECT_LEFT: &str = "▸";
-const SELECT_RIGHT: &str = "◂";
 
 fn build_node_render_info(
     ni: NodeIndex,
     node: &LoomGraphNode,
     loom: &LoomState,
-    bounds: &(f64, f64),
-    canvas_width: f64,
-    canvas_height: f64,
     lx: f64,
     ly: f64,
+    bounds: &(f64, f64),
+    area: Rect,
 ) -> NodeRenderInfo {
-    let (cx, cy) = layout_to_canvas(lx, ly, bounds, canvas_width, canvas_height);
-    let gauge_width = 8;
+    // Convert layout coords to terminal cell position.
+    let frac_x = if bounds.0 > 0.0 { lx / bounds.0 } else { 0.5 };
+    let frac_y = if bounds.1 > 0.0 { ly / bounds.1 } else { 0.5 };
+
+    let center_col = area.x + (frac_x * area.width as f64) as u16;
+    let center_row = area.y + (frac_y * area.height as f64) as u16;
+
+    // Clamp the gauge rect within the area.
+    let half_w = NODE_WIDTH / 2;
+    let half_h = NODE_HEIGHT / 2;
+    let x = center_col.saturating_sub(half_w).max(area.x);
+    let y = center_row.saturating_sub(half_h).max(area.y);
+    let w = NODE_WIDTH.min(area.right().saturating_sub(x));
+    let h = NODE_HEIGHT.min(area.bottom().saturating_sub(y));
+    let rect = Rect::new(x, y, w, h);
 
     match node {
         LoomGraphNode::Extractor(id) => {
@@ -216,59 +220,56 @@ fn build_node_render_info(
             let resource = node_native_resource(*id);
             let color = resource_color(resource);
             let ext = &loom.persistent.nodes[id.index()];
-            let cap = ext.buffer_capacity;
-            let fill = if cap > 0.0 {
-                Some((ext.buffer / cap).clamp(0.0, 1.0))
+            let ratio = if ext.buffer_capacity > 0.0 {
+                (ext.buffer / ext.buffer_capacity).clamp(0.0, 1.0)
             } else {
-                Some(0.0)
+                0.0
             };
             NodeRenderInfo {
                 ni,
-                cx,
-                cy,
+                rect,
                 label,
                 color,
-                fill,
-                pattern_progress: None,
-                gauge_width,
+                ratio,
+                is_pattern: false,
             }
         }
         LoomGraphNode::Shuttle(idx) => {
             if *idx == usize::MAX {
                 return NodeRenderInfo {
                     ni,
-                    cx,
-                    cy,
+                    rect,
                     label: "NEW".to_string(),
                     color: Color::Rgb(100, 100, 100),
-                    fill: None,
-                    pattern_progress: None,
-                    gauge_width,
+                    ratio: 0.0,
+                    is_pattern: false,
                 };
             }
-            let (label, color, fill) = if *idx < loom.persistent.shuttles.len() {
+            let (label, color, ratio) = if *idx < loom.persistent.shuttles.len() {
                 let s = &loom.persistent.shuttles[*idx];
                 let out = short_resource_name(s.output);
-                let lbl = format!("S{}\u{2192}{}", idx, out);
+                let lbl = if s.under_construction {
+                    format!("S{} Building..", idx)
+                } else {
+                    format!("S{}\u{2192}{}", idx, out)
+                };
                 let c = resource_color(s.output);
-                let f = if s.buffer_capacity > 0.0 {
+                let r = if s.buffer_capacity > 0.0 {
                     (s.buffer / s.buffer_capacity).clamp(0.0, 1.0)
                 } else {
                     0.0
                 };
-                (lbl, c, Some(f))
+                (lbl, c, r)
             } else {
-                (format!("S{}", idx), Color::Rgb(180, 180, 180), None)
+                (format!("S{}", idx), Color::Rgb(180, 180, 180), 0.0)
             };
             NodeRenderInfo {
                 ni,
-                cx,
-                cy,
+                rect,
                 label,
                 color,
-                fill,
-                pattern_progress: None,
-                gauge_width,
+                ratio,
+                is_pattern: false,
             }
         }
         LoomGraphNode::PatternSink(idx) => {
@@ -281,63 +282,54 @@ fn build_node_render_info(
             let label = format!("\u{2605} {}", name);
             NodeRenderInfo {
                 ni,
-                cx,
-                cy,
+                rect,
                 label,
                 color: Color::Rgb(255, 200, 60),
-                fill: None,
-                pattern_progress: Some(progress),
-                gauge_width: 10,
+                ratio: progress,
+                is_pattern: true,
             }
         }
     }
 }
 
-/// Render a node as a text-based gauge bar at canvas coordinates.
-fn render_gauge_node(
-    ctx: &mut ratatui::widgets::canvas::Context<'_>,
-    info: &NodeRenderInfo,
-    is_selected: bool,
-) {
-    let fill_frac = info.fill.or(info.pattern_progress).unwrap_or(0.0);
-    let filled = (fill_frac * info.gauge_width as f64).round() as usize;
-    let empty = info.gauge_width.saturating_sub(filled);
-
-    let gauge_str: String = std::iter::repeat(GAUGE_FULL)
-        .take(filled)
-        .chain(std::iter::repeat(GAUGE_EMPTY).take(empty))
-        .collect();
-
-    // Build the display line: [select] label gauge [select]
-    let mut spans = Vec::new();
-
-    if is_selected {
-        spans.push(Span::styled(SELECT_LEFT, Style::default().fg(Color::White)));
+/// Render a node as a ratatui Gauge widget at its terminal position.
+fn render_node_gauge(frame: &mut Frame, info: &NodeRenderInfo, is_selected: bool) {
+    if info.rect.width < 3 || info.rect.height < 1 {
+        return;
     }
 
-    spans.push(Span::styled(
-        format!("{} ", info.label),
-        Style::default().fg(if is_selected {
-            Color::White
-        } else {
-            info.color
-        }),
-    ));
+    let border_color = if is_selected {
+        Color::White
+    } else {
+        info.color
+    };
+    let border_style = Style::default().fg(border_color);
+    let label_style = if is_selected {
+        Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(info.color)
+    };
 
-    spans.push(Span::styled(gauge_str, Style::default().fg(info.color)));
+    let gauge_color = if info.is_pattern {
+        Color::Rgb(255, 200, 60) // gold for pattern progress
+    } else {
+        info.color
+    };
 
-    if is_selected {
-        spans.push(Span::styled(
-            SELECT_RIGHT,
-            Style::default().fg(Color::White),
-        ));
-    }
+    let label = Span::styled(info.label.clone(), label_style);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(border_style);
 
-    let line = Line::from(spans);
-    // Total display width for centering
-    let display_width = info.label.len() + 1 + info.gauge_width + if is_selected { 2 } else { 0 };
-    let half_w = display_width as f64 / 2.0;
-    ctx.print(info.cx - half_w, info.cy, line);
+    let gauge = Gauge::default()
+        .block(block)
+        .gauge_style(Style::default().fg(gauge_color).bg(Color::Rgb(20, 15, 30)))
+        .ratio(info.ratio.clamp(0.0, 1.0))
+        .label(label);
+
+    frame.render_widget(gauge, info.rect);
 }
 
 /// A pre-computed edge with its canvas-space polyline, color, and particle positions.
@@ -348,8 +340,6 @@ struct EdgeSegment {
 }
 
 /// Map layout-space coordinates to canvas-space coordinates.
-/// Layout space: (0..bounds.0, 0..bounds.1) with y increasing downward.
-/// Canvas space: (0..canvas_width, 0..canvas_height) with y increasing upward.
 fn layout_to_canvas(
     lx: f64,
     ly: f64,
@@ -368,7 +358,6 @@ fn layout_to_canvas(
         1.0
     };
     let cx = lx * scale_x;
-    // Y-axis inversion: canvas y increases upward, layout y increases downward.
     let cy = canvas_height - (ly * scale_y);
     (cx, cy)
 }
@@ -379,7 +368,6 @@ fn compute_particles(path: &[(f64, f64)], phase: f64) -> Vec<(f64, f64)> {
         return Vec::new();
     }
 
-    // Compute total path length.
     let mut total_len = 0.0;
     let mut seg_lengths = Vec::new();
     for pair in path.windows(2) {
@@ -395,7 +383,6 @@ fn compute_particles(path: &[(f64, f64)], phase: f64) -> Vec<(f64, f64)> {
 
     let mut particles = Vec::with_capacity(3);
     for i in 0..3 {
-        // Evenly spaced particles, offset by phase.
         let t = (phase + i as f64 / 3.0) % 1.0;
         let target_dist = t * total_len;
 
@@ -419,14 +406,10 @@ fn compute_particles(path: &[(f64, f64)], phase: f64) -> Vec<(f64, f64)> {
 }
 
 /// Compute glowing edges via BFS upstream from active pattern sinks.
-///
-/// A pattern sink "glows" if any of its requirements has `sustained_secs > 0` and `!completed`.
-/// All edges feeding a glowing sink (recursively upstream) also glow.
 fn compute_glowing_edges(lg: &LoomGraph, loom: &LoomState) -> HashSet<EdgeIndex> {
     let mut glowing = HashSet::new();
     let mut visited_nodes: HashSet<NodeIndex> = HashSet::new();
 
-    // Find glowing pattern sinks.
     let mut queue: Vec<NodeIndex> = Vec::new();
     for (gn, &ni) in &lg.node_indices {
         if let LoomGraphNode::PatternSink(pat_idx) = gn {
@@ -444,8 +427,6 @@ fn compute_glowing_edges(lg: &LoomGraph, loom: &LoomState) -> HashSet<EdgeIndex>
         }
     }
 
-    // BFS upstream: for each node, mark all incoming edges as glowing,
-    // and enqueue their source nodes.
     while let Some(node) = queue.pop() {
         for edge_ref in lg.graph.edges_directed(node, Direction::Incoming) {
             glowing.insert(edge_ref.id());
@@ -459,7 +440,7 @@ fn compute_glowing_edges(lg: &LoomGraph, loom: &LoomState) -> HashSet<EdgeIndex>
     glowing
 }
 
-/// Short display name for a resource (used in shuttle labels).
+/// Short display name for a resource.
 fn short_resource_name(resource: Resource) -> &'static str {
     match resource {
         Resource::Ember => "Ember",
@@ -476,9 +457,6 @@ fn short_resource_name(resource: Resource) -> &'static str {
 }
 
 /// Compute overall pattern progress as a fraction (0.0..1.0).
-///
-/// Each requirement contributes 1.0 when completed, or partial progress
-/// based on sustained_secs / sustain_duration_secs when in progress.
 fn compute_pattern_progress(pattern: &crate::loom::types::WovenPattern) -> f64 {
     if pattern.requirements.is_empty() {
         return 0.0;
