@@ -221,12 +221,17 @@ pub fn render_graph_canvas(
             }
 
             // 2. Draw edge labels (only for edges connected to selected node).
-            let dim_label = Color::Rgb(100, 90, 130);
+            // Pulse between bright and dim every ~0.5s to draw attention.
+            let label_color = if (frame_count / 5) % 2 == 0 {
+                Color::Rgb(180, 170, 220) // bright
+            } else {
+                Color::Rgb(100, 90, 130) // dim
+            };
             for seg in &edge_segments {
                 if seg.show_label && !seg.label.is_empty() {
                     let lbl = Line::from(Span::styled(
                         seg.label.clone(),
-                        Style::default().fg(dim_label),
+                        Style::default().fg(label_color),
                     ));
                     // Offset slightly above the edge midpoint so it doesn't sit on the line.
                     ctx.print(seg.label_pos.0, seg.label_pos.1 + 3.0, lbl);
