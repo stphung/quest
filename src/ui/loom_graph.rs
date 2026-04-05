@@ -190,11 +190,12 @@ pub fn render_graph_canvas(
                 }
             }
 
-            // 3. Draw small filled square at each node center (Braille layer).
-            // 3x3 Braille dots = compact, visible anchor for edge connections.
+            // 3. Draw small filled square below each node's text (Braille layer).
+            // Positioned one row below the rate text line so it's always visible.
+            let dot_row_offset = -4.0; // 1 terminal row below center (where rate text is)
             for info in &node_info {
                 let mut dot_coords: Vec<(f64, f64)> = Vec::new();
-                let (cx, cy) = (info.cx, info.cy);
+                let (cx, cy) = (info.cx, info.cy + dot_row_offset);
                 for dx in -1..=1 {
                     for dy in -1..=1 {
                         dot_coords.push((cx + dx as f64, cy + dy as f64));
