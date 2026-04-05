@@ -63,7 +63,24 @@ pub fn render_graph_canvas(
         })
         .collect();
 
-    // Pre-compute edge segments.
+    // Build a lookup: NodeIndex → (canvas_cx, canvas_cy, half_width_in_canvas_units).
+    // half_width is in terminal columns (= canvas Braille units / 2 since Braille is 2 dots/col).
+    // But ctx.print uses terminal-cell x positions, while canvas lines use Braille x.
+    // Text occupies `label_display_w + 1 + gauge_width` terminal columns.
+    // In Braille coords that's `display_w * 2` dots. So half_width = display_w (in Braille dots).
+    let node_bounds: std::collections::HashMap<NodeIndex, (f64, f64, f64)> = node_info
+        .iter()
+        .map(|info| {
+            let display_w = (info.label_display_width + 1 + info.gauge_width) as f64;
+            // half_w in Braille canvas coords (each terminal col = 2 Braille dots)
+            (info.ni, (info.cx, info.cy, display_w))
+        })
+        .collect();
+
+    // Row height for vertical offset (text renders at cy + row_height).
+    let row_height = 4.0;
+
+    // Pre-compute edge segments with endpoints offset to node boundaries.
     let edge_segments: Vec<EdgeSegment> = loom_graph
         .graph
         .edge_indices()
@@ -80,8 +97,10 @@ pub fn render_graph_canvas(
                 Color::Rgb(60, 70, 100) // dim gray-blue
             };
 
-            // Build waypoint chain (source -> dummies -> target) in canvas coords.
+            // Build waypoint chain with endpoints offset to node edges.
             let mut points = Vec::new();
+
+            // Source: exit from the right edge of the source node.
             let (sx, sy) = layout_to_canvas(
                 src_pos.0,
                 src_pos.1,
@@ -89,16 +108,18 @@ pub fn render_graph_canvas(
                 canvas_width,
                 canvas_height,
             );
-            points.push((sx, sy));
+            let src_half_w = node_bounds.get(&src_ni).map(|b| b.2).unwrap_or(0.0);
+            points.push((sx + src_half_w, sy + row_height));
 
             if let Some(dummies) = layout.dummy_paths.get(&(src_ni, tgt_ni)) {
                 for &(dx, dy) in dummies {
                     let (cx, cy) =
                         layout_to_canvas(dx, dy, &layout.bounds, canvas_width, canvas_height);
-                    points.push((cx, cy));
+                    points.push((cx, cy + row_height));
                 }
             }
 
+            // Target: enter at the left edge of the target node.
             let (tx, ty) = layout_to_canvas(
                 tgt_pos.0,
                 tgt_pos.1,
@@ -106,7 +127,8 @@ pub fn render_graph_canvas(
                 canvas_width,
                 canvas_height,
             );
-            points.push((tx, ty));
+            let tgt_half_w = node_bounds.get(&tgt_ni).map(|b| b.2).unwrap_or(0.0);
+            points.push((tx - tgt_half_w, ty + row_height));
 
             // Particle positions (3 dots along the edge path based on phase).
             let particles = if edge.current_rate > 0.0 {
