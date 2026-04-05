@@ -678,23 +678,11 @@ fn render_bottom_panel_extractor(
         None => return,
     };
 
-    // Split into 2 columns: info (left) | buffer gauge + upgrade (right).
-    let cols = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
-        .split(area);
-
-    // ── Left column: identity and stats ──
-    let emoji = node_emoji(node_id);
-    let mut lines: Vec<Line> = Vec::new();
-    lines.push(Line::from(Span::styled(
-        format!(" {} {}", emoji, node_id.name()),
-        Style::default().fg(node_color(node_id)),
-    )));
-
     if !node.unlocked {
+        let mut lines: Vec<Line> = Vec::new();
+        let emoji = node_emoji(node_id);
         lines.push(Line::from(Span::styled(
-            " [Locked]",
+            format!(" {} {} [Locked]", emoji, node_id.name()),
             Style::default().fg(Color::Rgb(80, 60, 110)),
         )));
         if node.unlock_progress > 0.0 {
@@ -703,53 +691,45 @@ fn render_bottom_panel_extractor(
                 Style::default().fg(Color::Rgb(100, 80, 160)),
             )));
         }
-    } else {
-        let rate = logic::node_effective_rate(loom, node);
-        lines.push(Line::from(Span::styled(
-            format!(" Lv {} \u{2022} {:.0}/hr", node.level, rate),
-            Style::default().fg(Color::Rgb(100, 200, 120)),
-        )));
-
-        // Consumer count.
-        let node_ref = crate::loom::types::LoomNodeRef::Extractor(node.id);
-        let consumer_count = loom
-            .persistent
-            .shuttles
-            .iter()
-            .filter(|s| {
-                !s.under_construction
-                    && (s.sources_a.contains(&node_ref) || s.sources_b.contains(&node_ref))
-            })
-            .count();
-        if consumer_count > 0 {
-            lines.push(Line::from(Span::styled(
-                format!(
-                    " {} consumer{}",
-                    consumer_count,
-                    if consumer_count == 1 { "" } else { "s" }
-                ),
-                Style::default().fg(Color::Rgb(120, 100, 160)),
-            )));
-        }
-    }
-
-    lines.truncate(area.height as usize);
-    frame.render_widget(
-        Paragraph::new(lines).style(Style::default().bg(LOOM_BG)),
-        cols[0],
-    );
-
-    // ── Right column: buffer gauge + upgrade ──
-    if !node.unlocked {
+        frame.render_widget(
+            Paragraph::new(lines).style(Style::default().bg(LOOM_BG)),
+            area,
+        );
         return;
     }
 
-    let right_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1), Constraint::Min(0)])
-        .split(cols[1]);
+    // ── P4 Layout: header + gauge (full width), then two-column body ──
 
-    // Buffer gauge.
+    // Split vertically: header (1 line) + gauge (1 line) + blank (1 line) + body (rest).
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // header
+            Constraint::Length(1), // gauge
+            Constraint::Length(1), // spacer
+            Constraint::Min(0),    // body
+        ])
+        .split(area);
+
+    // Header: emoji + name + level + rate.
+    let emoji = node_emoji(node_id);
+    let rate = logic::node_effective_rate(loom, node);
+    let header = Line::from(Span::styled(
+        format!(
+            " {} {} \u{2022} Level {} \u{2022} {:.0}/hr",
+            emoji,
+            node_id.name(),
+            node.level,
+            rate
+        ),
+        Style::default().fg(node_color(node_id)),
+    ));
+    frame.render_widget(
+        Paragraph::new(vec![header]).style(Style::default().bg(LOOM_BG)),
+        rows[0],
+    );
+
+    // Full-width buffer gauge.
     let fill = if node.buffer_capacity > 0.0 {
         (node.buffer / node.buffer_capacity).min(1.0)
     } else {
@@ -767,9 +747,49 @@ fn render_bottom_panel_extractor(
         .ratio(fill)
         .label(label)
         .gauge_style(Style::default().fg(bar_color).bg(Color::Rgb(30, 20, 40)));
-    frame.render_widget(gauge, right_chunks[0]);
+    frame.render_widget(gauge, rows[1]);
 
-    // Upgrade info — expanded U3 risk/reward format.
+    // ── Two-column body: consumers (left) | upgrade (right) ──
+    let body_cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
+        .split(rows[3]);
+
+    // Left column: consumers list.
+    let node_ref = crate::loom::types::LoomNodeRef::Extractor(node.id);
+    let mut left_lines: Vec<Line> = Vec::new();
+    left_lines.push(Line::from(Span::styled(
+        " Consumers:",
+        Style::default().fg(Color::Rgb(140, 120, 180)),
+    )));
+    let mut consumer_count = 0;
+    for (i, shuttle) in loom.persistent.shuttles.iter().enumerate() {
+        if shuttle.under_construction {
+            continue;
+        }
+        if shuttle.sources_a.contains(&node_ref) || shuttle.sources_b.contains(&node_ref) {
+            let out_emoji = resource_emoji(&shuttle.output);
+            let out_name = resource_name(&shuttle.output);
+            left_lines.push(Line::from(Span::styled(
+                format!("   S{} \u{2192} {} {}", i, out_emoji, out_name),
+                Style::default().fg(Color::Rgb(120, 100, 160)),
+            )));
+            consumer_count += 1;
+        }
+    }
+    if consumer_count == 0 {
+        left_lines.push(Line::from(Span::styled(
+            "   (none)",
+            Style::default().fg(Color::Rgb(80, 60, 100)),
+        )));
+    }
+    left_lines.truncate(body_cols[0].height as usize);
+    frame.render_widget(
+        Paragraph::new(left_lines).style(Style::default().bg(LOOM_BG)),
+        body_cols[0],
+    );
+
+    // Right column: upgrade info.
     let dim = Color::Rgb(120, 100, 160);
     let bright = Color::Rgb(180, 150, 220);
     let mut upgrade_lines: Vec<Line> = Vec::new();
@@ -798,6 +818,7 @@ fn render_bottom_panel_extractor(
         let dur_str = crate::ui::loom_graph::format_duration(duration);
         let current_rate = logic::node_effective_rate(loom, node);
         let next_rate = node.base_rate * logic::node_level_multiplier(node.level + 1);
+        let next_cap = node.base_rate * logic::node_level_multiplier(node.level + 1) * 10.0;
 
         upgrade_lines.push(Line::from(Span::styled(
             format!(
@@ -806,7 +827,6 @@ fn render_bottom_panel_extractor(
             ),
             Style::default().fg(bright),
         )));
-        let next_cap = node.base_rate * logic::node_level_multiplier(node.level + 1) * 10.0;
         upgrade_lines.push(Line::from(Span::styled(
             format!(
                 " Cost:       {:.0} {} (50% of buffer)",
@@ -855,10 +875,10 @@ fn render_bottom_panel_extractor(
             Style::default().fg(Color::Rgb(100, 200, 120)),
         )));
     };
-    upgrade_lines.truncate(right_chunks[1].height as usize);
+    upgrade_lines.truncate(body_cols[1].height as usize);
     frame.render_widget(
         Paragraph::new(upgrade_lines).style(Style::default().bg(LOOM_BG)),
-        right_chunks[1],
+        body_cols[1],
     );
 }
 
