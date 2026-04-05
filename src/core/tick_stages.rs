@@ -1036,17 +1036,25 @@ pub(super) fn tick_loom(
         return;
     }
 
-    // Loom runs on wall-clock time only — skip during Chrono Surge bursts.
-    if state.chrono_surge_active {
-        return;
-    }
+    // Loom uses wall-clock time. Compute real elapsed seconds since last tick.
+    let now = chrono::Utc::now();
+    let wall_delta = match loom.last_tick_at {
+        Some(prev) => {
+            let elapsed = (now - prev).num_milliseconds().max(0) as f64 / 1000.0;
+            // Cap at 1 second to avoid huge jumps on resume/load.
+            elapsed.min(1.0)
+        }
+        None => 0.1, // First tick after load — use nominal 100ms.
+    };
+    loom.last_tick_at = Some(now);
 
-    let warp = if loom.time_warp > 0.0 {
+    // Apply debug time warp to wall delta (for testing only).
+    let warp = if loom.time_warp > 1.0 {
         loom.time_warp
     } else {
         1.0
     };
-    let tick_seconds: f64 = 0.1 * warp; // 100ms tick interval × debug time warp
+    let tick_seconds: f64 = wall_delta * warp;
 
     // Tick staggered second-node unlock.
     if loom.persistent.second_node_unlock_elapsed.is_some() {

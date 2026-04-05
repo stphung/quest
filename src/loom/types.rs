@@ -387,6 +387,10 @@ pub struct LoomState {
     /// Signals the UI to rebuild the graph layout (set by tick-path logic, consumed by UI).
     #[serde(skip)]
     pub graph_dirty: bool,
+    /// Wall-clock timestamp of the last Loom tick, for computing real elapsed time.
+    /// Transient — initialized on first tick after load.
+    #[serde(skip)]
+    pub last_tick_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl LoomState {
@@ -396,6 +400,7 @@ impl LoomState {
             rate_trackers: HashMap::new(),
             time_warp: 1.0,
             graph_dirty: false,
+            last_tick_at: None,
         }
     }
 }
