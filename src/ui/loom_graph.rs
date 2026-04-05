@@ -154,7 +154,7 @@ pub fn render_graph_canvas(
             // current_rate is already un-warped (normalized in update_edge_rates).
             let rate = edge.current_rate;
             let label = if rate > 0.5 {
-                format!("{:.0}{}/hr", rate, resource_emoji(edge.resource))
+                format!("{} {:.0}/hr", resource_emoji(edge.resource), rate)
             } else {
                 String::new()
             };
