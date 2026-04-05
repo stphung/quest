@@ -425,13 +425,9 @@ fn build_node_render_info(
     }
 }
 
-/// Render a node as up to three text lines at canvas coordinates:
-///   Line 1: `Label ▰▰▰▰▱▱▱▱`
-///   Line 2: `     42/hr`        (centered, dimmed)
-///   Line 3: `▔▔▔▔▔▔▔▔▔▔▔▔▔▔`   (underline bar, selected only)
-///
-/// All nodes render at full color. Selected node gets a bright white
-/// underline bar beneath the rate text.
+/// Render a node as two text lines at canvas coordinates:
+///   Line 1: `「Label ▰▰▰▰▱▱▱▱」`  (brackets if selected, white text)
+///   Line 2: `             42/hr`    (right-aligned under gauge)
 fn render_gauge_node(
     ctx: &mut ratatui::widgets::canvas::Context<'_>,
     info: &NodeRenderInfo,
@@ -446,23 +442,38 @@ fn render_gauge_node(
         .chain(std::iter::repeat(GAUGE_EMPTY).take(empty))
         .collect();
 
-    // All nodes at full resource color.
-    let label_color = info.color;
+    let label_color = if is_selected {
+        Color::White
+    } else {
+        info.color
+    };
     let rate_color = Color::Rgb(100, 100, 120);
 
     // Canvas Braille space: 2 dots per terminal column, 4 dots per terminal row.
-    // ctx.print() maps canvas x to terminal columns, so 1 char = 2.0 canvas x-units.
     let char_w = 2.0; // 1 terminal character = 2 braille x-dots
     let row_h = 4.0; // 1 terminal row = 4 braille y-dots
 
-    // Line 1: label + gauge (centered on node position)
-    let label_display_w = info.label_display_width + 1 + info.gauge_width;
+    // Line 1: [bracket] label gauge [bracket]
+    let mut spans = Vec::new();
+    if is_selected {
+        spans.push(Span::styled("\u{300c}", Style::default().fg(Color::White)));
+        // 「
+    }
+    spans.push(Span::styled(
+        format!("{} ", info.label),
+        Style::default().fg(label_color),
+    ));
+    spans.push(Span::styled(gauge_str, Style::default().fg(label_color)));
+    if is_selected {
+        spans.push(Span::styled("\u{300d}", Style::default().fg(Color::White)));
+        // 」
+    }
+
+    let bracket_extra = if is_selected { 2 } else { 0 }; // 「」 are 1 wide each
+    let label_display_w = info.label_display_width + 1 + info.gauge_width + bracket_extra;
     let half_w_px = label_display_w as f64 * char_w / 2.0;
 
-    let line1 = Line::from(vec![
-        Span::styled(format!("{} ", info.label), Style::default().fg(label_color)),
-        Span::styled(gauge_str, Style::default().fg(label_color)),
-    ]);
+    let line1 = Line::from(spans);
     ctx.print(info.cx - half_w_px, info.cy + row_h, line1);
 
     // Line 2: rate text right-aligned under the gauge portion of line 1.
@@ -474,15 +485,6 @@ fn render_gauge_node(
         let right_edge = info.cx + half_w_px;
         let rate_w_px = info.rate_text.len() as f64 * char_w;
         ctx.print(right_edge - rate_w_px, info.cy, line2);
-    }
-
-    // Line 3 (selected only): bright white underline bar below rate text.
-    if is_selected {
-        let bar: String = std::iter::repeat('\u{2594}')
-            .take(label_display_w)
-            .collect();
-        let line3 = Line::from(Span::styled(bar, Style::default().fg(Color::White)));
-        ctx.print(info.cx - half_w_px, info.cy - 2.0 * row_h, line3);
     }
 }
 
