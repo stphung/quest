@@ -44,9 +44,6 @@ pub fn render_graph_canvas(
     let canvas_width = (area.width * 2) as f64; // Braille: 2 dots per cell horizontally
     let canvas_height = (area.height * 4) as f64; // Braille: 4 dots per cell vertically
 
-    // Pre-compute glow set (edges feeding active pattern sinks).
-    let glowing_edges = compute_glowing_edges(loom_graph, loom);
-
     // Pre-compute node rendering data: position, label, gauge fill, color.
     let node_info: Vec<NodeRenderInfo> = layout
         .node_positions
@@ -77,12 +74,7 @@ pub fn render_graph_canvas(
             let src_pos = layout.node_positions.get(&src_ni)?;
             let tgt_pos = layout.node_positions.get(&tgt_ni)?;
 
-            let glowing = glowing_edges.contains(&ei);
-            let color = if glowing {
-                Color::Rgb(255, 200, 60) // gold/amber glow
-            } else {
-                Color::Rgb(60, 70, 100) // dim gray-blue
-            };
+            let color = Color::Rgb(60, 70, 100); // uniform edge color
 
             // Particle color = source node's resource color.
             let src_node = loom_graph.graph.node_weight(src_ni)?;
@@ -277,6 +269,8 @@ struct NodeRenderInfo {
     rate_text: String,
     /// Gauge width in characters.
     gauge_width: usize,
+    /// Whether this pattern node is actively sustaining (all requirements met).
+    is_sustaining: bool,
 }
 
 /// Resource emoji for display.
@@ -375,6 +369,7 @@ fn build_node_render_info(
                 fill,
                 rate_text,
                 gauge_width,
+                is_sustaining: false,
             }
         }
         LoomGraphNode::Shuttle(idx) => {
@@ -389,6 +384,7 @@ fn build_node_render_info(
                     fill: 0.0,
                     rate_text: String::new(),
                     gauge_width,
+                    is_sustaining: false,
                 };
             }
             if *idx < loom.persistent.shuttles.len() {
@@ -436,6 +432,7 @@ fn build_node_render_info(
                     fill,
                     rate_text,
                     gauge_width,
+                    is_sustaining: false,
                 }
             } else {
                 NodeRenderInfo {
@@ -448,6 +445,7 @@ fn build_node_render_info(
                     fill: 0.0,
                     rate_text: String::new(),
                     gauge_width,
+                    is_sustaining: false,
                 }
             }
         }
@@ -455,7 +453,28 @@ fn build_node_render_info(
             if *idx < loom.persistent.patterns.len() {
                 let pat = &loom.persistent.patterns[*idx];
                 let progress = compute_pattern_progress(pat);
-                let label = format!("\u{2b50} {}", pat.name); // ⭐
+
+                // Check if ALL requirements are currently being met.
+                let rates: std::collections::HashMap<_, _> = loom
+                    .rate_trackers
+                    .iter()
+                    .map(|(r, t)| (*r, t.rate_per_hour()))
+                    .collect();
+                let is_sustaining = !pat.completed
+                    && pat.requirements.iter().all(|req| {
+                        req.completed
+                            || rates.get(&req.resource).copied().unwrap_or(0.0) >= req.required_rate
+                    });
+
+                // C: Play/pause prefix.
+                let status_icon = if pat.completed {
+                    "\u{2713}" // ✓
+                } else if is_sustaining {
+                    "\u{25b6}" // ▶
+                } else {
+                    "\u{23f8}" // ⏸
+                };
+                let label = format!("{} {}", status_icon, pat.name);
                 let label_display_width = display_width(&label);
                 let rate_text = format_pattern_status(pat);
                 NodeRenderInfo {
@@ -468,6 +487,7 @@ fn build_node_render_info(
                     fill: progress,
                     rate_text,
                     gauge_width: 10,
+                    is_sustaining,
                 }
             } else {
                 NodeRenderInfo {
@@ -480,6 +500,7 @@ fn build_node_render_info(
                     fill: 0.0,
                     rate_text: String::new(),
                     gauge_width: 10,
+                    is_sustaining: false,
                 }
             }
         }
@@ -499,15 +520,44 @@ fn render_gauge_node(
     let filled = (info.fill * info.gauge_width as f64).round() as usize;
     let empty = info.gauge_width.saturating_sub(filled);
 
-    let gauge_str: String = std::iter::repeat(GAUGE_FULL)
-        .take(filled)
-        .chain(std::iter::repeat(GAUGE_EMPTY).take(empty))
-        .collect();
+    // B: Shimmer effect on gauge when sustaining — a bright character ripples through.
+    let gauge_str: String = if info.is_sustaining && filled > 0 {
+        let shimmer_pos = (frame_count as usize / 3) % filled; // ripple every 3 frames
+        (0..info.gauge_width)
+            .map(|i| {
+                if i < filled {
+                    if i == shimmer_pos {
+                        '▱'
+                    } else {
+                        GAUGE_FULL
+                    } // bright gap ripples through
+                } else {
+                    GAUGE_EMPTY
+                }
+            })
+            .collect()
+    } else {
+        std::iter::repeat(GAUGE_FULL)
+            .take(filled)
+            .chain(std::iter::repeat(GAUGE_EMPTY).take(empty))
+            .collect()
+    };
+
+    // A: Pulse color when sustaining.
+    let base_color = if info.is_sustaining {
+        if (frame_count / 5) % 2 == 0 {
+            Color::Rgb(255, 220, 100) // bright gold
+        } else {
+            Color::Rgb(255, 255, 200) // bright white-gold
+        }
+    } else {
+        info.color
+    };
 
     let label_color = if is_selected {
         Color::White
     } else {
-        info.color
+        base_color
     };
     let rate_color = Color::Rgb(100, 100, 120);
 
@@ -681,47 +731,6 @@ fn compute_particles(path: &[(f64, f64)], phase: f64) -> Vec<ParticleWithTrail> 
         particles.push(ParticleWithTrail { head, trail });
     }
     particles
-}
-
-/// Compute glowing edges via BFS upstream from active pattern sinks.
-///
-/// A pattern sink "glows" if any of its requirements has `sustained_secs > 0` and `!completed`.
-/// All edges feeding a glowing sink (recursively upstream) also glow.
-fn compute_glowing_edges(lg: &LoomGraph, loom: &LoomState) -> HashSet<EdgeIndex> {
-    let mut glowing = HashSet::new();
-    let mut visited_nodes: HashSet<NodeIndex> = HashSet::new();
-
-    // Find glowing pattern sinks.
-    let mut queue: Vec<NodeIndex> = Vec::new();
-    for (gn, &ni) in &lg.node_indices {
-        if let LoomGraphNode::PatternSink(pat_idx) = gn {
-            if *pat_idx < loom.persistent.patterns.len() {
-                let pat = &loom.persistent.patterns[*pat_idx];
-                let is_glowing = pat
-                    .requirements
-                    .iter()
-                    .any(|r| r.sustained_secs > 0.0 && !r.completed);
-                if is_glowing {
-                    queue.push(ni);
-                    visited_nodes.insert(ni);
-                }
-            }
-        }
-    }
-
-    // BFS upstream: for each node, mark all incoming edges as glowing,
-    // and enqueue their source nodes.
-    while let Some(node) = queue.pop() {
-        for edge_ref in lg.graph.edges_directed(node, Direction::Incoming) {
-            glowing.insert(edge_ref.id());
-            let source = edge_ref.source();
-            if visited_nodes.insert(source) {
-                queue.push(source);
-            }
-        }
-    }
-
-    glowing
 }
 
 /// Short display name for a resource (used in shuttle labels).
