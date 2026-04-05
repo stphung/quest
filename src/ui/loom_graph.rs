@@ -70,34 +70,7 @@ pub fn render_graph_canvas(
             let src_pos = layout.node_positions.get(&src_ni)?;
             let tgt_pos = layout.node_positions.get(&tgt_ni)?;
 
-            // V3: Gold edges into pattern sink when sustaining, dim otherwise.
-            let tgt_node = loom_graph.graph.node_weight(tgt_ni)?;
-            let color = if let LoomGraphNode::PatternSink(pat_idx) = tgt_node {
-                // Check if pattern is actively sustaining.
-                let is_sustaining = if *pat_idx < loom.persistent.patterns.len() {
-                    let pat = &loom.persistent.patterns[*pat_idx];
-                    let rates: std::collections::HashMap<_, _> = loom
-                        .rate_trackers
-                        .iter()
-                        .map(|(r, t)| (*r, t.rate_per_hour()))
-                        .collect();
-                    !pat.completed
-                        && pat.requirements.iter().all(|req| {
-                            req.completed
-                                || rates.get(&req.resource).copied().unwrap_or(0.0)
-                                    >= req.required_rate
-                        })
-                } else {
-                    false
-                };
-                if is_sustaining {
-                    Color::Rgb(255, 200, 60) // gold
-                } else {
-                    Color::Rgb(60, 70, 100) // dim
-                }
-            } else {
-                Color::Rgb(60, 70, 100) // dim for non-pattern edges
-            };
+            let color = Color::Rgb(60, 70, 100); // uniform dim edge color
 
             // Particle color = source node's resource color.
             let src_node = loom_graph.graph.node_weight(src_ni)?;
