@@ -524,6 +524,7 @@ mod tests {
                 accumulated: 0.0,
             }],
             completed: false,
+            flavor: String::new(),
         });
         loom.persistent.active_pattern = 0;
 
@@ -563,6 +564,7 @@ mod tests {
                 accumulated: 0.0,
             }],
             completed: false,
+            flavor: String::new(),
         });
         loom.persistent.active_pattern = 0;
 
@@ -618,6 +620,7 @@ mod tests {
                 accumulated: 0.0,
             }],
             completed: false,
+            flavor: String::new(),
         });
         loom.persistent.active_pattern = 0;
 
@@ -653,6 +656,7 @@ mod tests {
                 name: format!("Pattern {}", i),
                 requirements: vec![],
                 completed: false,
+                flavor: String::new(),
             });
         }
         loom.persistent.active_pattern = 0;
@@ -670,6 +674,7 @@ mod tests {
                 name: format!("Pattern {}", i),
                 requirements: vec![],
                 completed: i == 0, // first is completed
+                flavor: String::new(),
             });
         }
         loom.persistent.active_pattern = 0;

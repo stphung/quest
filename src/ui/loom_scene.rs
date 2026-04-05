@@ -923,8 +923,23 @@ fn render_bottom_panel_pattern(frame: &mut Frame, area: Rect, loom: &LoomState, 
         )
     };
 
-    // First line: pattern name + overall progress bar.
-    let mut lines: Vec<Line> = vec![Line::from(vec![
+    // Chapter header line.
+    let chapter = crate::loom::discovery::pattern_chapter(pattern.index);
+    let mut lines: Vec<Line> = Vec::new();
+    if !chapter.is_empty() {
+        let chapter_text = format!(" \u{2500}\u{2500} {} ", chapter);
+        let pad_len = area.width as usize - chapter_text.len().min(area.width as usize);
+        let padded = format!("{}{}", chapter_text, "\u{2500}".repeat(pad_len));
+        lines.push(Line::from(Span::styled(
+            padded,
+            Style::default()
+                .fg(Color::Rgb(100, 70, 140))
+                .add_modifier(Modifier::DIM),
+        )));
+    }
+
+    // Pattern name + overall progress bar.
+    lines.push(Line::from(vec![
         Span::styled(
             format!(" Pattern #{}: {} ", pat_idx + 1, pattern.name),
             Style::default().fg(title_color),
@@ -934,7 +949,18 @@ fn render_bottom_panel_pattern(frame: &mut Frame, area: Rect, loom: &LoomState, 
             format!(" {}", progress_text),
             Style::default().fg(Color::Rgb(140, 120, 180)),
         ),
-    ])];
+    ]));
+
+    // Flavor text (italic, muted purple, quoted).
+    if !pattern.flavor.is_empty() {
+        lines.push(Line::from(Span::styled(
+            format!(" \u{201c}{}\u{201d}", pattern.flavor),
+            Style::default()
+                .fg(Color::Rgb(130, 110, 160))
+                .add_modifier(Modifier::ITALIC),
+        )));
+        lines.push(Line::from(""))
+    }
 
     // Check if all requirements are currently being met (for status indicator).
     let rates: std::collections::HashMap<_, _> = loom

@@ -12,14 +12,35 @@ pub fn complete_discovery(loom: &mut LoomState) {
 
 fn create_pattern_sequence() -> Vec<WovenPattern> {
     vec![
-        // ── Teaching Arc (1-8) ── ~3 days (72 hours) ──
-        pattern(0, "First Thread", vec![(Resource::Ember, 25.0, 2.0)]),
-        pattern(1, "Still Waters", vec![(Resource::Silence, 25.0, 2.0)]),
-        pattern(2, "Echoing Halls", vec![(Resource::Memory, 25.0, 4.0)]),
-        pattern(3, "Harmonic Pulse", vec![(Resource::Resonance, 25.0, 4.0)]),
+        // ── Chapter I: The Awakening (1-8) ── ~3 days (72 hours) ──
+        pattern(
+            0,
+            "First Thread",
+            "The Loom stirs. A single thread of ember light stretches into the dark.",
+            vec![(Resource::Ember, 25.0, 2.0)],
+        ),
+        pattern(
+            1,
+            "Still Waters",
+            "In silence, the Loom whispers its first secret.",
+            vec![(Resource::Silence, 25.0, 2.0)],
+        ),
+        pattern(
+            2,
+            "Echoing Halls",
+            "Memories gather like dust in forgotten corridors. The Loom remembers.",
+            vec![(Resource::Memory, 25.0, 4.0)],
+        ),
+        pattern(
+            3,
+            "Harmonic Pulse",
+            "A rhythm emerges \u{2014} not heard, but felt. The threads begin to hum.",
+            vec![(Resource::Resonance, 25.0, 4.0)],
+        ),
         pattern(
             4,
             "Mirror and Void",
+            "Two forces, opposed yet intertwined. Emptiness and reflection are the same thread.",
             vec![
                 (Resource::Reflection, 30.0, 6.0),
                 (Resource::VoidEssence, 30.0, 6.0),
@@ -28,6 +49,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             5,
             "Full Circle",
+            "Six voices, one chord. The Loom sings for the first time.",
             vec![
                 (Resource::Ember, 20.0, 10.0),
                 (Resource::Reflection, 20.0, 10.0),
@@ -40,33 +62,44 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             6,
             "The Catalyst",
+            "Raw ember condenses into something new. The first transformation.",
             vec![(Resource::CondensedEmber, 8.0, 16.0)],
         ),
-        pattern(7, "Echo of Flame", vec![(Resource::EmberEcho, 8.0, 28.0)]),
-        // ── Mastery Arc (9-16) ── ~10 days (236 hours) ──
+        pattern(
+            7,
+            "Echo of Flame",
+            "Fire remembers itself. What was consumed returns, changed.",
+            vec![(Resource::EmberEcho, 8.0, 28.0)],
+        ),
+        // ── Chapter II: The Deepening (9-16) ── ~10 days (236 hours) ──
         pattern(
             8,
             "Forged in Fire",
+            "Light bends to will. The weaver shapes, and the Loom obeys.",
             vec![(Resource::ForgedLight, 15.0, 16.0)],
         ),
         pattern(
             9,
             "Glass Resonance",
+            "Fragile beauty crystallizes from chaos. Handle with reverence.",
             vec![(Resource::EchoGlass, 15.0, 16.0)],
         ),
         pattern(
             10,
             "The Unsung",
+            "A song that was never meant to be heard. The Loom grieves and creates.",
             vec![(Resource::StillbornSong, 15.0, 24.0)],
         ),
         pattern(
             11,
             "Void Distillation",
+            "Nothingness, refined. What remains when everything is stripped away?",
             vec![(Resource::PurifiedVoid, 10.0, 24.0)],
         ),
         pattern(
             12,
             "Crossed Streams",
+            "Light meets glass. The weaver learns to hold two truths at once.",
             vec![
                 (Resource::ForgedLight, 12.0, 24.0),
                 (Resource::EchoGlass, 12.0, 24.0),
@@ -75,6 +108,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             13,
             "The Asymmetry",
+            "Not all balance is equal. The Loom teaches the beauty of imbalance.",
             vec![
                 (Resource::ForgedLight, 25.0, 36.0),
                 (Resource::StillbornSong, 8.0, 36.0),
@@ -83,6 +117,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             14,
             "Pressure Test",
+            "Three forces converge. The threads strain but hold.",
             vec![
                 (Resource::CondensedEmber, 15.0, 36.0),
                 (Resource::EmberEcho, 10.0, 36.0),
@@ -92,21 +127,24 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             15,
             "Three Confluences",
+            "The great rivers meet. What flows downstream will reshape the world.",
             vec![
                 (Resource::ForgedLight, 18.0, 60.0),
                 (Resource::EchoGlass, 18.0, 60.0),
                 (Resource::StillbornSong, 18.0, 60.0),
             ],
         ),
-        // ── Endgame Arc (17-28) ── ~22 days (534 hours) ──
+        // ── Chapter III: The Unraveling (17-28) ── ~22 days (534 hours) ──
         pattern(
             16,
             "The Amplifier",
+            "More. The Loom demands more, and the weaver provides.",
             vec![(Resource::ForgedLight, 35.0, 18.0)],
         ),
         pattern(
             17,
             "Purified Cascade",
+            "Clean lines through tangled threads. Clarity emerges from complexity.",
             vec![
                 (Resource::PurifiedVoid, 20.0, 24.0),
                 (Resource::ForgedLight, 20.0, 24.0),
@@ -115,15 +153,22 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             18,
             "Resonance Cascade",
+            "The hum becomes a roar. Every thread vibrates in sympathy.",
             vec![
                 (Resource::Resonance, 150.0, 24.0),
                 (Resource::StillbornSong, 25.0, 24.0),
             ],
         ),
-        pattern(19, "First Weave", vec![(Resource::WovenReality, 5.0, 30.0)]),
+        pattern(
+            19,
+            "First Weave",
+            "Reality bends. For the first time, the weaver touches the fabric of worlds.",
+            vec![(Resource::WovenReality, 5.0, 30.0)],
+        ),
         pattern(
             20,
             "The Unraveling",
+            "To create, one must first undo. The weaver pulls at the seams of what is.",
             vec![
                 (Resource::WovenReality, 15.0, 36.0),
                 (Resource::PurifiedVoid, 15.0, 36.0),
@@ -132,6 +177,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             21,
             "Grand Harmony",
+            "Every voice, every thread, every silence \u{2014} aligned. The Loom trembles.",
             vec![
                 (Resource::Ember, 100.0, 36.0),
                 (Resource::Reflection, 100.0, 36.0),
@@ -147,6 +193,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             22,
             "The Knot",
+            "Some patterns resist unraveling. The weaver learns to work with the tangles.",
             vec![
                 (Resource::ForgedLight, 25.0, 36.0),
                 (Resource::PurifiedVoid, 15.0, 36.0),
@@ -156,6 +203,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             23,
             "Strange Alchemy",
+            "The old rules dissolve. New ones take their place, stranger and more beautiful.",
             vec![
                 (Resource::ForgedLight, 30.0, 42.0),
                 (Resource::EchoGlass, 30.0, 42.0),
@@ -167,15 +215,22 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             24,
             "Refined Purpose",
+            "The void is not empty. It is waiting.",
             vec![
                 (Resource::PurifiedVoid, 30.0, 48.0),
                 (Resource::ForgedLight, 25.0, 48.0),
             ],
         ),
-        pattern(25, "The Flood", vec![(Resource::WovenReality, 35.0, 48.0)]),
+        pattern(
+            25,
+            "The Flood",
+            "Reality pours through the Loom like water through a broken dam.",
+            vec![(Resource::WovenReality, 35.0, 48.0)],
+        ),
         pattern(
             26,
             "Everything Flows",
+            "All resources, all paths, all threads \u{2014} one continuous motion.",
             vec![
                 (Resource::Ember, 50.0, 72.0),
                 (Resource::Reflection, 50.0, 72.0),
@@ -195,6 +250,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             27,
             "Mended Loom",
+            "The final thread is woven. The Loom is whole. The weaver is the Loom.",
             vec![
                 (Resource::WovenReality, 20.0, 120.0),
                 (Resource::ForgedLight, 40.0, 120.0),
@@ -208,10 +264,11 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
     ]
 }
 
-fn pattern(index: u32, name: &str, reqs: Vec<(Resource, f64, f64)>) -> WovenPattern {
+fn pattern(index: u32, name: &str, flavor: &str, reqs: Vec<(Resource, f64, f64)>) -> WovenPattern {
     WovenPattern {
         index,
         name: name.to_string(),
+        flavor: flavor.to_string(),
         requirements: reqs
             .into_iter()
             .map(|(resource, rate, duration_hours)| PatternRequirement {
@@ -225,6 +282,16 @@ fn pattern(index: u32, name: &str, reqs: Vec<(Resource, f64, f64)>) -> WovenPatt
             })
             .collect(),
         completed: false,
+    }
+}
+
+/// Returns the narrative chapter name for a given pattern index (0-based).
+pub fn pattern_chapter(index: u32) -> &'static str {
+    match index {
+        0..=7 => "Chapter I: The Awakening",
+        8..=15 => "Chapter II: The Deepening",
+        16..=27 => "Chapter III: The Unraveling",
+        _ => "",
     }
 }
 

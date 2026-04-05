@@ -267,6 +267,9 @@ pub struct WovenPattern {
     pub requirements: Vec<PatternRequirement>,
     #[serde(default)]
     pub completed: bool,
+    /// Narrative flavor text displayed when this pattern is active.
+    #[serde(default)]
+    pub flavor: String,
 }
 
 /// A single requirement within a woven pattern.
@@ -641,6 +644,7 @@ mod tests {
             name: "Test".to_string(),
             requirements: vec![],
             completed: false,
+            flavor: String::new(),
         };
         assert!(!pattern.completed);
         assert_eq!(pattern.index, 0);
@@ -660,12 +664,14 @@ mod tests {
             name: "A".to_string(),
             requirements: vec![],
             completed: true,
+            flavor: String::new(),
         });
         state.persistent.patterns.push(WovenPattern {
             index: 1,
             name: "B".to_string(),
             requirements: vec![],
             completed: false,
+            flavor: String::new(),
         });
         assert_eq!(state.persistent.completed_pattern_count(), 1);
     }

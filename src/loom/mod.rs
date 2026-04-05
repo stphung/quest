@@ -8,7 +8,8 @@ pub mod persistence;
 pub mod recipes;
 pub mod types;
 
-pub use discovery::complete_discovery;
+#[allow(unused_imports)]
+pub use discovery::{complete_discovery, pattern_chapter};
 #[allow(unused_imports)]
 pub use logic::{
     archetype_nodes, build_shuttle, check_node_stall, codex_hint_indices, demolish_shuttle,
