@@ -63,17 +63,29 @@ pub fn render_graph_canvas(
         })
         .collect();
 
-    // Build a lookup: NodeIndex → (canvas_cx, canvas_cy, half_width_in_canvas_units).
-    // half_width is in terminal columns (= canvas Braille units / 2 since Braille is 2 dots/col).
-    // But ctx.print uses terminal-cell x positions, while canvas lines use Braille x.
-    // Text occupies `label_display_w + 1 + gauge_width` terminal columns.
-    // In Braille coords that's `display_w * 2` dots. So half_width = display_w (in Braille dots).
+    // Build a lookup: NodeIndex → (canvas_cx, canvas_cy, text_half_canvas_width).
+    //
+    // ctx.print(x, ...) places text at canvas coordinate x. Each terminal character
+    // occupies 2 Braille dots in canvas-x space. So text of `display_w` terminal columns
+    // starts at print_x and extends to print_x + display_w (in print coords), but in
+    // canvas/line coords that same text spans from print_x to print_x + display_w * 2.
+    //
+    // The text is printed at cx - half_w where half_w = display_w / 2.0 (print coords).
+    // Its right edge in canvas coords = (cx - half_w) + display_w * 2 = cx + half_w * 3.
+    // For edge endpoints we need the canvas-coord half-extent from cx:
+    //   right edge at cx + display_w (since print_x = cx - display_w/2, right = print_x + display_w*2 - cx = cx + display_w*1.5... )
+    //
+    // Simpler: store half_extent in canvas coords = display_w (the full terminal width
+    // equals the half-extent in canvas coords because print uses 1:1 but each char = 2 dots).
     let node_bounds: std::collections::HashMap<NodeIndex, (f64, f64, f64)> = node_info
         .iter()
         .map(|info| {
             let display_w = (info.label_display_width + 1 + info.gauge_width) as f64;
-            // half_w in Braille canvas coords (each terminal col = 2 Braille dots)
-            (info.ni, (info.cx, info.cy, display_w))
+            // In render_gauge_node, text is printed at cx - display_w/2.
+            // Each char occupies 1 unit in ctx.print x-space (which = canvas x-space).
+            // So right edge of text = cx - display_w/2 + display_w = cx + display_w/2.
+            // half_extent from center = display_w / 2.
+            (info.ni, (info.cx, info.cy, display_w / 2.0))
         })
         .collect();
 
@@ -108,9 +120,8 @@ pub fn render_graph_canvas(
                 canvas_width,
                 canvas_height,
             );
-            let src_display_w = node_bounds.get(&src_ni).map(|b| b.2).unwrap_or(0.0);
-            let src_half = src_display_w / 2.0;
-            points.push((sx + src_half + 2.0, sy + row_height)); // exit just past right text edge
+            let src_half_ext = node_bounds.get(&src_ni).map(|b| b.2).unwrap_or(0.0);
+            points.push((sx + src_half_ext + 3.0, sy + row_height)); // exit past right text edge
 
             if let Some(dummies) = layout.dummy_paths.get(&(src_ni, tgt_ni)) {
                 for &(dx, dy) in dummies {
@@ -128,9 +139,8 @@ pub fn render_graph_canvas(
                 canvas_width,
                 canvas_height,
             );
-            let tgt_display_w = node_bounds.get(&tgt_ni).map(|b| b.2).unwrap_or(0.0);
-            let tgt_half = tgt_display_w / 2.0;
-            points.push((tx - tgt_half - 1.0, ty + row_height)); // enter just before left text edge
+            let tgt_half_ext = node_bounds.get(&tgt_ni).map(|b| b.2).unwrap_or(0.0);
+            points.push((tx - tgt_half_ext - 1.0, ty + row_height)); // enter just before left text edge
 
             // Particle positions (3 dots along the edge path based on phase).
             let particles = if edge.current_rate > 0.0 {
