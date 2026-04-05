@@ -63,42 +63,7 @@ pub fn render_graph_canvas(
         })
         .collect();
 
-    // Build a lookup: NodeIndex → (canvas_cx, canvas_cy, text_half_canvas_width).
-    //
-    // ctx.print(x, ...) places text at canvas coordinate x. Each terminal character
-    // occupies 2 Braille dots in canvas-x space. So text of `display_w` terminal columns
-    // starts at print_x and extends to print_x + display_w (in print coords), but in
-    // canvas/line coords that same text spans from print_x to print_x + display_w * 2.
-    //
-    // The text is printed at cx - half_w where half_w = display_w / 2.0 (print coords).
-    // Its right edge in canvas coords = (cx - half_w) + display_w * 2 = cx + half_w * 3.
-    // For edge endpoints we need the canvas-coord half-extent from cx:
-    //   right edge at cx + display_w (since print_x = cx - display_w/2, right = print_x + display_w*2 - cx = cx + display_w*1.5... )
-    //
-    // Simpler: store half_extent in canvas coords = display_w (the full terminal width
-    // equals the half-extent in canvas coords because print uses 1:1 but each char = 2 dots).
-    // (cx, cy, right_half_extent, left_half_extent) in canvas coords
-    let node_bounds: std::collections::HashMap<NodeIndex, (f64, f64, f64, f64)> = node_info
-        .iter()
-        .map(|info| {
-            let display_w = (info.label_display_width + 1 + info.gauge_width) as f64;
-            let half_w = display_w / 2.0; // print offset from center (ctx.print units)
-                                          // ctx.print places text at canvas coord cx - half_w.
-                                          // Each text character occupies 2 canvas-x units (1 terminal col = 2 Braille dots).
-                                          // So text right edge in canvas coords = (cx - half_w) + display_w * 2
-                                          //                                     = cx + display_w * 2 - half_w
-                                          //                                     = cx + display_w * 1.5
-                                          // Half-extent from center for right edge = display_w * 1.5
-                                          // Half-extent from center for left edge = half_w (print coords = canvas coords)
-                                          // Store (right_half_extent, left_half_extent)
-            (info.ni, (info.cx, info.cy, display_w * 1.5, half_w))
-        })
-        .collect();
-
-    // Row height for vertical offset (text renders at cy + row_height).
-    let row_height = 4.0;
-
-    // Pre-compute edge segments with endpoints offset to node boundaries.
+    // Pre-compute edge segments.
     let edge_segments: Vec<EdgeSegment> = loom_graph
         .graph
         .edge_indices()
@@ -115,10 +80,8 @@ pub fn render_graph_canvas(
                 Color::Rgb(60, 70, 100) // dim gray-blue
             };
 
-            // Build waypoint chain with endpoints offset to node edges.
+            // Build waypoint chain (source -> dummies -> target) in canvas coords.
             let mut points = Vec::new();
-
-            // Source: exit from the right edge of the source node.
             let (sx, sy) = layout_to_canvas(
                 src_pos.0,
                 src_pos.1,
@@ -126,18 +89,16 @@ pub fn render_graph_canvas(
                 canvas_width,
                 canvas_height,
             );
-            let src_right_ext = node_bounds.get(&src_ni).map(|b| b.2).unwrap_or(0.0);
-            points.push((sx + src_right_ext + 4.0, sy + row_height)); // exit past right text edge
+            points.push((sx, sy));
 
             if let Some(dummies) = layout.dummy_paths.get(&(src_ni, tgt_ni)) {
                 for &(dx, dy) in dummies {
                     let (cx, cy) =
                         layout_to_canvas(dx, dy, &layout.bounds, canvas_width, canvas_height);
-                    points.push((cx, cy + row_height));
+                    points.push((cx, cy));
                 }
             }
 
-            // Target: enter at the left edge of the target node.
             let (tx, ty) = layout_to_canvas(
                 tgt_pos.0,
                 tgt_pos.1,
@@ -145,8 +106,7 @@ pub fn render_graph_canvas(
                 canvas_width,
                 canvas_height,
             );
-            let tgt_left_ext = node_bounds.get(&tgt_ni).map(|b| b.3).unwrap_or(0.0);
-            points.push((tx - tgt_left_ext - 2.0, ty + row_height)); // enter just before left text edge
+            points.push((tx, ty));
 
             // Particle positions (3 dots along the edge path based on phase).
             let particles = if edge.current_rate > 0.0 {
@@ -420,19 +380,20 @@ fn render_gauge_node(
     let label_color = info.color;
     let rate_color = Color::Rgb(100, 100, 120);
 
-    // Each text row in Canvas Braille space occupies 4 braille dots vertically.
-    // We render 2 lines (label+gauge, then rate) spaced 4 dots apart.
-    let row_height = 4.0; // 1 terminal row = 4 braille dots
+    // Canvas Braille space: 2 dots per terminal column, 4 dots per terminal row.
+    // ctx.print() maps canvas x to terminal columns, so 1 char = 2.0 canvas x-units.
+    let char_w = 2.0; // 1 terminal character = 2 braille x-dots
+    let row_h = 4.0; // 1 terminal row = 4 braille y-dots
 
     // Line 1: label + gauge (centered on node position)
     let label_display_w = info.label_display_width + 1 + info.gauge_width;
-    let half_w = label_display_w as f64 / 2.0;
+    let half_w_px = label_display_w as f64 * char_w / 2.0;
 
     let line1 = Line::from(vec![
         Span::styled(format!("{} ", info.label), Style::default().fg(label_color)),
         Span::styled(gauge_str, Style::default().fg(label_color)),
     ]);
-    ctx.print(info.cx - half_w, info.cy + row_height, line1);
+    ctx.print(info.cx - half_w_px, info.cy + row_h, line1);
 
     // Line 2: rate text right-aligned under the gauge portion of line 1.
     if !info.rate_text.is_empty() {
@@ -440,18 +401,18 @@ fn render_gauge_node(
             info.rate_text.clone(),
             Style::default().fg(rate_color),
         ));
-        let right_edge = info.cx + half_w; // right edge of line 1
-        let rate_x = right_edge - info.rate_text.len() as f64;
-        ctx.print(rate_x, info.cy, line2);
+        let right_edge = info.cx + half_w_px;
+        let rate_w_px = info.rate_text.len() as f64 * char_w;
+        ctx.print(right_edge - rate_w_px, info.cy, line2);
     }
 
-    // Line 3 (selected only): bright white underline bar well below rate text.
+    // Line 3 (selected only): bright white underline bar below rate text.
     if is_selected {
         let bar: String = std::iter::repeat('\u{2594}')
             .take(label_display_w)
             .collect();
         let line3 = Line::from(Span::styled(bar, Style::default().fg(Color::White)));
-        ctx.print(info.cx - half_w, info.cy - 2.0 * row_height, line3);
+        ctx.print(info.cx - half_w_px, info.cy - 2.0 * row_h, line3);
     }
 }
 
