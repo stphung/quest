@@ -938,6 +938,34 @@ fn render_bottom_panel_pattern(frame: &mut Frame, area: Rect, loom: &LoomState, 
         )));
     }
 
+    // Diamond progress trail: ◇◇◇◇◆◇◇◇ showing position in sequence.
+    let total_patterns = loom.persistent.patterns.len();
+    if total_patterns > 0 {
+        let mut diamond_spans: Vec<Span> = vec![Span::raw(" ")];
+        for i in 0..total_patterns {
+            let ch = if loom.persistent.patterns[i].completed {
+                "\u{25c6}" // ◆ filled (completed)
+            } else if i == pat_idx {
+                "\u{25c6}" // ◆ filled (current)
+            } else {
+                "\u{25c7}" // ◇ hollow (future)
+            };
+            let color = if i == pat_idx {
+                Color::Rgb(255, 200, 60) // gold for current
+            } else if loom.persistent.patterns[i].completed {
+                Color::Rgb(100, 200, 120) // green for completed
+            } else {
+                Color::Rgb(60, 50, 80) // dim for future
+            };
+            diamond_spans.push(Span::styled(ch, Style::default().fg(color)));
+        }
+        diamond_spans.push(Span::styled(
+            format!("  {}/{}", pat_idx + 1, total_patterns),
+            Style::default().fg(Color::Rgb(80, 70, 100)),
+        ));
+        lines.push(Line::from(diamond_spans));
+    }
+
     // Pattern name + overall progress bar.
     lines.push(Line::from(vec![
         Span::styled(
