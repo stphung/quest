@@ -108,8 +108,9 @@ pub fn render_graph_canvas(
                 canvas_width,
                 canvas_height,
             );
-            let src_half_w = node_bounds.get(&src_ni).map(|b| b.2).unwrap_or(0.0);
-            points.push((sx + src_half_w, sy + row_height));
+            let src_display_w = node_bounds.get(&src_ni).map(|b| b.2).unwrap_or(0.0);
+            let src_half = src_display_w / 2.0;
+            points.push((sx + src_half + 2.0, sy + row_height)); // exit just past right text edge
 
             if let Some(dummies) = layout.dummy_paths.get(&(src_ni, tgt_ni)) {
                 for &(dx, dy) in dummies {
@@ -127,8 +128,9 @@ pub fn render_graph_canvas(
                 canvas_width,
                 canvas_height,
             );
-            let tgt_half_w = node_bounds.get(&tgt_ni).map(|b| b.2).unwrap_or(0.0);
-            points.push((tx - tgt_half_w, ty + row_height));
+            let tgt_display_w = node_bounds.get(&tgt_ni).map(|b| b.2).unwrap_or(0.0);
+            let tgt_half = tgt_display_w / 2.0;
+            points.push((tx - tgt_half - 1.0, ty + row_height)); // enter just before left text edge
 
             // Particle positions (3 dots along the edge path based on phase).
             let particles = if edge.current_rate > 0.0 {
