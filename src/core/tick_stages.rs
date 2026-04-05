@@ -1036,6 +1036,11 @@ pub(super) fn tick_loom(
         return;
     }
 
+    // Loom runs on wall-clock time only — skip during Chrono Surge bursts.
+    if state.chrono_surge_active {
+        return;
+    }
+
     let warp = if loom.time_warp > 0.0 {
         loom.time_warp
     } else {
