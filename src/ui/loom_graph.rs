@@ -233,14 +233,33 @@ pub fn render_graph_canvas(
                 }
             }
 
-            // 3. Draw single node marker below text (Braille layer).
-            // This is where edges connect — see NODE_DOT_Y_OFFSET.
+            // 3. Draw node marker below text (Braille layer).
+            // Producing nodes get a spinning dot; idle/upgrading nodes get a static square.
             for info in &node_info {
                 let mut dot_coords: Vec<(f64, f64)> = Vec::new();
                 let dot_y = info.cy + NODE_DOT_Y_OFFSET;
-                for dx in -1..=1 {
-                    for dy in -1..=1 {
-                        dot_coords.push((info.cx + dx as f64, dot_y + dy as f64));
+                let is_producing = info.fill > 0.0 && !info.rate_text.starts_with('\u{23f3}');
+
+                if is_producing {
+                    // Spinning throbber: rotate 4 dots around a center point.
+                    let phase = (frame_count / 3) % 4; // cycle through 4 positions
+                    let offsets: [(f64, f64); 4] = match phase {
+                        0 => [(-1.0, 0.0), (0.0, -1.0), (1.0, 0.0), (0.0, 1.0)], // diamond
+                        1 => [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)], // square rotated
+                        2 => [(0.0, -1.0), (1.0, 0.0), (0.0, 1.0), (-1.0, 0.0)], // diamond shifted
+                        _ => [(1.0, -1.0), (-1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)], // square
+                    };
+                    // Center dot always present.
+                    dot_coords.push((info.cx, dot_y));
+                    for (dx, dy) in &offsets {
+                        dot_coords.push((info.cx + dx, dot_y + dy));
+                    }
+                } else {
+                    // Static square for idle/upgrading nodes.
+                    for dx in -1..=1 {
+                        for dy in -1..=1 {
+                            dot_coords.push((info.cx + dx as f64, dot_y + dy as f64));
+                        }
                     }
                 }
                 let dot_color = if build_mode {
