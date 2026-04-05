@@ -396,9 +396,21 @@ fn handle_build_input(
                     );
                     build.eligible_sources_a = sources_a.clone();
                     build.eligible_sources_b = sources_b.clone();
-                    // If no eligible sources for either input, can't proceed.
+                    // If no eligible sources for either input, show blocked message.
                     if sources_a.is_empty() || sources_b.is_empty() {
-                        // Stay on recipe select — player needs more nodes unlocked.
+                        let mut missing = Vec::new();
+                        if sources_a.is_empty() {
+                            missing.push(format!("{:?}", recipe.input_a));
+                        }
+                        if sources_b.is_empty() {
+                            missing.push(format!("{:?}", recipe.input_b));
+                        }
+                        build.step = BuildStep::Blocked {
+                            message: format!(
+                                "No source produces: {}. Unlock more extractors or build lower-tier shuttles first.",
+                                missing.join(", ")
+                            ),
+                        };
                         return InputResult::Continue;
                     }
                     let toggle = vec![false; sources_a.len()];

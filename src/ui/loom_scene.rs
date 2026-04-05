@@ -249,25 +249,61 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                         } => {
                             let r = &all_recipes[*global_idx];
                             let is_selected = *recipe_list_idx == *cursor;
+
+                            // Check if both inputs have eligible sources.
+                            let sources_a =
+                                crate::loom::eligible_sources_for_tier(loom, build.tier, r.input_a);
+                            let sources_b =
+                                crate::loom::eligible_sources_for_tier(loom, build.tier, r.input_b);
+                            let missing_a = sources_a.is_empty();
+                            let missing_b = sources_b.is_empty();
+                            let buildable = !missing_a && !missing_b;
+
                             let prefix = if is_selected { " \u{25b6} " } else { "   " };
-                            let style = if is_selected {
+                            let style = if !buildable {
+                                // Unbuildable: dim red
+                                Style::default().fg(Color::Rgb(80, 50, 60))
+                            } else if is_selected {
                                 Style::default()
                                     .fg(Color::White)
                                     .add_modifier(Modifier::BOLD)
                             } else {
                                 Style::default().fg(Color::Rgb(120, 100, 150))
                             };
-                            let label = format!(
-                                "{}{} {} + {} {}  ({:?})  {:.0}/hr",
-                                prefix,
-                                resource_emoji(&r.input_a),
-                                resource_name(&r.input_a),
-                                resource_emoji(&r.input_b),
-                                resource_name(&r.input_b),
-                                r.node_nature,
-                                intake_cap,
-                            );
-                            lines.push(Line::from(Span::styled(label, style)));
+
+                            let mut spans = vec![Span::styled(
+                                format!(
+                                    "{}{} {} + {} {}  ({:?})  {:.0}/hr",
+                                    prefix,
+                                    resource_emoji(&r.input_a),
+                                    resource_name(&r.input_a),
+                                    resource_emoji(&r.input_b),
+                                    resource_name(&r.input_b),
+                                    r.node_nature,
+                                    intake_cap,
+                                ),
+                                style,
+                            )];
+
+                            // Show missing source indicator.
+                            if missing_a && missing_b {
+                                spans.push(Span::styled(
+                                    "  \u{2717} no sources",
+                                    Style::default().fg(Color::Rgb(120, 50, 50)),
+                                ));
+                            } else if missing_a {
+                                spans.push(Span::styled(
+                                    format!("  \u{2717} no {}", resource_name(&r.input_a)),
+                                    Style::default().fg(Color::Rgb(120, 50, 50)),
+                                ));
+                            } else if missing_b {
+                                spans.push(Span::styled(
+                                    format!("  \u{2717} no {}", resource_name(&r.input_b)),
+                                    Style::default().fg(Color::Rgb(120, 50, 50)),
+                                ));
+                            }
+
+                            lines.push(Line::from(spans));
                         }
                     }
                 }
