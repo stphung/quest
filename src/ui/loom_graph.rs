@@ -186,9 +186,6 @@ struct NodeRenderInfo {
 /// Gauge bar characters.
 const GAUGE_FULL: char = '▰';
 const GAUGE_EMPTY: char = '▱';
-/// Selection indicator.
-const SELECT_LEFT: &str = "▸";
-const SELECT_RIGHT: &str = "◂";
 
 fn build_node_render_info(
     ni: NodeIndex,
@@ -324,29 +321,18 @@ fn build_node_render_info(
     }
 }
 
-/// Dim a color to ~40% brightness for unselected nodes.
-fn dim_color(c: Color) -> Color {
-    match c {
-        Color::Rgb(r, g, b) => Color::Rgb(
-            (r as f64 * 0.35) as u8,
-            (g as f64 * 0.35) as u8,
-            (b as f64 * 0.35) as u8,
-        ),
-        _ => Color::Rgb(60, 60, 60),
-    }
-}
-
-/// Render a node as two text lines at canvas coordinates:
-///   Line 1: `▸ Label ▰▰▰▰▱▱▱▱ ◂`  (or without arrows if unselected)
-///   Line 2: `      42/hr`           (centered below gauge)
+/// Render a node as up to three text lines at canvas coordinates:
+///   Line 1: `Label ▰▰▰▰▱▱▱▱`
+///   Line 2: `     42/hr`        (centered, dimmed)
+///   Line 3: `▔▔▔▔▔▔▔▔▔▔▔▔▔▔`   (underline bar, selected only)
 ///
-/// When `has_selection` is true and this node is NOT selected, it renders
-/// dimmed so the selected node stands out by contrast.
+/// All nodes render at full color. Selected node gets a bright white
+/// underline bar beneath the rate text.
 fn render_gauge_node(
     ctx: &mut ratatui::widgets::canvas::Context<'_>,
     info: &NodeRenderInfo,
     is_selected: bool,
-    has_selection: bool,
+    _has_selection: bool,
 ) {
     let filled = (info.fill * info.gauge_width as f64).round() as usize;
     let empty = info.gauge_width.saturating_sub(filled);
@@ -356,50 +342,22 @@ fn render_gauge_node(
         .chain(std::iter::repeat(GAUGE_EMPTY).take(empty))
         .collect();
 
-    // Color scheme: selected = full bright white, unselected = dimmed when a selection exists.
-    let (label_color, gauge_color, rate_color) = if is_selected {
-        (
-            Color::White,
-            Color::Rgb(220, 200, 255),
-            Color::Rgb(180, 170, 200),
-        )
-    } else if has_selection {
-        (
-            dim_color(info.color),
-            dim_color(info.color),
-            Color::Rgb(50, 50, 60),
-        )
-    } else {
-        (info.color, info.color, Color::Rgb(100, 100, 120))
-    };
+    // All nodes at full resource color.
+    let label_color = info.color;
+    let rate_color = Color::Rgb(100, 100, 120);
 
-    // Line 1: [▸] label gauge [◂]
-    let mut spans = Vec::new();
-
-    if is_selected {
-        spans.push(Span::styled(SELECT_LEFT, Style::default().fg(Color::White)));
-    }
-
-    spans.push(Span::styled(
-        format!("{} ", info.label),
-        Style::default().fg(label_color),
-    ));
-    spans.push(Span::styled(gauge_str, Style::default().fg(gauge_color)));
-
-    if is_selected {
-        spans.push(Span::styled(
-            SELECT_RIGHT,
-            Style::default().fg(Color::White),
-        ));
-    }
+    // Line 1: label + gauge
+    let spans = vec![
+        Span::styled(format!("{} ", info.label), Style::default().fg(label_color)),
+        Span::styled(gauge_str, Style::default().fg(label_color)),
+    ];
 
     let line1 = Line::from(spans);
-    let display_width = info.label.len() + 1 + info.gauge_width + if is_selected { 2 } else { 0 };
+    let display_width = info.label.len() + 1 + info.gauge_width;
     let half_w = display_width as f64 / 2.0;
     ctx.print(info.cx - half_w, info.cy, line1);
 
-    // Line 2: rate text centered below the gauge portion (not the full label+gauge).
-    // Offset down by 1 text row = ~4 braille dots.
+    // Line 2: rate text centered below (offset down by 1 text row = ~4 braille dots).
     if !info.rate_text.is_empty() {
         let line2 = Line::from(Span::styled(
             info.rate_text.clone(),
@@ -407,6 +365,19 @@ fn render_gauge_node(
         ));
         let half_rate_w = info.rate_text.len() as f64 / 2.0;
         ctx.print(info.cx - half_rate_w, info.cy - 4.0, line2);
+    }
+
+    // Line 3 (selected only): bright white underline bar beneath the rate text.
+    if is_selected {
+        let bar: String = std::iter::repeat('▔').take(display_width).collect();
+        let line3 = Line::from(Span::styled(bar, Style::default().fg(Color::White)));
+        // Position below rate text (or below gauge if no rate). ~8 braille dots down.
+        let bar_y = if info.rate_text.is_empty() {
+            info.cy - 4.0
+        } else {
+            info.cy - 8.0
+        };
+        ctx.print(info.cx - half_w, bar_y, line3);
     }
 }
 
