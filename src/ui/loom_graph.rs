@@ -41,8 +41,8 @@ pub fn render_graph_canvas(
         return;
     }
 
-    let canvas_width = area.width as f64;
-    let canvas_height = (area.height * 2) as f64; // HalfBlock doubles vertical resolution
+    let canvas_width = (area.width * 2) as f64; // Braille: 2 dots per cell horizontally
+    let canvas_height = (area.height * 4) as f64; // Braille: 4 dots per cell vertically
 
     // Pre-compute glow set (edges feeding active pattern sinks).
     let glowing_edges = compute_glowing_edges(loom_graph, loom);
@@ -141,7 +141,7 @@ pub fn render_graph_canvas(
     let canvas = Canvas::default()
         .x_bounds([0.0, canvas_width])
         .y_bounds([0.0, canvas_height])
-        .marker(Marker::HalfBlock)
+        .marker(Marker::Braille)
         .background_color(Color::Rgb(10, 5, 18))
         .paint(|ctx| {
             // 1. Draw edges (behind nodes).
@@ -151,9 +151,16 @@ pub fn render_graph_canvas(
                         pair[0].0, pair[0].1, pair[1].0, pair[1].1, seg.color,
                     ));
                 }
-                // Draw particle dots.
+                // Draw particle dots — small cross clusters for visibility with Braille.
                 if !seg.particles.is_empty() {
-                    let coords: Vec<(f64, f64)> = seg.particles.clone();
+                    let mut coords: Vec<(f64, f64)> = Vec::new();
+                    for &(px, py) in &seg.particles {
+                        coords.push((px, py));
+                        coords.push((px + 0.5, py));
+                        coords.push((px - 0.5, py));
+                        coords.push((px, py + 0.5));
+                        coords.push((px, py - 0.5));
+                    }
                     ctx.draw(&Points {
                         coords: &coords,
                         color: Color::Rgb(255, 255, 200),
