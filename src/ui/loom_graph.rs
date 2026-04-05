@@ -84,6 +84,20 @@ pub fn render_graph_canvas(
                 Color::Rgb(60, 70, 100) // dim gray-blue
             };
 
+            // Particle color = source node's resource color.
+            let src_node = loom_graph.graph.node_weight(src_ni)?;
+            let particle_color = match src_node {
+                LoomGraphNode::Extractor(id) => resource_color_render(node_native_resource(*id)),
+                LoomGraphNode::Shuttle(idx) => {
+                    if *idx < loom.persistent.shuttles.len() {
+                        resource_color_render(loom.persistent.shuttles[*idx].output)
+                    } else {
+                        Color::Rgb(255, 255, 200)
+                    }
+                }
+                LoomGraphNode::PatternSink(_) => Color::Rgb(255, 200, 60),
+            };
+
             // Build waypoint chain (source -> dummies -> target) in canvas coords.
             // Offset endpoints to match the node dot position (below text).
             let mut points = Vec::new();
@@ -143,6 +157,7 @@ pub fn render_graph_canvas(
                 points,
                 color,
                 particles,
+                particle_color,
                 label,
                 label_pos: mid_pos,
             })
@@ -177,7 +192,7 @@ pub fn render_graph_canvas(
                     }
                     ctx.draw(&Points {
                         coords: &coords,
-                        color: Color::Rgb(255, 255, 200),
+                        color: seg.particle_color,
                     });
                 }
             }
@@ -493,6 +508,8 @@ struct EdgeSegment {
     points: Vec<(f64, f64)>,
     color: Color,
     particles: Vec<(f64, f64)>,
+    /// Color for particles (source node's resource color).
+    particle_color: Color,
     /// Rate label text (e.g., "42🔥/hr"). Empty if rate ~0.
     label: String,
     /// Canvas position for the label (midpoint of edge path).
