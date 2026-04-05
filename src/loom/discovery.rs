@@ -62,14 +62,14 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             6,
             "The Catalyst",
-            "The ember changed in my hands. Condensed into something harder, brighter, more real than the raw flame it came from. I made something new. The Loom made something new through me.",
-            vec![(Resource::CondensedEmber, 8.0, 16.0)],
+            "I forged light from fire and void today \u{2014} poured everything I had into it. The Loom drank it up, hungry, insatiable. I think it\u{2019}s testing how much I can sustain.",
+            vec![(Resource::ForgedLight, 20.0, 16.0)],
         ),
         pattern(
             7,
             "Echo of Flame",
-            "What burns doesn\u{2019}t disappear. It echoes, and the echo carries the memory of heat. I\u{2019}m beginning to understand \u{2014} nothing in the Loom is ever truly lost.",
-            vec![(Resource::EmberEcho, 8.0, 28.0)],
+            "Glass and song, woven side by side for the first time. Two confluences flowing together \u{2014} they don\u{2019}t merge, but they resonate. The Loom hums differently when they\u{2019}re close.",
+            vec![(Resource::EchoGlass, 15.0, 20.0), (Resource::StillbornSong, 10.0, 20.0)],
         ),
         // ── Chapter II: The Deepening (9-16) ── ~10 days (236 hours) ──
         pattern(

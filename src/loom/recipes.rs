@@ -104,13 +104,8 @@ impl Recipe {
 
 /// Returns the complete static recipe registry (cached after first call).
 ///
-/// Design principles:
-/// - Heat (Ember Spindle): intensifies, accelerates, burns away impurity
-/// - Form (Reflection Lens): gives structure, duplicates, refracts
-/// - Void (Void Condenser): strips, purifies, reduces to essence
-/// - Pattern (Memory Archive): records, preserves, creates blueprints
-/// - Stillness (Silence Well): dampens, concentrates, creates potential
-/// - Vibration (Resonance Forge): amplifies, harmonizes, creates feedback
+/// 7 exclusive recipes — each output produced by exactly one recipe.
+/// T1: 3 confluences, T2: 3 reaction products, T3: 1 reality.
 pub fn all_recipes() -> &'static [Recipe] {
     recipe_registry()
 }
@@ -122,62 +117,16 @@ fn recipe_registry() -> &'static [Recipe] {
         use Resource::*;
 
         vec![
-            // ── Tier 1: Base × Base ──────────────────────────────────────────────
-            // Ember + Reflection combinations (fire given form / form given fire)
-            Recipe::new(Ember, Reflection, Heat, ForgedLight, 0.8, 1), // Fire tempered by form through Heat → Forged Light (confluence shortcut)
-            Recipe::new(Ember, Reflection, Form, CondensedEmber, 0.6, 1), // Ember refracted by Form → dense ember packet
-            Recipe::new(Ember, Reflection, Stillness, EmberEcho, 0.5, 1), // Ember dampened by Stillness leaves an Echo
-            // Ember + Void combinations (creation vs consumption)
-            Recipe::new(Ember, VoidEssence, Heat, ForgedLight, 1.0, 1), // Canonical: Ember + Void + Heat → Forged Light (primary confluence)
-            Recipe::new(Ember, VoidEssence, Void, PurifiedVoid, 0.7, 1), // Void strips Ember of impurity → Purified Void
-            Recipe::new(Ember, VoidEssence, Pattern, EmberEcho, 0.6, 1), // Pattern records the moment of consumption → Ember Echo
-            // Ember + Memory combinations (fire remembering itself)
-            Recipe::new(Ember, Memory, Heat, CondensedEmber, 0.9, 1), // Memory of fire, intensified by Heat → dense ember
-            Recipe::new(Ember, Memory, Form, EmberEcho, 0.7, 1), // Memory of fire given Form → Echo
-            // Reflection + VoidEssence combinations (structure meeting the void)
-            Recipe::new(Reflection, VoidEssence, Form, EchoGlass, 0.8, 1), // Form given Memory → Echo Glass (confluence shortcut)
-            Recipe::new(Reflection, VoidEssence, Void, PurifiedVoid, 0.9, 1), // Void strips Reflection to essence → Purified Void
-            // Memory + Silence combinations (pattern meeting stillness)
-            Recipe::new(Memory, Silence, Pattern, EchoGlass, 1.0, 1), // Canonical: Memory + Silence + Pattern → Echo Glass (primary confluence)
-            Recipe::new(Memory, Silence, Stillness, StillbornSong, 0.8, 1), // Memory dampened by Stillness → Song that never plays
-            // Silence + Resonance combinations (space that vibrates)
-            Recipe::new(Silence, Resonance, Stillness, StillbornSong, 1.0, 1), // Canonical: Silence + Resonance + Stillness → Stillborn Song (primary confluence)
-            Recipe::new(Silence, Resonance, Vibration, CondensedEmber, 0.5, 1), // Vibration amplifies potential energy from silence into dense matter
-            // Resonance + Ember combinations (the feedback loop)
-            Recipe::new(Resonance, Ember, Vibration, ForgedLight, 0.7, 1), // Resonance harmonizing with Ember creates structured light
-            // ── Tier 2: Confluence × Base ────────────────────────────────────────
-            // ForgedLight combinations (structured light meeting other resources)
-            Recipe::new(ForgedLight, Reflection, Form, EchoGlass, 0.6, 2), // Forged Light refracted by Form → Echo Glass
-            Recipe::new(ForgedLight, Memory, Pattern, WovenReality, 0.3, 2), // Forged Light + Memory + Pattern → fragment of Woven Reality
-            Recipe::new(ForgedLight, Silence, Stillness, StillbornSong, 0.7, 2), // Forged Light dampened to stillness → Stillborn Song
-            Recipe::new(ForgedLight, VoidEssence, Void, PurifiedVoid, 1.2, 2), // Void strips Forged Light to its essence → high-yield Purified Void
-            Recipe::new(ForgedLight, Resonance, Vibration, CondensedEmber, 0.8, 2), // Resonance feedback on Forged Light compresses into dense matter
-            // EchoGlass combinations (memory-form meeting other resources)
-            Recipe::new(EchoGlass, Ember, Heat, ForgedLight, 0.7, 2), // Heating Echo Glass releases its stored light
-            Recipe::new(EchoGlass, VoidEssence, Void, PurifiedVoid, 1.0, 2), // Void distills Echo Glass to pure essence
-            Recipe::new(EchoGlass, Resonance, Vibration, WovenReality, 0.25, 2), // Resonance vibrating through glass creates reality fragments
-            Recipe::new(EchoGlass, Silence, Pattern, StillbornSong, 0.9, 2), // Pattern records the silence within glass → Stillborn Song
-            // StillbornSong combinations (vibrating silence meeting other resources)
-            Recipe::new(StillbornSong, Ember, Heat, CondensedEmber, 1.0, 2), // Heat applied to a stillborn song releases condensed energy
-            Recipe::new(StillbornSong, Memory, Pattern, WovenReality, 0.3, 2), // Pattern + Memory crystallizes the song into reality
-            Recipe::new(StillbornSong, Reflection, Form, EchoGlass, 0.8, 2), // Form gives structure to a stillborn song → Echo Glass
-            // ── Tier 3: Three-input / Tapestry-tier ──────────────────────────────
-            // These require all three confluence resources to converge.
-            // In the two-input recipe system, Tier 3 is reached by piping a
-            // confluence resource into a node that also receives another confluence.
-            Recipe::new(ForgedLight, EchoGlass, Heat, WovenReality, 0.5, 3), // Two confluences fused by Heat → Woven Reality
-            Recipe::new(ForgedLight, EchoGlass, Form, WovenReality, 0.4, 3), // Two confluences given Form → Woven Reality
-            Recipe::new(ForgedLight, StillbornSong, Vibration, WovenReality, 0.5, 3), // Vibration harmonizes Forged Light with Stillborn Song
-            Recipe::new(ForgedLight, StillbornSong, Pattern, WovenReality, 0.4, 3), // Pattern records the convergence of fire and silence
-            Recipe::new(EchoGlass, StillbornSong, Stillness, WovenReality, 0.5, 3), // Stillness concentrates memory-glass and silent song
-            Recipe::new(EchoGlass, StillbornSong, Void, WovenReality, 0.4, 3), // Void reduces both confluences to essential reality
-            // Cross-confluence reactions that produce enhanced confluences
-            Recipe::new(ForgedLight, EchoGlass, Void, StillbornSong, 1.5, 3), // Void strips two confluences → dense Stillborn Song
-            Recipe::new(ForgedLight, StillbornSong, Form, EchoGlass, 1.3, 3), // Form gives structure to the interplay → Echo Glass upgrade
-            Recipe::new(EchoGlass, StillbornSong, Heat, ForgedLight, 1.3, 3), // Heat intensifies memory-silence into Forged Light
-            // PurifiedVoid as input (deep tier 2/3 bridge)
-            Recipe::new(PurifiedVoid, Resonance, Vibration, WovenReality, 0.35, 3), // Vibration through pure void with resonance weaves reality
-            Recipe::new(PurifiedVoid, ForgedLight, Heat, WovenReality, 0.4, 3), // Pure void + Forged Light + Heat = fundamental creation
+            // ── Tier 1: Base × Base → Confluences ──
+            Recipe::new(Ember, VoidEssence, Heat, ForgedLight, 1.0, 1),
+            Recipe::new(Memory, Silence, Pattern, EchoGlass, 1.0, 1),
+            Recipe::new(Silence, Resonance, Stillness, StillbornSong, 1.0, 1),
+            // ── Tier 2: Confluence × Base → Reaction Products ──
+            Recipe::new(StillbornSong, Ember, Heat, CondensedEmber, 1.0, 2),
+            Recipe::new(ForgedLight, Memory, Form, EmberEcho, 1.0, 2),
+            Recipe::new(EchoGlass, VoidEssence, Void, PurifiedVoid, 1.0, 2),
+            // ── Tier 3: Confluence × Confluence → Woven Reality ──
+            Recipe::new(ForgedLight, EchoGlass, Vibration, WovenReality, 1.0, 3),
         ]
     })
 }
@@ -268,11 +217,12 @@ mod tests {
     use Resource::*;
 
     #[test]
-    fn test_recipe_count_in_range() {
+    fn test_recipe_count_is_seven() {
         let recipes = all_recipes();
-        assert!(
-            recipes.len() >= 35 && recipes.len() <= 45,
-            "Expected 35-45 recipes, got {}",
+        assert_eq!(
+            recipes.len(),
+            7,
+            "Expected 7 recipes, got {}",
             recipes.len()
         );
     }
@@ -280,31 +230,19 @@ mod tests {
     #[test]
     fn test_tier1_count() {
         let t1 = recipes_by_tier(1);
-        assert!(
-            t1.len() >= 13 && t1.len() <= 18,
-            "Expected ~15 tier 1 recipes, got {}",
-            t1.len()
-        );
+        assert_eq!(t1.len(), 3, "Expected 3 tier 1 recipes, got {}", t1.len());
     }
 
     #[test]
     fn test_tier2_count() {
         let t2 = recipes_by_tier(2);
-        assert!(
-            t2.len() >= 10 && t2.len() <= 14,
-            "Expected ~12 tier 2 recipes, got {}",
-            t2.len()
-        );
+        assert_eq!(t2.len(), 3, "Expected 3 tier 2 recipes, got {}", t2.len());
     }
 
     #[test]
     fn test_tier3_count() {
         let t3 = recipes_by_tier(3);
-        assert!(
-            t3.len() >= 8 && t3.len() <= 14,
-            "Expected ~10 tier 3 recipes, got {}",
-            t3.len()
-        );
+        assert_eq!(t3.len(), 1, "Expected 1 tier 3 recipe, got {}", t3.len());
     }
 
     #[test]
@@ -433,9 +371,10 @@ mod tests {
     #[test]
     fn test_recipes_producing_forged_light() {
         let producers = recipes_producing(ForgedLight);
-        assert!(
-            producers.len() >= 2,
-            "ForgedLight should be producible via multiple routes"
+        assert_eq!(
+            producers.len(),
+            1,
+            "ForgedLight should be producible via exactly one recipe"
         );
     }
 

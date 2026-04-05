@@ -1601,12 +1601,12 @@ mod tests {
             Resource::Ember,
             Resource::VoidEssence,
             super::super::types::NodeNature::Heat,
-            Resource::CondensedEmber,
-            0.5,
+            Resource::ForgedLight,
+            1.0,
         );
         assert_eq!(codex.len(), 1);
         assert!(codex[0].discovered);
-        assert_eq!(codex[0].output, Resource::CondensedEmber);
+        assert_eq!(codex[0].output, Resource::ForgedLight);
     }
 
     #[test]
@@ -1615,8 +1615,8 @@ mod tests {
         let mut codex = vec![CodexEntry {
             inputs: vec![Resource::Ember, Resource::VoidEssence],
             node_nature: NodeNature::Heat,
-            output: Resource::CondensedEmber,
-            output_amount: 0.5,
+            output: Resource::ForgedLight,
+            output_amount: 1.0,
             discovered: false,
         }];
         record_codex_discovery(
@@ -1624,8 +1624,8 @@ mod tests {
             Resource::Ember,
             Resource::VoidEssence,
             NodeNature::Heat,
-            Resource::CondensedEmber,
-            0.5,
+            Resource::ForgedLight,
+            1.0,
         );
         assert_eq!(codex.len(), 1, "should not duplicate");
         assert!(codex[0].discovered);
@@ -1637,8 +1637,8 @@ mod tests {
         let mut codex = vec![CodexEntry {
             inputs: vec![Resource::Ember, Resource::VoidEssence],
             node_nature: NodeNature::Heat,
-            output: Resource::CondensedEmber,
-            output_amount: 0.5,
+            output: Resource::ForgedLight,
+            output_amount: 1.0,
             discovered: false,
         }];
         // Reverse input order — should still match.
@@ -1647,8 +1647,8 @@ mod tests {
             Resource::VoidEssence,
             Resource::Ember,
             NodeNature::Heat,
-            Resource::CondensedEmber,
-            0.5,
+            Resource::ForgedLight,
+            1.0,
         );
         assert_eq!(codex.len(), 1, "commutative match should not duplicate");
         assert!(codex[0].discovered);
@@ -2186,13 +2186,13 @@ mod tests {
         ));
         loom.persistent.shuttles.push(Shuttle::new(
             Resource::ForgedLight,
-            Resource::Reflection,
+            Resource::Memory,
             NodeNature::Form,
-            Resource::EchoGlass,
+            Resource::EmberEcho,
             1.0,
             2,
             vec![LoomNodeRef::Shuttle(0)],
-            vec![LoomNodeRef::Extractor(NodeId::ReflectionLens)],
+            vec![LoomNodeRef::Extractor(NodeId::MemoryArchive)],
         ));
         // Insert a T1 shuttle before index 0 — then demolish it.
         // Actually insert at index 0 by inserting first, shifting second to index 1.
@@ -2461,7 +2461,7 @@ mod external_bonus_tests {
             &mut loom,
             Resource::ForgedLight,
             Resource::EchoGlass,
-            NodeNature::Heat,
+            NodeNature::Vibration,
             vec![],
             vec![],
         );
@@ -2650,13 +2650,13 @@ mod external_bonus_tests {
         setup_patterns(&mut loom, 1);
         loom.persistent.shuttles.push(Shuttle::new(
             Resource::Ember,
-            Resource::Reflection,
+            Resource::VoidEssence,
             NodeNature::Heat,
             Resource::ForgedLight,
             1.0,
             1,
             vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
-            vec![LoomNodeRef::Extractor(NodeId::ReflectionLens)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         ));
         for _ in 0..10 {
             tick_shuttle_pull(&mut loom, 0.1);
