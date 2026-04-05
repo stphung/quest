@@ -798,7 +798,6 @@ fn render_bottom_panel_extractor(
         let dur_str = crate::ui::loom_graph::format_duration(duration);
         let current_rate = logic::node_effective_rate(loom, node);
         let next_rate = node.base_rate * logic::node_level_multiplier(node.level + 1);
-        let rate_pct = ((next_rate / current_rate - 1.0) * 100.0).round() as i32;
 
         upgrade_lines.push(Line::from(Span::styled(
             format!(
@@ -807,9 +806,10 @@ fn render_bottom_panel_extractor(
             ),
             Style::default().fg(bright),
         )));
+        let next_cap = node.base_rate * logic::node_level_multiplier(node.level + 1) * 10.0;
         upgrade_lines.push(Line::from(Span::styled(
             format!(
-                " Cost:    {:.0} {} (50% of buffer)",
+                " Cost:       {:.0} {} (50% of buffer)",
                 drain,
                 resource_emoji(&logic::node_native_resource(node_id))
             ),
@@ -820,15 +820,22 @@ fn render_bottom_panel_extractor(
             }),
         )));
         upgrade_lines.push(Line::from(Span::styled(
-            format!(" Lockout: {} \u{2014} no production", dur_str),
+            format!(" Build time: {}", dur_str),
             Style::default().fg(dim),
         )));
         upgrade_lines.push(Line::from(Span::styled(
             format!(
-                " Reward:  +{}% production ({:.0} \u{2192} {:.0}/hr)",
-                rate_pct, current_rate, next_rate
+                " Production: {:.0} \u{2192} {:.0}/hr",
+                current_rate, next_rate
             ),
-            Style::default().fg(Color::Rgb(100, 200, 120)),
+            Style::default().fg(dim),
+        )));
+        upgrade_lines.push(Line::from(Span::styled(
+            format!(
+                " Buffer:     {:.0} \u{2192} {:.0}",
+                node.buffer_capacity, next_cap
+            ),
+            Style::default().fg(dim),
         )));
         upgrade_lines.push(Line::from(""));
         if can_afford {
