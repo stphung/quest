@@ -404,13 +404,13 @@ fn render_gauge_node(
         ctx.print(info.cx - half_rate_w, info.cy, line2);
     }
 
-    // Line 3 (selected only): bright white underline bar beneath rate text.
+    // Line 3 (selected only): bright white underline bar well below rate text.
     if is_selected {
         let bar: String = std::iter::repeat('\u{2594}')
             .take(label_display_w)
             .collect();
         let line3 = Line::from(Span::styled(bar, Style::default().fg(Color::White)));
-        ctx.print(info.cx - half_w, info.cy - row_height, line3);
+        ctx.print(info.cx - half_w, info.cy - 2.0 * row_height, line3);
     }
 }
 
