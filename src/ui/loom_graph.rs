@@ -205,18 +205,18 @@ fn build_node_render_info(
 
     match node {
         LoomGraphNode::Extractor(id) => {
-            let label = match id {
+            let ext = &loom.persistent.nodes[id.index()];
+            let name = match id {
                 NodeId::EmberSpindle => "Ember",
                 NodeId::ReflectionLens => "Reflect",
                 NodeId::VoidCondenser => "Void",
                 NodeId::MemoryArchive => "Memory",
                 NodeId::SilenceWell => "Silence",
                 NodeId::ResonanceForge => "Reson",
-            }
-            .to_string();
+            };
+            let label = format!("{} L{}", name, ext.level);
             let resource = node_native_resource(*id);
             let color = resource_color(resource);
-            let ext = &loom.persistent.nodes[id.index()];
             let cap = ext.buffer_capacity;
             let fill = if cap > 0.0 {
                 (ext.buffer / cap).clamp(0.0, 1.0)
@@ -257,7 +257,7 @@ fn build_node_render_info(
             if *idx < loom.persistent.shuttles.len() {
                 let s = &loom.persistent.shuttles[*idx];
                 let out = short_resource_name(s.output);
-                let label = format!("S{}\u{2192}{}", idx, out);
+                let label = format!("S{}\u{2192}{} L{}", idx, out, s.level);
                 let color = resource_color(s.output);
                 let fill = if s.buffer_capacity > 0.0 {
                     (s.buffer / s.buffer_capacity).clamp(0.0, 1.0)
@@ -322,7 +322,9 @@ fn build_node_render_info(
     }
 }
 
-/// Render a node as a text-based gauge bar at canvas coordinates.
+/// Render a node as two text lines at canvas coordinates:
+///   Line 1: `▸ Label ▰▰▰▰▱▱▱▱ ◂`
+///   Line 2: `    42/hr`  (centered, dimmed)
 fn render_gauge_node(
     ctx: &mut ratatui::widgets::canvas::Context<'_>,
     info: &NodeRenderInfo,
@@ -336,14 +338,13 @@ fn render_gauge_node(
         .chain(std::iter::repeat(GAUGE_EMPTY).take(empty))
         .collect();
 
-    let dim = Color::Rgb(100, 100, 120);
     let label_color = if is_selected {
         Color::White
     } else {
         info.color
     };
 
-    // Build the display line: [▸] label gauge rate [◂]
+    // Line 1: [▸] label gauge [◂]
     let mut spans = Vec::new();
 
     if is_selected {
@@ -356,13 +357,6 @@ fn render_gauge_node(
     ));
     spans.push(Span::styled(gauge_str, Style::default().fg(info.color)));
 
-    if !info.rate_text.is_empty() {
-        spans.push(Span::styled(
-            format!(" {}", info.rate_text),
-            Style::default().fg(dim),
-        ));
-    }
-
     if is_selected {
         spans.push(Span::styled(
             SELECT_RIGHT,
@@ -370,16 +364,21 @@ fn render_gauge_node(
         ));
     }
 
-    let line = Line::from(spans);
-    let rate_w = if info.rate_text.is_empty() {
-        0
-    } else {
-        info.rate_text.len() + 1
-    };
-    let display_width =
-        info.label.len() + 1 + info.gauge_width + rate_w + if is_selected { 2 } else { 0 };
+    let line1 = Line::from(spans);
+    let display_width = info.label.len() + 1 + info.gauge_width + if is_selected { 2 } else { 0 };
     let half_w = display_width as f64 / 2.0;
-    ctx.print(info.cx - half_w, info.cy, line);
+    ctx.print(info.cx - half_w, info.cy, line1);
+
+    // Line 2: rate text centered below (offset down by 1 text row = ~4 braille dots)
+    if !info.rate_text.is_empty() {
+        let dim = Color::Rgb(100, 100, 120);
+        let line2 = Line::from(Span::styled(
+            info.rate_text.clone(),
+            Style::default().fg(dim),
+        ));
+        let half_rate_w = info.rate_text.len() as f64 / 2.0;
+        ctx.print(info.cx - half_rate_w, info.cy - 4.0, line2);
+    }
 }
 
 /// A pre-computed edge with its canvas-space polyline, color, and particle positions.
