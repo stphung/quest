@@ -22,7 +22,7 @@ use ratatui::{
 use crate::loom::graph::{LoomGraph, LoomGraphNode};
 use crate::loom::layout::LoomLayout;
 use crate::loom::logic::node_native_resource;
-use crate::loom::types::{LoomState, LoomUiState, NodeId, Resource};
+use crate::loom::types::{LoomState, LoomUiState, Resource};
 
 /// Render the Loom production graph onto a Canvas widget.
 pub fn render_graph_canvas(
@@ -174,6 +174,8 @@ struct NodeRenderInfo {
     cx: f64,
     cy: f64,
     label: String,
+    /// Display width of label in terminal columns (accounts for double-width emoji).
+    label_display_width: usize,
     color: Color,
     /// Fill fraction (0.0..1.0) for the gauge bar.
     fill: f64,
@@ -181,6 +183,28 @@ struct NodeRenderInfo {
     rate_text: String,
     /// Gauge width in characters.
     gauge_width: usize,
+}
+
+/// Resource emoji for display.
+fn resource_emoji(resource: Resource) -> &'static str {
+    match resource {
+        Resource::Ember => "\u{1f525}",         // 🔥
+        Resource::Reflection => "\u{1f48e}",    // 💎
+        Resource::VoidEssence => "\u{1f300}",   // 🌀
+        Resource::Memory => "\u{1f4dc}",        // 📜
+        Resource::Silence => "\u{1f311}",       // 🌑
+        Resource::Resonance => "\u{1f514}",     // 🔔
+        Resource::ForgedLight => "\u{2728}",    // ✨
+        Resource::EchoGlass => "\u{1fa9e}",     // 🪞
+        Resource::StillbornSong => "\u{1f3b5}", // 🎵
+        _ => "\u{25cf}",                        // ●
+    }
+}
+
+/// Compute the terminal display width of a string (emoji = 2 columns).
+fn display_width(s: &str) -> usize {
+    use unicode_width::UnicodeWidthStr;
+    UnicodeWidthStr::width(s)
 }
 
 /// Gauge bar characters.
@@ -204,17 +228,11 @@ fn build_node_render_info(
     match node {
         LoomGraphNode::Extractor(id) => {
             let ext = &loom.persistent.nodes[id.index()];
-            let name = match id {
-                NodeId::EmberSpindle => "Ember",
-                NodeId::ReflectionLens => "Reflect",
-                NodeId::VoidCondenser => "Void",
-                NodeId::MemoryArchive => "Memory",
-                NodeId::SilenceWell => "Silence",
-                NodeId::ResonanceForge => "Reson",
-            };
-            let label = format!("{} L{}", name, ext.level);
             let resource = node_native_resource(*id);
-            let color = resource_color(resource);
+            let emoji = resource_emoji(resource);
+            let label = format!("{} {} L{}", emoji, id.name(), ext.level);
+            let label_display_width = display_width(&label);
+            let color = resource_color_render(resource);
             let cap = ext.buffer_capacity;
             let fill = if cap > 0.0 {
                 (ext.buffer / cap).clamp(0.0, 1.0)
@@ -234,6 +252,7 @@ fn build_node_render_info(
                 cx,
                 cy,
                 label,
+                label_display_width,
                 color,
                 fill,
                 rate_text,
@@ -247,6 +266,7 @@ fn build_node_render_info(
                     cx,
                     cy,
                     label: "NEW".to_string(),
+                    label_display_width: 3,
                     color: Color::Rgb(100, 100, 100),
                     fill: 0.0,
                     rate_text: String::new(),
@@ -255,9 +275,16 @@ fn build_node_render_info(
             }
             if *idx < loom.persistent.shuttles.len() {
                 let s = &loom.persistent.shuttles[*idx];
-                let out = short_resource_name(s.output);
-                let label = format!("S{}\u{2192}{} L{}", idx, out, s.level);
-                let color = resource_color(s.output);
+                let in_a = resource_emoji(s.input_a);
+                let in_b = resource_emoji(s.input_b);
+                let out_emoji = resource_emoji(s.output);
+                let out_name = short_resource_name(s.output);
+                let label = format!(
+                    "{}+{}\u{2192}{} {} L{}",
+                    in_a, in_b, out_emoji, out_name, s.level
+                );
+                let label_display_width = display_width(&label);
+                let color = resource_color_render(s.output);
                 let fill = if s.buffer_capacity > 0.0 {
                     (s.buffer / s.buffer_capacity).clamp(0.0, 1.0)
                 } else {
@@ -270,6 +297,7 @@ fn build_node_render_info(
                     cx,
                     cy,
                     label,
+                    label_display_width,
                     color,
                     fill,
                     rate_text,
@@ -281,6 +309,7 @@ fn build_node_render_info(
                     cx,
                     cy,
                     label: format!("S{}", idx),
+                    label_display_width: 2,
                     color: Color::Rgb(180, 180, 180),
                     fill: 0.0,
                     rate_text: String::new(),
@@ -292,7 +321,8 @@ fn build_node_render_info(
             if *idx < loom.persistent.patterns.len() {
                 let pat = &loom.persistent.patterns[*idx];
                 let progress = compute_pattern_progress(pat);
-                let label = format!("\u{2605} {}", pat.name);
+                let label = format!("\u{2b50} {}", pat.name); // ⭐
+                let label_display_width = display_width(&label);
                 let pct = (progress * 100.0).round() as u32;
                 let rate_text = format!("{}%", pct);
                 NodeRenderInfo {
@@ -300,6 +330,7 @@ fn build_node_render_info(
                     cx,
                     cy,
                     label,
+                    label_display_width,
                     color: Color::Rgb(255, 200, 60),
                     fill: progress,
                     rate_text,
@@ -310,7 +341,8 @@ fn build_node_render_info(
                     ni,
                     cx,
                     cy,
-                    label: "Pattern".to_string(),
+                    label: "\u{2b50} Pattern".to_string(),
+                    label_display_width: 9,
                     color: Color::Rgb(255, 200, 60),
                     fill: 0.0,
                     rate_text: String::new(),
@@ -353,8 +385,8 @@ fn render_gauge_node(
     ];
 
     let line1 = Line::from(spans);
-    let display_width = info.label.len() + 1 + info.gauge_width;
-    let half_w = display_width as f64 / 2.0;
+    let total_display_width = info.label_display_width + 1 + info.gauge_width;
+    let half_w = total_display_width as f64 / 2.0;
     ctx.print(info.cx - half_w, info.cy, line1);
 
     // Line 2: rate text centered below (offset down by 1 text row = ~4 braille dots).
@@ -369,7 +401,7 @@ fn render_gauge_node(
 
     // Line 3 (selected only): bright white underline bar beneath the rate text.
     if is_selected {
-        let bar: String = std::iter::repeat('▔').take(display_width).collect();
+        let bar: String = std::iter::repeat('▔').take(total_display_width).collect();
         let line3 = Line::from(Span::styled(bar, Style::default().fg(Color::White)));
         // Position below rate text (or below gauge if no rate). ~8 braille dots down.
         let bar_y = if info.rate_text.is_empty() {
@@ -541,7 +573,7 @@ fn compute_pattern_progress(pattern: &crate::loom::types::WovenPattern) -> f64 {
 }
 
 /// Map a resource to its display color.
-fn resource_color(resource: Resource) -> Color {
+fn resource_color_render(resource: Resource) -> Color {
     match resource {
         Resource::Ember => Color::Rgb(255, 140, 0),
         Resource::Reflection => Color::Rgb(100, 180, 255),
