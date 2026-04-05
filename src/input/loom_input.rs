@@ -275,6 +275,29 @@ pub(super) fn handle_loom(
 /// Start the build shuttle flow.
 fn start_build(loom_state: &LoomState, loom_ui: &mut LoomUiState) {
     use crate::loom::types::BuildStep;
+
+    // Check shuttle capacity first.
+    let current = loom_state.persistent.shuttles.len();
+    let max = loom_state.persistent.max_shuttles();
+    if current >= max {
+        loom_ui.build = Some(BuildState {
+            step: BuildStep::Blocked {
+                message: format!(
+                    "Shuttle capacity reached ({}/{}). Demolish a shuttle or complete more patterns to unlock slots.",
+                    current, max
+                ),
+            },
+            tier: 1,
+            recipe_index: 0,
+            available_recipes: Vec::new(),
+            eligible_sources_a: Vec::new(),
+            eligible_sources_b: Vec::new(),
+            selected_sources_a: Vec::new(),
+            selected_sources_b: Vec::new(),
+        });
+        return;
+    }
+
     let tiers = crate::loom::unlocked_tiers(loom_state);
     if tiers.is_empty() {
         // Show a message explaining why building is locked.

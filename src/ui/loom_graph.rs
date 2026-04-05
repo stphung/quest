@@ -338,8 +338,19 @@ fn render_gauge_node(
         .chain(std::iter::repeat(GAUGE_EMPTY).take(empty))
         .collect();
 
+    // Selected: white text on dim background. Unselected: normal color, no bg.
+    let bg = if is_selected {
+        Color::Rgb(35, 25, 50)
+    } else {
+        Color::Reset
+    };
     let label_color = if is_selected {
         Color::White
+    } else {
+        info.color
+    };
+    let gauge_color = if is_selected {
+        Color::Rgb(200, 180, 255)
     } else {
         info.color
     };
@@ -348,19 +359,25 @@ fn render_gauge_node(
     let mut spans = Vec::new();
 
     if is_selected {
-        spans.push(Span::styled(SELECT_LEFT, Style::default().fg(Color::White)));
+        spans.push(Span::styled(
+            SELECT_LEFT,
+            Style::default().fg(Color::White).bg(bg),
+        ));
     }
 
     spans.push(Span::styled(
         format!("{} ", info.label),
-        Style::default().fg(label_color),
+        Style::default().fg(label_color).bg(bg),
     ));
-    spans.push(Span::styled(gauge_str, Style::default().fg(info.color)));
+    spans.push(Span::styled(
+        gauge_str,
+        Style::default().fg(gauge_color).bg(bg),
+    ));
 
     if is_selected {
         spans.push(Span::styled(
             SELECT_RIGHT,
-            Style::default().fg(Color::White),
+            Style::default().fg(Color::White).bg(bg),
         ));
     }
 

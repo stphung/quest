@@ -178,9 +178,15 @@ pub fn render_loom_overlay(
 fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &LoomUiState) {
     use crate::loom::graph::LoomGraphNode;
 
+    let current_shuttles = loom.persistent.shuttles.len();
+    let max_shuttles = loom.persistent.max_shuttles();
+    let title = format!(
+        " Detail  [Shuttles: {}/{}] ",
+        current_shuttles, max_shuttles
+    );
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(" Detail ")
+        .title(title)
         .border_style(Style::default().fg(LOOM_BORDER_COLOR));
     let inner = block.inner(area);
     frame.render_widget(block, area);
