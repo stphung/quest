@@ -311,14 +311,9 @@ fn build_node_render_info(
             }
             if *idx < loom.persistent.shuttles.len() {
                 let s = &loom.persistent.shuttles[*idx];
-                let in_a = resource_emoji(s.input_a);
-                let in_b = resource_emoji(s.input_b);
                 let out_emoji = resource_emoji(s.output);
                 let out_name = short_resource_name(s.output);
-                let label = format!(
-                    "{}+{}\u{2192}{} {} L{}",
-                    in_a, in_b, out_emoji, out_name, s.level
-                );
+                let label = format!("{} {} L{}", out_emoji, out_name, s.level);
                 let label_display_width = display_width(&label);
                 let color = resource_color_render(s.output);
                 let fill = if s.buffer_capacity > 0.0 {
