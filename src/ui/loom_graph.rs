@@ -394,14 +394,15 @@ fn render_gauge_node(
     ]);
     ctx.print(info.cx - half_w, info.cy + row_height, line1);
 
-    // Line 2: rate text centered below
+    // Line 2: rate text right-aligned under the gauge portion of line 1.
     if !info.rate_text.is_empty() {
         let line2 = Line::from(Span::styled(
             info.rate_text.clone(),
             Style::default().fg(rate_color),
         ));
-        let half_rate_w = info.rate_text.len() as f64 / 2.0;
-        ctx.print(info.cx - half_rate_w, info.cy, line2);
+        let right_edge = info.cx + half_w; // right edge of line 1
+        let rate_x = right_edge - info.rate_text.len() as f64;
+        ctx.print(rate_x, info.cy, line2);
     }
 
     // Line 3 (selected only): bright white underline bar well below rate text.
