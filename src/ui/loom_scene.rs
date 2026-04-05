@@ -901,18 +901,6 @@ fn render_bottom_panel_pattern(frame: &mut Frame, area: Rect, loom: &LoomState, 
         .map(|r| (r.sustain_duration_secs - r.sustained_secs).max(0.0))
         .fold(0.0_f64, f64::max);
 
-    let overall_bar_width = 15usize;
-    let overall_filled = (overall_progress * overall_bar_width as f64).round() as usize;
-    let overall_bar: String = (0..overall_bar_width)
-        .map(|i| {
-            if i < overall_filled {
-                '\u{2588}'
-            } else {
-                '\u{2591}'
-            }
-        })
-        .collect();
-
     let progress_text = if pattern.completed {
         "100% \u{2713}".to_string()
     } else {
@@ -964,18 +952,17 @@ fn render_bottom_panel_pattern(frame: &mut Frame, area: Rect, loom: &LoomState, 
         lines.push(Line::from(diamond_spans));
     }
 
-    // Pattern name + overall progress bar.
-    lines.push(Line::from(vec![
-        Span::styled(
-            format!(" Pattern #{}: {} ", pat_idx + 1, pattern.name),
-            Style::default().fg(title_color),
-        ),
-        Span::styled(overall_bar, Style::default().fg(title_color)),
-        Span::styled(
-            format!(" {}", progress_text),
-            Style::default().fg(Color::Rgb(140, 120, 180)),
-        ),
-    ]));
+    // Pattern name.
+    lines.push(Line::from(Span::styled(
+        format!(" Pattern #{}: {}", pat_idx + 1, pattern.name),
+        Style::default().fg(title_color),
+    )));
+
+    // We'll render a Gauge widget separately below the text lines.
+    // Store the progress info for later; insert a blank line as placeholder.
+    let gauge_label = progress_text;
+    let gauge_ratio = overall_progress.clamp(0.0, 1.0);
+    lines.push(Line::from("")); // placeholder for gauge row
 
     // Flavor text (italic, muted purple, quoted).
     if !pattern.flavor.is_empty() {
@@ -1034,11 +1021,34 @@ fn render_bottom_panel_pattern(frame: &mut Frame, area: Rect, loom: &LoomState, 
         ]));
     }
 
+    // Find which line is the gauge placeholder (the blank line after the pattern name).
+    // It's the line right after "Pattern #N: Name".
+    let gauge_line_idx = lines
+        .iter()
+        .position(|l| l.spans.is_empty() || (l.spans.len() == 1 && l.spans[0].content.is_empty()));
+
     lines.truncate(area.height as usize);
     frame.render_widget(
         Paragraph::new(lines).style(Style::default().bg(LOOM_BG)),
         area,
     );
+
+    // Overlay the Gauge widget on the placeholder row.
+    if let Some(row) = gauge_line_idx {
+        if (row as u16) < area.height {
+            let gauge_area = Rect::new(
+                area.x + 1,
+                area.y + row as u16,
+                area.width.saturating_sub(2),
+                1,
+            );
+            let gauge = Gauge::default()
+                .ratio(gauge_ratio)
+                .label(gauge_label)
+                .gauge_style(Style::default().fg(title_color).bg(Color::Rgb(30, 20, 40)));
+            frame.render_widget(gauge, gauge_area);
+        }
+    }
 }
 
 // ── Build Shuttle Overlay ────────────────────────────────────────────────────
