@@ -529,17 +529,10 @@ fn build_node_render_info(
                         let emoji = resource_emoji(req.resource);
                         let current = rates.get(&req.resource).copied().unwrap_or(0.0);
                         let met = req.completed || current >= req.required_rate;
-                        let icon = if req.completed {
-                            "\u{2713}"
-                        } else if met {
-                            "\u{25cf}" // ●
+                        let (icon, color) = if met {
+                            ("\u{2713}", Color::Rgb(80, 180, 100)) // ✓ green
                         } else {
-                            "\u{25cb}" // ○
-                        };
-                        let color = if req.completed || met {
-                            Color::Rgb(80, 180, 100)
-                        } else {
-                            Color::Rgb(160, 60, 60)
+                            ("\u{2717}", Color::Rgb(160, 60, 60)) // ✗ red
                         };
                         (
                             format!("{} {} {:.0}/hr", icon, emoji, req.required_rate),
