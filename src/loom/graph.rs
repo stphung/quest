@@ -329,42 +329,97 @@ pub fn remove_ghost_node(lg: &mut LoomGraph, ghost_idx: NodeIndex) {
 /// - Edges from extractors: use the resource's global rate tracker
 /// - Edges from shuttles: use the shuttle's output_rate_tracker
 /// - Edges from pattern sinks (if any): 0.0
-/// Update edge rates from source node trackers.
-/// All rates are normalized to un-warped values (real-time rates).
+/// Update edge rates using contention-aware flow computation.
+///
+/// Computes actual per-edge flow rates considering:
+/// - Source production rates (extractor base rate or shuttle output rate)
+/// - Number of consumers sharing each source
+/// - Intake cap per shuttle tier/level
+///
+/// All rates are normalized to un-warped (real-time) values.
 pub fn update_edge_rates(lg: &mut LoomGraph, loom: &LoomState) {
+    use super::types::LoomNodeRef;
+
+    let persistent = &loom.persistent;
+
+    // Step 1: Count consumers per source (same as tick_shuttle_pull).
+    let mut consumer_count: HashMap<LoomNodeRef, usize> = HashMap::new();
+    for shuttle in &persistent.shuttles {
+        if shuttle.under_construction {
+            continue;
+        }
+        for &src in shuttle.sources_a.iter().chain(shuttle.sources_b.iter()) {
+            *consumer_count.entry(src).or_insert(0) += 1;
+        }
+    }
+
+    // Step 2: Compute source production rates (un-warped).
+    // Extractors: use node_effective_rate (base * level_mult * throughput_mult).
+    // Shuttles: use output_rate_tracker / warp.
     let warp = loom.time_warp.max(1.0);
+    let source_rates: HashMap<LoomNodeRef, f64> = {
+        let mut rates = HashMap::new();
+        for node in &persistent.nodes {
+            if node.unlocked {
+                let rate = super::logic::node_effective_rate(loom, node);
+                rates.insert(LoomNodeRef::Extractor(node.id), rate);
+            }
+        }
+        for (i, shuttle) in persistent.shuttles.iter().enumerate() {
+            let rate = shuttle.output_rate_tracker.rate_per_hour() / warp;
+            rates.insert(LoomNodeRef::Shuttle(i), rate);
+        }
+        rates
+    };
+
+    // Step 3: For each edge, compute the actual flow rate.
     let edge_indices: Vec<_> = lg.graph.edge_indices().collect();
     for edge_idx in edge_indices {
-        let (source_ni, _target_ni) = match lg.graph.edge_endpoints(edge_idx) {
-            Some(endpoints) => endpoints,
+        let (source_ni, target_ni) = match lg.graph.edge_endpoints(edge_idx) {
+            Some(ep) => ep,
             None => continue,
         };
         let source_node = match lg.graph.node_weight(source_ni) {
             Some(n) => n.clone(),
             None => continue,
         };
+        let target_node = match lg.graph.node_weight(target_ni) {
+            Some(n) => n.clone(),
+            None => continue,
+        };
 
-        let rate = match &source_node {
-            LoomGraphNode::Extractor(node_id) => {
-                // rate_trackers already stores un-warped rates.
-                let resource = node_native_resource(*node_id);
-                loom.rate_trackers
-                    .get(&resource)
-                    .map(|t| t.rate_per_hour())
-                    .unwrap_or(0.0)
-            }
-            LoomGraphNode::Shuttle(idx) => {
-                // output_rate_tracker stores raw (warped) rates — normalize here.
-                if *idx < loom.persistent.shuttles.len() {
-                    loom.persistent.shuttles[*idx]
-                        .output_rate_tracker
-                        .rate_per_hour()
-                        / warp
+        let rate = match (&source_node, &target_node) {
+            // Extractor/Shuttle → Shuttle: use contention-aware flow.
+            (_, LoomGraphNode::Shuttle(shuttle_idx)) => {
+                if *shuttle_idx < persistent.shuttles.len() {
+                    let shuttle = &persistent.shuttles[*shuttle_idx];
+                    let cap = shuttle_effective_intake_cap(shuttle.tier, shuttle.level);
+
+                    // Determine which LoomNodeRef this source corresponds to.
+                    let src_ref = match &source_node {
+                        LoomGraphNode::Extractor(id) => LoomNodeRef::Extractor(*id),
+                        LoomGraphNode::Shuttle(idx) => LoomNodeRef::Shuttle(*idx),
+                        _ => continue,
+                    };
+
+                    let available = source_rates.get(&src_ref).copied().unwrap_or(0.0);
+                    let consumers = consumer_count.get(&src_ref).copied().unwrap_or(1).max(1);
+                    let share = available / consumers as f64;
+                    share.min(cap)
                 } else {
                     0.0
                 }
             }
-            LoomGraphNode::PatternSink(_) => 0.0,
+            // Anything → PatternSink: use the source's production rate directly.
+            (_, LoomGraphNode::PatternSink(_)) => {
+                let src_ref = match &source_node {
+                    LoomGraphNode::Extractor(id) => LoomNodeRef::Extractor(*id),
+                    LoomGraphNode::Shuttle(idx) => LoomNodeRef::Shuttle(*idx),
+                    _ => continue,
+                };
+                source_rates.get(&src_ref).copied().unwrap_or(0.0)
+            }
+            _ => 0.0,
         };
 
         if let Some(edge) = lg.graph.edge_weight_mut(edge_idx) {
