@@ -361,7 +361,11 @@ pub fn update_edge_rates(lg: &mut LoomGraph, loom: &LoomState) {
         let mut rates = HashMap::new();
         for node in &persistent.nodes {
             if node.unlocked {
-                let rate = super::logic::node_effective_rate(loom, node);
+                let rate = if node.upgrading {
+                    0.0 // No production while upgrading.
+                } else {
+                    super::logic::node_effective_rate(loom, node)
+                };
                 rates.insert(LoomNodeRef::Extractor(node.id), rate);
             }
         }
