@@ -5,11 +5,7 @@
 //! - Nodes (rectangles with labels) colored by resource type
 //! - Selection highlighting
 
-use std::collections::HashSet;
-
-use petgraph::stable_graph::{EdgeIndex, NodeIndex};
-use petgraph::visit::EdgeRef;
-use petgraph::Direction;
+use petgraph::stable_graph::NodeIndex;
 use ratatui::{
     layout::Rect,
     style::{Color, Style},
