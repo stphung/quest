@@ -16,31 +16,31 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             0,
             "First Thread",
-            "The Loom stirs. A single thread of ember light stretches into the dark.",
+            "My first thread. Clumsy, fraying at the edges, but it held. The Loom hummed when I touched it \u{2014} a low, patient sound. I think it\u{2019}s been waiting for someone.",
             vec![(Resource::Ember, 25.0, 2.0)],
         ),
         pattern(
             1,
             "Still Waters",
-            "In silence, the Loom whispers its first secret.",
+            "I sat with the silence today. Hours of nothing, and then \u{2014} a thread appeared where none had been. The Loom rewards stillness. I need to remember that.",
             vec![(Resource::Silence, 25.0, 2.0)],
         ),
         pattern(
             2,
             "Echoing Halls",
-            "Memories gather like dust in forgotten corridors. The Loom remembers.",
+            "The old patterns are still here, woven into the Archive. Someone came before me. Their threads are faded but I can feel the shape of what they built. I won\u{2019}t make their mistakes.",
             vec![(Resource::Memory, 25.0, 4.0)],
         ),
         pattern(
             3,
             "Harmonic Pulse",
-            "A rhythm emerges \u{2014} not heard, but felt. The threads begin to hum.",
+            "I can hear it now \u{2014} a pulse beneath everything. The Loom has a heartbeat, and it\u{2019}s been beating long before I arrived. My threads are starting to match its rhythm.",
             vec![(Resource::Resonance, 25.0, 4.0)],
         ),
         pattern(
             4,
             "Mirror and Void",
-            "Two forces, opposed yet intertwined. Emptiness and reflection are the same thread.",
+            "I was afraid to combine them. Void and reflection seemed like they\u{2019}d destroy each other. Instead they braided together so naturally I wondered if they were ever truly apart.",
             vec![
                 (Resource::Reflection, 30.0, 6.0),
                 (Resource::VoidEssence, 30.0, 6.0),
@@ -49,7 +49,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             5,
             "Full Circle",
-            "Six voices, one chord. The Loom sings for the first time.",
+            "Six threads, woven together for the first time. The sound the Loom made \u{2014} I don\u{2019}t have words for it. A chord that resonated in my chest. I laughed. I actually laughed.",
             vec![
                 (Resource::Ember, 20.0, 10.0),
                 (Resource::Reflection, 20.0, 10.0),
@@ -62,44 +62,44 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             6,
             "The Catalyst",
-            "Raw ember condenses into something new. The first transformation.",
+            "The ember changed in my hands. Condensed into something harder, brighter, more real than the raw flame it came from. I made something new. The Loom made something new through me.",
             vec![(Resource::CondensedEmber, 8.0, 16.0)],
         ),
         pattern(
             7,
             "Echo of Flame",
-            "Fire remembers itself. What was consumed returns, changed.",
+            "What burns doesn\u{2019}t disappear. It echoes, and the echo carries the memory of heat. I\u{2019}m beginning to understand \u{2014} nothing in the Loom is ever truly lost.",
             vec![(Resource::EmberEcho, 8.0, 28.0)],
         ),
         // ── Chapter II: The Deepening (9-16) ── ~10 days (236 hours) ──
         pattern(
             8,
             "Forged in Fire",
-            "Light bends to will. The weaver shapes, and the Loom obeys.",
+            "I bent light into something permanent today. The Loom bends with me now, not against me. There was a time I wrestled with every thread. Now they come when I call.",
             vec![(Resource::ForgedLight, 15.0, 16.0)],
         ),
         pattern(
             9,
             "Glass Resonance",
-            "Fragile beauty crystallizes from chaos. Handle with reverence.",
+            "Glass from chaos. I keep expecting the delicate things to shatter, but they hold. The Loom trusts me with fragile work now. I\u{2019}m not sure I\u{2019}ve earned that yet.",
             vec![(Resource::EchoGlass, 15.0, 16.0)],
         ),
         pattern(
             10,
             "The Unsung",
-            "A song that was never meant to be heard. The Loom grieves and creates.",
+            "I wove a song that shouldn\u{2019}t exist \u{2014} born from silence and stillness, shaped into sound. It plays quietly in the back of my mind. I don\u{2019}t think it will ever stop.",
             vec![(Resource::StillbornSong, 15.0, 24.0)],
         ),
         pattern(
             11,
             "Void Distillation",
-            "Nothingness, refined. What remains when everything is stripped away?",
+            "I distilled the void today. Held nothingness in my hands and refined it until something remained. There\u{2019}s substance in emptiness. The Loom knew that all along.",
             vec![(Resource::PurifiedVoid, 10.0, 24.0)],
         ),
         pattern(
             12,
             "Crossed Streams",
-            "Light meets glass. The weaver learns to hold two truths at once.",
+            "Two streams crossed without breaking. Light and glass, flowing through each other. A year ago this would have been impossible. Now it feels like the obvious next step.",
             vec![
                 (Resource::ForgedLight, 12.0, 24.0),
                 (Resource::EchoGlass, 12.0, 24.0),
@@ -108,7 +108,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             13,
             "The Asymmetry",
-            "Not all balance is equal. The Loom teaches the beauty of imbalance.",
+            "Not everything needs to balance. I forced symmetry for so long and the Loom resisted. Today I let the pattern lean, let it breathe unevenly, and it sang louder than anything I\u{2019}ve made.",
             vec![
                 (Resource::ForgedLight, 25.0, 36.0),
                 (Resource::StillbornSong, 8.0, 36.0),
@@ -117,7 +117,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             14,
             "Pressure Test",
-            "Three forces converge. The threads strain but hold.",
+            "Three forces, one thread. Condensed ember, echo, and purified void \u{2014} all pulling in different directions. My hands don\u{2019}t shake anymore. I held them steady and the thread held too.",
             vec![
                 (Resource::CondensedEmber, 15.0, 36.0),
                 (Resource::EmberEcho, 10.0, 36.0),
@@ -127,7 +127,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             15,
             "Three Confluences",
-            "The great rivers meet. What flows downstream will reshape the world.",
+            "The great rivers converged today. Light, glass, and song \u{2014} all flowing together through a single point. I stood at the center and directed the flow. The Loom trembled. So did I.",
             vec![
                 (Resource::ForgedLight, 18.0, 60.0),
                 (Resource::EchoGlass, 18.0, 60.0),
@@ -138,13 +138,13 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             16,
             "The Amplifier",
-            "More. The Loom demands more, and the weaver provides.",
+            "More. Always more. The Loom\u{2019}s appetite has grown with mine and I\u{2019}m no longer sure which of us is driving. The threads come faster now. I have to keep up or be swept away.",
             vec![(Resource::ForgedLight, 35.0, 18.0)],
         ),
         pattern(
             17,
             "Purified Cascade",
-            "Clean lines through tangled threads. Clarity emerges from complexity.",
+            "I can see the tangles now \u{2014} the clean paths through the chaos. What used to take hours of careful work now flows in minutes. My hands remember what my mind hasn\u{2019}t figured out yet.",
             vec![
                 (Resource::PurifiedVoid, 20.0, 24.0),
                 (Resource::ForgedLight, 20.0, 24.0),
@@ -153,7 +153,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             18,
             "Resonance Cascade",
-            "The hum becomes a roar. Every thread vibrates in sympathy.",
+            "The hum became a roar today. Every thread in the Loom vibrated at once, and for a moment I couldn\u{2019}t tell where the sound ended and I began. I had to shut it down. I wasn\u{2019}t ready.",
             vec![
                 (Resource::Resonance, 150.0, 24.0),
                 (Resource::StillbornSong, 25.0, 24.0),
@@ -162,13 +162,13 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             19,
             "First Weave",
-            "Reality bends. For the first time, the weaver touches the fabric of worlds.",
+            "I touched reality. Not metaphor \u{2014} I felt the weave of the world give way beneath my fingers. Just for a moment. Just a thread\u{2019}s width. But the hole I made hasn\u{2019}t closed. It\u{2019}s waiting.",
             vec![(Resource::WovenReality, 5.0, 30.0)],
         ),
         pattern(
             20,
             "The Unraveling",
-            "To create, one must first undo. The weaver pulls at the seams of what is.",
+            "To weave the new, I had to unravel the old. I pulled a thread I\u{2019}d been proud of \u{2014} one of my first \u{2014} and watched it dissolve. The Loom doesn\u{2019}t mourn. I\u{2019}m learning not to either.",
             vec![
                 (Resource::WovenReality, 15.0, 36.0),
                 (Resource::PurifiedVoid, 15.0, 36.0),
@@ -177,7 +177,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             21,
             "Grand Harmony",
-            "Every voice, every thread, every silence \u{2014} aligned. The Loom trembles.",
+            "Everything aligned. Every thread, every node, every silence. Nine resources flowing in perfect concert for thirty-six hours. I didn\u{2019}t sleep. I didn\u{2019}t need to. The Loom sustained me.",
             vec![
                 (Resource::Ember, 100.0, 36.0),
                 (Resource::Reflection, 100.0, 36.0),
@@ -193,7 +193,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             22,
             "The Knot",
-            "Some patterns resist unraveling. The weaver learns to work with the tangles.",
+            "Some patterns resist. They have their own will \u{2014} a stubbornness I recognize because it mirrors my own. I stopped forcing and started negotiating. The knot loosened when I asked nicely.",
             vec![
                 (Resource::ForgedLight, 25.0, 36.0),
                 (Resource::PurifiedVoid, 15.0, 36.0),
@@ -203,7 +203,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             23,
             "Strange Alchemy",
-            "The old rules dissolve. New ones take their place, stranger and more beautiful.",
+            "The old rules dissolved today. Combinations that shouldn\u{2019}t work, that violate everything I learned in the first chapter \u{2014} they produce the most beautiful results. The Loom is rewriting me.",
             vec![
                 (Resource::ForgedLight, 30.0, 42.0),
                 (Resource::EchoGlass, 30.0, 42.0),
@@ -215,7 +215,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             24,
             "Refined Purpose",
-            "The void is not empty. It is waiting.",
+            "The void isn\u{2019}t empty. It never was. I spent all this time filling it when I should have been listening. There\u{2019}s a voice in the emptiness, and it\u{2019}s been telling me what comes next.",
             vec![
                 (Resource::PurifiedVoid, 30.0, 48.0),
                 (Resource::ForgedLight, 25.0, 48.0),
@@ -224,13 +224,13 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             25,
             "The Flood",
-            "Reality pours through the Loom like water through a broken dam.",
+            "Reality poured through the Loom today like water through a broken dam. I barely held on. My hands are raw, my vision is blurred, but I kept the threads intact. Barely. Barely was enough.",
             vec![(Resource::WovenReality, 35.0, 48.0)],
         ),
         pattern(
             26,
             "Everything Flows",
-            "All resources, all paths, all threads \u{2014} one continuous motion.",
+            "I stopped fighting the current. Thirteen resources, all flowing at once, all connected. I\u{2019}m not directing anymore \u{2014} I\u{2019}m part of the flow. The distinction between weaver and woven is dissolving.",
             vec![
                 (Resource::Ember, 50.0, 72.0),
                 (Resource::Reflection, 50.0, 72.0),
@@ -250,7 +250,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
         pattern(
             27,
             "Mended Loom",
-            "The final thread is woven. The Loom is whole. The weaver is the Loom.",
+            "The last thread is in place. The Loom is whole \u{2014} not repaired, but completed. It was never broken. It was waiting to be finished. And now that it is, I understand: I didn\u{2019}t mend the Loom. The Loom mended me.",
             vec![
                 (Resource::WovenReality, 20.0, 120.0),
                 (Resource::ForgedLight, 40.0, 120.0),
