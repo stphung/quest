@@ -653,7 +653,17 @@ pub fn loom_production_bonus(
     1.0 + deep_bonus + haven_bonus + sigil_bonus + ascension_bonus
 }
 
-/// Ticks required for a shuttle to finish construction (2 hours at 100ms/tick = 72000 ticks).
+/// Construction ticks by tier: T1=2h, T2=4h, T3=6h (at 100ms/tick).
+pub fn shuttle_construction_ticks(tier: u8) -> u32 {
+    match tier {
+        1 => 72_000,  // 2 hours
+        2 => 144_000, // 4 hours
+        3 => 216_000, // 6 hours
+        _ => 72_000,
+    }
+}
+
+/// Legacy constant kept for tests — use shuttle_construction_ticks(tier) instead.
 pub const SHUTTLE_CONSTRUCTION_TICKS: u32 = 72_000;
 
 /// Error conditions for shuttle building.
@@ -831,7 +841,7 @@ pub fn build_shuttle(
         sources_b,
     );
     r.under_construction = true;
-    r.construction_ticks_remaining = SHUTTLE_CONSTRUCTION_TICKS;
+    r.construction_ticks_remaining = shuttle_construction_ticks(recipe.tier);
     loom.persistent.shuttles.push(r);
     loom.graph_dirty = true;
     Ok(loom.persistent.shuttles.len() - 1)
