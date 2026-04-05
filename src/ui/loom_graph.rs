@@ -116,10 +116,30 @@ pub fn render_graph_canvas(
                 Vec::new()
             };
 
+            // Edge label: rate + resource emoji at midpoint.
+            let warp = loom.time_warp.max(1.0);
+            let rate = edge.current_rate / warp;
+            let label = if rate > 0.5 {
+                format!("{:.0}{}/hr", rate, resource_emoji(edge.resource))
+            } else {
+                String::new()
+            };
+            // Midpoint of the path.
+            let mid_idx = points.len() / 2;
+            let mid_pos = if points.len() >= 2 {
+                let a = points[mid_idx.saturating_sub(1)];
+                let b = points[mid_idx.min(points.len() - 1)];
+                ((a.0 + b.0) / 2.0, (a.1 + b.1) / 2.0)
+            } else {
+                points[0]
+            };
+
             Some(EdgeSegment {
                 points,
                 color,
                 particles,
+                label,
+                label_pos: mid_pos,
             })
         })
         .collect();
@@ -157,7 +177,20 @@ pub fn render_graph_canvas(
                 }
             }
 
-            // 2. Draw nodes as gauge bars via ctx.print (text-resolution, always crisp).
+            // 2. Draw edge labels at midpoints.
+            let dim_label = Color::Rgb(70, 65, 90);
+            for seg in &edge_segments {
+                if !seg.label.is_empty() {
+                    let lbl = Line::from(Span::styled(
+                        seg.label.clone(),
+                        Style::default().fg(dim_label),
+                    ));
+                    // Offset slightly above the edge midpoint so it doesn't sit on the line.
+                    ctx.print(seg.label_pos.0, seg.label_pos.1 + 3.0, lbl);
+                }
+            }
+
+            // 3. Draw nodes as gauge bars via ctx.print (text-resolution, always crisp).
             let has_selection = selected.is_some();
             for info in &node_info {
                 let is_selected = selected == Some(info.ni);
@@ -416,11 +449,15 @@ fn render_gauge_node(
     }
 }
 
-/// A pre-computed edge with its canvas-space polyline, color, and particle positions.
+/// A pre-computed edge with its canvas-space polyline, color, particle positions, and label.
 struct EdgeSegment {
     points: Vec<(f64, f64)>,
     color: Color,
     particles: Vec<(f64, f64)>,
+    /// Rate label text (e.g., "42🔥/hr"). Empty if rate ~0.
+    label: String,
+    /// Canvas position for the label (midpoint of edge path).
+    label_pos: (f64, f64),
 }
 
 /// Map layout-space coordinates to canvas-space coordinates.
