@@ -14,6 +14,7 @@ use ratatui::{
     widgets::canvas::{Canvas, Line as CanvasLine, Points},
     Frame,
 };
+use std::collections::HashMap;
 
 use crate::loom::graph::{LoomGraph, LoomGraphNode};
 use crate::loom::layout::LoomLayout;
@@ -59,6 +60,15 @@ pub fn render_graph_canvas(
             Some(info)
         })
         .collect();
+
+    // Compute build-mode highlights: which nodes to highlight and in what color.
+    // Cyan = Source A candidate, Magenta = Source B candidate, None = dim.
+    let build_highlights: HashMap<NodeIndex, Color> = if let Some(build) = &ui.build {
+        compute_build_highlights(build, loom, loom_graph)
+    } else {
+        HashMap::new()
+    };
+    let build_mode = !build_highlights.is_empty();
 
     // Pre-compute edge segments.
     let edge_segments: Vec<EdgeSegment> = loom_graph
@@ -233,9 +243,17 @@ pub fn render_graph_canvas(
                         dot_coords.push((info.cx + dx as f64, dot_y + dy as f64));
                     }
                 }
+                let dot_color = if build_mode {
+                    build_highlights
+                        .get(&info.ni)
+                        .copied()
+                        .unwrap_or_else(|| dim_color_35(info.color))
+                } else {
+                    info.color
+                };
                 ctx.draw(&Points {
                     coords: &dot_coords,
-                    color: info.color,
+                    color: dot_color,
                 });
             }
 
@@ -245,7 +263,22 @@ pub fn render_graph_canvas(
             let row_h = 4.0_f64;
             for info in &node_info {
                 let is_selected = selected == Some(info.ni);
-                render_gauge_node(ctx, info, is_selected, has_selection, frame_count);
+                let effective_color = if build_mode {
+                    build_highlights
+                        .get(&info.ni)
+                        .copied()
+                        .unwrap_or_else(|| dim_color_35(info.color))
+                } else {
+                    info.color
+                };
+                render_gauge_node(
+                    ctx,
+                    info,
+                    is_selected,
+                    has_selection,
+                    frame_count,
+                    effective_color,
+                );
 
                 // 5. Draw pattern requirement lines below the node dot.
                 if !info.req_lines.is_empty() {
@@ -551,12 +584,16 @@ fn build_node_render_info(
 /// Render a node as two text lines at canvas coordinates:
 ///   Line 1: `「Label ▰▰▰▰▱▱▱▱」`  (brackets if selected, white text)
 ///   Line 2: `             42/hr`    (right-aligned under gauge)
+///
+/// `effective_color` overrides the node's base color (used in build mode for
+/// highlighting/dimming). When `is_selected`, label is always white.
 fn render_gauge_node(
     ctx: &mut ratatui::widgets::canvas::Context<'_>,
     info: &NodeRenderInfo,
     is_selected: bool,
     _has_selection: bool,
     frame_count: u32,
+    effective_color: Color,
 ) {
     let filled = (info.fill * info.gauge_width as f64).round() as usize;
     let empty = info.gauge_width.saturating_sub(filled);
@@ -584,15 +621,17 @@ fn render_gauge_node(
             .collect()
     };
 
-    // A: Pulse color when sustaining.
-    let base_color = if info.is_sustaining {
+    // A: Pulse color when sustaining — but only if this node is not overridden by build mode.
+    // (effective_color already incorporates the build-mode override or dim.)
+    let base_color = if info.is_sustaining && effective_color == info.color {
+        // Only pulse when using the node's own color (not dimmed/highlighted by build mode).
         if (frame_count / 5) % 2 == 0 {
             Color::Rgb(255, 220, 100) // bright gold
         } else {
             Color::Rgb(255, 255, 200) // bright white-gold
         }
     } else {
-        info.color
+        effective_color
     };
 
     let label_color = if is_selected {
@@ -612,10 +651,10 @@ fn render_gauge_node(
         if (frame_count / 5) % 2 == 0 {
             Color::White
         } else {
-            info.color
+            effective_color
         }
     } else {
-        info.color
+        effective_color
     };
 
     let mut spans = Vec::new();
@@ -691,6 +730,118 @@ fn layout_to_canvas(
     // Y-axis inversion: canvas y increases upward, layout y increases downward.
     let cy = canvas_height - (ly * scale_y);
     (cx, cy)
+}
+
+/// Dim a color to ~35% brightness for non-highlighted nodes in build mode.
+fn dim_color_35(c: Color) -> Color {
+    match c {
+        Color::Rgb(r, g, b) => Color::Rgb(
+            (r as f64 * 0.35) as u8,
+            (g as f64 * 0.35) as u8,
+            (b as f64 * 0.35) as u8,
+        ),
+        _ => Color::Rgb(50, 50, 50),
+    }
+}
+
+/// Compute build-mode node highlight colors.
+///
+/// Returns a map from NodeIndex -> highlight Color. Nodes absent from the map
+/// should be dimmed. Returns an empty map when no highlighting is needed.
+fn compute_build_highlights(
+    build: &crate::loom::types::BuildState,
+    loom: &LoomState,
+    lg: &LoomGraph,
+) -> HashMap<NodeIndex, Color> {
+    use crate::loom::types::BuildStep;
+
+    let mut highlights = HashMap::new();
+    let recipes = crate::loom::recipes::all_recipes();
+
+    let cyan = Color::Rgb(80, 200, 220); // Source A
+    let magenta = Color::Rgb(200, 100, 220); // Source B
+    let dim_cyan = Color::Rgb(40, 100, 110); // Confirmed A (dimmed)
+
+    match &build.step {
+        BuildStep::SelectRecipe { cursor } => {
+            // Highlight all potential sources for the selected recipe.
+            if *cursor < build.available_recipes.len() {
+                let recipe_idx = build.available_recipes[*cursor];
+                let recipe = &recipes[recipe_idx];
+
+                let sources_a =
+                    crate::loom::eligible_sources_for_tier(loom, build.tier, recipe.input_a);
+                let sources_b =
+                    crate::loom::eligible_sources_for_tier(loom, build.tier, recipe.input_b);
+
+                for src in &sources_a {
+                    if let Some(&ni) = node_ref_to_index(src, lg) {
+                        highlights.insert(ni, cyan);
+                    }
+                }
+                for src in &sources_b {
+                    if let Some(&ni) = node_ref_to_index(src, lg) {
+                        // If already cyan (both A and B), cyan takes priority.
+                        highlights.entry(ni).or_insert(magenta);
+                    }
+                }
+            }
+        }
+        BuildStep::SelectSourcesA { toggle, .. } => {
+            // Only highlight toggled-on A sources.
+            for (i, src) in build.eligible_sources_a.iter().enumerate() {
+                if toggle.get(i).copied().unwrap_or(false) {
+                    if let Some(&ni) = node_ref_to_index(src, lg) {
+                        highlights.insert(ni, cyan);
+                    }
+                }
+            }
+        }
+        BuildStep::SelectSourcesB { toggle, .. } => {
+            // Show confirmed A sources dimmed cyan, toggled-on B sources bright magenta.
+            for src in &build.selected_sources_a {
+                if let Some(&ni) = node_ref_to_index(src, lg) {
+                    highlights.insert(ni, dim_cyan);
+                }
+            }
+            for (i, src) in build.eligible_sources_b.iter().enumerate() {
+                if toggle.get(i).copied().unwrap_or(false) {
+                    if let Some(&ni) = node_ref_to_index(src, lg) {
+                        highlights.insert(ni, magenta);
+                    }
+                }
+            }
+        }
+        BuildStep::Confirm => {
+            // Show all selected sources.
+            for src in &build.selected_sources_a {
+                if let Some(&ni) = node_ref_to_index(src, lg) {
+                    highlights.insert(ni, cyan);
+                }
+            }
+            for src in &build.selected_sources_b {
+                if let Some(&ni) = node_ref_to_index(src, lg) {
+                    highlights.insert(ni, magenta);
+                }
+            }
+        }
+        _ => {}
+    }
+
+    highlights
+}
+
+/// Map a LoomNodeRef to a NodeIndex in the graph.
+fn node_ref_to_index<'a>(
+    src: &crate::loom::types::LoomNodeRef,
+    lg: &'a LoomGraph,
+) -> Option<&'a NodeIndex> {
+    use crate::loom::types::LoomNodeRef;
+    let gn = match src {
+        LoomNodeRef::Extractor(id) => LoomGraphNode::Extractor(*id),
+        LoomNodeRef::Shuttle(idx) => LoomGraphNode::Shuttle(*idx),
+    };
+    lg.node_indices.get(&gn)
 }
 
 /// Compute 3 particle positions along a polyline path based on phase (0.0..1.0).
