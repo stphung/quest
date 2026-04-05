@@ -190,20 +190,23 @@ pub fn render_graph_canvas(
                 }
             }
 
-            // 3. Draw small dot clusters at each node center (Braille layer).
+            // 3. Draw filled circle at each node center (Braille layer).
+            // Radius of ~2.5 Braille dots gives a solid, visible anchor.
+            let radius = 2.5_f64;
             for info in &node_info {
                 let mut dot_coords: Vec<(f64, f64)> = Vec::new();
-                let (x, y) = (info.cx, info.cy);
-                // 3x3 cross pattern for a visible but minimal anchor point.
-                dot_coords.push((x, y));
-                dot_coords.push((x + 0.5, y));
-                dot_coords.push((x - 0.5, y));
-                dot_coords.push((x, y + 0.5));
-                dot_coords.push((x, y - 0.5));
-                dot_coords.push((x + 0.5, y + 0.5));
-                dot_coords.push((x - 0.5, y - 0.5));
-                dot_coords.push((x + 0.5, y - 0.5));
-                dot_coords.push((x - 0.5, y + 0.5));
+                let (cx, cy) = (info.cx, info.cy);
+                // Fill a circle by iterating over a grid and keeping points within radius.
+                let steps = (radius * 2.0).ceil() as i32;
+                for dx in -steps..=steps {
+                    for dy in -steps..=steps {
+                        let px = dx as f64 * 0.5;
+                        let py = dy as f64 * 0.5;
+                        if px * px + py * py <= radius * radius {
+                            dot_coords.push((cx + px, cy + py));
+                        }
+                    }
+                }
                 ctx.draw(&Points {
                     coords: &dot_coords,
                     color: info.color,
