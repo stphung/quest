@@ -746,11 +746,7 @@ fn render_bottom_panel_extractor(
 
     let right_chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Min(0),
-        ])
+        .constraints([Constraint::Length(1), Constraint::Min(0)])
         .split(cols[1]);
 
     // Buffer gauge.
@@ -773,46 +769,88 @@ fn render_bottom_panel_extractor(
         .gauge_style(Style::default().fg(bar_color).bg(Color::Rgb(30, 20, 40)));
     frame.render_widget(gauge, right_chunks[0]);
 
-    // Upgrade info.
-    let upgrade_line = if node.upgrading {
-        // Show upgrade progress.
+    // Upgrade info — expanded U3 risk/reward format.
+    let dim = Color::Rgb(120, 100, 160);
+    let bright = Color::Rgb(180, 150, 220);
+    let mut upgrade_lines: Vec<Line> = Vec::new();
+
+    if node.upgrading {
+        let total = logic::node_upgrade_duration(node.level);
+        let elapsed = total - node.upgrade_remaining_secs;
+        let progress = if total > 0.0 { elapsed / total } else { 1.0 };
         let remaining = crate::ui::loom_graph::format_duration(node.upgrade_remaining_secs);
-        Line::from(Span::styled(
-            format!(" \u{23f3} Upgrading... {} remaining", remaining),
+        upgrade_lines.push(Line::from(Span::styled(
+            format!(" \u{23f3} Upgrading to Level {}...", node.level + 1),
             Style::default().fg(Color::Rgb(220, 180, 60)),
-        ))
+        )));
+        upgrade_lines.push(Line::from(Span::styled(
+            format!(" {} remaining ({:.0}%)", remaining, progress * 100.0),
+            Style::default().fg(Color::Rgb(180, 160, 80)),
+        )));
+        upgrade_lines.push(Line::from(Span::styled(
+            " No production during upgrade",
+            Style::default().fg(Color::Rgb(160, 80, 80)),
+        )));
     } else if node.level < logic::MAX_NODE_LEVEL {
         let drain = node.buffer_capacity * 0.5;
         let can_afford = node.buffer >= drain;
         let duration = logic::node_upgrade_duration(node.level);
         let dur_str = crate::ui::loom_graph::format_duration(duration);
-        let color = if can_afford {
-            Color::Rgb(100, 200, 120)
-        } else {
-            Color::Rgb(80, 60, 100)
-        };
-        Line::from(vec![
-            Span::styled(
-                " [U] ",
-                Style::default().fg(if can_afford {
-                    Color::Rgb(200, 180, 240)
-                } else {
-                    Color::DarkGray
-                }),
+        let current_rate = logic::node_effective_rate(loom, node);
+        let next_rate = node.base_rate * logic::node_level_multiplier(node.level + 1);
+        let rate_pct = ((next_rate / current_rate - 1.0) * 100.0).round() as i32;
+
+        upgrade_lines.push(Line::from(Span::styled(
+            format!(
+                " \u{2500}\u{2500} Upgrade to Level {} \u{2500}\u{2500}",
+                node.level + 1
             ),
-            Span::styled(
-                format!("Lv{} (50% buf + {})", node.level + 1, dur_str),
-                Style::default().fg(color),
+            Style::default().fg(bright),
+        )));
+        upgrade_lines.push(Line::from(Span::styled(
+            format!(
+                " Cost:    {:.0} {} (50% of buffer)",
+                drain,
+                resource_emoji(&logic::node_native_resource(node_id))
             ),
-        ])
-    } else {
-        Line::from(Span::styled(
-            " Max Level",
+            Style::default().fg(if can_afford {
+                dim
+            } else {
+                Color::Rgb(160, 60, 60)
+            }),
+        )));
+        upgrade_lines.push(Line::from(Span::styled(
+            format!(" Lockout: {} \u{2014} no production", dur_str),
+            Style::default().fg(dim),
+        )));
+        upgrade_lines.push(Line::from(Span::styled(
+            format!(
+                " Reward:  +{}% production ({:.0} \u{2192} {:.0}/hr)",
+                rate_pct, current_rate, next_rate
+            ),
             Style::default().fg(Color::Rgb(100, 200, 120)),
-        ))
+        )));
+        upgrade_lines.push(Line::from(""));
+        if can_afford {
+            upgrade_lines.push(Line::from(Span::styled(
+                " Press [U] to begin upgrade",
+                Style::default().fg(Color::Rgb(200, 180, 240)),
+            )));
+        } else {
+            upgrade_lines.push(Line::from(Span::styled(
+                format!(" Need {:.0} in buffer (have {:.0})", drain, node.buffer),
+                Style::default().fg(Color::Rgb(160, 60, 60)),
+            )));
+        }
+    } else {
+        upgrade_lines.push(Line::from(Span::styled(
+            " \u{2713} Max Level",
+            Style::default().fg(Color::Rgb(100, 200, 120)),
+        )));
     };
+    upgrade_lines.truncate(right_chunks[1].height as usize);
     frame.render_widget(
-        Paragraph::new(vec![upgrade_line]).style(Style::default().bg(LOOM_BG)),
+        Paragraph::new(upgrade_lines).style(Style::default().bg(LOOM_BG)),
         right_chunks[1],
     );
 }
