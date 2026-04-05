@@ -376,11 +376,7 @@ fn build_node_render_info(
             }
             if *idx < loom.persistent.shuttles.len() {
                 let s = &loom.persistent.shuttles[*idx];
-                let out_emoji = if s.under_construction {
-                    "\u{1f6a7}" // 🚧 construction
-                } else {
-                    resource_emoji(s.output)
-                };
+                let out_emoji = resource_emoji(s.output);
                 let out_name = short_resource_name(s.output);
                 let label = format!("{} {}", out_emoji, out_name);
                 let label_display_width = display_width(&label);
@@ -402,7 +398,7 @@ fn build_node_render_info(
                     let remaining_secs = s.construction_ticks_remaining as f64 * 0.1 / warp;
                     (
                         progress,
-                        format!("\u{1f6a7}{}", format_duration(remaining_secs)),
+                        format!("\u{23f3}{}", format_duration(remaining_secs)),
                     )
                 } else {
                     let fill = if s.buffer_capacity > 0.0 {
