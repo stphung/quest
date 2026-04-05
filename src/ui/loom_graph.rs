@@ -22,11 +22,7 @@ use ratatui::{
 use crate::loom::graph::{LoomGraph, LoomGraphNode};
 use crate::loom::layout::LoomLayout;
 use crate::loom::logic::node_native_resource;
-use crate::loom::types::{LoomState, LoomUiState, Resource};
-
-/// Half-width/height of a node rectangle in canvas coordinates.
-const NODE_HALF_W: f64 = 9.0;
-const NODE_HALF_H: f64 = 2.0;
+use crate::loom::types::{LoomState, LoomUiState, NodeId, Resource};
 
 /// Render the Loom production graph onto a Canvas widget.
 pub fn render_graph_canvas(
@@ -47,16 +43,23 @@ pub fn render_graph_canvas(
     // Pre-compute glow set (edges feeding active pattern sinks).
     let glowing_edges = compute_glowing_edges(loom_graph, loom);
 
-    // Pre-compute node labels and colors.
-    let node_info: Vec<(NodeIndex, (f64, f64), String, Color)> = layout
+    // Pre-compute node rendering data: position, label, gauge fill, color.
+    let node_info: Vec<NodeRenderInfo> = layout
         .node_positions
         .iter()
         .filter_map(|(&ni, &(lx, ly))| {
             let node = loom_graph.graph.node_weight(ni)?;
-            let (label, color) = node_label_color(node, loom);
-            // Map layout coords to canvas coords.
-            let (cx, cy) = layout_to_canvas(lx, ly, &layout.bounds, canvas_width, canvas_height);
-            Some((ni, (cx, cy), label, color))
+            let info = build_node_render_info(
+                ni,
+                node,
+                loom,
+                &layout.bounds,
+                canvas_width,
+                canvas_height,
+                lx,
+                ly,
+            );
+            Some(info)
         })
         .collect();
 
@@ -121,21 +124,7 @@ pub fn render_graph_canvas(
         })
         .collect();
 
-    // Pre-compute pattern progress for fill bars inside pattern sink nodes.
-    let pattern_progress: Vec<(NodeIndex, f64)> = node_info
-        .iter()
-        .filter_map(|&(ni, _, _, _)| {
-            if let Some(LoomGraphNode::PatternSink(pat_idx)) = loom_graph.graph.node_weight(ni) {
-                if let Some(pattern) = loom.persistent.patterns.get(*pat_idx) {
-                    let progress = compute_pattern_progress(pattern);
-                    if progress > 0.0 {
-                        return Some((ni, progress));
-                    }
-                }
-            }
-            None
-        })
-        .collect();
+    let selected = ui.selected_graph_node;
 
     // Build and render the canvas.
     let canvas = Canvas::default()
@@ -168,34 +157,187 @@ pub fn render_graph_canvas(
                 }
             }
 
-            // 2. Draw node rectangles.
-            for &(ni, (cx, cy), ref _label, color) in &node_info {
-                let selected = ui.selected_graph_node == Some(ni);
-                let border_color = if selected { Color::White } else { color };
-                draw_node_rect(ctx, cx, cy, border_color);
-            }
-
-            // 2b. Draw pattern progress fill bars inside pattern sink nodes.
-            for &(ni, progress) in &pattern_progress {
-                if let Some(&(_, (cx, cy), _, _)) = node_info.iter().find(|&&(n, _, _, _)| n == ni)
-                {
-                    let x0 = cx - NODE_HALF_W + 0.5;
-                    let x1 = x0 + (2.0 * NODE_HALF_W - 1.0) * progress.min(1.0);
-                    let y0 = cy - NODE_HALF_H + 0.5;
-                    ctx.draw(&CanvasLine::new(x0, y0, x1, y0, Color::Rgb(255, 200, 60)));
-                }
-            }
-
-            // 3. Draw node labels via ctx.print.
-            for &(_, (cx, cy), ref label, color) in &node_info {
-                let line = Line::from(Span::styled(label.clone(), Style::default().fg(color)));
-                // Approximate centering: offset by half the label's character width.
-                let half_label_w = label.len() as f64 / 2.0;
-                ctx.print(cx - half_label_w, cy, line);
+            // 2. Draw nodes as gauge bars via ctx.print (text-resolution, always crisp).
+            for info in &node_info {
+                let is_selected = selected == Some(info.ni);
+                render_gauge_node(ctx, info, is_selected);
             }
         });
 
     frame.render_widget(canvas, area);
+}
+
+/// Pre-computed rendering data for a single graph node.
+struct NodeRenderInfo {
+    ni: NodeIndex,
+    cx: f64,
+    cy: f64,
+    label: String,
+    color: Color,
+    /// Buffer fill fraction (0.0..1.0). None for pattern sinks.
+    fill: Option<f64>,
+    /// Pattern progress fraction (0.0..1.0). Only for pattern sinks.
+    pattern_progress: Option<f64>,
+    /// Gauge width in characters.
+    gauge_width: usize,
+}
+
+/// Gauge bar characters.
+const GAUGE_FULL: char = '▰';
+const GAUGE_EMPTY: char = '▱';
+/// Selection indicator.
+const SELECT_LEFT: &str = "▸";
+const SELECT_RIGHT: &str = "◂";
+
+fn build_node_render_info(
+    ni: NodeIndex,
+    node: &LoomGraphNode,
+    loom: &LoomState,
+    bounds: &(f64, f64),
+    canvas_width: f64,
+    canvas_height: f64,
+    lx: f64,
+    ly: f64,
+) -> NodeRenderInfo {
+    let (cx, cy) = layout_to_canvas(lx, ly, bounds, canvas_width, canvas_height);
+    let gauge_width = 8;
+
+    match node {
+        LoomGraphNode::Extractor(id) => {
+            let label = match id {
+                NodeId::EmberSpindle => "Ember",
+                NodeId::ReflectionLens => "Reflect",
+                NodeId::VoidCondenser => "Void",
+                NodeId::MemoryArchive => "Memory",
+                NodeId::SilenceWell => "Silence",
+                NodeId::ResonanceForge => "Reson",
+            }
+            .to_string();
+            let resource = node_native_resource(*id);
+            let color = resource_color(resource);
+            let ext = &loom.persistent.nodes[id.index()];
+            let cap = ext.buffer_capacity;
+            let fill = if cap > 0.0 {
+                Some((ext.buffer / cap).clamp(0.0, 1.0))
+            } else {
+                Some(0.0)
+            };
+            NodeRenderInfo {
+                ni,
+                cx,
+                cy,
+                label,
+                color,
+                fill,
+                pattern_progress: None,
+                gauge_width,
+            }
+        }
+        LoomGraphNode::Shuttle(idx) => {
+            if *idx == usize::MAX {
+                return NodeRenderInfo {
+                    ni,
+                    cx,
+                    cy,
+                    label: "NEW".to_string(),
+                    color: Color::Rgb(100, 100, 100),
+                    fill: None,
+                    pattern_progress: None,
+                    gauge_width,
+                };
+            }
+            let (label, color, fill) = if *idx < loom.persistent.shuttles.len() {
+                let s = &loom.persistent.shuttles[*idx];
+                let out = short_resource_name(s.output);
+                let lbl = format!("S{}\u{2192}{}", idx, out);
+                let c = resource_color(s.output);
+                let f = if s.buffer_capacity > 0.0 {
+                    (s.buffer / s.buffer_capacity).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                (lbl, c, Some(f))
+            } else {
+                (format!("S{}", idx), Color::Rgb(180, 180, 180), None)
+            };
+            NodeRenderInfo {
+                ni,
+                cx,
+                cy,
+                label,
+                color,
+                fill,
+                pattern_progress: None,
+                gauge_width,
+            }
+        }
+        LoomGraphNode::PatternSink(idx) => {
+            let (name, progress) = if *idx < loom.persistent.patterns.len() {
+                let pat = &loom.persistent.patterns[*idx];
+                (pat.name.clone(), compute_pattern_progress(pat))
+            } else {
+                ("Pattern".to_string(), 0.0)
+            };
+            let label = format!("\u{2605} {}", name);
+            NodeRenderInfo {
+                ni,
+                cx,
+                cy,
+                label,
+                color: Color::Rgb(255, 200, 60),
+                fill: None,
+                pattern_progress: Some(progress),
+                gauge_width: 10,
+            }
+        }
+    }
+}
+
+/// Render a node as a text-based gauge bar at canvas coordinates.
+fn render_gauge_node(
+    ctx: &mut ratatui::widgets::canvas::Context<'_>,
+    info: &NodeRenderInfo,
+    is_selected: bool,
+) {
+    let fill_frac = info.fill.or(info.pattern_progress).unwrap_or(0.0);
+    let filled = (fill_frac * info.gauge_width as f64).round() as usize;
+    let empty = info.gauge_width.saturating_sub(filled);
+
+    let gauge_str: String = std::iter::repeat(GAUGE_FULL)
+        .take(filled)
+        .chain(std::iter::repeat(GAUGE_EMPTY).take(empty))
+        .collect();
+
+    // Build the display line: [select] label gauge [select]
+    let mut spans = Vec::new();
+
+    if is_selected {
+        spans.push(Span::styled(SELECT_LEFT, Style::default().fg(Color::White)));
+    }
+
+    spans.push(Span::styled(
+        format!("{} ", info.label),
+        Style::default().fg(if is_selected {
+            Color::White
+        } else {
+            info.color
+        }),
+    ));
+
+    spans.push(Span::styled(gauge_str, Style::default().fg(info.color)));
+
+    if is_selected {
+        spans.push(Span::styled(
+            SELECT_RIGHT,
+            Style::default().fg(Color::White),
+        ));
+    }
+
+    let line = Line::from(spans);
+    // Total display width for centering
+    let display_width = info.label.len() + 1 + info.gauge_width + if is_selected { 2 } else { 0 };
+    let half_w = display_width as f64 / 2.0;
+    ctx.print(info.cx - half_w, info.cy, line);
 }
 
 /// A pre-computed edge with its canvas-space polyline, color, and particle positions.
@@ -229,23 +371,6 @@ fn layout_to_canvas(
     // Y-axis inversion: canvas y increases upward, layout y increases downward.
     let cy = canvas_height - (ly * scale_y);
     (cx, cy)
-}
-
-/// Draw a small rectangle outline for a node at canvas coordinates (cx, cy).
-fn draw_node_rect(ctx: &mut ratatui::widgets::canvas::Context<'_>, cx: f64, cy: f64, color: Color) {
-    let x0 = cx - NODE_HALF_W;
-    let x1 = cx + NODE_HALF_W;
-    let y0 = cy - NODE_HALF_H;
-    let y1 = cy + NODE_HALF_H;
-
-    // Top edge
-    ctx.draw(&CanvasLine::new(x0, y1, x1, y1, color));
-    // Bottom edge
-    ctx.draw(&CanvasLine::new(x0, y0, x1, y0, color));
-    // Left edge
-    ctx.draw(&CanvasLine::new(x0, y0, x0, y1, color));
-    // Right edge
-    ctx.draw(&CanvasLine::new(x1, y0, x1, y1, color));
 }
 
 /// Compute 3 particle positions along a polyline path based on phase (0.0..1.0).
@@ -332,51 +457,6 @@ fn compute_glowing_edges(lg: &LoomGraph, loom: &LoomState) -> HashSet<EdgeIndex>
     }
 
     glowing
-}
-
-/// Returns a descriptive label and color for a graph node.
-fn node_label_color(node: &LoomGraphNode, loom: &LoomState) -> (String, Color) {
-    match node {
-        LoomGraphNode::Extractor(id) => {
-            let label = match id {
-                crate::loom::types::NodeId::EmberSpindle => "Ember",
-                crate::loom::types::NodeId::ReflectionLens => "Reflect",
-                crate::loom::types::NodeId::VoidCondenser => "Void",
-                crate::loom::types::NodeId::MemoryArchive => "Memory",
-                crate::loom::types::NodeId::SilenceWell => "Silence",
-                crate::loom::types::NodeId::ResonanceForge => "Reson",
-            };
-            let resource = node_native_resource(*id);
-            (label.to_string(), resource_color(resource))
-        }
-        LoomGraphNode::Shuttle(idx) => {
-            // Ghost node: sentinel index usize::MAX means a not-yet-built preview shuttle
-            if *idx == usize::MAX {
-                return ("NEW".to_string(), Color::Rgb(100, 100, 100));
-            }
-            let (label, color) = if *idx < loom.persistent.shuttles.len() {
-                let shuttle = &loom.persistent.shuttles[*idx];
-                let out_name = short_resource_name(shuttle.output);
-                (
-                    format!("S{} \u{2192}{}", idx, out_name),
-                    resource_color(shuttle.output),
-                )
-            } else {
-                (format!("S{}", idx), Color::Rgb(180, 180, 180))
-            };
-            (label, color)
-        }
-        LoomGraphNode::PatternSink(idx) => {
-            // Active pattern sink — render with a star and gold/amber color.
-            let name = if *idx < loom.persistent.patterns.len() {
-                &loom.persistent.patterns[*idx].name
-            } else {
-                "Pattern"
-            };
-            let label = format!("\u{2605} {}", name);
-            (label, Color::Rgb(255, 200, 60))
-        }
-    }
 }
 
 /// Short display name for a resource (used in shuttle labels).

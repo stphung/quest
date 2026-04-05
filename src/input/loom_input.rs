@@ -51,19 +51,23 @@ fn navigate_right(
         return via_edge;
     }
 
-    // Fallback: jump to nearest node in the next layer (by y-position).
+    // Fallback: jump to nearest node in any higher layer (scan layers 1-4).
     let current_layer = node_layer(&graph.graph[current], loom);
-    let next_layer = current_layer + 1;
-
-    graph
-        .graph
-        .node_indices()
-        .filter(|&idx| node_layer(&graph.graph[idx], loom) == next_layer)
-        .min_by(|a, b| {
-            let da = (layout.node_positions[a].1 - current_y).abs();
-            let db = (layout.node_positions[b].1 - current_y).abs();
-            da.partial_cmp(&db).unwrap()
-        })
+    for target_layer in (current_layer + 1)..=4 {
+        let candidate = graph
+            .graph
+            .node_indices()
+            .filter(|&idx| node_layer(&graph.graph[idx], loom) == target_layer)
+            .min_by(|a, b| {
+                let da = (layout.node_positions[a].1 - current_y).abs();
+                let db = (layout.node_positions[b].1 - current_y).abs();
+                da.partial_cmp(&db).unwrap()
+            });
+        if candidate.is_some() {
+            return candidate;
+        }
+    }
+    None
 }
 
 /// Navigate left: nearest upstream neighbor by y-position.
@@ -90,22 +94,26 @@ fn navigate_left(
         return via_edge;
     }
 
-    // Fallback: jump to nearest node in the previous layer (by y-position).
+    // Fallback: jump to nearest node in any lower layer (scan layers downward).
     let current_layer = node_layer(&graph.graph[current], loom);
     if current_layer == 0 {
         return None;
     }
-    let prev_layer = current_layer - 1;
-
-    graph
-        .graph
-        .node_indices()
-        .filter(|&idx| node_layer(&graph.graph[idx], loom) == prev_layer)
-        .min_by(|a, b| {
-            let da = (layout.node_positions[a].1 - current_y).abs();
-            let db = (layout.node_positions[b].1 - current_y).abs();
-            da.partial_cmp(&db).unwrap()
-        })
+    for target_layer in (0..current_layer).rev() {
+        let candidate = graph
+            .graph
+            .node_indices()
+            .filter(|&idx| node_layer(&graph.graph[idx], loom) == target_layer)
+            .min_by(|a, b| {
+                let da = (layout.node_positions[a].1 - current_y).abs();
+                let db = (layout.node_positions[b].1 - current_y).abs();
+                da.partial_cmp(&db).unwrap()
+            });
+        if candidate.is_some() {
+            return candidate;
+        }
+    }
+    None
 }
 
 /// Top-level dispatcher for the Loom of Worlds overlay input.
