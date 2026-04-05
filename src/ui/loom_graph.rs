@@ -77,15 +77,21 @@ pub fn render_graph_canvas(
     //
     // Simpler: store half_extent in canvas coords = display_w (the full terminal width
     // equals the half-extent in canvas coords because print uses 1:1 but each char = 2 dots).
-    let node_bounds: std::collections::HashMap<NodeIndex, (f64, f64, f64)> = node_info
+    // (cx, cy, right_half_extent, left_half_extent) in canvas coords
+    let node_bounds: std::collections::HashMap<NodeIndex, (f64, f64, f64, f64)> = node_info
         .iter()
         .map(|info| {
             let display_w = (info.label_display_width + 1 + info.gauge_width) as f64;
-            // In render_gauge_node, text is printed at cx - display_w/2.
-            // Each char occupies 1 unit in ctx.print x-space (which = canvas x-space).
-            // So right edge of text = cx - display_w/2 + display_w = cx + display_w/2.
-            // half_extent from center = display_w / 2.
-            (info.ni, (info.cx, info.cy, display_w / 2.0))
+            let half_w = display_w / 2.0; // print offset from center (ctx.print units)
+                                          // ctx.print places text at canvas coord cx - half_w.
+                                          // Each text character occupies 2 canvas-x units (1 terminal col = 2 Braille dots).
+                                          // So text right edge in canvas coords = (cx - half_w) + display_w * 2
+                                          //                                     = cx + display_w * 2 - half_w
+                                          //                                     = cx + display_w * 1.5
+                                          // Half-extent from center for right edge = display_w * 1.5
+                                          // Half-extent from center for left edge = half_w (print coords = canvas coords)
+                                          // Store (right_half_extent, left_half_extent)
+            (info.ni, (info.cx, info.cy, display_w * 1.5, half_w))
         })
         .collect();
 
@@ -120,8 +126,8 @@ pub fn render_graph_canvas(
                 canvas_width,
                 canvas_height,
             );
-            let src_half_ext = node_bounds.get(&src_ni).map(|b| b.2).unwrap_or(0.0);
-            points.push((sx + src_half_ext + 8.0, sy + row_height)); // exit well past right text edge
+            let src_right_ext = node_bounds.get(&src_ni).map(|b| b.2).unwrap_or(0.0);
+            points.push((sx + src_right_ext + 4.0, sy + row_height)); // exit past right text edge
 
             if let Some(dummies) = layout.dummy_paths.get(&(src_ni, tgt_ni)) {
                 for &(dx, dy) in dummies {
@@ -139,8 +145,8 @@ pub fn render_graph_canvas(
                 canvas_width,
                 canvas_height,
             );
-            let tgt_half_ext = node_bounds.get(&tgt_ni).map(|b| b.2).unwrap_or(0.0);
-            points.push((tx - tgt_half_ext - 1.0, ty + row_height)); // enter just before left text edge
+            let tgt_left_ext = node_bounds.get(&tgt_ni).map(|b| b.3).unwrap_or(0.0);
+            points.push((tx - tgt_left_ext - 2.0, ty + row_height)); // enter just before left text edge
 
             // Particle positions (3 dots along the edge path based on phase).
             let particles = if edge.current_rate > 0.0 {
