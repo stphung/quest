@@ -224,12 +224,13 @@ fn build_node_render_info(
             } else {
                 0.0
             };
+            // rate_trackers already stores un-warped rates (divided by warp in tick_stages),
+            // so don't divide again here.
             let rate = loom
                 .rate_trackers
                 .get(&resource)
                 .map(|t| t.rate_per_hour())
-                .unwrap_or(0.0)
-                / warp;
+                .unwrap_or(0.0);
             let rate_text = format!("{:.0}/hr", rate);
             NodeRenderInfo {
                 ni,
