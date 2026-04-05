@@ -339,6 +339,7 @@ fn handle_build_input(
     // Esc always cancels the build flow.
     if key.code == KeyCode::Esc {
         loom_ui.build = None;
+        loom_ui.graph_dirty = true; // trigger rebuild to restore selection
         return InputResult::Continue;
     }
 
@@ -348,6 +349,7 @@ fn handle_build_input(
         BuildStep::Blocked { .. } => {
             // Any key dismisses the blocked message.
             loom_ui.build = None;
+            loom_ui.graph_dirty = true; // trigger rebuild to restore selection
             InputResult::Continue
         }
         BuildStep::SelectRecipe { cursor } => {
@@ -511,6 +513,7 @@ fn handle_build_input(
                     sources_b,
                 );
                 loom_ui.build = None;
+                loom_ui.graph_dirty = true; // trigger rebuild to restore selection
                 match result {
                     Ok(_) => InputResult::NeedsSave,
                     Err(_) => InputResult::Continue,
