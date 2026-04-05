@@ -310,7 +310,31 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
             render_bottom_panel_extractor(frame, inner, loom, *node_id);
         }
         LoomGraphNode::Shuttle(idx) => {
-            render_bottom_panel_shuttle(frame, inner, loom, *idx);
+            if ui.demolish_pending {
+                let name = if *idx < loom.persistent.shuttles.len() {
+                    let s = &loom.persistent.shuttles[*idx];
+                    format!("S{} ({:?})", idx, s.output)
+                } else {
+                    format!("S{}", idx)
+                };
+                let lines = vec![
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        format!(" Demolish {}?", name),
+                        Style::default().fg(Color::Rgb(255, 100, 100)),
+                    )),
+                    Line::from(Span::styled(
+                        " Press [D] again to confirm, any other key to cancel.",
+                        Style::default().fg(Color::Rgb(180, 140, 140)),
+                    )),
+                ];
+                frame.render_widget(
+                    Paragraph::new(lines).style(Style::default().bg(LOOM_BG)),
+                    inner,
+                );
+            } else {
+                render_bottom_panel_shuttle(frame, inner, loom, *idx);
+            }
         }
         LoomGraphNode::PatternSink(pat_idx) => {
             render_bottom_panel_pattern(frame, inner, loom, *pat_idx);

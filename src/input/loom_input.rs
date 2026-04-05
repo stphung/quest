@@ -127,8 +127,14 @@ pub(super) fn handle_loom(
         return handle_build_input(key, loom_state, loom_ui);
     }
 
+    // Cancel demolish confirmation on any key except D.
+    if loom_ui.demolish_pending && !matches!(key.code, KeyCode::Char('d') | KeyCode::Char('D')) {
+        loom_ui.demolish_pending = false;
+    }
+
     match key.code {
         KeyCode::Esc => {
+            loom_ui.demolish_pending = false;
             loom_ui.open = false;
             InputResult::Continue
         }
@@ -214,11 +220,16 @@ pub(super) fn handle_loom(
                 if let LoomGraphNode::Shuttle(shuttle_idx) = &graph.graph[current] {
                     let idx = *shuttle_idx;
                     if idx < loom_state.persistent.shuttles.len() {
-                        crate::loom::demolish_shuttle(loom_state, idx);
-                        // Graph is now stale; navigation will use rebuilt graph next frame.
-                        // Clear selection to avoid dangling reference.
-                        loom_ui.selected_graph_node = None;
-                        return InputResult::NeedsSave;
+                        if loom_ui.demolish_pending {
+                            // Second D press — confirm demolish.
+                            crate::loom::demolish_shuttle(loom_state, idx);
+                            loom_ui.selected_graph_node = None;
+                            loom_ui.demolish_pending = false;
+                            return InputResult::NeedsSave;
+                        } else {
+                            // First D press — set pending.
+                            loom_ui.demolish_pending = true;
+                        }
                     }
                 }
             }
@@ -716,13 +727,20 @@ mod tests {
             ui.loom_layout = Some(layout);
             ui.selected_graph_node = Some(sh);
 
+            // First D sets pending, second D confirms.
+            let result = handle_loom(key(KeyCode::Char('d')), &mut state, &mut ui);
+            assert!(matches!(result, InputResult::Continue));
+            assert!(ui.demolish_pending, "First D should set pending");
+            assert_eq!(state.persistent.shuttles.len(), 1, "Not demolished yet");
+
             let result = handle_loom(key(KeyCode::Char('d')), &mut state, &mut ui);
             assert!(matches!(result, InputResult::NeedsSave));
             assert_eq!(
                 state.persistent.shuttles.len(),
                 0,
-                "Shuttle should be demolished"
+                "Shuttle should be demolished on second D"
             );
+            assert!(!ui.demolish_pending, "Pending should be cleared");
             assert_eq!(
                 ui.selected_graph_node, None,
                 "Selection should be cleared after demolish"

@@ -447,6 +447,8 @@ pub struct LoomUiState {
     pub loom_layout: Option<super::layout::LoomLayout>,
     /// UI-side dirty flag for graph rebuild (e.g., after window resize).
     pub graph_dirty: bool,
+    /// True when waiting for second D press to confirm shuttle demolish.
+    pub demolish_pending: bool,
 }
 
 impl LoomUiState {
@@ -460,6 +462,7 @@ impl LoomUiState {
             loom_graph: None,
             loom_layout: None,
             graph_dirty: false,
+            demolish_pending: false,
         }
     }
 
