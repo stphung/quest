@@ -67,6 +67,9 @@ pub fn render_graph_canvas(
         })
         .collect();
 
+    let selected = ui.selected_graph_node;
+    let frame_count = ui.throbber_frame;
+
     // Pre-compute edge segments.
     let edge_segments: Vec<EdgeSegment> = loom_graph
         .graph
@@ -135,20 +138,46 @@ pub fn render_graph_canvas(
                 Vec::new()
             };
 
-            // Edge label: rate + resource emoji at midpoint.
-            // current_rate is already un-warped (normalized in update_edge_rates).
+            // Edge label: only shown for edges connected to the selected node.
+            // Positioned at 30% along the path (near source, away from both nodes).
+            let connected_to_selected = selected
+                .map(|sel| src_ni == sel || tgt_ni == sel)
+                .unwrap_or(false);
+
             let rate = edge.current_rate;
-            let label = if rate > 0.5 {
+            let label = if connected_to_selected && rate > 0.5 {
                 format!("{:.0}{}/hr", rate, resource_emoji(edge.resource))
             } else {
                 String::new()
             };
-            // Midpoint of the path.
-            let mid_idx = points.len() / 2;
-            let mid_pos = if points.len() >= 2 {
-                let a = points[mid_idx.saturating_sub(1)];
-                let b = points[mid_idx.min(points.len() - 1)];
-                ((a.0 + b.0) / 2.0, (a.1 + b.1) / 2.0)
+
+            // Position at 30% along the path (near source, away from nodes).
+            let label_pos = if points.len() >= 2 {
+                let total_len: f64 = points
+                    .windows(2)
+                    .map(|p| ((p[1].0 - p[0].0).powi(2) + (p[1].1 - p[0].1).powi(2)).sqrt())
+                    .sum();
+                let target = total_len * 0.3;
+                let mut accum = 0.0;
+                let mut pos = points[0];
+                for pair in points.windows(2) {
+                    let seg_len =
+                        ((pair[1].0 - pair[0].0).powi(2) + (pair[1].1 - pair[0].1).powi(2)).sqrt();
+                    if accum + seg_len >= target {
+                        let t = if seg_len > 0.001 {
+                            (target - accum) / seg_len
+                        } else {
+                            0.0
+                        };
+                        pos = (
+                            pair[0].0 + (pair[1].0 - pair[0].0) * t,
+                            pair[0].1 + (pair[1].1 - pair[0].1) * t,
+                        );
+                        break;
+                    }
+                    accum += seg_len;
+                }
+                pos
             } else {
                 points[0]
             };
@@ -159,13 +188,10 @@ pub fn render_graph_canvas(
                 particles,
                 particle_color,
                 label,
-                label_pos: mid_pos,
+                label_pos,
             })
         })
         .collect();
-
-    let selected = ui.selected_graph_node;
-    let frame_count = ui.throbber_frame;
 
     // Build and render the canvas.
     let canvas = Canvas::default()
