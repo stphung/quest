@@ -143,14 +143,12 @@ pub fn render_graph_canvas(
             } else {
                 String::new()
             };
-            // Position label at 30% along the path (near source, away from nodes).
+            // Midpoint of the path.
+            let mid_idx = points.len() / 2;
             let label_pos = if points.len() >= 2 {
-                let first = points[0];
-                let last = points[points.len() - 1];
-                (
-                    first.0 + (last.0 - first.0) * 0.3,
-                    first.1 + (last.1 - first.1) * 0.3,
-                )
+                let a = points[mid_idx.saturating_sub(1)];
+                let b = points[mid_idx.min(points.len() - 1)];
+                ((a.0 + b.0) / 2.0, (a.1 + b.1) / 2.0)
             } else {
                 points[0]
             };
