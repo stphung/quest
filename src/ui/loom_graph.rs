@@ -121,7 +121,7 @@ pub fn render_graph_canvas(
                 canvas_height,
             );
             let src_half_ext = node_bounds.get(&src_ni).map(|b| b.2).unwrap_or(0.0);
-            points.push((sx + src_half_ext + 3.0, sy + row_height)); // exit past right text edge
+            points.push((sx + src_half_ext + 8.0, sy + row_height)); // exit well past right text edge
 
             if let Some(dummies) = layout.dummy_paths.get(&(src_ni, tgt_ni)) {
                 for &(dx, dy) in dummies {
