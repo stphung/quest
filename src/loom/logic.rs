@@ -206,6 +206,14 @@ pub fn try_upgrade_node(loom: &mut LoomState, node_id: NodeId) -> bool {
     node.upgrading = true;
     node.upgrade_remaining_secs = node_upgrade_duration(node.level);
     loom.graph_dirty = true;
+
+    // Clear the rate tracker so the rate drops to 0 immediately
+    // (instead of decaying over the 20-second rolling window).
+    let resource = node_native_resource(node_id);
+    loom.rate_trackers
+        .entry(resource)
+        .and_modify(|t| *t = super::types::RateTracker::new());
+
     true
 }
 
