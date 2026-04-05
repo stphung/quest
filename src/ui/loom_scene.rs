@@ -537,7 +537,7 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
             }
         }
         LoomGraphNode::PatternSink(pat_idx) => {
-            render_bottom_panel_pattern(frame, inner, loom, *pat_idx);
+            render_bottom_panel_pattern(frame, inner, loom, ui, *pat_idx);
         }
     }
 }
@@ -859,7 +859,13 @@ fn render_bottom_panel_shuttle(
 }
 
 /// Render bottom panel content for a PatternSink node.
-fn render_bottom_panel_pattern(frame: &mut Frame, area: Rect, loom: &LoomState, pat_idx: usize) {
+fn render_bottom_panel_pattern(
+    frame: &mut Frame,
+    area: Rect,
+    loom: &LoomState,
+    ui: &LoomUiState,
+    pat_idx: usize,
+) {
     let pattern = match loom.persistent.patterns.get(pat_idx) {
         Some(p) => p,
         None => return,
@@ -932,7 +938,12 @@ fn render_bottom_panel_pattern(frame: &mut Frame, area: Rect, loom: &LoomState, 
             let ch = if loom.persistent.patterns[i].completed {
                 "\u{25c6}" // ◆ filled (completed)
             } else if i == pat_idx {
-                "\u{25c6}" // ◆ filled (current)
+                // Slow blink: alternate filled/hollow every ~0.5s (5 frames at 10fps).
+                if (ui.throbber_frame / 5) % 2 == 0 {
+                    "\u{25c6}" // ◆ filled
+                } else {
+                    "\u{25c7}" // ◇ hollow
+                }
             } else {
                 "\u{25c7}" // ◇ hollow (future)
             };
