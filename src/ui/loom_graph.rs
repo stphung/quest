@@ -233,33 +233,14 @@ pub fn render_graph_canvas(
                 }
             }
 
-            // 3. Draw node marker below text (Braille layer).
-            // Producing nodes get a spinning dot; idle/upgrading nodes get a static square.
+            // 3. Draw single node marker below text (Braille layer).
+            // This is where edges connect — see NODE_DOT_Y_OFFSET.
             for info in &node_info {
                 let mut dot_coords: Vec<(f64, f64)> = Vec::new();
                 let dot_y = info.cy + NODE_DOT_Y_OFFSET;
-                let is_producing = info.fill > 0.0 && !info.rate_text.starts_with('\u{23f3}');
-
-                if is_producing {
-                    // Spinning throbber: rotate 4 dots around a center point.
-                    let phase = (frame_count / 3) % 4; // cycle through 4 positions
-                    let offsets: [(f64, f64); 4] = match phase {
-                        0 => [(-1.0, 0.0), (0.0, -1.0), (1.0, 0.0), (0.0, 1.0)], // diamond
-                        1 => [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)], // square rotated
-                        2 => [(0.0, -1.0), (1.0, 0.0), (0.0, 1.0), (-1.0, 0.0)], // diamond shifted
-                        _ => [(1.0, -1.0), (-1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)], // square
-                    };
-                    // Center dot always present.
-                    dot_coords.push((info.cx, dot_y));
-                    for (dx, dy) in &offsets {
-                        dot_coords.push((info.cx + dx, dot_y + dy));
-                    }
-                } else {
-                    // Static square for idle/upgrading nodes.
-                    for dx in -1..=1 {
-                        for dy in -1..=1 {
-                            dot_coords.push((info.cx + dx as f64, dot_y + dy as f64));
-                        }
+                for dx in -1..=1 {
+                    for dy in -1..=1 {
+                        dot_coords.push((info.cx + dx as f64, dot_y + dy as f64));
                     }
                 }
                 let dot_color = if build_mode {
@@ -807,26 +788,33 @@ fn compute_build_highlights(
             }
         }
         BuildStep::SelectSourcesA { toggle, .. } => {
-            // Only highlight toggled-on A sources.
+            let dim_a = Color::Rgb(40, 100, 110); // eligible but not toggled
+            let has_any = toggle.iter().any(|&t| t);
             for (i, src) in build.eligible_sources_a.iter().enumerate() {
-                if toggle.get(i).copied().unwrap_or(false) {
-                    if let Some(&ni) = node_ref_to_index(src, lg) {
-                        highlights.insert(ni, cyan);
+                if let Some(&ni) = node_ref_to_index(src, lg) {
+                    if toggle.get(i).copied().unwrap_or(false) {
+                        highlights.insert(ni, cyan); // toggled on = bright
+                    } else if !has_any {
+                        highlights.insert(ni, dim_a); // nothing selected yet = show all eligible
                     }
                 }
             }
         }
         BuildStep::SelectSourcesB { toggle, .. } => {
-            // Show confirmed A sources dimmed cyan, toggled-on B sources bright magenta.
+            let dim_b = Color::Rgb(100, 50, 110); // eligible but not toggled
+            let has_any = toggle.iter().any(|&t| t);
+            // Always show confirmed A sources.
             for src in &build.selected_sources_a {
                 if let Some(&ni) = node_ref_to_index(src, lg) {
                     highlights.insert(ni, dim_cyan);
                 }
             }
             for (i, src) in build.eligible_sources_b.iter().enumerate() {
-                if toggle.get(i).copied().unwrap_or(false) {
-                    if let Some(&ni) = node_ref_to_index(src, lg) {
-                        highlights.insert(ni, magenta);
+                if let Some(&ni) = node_ref_to_index(src, lg) {
+                    if toggle.get(i).copied().unwrap_or(false) {
+                        highlights.insert(ni, magenta); // toggled on = bright
+                    } else if !has_any {
+                        highlights.insert(ni, dim_b); // nothing selected yet = show all eligible
                     }
                 }
             }
