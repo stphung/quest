@@ -165,6 +165,7 @@ pub fn render_graph_canvas(
         .collect();
 
     let selected = ui.selected_graph_node;
+    let frame_count = ui.throbber_frame;
 
     // Build and render the canvas.
     let canvas = Canvas::default()
@@ -230,7 +231,7 @@ pub fn render_graph_canvas(
             let has_selection = selected.is_some();
             for info in &node_info {
                 let is_selected = selected == Some(info.ni);
-                render_gauge_node(ctx, info, is_selected, has_selection);
+                render_gauge_node(ctx, info, is_selected, has_selection, frame_count);
             }
         });
 
@@ -448,6 +449,7 @@ fn render_gauge_node(
     info: &NodeRenderInfo,
     is_selected: bool,
     _has_selection: bool,
+    frame_count: u32,
 ) {
     let filled = (info.fill * info.gauge_width as f64).round() as usize;
     let empty = info.gauge_width.saturating_sub(filled);
@@ -469,9 +471,20 @@ fn render_gauge_node(
     let row_h = 4.0; // 1 terminal row = 4 braille y-dots
 
     // Line 1: [bracket] label gauge [bracket]
+    // Selected brackets pulse between white and resource color (~1s cycle).
+    let bracket_color = if is_selected {
+        if (frame_count / 5) % 2 == 0 {
+            Color::White
+        } else {
+            info.color
+        }
+    } else {
+        info.color
+    };
+
     let mut spans = Vec::new();
     if is_selected {
-        spans.push(Span::styled("\u{300c}", Style::default().fg(Color::White)));
+        spans.push(Span::styled("\u{300c}", Style::default().fg(bracket_color)));
         // 「
     }
     spans.push(Span::styled(
@@ -480,7 +493,7 @@ fn render_gauge_node(
     ));
     spans.push(Span::styled(gauge_str, Style::default().fg(label_color)));
     if is_selected {
-        spans.push(Span::styled("\u{300d}", Style::default().fg(Color::White)));
+        spans.push(Span::styled("\u{300d}", Style::default().fg(bracket_color)));
         // 」
     }
 
