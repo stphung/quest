@@ -932,9 +932,7 @@ fn render_bottom_panel_pattern(frame: &mut Frame, area: Rect, loom: &LoomState, 
         let padded = format!("{}{}", chapter_text, "\u{2500}".repeat(pad_len));
         lines.push(Line::from(Span::styled(
             padded,
-            Style::default()
-                .fg(Color::Rgb(100, 70, 140))
-                .add_modifier(Modifier::DIM),
+            Style::default().fg(Color::Rgb(160, 130, 200)),
         )));
     }
 
