@@ -188,20 +188,37 @@ pub fn render_graph_canvas(
                         pair[0].0, pair[0].1, pair[1].0, pair[1].1, seg.color,
                     ));
                 }
-                // Draw particle dots — small cross clusters for visibility with Braille.
+                // Draw particles with trailing dots.
                 if !seg.particles.is_empty() {
-                    let mut coords: Vec<(f64, f64)> = Vec::new();
-                    for &(px, py) in &seg.particles {
-                        coords.push((px, py));
-                        coords.push((px + 0.5, py));
-                        coords.push((px - 0.5, py));
-                        coords.push((px, py + 0.5));
-                        coords.push((px, py - 0.5));
+                    // Heads: bright cross clusters.
+                    let mut head_coords: Vec<(f64, f64)> = Vec::new();
+                    for p in &seg.particles {
+                        let (px, py) = p.head;
+                        head_coords.push((px, py));
+                        head_coords.push((px + 0.5, py));
+                        head_coords.push((px - 0.5, py));
+                        head_coords.push((px, py + 0.5));
+                        head_coords.push((px, py - 0.5));
                     }
                     ctx.draw(&Points {
-                        coords: &coords,
+                        coords: &head_coords,
                         color: seg.particle_color,
                     });
+
+                    // Trails: single dimmer dots behind each head.
+                    let trail_color = dim_color(seg.particle_color);
+                    let mut trail_coords: Vec<(f64, f64)> = Vec::new();
+                    for p in &seg.particles {
+                        for &(tx, ty) in &p.trail {
+                            trail_coords.push((tx, ty));
+                        }
+                    }
+                    if !trail_coords.is_empty() {
+                        ctx.draw(&Points {
+                            coords: &trail_coords,
+                            color: trail_color,
+                        });
+                    }
                 }
             }
 
@@ -548,7 +565,7 @@ fn render_gauge_node(
 struct EdgeSegment {
     points: Vec<(f64, f64)>,
     color: Color,
-    particles: Vec<(f64, f64)>,
+    particles: Vec<ParticleWithTrail>,
     /// Color for particles (source node's resource color).
     particle_color: Color,
     /// Rate label text (e.g., "42🔥/hr"). Empty if rate ~0.
@@ -586,7 +603,22 @@ fn layout_to_canvas(
 }
 
 /// Compute 3 particle positions along a polyline path based on phase (0.0..1.0).
-fn compute_particles(path: &[(f64, f64)], phase: f64) -> Vec<(f64, f64)> {
+/// Dim a color to ~50% brightness for trail dots.
+fn dim_color(c: Color) -> Color {
+    match c {
+        Color::Rgb(r, g, b) => Color::Rgb(r / 2, g / 2, b / 2),
+        _ => Color::Rgb(80, 80, 80),
+    }
+}
+
+/// A particle with its position and trailing positions.
+struct ParticleWithTrail {
+    head: (f64, f64),
+    trail: Vec<(f64, f64)>,
+}
+
+/// Compute 7 particle positions along a polyline path, each with 2 trailing dots.
+fn compute_particles(path: &[(f64, f64)], phase: f64) -> Vec<ParticleWithTrail> {
     if path.len() < 2 {
         return Vec::new();
     }
@@ -605,27 +637,48 @@ fn compute_particles(path: &[(f64, f64)], phase: f64) -> Vec<(f64, f64)> {
         return Vec::new();
     }
 
-    let mut particles = Vec::with_capacity(3);
-    for i in 0..3 {
-        // Evenly spaced particles, offset by phase.
-        let t = (phase + i as f64 / 3.0) % 1.0;
-        let target_dist = t * total_len;
+    let num_particles = 7;
+    let trail_count = 2;
+    let trail_spacing = total_len * 0.015; // spacing between head and each trail dot
 
+    let point_at_dist = |dist: f64| -> (f64, f64) {
+        let d = dist.clamp(0.0, total_len);
         let mut accum = 0.0;
         for (seg_i, &seg_len) in seg_lengths.iter().enumerate() {
-            if accum + seg_len >= target_dist || seg_i == seg_lengths.len() - 1 {
+            if accum + seg_len >= d || seg_i == seg_lengths.len() - 1 {
                 let local_t = if seg_len > 0.001 {
-                    (target_dist - accum) / seg_len
+                    (d - accum) / seg_len
                 } else {
                     0.0
                 };
                 let x = path[seg_i].0 + (path[seg_i + 1].0 - path[seg_i].0) * local_t;
                 let y = path[seg_i].1 + (path[seg_i + 1].1 - path[seg_i].1) * local_t;
-                particles.push((x, y));
-                break;
+                return (x, y);
             }
             accum += seg_len;
         }
+        *path.last().unwrap()
+    };
+
+    let mut particles = Vec::with_capacity(num_particles);
+    for i in 0..num_particles {
+        let t = (phase + i as f64 / num_particles as f64) % 1.0;
+        let head_dist = t * total_len;
+        let head = point_at_dist(head_dist);
+
+        let mut trail = Vec::with_capacity(trail_count);
+        for ti in 1..=trail_count {
+            let trail_dist = head_dist - trail_spacing * ti as f64;
+            // Wrap around if trail goes past the start.
+            let wrapped = if trail_dist < 0.0 {
+                trail_dist + total_len
+            } else {
+                trail_dist
+            };
+            trail.push(point_at_dist(wrapped));
+        }
+
+        particles.push(ParticleWithTrail { head, trail });
     }
     particles
 }
