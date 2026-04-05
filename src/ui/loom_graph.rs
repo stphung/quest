@@ -380,38 +380,37 @@ fn render_gauge_node(
     let label_color = info.color;
     let rate_color = Color::Rgb(100, 100, 120);
 
-    // Line 1: label + gauge
-    let spans = vec![
+    // Each text row in Canvas Braille space occupies 4 braille dots vertically.
+    // We render 2 lines (label+gauge, then rate) spaced 4 dots apart.
+    let row_height = 4.0; // 1 terminal row = 4 braille dots
+
+    // Line 1: label + gauge (centered on node position)
+    let label_display_w = info.label_display_width + 1 + info.gauge_width;
+    let half_w = label_display_w as f64 / 2.0;
+
+    let line1 = Line::from(vec![
         Span::styled(format!("{} ", info.label), Style::default().fg(label_color)),
         Span::styled(gauge_str, Style::default().fg(label_color)),
-    ];
+    ]);
+    ctx.print(info.cx - half_w, info.cy + row_height, line1);
 
-    let line1 = Line::from(spans);
-    let total_display_width = info.label_display_width + 1 + info.gauge_width;
-    let half_w = total_display_width as f64 / 2.0;
-    ctx.print(info.cx - half_w, info.cy, line1);
-
-    // Line 2: rate text centered below (offset down by 1 text row = ~4 braille dots).
+    // Line 2: rate text centered below
     if !info.rate_text.is_empty() {
         let line2 = Line::from(Span::styled(
             info.rate_text.clone(),
             Style::default().fg(rate_color),
         ));
         let half_rate_w = info.rate_text.len() as f64 / 2.0;
-        ctx.print(info.cx - half_rate_w, info.cy - 4.0, line2);
+        ctx.print(info.cx - half_rate_w, info.cy, line2);
     }
 
-    // Line 3 (selected only): bright white underline bar beneath the rate text.
+    // Line 3 (selected only): bright white underline bar beneath rate text.
     if is_selected {
-        let bar: String = std::iter::repeat('▔').take(total_display_width).collect();
+        let bar: String = std::iter::repeat('\u{2594}')
+            .take(label_display_w)
+            .collect();
         let line3 = Line::from(Span::styled(bar, Style::default().fg(Color::White)));
-        // Position below rate text (or below gauge if no rate). ~8 braille dots down.
-        let bar_y = if info.rate_text.is_empty() {
-            info.cy - 4.0
-        } else {
-            info.cy - 8.0
-        };
-        ctx.print(info.cx - half_w, bar_y, line3);
+        ctx.print(info.cx - half_w, info.cy - row_height, line3);
     }
 }
 
