@@ -190,7 +190,27 @@ pub fn render_graph_canvas(
                 }
             }
 
-            // 3. Draw nodes as gauge bars via ctx.print (text-resolution, always crisp).
+            // 3. Draw small dot clusters at each node center (Braille layer).
+            for info in &node_info {
+                let mut dot_coords: Vec<(f64, f64)> = Vec::new();
+                let (x, y) = (info.cx, info.cy);
+                // 3x3 cross pattern for a visible but minimal anchor point.
+                dot_coords.push((x, y));
+                dot_coords.push((x + 0.5, y));
+                dot_coords.push((x - 0.5, y));
+                dot_coords.push((x, y + 0.5));
+                dot_coords.push((x, y - 0.5));
+                dot_coords.push((x + 0.5, y + 0.5));
+                dot_coords.push((x - 0.5, y - 0.5));
+                dot_coords.push((x + 0.5, y - 0.5));
+                dot_coords.push((x - 0.5, y + 0.5));
+                ctx.draw(&Points {
+                    coords: &dot_coords,
+                    color: info.color,
+                });
+            }
+
+            // 4. Draw nodes as gauge bars via ctx.print (text-resolution, always crisp).
             let has_selection = selected.is_some();
             for info in &node_info {
                 let is_selected = selected == Some(info.ni);
