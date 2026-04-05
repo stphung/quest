@@ -207,6 +207,12 @@ pub struct LoomNode {
     /// When this reaches the threshold (2.0 hours), the node unlocks.
     #[serde(default)]
     pub unlock_progress: f64,
+    /// Whether the node is currently upgrading (locked out from production).
+    #[serde(default)]
+    pub upgrading: bool,
+    /// Remaining seconds until upgrade completes. Ticked down each game tick.
+    #[serde(default)]
+    pub upgrade_remaining_secs: f64,
 }
 
 fn default_node_level() -> u32 {
@@ -236,6 +242,8 @@ impl LoomNode {
             base_rate: 50.0,
             stalled: false,
             unlock_progress: 0.0,
+            upgrading: false,
+            upgrade_remaining_secs: 0.0,
         }
     }
 }

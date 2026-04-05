@@ -265,24 +265,45 @@ fn build_node_render_info(
         LoomGraphNode::Extractor(id) => {
             let ext = &loom.persistent.nodes[id.index()];
             let resource = node_native_resource(*id);
-            let emoji = resource_emoji(resource);
+            let emoji = if ext.upgrading {
+                "\u{23f3}" // hourglass for upgrading
+            } else {
+                resource_emoji(resource)
+            };
             let label = format!("{} {} L{}", emoji, id.name(), ext.level);
             let label_display_width = display_width(&label);
-            let color = resource_color_render(resource);
-            let cap = ext.buffer_capacity;
-            let fill = if cap > 0.0 {
-                (ext.buffer / cap).clamp(0.0, 1.0)
+            let color = if ext.upgrading {
+                Color::Rgb(120, 100, 60) // dimmed amber for upgrading
             } else {
-                0.0
+                resource_color_render(resource)
             };
-            // rate_trackers already stores un-warped rates (divided by warp in tick_stages),
-            // so don't divide again here.
-            let rate = loom
-                .rate_trackers
-                .get(&resource)
-                .map(|t| t.rate_per_hour())
-                .unwrap_or(0.0);
-            let rate_text = format!("{:.0}/hr", rate);
+            let (fill, rate_text) = if ext.upgrading {
+                // Show upgrade progress as gauge fill.
+                let total = crate::loom::logic::node_upgrade_duration(ext.level);
+                let elapsed = total - ext.upgrade_remaining_secs;
+                let progress = if total > 0.0 {
+                    (elapsed / total).clamp(0.0, 1.0)
+                } else {
+                    1.0
+                };
+                let remaining = format_duration(ext.upgrade_remaining_secs);
+                (progress, format!("\u{23f3}{}", remaining))
+            } else {
+                let cap = ext.buffer_capacity;
+                let fill = if cap > 0.0 {
+                    (ext.buffer / cap).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                // rate_trackers already stores un-warped rates (divided by warp in tick_stages),
+                // so don't divide again here.
+                let rate = loom
+                    .rate_trackers
+                    .get(&resource)
+                    .map(|t| t.rate_per_hour())
+                    .unwrap_or(0.0);
+                (fill, format!("{:.0}/hr", rate))
+            };
             NodeRenderInfo {
                 ni,
                 cx,

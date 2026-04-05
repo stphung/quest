@@ -17,12 +17,13 @@ pub use logic::{
     node_conversion_multiplier, node_effective_rate, node_level_multiplier, node_native_resource,
     node_neighbor_unlock_count, node_neighbor_unlock_speed_multiplier, node_neighbors,
     node_throughput_multiplier, node_upgrade_cost, node_upgrade_cost_multiplier,
-    resonance_early_feedback_active, select_archetype, shuttle_build_cost_public,
-    shuttle_effective_intake_cap, tick_base_production, tick_loom_staggered_unlock,
-    tick_neighbor_unlocking, tick_shuttle_construction, tick_shuttle_pull,
-    tick_shuttle_stall_detection, tick_stall_detection, try_upgrade_node, unlocked_tiers,
-    upgrade_shuttle, wr_to_pr_per_day, LoomExternalBonuses, ShuttleError, ShuttleUpgradeError,
-    MAX_NODE_LEVEL, SECOND_NODE_UNLOCK_SECONDS, SHUTTLE_CONSTRUCTION_TICKS,
+    node_upgrade_duration, resonance_early_feedback_active, select_archetype,
+    shuttle_build_cost_public, shuttle_effective_intake_cap, tick_base_production,
+    tick_loom_staggered_unlock, tick_neighbor_unlocking, tick_node_upgrades,
+    tick_shuttle_construction, tick_shuttle_pull, tick_shuttle_stall_detection,
+    tick_stall_detection, try_upgrade_node, unlocked_tiers, upgrade_shuttle, wr_to_pr_per_day,
+    LoomExternalBonuses, ShuttleError, ShuttleUpgradeError, MAX_NODE_LEVEL,
+    SECOND_NODE_UNLOCK_SECONDS, SHUTTLE_CONSTRUCTION_TICKS,
 };
 pub use milestones::PatternMilestone;
 #[allow(unused_imports)]

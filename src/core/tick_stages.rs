@@ -1066,6 +1066,9 @@ pub(super) fn tick_loom(
     // Update shuttle stall flags.
     crate::loom::tick_shuttle_stall_detection(loom);
 
+    // Tick extractor upgrade timers (before base production so completed upgrades apply immediately).
+    crate::loom::tick_node_upgrades(loom, tick_seconds);
+
     // Tick base production for all unlocked nodes.
     let mut produced = crate::loom::tick_base_production(loom, tick_seconds);
 

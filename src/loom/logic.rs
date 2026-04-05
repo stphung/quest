@@ -139,6 +139,9 @@ pub fn tick_base_production(
             continue;
         }
         let node = &mut loom.persistent.nodes[idx];
+        if node.upgrading {
+            continue; // Nodes produce nothing while upgrading.
+        }
 
         let amount = rate * delta_hours;
         node.buffer = (node.buffer + amount).min(capacity);
@@ -170,28 +173,59 @@ pub const MAX_NODE_LEVEL: u32 = 20;
 /// Buffer capacity multiplier: 10 hours of production at current level's rate.
 const BUFFER_HOURS: f64 = 10.0;
 
-/// Attempt to upgrade a node's level.
-/// Costs `node_upgrade_cost()` units of the node's native resource from the node's buffer.
+/// Upgrade duration in seconds for going from current_level to next.
+/// L1->L2: 5 min, L2->L3: 10 min, L3->L4: 20 min, doubling each level.
+/// Time warp accelerates this (delta_seconds includes warp).
+pub fn node_upgrade_duration(level: u32) -> f64 {
+    300.0 * 2.0_f64.powi(level.saturating_sub(1) as i32) // 5min, 10min, 20min, 40min...
+}
+
+/// Attempt to start upgrading a node's level.
+/// Drains 50% of buffer capacity as cost and starts a lockout timer.
+/// The node produces nothing while upgrading. When the timer expires,
+/// the node's level increases.
 /// Capped at `MAX_NODE_LEVEL` (level 20 = 525/hr).
-/// Returns true if the upgrade succeeded.
+/// Returns true if the upgrade was initiated.
 pub fn try_upgrade_node(loom: &mut LoomState, node_id: NodeId) -> bool {
     let node = &loom.persistent.nodes[node_id.index()];
-    if node.level >= MAX_NODE_LEVEL || !node.unlocked {
+    if node.level >= MAX_NODE_LEVEL || !node.unlocked || node.upgrading {
         return false;
     }
 
-    let cost = node_upgrade_cost(loom, node_id);
+    let drain = node.buffer_capacity * 0.5;
 
     let node = &mut loom.persistent.nodes[node_id.index()];
-    if node.buffer < cost {
+    if node.buffer < drain {
         return false;
     }
-    node.buffer -= cost;
 
-    node.level += 1;
-    node.buffer_capacity = node.base_rate * node_level_multiplier(node.level) * BUFFER_HOURS;
+    // Drain 50% of buffer capacity as upgrade cost.
+    node.buffer = (node.buffer - drain).max(0.0);
 
+    // Start upgrade lockout.
+    node.upgrading = true;
+    node.upgrade_remaining_secs = node_upgrade_duration(node.level);
+    loom.graph_dirty = true;
     true
+}
+
+/// Tick upgrade timers for all nodes. Called each game tick.
+/// When an upgrade completes, the node's level increases and production resumes.
+pub fn tick_node_upgrades(loom: &mut LoomState, delta_seconds: f64) {
+    for node in &mut loom.persistent.nodes {
+        if !node.upgrading {
+            continue;
+        }
+        node.upgrade_remaining_secs -= delta_seconds;
+        if node.upgrade_remaining_secs <= 0.0 {
+            node.upgrading = false;
+            node.upgrade_remaining_secs = 0.0;
+            node.level += 1;
+            node.buffer_capacity =
+                node.base_rate * node_level_multiplier(node.level) * BUFFER_HOURS;
+            loom.graph_dirty = true;
+        }
+    }
 }
 
 // ── Phase 3: Neighbor Unlocking ───────────────────────────────────────────────
@@ -1157,12 +1191,18 @@ mod tests {
         let result = try_upgrade_node(&mut loom, NodeId::EmberSpindle);
         assert!(result);
 
-        let ember = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap();
+        let ember = &loom.persistent.nodes[NodeId::EmberSpindle.index()];
+        // Upgrade is now deferred — node should be upgrading, still level 1.
+        assert!(ember.upgrading);
+        assert_eq!(ember.level, 1);
+        assert!(ember.upgrade_remaining_secs > 0.0);
+
+        // Complete the upgrade by ticking past the duration.
+        let remaining = ember.upgrade_remaining_secs;
+        tick_node_upgrades(&mut loom, remaining + 1.0);
+
+        let ember = &loom.persistent.nodes[NodeId::EmberSpindle.index()];
+        assert!(!ember.upgrading);
         assert_eq!(ember.level, 2);
     }
 
@@ -1768,24 +1808,16 @@ mod tests {
     fn test_upgrade_node_increases_buffer_capacity() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
-        let old_capacity = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap()
-            .buffer_capacity;
+        let old_capacity = loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer_capacity;
 
         loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
         try_upgrade_node(&mut loom, NodeId::EmberSpindle);
 
-        let new_capacity = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap()
-            .buffer_capacity;
+        // Complete the upgrade by ticking past the duration.
+        let remaining = loom.persistent.nodes[NodeId::EmberSpindle.index()].upgrade_remaining_secs;
+        tick_node_upgrades(&mut loom, remaining + 1.0);
+
+        let new_capacity = loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer_capacity;
         assert!(
             new_capacity > old_capacity,
             "buffer_capacity should grow after upgrade: {} -> {}",
@@ -1798,8 +1830,10 @@ mod tests {
     fn test_upgrade_node_deducts_cost_from_stockpile() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
-        let cost = node_upgrade_cost(&loom, NodeId::EmberSpindle);
-        let starting_buffer = cost + 5.0;
+
+        // Upgrade now drains 50% of buffer_capacity (500 * 0.5 = 250).
+        let drain = loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer_capacity * 0.5;
+        let starting_buffer = drain + 5.0;
 
         loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = starting_buffer;
         try_upgrade_node(&mut loom, NodeId::EmberSpindle);

@@ -652,11 +652,18 @@ fn render_bottom_panel_extractor(
     frame.render_widget(gauge, right_chunks[0]);
 
     // Upgrade info.
-    let resource = logic::node_native_resource(node.id);
-    let re = resource_emoji(&resource);
-    let upgrade_line = if node.level < logic::MAX_NODE_LEVEL {
-        let cost = logic::node_upgrade_cost(loom, node.id);
-        let can_afford = node.buffer >= cost;
+    let upgrade_line = if node.upgrading {
+        // Show upgrade progress.
+        let remaining = crate::ui::loom_graph::format_duration(node.upgrade_remaining_secs);
+        Line::from(Span::styled(
+            format!(" \u{23f3} Upgrading... {} remaining", remaining),
+            Style::default().fg(Color::Rgb(220, 180, 60)),
+        ))
+    } else if node.level < logic::MAX_NODE_LEVEL {
+        let drain = node.buffer_capacity * 0.5;
+        let can_afford = node.buffer >= drain;
+        let duration = logic::node_upgrade_duration(node.level);
+        let dur_str = crate::ui::loom_graph::format_duration(duration);
         let color = if can_afford {
             Color::Rgb(100, 200, 120)
         } else {
@@ -672,7 +679,7 @@ fn render_bottom_panel_extractor(
                 }),
             ),
             Span::styled(
-                format!("Lv{} ({:.0}{} cost)", node.level + 1, cost, re),
+                format!("Lv{} (50% buf + {})", node.level + 1, dur_str),
                 Style::default().fg(color),
             ),
         ])
@@ -823,7 +830,7 @@ fn render_bottom_panel_shuttle(
         mid_chunks[1],
     );
 
-    // ── Right column: status + upgrade ──
+    // ── Right column: status + demolish ──
     let status_text = if shuttle.stalled {
         " STALLED"
     } else {
@@ -840,28 +847,6 @@ fn render_bottom_panel_shuttle(
         Style::default().fg(status_color),
     ))];
 
-    // Upgrade cost (shuttle upgrade costs 100 * level^1.2 from buffer).
-    let cost = 100.0 * (shuttle.level as f64).powf(1.2);
-    let can_afford = shuttle.buffer >= cost;
-    let cost_color = if can_afford {
-        Color::Rgb(100, 200, 120)
-    } else {
-        Color::Rgb(80, 60, 100)
-    };
-    right_lines.push(Line::from(vec![
-        Span::styled(
-            " [U] ",
-            Style::default().fg(if can_afford {
-                Color::Rgb(200, 180, 240)
-            } else {
-                Color::DarkGray
-            }),
-        ),
-        Span::styled(
-            format!("Lv{} ({:.0} cost)", shuttle.level + 1, cost),
-            Style::default().fg(cost_color),
-        ),
-    ]));
     right_lines.push(Line::from(Span::styled(
         " [D]emolish",
         Style::default().fg(Color::DarkGray),

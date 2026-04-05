@@ -200,9 +200,7 @@ pub(super) fn handle_loom(
                         }
                     }
                     LoomGraphNode::Shuttle(_index) => {
-                        // Shuttle upgrades require ascension_level which is not
-                        // available in this context yet. Will be wired in a
-                        // future task when handle_loom receives game-wide state.
+                        // Shuttle upgrading removed — shuttles stay at level 1.
                     }
                     LoomGraphNode::PatternSink(_) => {} // Can't upgrade pattern sinks
                 }
