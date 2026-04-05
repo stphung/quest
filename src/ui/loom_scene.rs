@@ -282,9 +282,9 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
 
                 lines
             }
-            crate::loom::BuildStep::SelectSourcesA { .. } => {
+            crate::loom::BuildStep::SelectSourcesA { cursor, toggle } => {
                 let r = &recipes[build.recipe_index];
-                vec![
+                let mut lines = vec![
                     Line::from(Span::styled(
                         format!(
                             " {} {} + {} {} \u{2192} {} {}",
@@ -299,17 +299,38 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                     )),
                     Line::from(Span::styled(
                         format!(
-                            " Step 2/4: Select sources for {} {}",
+                            " Select sources for {} {}:  [Space] toggle  [Enter] confirm",
                             resource_emoji(&r.input_a),
                             resource_name(&r.input_a),
                         ),
                         Style::default().fg(Color::Rgb(140, 110, 170)),
                     )),
-                ]
+                ];
+                for (i, src) in build.eligible_sources_a.iter().enumerate() {
+                    let marker = if i == *cursor { "\u{25b6}" } else { " " };
+                    let check = if toggle[i] { "[\u{2713}]" } else { "[ ]" };
+                    let name = source_name(src, loom);
+                    let color = if i == *cursor {
+                        Color::White
+                    } else {
+                        Color::Rgb(140, 110, 170)
+                    };
+                    lines.push(Line::from(Span::styled(
+                        format!(" {} {} {}", marker, check, name),
+                        Style::default().fg(color),
+                    )));
+                }
+                if build.eligible_sources_a.is_empty() {
+                    lines.push(Line::from(Span::styled(
+                        " (no eligible sources)",
+                        Style::default().fg(Color::Rgb(160, 80, 80)),
+                    )));
+                }
+                lines
             }
-            crate::loom::BuildStep::SelectSourcesB { .. } => {
+            crate::loom::BuildStep::SelectSourcesB { cursor, toggle } => {
                 let r = &recipes[build.recipe_index];
-                vec![
+                let mut lines = vec![
                     Line::from(Span::styled(
                         format!(
                             " {} {} + {} {} \u{2192} {} {}",
@@ -324,13 +345,50 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                     )),
                     Line::from(Span::styled(
                         format!(
-                            " Step 3/4: Select sources for {} {}",
+                            " Select sources for {} {}:  [Space] toggle  [Enter] confirm",
                             resource_emoji(&r.input_b),
                             resource_name(&r.input_b),
                         ),
                         Style::default().fg(Color::Rgb(140, 110, 170)),
                     )),
-                ]
+                ];
+                // Show confirmed A sources dimmed.
+                if !build.selected_sources_a.is_empty() {
+                    lines.push(Line::from(Span::styled(
+                        format!(
+                            " Source A ({}): {}",
+                            resource_name(&r.input_a),
+                            build
+                                .selected_sources_a
+                                .iter()
+                                .map(|s| source_name(s, loom))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ),
+                        Style::default().fg(Color::Rgb(80, 70, 100)),
+                    )));
+                }
+                for (i, src) in build.eligible_sources_b.iter().enumerate() {
+                    let marker = if i == *cursor { "\u{25b6}" } else { " " };
+                    let check = if toggle[i] { "[\u{2713}]" } else { "[ ]" };
+                    let name = source_name(src, loom);
+                    let color = if i == *cursor {
+                        Color::White
+                    } else {
+                        Color::Rgb(140, 110, 170)
+                    };
+                    lines.push(Line::from(Span::styled(
+                        format!(" {} {} {}", marker, check, name),
+                        Style::default().fg(color),
+                    )));
+                }
+                if build.eligible_sources_b.is_empty() {
+                    lines.push(Line::from(Span::styled(
+                        " (no eligible sources)",
+                        Style::default().fg(Color::Rgb(160, 80, 80)),
+                    )));
+                }
+                lines
             }
             crate::loom::BuildStep::Confirm => {
                 let r = &recipes[build.recipe_index];
@@ -1009,6 +1067,33 @@ fn resource_name(resource: &crate::loom::types::Resource) -> &'static str {
         Resource::EmberEcho => "Ember Echo",
         Resource::PurifiedVoid => "Purified Void",
         Resource::WovenReality => "Woven Reality",
+    }
+}
+
+fn source_name(src: &crate::loom::types::LoomNodeRef, loom: &LoomState) -> String {
+    match src {
+        crate::loom::types::LoomNodeRef::Extractor(id) => {
+            let node = &loom.persistent.nodes[id.index()];
+            format!(
+                "{} {} L{}",
+                resource_emoji(&crate::loom::logic::node_native_resource(*id)),
+                id.name(),
+                node.level
+            )
+        }
+        crate::loom::types::LoomNodeRef::Shuttle(idx) => {
+            if let Some(s) = loom.persistent.shuttles.get(*idx) {
+                format!(
+                    "S{} {} {} L{}",
+                    idx,
+                    resource_emoji(&s.output),
+                    resource_name(&s.output),
+                    s.level
+                )
+            } else {
+                format!("S{}", idx)
+            }
+        }
     }
 }
 
