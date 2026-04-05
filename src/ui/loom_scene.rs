@@ -43,8 +43,8 @@ fn resource_emoji(resource: &crate::loom::types::Resource) -> &'static str {
         Resource::ForgedLight => "\u{2728}",     // ✨
         Resource::EchoGlass => "\u{1fa9e}",      // 🪞
         Resource::StillbornSong => "\u{1f3b5}",  // 🎵
-        Resource::CondensedEmber => "\u{1f536}", // 🔶
-        Resource::EmberEcho => "\u{1f538}",      // 🔸
+        Resource::CondensedEmber => "\u{1f4a0}", // 💠
+        Resource::EmberEcho => "\u{1fae7}",      // 🫧
         Resource::PurifiedVoid => "\u{1f49c}",   // 💜
         Resource::WovenReality => "\u{1f310}",   // 🌐
     }
