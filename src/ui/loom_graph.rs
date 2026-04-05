@@ -188,16 +188,19 @@ struct NodeRenderInfo {
 /// Resource emoji for display.
 fn resource_emoji(resource: Resource) -> &'static str {
     match resource {
-        Resource::Ember => "\u{1f525}",         // 🔥
-        Resource::Reflection => "\u{1f48e}",    // 💎
-        Resource::VoidEssence => "\u{1f300}",   // 🌀
-        Resource::Memory => "\u{1f4dc}",        // 📜
-        Resource::Silence => "\u{1f311}",       // 🌑
-        Resource::Resonance => "\u{1f514}",     // 🔔
-        Resource::ForgedLight => "\u{2728}",    // ✨
-        Resource::EchoGlass => "\u{1fa9e}",     // 🪞
-        Resource::StillbornSong => "\u{1f3b5}", // 🎵
-        _ => "\u{25cf}",                        // ●
+        Resource::Ember => "\u{1f525}",          // 🔥
+        Resource::Reflection => "\u{1f48e}",     // 💎
+        Resource::VoidEssence => "\u{1f300}",    // 🌀
+        Resource::Memory => "\u{1f4dc}",         // 📜
+        Resource::Silence => "\u{1f311}",        // 🌑
+        Resource::Resonance => "\u{1f514}",      // 🔔
+        Resource::ForgedLight => "\u{2728}",     // ✨
+        Resource::EchoGlass => "\u{1fa9e}",      // 🪞
+        Resource::StillbornSong => "\u{1f3b5}",  // 🎵
+        Resource::CondensedEmber => "\u{1f536}", // 🔶
+        Resource::EmberEcho => "\u{1f538}",      // 🔸
+        Resource::PurifiedVoid => "\u{1f49c}",   // 💜
+        Resource::WovenReality => "\u{1f310}",   // 🌐
     }
 }
 
@@ -544,7 +547,10 @@ fn short_resource_name(resource: Resource) -> &'static str {
         Resource::ForgedLight => "FLight",
         Resource::EchoGlass => "EGlass",
         Resource::StillbornSong => "SSong",
-        _ => "???",
+        Resource::CondensedEmber => "CEmber",
+        Resource::EmberEcho => "EEcho",
+        Resource::PurifiedVoid => "PVoid",
+        Resource::WovenReality => "WReal",
     }
 }
 
@@ -584,6 +590,9 @@ fn resource_color_render(resource: Resource) -> Color {
         Resource::ForgedLight => Color::Rgb(255, 220, 100),
         Resource::EchoGlass => Color::Rgb(140, 220, 200),
         Resource::StillbornSong => Color::Rgb(180, 140, 200),
-        _ => Color::Rgb(180, 180, 180),
+        Resource::CondensedEmber => Color::Rgb(230, 160, 50),
+        Resource::EmberEcho => Color::Rgb(220, 140, 80),
+        Resource::PurifiedVoid => Color::Rgb(180, 100, 240),
+        Resource::WovenReality => Color::Rgb(100, 200, 200),
     }
 }
