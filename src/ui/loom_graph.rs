@@ -67,9 +67,6 @@ pub fn render_graph_canvas(
         })
         .collect();
 
-    let selected = ui.selected_graph_node;
-    let frame_count = ui.throbber_frame;
-
     // Pre-compute edge segments.
     let edge_segments: Vec<EdgeSegment> = loom_graph
         .graph
@@ -138,49 +135,31 @@ pub fn render_graph_canvas(
                 Vec::new()
             };
 
-            // Edge label: only shown for edges connected to the selected node.
-            // Positioned at 30% along the path (near source, away from both nodes).
-            let connected_to_selected = selected
-                .map(|sel| src_ni == sel || tgt_ni == sel)
-                .unwrap_or(false);
-
+            // Edge label: rate + resource emoji at midpoint.
+            // current_rate is already un-warped (normalized in update_edge_rates).
             let rate = edge.current_rate;
-            let label = if connected_to_selected && rate > 0.5 {
+            let label = if rate > 0.5 {
                 format!("{:.0}{}/hr", rate, resource_emoji(edge.resource))
             } else {
                 String::new()
             };
-
-            // Position at 30% along the path (near source, away from nodes).
+            // Position label at 30% along the path (near source, away from nodes).
             let label_pos = if points.len() >= 2 {
-                let total_len: f64 = points
-                    .windows(2)
-                    .map(|p| ((p[1].0 - p[0].0).powi(2) + (p[1].1 - p[0].1).powi(2)).sqrt())
-                    .sum();
-                let target = total_len * 0.3;
-                let mut accum = 0.0;
-                let mut pos = points[0];
-                for pair in points.windows(2) {
-                    let seg_len =
-                        ((pair[1].0 - pair[0].0).powi(2) + (pair[1].1 - pair[0].1).powi(2)).sqrt();
-                    if accum + seg_len >= target {
-                        let t = if seg_len > 0.001 {
-                            (target - accum) / seg_len
-                        } else {
-                            0.0
-                        };
-                        pos = (
-                            pair[0].0 + (pair[1].0 - pair[0].0) * t,
-                            pair[0].1 + (pair[1].1 - pair[0].1) * t,
-                        );
-                        break;
-                    }
-                    accum += seg_len;
-                }
-                pos
+                let first = points[0];
+                let last = points[points.len() - 1];
+                (
+                    first.0 + (last.0 - first.0) * 0.3,
+                    first.1 + (last.1 - first.1) * 0.3,
+                )
             } else {
                 points[0]
             };
+
+            // Only show label if this edge connects to the selected node.
+            let connected_to_selected = ui
+                .selected_graph_node
+                .map(|sel| src_ni == sel || tgt_ni == sel)
+                .unwrap_or(false);
 
             Some(EdgeSegment {
                 points,
@@ -189,9 +168,13 @@ pub fn render_graph_canvas(
                 particle_color,
                 label,
                 label_pos,
+                show_label: connected_to_selected,
             })
         })
         .collect();
+
+    let selected = ui.selected_graph_node;
+    let frame_count = ui.throbber_frame;
 
     // Build and render the canvas.
     let canvas = Canvas::default()
@@ -224,10 +207,10 @@ pub fn render_graph_canvas(
                 }
             }
 
-            // 2. Draw edge labels at midpoints.
-            let dim_label = Color::Rgb(70, 65, 90);
+            // 2. Draw edge labels (only for edges connected to selected node).
+            let dim_label = Color::Rgb(100, 90, 130);
             for seg in &edge_segments {
-                if !seg.label.is_empty() {
+                if seg.show_label && !seg.label.is_empty() {
                     let lbl = Line::from(Span::styled(
                         seg.label.clone(),
                         Style::default().fg(dim_label),
@@ -395,18 +378,43 @@ fn build_node_render_info(
             }
             if *idx < loom.persistent.shuttles.len() {
                 let s = &loom.persistent.shuttles[*idx];
-                let out_emoji = resource_emoji(s.output);
-                let out_name = short_resource_name(s.output);
-                let label = format!("{} {} L{}", out_emoji, out_name, s.level);
-                let label_display_width = display_width(&label);
-                let color = resource_color_render(s.output);
-                let fill = if s.buffer_capacity > 0.0 {
-                    (s.buffer / s.buffer_capacity).clamp(0.0, 1.0)
+                let out_emoji = if s.under_construction {
+                    "\u{1f6a7}" // 🚧 construction
                 } else {
-                    0.0
+                    resource_emoji(s.output)
                 };
-                let rate = s.output_rate_tracker.rate_per_hour() / warp;
-                let rate_text = format!("{:.0}/hr", rate);
+                let out_name = short_resource_name(s.output);
+                let label = format!("{} {}", out_emoji, out_name);
+                let label_display_width = display_width(&label);
+                let color = if s.under_construction {
+                    Color::Rgb(120, 100, 60) // dimmed amber
+                } else {
+                    resource_color_render(s.output)
+                };
+                let (fill, rate_text) = if s.under_construction {
+                    // Show construction progress.
+                    let total = crate::loom::logic::shuttle_construction_ticks(s.tier) as f64;
+                    let elapsed = total - s.construction_ticks_remaining as f64;
+                    let progress = if total > 0.0 {
+                        (elapsed / total).clamp(0.0, 1.0)
+                    } else {
+                        1.0
+                    };
+                    // Convert remaining ticks to seconds (100ms per tick), adjusted for warp.
+                    let remaining_secs = s.construction_ticks_remaining as f64 * 0.1 / warp;
+                    (
+                        progress,
+                        format!("\u{1f6a7}{}", format_duration(remaining_secs)),
+                    )
+                } else {
+                    let fill = if s.buffer_capacity > 0.0 {
+                        (s.buffer / s.buffer_capacity).clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    let rate = s.output_rate_tracker.rate_per_hour() / warp;
+                    (fill, format!("{:.0}/hr", rate))
+                };
                 NodeRenderInfo {
                     ni,
                     cx,
@@ -551,8 +559,10 @@ struct EdgeSegment {
     particle_color: Color,
     /// Rate label text (e.g., "42🔥/hr"). Empty if rate ~0.
     label: String,
-    /// Canvas position for the label (midpoint of edge path).
+    /// Canvas position for the label (30% along edge path).
     label_pos: (f64, f64),
+    /// Whether to show the label (only for edges connected to selected node).
+    show_label: bool,
 }
 
 /// Map layout-space coordinates to canvas-space coordinates.

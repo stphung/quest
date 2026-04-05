@@ -394,22 +394,24 @@ pub fn update_edge_rates(lg: &mut LoomGraph, loom: &LoomState) {
 
         let rate = match (&source_node, &target_node) {
             // Extractor/Shuttle → Shuttle: use contention-aware flow.
+            // Under-construction shuttles can't pull — zero flow on all incoming edges.
             (_, LoomGraphNode::Shuttle(shuttle_idx)) => {
                 if *shuttle_idx < persistent.shuttles.len() {
                     let shuttle = &persistent.shuttles[*shuttle_idx];
-                    let cap = shuttle_effective_intake_cap(shuttle.tier, shuttle.level);
-
-                    // Determine which LoomNodeRef this source corresponds to.
-                    let src_ref = match &source_node {
-                        LoomGraphNode::Extractor(id) => LoomNodeRef::Extractor(*id),
-                        LoomGraphNode::Shuttle(idx) => LoomNodeRef::Shuttle(*idx),
-                        _ => continue,
-                    };
-
-                    let available = source_rates.get(&src_ref).copied().unwrap_or(0.0);
-                    let consumers = consumer_count.get(&src_ref).copied().unwrap_or(1).max(1);
-                    let share = available / consumers as f64;
-                    share.min(cap)
+                    if shuttle.under_construction {
+                        0.0
+                    } else {
+                        let cap = shuttle_effective_intake_cap(shuttle.tier, shuttle.level);
+                        let src_ref = match &source_node {
+                            LoomGraphNode::Extractor(id) => LoomNodeRef::Extractor(*id),
+                            LoomGraphNode::Shuttle(idx) => LoomNodeRef::Shuttle(*idx),
+                            _ => continue,
+                        };
+                        let available = source_rates.get(&src_ref).copied().unwrap_or(0.0);
+                        let consumers = consumer_count.get(&src_ref).copied().unwrap_or(1).max(1);
+                        let share = available / consumers as f64;
+                        share.min(cap)
+                    }
                 } else {
                     0.0
                 }
