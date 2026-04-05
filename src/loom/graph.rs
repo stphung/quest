@@ -84,17 +84,20 @@ pub fn refresh_graph(
         update_edge_rates(graph, loom);
     }
 
-    // Advance particle phases
+    // Advance particle phases.
+    // Uses sqrt easing so low rates are visible and high rates don't get frenetic.
+    // Base step 0.02 * sqrt(utilization) = ~4-5 second cycle at full rate.
     if let Some(ref graph) = ui.loom_graph {
         for edge_idx in graph.graph.edge_indices() {
             let edge = &graph.graph[edge_idx];
-            let speed = if edge.max_rate > 0.0 {
-                edge.current_rate / edge.max_rate
+            let utilization = if edge.max_rate > 0.0 {
+                (edge.current_rate / edge.max_rate).clamp(0.0, 1.5)
             } else {
                 0.0
             };
+            let speed = utilization.sqrt(); // easing: diminishing returns at high rates
             if let Some(phase) = ui.particle_phases.get_mut(&edge_idx) {
-                *phase = (*phase + 0.05 * speed) % 1.0;
+                *phase = (*phase + 0.02 * speed) % 1.0;
             }
         }
     }
