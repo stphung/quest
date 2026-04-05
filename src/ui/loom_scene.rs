@@ -184,80 +184,60 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
         let recipes = crate::loom::recipes::all_recipes();
         let lines: Vec<Line> = match &build.step {
             crate::loom::BuildStep::SelectRecipe { cursor } => {
-                let tiers = crate::loom::unlocked_tiers(loom);
-                // Build tier tab bar.
-                let mut tab_spans: Vec<Span> = Vec::new();
-                tab_spans.push(Span::raw(" "));
-                for &t in &tiers {
-                    let is_active = t == build.tier;
-                    if is_active {
-                        tab_spans.push(Span::styled(
-                            format!("[ T{} ]", t),
-                            Style::default()
-                                .fg(Color::White)
-                                .add_modifier(Modifier::BOLD),
-                        ));
-                    } else {
-                        tab_spans.push(Span::styled(
-                            format!("  T{}  ", t),
-                            Style::default().fg(Color::Rgb(80, 70, 100)),
-                        ));
-                    }
-                    tab_spans.push(Span::raw(" "));
-                }
-                // Right-align the Tab hint by padding.
-                tab_spans.push(Span::styled(
-                    "  [Tab] cycle tiers",
-                    Style::default().fg(Color::Rgb(80, 70, 100)),
-                ));
-                let tab_line = Line::from(tab_spans);
-
-                // Build recipe list (scrolling window, max 5 visible).
                 let all_recipes = crate::loom::recipes::all_recipes();
-                let window_size: usize = 5;
-                let total = build.available_recipes.len();
-                let scroll_start = if *cursor >= window_size {
-                    cursor.saturating_sub(window_size - 1)
+                // Show compact grouped recipe list in the bottom panel.
+                let display_rows = build_recipe_display_rows(&build.available_recipes);
+                let cursor_row = cursor_to_display_row(&display_rows, *cursor);
+                let window_size: usize = (inner.height as usize).saturating_sub(2).min(6);
+                let half = window_size / 2;
+                let scroll_start = if cursor_row >= half {
+                    (cursor_row - half).min(display_rows.len().saturating_sub(window_size))
                 } else {
                     0
                 };
-                let scroll_end = (scroll_start + window_size).min(total);
+                let scroll_end = (scroll_start + window_size).min(display_rows.len());
+                let intake_cap = crate::loom::logic::shuttle_effective_intake_cap(build.tier, 1);
 
                 let mut lines: Vec<Line> = Vec::new();
                 lines.push(Line::from(Span::styled(
-                    " Building Shuttle \u{2014} Step 1/4: Select recipe",
+                    format!(" Building Shuttle \u{2014} T{} recipes", build.tier),
                     Style::default().fg(Color::Rgb(180, 140, 220)),
                 )));
-                lines.push(tab_line);
-                for i in scroll_start..scroll_end {
-                    let recipe_idx = build.available_recipes[i];
-                    let r = &all_recipes[recipe_idx];
-                    let is_selected = i == *cursor;
-                    let prefix = if is_selected { " > " } else { "   " };
-                    let label = format!(
-                        "{}{} {} \u{2192} {}",
-                        prefix,
-                        resource_emoji(&r.input_a),
-                        resource_emoji(&r.input_b),
-                        resource_emoji(&r.output),
-                    );
-                    let suffix = if is_selected {
-                        "  [\u{2191}\u{2193}] select  [Enter] confirm"
-                    } else {
-                        ""
-                    };
-                    let style = if is_selected {
-                        Style::default()
-                            .fg(Color::White)
-                            .add_modifier(Modifier::BOLD)
-                    } else {
-                        Style::default().fg(Color::Rgb(120, 100, 150))
-                    };
-                    let hint_style = Style::default().fg(Color::Rgb(80, 70, 100));
-                    lines.push(Line::from(vec![
-                        Span::styled(label, style),
-                        Span::styled(suffix.to_string(), hint_style),
-                    ]));
+                for row in &display_rows[scroll_start..scroll_end] {
+                    match row {
+                        RecipeRowKind::Header(text) => {
+                            lines.push(Line::from(Span::styled(
+                                format!(" {}", text),
+                                Style::default().fg(Color::Rgb(140, 110, 170)),
+                            )));
+                        }
+                        RecipeRowKind::Recipe {
+                            recipe_list_idx,
+                            global_idx,
+                        } => {
+                            let r = &all_recipes[*global_idx];
+                            let is_selected = *recipe_list_idx == *cursor;
+                            let prefix = if is_selected { " > " } else { "   " };
+                            let style = if is_selected {
+                                Style::default()
+                                    .fg(Color::White)
+                                    .add_modifier(Modifier::BOLD)
+                            } else {
+                                Style::default().fg(Color::Rgb(120, 100, 150))
+                            };
+                            let label = format!(
+                                "{}{} {} + {} {}  ({:?})  cap: {:.0}/hr",
+                                prefix,
+                                resource_emoji(&r.input_a),
+                                resource_name(&r.input_a),
+                                resource_emoji(&r.input_b),
+                                resource_name(&r.input_b),
+                                r.node_nature,
+                                intake_cap,
+                            );
+                            lines.push(Line::from(Span::styled(label, style)));
+                        }
+                    }
                 }
                 lines
             }
@@ -266,17 +246,21 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                 vec![
                     Line::from(Span::styled(
                         format!(
-                            " {} + {} \u{2192} {}",
+                            " {} {} + {} {} \u{2192} {} {}",
+                            resource_emoji(&r.input_a),
                             resource_name(&r.input_a),
+                            resource_emoji(&r.input_b),
                             resource_name(&r.input_b),
+                            resource_emoji(&r.output),
                             resource_name(&r.output),
                         ),
                         Style::default().fg(Color::Rgb(180, 140, 220)),
                     )),
                     Line::from(Span::styled(
                         format!(
-                            " Step 2/4: Select sources for {}",
-                            resource_name(&r.input_a)
+                            " Step 2/4: Select sources for {} {}",
+                            resource_emoji(&r.input_a),
+                            resource_name(&r.input_a),
                         ),
                         Style::default().fg(Color::Rgb(140, 110, 170)),
                     )),
@@ -287,17 +271,21 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                 vec![
                     Line::from(Span::styled(
                         format!(
-                            " {} + {} \u{2192} {}",
+                            " {} {} + {} {} \u{2192} {} {}",
+                            resource_emoji(&r.input_a),
                             resource_name(&r.input_a),
+                            resource_emoji(&r.input_b),
                             resource_name(&r.input_b),
+                            resource_emoji(&r.output),
                             resource_name(&r.output),
                         ),
                         Style::default().fg(Color::Rgb(180, 140, 220)),
                     )),
                     Line::from(Span::styled(
                         format!(
-                            " Step 3/4: Select sources for {}",
-                            resource_name(&r.input_b)
+                            " Step 3/4: Select sources for {} {}",
+                            resource_emoji(&r.input_b),
+                            resource_name(&r.input_b),
                         ),
                         Style::default().fg(Color::Rgb(140, 110, 170)),
                     )),
@@ -305,18 +293,29 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
             }
             crate::loom::BuildStep::Confirm => {
                 let r = &recipes[build.recipe_index];
+                let intake_cap = crate::loom::logic::shuttle_effective_intake_cap(build.tier, 1);
+                let cost = crate::loom::shuttle_build_cost_public(build.tier);
                 vec![
                     Line::from(Span::styled(
                         format!(
-                            " {} + {} \u{2192} {}",
+                            " {} {} + {} {} \u{2192} {} {}",
+                            resource_emoji(&r.input_a),
                             resource_name(&r.input_a),
+                            resource_emoji(&r.input_b),
                             resource_name(&r.input_b),
+                            resource_emoji(&r.output),
                             resource_name(&r.output),
                         ),
                         Style::default().fg(Color::Rgb(180, 140, 220)),
                     )),
                     Line::from(Span::styled(
-                        " Step 4/4: Confirm build [Enter]",
+                        format!(
+                            " Step 4/4: Confirm  ~{:.0}/hr output  cost: {:.0} {} {}",
+                            intake_cap * r.amount,
+                            cost,
+                            resource_emoji(&r.input_a),
+                            resource_name(&r.input_a),
+                        ),
                         Style::default().fg(Color::Rgb(100, 200, 120)),
                     )),
                 ]
@@ -872,14 +871,67 @@ fn render_bottom_panel_pattern(frame: &mut Frame, area: Rect, loom: &LoomState, 
 
 // ── Build Shuttle Overlay ────────────────────────────────────────────────────
 
+/// Which kind of row appears in the grouped recipe display list.
+enum RecipeRowKind {
+    /// Group header line (output resource name).
+    Header(String),
+    /// A selectable recipe row. `recipe_list_idx` indexes into
+    /// `build.available_recipes`; `global_idx` is the index into `all_recipes()`.
+    Recipe {
+        recipe_list_idx: usize,
+        #[allow(dead_code)]
+        global_idx: usize,
+    },
+}
+
+/// Build the grouped display rows from sorted `available_recipes`.
+/// Inserts a header whenever the output resource changes.
+fn build_recipe_display_rows(available: &[usize]) -> Vec<RecipeRowKind> {
+    let all = crate::loom::recipes::all_recipes();
+    let mut rows = Vec::new();
+    let mut last_output: Option<crate::loom::types::Resource> = None;
+    for (list_idx, &global_idx) in available.iter().enumerate() {
+        let r = &all[global_idx];
+        if !last_output.is_some_and(|prev| prev == r.output) {
+            let header = format!(
+                "\u{2500}\u{2500} {} {} ",
+                resource_emoji(&r.output),
+                resource_name(&r.output),
+            );
+            rows.push(RecipeRowKind::Header(header));
+            last_output = Some(r.output);
+        }
+        rows.push(RecipeRowKind::Recipe {
+            recipe_list_idx: list_idx,
+            global_idx,
+        });
+    }
+    rows
+}
+
+/// Map a recipe cursor (index into `available_recipes`) to a display row index.
+fn cursor_to_display_row(rows: &[RecipeRowKind], cursor: usize) -> usize {
+    for (i, row) in rows.iter().enumerate() {
+        if let RecipeRowKind::Recipe {
+            recipe_list_idx, ..
+        } = row
+        {
+            if *recipe_list_idx == cursor {
+                return i;
+            }
+        }
+    }
+    0
+}
+
 fn render_build_overlay(frame: &mut Frame, area: Rect, loom_state: &LoomState, ui: &LoomUiState) {
     let build = match &ui.build {
         Some(b) => b,
         None => return,
     };
 
-    let popup_w = area.width.clamp(30, 50);
-    let popup_h = area.height.clamp(10, 20);
+    let popup_w = area.width.clamp(40, 64);
+    let popup_h = area.height.clamp(12, 24);
     let popup_x = area.x + (area.width.saturating_sub(popup_w)) / 2;
     let popup_y = area.y + (area.height.saturating_sub(popup_h)) / 2;
     let popup = Rect::new(popup_x, popup_y, popup_w, popup_h);
@@ -887,152 +939,338 @@ fn render_build_overlay(frame: &mut Frame, area: Rect, loom_state: &LoomState, u
     frame.render_widget(Clear, popup);
 
     let recipes = crate::loom::recipes::all_recipes();
+    let current_shuttles = loom_state.persistent.shuttles.len();
+    let max_shuttles = loom_state.persistent.max_shuttles();
 
     let (title, lines) = match &build.step {
+        // ── Phase 1: Grouped recipe selection ────────────────────────────
         crate::loom::BuildStep::SelectRecipe { cursor } => {
             let mut lines = Vec::new();
+
+            // Tier tab bar.
             let unlocked_tiers = crate::loom::unlocked_tiers(loom_state);
-            let tier_labels: String = unlocked_tiers
-                .iter()
-                .map(|t| {
-                    if *t == build.tier {
-                        format!("[T{}]", t)
-                    } else {
-                        format!(" T{} ", t)
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join("");
-            lines.push(Line::from(Span::styled(
-                format!(" {} Recipes:", tier_labels),
-                Style::default().fg(Color::Rgb(180, 140, 220)),
-            )));
-            if unlocked_tiers.len() > 1 {
-                lines.push(Line::from(Span::styled(
-                    " [Tab] Switch Tier",
-                    Style::default().fg(Color::DarkGray),
-                )));
-            }
-            lines.push(Line::from(""));
-            for (i, &ridx) in build.available_recipes.iter().enumerate() {
-                let r = &recipes[ridx];
-                let marker = if i == *cursor { "\u{25b6} " } else { "  " };
-                let color = if i == *cursor {
-                    Color::White
+            let mut tab_spans: Vec<Span> = Vec::new();
+            tab_spans.push(Span::raw(" "));
+            for &t in &unlocked_tiers {
+                if t == build.tier {
+                    tab_spans.push(Span::styled(
+                        format!("[ T{} ]", t),
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD),
+                    ));
                 } else {
-                    Color::Rgb(140, 110, 170)
-                };
-                lines.push(Line::from(Span::styled(
-                    format!(
-                        "{}{} + {} \u{2192} {} ({:.1}x)",
-                        marker,
-                        resource_name(&r.input_a),
-                        resource_name(&r.input_b),
-                        resource_name(&r.output),
-                        r.amount,
-                    ),
-                    Style::default().fg(color),
-                )));
+                    tab_spans.push(Span::styled(
+                        format!("  T{}  ", t),
+                        Style::default().fg(Color::Rgb(80, 70, 100)),
+                    ));
+                }
+                tab_spans.push(Span::raw(" "));
             }
+            // Right-side hints.
+            let mut right_hints = String::new();
+            if unlocked_tiers.len() > 1 {
+                right_hints.push_str("  [Tab] tiers");
+            }
+            right_hints.push_str("  [Esc] cancel");
+            tab_spans.push(Span::styled(
+                right_hints,
+                Style::default().fg(Color::Rgb(80, 70, 100)),
+            ));
+            lines.push(Line::from(tab_spans));
             lines.push(Line::from(""));
-            let cost = crate::loom::shuttle_build_cost_public(build.tier);
+
+            // Build grouped display rows.
+            let display_rows = build_recipe_display_rows(&build.available_recipes);
+            let cursor_row = cursor_to_display_row(&display_rows, *cursor);
+
+            // Scrolling window (max 8 visible lines), centered on cursor.
+            let window_size: usize = 8;
+            let total_rows = display_rows.len();
+            let half = window_size / 2;
+            let scroll_start = if cursor_row >= half {
+                (cursor_row - half).min(total_rows.saturating_sub(window_size))
+            } else {
+                0
+            };
+            let scroll_end = (scroll_start + window_size).min(total_rows);
+
+            let intake_cap = crate::loom::logic::shuttle_effective_intake_cap(build.tier, 1);
+
+            for row in &display_rows[scroll_start..scroll_end] {
+                match row {
+                    RecipeRowKind::Header(text) => {
+                        // Pad header with horizontal rule characters to fill width.
+                        let padded = format!(
+                            " {}{}",
+                            text,
+                            "\u{2500}".repeat((popup_w as usize).saturating_sub(text.len() + 4))
+                        );
+                        lines.push(Line::from(Span::styled(
+                            padded,
+                            Style::default().fg(Color::Rgb(140, 110, 170)),
+                        )));
+                    }
+                    RecipeRowKind::Recipe {
+                        recipe_list_idx,
+                        global_idx,
+                    } => {
+                        let r = &recipes[*global_idx];
+                        let is_selected = *recipe_list_idx == *cursor;
+                        let prefix = if is_selected { " > " } else { "   " };
+                        let style = if is_selected {
+                            Style::default()
+                                .fg(Color::White)
+                                .add_modifier(Modifier::BOLD)
+                        } else {
+                            Style::default().fg(Color::Rgb(120, 100, 150))
+                        };
+                        let nature_str = format!("{:?}", r.node_nature);
+                        let label = format!(
+                            "{}{} {} + {} {}  ({})     cap: {:.0}/hr",
+                            prefix,
+                            resource_emoji(&r.input_a),
+                            resource_name(&r.input_a),
+                            resource_emoji(&r.input_b),
+                            resource_name(&r.input_b),
+                            nature_str,
+                            intake_cap,
+                        );
+                        lines.push(Line::from(Span::styled(label, style)));
+                    }
+                }
+            }
+
+            lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
-                format!(" Build cost: {:.0} of input A resource", cost),
-                Style::default().fg(Color::Rgb(100, 80, 130)),
+                " [\u{2191}\u{2193}] select  [Enter] next step",
+                Style::default().fg(Color::DarkGray),
             )));
-            (" Build Shuttle ", lines)
+
+            let title = format!(
+                " Build Shuttle \u{2500}\u{2500} [Shuttles: {}/{}] ",
+                current_shuttles, max_shuttles
+            );
+            (title, lines)
         }
+        // ── Phase 2A: Source selection for input A (both columns shown) ──
         crate::loom::BuildStep::SelectSourcesA { cursor, toggle } => {
             let r = &recipes[build.recipe_index];
             let mut lines = Vec::new();
+
+            // Header: recipe summary.
             lines.push(Line::from(Span::styled(
                 format!(
-                    " {} + {} \u{2192} {}",
+                    " Build: {} {} + {} {} \u{2192} {} {}  ({:?})",
+                    resource_emoji(&r.input_a),
                     resource_name(&r.input_a),
+                    resource_emoji(&r.input_b),
                     resource_name(&r.input_b),
-                    resource_name(&r.output)
+                    resource_emoji(&r.output),
+                    resource_name(&r.output),
+                    r.node_nature,
                 ),
                 Style::default().fg(Color::Rgb(180, 140, 220)),
             )));
             lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                format!(" Select sources for {}:", resource_name(&r.input_a)),
-                Style::default().fg(Color::Rgb(140, 110, 170)),
-            )));
-            for (i, src) in build.eligible_sources_a.iter().enumerate() {
-                let marker = if i == *cursor { "\u{25b6}" } else { " " };
-                let check = if toggle[i] { "[\u{2713}]" } else { "[ ]" };
-                let name = source_display_name(src, loom_state);
-                let color = if i == *cursor {
-                    Color::White
+
+            // Column headers.
+            let col_w = (popup_w as usize).saturating_sub(4) / 2;
+            let header_a = format!(
+                " Source A ({} {}):",
+                resource_emoji(&r.input_a),
+                resource_name(&r.input_a)
+            );
+            let header_b = format!(
+                "\u{2502} Source B ({} {}):",
+                resource_emoji(&r.input_b),
+                resource_name(&r.input_b)
+            );
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!("{:<width$}", header_a, width = col_w),
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(header_b, Style::default().fg(Color::Rgb(80, 70, 100))),
+            ]));
+
+            // Determine max rows needed.
+            let max_rows = build
+                .eligible_sources_a
+                .len()
+                .max(build.eligible_sources_b.len());
+            #[allow(clippy::needless_range_loop)]
+            for i in 0..max_rows {
+                let left = if i < build.eligible_sources_a.len() {
+                    let marker = if i == *cursor { "\u{25b6}" } else { " " };
+                    let check = if toggle[i] { "[\u{2713}]" } else { "[ ]" };
+                    let name = source_display_name(&build.eligible_sources_a[i], loom_state);
+                    let color = if i == *cursor {
+                        Color::White
+                    } else {
+                        Color::Rgb(140, 110, 170)
+                    };
+                    Span::styled(
+                        format!(
+                            " {} {} {:<width$}",
+                            marker,
+                            check,
+                            name,
+                            width = col_w.saturating_sub(9)
+                        ),
+                        Style::default().fg(color),
+                    )
                 } else {
-                    Color::Rgb(140, 110, 170)
+                    Span::styled(format!("{:<width$}", "", width = col_w), Style::default())
                 };
-                lines.push(Line::from(Span::styled(
-                    format!(" {} {} {}", marker, check, name),
-                    Style::default().fg(color),
-                )));
+
+                let right = if i < build.eligible_sources_b.len() {
+                    let name = source_display_name(&build.eligible_sources_b[i], loom_state);
+                    Span::styled(
+                        format!("\u{2502}     {}", name),
+                        Style::default().fg(Color::Rgb(80, 70, 100)),
+                    )
+                } else {
+                    Span::styled(
+                        "\u{2502}".to_string(),
+                        Style::default().fg(Color::Rgb(80, 70, 100)),
+                    )
+                };
+
+                lines.push(Line::from(vec![left, right]));
             }
+
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
-                " [Space] Toggle  [Enter] Next",
+                " [\u{2191}\u{2193}] navigate  [Space] toggle  [Enter] confirm",
                 Style::default().fg(Color::DarkGray),
             )));
-            (" Sources: Input A ", lines)
+
+            (" Sources: Input A ".to_string(), lines)
         }
+        // ── Phase 2B: Source selection for input B (both columns shown) ──
         crate::loom::BuildStep::SelectSourcesB { cursor, toggle } => {
             let r = &recipes[build.recipe_index];
             let mut lines = Vec::new();
+
+            // Header: recipe summary.
             lines.push(Line::from(Span::styled(
                 format!(
-                    " {} + {} \u{2192} {}",
+                    " Build: {} {} + {} {} \u{2192} {} {}  ({:?})",
+                    resource_emoji(&r.input_a),
                     resource_name(&r.input_a),
+                    resource_emoji(&r.input_b),
                     resource_name(&r.input_b),
-                    resource_name(&r.output)
+                    resource_emoji(&r.output),
+                    resource_name(&r.output),
+                    r.node_nature,
                 ),
                 Style::default().fg(Color::Rgb(180, 140, 220)),
             )));
             lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                format!(" Select sources for {}:", resource_name(&r.input_b)),
-                Style::default().fg(Color::Rgb(140, 110, 170)),
-            )));
-            for (i, src) in build.eligible_sources_b.iter().enumerate() {
-                let marker = if i == *cursor { "\u{25b6}" } else { " " };
-                let check = if toggle[i] { "[\u{2713}]" } else { "[ ]" };
-                let name = source_display_name(src, loom_state);
-                let color = if i == *cursor {
-                    Color::White
+
+            // Column headers — B is active (bright), A is dimmed (already done).
+            let col_w = (popup_w as usize).saturating_sub(4) / 2;
+            let header_a = format!(
+                " Source A ({} {}):",
+                resource_emoji(&r.input_a),
+                resource_name(&r.input_a)
+            );
+            let header_b = format!(
+                "\u{2502} Source B ({} {}):",
+                resource_emoji(&r.input_b),
+                resource_name(&r.input_b)
+            );
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!("{:<width$}", header_a, width = col_w),
+                    Style::default().fg(Color::Rgb(80, 70, 100)),
+                ),
+                Span::styled(
+                    header_b,
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]));
+
+            // Determine max rows needed.
+            let max_rows = build
+                .selected_sources_a
+                .len()
+                .max(build.eligible_sources_b.len());
+            #[allow(clippy::needless_range_loop)]
+            for i in 0..max_rows {
+                // Left column: already-selected A sources (dimmed, with check marks).
+                let left = if i < build.selected_sources_a.len() {
+                    let name = source_display_name(&build.selected_sources_a[i], loom_state);
+                    Span::styled(
+                        format!(
+                            "   [\u{2713}] {:<width$}",
+                            name,
+                            width = col_w.saturating_sub(8)
+                        ),
+                        Style::default().fg(Color::Rgb(80, 70, 100)),
+                    )
                 } else {
-                    Color::Rgb(140, 110, 170)
+                    Span::styled(format!("{:<width$}", "", width = col_w), Style::default())
                 };
-                lines.push(Line::from(Span::styled(
-                    format!(" {} {} {}", marker, check, name),
-                    Style::default().fg(color),
-                )));
+
+                let right = if i < build.eligible_sources_b.len() {
+                    let marker = if i == *cursor { "\u{25b6}" } else { " " };
+                    let check = if toggle[i] { "[\u{2713}]" } else { "[ ]" };
+                    let name = source_display_name(&build.eligible_sources_b[i], loom_state);
+                    let color = if i == *cursor {
+                        Color::White
+                    } else {
+                        Color::Rgb(140, 110, 170)
+                    };
+                    Span::styled(
+                        format!("\u{2502} {} {} {}", marker, check, name),
+                        Style::default().fg(color),
+                    )
+                } else {
+                    Span::styled(
+                        "\u{2502}".to_string(),
+                        Style::default().fg(Color::Rgb(80, 70, 100)),
+                    )
+                };
+
+                lines.push(Line::from(vec![left, right]));
             }
+
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
-                " [Space] Toggle  [Enter] Next",
+                " [\u{2191}\u{2193}] navigate  [Space] toggle  [Enter] confirm",
                 Style::default().fg(Color::DarkGray),
             )));
-            (" Sources: Input B ", lines)
+
+            (" Sources: Input B ".to_string(), lines)
         }
+        // ── Phase 3: Confirm ─────────────────────────────────────────────
         crate::loom::BuildStep::Confirm => {
             let r = &recipes[build.recipe_index];
             let mut lines = Vec::new();
+
             lines.push(Line::from(Span::styled(
                 format!(
-                    " {} + {} \u{2192} {}",
+                    " Confirm Build: {} {} + {} {} \u{2192} {} {}",
+                    resource_emoji(&r.input_a),
                     resource_name(&r.input_a),
+                    resource_emoji(&r.input_b),
                     resource_name(&r.input_b),
-                    resource_name(&r.output)
+                    resource_emoji(&r.output),
+                    resource_name(&r.output),
                 ),
                 Style::default().fg(Color::Rgb(180, 140, 220)),
             )));
             lines.push(Line::from(""));
+
+            // Sources A summary.
             lines.push(Line::from(Span::styled(
-                " Sources A:",
+                format!(" Sources A ({}):", resource_name(&r.input_a)),
                 Style::default().fg(Color::Rgb(140, 110, 170)),
             )));
             for src in &build.selected_sources_a {
@@ -1041,8 +1279,10 @@ fn render_build_overlay(frame: &mut Frame, area: Rect, loom_state: &LoomState, u
                     Style::default().fg(Color::Rgb(120, 100, 160)),
                 )));
             }
+
+            // Sources B summary.
             lines.push(Line::from(Span::styled(
-                " Sources B:",
+                format!(" Sources B ({}):", resource_name(&r.input_b)),
                 Style::default().fg(Color::Rgb(140, 110, 170)),
             )));
             for src in &build.selected_sources_b {
@@ -1051,7 +1291,17 @@ fn render_build_overlay(frame: &mut Frame, area: Rect, loom_state: &LoomState, u
                     Style::default().fg(Color::Rgb(120, 100, 160)),
                 )));
             }
+
             lines.push(Line::from(""));
+
+            // Expected output rate.
+            let intake_cap = crate::loom::logic::shuttle_effective_intake_cap(build.tier, 1);
+            lines.push(Line::from(Span::styled(
+                format!(" Expected output: ~{:.0}/hr", intake_cap * r.amount),
+                Style::default().fg(Color::Rgb(120, 180, 160)),
+            )));
+
+            // Build cost.
             let cost = crate::loom::shuttle_build_cost_public(build.tier);
             let available = crate::loom::logic::available_resource(loom_state, r.input_a);
             let can_afford = available >= cost;
@@ -1062,14 +1312,16 @@ fn render_build_overlay(frame: &mut Frame, area: Rect, loom_state: &LoomState, u
             };
             lines.push(Line::from(Span::styled(
                 format!(
-                    " Cost: {:.0} {} (have {:.0})",
+                    " Build cost: {:.0} {} {} (have {:.0})",
                     cost,
+                    resource_emoji(&r.input_a),
                     resource_name(&r.input_a),
-                    available
+                    available,
                 ),
                 Style::default().fg(cost_color),
             )));
             lines.push(Line::from(""));
+
             if can_afford {
                 lines.push(Line::from(Span::styled(
                     " [Enter] Build  [Esc] Cancel",
@@ -1081,8 +1333,10 @@ fn render_build_overlay(frame: &mut Frame, area: Rect, loom_state: &LoomState, u
                     Style::default().fg(Color::Rgb(180, 80, 80)),
                 )));
             }
-            (" Confirm Build ", lines)
+
+            (" Confirm Build ".to_string(), lines)
         }
+        // ── Blocked ──────────────────────────────────────────────────────
         crate::loom::BuildStep::Blocked { message } => {
             let mut lines = Vec::new();
             lines.push(Line::from(""));
@@ -1095,7 +1349,7 @@ fn render_build_overlay(frame: &mut Frame, area: Rect, loom_state: &LoomState, u
                 " Press any key to dismiss",
                 Style::default().fg(Color::DarkGray),
             )));
-            (" Cannot Build ", lines)
+            (" Cannot Build ".to_string(), lines)
         }
     };
 
