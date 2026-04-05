@@ -116,9 +116,12 @@ pub fn compute_layout(lg: &LoomGraph, loom: &LoomState, width: f64, height: f64)
     let active_layers: Vec<usize> = (0..5).filter(|l| !layer_nodes[*l].is_empty()).collect();
     let num_active = active_layers.len();
 
-    // X positions for each active layer
-    let margin_x = width * 0.05;
-    let usable_w = width - 2.0 * margin_x;
+    // X positions for each active layer.
+    // Generous margins to prevent long gauge-bar labels from clipping at edges.
+    // Right margin is larger because pattern sink labels tend to be the widest.
+    let margin_left = width * 0.12;
+    let margin_right = width * 0.18;
+    let usable_w = width - margin_left - margin_right;
     let layer_x: HashMap<usize, f64> = if num_active == 1 {
         let mut m = HashMap::new();
         m.insert(active_layers[0], width / 2.0);
@@ -128,7 +131,7 @@ pub fn compute_layout(lg: &LoomGraph, loom: &LoomState, width: f64, height: f64)
             .iter()
             .enumerate()
             .map(|(i, &l)| {
-                let x = margin_x + usable_w * (i as f64) / (num_active as f64 - 1.0);
+                let x = margin_left + usable_w * (i as f64) / (num_active as f64 - 1.0);
                 (l, x)
             })
             .collect()
