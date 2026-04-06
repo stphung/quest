@@ -360,12 +360,12 @@ fn handle_build_input(
         BuildStep::SelectRecipe { cursor } => {
             let recipes = crate::loom::recipes::all_recipes();
             match key.code {
-                KeyCode::Tab | KeyCode::BackTab => {
-                    // Cycle through unlocked tiers.
+                KeyCode::Left | KeyCode::Right => {
+                    // Cycle through unlocked tiers with left/right arrows.
                     let tiers = crate::loom::unlocked_tiers(loom_state);
                     if tiers.len() > 1 {
                         let current_pos = tiers.iter().position(|&t| t == build.tier).unwrap_or(0);
-                        let next_pos = if key.code == KeyCode::Tab {
+                        let next_pos = if key.code == KeyCode::Right {
                             (current_pos + 1) % tiers.len()
                         } else {
                             (current_pos + tiers.len() - 1) % tiers.len()

@@ -197,9 +197,31 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                 let display_rows = build_recipe_display_rows(&build.available_recipes);
                 let cursor_row = cursor_to_display_row(&display_rows, *cursor);
 
-                // ── Left column: tier tabs + scrollable recipe list ──
-                let avail_h = left_area.height as usize;
-                let list_height = avail_h.saturating_sub(2); // tier tab line + hint line
+                // ── Left column: tier tabs (ratatui Tabs widget) + scrollable recipe list ──
+                let left_rows = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([Constraint::Length(1), Constraint::Min(0)])
+                    .split(left_area);
+
+                // Render tier tabs using ratatui Tabs widget.
+                let tiers = crate::loom::unlocked_tiers(loom);
+                let tab_titles: Vec<String> =
+                    tiers.iter().map(|t| format!(" Tier {} ", t)).collect();
+                let selected_tab = tiers.iter().position(|&t| t == build.tier).unwrap_or(0);
+                let tabs_widget = ratatui::widgets::Tabs::new(tab_titles)
+                    .select(selected_tab)
+                    .style(Style::default().fg(Color::Rgb(80, 70, 100)))
+                    .highlight_style(
+                        Style::default()
+                            .fg(LOOM_BORDER_COLOR)
+                            .add_modifier(Modifier::BOLD),
+                    )
+                    .divider(" ");
+                frame.render_widget(tabs_widget, left_rows[0]);
+
+                // Recipe list below tabs.
+                let avail_h = left_rows[1].height as usize;
+                let list_height = avail_h.saturating_sub(1); // hint line
                 let total_rows = display_rows.len();
 
                 let half = list_height / 2;
@@ -211,33 +233,6 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                 let scroll_end = (scroll_start + list_height).min(total_rows);
 
                 let mut left_lines: Vec<Line> = Vec::new();
-
-                // Tier tabs.
-                let tiers = crate::loom::unlocked_tiers(loom);
-                let mut tab_spans: Vec<Span> = vec![Span::raw(" ")];
-                for &t in &tiers {
-                    if t == build.tier {
-                        tab_spans.push(Span::styled(
-                            format!("[T{}]", t),
-                            Style::default()
-                                .fg(Color::White)
-                                .add_modifier(Modifier::BOLD),
-                        ));
-                    } else {
-                        tab_spans.push(Span::styled(
-                            format!(" T{} ", t),
-                            Style::default().fg(Color::Rgb(80, 70, 100)),
-                        ));
-                    }
-                    tab_spans.push(Span::raw(" "));
-                }
-                if tiers.len() > 1 {
-                    tab_spans.push(Span::styled(
-                        " [Tab] tiers",
-                        Style::default().fg(Color::Rgb(80, 70, 100)),
-                    ));
-                }
-                left_lines.push(Line::from(tab_spans));
 
                 // Scroll-up indicator.
                 if scroll_start > 0 {
@@ -328,7 +323,7 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
 
                 frame.render_widget(
                     Paragraph::new(left_lines).style(Style::default().bg(LOOM_BG)),
-                    left_area,
+                    left_rows[1],
                 );
 
                 // ── Right column: detail sidebar for selected recipe ──
