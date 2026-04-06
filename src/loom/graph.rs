@@ -427,14 +427,22 @@ pub fn update_edge_rates(lg: &mut LoomGraph, loom: &LoomState) {
                     0.0
                 }
             }
-            // Anything → PatternSink: use the source's production rate directly.
+            // Anything → PatternSink: split source rate by total outgoing edges
+            // so that a node feeding both a shuttle and a pattern doesn't show
+            // its full rate on each edge (which would look like it exceeds capacity).
             (_, LoomGraphNode::PatternSink(_)) => {
                 let src_ref = match &source_node {
                     LoomGraphNode::Extractor(id) => LoomNodeRef::Extractor(*id),
                     LoomGraphNode::Shuttle(idx) => LoomNodeRef::Shuttle(*idx),
                     _ => continue,
                 };
-                source_rates.get(&src_ref).copied().unwrap_or(0.0)
+                let available = source_rates.get(&src_ref).copied().unwrap_or(0.0);
+                let total_out = lg
+                    .graph
+                    .edges_directed(source_ni, petgraph::Direction::Outgoing)
+                    .count()
+                    .max(1);
+                available / total_out as f64
             }
             _ => 0.0,
         };

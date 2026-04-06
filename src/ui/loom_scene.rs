@@ -251,21 +251,6 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                 // Recipe list rows.
                 for row in &display_rows[scroll_start..scroll_end] {
                     match row {
-                        RecipeRowKind::Header(text) => {
-                            // Look up the output resource for this header to color it.
-                            let header_color = header_color_from_display_rows(
-                                &display_rows,
-                                row,
-                                all_recipes,
-                                &build.available_recipes,
-                            );
-                            left_lines.push(Line::from(Span::styled(
-                                format!(" {}", text),
-                                Style::default()
-                                    .fg(header_color)
-                                    .add_modifier(Modifier::BOLD),
-                            )));
-                        }
                         RecipeRowKind::Recipe {
                             recipe_list_idx,
                             global_idx,
@@ -1251,8 +1236,6 @@ fn render_bottom_panel_pattern(
 
 /// Which kind of row appears in the grouped recipe display list.
 enum RecipeRowKind {
-    /// Group header line (output resource name).
-    Header(String),
     /// A selectable recipe row. `recipe_list_idx` indexes into
     /// `build.available_recipes`; `global_idx` is the index into `all_recipes()`.
     Recipe {
@@ -1265,18 +1248,8 @@ enum RecipeRowKind {
 /// Build the grouped display rows from sorted `available_recipes`.
 /// Inserts a header whenever the output resource changes.
 fn build_recipe_display_rows(available: &[usize]) -> Vec<RecipeRowKind> {
-    let all = crate::loom::recipes::all_recipes();
     let mut rows = Vec::new();
-    let mut last_output: Option<crate::loom::types::Resource> = None;
     for (list_idx, &global_idx) in available.iter().enumerate() {
-        let r = &all[global_idx];
-        if !last_output.is_some_and(|prev| prev == r.output) {
-            let emoji = resource_emoji(&r.output);
-            let name = resource_name(&r.output);
-            let header = format!("{e}{e} {n} {e}{e}", e = emoji, n = name,);
-            rows.push(RecipeRowKind::Header(header));
-            last_output = Some(r.output);
-        }
         rows.push(RecipeRowKind::Recipe {
             recipe_list_idx: list_idx,
             global_idx,
@@ -1286,40 +1259,17 @@ fn build_recipe_display_rows(available: &[usize]) -> Vec<RecipeRowKind> {
 }
 
 /// Map a recipe cursor (index into `available_recipes`) to a display row index.
+/// With headers removed, this is a direct 1:1 mapping.
 fn cursor_to_display_row(rows: &[RecipeRowKind], cursor: usize) -> usize {
     for (i, row) in rows.iter().enumerate() {
-        if let RecipeRowKind::Recipe {
+        let RecipeRowKind::Recipe {
             recipe_list_idx, ..
-        } = row
-        {
-            if *recipe_list_idx == cursor {
-                return i;
-            }
+        } = row;
+        if *recipe_list_idx == cursor {
+            return i;
         }
     }
     0
-}
-
-/// Determine the color for a group header row by finding the first recipe
-/// that follows it and looking up its output resource color.
-fn header_color_from_display_rows(
-    display_rows: &[RecipeRowKind],
-    header_row: &RecipeRowKind,
-    all_recipes: &[crate::loom::recipes::Recipe],
-    available: &[usize],
-) -> Color {
-    // Find this header's position, then look at the next Recipe row.
-    let header_ptr = header_row as *const RecipeRowKind;
-    for (i, row) in display_rows.iter().enumerate() {
-        if std::ptr::eq(row, header_ptr) {
-            // Look at the next row for the recipe's output resource.
-            if let Some(RecipeRowKind::Recipe { global_idx, .. }) = display_rows.get(i + 1) {
-                let _ = available; // available not needed — global_idx is direct
-                return resource_color(&all_recipes[*global_idx].output);
-            }
-        }
-    }
-    Color::Rgb(140, 110, 170) // fallback
 }
 
 // ── Navigation hints ──────────────────────────────────────────────────────────
@@ -1366,26 +1316,6 @@ fn resource_name(resource: &crate::loom::types::Resource) -> &'static str {
         Resource::EmberEcho => "Ember Echo",
         Resource::PurifiedVoid => "Purified Void",
         Resource::WovenReality => "Woven Reality",
-    }
-}
-
-/// Color associated with each resource for UI highlights.
-fn resource_color(resource: &crate::loom::types::Resource) -> Color {
-    use crate::loom::types::Resource;
-    match resource {
-        Resource::Ember => Color::Rgb(255, 140, 0), // orange
-        Resource::Reflection => Color::Rgb(100, 180, 255), // sky blue
-        Resource::VoidEssence => Color::Rgb(160, 80, 220), // deep purple
-        Resource::Memory => Color::Rgb(220, 200, 80), // golden yellow
-        Resource::Silence => Color::Rgb(140, 140, 160), // silver gray
-        Resource::Resonance => Color::Rgb(200, 100, 100), // warm red
-        Resource::ForgedLight => Color::Rgb(255, 220, 100), // bright gold
-        Resource::EchoGlass => Color::Rgb(220, 240, 255), // ice white
-        Resource::StillbornSong => Color::Rgb(180, 140, 220), // soft violet
-        Resource::CondensedEmber => Color::Rgb(255, 180, 60), // amber
-        Resource::EmberEcho => Color::Rgb(200, 160, 200), // dusty rose
-        Resource::PurifiedVoid => Color::Rgb(180, 100, 240), // bright purple
-        Resource::WovenReality => Color::Rgb(100, 220, 200), // teal
     }
 }
 
