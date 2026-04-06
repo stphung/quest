@@ -894,135 +894,143 @@ fn render_bottom_panel_shuttle(
     };
 
     if shuttle.under_construction {
-        let secs = shuttle.construction_secs_remaining;
-        let lines = vec![
-            Line::from(Span::styled(
-                format!(" Shuttle {} \u{2014} Under Construction", shuttle_idx),
-                Style::default().fg(Color::Rgb(160, 120, 200)),
-            )),
-            Line::from(Span::styled(
-                format!(" ~{:.0}s remaining", secs),
-                Style::default().fg(Color::Rgb(100, 80, 130)),
-            )),
-        ];
+        let total = crate::loom::logic::shuttle_construction_secs(shuttle.tier);
+        let elapsed = total - shuttle.construction_secs_remaining;
+        let progress = if total > 0.0 {
+            (elapsed / total).clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+        let remaining = crate::ui::loom_graph::format_duration(shuttle.construction_secs_remaining);
+
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Min(0),
+            ])
+            .split(area);
+
         frame.render_widget(
-            Paragraph::new(lines).style(Style::default().bg(LOOM_BG)),
-            area,
+            Paragraph::new(Line::from(Span::styled(
+                format!(
+                    " {} {} \u{2022} Tier {} \u{2022} Under Construction",
+                    resource_emoji(&shuttle.output),
+                    resource_name(&shuttle.output),
+                    shuttle.tier
+                ),
+                Style::default().fg(Color::Rgb(180, 140, 220)),
+            )))
+            .style(Style::default().bg(LOOM_BG)),
+            rows[0],
+        );
+        let gauge = Gauge::default()
+            .ratio(progress)
+            .label(format!("{} remaining", remaining))
+            .gauge_style(
+                Style::default()
+                    .fg(Color::Rgb(180, 140, 220))
+                    .bg(Color::Rgb(30, 20, 40)),
+            );
+        frame.render_widget(gauge, rows[1]);
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                format!(
+                    " {} {} + {} {}",
+                    resource_emoji(&shuttle.input_a),
+                    resource_name(&shuttle.input_a),
+                    resource_emoji(&shuttle.input_b),
+                    resource_name(&shuttle.input_b)
+                ),
+                Style::default().fg(Color::Rgb(120, 100, 160)),
+            )))
+            .style(Style::default().bg(LOOM_BG)),
+            rows[2],
         );
         return;
     }
 
-    // Split into 3 columns: recipe | buffer+rate | status+upgrade.
-    let cols = Layout::default()
-        .direction(Direction::Horizontal)
+    // ── Layout B: output headline, recipe, gauge, output rate, demolish ──
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(35),
-            Constraint::Percentage(35),
-            Constraint::Percentage(30),
+            Constraint::Length(1), // output name + tier
+            Constraint::Length(1), // recipe line
+            Constraint::Length(1), // buffer gauge
+            Constraint::Length(1), // spacer
+            Constraint::Min(0),    // output rate + demolish
         ])
         .split(area);
 
-    // ── Left column: recipe and tier ──
-    let ea = resource_emoji(&shuttle.input_a);
-    let eb = resource_emoji(&shuttle.input_b);
+    // Line 1: output name + tier
     let eo = resource_emoji(&shuttle.output);
-    let mut left_lines: Vec<Line> = vec![
-        Line::from(Span::styled(
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
             format!(
-                " Shuttle {} \u{2022} T{} Lv{}",
-                shuttle_idx, shuttle.tier, shuttle.level
-            ),
-            Style::default().fg(Color::Rgb(180, 140, 220)),
-        )),
-        Line::from(Span::styled(
-            format!(
-                " {}{}+{}{}\u{2192}{}{}",
-                ea,
-                resource_name(&shuttle.input_a),
-                eb,
-                resource_name(&shuttle.input_b),
+                " {} {} \u{2022} Tier {}",
                 eo,
                 resource_name(&shuttle.output),
+                shuttle.tier
             ),
-            Style::default().fg(Color::Rgb(160, 120, 200)),
-        )),
-        Line::from(Span::styled(
-            format!(" Yield: x{:.1}/cycle", shuttle.amount),
-            Style::default().fg(Color::Rgb(100, 200, 120)),
-        )),
-    ];
-    left_lines.truncate(area.height as usize);
-    frame.render_widget(
-        Paragraph::new(left_lines).style(Style::default().bg(LOOM_BG)),
-        cols[0],
+            Style::default().fg(Color::Rgb(180, 140, 220)),
+        )))
+        .style(Style::default().bg(LOOM_BG)),
+        rows[0],
     );
 
-    // ── Middle column: buffer gauge + output rate ──
-    let mid_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1), Constraint::Min(0)])
-        .split(cols[1]);
+    // Line 2: recipe (inputs → output)
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            format!(
+                " {} {} + {} {}",
+                resource_emoji(&shuttle.input_a),
+                resource_name(&shuttle.input_a),
+                resource_emoji(&shuttle.input_b),
+                resource_name(&shuttle.input_b)
+            ),
+            Style::default().fg(Color::Rgb(120, 100, 160)),
+        )))
+        .style(Style::default().bg(LOOM_BG)),
+        rows[1],
+    );
 
+    // Line 3: full-width buffer gauge
     let fill = if shuttle.buffer_capacity > 0.0 {
         (shuttle.buffer / shuttle.buffer_capacity).min(1.0)
     } else {
         0.0
     };
     let bar_color = if fill >= 0.90 {
-        Color::Rgb(220, 60, 60)
-    } else if fill >= 0.75 {
         Color::Rgb(220, 180, 60)
     } else {
         Color::Rgb(60, 200, 100)
     };
-    let gauge_label = format!("{:.0}/{:.0}", shuttle.buffer, shuttle.buffer_capacity);
     let gauge = Gauge::default()
         .ratio(fill)
-        .label(gauge_label)
+        .label(format!(
+            "{:.0}/{:.0}",
+            shuttle.buffer, shuttle.buffer_capacity
+        ))
         .gauge_style(Style::default().fg(bar_color).bg(Color::Rgb(30, 20, 40)));
-    frame.render_widget(gauge, mid_chunks[0]);
+    frame.render_widget(gauge, rows[2]);
 
+    // Line 5: output rate + demolish (right-aligned)
     let output_rate = shuttle.output_rate_tracker.rate_per_hour();
-    let mut mid_lines: Vec<Line> = vec![Line::from(Span::styled(
-        format!(
-            " Output: {:.0}/hr {}",
-            output_rate,
-            resource_name(&shuttle.output)
-        ),
+    let mut bottom_lines: Vec<Line> = vec![Line::from(Span::styled(
+        format!(" Output: {:.0}/hr", output_rate),
         Style::default().fg(Color::Rgb(100, 200, 120)),
     ))];
-    // No intake cap — throughput limited by source rate and contention.
-    mid_lines.truncate(mid_chunks[1].height as usize);
-    frame.render_widget(
-        Paragraph::new(mid_lines).style(Style::default().bg(LOOM_BG)),
-        mid_chunks[1],
-    );
-
-    // ── Right column: status + demolish ──
-    let status_text = if shuttle.stalled {
-        " STALLED"
-    } else {
-        " Running"
-    };
-    let status_color = if shuttle.stalled {
-        Color::Rgb(220, 60, 60)
-    } else {
-        Color::Rgb(80, 200, 120)
-    };
-
-    let mut right_lines: Vec<Line> = vec![Line::from(Span::styled(
-        status_text,
-        Style::default().fg(status_color),
-    ))];
-
-    right_lines.push(Line::from(Span::styled(
+    bottom_lines.push(Line::from(""));
+    bottom_lines.push(Line::from(Span::styled(
         " [D]emolish",
         Style::default().fg(Color::DarkGray),
     )));
-    right_lines.truncate(area.height as usize);
+    bottom_lines.truncate(rows[4].height as usize);
     frame.render_widget(
-        Paragraph::new(right_lines).style(Style::default().bg(LOOM_BG)),
-        cols[2],
+        Paragraph::new(bottom_lines).style(Style::default().bg(LOOM_BG)),
+        rows[4],
     );
 }
 
