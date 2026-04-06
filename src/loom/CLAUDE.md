@@ -55,14 +55,7 @@ Instead of discrete pipe objects, shuttles pull directly from their declared sou
 
 **Contention model**: If multiple shuttles share a source, the source's available buffer is split equally among consumers. Each consumer gets `share = source_buffer / num_consumers`.
 
-**Intake caps** (`tier_intake_cap(tier)` in `logic.rs`):
-| Tier | Max intake per input slot (units/hour) |
-|------|---------------------------------------|
-| T1   | 20.0 |
-| T2   | 30.0 |
-| T3   | 40.0 |
-
-The actual pull per source is `min(intake_cap, share)`, summed across all sources for that input slot.
+**No intake cap**: There is no per-tier intake cap on shuttle throughput. Shuttle throughput is limited only by the source node's output rate and contention splitting among consumers. `tier_intake_cap()` exists in `logic.rs` but is used for display purposes only and does not gate actual production.
 
 **Source restrictions** (`valid_source_for_tier()` in `logic.rs`):
 - Extractors are always valid sources for any tier.
@@ -88,9 +81,21 @@ Shuttles are recipe-locked processing nodes that create multi-step production ch
 | T2 | 8 patterns complete | 150 of input_a resource |
 | T3 | 15 patterns complete | 100 of input_a resource |
 
-**Shuttle limit**: Governed by a milestone curve (`MAX_SHUTTLES = 12`). Capacity unlocks at specific pattern completion milestones rather than scaling 1:1 with pattern count.
+**Shuttle limit**: Governed by a milestone curve (`MAX_SHUTTLES = 5`). Capacity unlocks at specific pattern completion milestones:
+| Patterns completed | Shuttle slots |
+|--------------------|---------------|
+| 1 | 1 |
+| 4 | 2 |
+| 8 | 3 |
+| 12 | 4 |
+| 15+ | 5 |
 
-**Construction**: Shuttles have a 50-tick construction period. `tick_shuttle_construction()` decrements timers and marks them ready.
+**Construction**: Shuttles have a tier-based construction period. `tick_shuttle_construction()` decrements timers and marks them ready:
+| Tier | Construction time |
+|------|-------------------|
+| T1 | 2h (72000 ticks) |
+| T2 | 4h (144000 ticks) |
+| T3 | 6h (216000 ticks) |
 
 **Processing**: `tick_shuttle_pull(loom, delta_seconds)` runs the direct-pull simulation each tick, returning a map of `Resource → amount produced` for pattern tracking.
 
@@ -107,9 +112,9 @@ Woven Patterns use sustained production rates rather than accumulated totals:
 - `PatternRequirement::sustained_secs` — seconds sustained so far (advances when rate >= threshold, pauses when below)
 - `PatternRequirement::completed` — whether this individual requirement is complete (locks independently)
 - Pattern completes when all requirements have `completed = true`
-- Requirements complete independently — the player doesn't need to sustain all resources simultaneously
+- Requirements must be met **simultaneously**: ALL resource rates must be at or above their thresholds at the same time for any timers to advance. If even one resource drops below its threshold, no requirement timers advance — the entire pattern is paused until all rates recover.
 - Rate measurement uses a 60-second rolling window (`RateTracker` struct, transient, not serialized)
-- Simple pause model: progress never decays, only pauses when rate drops below threshold
+- Simple pause model: progress never decays, only pauses when any rate drops below threshold
 
 ## Production Chain Flow
 
@@ -122,9 +127,25 @@ Extractor (base production) → [direct pull] → Shuttle (recipe processing) �
 3. Shuttles consume input resources and produce output resources into their buffer
 4. `tick_pattern_sustain()` draws from stockpiles and shuttle output to advance pattern requirements
 
+## Base Production Rate
+
+Extractors produce at a base rate of **25/hr** (at level 1). Higher levels multiply this base rate via `node_level_multiplier(level)`.
+
+## Recipes
+
+The Loom has **7 exclusive recipes** split across tiers with no overlap — each output resource belongs to exactly one tier:
+
+| Tier | Count | Notes |
+|------|-------|-------|
+| T1 | 3 recipes | Combine base extractor resources into T1 outputs |
+| T2 | 3 recipes | Combine T1 (and/or base) resources into T2 outputs |
+| T3 | 1 recipe | Produces the single T3 output resource |
+
+Each recipe is identified by `(input_a, input_b, nature)` and looked up via `lookup_recipe(a, b, nature)` in `recipes.rs`. `recipes_by_nature()` returns all recipes filtered by nature type.
+
 ## UI (in `src/ui/loom_scene.rs` and `src/ui/loom_graph.rs`)
 
-Single graph view:
+Single graph view (the Codex was removed; FlowView was replaced by GraphView):
 - **GraphView**: Canvas-based DAG visualization using petgraph. Nodes arranged in layers — extractors (layer 0), T1/T2/T3 shuttles (layers 1–3), pattern sinks (layer 4). Animated edges with particles and glow propagation reflecting live flow rates. Bottom panel shows node detail, build flow, or pattern info depending on selection. Layout computed by `layout.rs` (Sugiyama algorithm).
 
 Shuttle nodes show: recipe name, tier badge, construction progress, buffer levels, stall indicator.
@@ -160,6 +181,22 @@ Shuttles can be upgraded to increase their intake cap. Each level adds 0.5x to t
 | VIII | 5 |
 | IX | 7 |
 | X | 10 |
+
+## Extractor Upgrade Lockout
+
+When an Extractor is upgraded, it enters a lockout period:
+
+- **Buffer drain**: 50% of the extractor's current buffer is consumed on upgrade start.
+- **Lockout duration**: `level * 2h` (e.g., upgrading to level 2 = 2h lockout, level 3 = 4h, etc.)
+- **Zero production**: The extractor produces nothing during the lockout period.
+- **Rate tracker cleared**: The `RateTracker` for that extractor is reset when the upgrade begins, so rolling-window rates reflect only post-upgrade production.
+
+## Wall-Clock Time Model
+
+The Loom uses **wall-clock time** (`chrono::Utc::now()`) rather than tick-based time for timers (construction, upgrade lockout, pattern sustain durations). Key implications:
+
+- Chrono Surge (the game's tick-acceleration mechanic) does **not** accelerate Loom timers — the Loom is skipped during surge processing.
+- The debug `time_warp` tool does advance Loom wall-clock timers and can be used to fast-forward construction and lockout periods during development.
 
 ## WR→PR Generation
 
