@@ -408,13 +408,6 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                         ),
                         Style::default().fg(b_color),
                     )));
-
-                    // Hints.
-                    right_lines.push(Line::from(""));
-                    right_lines.push(Line::from(Span::styled(
-                        " [Enter] next  [Esc] cancel",
-                        Style::default().fg(Color::Rgb(80, 70, 100)),
-                    )));
                 }
 
                 frame.render_widget(
@@ -443,7 +436,7 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                     )),
                     Line::from(Span::styled(
                         format!(
-                            " Select sources for {} {}:  [Space] toggle  [Enter] confirm",
+                            " Select sources for {} {}:",
                             resource_emoji(&r.input_a),
                             resource_name(&r.input_a),
                         ),
@@ -489,7 +482,7 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                     )),
                     Line::from(Span::styled(
                         format!(
-                            " Select sources for {} {}:  [Space] toggle  [Enter] confirm",
+                            " Select sources for {} {}:",
                             resource_emoji(&r.input_b),
                             resource_name(&r.input_b),
                         ),
@@ -842,12 +835,7 @@ fn render_bottom_panel_extractor(
             Style::default().fg(dim),
         )));
         upgrade_lines.push(Line::from(""));
-        if can_afford {
-            upgrade_lines.push(Line::from(Span::styled(
-                " Press [U] to begin upgrade",
-                Style::default().fg(Color::Rgb(200, 180, 240)),
-            )));
-        } else {
+        if !can_afford {
             upgrade_lines.push(Line::from(Span::styled(
                 format!(" Need {:.0} in buffer (have {:.0})", drain, node.buffer),
                 Style::default().fg(Color::Rgb(160, 60, 60)),
@@ -1017,11 +1005,6 @@ fn render_bottom_panel_shuttle(
         format!(" Output: {:.0}/hr", output_rate),
         Style::default().fg(Color::Rgb(100, 200, 120)),
     ))];
-    bottom_lines.push(Line::from(""));
-    bottom_lines.push(Line::from(Span::styled(
-        " [D]emolish",
-        Style::default().fg(Color::DarkGray),
-    )));
     bottom_lines.truncate(rows[4].height as usize);
     frame.render_widget(
         Paragraph::new(bottom_lines).style(Style::default().bg(LOOM_BG)),
@@ -1280,10 +1263,22 @@ fn render_nav_hints(frame: &mut Frame, area: Rect, ui: &LoomUiState) {
         return;
     }
 
-    let hints = if ui.build.is_some() {
-        " [Up/Down] Select  [Space] Toggle  [Enter] Confirm  [Esc] Cancel "
+    let hints = if let Some(build) = &ui.build {
+        match &build.step {
+            crate::loom::BuildStep::SelectRecipe { .. } => {
+                " [\u{2191}\u{2193}] Select  [\u{2190}\u{2192}] Tier  [Enter] Next  [Esc] Cancel "
+            }
+            crate::loom::BuildStep::SelectSourcesA { .. }
+            | crate::loom::BuildStep::SelectSourcesB { .. } => {
+                " [\u{2191}\u{2193}] Navigate  [Space] Toggle  [Enter] Confirm  [Esc] Back "
+            }
+            crate::loom::BuildStep::Confirm => " [Enter] Build  [Esc] Cancel ",
+            crate::loom::BuildStep::Blocked { .. } => " Press any key to dismiss ",
+        }
+    } else if ui.demolish_pending {
+        " [D] Confirm Demolish  [Any] Cancel "
     } else {
-        " [Arrows] Navigate  [U] Upgrade  [B] Build  [D] Demolish  [Esc] Close "
+        " [\u{2191}\u{2193}\u{2190}\u{2192}] Navigate  [U] Upgrade  [B] Build  [D] Demolish  [Esc] Close "
     };
 
     let hint_line = Line::from(Span::styled(hints, Style::default().fg(Color::DarkGray)));
