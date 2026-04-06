@@ -1286,16 +1286,16 @@ fn render_nav_hints(frame: &mut Frame, area: Rect, ui: &LoomUiState) {
         });
         match selected_node {
             Some(LoomGraphNode::Extractor(_)) => {
-                " [\u{2191}\u{2193}\u{2190}\u{2192}] Navigate  [U] Upgrade  [B] Build  [Esc] Close "
+                " [\u{2191}\u{2193}\u{2190}\u{2192}] Navigate  [U] Upgrade  [B] Build Shuttle  [Esc] Close "
             }
             Some(LoomGraphNode::Shuttle(_)) => {
-                " [\u{2191}\u{2193}\u{2190}\u{2192}] Navigate  [B] Build  [D] Demolish  [Esc] Close "
+                " [\u{2191}\u{2193}\u{2190}\u{2192}] Navigate  [B] Build Shuttle  [D] Demolish  [Esc] Close "
             }
             Some(LoomGraphNode::PatternSink(_)) => {
-                " [\u{2191}\u{2193}\u{2190}\u{2192}] Navigate  [B] Build  [Esc] Close "
+                " [\u{2191}\u{2193}\u{2190}\u{2192}] Navigate  [B] Build Shuttle  [Esc] Close "
             }
             None => {
-                " [\u{2191}\u{2193}\u{2190}\u{2192}] Navigate  [B] Build  [Esc] Close "
+                " [\u{2191}\u{2193}\u{2190}\u{2192}] Navigate  [B] Build Shuttle  [Esc] Close "
             }
         }
     };
