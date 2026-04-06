@@ -1,5 +1,6 @@
 //! Loom of Worlds overlay input handling.
-#![allow(dead_code)]
+//!
+//! Graph view navigation (arrow keys follow topology), shuttle build/demolish flows.
 
 use super::types::InputResult;
 use crate::loom::graph::{LoomGraph, LoomGraphNode};
@@ -23,7 +24,7 @@ fn siblings_in_layer(
         .filter(|&idx| node_layer(&graph.graph[idx], loom) == current_layer)
         .map(|idx| (idx, layout.node_positions[&idx].1))
         .collect();
-    siblings.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    siblings.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
     siblings.into_iter().map(|(idx, _)| idx).collect()
 }
 
@@ -44,7 +45,7 @@ fn navigate_right(
         .min_by(|a, b| {
             let da = (layout.node_positions[a].1 - current_y).abs();
             let db = (layout.node_positions[b].1 - current_y).abs();
-            da.partial_cmp(&db).unwrap()
+            da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
         });
 
     if via_edge.is_some() {
@@ -61,7 +62,7 @@ fn navigate_right(
             .min_by(|a, b| {
                 let da = (layout.node_positions[a].1 - current_y).abs();
                 let db = (layout.node_positions[b].1 - current_y).abs();
-                da.partial_cmp(&db).unwrap()
+                da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
             });
         if candidate.is_some() {
             return candidate;
@@ -87,7 +88,7 @@ fn navigate_left(
         .min_by(|a, b| {
             let da = (layout.node_positions[a].1 - current_y).abs();
             let db = (layout.node_positions[b].1 - current_y).abs();
-            da.partial_cmp(&db).unwrap()
+            da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
         });
 
     if via_edge.is_some() {
@@ -107,7 +108,7 @@ fn navigate_left(
             .min_by(|a, b| {
                 let da = (layout.node_positions[a].1 - current_y).abs();
                 let db = (layout.node_positions[b].1 - current_y).abs();
-                da.partial_cmp(&db).unwrap()
+                da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
             });
         if candidate.is_some() {
             return candidate;

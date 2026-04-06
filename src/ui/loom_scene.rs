@@ -194,8 +194,7 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                 let right_area = cols[1];
 
                 let all_recipes = crate::loom::recipes::all_recipes();
-                let display_rows = build_recipe_display_rows(&build.available_recipes);
-                let cursor_row = cursor_to_display_row(&display_rows, *cursor);
+                let cursor_row = *cursor;
 
                 // ── Left column: tier tabs (ratatui Tabs widget) + scrollable recipe list ──
                 let left_rows = Layout::default()
@@ -222,7 +221,7 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                 // Recipe list below tabs.
                 let avail_h = left_rows[1].height as usize;
                 let list_height = avail_h.saturating_sub(1); // hint line
-                let total_rows = display_rows.len();
+                let total_rows = build.available_recipes.len();
 
                 let half = list_height / 2;
                 let scroll_start = if cursor_row >= half {
@@ -243,73 +242,72 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                 }
 
                 // Recipe list rows.
-                for row in &display_rows[scroll_start..scroll_end] {
-                    match row {
-                        RecipeRowKind::Recipe {
-                            recipe_list_idx,
-                            global_idx,
-                        } => {
-                            let r = &all_recipes[*global_idx];
-                            let is_selected = *recipe_list_idx == *cursor;
+                for (i, &global_idx) in build.available_recipes[scroll_start..scroll_end]
+                    .iter()
+                    .enumerate()
+                {
+                    {
+                        let recipe_list_idx = scroll_start + i;
+                        let r = &all_recipes[global_idx];
+                        let is_selected = recipe_list_idx == *cursor;
 
-                            let sources_a =
-                                crate::loom::eligible_sources_for_tier(loom, build.tier, r.input_a);
-                            let sources_b =
-                                crate::loom::eligible_sources_for_tier(loom, build.tier, r.input_b);
-                            let missing_a = sources_a.is_empty();
-                            let missing_b = sources_b.is_empty();
-                            let buildable = !missing_a && !missing_b;
+                        let sources_a =
+                            crate::loom::eligible_sources_for_tier(loom, build.tier, r.input_a);
+                        let sources_b =
+                            crate::loom::eligible_sources_for_tier(loom, build.tier, r.input_b);
+                        let missing_a = sources_a.is_empty();
+                        let missing_b = sources_b.is_empty();
+                        let buildable = !missing_a && !missing_b;
 
-                            let prefix = if is_selected { " \u{25b6} " } else { "   " };
-                            let style = if !buildable {
-                                Style::default().fg(Color::Rgb(80, 50, 60))
-                            } else if is_selected {
-                                Style::default()
-                                    .fg(Color::White)
-                                    .add_modifier(Modifier::BOLD)
-                            } else {
-                                Style::default().fg(Color::Rgb(120, 100, 150))
-                            };
+                        let prefix = if is_selected { " \u{25b6} " } else { "   " };
+                        let style = if !buildable {
+                            Style::default().fg(Color::Rgb(80, 50, 60))
+                        } else if is_selected {
+                            Style::default()
+                                .fg(Color::White)
+                                .add_modifier(Modifier::BOLD)
+                        } else {
+                            Style::default().fg(Color::Rgb(120, 100, 150))
+                        };
 
-                            let mut spans = vec![
-                                Span::styled(
-                                    format!(
-                                        "{}{} {}",
-                                        prefix,
-                                        resource_emoji(&r.output),
-                                        resource_name(&r.output),
-                                    ),
-                                    style,
+                        let mut spans = vec![
+                            Span::styled(
+                                format!(
+                                    "{}{} {}",
+                                    prefix,
+                                    resource_emoji(&r.output),
+                                    resource_name(&r.output),
                                 ),
-                                Span::styled(
-                                    format!(
-                                        "    \u{2190} {}+{}",
-                                        resource_emoji(&r.input_a),
-                                        resource_emoji(&r.input_b),
-                                    ),
-                                    Style::default().fg(Color::Rgb(80, 70, 110)),
+                                style,
+                            ),
+                            Span::styled(
+                                format!(
+                                    "    \u{2190} {}+{}",
+                                    resource_emoji(&r.input_a),
+                                    resource_emoji(&r.input_b),
                                 ),
-                            ];
+                                Style::default().fg(Color::Rgb(80, 70, 110)),
+                            ),
+                        ];
 
-                            if missing_a && missing_b {
-                                spans.push(Span::styled(
-                                    "  \u{2717} no sources",
-                                    Style::default().fg(Color::Rgb(120, 50, 50)),
-                                ));
-                            } else if missing_a {
-                                spans.push(Span::styled(
-                                    format!("  \u{2717} no {}", resource_name(&r.input_a)),
-                                    Style::default().fg(Color::Rgb(120, 50, 50)),
-                                ));
-                            } else if missing_b {
-                                spans.push(Span::styled(
-                                    format!("  \u{2717} no {}", resource_name(&r.input_b)),
-                                    Style::default().fg(Color::Rgb(120, 50, 50)),
-                                ));
-                            }
-
-                            left_lines.push(Line::from(spans));
+                        if missing_a && missing_b {
+                            spans.push(Span::styled(
+                                "  \u{2717} no sources",
+                                Style::default().fg(Color::Rgb(120, 50, 50)),
+                            ));
+                        } else if missing_a {
+                            spans.push(Span::styled(
+                                format!("  \u{2717} no {}", resource_name(&r.input_a)),
+                                Style::default().fg(Color::Rgb(120, 50, 50)),
+                            ));
+                        } else if missing_b {
+                            spans.push(Span::styled(
+                                format!("  \u{2717} no {}", resource_name(&r.input_b)),
+                                Style::default().fg(Color::Rgb(120, 50, 50)),
+                            ));
                         }
+
+                        left_lines.push(Line::from(spans));
                     }
                 }
 
@@ -1232,46 +1230,6 @@ fn render_bottom_panel_pattern(
             frame.render_widget(gauge, gauge_area);
         }
     }
-}
-
-// ── Build Shuttle Overlay ────────────────────────────────────────────────────
-
-/// Which kind of row appears in the grouped recipe display list.
-enum RecipeRowKind {
-    /// A selectable recipe row. `recipe_list_idx` indexes into
-    /// `build.available_recipes`; `global_idx` is the index into `all_recipes()`.
-    Recipe {
-        recipe_list_idx: usize,
-        #[allow(dead_code)]
-        global_idx: usize,
-    },
-}
-
-/// Build the grouped display rows from sorted `available_recipes`.
-/// Inserts a header whenever the output resource changes.
-fn build_recipe_display_rows(available: &[usize]) -> Vec<RecipeRowKind> {
-    let mut rows = Vec::new();
-    for (list_idx, &global_idx) in available.iter().enumerate() {
-        rows.push(RecipeRowKind::Recipe {
-            recipe_list_idx: list_idx,
-            global_idx,
-        });
-    }
-    rows
-}
-
-/// Map a recipe cursor (index into `available_recipes`) to a display row index.
-/// With headers removed, this is a direct 1:1 mapping.
-fn cursor_to_display_row(rows: &[RecipeRowKind], cursor: usize) -> usize {
-    for (i, row) in rows.iter().enumerate() {
-        let RecipeRowKind::Recipe {
-            recipe_list_idx, ..
-        } = row;
-        if *recipe_list_idx == cursor {
-            return i;
-        }
-    }
-    0
 }
 
 // ── Navigation hints ──────────────────────────────────────────────────────────

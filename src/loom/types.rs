@@ -491,11 +491,11 @@ impl Default for LoomUiState {
     }
 }
 
-/// Rolling window rate tracker for measuring resource production over 60 seconds.
+/// Rolling window rate tracker for measuring resource production over 20 seconds.
 ///
-/// Uses a circular buffer of 600 ticks (at 100ms/tick = 60 seconds).
+/// Uses a circular buffer of 200 ticks (at 100ms/tick = 20 seconds).
 /// The running sum gives O(1) per-tick updates. Not serialized — on load,
-/// it starts empty and ramps up over 60 seconds.
+/// it starts empty and ramps up over 20 seconds.
 const RATE_WINDOW_SIZE: usize = 200;
 const TICKS_PER_HOUR: f64 = 36_000.0;
 
