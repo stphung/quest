@@ -533,7 +533,10 @@ pub fn tick_shuttle_pull(
                 r.buffer = (r.buffer + output_this_tick).min(r.buffer_capacity);
                 r.stalled = false;
                 *produced.entry(r.output).or_insert(0.0) += output_this_tick;
-                r.output_rate_tracker.push(output_this_tick);
+                // Push un-warped amount so rate_per_hour() reflects logical rate,
+                // consistent with extractor rate_trackers in tick_stages.rs.
+                let warp = loom.time_warp.max(1.0);
+                r.output_rate_tracker.push(output_this_tick / warp);
             } else {
                 loom.persistent.shuttles[idx].output_rate_tracker.push(0.0);
             }

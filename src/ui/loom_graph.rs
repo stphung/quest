@@ -369,7 +369,6 @@ fn build_node_render_info(
 ) -> NodeRenderInfo {
     let (cx, cy) = layout_to_canvas(lx, ly, bounds, canvas_width, canvas_height);
     let gauge_width = 8;
-    let warp = loom.time_warp.max(1.0); // divide displayed rates by time warp factor
 
     match node {
         LoomGraphNode::Extractor(id) => {
@@ -475,7 +474,7 @@ fn build_node_render_info(
                     } else {
                         0.0
                     };
-                    let rate = s.output_rate_tracker.rate_per_hour() / warp;
+                    let rate = s.output_rate_tracker.rate_per_hour();
                     (fill, format!("{:.0}/hr", rate))
                 };
                 NodeRenderInfo {

@@ -231,7 +231,12 @@ pub(super) fn handle_loom(
                             loom_ui.demolish_pending = true;
                         }
                     }
+                } else {
+                    // Not a shuttle — clear any pending demolish.
+                    loom_ui.demolish_pending = false;
                 }
+            } else {
+                loom_ui.demolish_pending = false;
             }
             InputResult::Continue
         }

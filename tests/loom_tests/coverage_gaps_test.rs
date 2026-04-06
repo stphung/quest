@@ -803,3 +803,52 @@ fn test_build_shuttle_t2_locked_before_8_patterns() {
         result.as_ref().err()
     );
 }
+
+/// Shuttle should produce zero output when one of its source extractors is upgrading.
+#[test]
+fn test_shuttle_pulls_zero_from_upgrading_extractor() {
+    let mut loom = setup_loom();
+    complete_n_patterns(&mut loom, 1); // Need 1 pattern for T1 shuttle
+
+    // Set extractors to level 2 with full buffers.
+    set_extractor_level(&mut loom, NodeId::EmberSpindle, 2);
+    set_extractor_level(&mut loom, NodeId::VoidCondenser, 2);
+
+    // Build a ForgedLight T1 shuttle (Ember + VoidEssence, Heat nature).
+    loom.persistent.shuttles.push(make_t1_shuttle(
+        Resource::Ember,
+        NodeId::EmberSpindle,
+        Resource::VoidEssence,
+        NodeId::VoidCondenser,
+        NodeNature::Heat,
+        Resource::ForgedLight,
+    ));
+
+    // Run several ticks to establish a non-zero output rate.
+    run_ticks(&mut loom, 100);
+
+    let rate_before = loom.persistent.shuttles[0]
+        .output_rate_tracker
+        .rate_per_hour();
+    assert!(
+        rate_before > 0.0,
+        "Shuttle should produce ForgedLight before upgrade, got {rate_before}"
+    );
+
+    // Start upgrading Ember Spindle — it should produce 0 during upgrade.
+    loom.persistent.nodes[NodeId::EmberSpindle.index()].upgrading = true;
+
+    // Clear the shuttle's rate tracker so we measure only post-upgrade ticks.
+    loom.persistent.shuttles[0].output_rate_tracker = RateTracker::new();
+
+    // Run more ticks — shuttle should get 0 from Ember, producing 0 ForgedLight.
+    run_ticks(&mut loom, 100);
+
+    let rate_after = loom.persistent.shuttles[0]
+        .output_rate_tracker
+        .rate_per_hour();
+    assert!(
+        rate_after < 0.01,
+        "Shuttle should produce ~0 ForgedLight while Ember is upgrading, got {rate_after}"
+    );
+}

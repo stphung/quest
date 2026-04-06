@@ -995,7 +995,7 @@ fn render_bottom_panel_shuttle(
         .gauge_style(Style::default().fg(bar_color).bg(Color::Rgb(30, 20, 40)));
     frame.render_widget(gauge, mid_chunks[0]);
 
-    let output_rate = shuttle.output_rate_tracker.rate_per_hour() / loom.time_warp.max(1.0);
+    let output_rate = shuttle.output_rate_tracker.rate_per_hour();
     let mut mid_lines: Vec<Line> = vec![Line::from(Span::styled(
         format!(
             " Output: {:.0}/hr {}",
