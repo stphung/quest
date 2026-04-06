@@ -1375,19 +1375,19 @@ fn resource_name(resource: &crate::loom::types::Resource) -> &'static str {
 fn resource_color(resource: &crate::loom::types::Resource) -> Color {
     use crate::loom::types::Resource;
     match resource {
-        Resource::Ember => Color::Rgb(255, 140, 50),
-        Resource::Reflection => Color::Rgb(80, 200, 220),
-        Resource::VoidEssence => Color::Rgb(160, 80, 220),
-        Resource::Memory => Color::Rgb(220, 200, 80),
-        Resource::Silence => Color::Rgb(140, 140, 160),
-        Resource::Resonance => Color::Rgb(80, 140, 255),
-        Resource::ForgedLight => Color::Rgb(255, 220, 100),
-        Resource::EchoGlass => Color::Rgb(180, 220, 240),
-        Resource::StillbornSong => Color::Rgb(180, 140, 220),
-        Resource::CondensedEmber => Color::Rgb(100, 180, 220),
-        Resource::EmberEcho => Color::Rgb(200, 180, 220),
-        Resource::PurifiedVoid => Color::Rgb(180, 100, 220),
-        Resource::WovenReality => Color::Rgb(100, 200, 180),
+        Resource::Ember => Color::Rgb(255, 140, 0), // orange
+        Resource::Reflection => Color::Rgb(100, 180, 255), // sky blue
+        Resource::VoidEssence => Color::Rgb(160, 80, 220), // deep purple
+        Resource::Memory => Color::Rgb(220, 200, 80), // golden yellow
+        Resource::Silence => Color::Rgb(140, 140, 160), // silver gray
+        Resource::Resonance => Color::Rgb(200, 100, 100), // warm red
+        Resource::ForgedLight => Color::Rgb(255, 220, 100), // bright gold
+        Resource::EchoGlass => Color::Rgb(220, 240, 255), // ice white
+        Resource::StillbornSong => Color::Rgb(180, 140, 220), // soft violet
+        Resource::CondensedEmber => Color::Rgb(255, 180, 60), // amber
+        Resource::EmberEcho => Color::Rgb(200, 160, 200), // dusty rose
+        Resource::PurifiedVoid => Color::Rgb(180, 100, 240), // bright purple
+        Resource::WovenReality => Color::Rgb(100, 220, 200), // teal
     }
 }
 
