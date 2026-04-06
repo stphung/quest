@@ -1278,7 +1278,26 @@ fn render_nav_hints(frame: &mut Frame, area: Rect, ui: &LoomUiState) {
     } else if ui.demolish_pending {
         " [D] Confirm Demolish  [Any] Cancel "
     } else {
-        " [\u{2191}\u{2193}\u{2190}\u{2192}] Navigate  [U] Upgrade  [B] Build  [D] Demolish  [Esc] Close "
+        // Context-sensitive hints based on selected node type.
+        use crate::loom::graph::LoomGraphNode;
+        let selected_node = ui.loom_graph.as_ref().and_then(|g| {
+            ui.selected_graph_node
+                .and_then(|ni| g.graph.node_weight(ni))
+        });
+        match selected_node {
+            Some(LoomGraphNode::Extractor(_)) => {
+                " [\u{2191}\u{2193}\u{2190}\u{2192}] Navigate  [U] Upgrade  [B] Build  [Esc] Close "
+            }
+            Some(LoomGraphNode::Shuttle(_)) => {
+                " [\u{2191}\u{2193}\u{2190}\u{2192}] Navigate  [B] Build  [D] Demolish  [Esc] Close "
+            }
+            Some(LoomGraphNode::PatternSink(_)) => {
+                " [\u{2191}\u{2193}\u{2190}\u{2192}] Navigate  [B] Build  [Esc] Close "
+            }
+            None => {
+                " [\u{2191}\u{2193}\u{2190}\u{2192}] Navigate  [B] Build  [Esc] Close "
+            }
+        }
     };
 
     let hint_line = Line::from(Span::styled(hints, Style::default().fg(Color::DarkGray)));
