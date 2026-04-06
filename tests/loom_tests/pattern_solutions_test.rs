@@ -653,55 +653,14 @@ fn test_pattern_18_resonance_cascade_is_solvable() {
 #[test]
 fn test_pattern_19_first_weave_is_solvable() {
     let mut loom = setup_loom(19);
-    // ForgedLight T1 + EchoGlass T1 + WovenReality T3.
-    // FL = min(Ember L4=62.5, Void L5=75) = 62.5.
-    // EG = min(Memory L3=50, Silence L6=87.5) = 50.
-    // WR T3 = min(FL shuttle=62.5, EG shuttle=50) = 50 >= 15.
-    set_extractor_level(&mut loom, NodeId::EmberSpindle, 4);
-    set_extractor_level(&mut loom, NodeId::VoidCondenser, 5);
-    set_extractor_level(&mut loom, NodeId::MemoryArchive, 3);
-    set_extractor_level(&mut loom, NodeId::SilenceWell, 6);
-    // Shuttle 0: ForgedLight T1
-    loom.persistent.shuttles.push(make_t1_shuttle(
-        Resource::Ember,
-        NodeId::EmberSpindle,
-        Resource::VoidEssence,
-        NodeId::VoidCondenser,
-        NodeNature::Heat,
-        Resource::ForgedLight,
-    ));
-    // Shuttle 1: EchoGlass T1
-    loom.persistent.shuttles.push(make_t1_shuttle(
-        Resource::Memory,
-        NodeId::MemoryArchive,
-        Resource::Silence,
-        NodeId::SilenceWell,
-        NodeNature::Pattern,
-        Resource::EchoGlass,
-    ));
-    // Shuttle 2: WovenReality T3 (FL shuttle + EG shuttle)
-    loom.persistent.shuttles.push(make_t3_shuttle(
-        Resource::ForgedLight,
-        LoomNodeRef::Shuttle(0),
-        Resource::EchoGlass,
-        LoomNodeRef::Shuttle(1),
-        NodeNature::Vibration,
-        Resource::WovenReality,
-    ));
-    run_ticks(&mut loom, 250);
-    verify_pattern(&loom, 19);
-}
-
-#[test]
-fn test_pattern_20_the_unraveling_is_solvable() {
-    let mut loom = setup_loom(20);
-    // ForgedLight T1 + EchoGlass T1 (shared->WR+PV) + WovenReality T3 + PurifiedVoid T2.
-    // Memory L4 = 62.5.
-    // EG = min(62.5, Silence L6=87.5) = 62.5, shared by WR and PV -> 62.5/2 = 31.25 each.
-    // Void L5 = 75, shared by FL and PV -> 75/2 = 37.5 each.
-    // FL = min(Ember L4=62.5, 37.5) = 37.5.
-    // WR = min(FL shuttle=37.5, EG share=31.25) = 31.25 >= 30.
-    // PV = min(EG share=31.25, Void share=37.5) = 31.25 >= 25.
+    // Full WR pipeline: FL T1 + EG T1 + EE T2 + PV T2 + WR T3 (5 slots).
+    // VoidEssence L5 = 75, shared by FL and PV -> 75/2 = 37.5 each.
+    // Memory L4 = 62.5, shared by EG and EE -> 62.5/2 = 31.25 each.
+    // FL = min(Ember L4=62.5, Void=37.5) = 37.5.
+    // EG = min(Memory=31.25, Silence L6=87.5) = 31.25.
+    // EE T2 = min(FL=37.5, Memory=31.25) = 31.25.
+    // PV T2 = min(EG=31.25, Void=37.5) = 31.25.
+    // WR T3 = min(PV=31.25, EE=31.25) = 31.25 >= 15.
     set_extractor_level(&mut loom, NodeId::EmberSpindle, 4);
     set_extractor_level(&mut loom, NodeId::VoidCondenser, 5);
     set_extractor_level(&mut loom, NodeId::MemoryArchive, 4);
@@ -724,14 +683,14 @@ fn test_pattern_20_the_unraveling_is_solvable() {
         NodeNature::Pattern,
         Resource::EchoGlass,
     ));
-    // Shuttle 2: WovenReality T3 (FL shuttle + EG shuttle)
-    loom.persistent.shuttles.push(make_t3_shuttle(
+    // Shuttle 2: EmberEcho T2 (FL shuttle + Memory extractor)
+    loom.persistent.shuttles.push(make_t2_shuttle(
         Resource::ForgedLight,
         LoomNodeRef::Shuttle(0),
-        Resource::EchoGlass,
-        LoomNodeRef::Shuttle(1),
-        NodeNature::Vibration,
-        Resource::WovenReality,
+        Resource::Memory,
+        LoomNodeRef::Extractor(NodeId::MemoryArchive),
+        NodeNature::Form,
+        Resource::EmberEcho,
     ));
     // Shuttle 3: PurifiedVoid T2 (EG shuttle + Void extractor)
     loom.persistent.shuttles.push(make_t2_shuttle(
@@ -741,6 +700,80 @@ fn test_pattern_20_the_unraveling_is_solvable() {
         LoomNodeRef::Extractor(NodeId::VoidCondenser),
         NodeNature::Void,
         Resource::PurifiedVoid,
+    ));
+    // Shuttle 4: WovenReality T3 (PV shuttle + EE shuttle)
+    loom.persistent.shuttles.push(make_t3_shuttle(
+        Resource::PurifiedVoid,
+        LoomNodeRef::Shuttle(3),
+        Resource::EmberEcho,
+        LoomNodeRef::Shuttle(2),
+        NodeNature::Vibration,
+        Resource::WovenReality,
+    ));
+    run_ticks(&mut loom, 250);
+    verify_pattern(&loom, 19);
+}
+
+#[test]
+fn test_pattern_20_the_unraveling_is_solvable() {
+    let mut loom = setup_loom(20);
+    // Full WR pipeline: FL T1 + EG T1 + EE T2 + PV T2 + WR T3 (5 slots).
+    // WR 25/hr + PV 20/hr. PV is in the pipeline, its rate tracker shows production.
+    // VoidEssence L5 = 75, shared by FL and PV -> 75/2 = 37.5 each.
+    // Memory L4 = 62.5, shared by EG and EE -> 62.5/2 = 31.25 each.
+    // FL = min(Ember L4=62.5, Void=37.5) = 37.5.
+    // EG = min(Memory=31.25, Silence L6=87.5) = 31.25.
+    // EE T2 = min(FL=37.5, Memory=31.25) = 31.25.
+    // PV T2 = min(EG=31.25, Void=37.5) = 31.25 >= 20.
+    // WR T3 = min(PV=31.25, EE=31.25) = 31.25 >= 25.
+    set_extractor_level(&mut loom, NodeId::EmberSpindle, 4);
+    set_extractor_level(&mut loom, NodeId::VoidCondenser, 5);
+    set_extractor_level(&mut loom, NodeId::MemoryArchive, 4);
+    set_extractor_level(&mut loom, NodeId::SilenceWell, 6);
+    // Shuttle 0: ForgedLight T1
+    loom.persistent.shuttles.push(make_t1_shuttle(
+        Resource::Ember,
+        NodeId::EmberSpindle,
+        Resource::VoidEssence,
+        NodeId::VoidCondenser,
+        NodeNature::Heat,
+        Resource::ForgedLight,
+    ));
+    // Shuttle 1: EchoGlass T1
+    loom.persistent.shuttles.push(make_t1_shuttle(
+        Resource::Memory,
+        NodeId::MemoryArchive,
+        Resource::Silence,
+        NodeId::SilenceWell,
+        NodeNature::Pattern,
+        Resource::EchoGlass,
+    ));
+    // Shuttle 2: EmberEcho T2 (FL shuttle + Memory extractor)
+    loom.persistent.shuttles.push(make_t2_shuttle(
+        Resource::ForgedLight,
+        LoomNodeRef::Shuttle(0),
+        Resource::Memory,
+        LoomNodeRef::Extractor(NodeId::MemoryArchive),
+        NodeNature::Form,
+        Resource::EmberEcho,
+    ));
+    // Shuttle 3: PurifiedVoid T2 (EG shuttle + Void extractor)
+    loom.persistent.shuttles.push(make_t2_shuttle(
+        Resource::EchoGlass,
+        LoomNodeRef::Shuttle(1),
+        Resource::VoidEssence,
+        LoomNodeRef::Extractor(NodeId::VoidCondenser),
+        NodeNature::Void,
+        Resource::PurifiedVoid,
+    ));
+    // Shuttle 4: WovenReality T3 (PV shuttle + EE shuttle)
+    loom.persistent.shuttles.push(make_t3_shuttle(
+        Resource::PurifiedVoid,
+        LoomNodeRef::Shuttle(3),
+        Resource::EmberEcho,
+        LoomNodeRef::Shuttle(2),
+        NodeNature::Vibration,
+        Resource::WovenReality,
     ));
     run_ticks(&mut loom, 250);
     verify_pattern(&loom, 20);
@@ -787,14 +820,13 @@ fn test_pattern_21_grand_harmony_is_solvable() {
 #[test]
 fn test_pattern_22_the_knot_is_solvable() {
     let mut loom = setup_loom(22);
-    // SS T1 + CE T2 + FL T1 + EG T1 + WR T3.
+    // CE + EE (no WR): SS T1 + FL T1 + CE T2 + EE T2 = 4 slots.
     // Ember L4 = 62.5, shared by FL and CE -> 62.5/2 = 31.25 each.
-    // Silence L6 = 87.5, shared by EG and SS -> 87.5/2 = 43.75 each.
-    // EG = min(Memory L4=62.5, 43.75) = 43.75.
-    // SS = min(43.75, Resonance L5=75) = 43.75.
-    // FL = min(31.25, Void L5=75) = 31.25.
-    // CE T2 = min(SS=43.75, Ember=31.25) = 31.25 >= 30.
-    // WR T3 = min(FL=31.25, EG=43.75) = 31.25 >= 15.
+    // Memory L4 = 62.5 (for EE T2, no contention — EE pulls from FL shuttle + Memory extractor).
+    // FL = min(Ember=31.25, Void L5=75) = 31.25.
+    // SS = min(Silence L6=87.5, Resonance L5=75) = 75.
+    // CE T2 = min(SS=75, Ember=31.25) = 31.25 >= 30.
+    // EE T2 = min(FL=31.25, Memory=62.5) = 31.25 >= 25.
     set_extractor_level(&mut loom, NodeId::EmberSpindle, 4);
     set_extractor_level(&mut loom, NodeId::VoidCondenser, 5);
     set_extractor_level(&mut loom, NodeId::MemoryArchive, 4);
@@ -809,16 +841,7 @@ fn test_pattern_22_the_knot_is_solvable() {
         NodeNature::Heat,
         Resource::ForgedLight,
     ));
-    // Shuttle 1: EchoGlass T1
-    loom.persistent.shuttles.push(make_t1_shuttle(
-        Resource::Memory,
-        NodeId::MemoryArchive,
-        Resource::Silence,
-        NodeId::SilenceWell,
-        NodeNature::Pattern,
-        Resource::EchoGlass,
-    ));
-    // Shuttle 2: StillbornSong T1
+    // Shuttle 1: StillbornSong T1
     loom.persistent.shuttles.push(make_t1_shuttle(
         Resource::Silence,
         NodeId::SilenceWell,
@@ -827,23 +850,23 @@ fn test_pattern_22_the_knot_is_solvable() {
         NodeNature::Stillness,
         Resource::StillbornSong,
     ));
-    // Shuttle 3: CondensedEmber T2 (SS shuttle + Ember extractor)
+    // Shuttle 2: CondensedEmber T2 (SS shuttle + Ember extractor)
     loom.persistent.shuttles.push(make_t2_shuttle(
         Resource::StillbornSong,
-        LoomNodeRef::Shuttle(2),
+        LoomNodeRef::Shuttle(1),
         Resource::Ember,
         LoomNodeRef::Extractor(NodeId::EmberSpindle),
         NodeNature::Heat,
         Resource::CondensedEmber,
     ));
-    // Shuttle 4: WovenReality T3 (FL shuttle + EG shuttle)
-    loom.persistent.shuttles.push(make_t3_shuttle(
+    // Shuttle 3: EmberEcho T2 (FL shuttle + Memory extractor)
+    loom.persistent.shuttles.push(make_t2_shuttle(
         Resource::ForgedLight,
         LoomNodeRef::Shuttle(0),
-        Resource::EchoGlass,
-        LoomNodeRef::Shuttle(1),
-        NodeNature::Vibration,
-        Resource::WovenReality,
+        Resource::Memory,
+        LoomNodeRef::Extractor(NodeId::MemoryArchive),
+        NodeNature::Form,
+        Resource::EmberEcho,
     ));
     run_ticks(&mut loom, 250);
     verify_pattern(&loom, 22);
@@ -918,12 +941,16 @@ fn test_pattern_23_strange_alchemy_is_solvable() {
 #[test]
 fn test_pattern_24_refined_purpose_is_solvable() {
     let mut loom = setup_loom(24);
-    // FL T1 (shared->WR+EE) + EG T1 + WR T3 + EE T2.
+    // Full WR pipeline: FL T1 + EG T1 + EE T2 + PV T2 + WR T3 (5 slots).
+    // WR 25/hr + EE 20/hr + Reflection 75/hr.
+    // EE is in the pipeline, its rate tracker shows production.
+    // VoidEssence L5 = 75, shared by FL and PV -> 75/2 = 37.5 each.
     // Memory L4 = 62.5, shared by EG and EE -> 62.5/2 = 31.25 each.
-    // FL = min(Ember L4=62.5, Void L5=75) = 62.5, shared by WR and EE -> 62.5/2 = 31.25 each.
-    // EG = min(31.25, Silence L6=87.5) = 31.25.
-    // WR = min(FL share=31.25, EG=31.25) = 31.25 >= 30.
-    // EE = min(FL share=31.25, Memory share=31.25) = 31.25 >= 20.
+    // FL = min(Ember L4=62.5, Void=37.5) = 37.5.
+    // EG = min(Memory=31.25, Silence L6=87.5) = 31.25.
+    // EE T2 = min(FL=37.5, Memory=31.25) = 31.25 >= 20.
+    // PV T2 = min(EG=31.25, Void=37.5) = 31.25.
+    // WR T3 = min(PV=31.25, EE=31.25) = 31.25 >= 25.
     // Reflection L5 = 75 >= 75.
     set_extractor_level(&mut loom, NodeId::EmberSpindle, 4);
     set_extractor_level(&mut loom, NodeId::VoidCondenser, 5);
@@ -948,16 +975,7 @@ fn test_pattern_24_refined_purpose_is_solvable() {
         NodeNature::Pattern,
         Resource::EchoGlass,
     ));
-    // Shuttle 2: WovenReality T3 (FL shuttle + EG shuttle)
-    loom.persistent.shuttles.push(make_t3_shuttle(
-        Resource::ForgedLight,
-        LoomNodeRef::Shuttle(0),
-        Resource::EchoGlass,
-        LoomNodeRef::Shuttle(1),
-        NodeNature::Vibration,
-        Resource::WovenReality,
-    ));
-    // Shuttle 3: EmberEcho T2 (FL shuttle + Memory extractor)
+    // Shuttle 2: EmberEcho T2 (FL shuttle + Memory extractor)
     loom.persistent.shuttles.push(make_t2_shuttle(
         Resource::ForgedLight,
         LoomNodeRef::Shuttle(0),
@@ -966,6 +984,24 @@ fn test_pattern_24_refined_purpose_is_solvable() {
         NodeNature::Form,
         Resource::EmberEcho,
     ));
+    // Shuttle 3: PurifiedVoid T2 (EG shuttle + Void extractor)
+    loom.persistent.shuttles.push(make_t2_shuttle(
+        Resource::EchoGlass,
+        LoomNodeRef::Shuttle(1),
+        Resource::VoidEssence,
+        LoomNodeRef::Extractor(NodeId::VoidCondenser),
+        NodeNature::Void,
+        Resource::PurifiedVoid,
+    ));
+    // Shuttle 4: WovenReality T3 (PV shuttle + EE shuttle)
+    loom.persistent.shuttles.push(make_t3_shuttle(
+        Resource::PurifiedVoid,
+        LoomNodeRef::Shuttle(3),
+        Resource::EmberEcho,
+        LoomNodeRef::Shuttle(2),
+        NodeNature::Vibration,
+        Resource::WovenReality,
+    ));
     run_ticks(&mut loom, 250);
     verify_pattern(&loom, 24);
 }
@@ -973,14 +1009,31 @@ fn test_pattern_24_refined_purpose_is_solvable() {
 #[test]
 fn test_pattern_25_the_flood_is_solvable() {
     let mut loom = setup_loom(25);
-    // ForgedLight T1 + EchoGlass T1 + WovenReality T3.
-    // Ember L7 = 100. FL = min(100, Void L5=75) = 75.
-    // EG = min(Memory L4=62.5, Silence L6=87.5) = 62.5.
-    // WR = min(FL=75, EG=62.5) = 62.5 >= 45.
+    // Full WR pipeline: FL T1 + EG T1 + EE T2 + PV T2 + WR T3 (5 slots).
+    // WR 40/hr + Ember 100/hr.
+    // Ember L7 = 100 (no contention — only FL pulls from Ember).
+    // VoidEssence L6 = 87.5, shared by FL and PV -> 87.5/2 = 43.75 each.
+    // Memory L5 = 75, shared by EG and EE -> 75/2 = 37.5 each.
+    // FL = min(Ember=100, Void=43.75) = 43.75.
+    // EG = min(Memory=37.5, Silence L6=87.5) = 37.5.
+    // EE T2 = min(FL=43.75, Memory=37.5) = 37.5.  (Note: Memory L5 is NOT shared with EG
+    //   because EG pulls from MemoryArchive and EE also pulls from MemoryArchive, so
+    //   Memory IS shared: 75/2 = 37.5 each.)
+    // PV T2 = min(EG=37.5, Void=43.75) = 37.5.
+    // WR T3 = min(PV=37.5, EE=37.5) = 37.5.
+    // Hmm, need WR >= 40. Need higher levels.
+    // Let's use: VoidEssence L7 = 100, Memory L6 = 87.5.
+    // Void shared by FL+PV -> 100/2 = 50 each.
+    // Memory shared by EG+EE -> 87.5/2 = 43.75 each.
+    // FL = min(100, 50) = 50.
+    // EG = min(43.75, Silence L6=87.5) = 43.75.
+    // EE = min(FL=50, Memory=43.75) = 43.75.
+    // PV = min(EG=43.75, Void=50) = 43.75.
+    // WR = min(PV=43.75, EE=43.75) = 43.75 >= 40.
     // Ember base rate = 100 >= 100.
     set_extractor_level(&mut loom, NodeId::EmberSpindle, 7);
-    set_extractor_level(&mut loom, NodeId::VoidCondenser, 5);
-    set_extractor_level(&mut loom, NodeId::MemoryArchive, 4);
+    set_extractor_level(&mut loom, NodeId::VoidCondenser, 7);
+    set_extractor_level(&mut loom, NodeId::MemoryArchive, 6);
     set_extractor_level(&mut loom, NodeId::SilenceWell, 6);
     // Shuttle 0: ForgedLight T1
     loom.persistent.shuttles.push(make_t1_shuttle(
@@ -1000,12 +1053,30 @@ fn test_pattern_25_the_flood_is_solvable() {
         NodeNature::Pattern,
         Resource::EchoGlass,
     ));
-    // Shuttle 2: WovenReality T3 (FL shuttle + EG shuttle)
-    loom.persistent.shuttles.push(make_t3_shuttle(
+    // Shuttle 2: EmberEcho T2 (FL shuttle + Memory extractor)
+    loom.persistent.shuttles.push(make_t2_shuttle(
         Resource::ForgedLight,
         LoomNodeRef::Shuttle(0),
+        Resource::Memory,
+        LoomNodeRef::Extractor(NodeId::MemoryArchive),
+        NodeNature::Form,
+        Resource::EmberEcho,
+    ));
+    // Shuttle 3: PurifiedVoid T2 (EG shuttle + Void extractor)
+    loom.persistent.shuttles.push(make_t2_shuttle(
         Resource::EchoGlass,
         LoomNodeRef::Shuttle(1),
+        Resource::VoidEssence,
+        LoomNodeRef::Extractor(NodeId::VoidCondenser),
+        NodeNature::Void,
+        Resource::PurifiedVoid,
+    ));
+    // Shuttle 4: WovenReality T3 (PV shuttle + EE shuttle)
+    loom.persistent.shuttles.push(make_t3_shuttle(
+        Resource::PurifiedVoid,
+        LoomNodeRef::Shuttle(3),
+        Resource::EmberEcho,
+        LoomNodeRef::Shuttle(2),
         NodeNature::Vibration,
         Resource::WovenReality,
     ));
@@ -1083,20 +1154,21 @@ fn test_pattern_26_everything_flows_is_solvable() {
 #[test]
 fn test_pattern_27_mended_loom_is_solvable() {
     let mut loom = setup_loom(27);
-    // 5 slots: FL T1(shared->WR+EE) + EG T1(shared->WR+PV) + WR T3 + EE T2 + PV T2.
+    // 5 slots: FL T1 + EG T1 + EE T2 + PV T2 + WR T3.
+    // WR 50/hr + EE 30/hr + Reflection 125/hr.
     // Ember L9 = 125 (no contention on Ember, only FL uses it).
-    // Void L15 = 200, shared by FL and PV -> 200/2 = 100 each.
-    // Memory L15 = 200, shared by EG and EE -> 200/2 = 100 each.
+    // Void L9 = 125, shared by FL and PV -> 125/2 = 62.5 each.
+    // Memory L9 = 125, shared by EG and EE -> 125/2 = 62.5 each.
     // Silence L9 = 125 (no contention on Silence, only EG uses it).
-    // FL = min(125, 100) = 100, shared by WR and EE -> 100/2 = 50 each.
-    // EG = min(100, 125) = 100, shared by WR and PV -> 100/2 = 50 each.
-    // WR = min(FL share=50, EG share=50) = 50 >= 50.
-    // EE = min(FL share=50, Memory share=100) = 50 >= 30.
-    // PV = min(EG share=50, Void share=100) = 50 >= 30.
+    // FL = min(Ember=125, Void=62.5) = 62.5.
+    // EG = min(Memory=62.5, Silence=125) = 62.5.
+    // EE T2 = min(FL=62.5, Memory=62.5) = 62.5 >= 30.
+    // PV T2 = min(EG=62.5, Void=62.5) = 62.5.
+    // WR T3 = min(PV=62.5, EE=62.5) = 62.5 >= 50.
     // Reflection L9 = 125 >= 125.
     set_extractor_level(&mut loom, NodeId::EmberSpindle, 9);
-    set_extractor_level(&mut loom, NodeId::VoidCondenser, 15);
-    set_extractor_level(&mut loom, NodeId::MemoryArchive, 15);
+    set_extractor_level(&mut loom, NodeId::VoidCondenser, 9);
+    set_extractor_level(&mut loom, NodeId::MemoryArchive, 9);
     set_extractor_level(&mut loom, NodeId::SilenceWell, 9);
     set_extractor_level(&mut loom, NodeId::ReflectionLens, 9);
     // Shuttle 0: ForgedLight T1
@@ -1117,16 +1189,7 @@ fn test_pattern_27_mended_loom_is_solvable() {
         NodeNature::Pattern,
         Resource::EchoGlass,
     ));
-    // Shuttle 2: WovenReality T3 (FL shuttle + EG shuttle)
-    loom.persistent.shuttles.push(make_t3_shuttle(
-        Resource::ForgedLight,
-        LoomNodeRef::Shuttle(0),
-        Resource::EchoGlass,
-        LoomNodeRef::Shuttle(1),
-        NodeNature::Vibration,
-        Resource::WovenReality,
-    ));
-    // Shuttle 3: EmberEcho T2 (FL shuttle + Memory extractor)
+    // Shuttle 2: EmberEcho T2 (FL shuttle + Memory extractor)
     loom.persistent.shuttles.push(make_t2_shuttle(
         Resource::ForgedLight,
         LoomNodeRef::Shuttle(0),
@@ -1135,7 +1198,7 @@ fn test_pattern_27_mended_loom_is_solvable() {
         NodeNature::Form,
         Resource::EmberEcho,
     ));
-    // Shuttle 4: PurifiedVoid T2 (EG shuttle + Void extractor)
+    // Shuttle 3: PurifiedVoid T2 (EG shuttle + Void extractor)
     loom.persistent.shuttles.push(make_t2_shuttle(
         Resource::EchoGlass,
         LoomNodeRef::Shuttle(1),
@@ -1143,6 +1206,15 @@ fn test_pattern_27_mended_loom_is_solvable() {
         LoomNodeRef::Extractor(NodeId::VoidCondenser),
         NodeNature::Void,
         Resource::PurifiedVoid,
+    ));
+    // Shuttle 4: WovenReality T3 (PV shuttle + EE shuttle)
+    loom.persistent.shuttles.push(make_t3_shuttle(
+        Resource::PurifiedVoid,
+        LoomNodeRef::Shuttle(3),
+        Resource::EmberEcho,
+        LoomNodeRef::Shuttle(2),
+        NodeNature::Vibration,
+        Resource::WovenReality,
     ));
     run_ticks(&mut loom, 250);
     verify_pattern(&loom, 27);

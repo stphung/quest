@@ -175,8 +175,8 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
             "The Unraveling",
             "To weave the new, I had to unravel the old. I pulled a thread I\u{2019}d been proud of \u{2014} one of my first \u{2014} and watched it dissolve. The Loom doesn\u{2019}t mourn. I\u{2019}m learning not to either.",
             vec![
-                (Resource::WovenReality, 30.0, 36.0),
-                (Resource::PurifiedVoid, 25.0, 36.0),
+                (Resource::WovenReality, 25.0, 36.0),
+                (Resource::PurifiedVoid, 20.0, 36.0),
             ],
         ),
         pattern(
@@ -200,7 +200,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
             "Some patterns resist. They have their own will \u{2014} a stubbornness I recognize because it mirrors my own. I stopped forcing and started negotiating. The knot loosened when I asked nicely.",
             vec![
                 (Resource::CondensedEmber, 30.0, 36.0),
-                (Resource::WovenReality, 15.0, 36.0),
+                (Resource::EmberEcho, 25.0, 36.0),
             ],
         ),
         pattern(
@@ -218,7 +218,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
             "Refined Purpose",
             "The void isn\u{2019}t empty. It never was. I spent all this time filling it when I should have been listening. There\u{2019}s a voice in the emptiness, and it\u{2019}s been telling me what comes next.",
             vec![
-                (Resource::WovenReality, 30.0, 48.0),
+                (Resource::WovenReality, 25.0, 48.0),
                 (Resource::EmberEcho, 20.0, 48.0),
                 (Resource::Reflection, 75.0, 48.0),
             ],
@@ -228,7 +228,7 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
             "The Flood",
             "Reality poured through the Loom today like water through a broken dam. I barely held on. My hands are raw, my vision is blurred, but I kept the threads intact. Barely. Barely was enough.",
             vec![
-                (Resource::WovenReality, 45.0, 48.0),
+                (Resource::WovenReality, 40.0, 48.0),
                 (Resource::Ember, 100.0, 48.0),
             ],
         ),
@@ -251,7 +251,6 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
             vec![
                 (Resource::WovenReality, 50.0, 120.0),
                 (Resource::EmberEcho, 30.0, 120.0),
-                (Resource::PurifiedVoid, 30.0, 120.0),
                 (Resource::Reflection, 125.0, 120.0),
             ],
         ),

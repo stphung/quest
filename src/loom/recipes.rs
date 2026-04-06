@@ -105,7 +105,7 @@ impl Recipe {
 /// Returns the complete static recipe registry (cached after first call).
 ///
 /// 7 exclusive recipes — each output produced by exactly one recipe.
-/// T1: 3 confluences, T2: 3 reaction products, T3: 1 reality.
+/// T1: 3 confluences, T2: 3 reaction products, T3: 1 reality (from two T2 products).
 pub fn all_recipes() -> &'static [Recipe] {
     recipe_registry()
 }
@@ -125,8 +125,8 @@ fn recipe_registry() -> &'static [Recipe] {
             Recipe::new(StillbornSong, Ember, Heat, CondensedEmber, 1.0, 2),
             Recipe::new(ForgedLight, Memory, Form, EmberEcho, 1.0, 2),
             Recipe::new(EchoGlass, VoidEssence, Void, PurifiedVoid, 1.0, 2),
-            // ── Tier 3: Confluence × Confluence → Woven Reality ──
-            Recipe::new(ForgedLight, EchoGlass, Vibration, WovenReality, 1.0, 3),
+            // ── Tier 3: Reaction × Reaction → Woven Reality ──
+            Recipe::new(PurifiedVoid, EmberEcho, Vibration, WovenReality, 1.0, 3),
         ]
     })
 }
@@ -502,12 +502,19 @@ mod tests {
     }
 
     #[test]
-    fn test_tier3_recipes_have_confluence_inputs() {
-        let confluence = [ForgedLight, EchoGlass, StillbornSong, PurifiedVoid];
+    fn test_tier3_recipes_have_higher_tier_inputs() {
+        let higher_tier = [
+            ForgedLight,
+            EchoGlass,
+            StillbornSong,
+            PurifiedVoid,
+            EmberEcho,
+            CondensedEmber,
+        ];
         for r in recipes_by_tier(3) {
             assert!(
-                confluence.contains(&r.input_a) || confluence.contains(&r.input_b),
-                "tier 3 recipe ({:?}+{:?}->{:?}) should have at least one confluence input",
+                higher_tier.contains(&r.input_a) || higher_tier.contains(&r.input_b),
+                "tier 3 recipe ({:?}+{:?}->{:?}) should have at least one higher-tier input",
                 r.input_a,
                 r.input_b,
                 r.output

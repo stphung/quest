@@ -337,18 +337,22 @@ fn test_demolish_consumer_restores_full_throughput() {
 
 #[test]
 fn test_t1_shuttle_shared_between_t2_and_t3() {
-    // ForgedLight T1 feeds both EmberEcho T2 and WovenReality T3.
-    // At L3 Ember+Void (50/hr each), ForgedLight = 50/hr.
-    // Each consumer (EE T2 and WR T3) gets 25/hr from ForgedLight.
+    // Full WR pipeline with T1 sharing: FL T1 feeds EE T2, EG T1 feeds PV T2.
+    // WR T3 pulls from PV T2 + EE T2.
+    // At L3 extractors (50/hr each):
+    // VoidEssence shared by FL and PV -> 50/2 = 25 each.
+    // Memory shared by EG and EE -> 50/2 = 25 each.
+    // FL = min(Ember=50, Void=25) = 25.
+    // EG = min(Memory=25, Silence=50) = 25.
+    // EE T2 = min(FL=25, Memory=25) = 25.
+    // PV T2 = min(EG=25, Void=25) = 25.
+    // WR T3 = min(PV=25, EE=25) = 25.
     let mut loom = setup_loom();
     complete_n_patterns(&mut loom, 15); // Unlock T1, T2, T3
 
-    // L3 extractors for ForgedLight
     set_extractor_level(&mut loom, NodeId::EmberSpindle, 3); // 50/hr
     set_extractor_level(&mut loom, NodeId::VoidCondenser, 3); // 50/hr
-                                                              // Memory extractor for EmberEcho T2 (ForgedLight + Memory -> EmberEcho)
     set_extractor_level(&mut loom, NodeId::MemoryArchive, 3); // 50/hr
-                                                              // EchoGlass needs Memory + Silence
     set_extractor_level(&mut loom, NodeId::SilenceWell, 3); // 50/hr
 
     // Shuttle 0: ForgedLight T1 (Ember + VoidEssence -> ForgedLight)
@@ -372,7 +376,6 @@ fn test_t1_shuttle_shared_between_t2_and_t3() {
     ));
 
     // Shuttle 2: EmberEcho T2 (ForgedLight + Memory -> EmberEcho)
-    // Sources: ForgedLight from Shuttle(0), Memory from MemoryArchive
     loom.persistent.shuttles.push(make_t2_shuttle(
         Resource::ForgedLight,
         LoomNodeRef::Shuttle(0),
@@ -382,43 +385,45 @@ fn test_t1_shuttle_shared_between_t2_and_t3() {
         Resource::EmberEcho,
     ));
 
-    // Shuttle 3: WovenReality T3 (ForgedLight + EchoGlass -> WovenReality)
-    // Sources: ForgedLight from Shuttle(0), EchoGlass from Shuttle(1)
-    loom.persistent.shuttles.push(make_t3_shuttle(
-        Resource::ForgedLight,
-        LoomNodeRef::Shuttle(0),
+    // Shuttle 3: PurifiedVoid T2 (EchoGlass + VoidEssence -> PurifiedVoid)
+    loom.persistent.shuttles.push(make_t2_shuttle(
         Resource::EchoGlass,
         LoomNodeRef::Shuttle(1),
+        Resource::VoidEssence,
+        LoomNodeRef::Extractor(NodeId::VoidCondenser),
+        NodeNature::Void,
+        Resource::PurifiedVoid,
+    ));
+
+    // Shuttle 4: WovenReality T3 (PurifiedVoid + EmberEcho -> WovenReality)
+    loom.persistent.shuttles.push(make_t3_shuttle(
+        Resource::PurifiedVoid,
+        LoomNodeRef::Shuttle(3),
+        Resource::EmberEcho,
+        LoomNodeRef::Shuttle(2),
         NodeNature::Vibration,
         Resource::WovenReality,
     ));
 
     run_ticks(&mut loom, 250);
 
-    // ForgedLight shuttle produces 50/hr (uncapped)
+    // ForgedLight shuttle produces 25/hr (limited by VoidEssence contention with PV)
     let fl_rate = loom.persistent.shuttles[0]
         .output_rate_tracker
         .rate_per_hour();
-    assert_rate_approx(fl_rate, 50.0, 1.0, "ForgedLight T1 output");
+    assert_rate_approx(fl_rate, 25.0, 1.0, "ForgedLight T1 output (shared Void)");
 
-    // EmberEcho T2 and WovenReality T3 share ForgedLight (2 consumers).
-    // Each gets 25/hr from ForgedLight.
-    // EmberEcho: min(25 FL, 50 Memory * share) = 25/hr
-    // Memory has 2 consumers (EmberEcho T2 + EchoGlass T1 via MemoryArchive),
-    // but EmberEcho pulls from Shuttle(0) for FL and Extractor(MemoryArchive) for Memory.
-    // MemoryArchive is shared by EchoGlass T1 (sources_a) and EmberEcho T2 (sources_b).
+    // EmberEcho T2: min(FL=25, Memory share=25) = 25
     let ee_rate = loom.persistent.shuttles[2]
         .output_rate_tracker
         .rate_per_hour();
-    // EmberEcho limited by ForgedLight share (25/hr) since Memory share is also 25/hr
-    assert_rate_approx(ee_rate, 25.0, 1.0, "EmberEcho T2 (shared ForgedLight)");
+    assert_rate_approx(ee_rate, 25.0, 1.0, "EmberEcho T2 output");
 
-    // WovenReality: min(25 FL, EchoGlass output share)
-    let wr_rate = loom.persistent.shuttles[3]
+    // WovenReality T3: min(PV=25, EE=25) = 25
+    let wr_rate = loom.persistent.shuttles[4]
         .output_rate_tracker
         .rate_per_hour();
-    // WovenReality limited by the lower of ForgedLight share (25) and EchoGlass output (25)
-    assert_rate_approx(wr_rate, 25.0, 1.0, "WovenReality T3 (shared ForgedLight)");
+    assert_rate_approx(wr_rate, 25.0, 1.0, "WovenReality T3 output");
 }
 
 // ── 4. Rate tracker cleared on upgrade ───────────────────────────────────────
