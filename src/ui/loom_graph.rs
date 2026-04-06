@@ -967,7 +967,7 @@ fn compute_pattern_progress(pattern: &crate::loom::types::WovenPattern) -> f64 {
     if pattern.requirements.is_empty() {
         return 0.0;
     }
-    let total: f64 = pattern
+    pattern
         .requirements
         .iter()
         .map(|r| {
@@ -979,8 +979,8 @@ fn compute_pattern_progress(pattern: &crate::loom::types::WovenPattern) -> f64 {
                 0.0
             }
         })
-        .sum();
-    total / pattern.requirements.len() as f64
+        .fold(f64::INFINITY, f64::min)
+        .min(1.0)
 }
 
 /// Map a resource to its display color.
@@ -1030,12 +1030,13 @@ pub fn format_pattern_status(pattern: &crate::loom::types::WovenPattern) -> Stri
     }
 
     // Compute remaining time from incomplete requirements.
+    // Requirements advance in parallel, so the bottleneck is the MAX, not the sum.
     let remaining_secs: f64 = pattern
         .requirements
         .iter()
         .filter(|r| !r.completed)
         .map(|r| (r.sustain_duration_secs - r.sustained_secs).max(0.0))
-        .sum();
+        .fold(0.0_f64, f64::max);
 
     if remaining_secs > 0.0 {
         format!("{}% ({} left)", pct, format_duration(remaining_secs))
