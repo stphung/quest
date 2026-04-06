@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 
 /// Maximum number of shuttles a player can build (balance cap).
-pub const MAX_SHUTTLES: usize = 12;
+pub const MAX_SHUTTLES: usize = 5;
 
 /// Which archetype the player chose at Loom unlock.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -340,13 +340,11 @@ impl LoomPersistent {
         let patterns = self.completed_pattern_count();
         let slots = match patterns {
             0 => 0,
-            1..=2 => 1,
-            3..=5 => 2,
-            6..=9 => 4,
-            10..=14 => 6,
-            15..=20 => 8,
-            21..=27 => 10,
-            _ => MAX_SHUTTLES,
+            1..=3 => 1,
+            4..=7 => 2,
+            8..=11 => 3,
+            12..=14 => 4,
+            _ => MAX_SHUTTLES, // 5 at 15+ patterns
         };
         slots.min(MAX_SHUTTLES)
     }
