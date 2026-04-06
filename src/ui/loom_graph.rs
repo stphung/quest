@@ -648,35 +648,21 @@ fn render_gauge_node(
     let char_w = 2.0; // 1 terminal character = 2 braille x-dots
     let row_h = 4.0; // 1 terminal row = 4 braille y-dots
 
-    // Line 1: [bracket] label gauge [bracket]
-    // Selected brackets pulse between white and resource color (~1s cycle).
-    let bracket_color = if is_selected {
-        if (frame_count / 5) % 2 == 0 {
-            Color::White
-        } else {
-            effective_color
-        }
-    } else {
-        effective_color
-    };
-
+    // Line 1: [▌] label gauge
+    // Selected: bright ▌ prefix + white text. Unselected: no prefix.
     let mut spans = Vec::new();
     if is_selected {
-        spans.push(Span::styled("\u{300c}", Style::default().fg(bracket_color)));
-        // 「
+        spans.push(Span::styled("\u{258c}", Style::default().fg(Color::White)));
+        // ▌
     }
     spans.push(Span::styled(
         format!("{} ", info.label),
         Style::default().fg(label_color),
     ));
     spans.push(Span::styled(gauge_str, Style::default().fg(label_color)));
-    if is_selected {
-        spans.push(Span::styled("\u{300d}", Style::default().fg(bracket_color)));
-        // 」
-    }
 
-    let bracket_extra = if is_selected { 4 } else { 0 }; // 「」 are 2 columns each (East Asian Wide)
-    let label_display_w = info.label_display_width + 1 + info.gauge_width + bracket_extra;
+    let prefix_extra = if is_selected { 1 } else { 0 }; // ▌ is 1 column
+    let label_display_w = info.label_display_width + 1 + info.gauge_width + prefix_extra;
     let half_w_px = label_display_w as f64 * char_w / 2.0;
 
     let line1 = Line::from(spans);
