@@ -276,18 +276,25 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                                 Style::default().fg(Color::Rgb(120, 100, 150))
                             };
 
-                            let mut spans = vec![Span::styled(
-                                format!(
-                                    "{}{} {} + {} {}  ({:?})",
-                                    prefix,
-                                    resource_emoji(&r.input_a),
-                                    resource_name(&r.input_a),
-                                    resource_emoji(&r.input_b),
-                                    resource_name(&r.input_b),
-                                    r.node_nature,
+                            let mut spans = vec![
+                                Span::styled(
+                                    format!(
+                                        "{}{} {}",
+                                        prefix,
+                                        resource_emoji(&r.output),
+                                        resource_name(&r.output),
+                                    ),
+                                    style,
                                 ),
-                                style,
-                            )];
+                                Span::styled(
+                                    format!(
+                                        "    \u{2190} {}+{}",
+                                        resource_emoji(&r.input_a),
+                                        resource_emoji(&r.input_b),
+                                    ),
+                                    Style::default().fg(Color::Rgb(80, 70, 110)),
+                                ),
+                            ];
 
                             if missing_a && missing_b {
                                 spans.push(Span::styled(
@@ -334,23 +341,23 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                     let sources_b =
                         crate::loom::eligible_sources_for_tier(loom, build.tier, r.input_b);
 
-                    // Recipe summary.
+                    // Recipe summary: output first, then inputs.
                     right_lines.push(Line::from(Span::styled(
                         format!(
-                            " {} {} + {} {} \u{2192} {} {}",
-                            resource_emoji(&r.input_a),
-                            resource_name(&r.input_a),
-                            resource_emoji(&r.input_b),
-                            resource_name(&r.input_b),
+                            " {} {}",
                             resource_emoji(&r.output),
                             resource_name(&r.output),
                         ),
                         Style::default().fg(Color::Rgb(180, 140, 220)),
                     )));
-
-                    // Nature.
                     right_lines.push(Line::from(Span::styled(
-                        format!(" Nature: {:?}", r.node_nature),
+                        format!(
+                            " \u{2190} {} {} + {} {}",
+                            resource_emoji(&r.input_a),
+                            resource_name(&r.input_a),
+                            resource_emoji(&r.input_b),
+                            resource_name(&r.input_b),
+                        ),
                         Style::default().fg(Color::Rgb(140, 110, 170)),
                     )));
 
