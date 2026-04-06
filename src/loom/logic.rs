@@ -351,6 +351,7 @@ pub fn tick_stall_detection(loom: &mut LoomState) -> Vec<NodeId> {
 // ── Phase 6: Direct-Pull Shuttle Tick ────────────────────────────────────────
 
 /// Max intake rate per input slot, by shuttle tier (units/hour).
+/// NOTE: Display-only — no longer used for simulation (intake cap removed).
 pub fn tier_intake_cap(tier: u8) -> f64 {
     match tier {
         1 => 20.0,
@@ -361,6 +362,7 @@ pub fn tier_intake_cap(tier: u8) -> f64 {
 }
 
 /// Effective intake cap for a shuttle, applying the level multiplier.
+/// NOTE: Display-only — no longer used for simulation (intake cap removed).
 pub fn shuttle_effective_intake_cap(tier: u8, level: u32) -> f64 {
     tier_intake_cap(tier) * node_level_multiplier(level)
 }
@@ -439,7 +441,7 @@ pub fn valid_source_for_tier(source: LoomNodeRef, shuttle_tier: u8, shuttles: &[
 /// 2. Process shuttles by tier order (T1 first, then T2, then T3).
 /// 3. For each shuttle: calculate available pull for each input slot.
 ///    - For each source: `share = source_available / num_consumers_of_that_source`
-///    - `actual_pull = min(tier_intake_cap, share)` summed across all sources for that slot
+///    - No per-tier intake cap — throughput limited only by source rate and contention.
 /// 4. `output_rate = min(total_pull_a, total_pull_b) * recipe_amount`
 /// 5. Add output to shuttle buffer (capped at capacity).
 ///
@@ -487,9 +489,8 @@ pub fn tick_shuttle_pull(
 
         for idx in indices {
             let r = &loom.persistent.shuttles[idx];
-            let cap = shuttle_effective_intake_cap(r.tier, r.level);
 
-            // Calculate available pull for input A.
+            // Calculate available pull for input A (no intake cap — limited only by source rate and contention).
             let pull_a: f64 = r
                 .sources_a
                 .iter()
@@ -501,13 +502,11 @@ pub fn tick_shuttle_pull(
                         &node_multipliers,
                     );
                     let consumers = consumer_count.get(&src).copied().unwrap_or(1).max(1);
-                    let share = available / consumers as f64;
-                    share.min(cap)
+                    available / consumers as f64
                 })
-                .sum::<f64>()
-                .min(cap);
+                .sum();
 
-            // Calculate available pull for input B.
+            // Calculate available pull for input B (no intake cap — limited only by source rate and contention).
             let pull_b: f64 = r
                 .sources_b
                 .iter()
@@ -519,11 +518,9 @@ pub fn tick_shuttle_pull(
                         &node_multipliers,
                     );
                     let consumers = consumer_count.get(&src).copied().unwrap_or(1).max(1);
-                    let share = available / consumers as f64;
-                    share.min(cap)
+                    available / consumers as f64
                 })
-                .sum::<f64>()
-                .min(cap);
+                .sum();
 
             // Output rate for this tick = min(pull_a, pull_b) * recipe_amount.
             let output_rate = pull_a.min(pull_b) * r.amount;
@@ -1093,10 +1090,10 @@ mod tests {
             .iter()
             .find(|n| n.id == NodeId::EmberSpindle)
             .unwrap();
-        // 50/hr base * 1.0x (no archetype bonus). After 1 hr: 50.0 units.
+        // 25/hr base * 1.0x (no archetype bonus). After 1 hr: 25.0 units.
         assert!(
-            (ember.buffer - 50.0).abs() < 0.001,
-            "buffer should be ~50.0, got {}",
+            (ember.buffer - 25.0).abs() < 0.001,
+            "buffer should be ~25.0, got {}",
             ember.buffer
         );
     }
@@ -1785,10 +1782,10 @@ mod tests {
             .find(|n| n.id == NodeId::SilenceWell)
             .unwrap();
         let rate = node_effective_rate(&loom, well);
-        // base_rate 50.0 * level_mult(2) 1.5 * throughput_mult 1.0 = 75.0
+        // base_rate 25.0 * level_mult(2) 1.5 * throughput_mult 1.0 = 37.5
         assert!(
-            (rate - 75.0).abs() < 0.001,
-            "expected 75.0/hr, got {}",
+            (rate - 37.5).abs() < 0.001,
+            "expected 37.5/hr, got {}",
             rate
         );
     }
@@ -1812,10 +1809,10 @@ mod tests {
             .find(|n| n.id == NodeId::EmberSpindle)
             .unwrap();
         let rate = node_effective_rate(&loom, ember);
-        // base_rate 50.0 * level_mult(3) 2.0 * throughput_mult 1.0 = 100.0
+        // base_rate 25.0 * level_mult(3) 2.0 * throughput_mult 1.0 = 50.0
         assert!(
-            (rate - 100.0).abs() < 0.001,
-            "expected 100.0/hr, got {}",
+            (rate - 50.0).abs() < 0.001,
+            "expected 50.0/hr, got {}",
             rate
         );
     }
@@ -1878,10 +1875,10 @@ mod tests {
             "produced map should include Ember"
         );
         let ember_amount = produced[&Resource::Ember];
-        // 50/hr base * 1.0x (no archetype bonus); after 1hr = 50.0 units
+        // 25/hr base * 1.0x (no archetype bonus); after 1hr = 25.0 units
         assert!(
-            (ember_amount - 50.0).abs() < 0.001,
-            "expected 50.0 Ember produced, got {}",
+            (ember_amount - 25.0).abs() < 0.001,
+            "expected 25.0 Ember produced, got {}",
             ember_amount
         );
     }
@@ -2492,12 +2489,12 @@ mod external_bonus_tests {
         let produced = tick_shuttle_pull(&mut loom, 3600.0);
         let forged = produced.get(&Resource::ForgedLight).copied().unwrap_or(0.0);
 
-        // T1 intake cap = 20.0/hr. EmberSpindle = 50.0/hr, VoidCondenser = 50.0/hr.
-        // pull_a = min(50.0, 20.0 cap) = 20.0; pull_b = min(50.0, 20.0 cap) = 20.0
-        // output = min(20.0, 20.0) * 1.0 = 20.0/hr => 20.0 in 1 hour.
+        // No intake cap. EmberSpindle = 25.0/hr, VoidCondenser = 25.0/hr.
+        // pull_a = 25.0; pull_b = 25.0
+        // output = min(25.0, 25.0) * 1.0 = 25.0/hr => 25.0 in 1 hour.
         assert!(
-            (forged - 20.0).abs() < 0.01,
-            "expected ~20.0 ForgedLight, got {forged}"
+            (forged - 25.0).abs() < 0.01,
+            "expected ~25.0 ForgedLight, got {forged}"
         );
     }
 
@@ -2527,12 +2524,12 @@ mod external_bonus_tests {
         let produced = tick_shuttle_pull(&mut loom, 3600.0);
         let forged = produced.get(&Resource::ForgedLight).copied().unwrap_or(0.0);
 
-        // EmberSpindle effective = 50.0/hr, split 2 ways = 25.0 each, capped at 20.0.
-        // VoidCondenser = 50.0/hr, split 2 ways = 25.0 each, capped at 20.0.
-        // Each shuttle: min(20.0, 20.0) * 1.0 = 20.0/hr. Total = 40.0/hr => 40.0 in 1 hour.
+        // EmberSpindle effective = 25.0/hr, split 2 ways = 12.5 each (no intake cap).
+        // VoidCondenser = 25.0/hr, split 2 ways = 12.5 each.
+        // Each shuttle: min(12.5, 12.5) * 1.0 = 12.5/hr. Total = 25.0/hr => 25.0 in 1 hour.
         assert!(
-            (forged - 40.0).abs() < 0.01,
-            "expected ~40.0 ForgedLight from two shuttles, got {forged}"
+            (forged - 25.0).abs() < 0.01,
+            "expected ~25.0 ForgedLight from two shuttles, got {forged}"
         );
     }
 

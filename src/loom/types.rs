@@ -220,11 +220,11 @@ fn default_node_level() -> u32 {
 }
 
 fn default_buffer_capacity() -> f64 {
-    500.0
+    250.0
 }
 
 fn default_base_rate() -> f64 {
-    50.0
+    25.0
 }
 
 fn default_time_warp() -> f64 {
@@ -238,8 +238,8 @@ impl LoomNode {
             level: 1,
             unlocked: false,
             buffer: 0.0,
-            buffer_capacity: 500.0, // 10 hours at 50/hr base
-            base_rate: 50.0,
+            buffer_capacity: 250.0, // 10 hours at 25/hr base
+            base_rate: 25.0,
             stalled: false,
             unlock_progress: 0.0,
             upgrading: false,

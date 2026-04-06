@@ -6,7 +6,7 @@ use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use std::collections::HashMap;
 
 use super::layout::compute_layout;
-use super::logic::{node_native_resource, shuttle_effective_intake_cap};
+use super::logic::{node_effective_rate, node_native_resource};
 use super::types::{LoomState, LoomUiState, NodeId, Resource};
 
 /// A node in the Loom production graph.
@@ -146,7 +146,6 @@ pub fn build_graph(loom: &LoomState) -> LoomGraph {
         };
 
         let num_sources_a = shuttle.sources_a.len().max(1) as f64;
-        let max_rate_a = shuttle_effective_intake_cap(shuttle.tier, shuttle.level) / num_sources_a;
 
         for source_ref in &shuttle.sources_a {
             let source_gn = match source_ref {
@@ -159,6 +158,14 @@ pub fn build_graph(loom: &LoomState) -> LoomGraph {
                     super::types::LoomNodeRef::Shuttle(idx) => {
                         loom.persistent.shuttles[*idx].output
                     }
+                };
+                // max_rate = source effective rate / number of sources in this slot
+                let max_rate_a = match source_ref {
+                    super::types::LoomNodeRef::Extractor(nid) => {
+                        let node = &loom.persistent.nodes[nid.index()];
+                        node_effective_rate(loom, node) / num_sources_a
+                    }
+                    super::types::LoomNodeRef::Shuttle(_) => 0.0, // estimated at update time
                 };
                 graph.add_edge(
                     source_ni,
@@ -173,7 +180,6 @@ pub fn build_graph(loom: &LoomState) -> LoomGraph {
         }
 
         let num_sources_b = shuttle.sources_b.len().max(1) as f64;
-        let max_rate_b = shuttle_effective_intake_cap(shuttle.tier, shuttle.level) / num_sources_b;
 
         for source_ref in &shuttle.sources_b {
             let source_gn = match source_ref {
@@ -186,6 +192,14 @@ pub fn build_graph(loom: &LoomState) -> LoomGraph {
                     super::types::LoomNodeRef::Shuttle(idx) => {
                         loom.persistent.shuttles[*idx].output
                     }
+                };
+                // max_rate = source effective rate / number of sources in this slot
+                let max_rate_b = match source_ref {
+                    super::types::LoomNodeRef::Extractor(nid) => {
+                        let node = &loom.persistent.nodes[nid.index()];
+                        node_effective_rate(loom, node) / num_sources_b
+                    }
+                    super::types::LoomNodeRef::Shuttle(_) => 0.0, // estimated at update time
                 };
                 graph.add_edge(
                     source_ni,
@@ -324,11 +338,6 @@ pub fn remove_ghost_node(lg: &mut LoomGraph, ghost_idx: NodeIndex) {
     lg.node_indices.retain(|_, &mut v| v != ghost_idx);
 }
 
-/// Update edge current_rate values from live rate trackers.
-///
-/// - Edges from extractors: use the resource's global rate tracker
-/// - Edges from shuttles: use the shuttle's output_rate_tracker
-/// - Edges from pattern sinks (if any): 0.0
 /// Update edge rates using contention-aware flow computation.
 ///
 /// Computes actual per-edge flow rates considering:
@@ -405,7 +414,6 @@ pub fn update_edge_rates(lg: &mut LoomGraph, loom: &LoomState) {
                     if shuttle.under_construction {
                         0.0
                     } else {
-                        let cap = shuttle_effective_intake_cap(shuttle.tier, shuttle.level);
                         let src_ref = match &source_node {
                             LoomGraphNode::Extractor(id) => LoomNodeRef::Extractor(*id),
                             LoomGraphNode::Shuttle(idx) => LoomNodeRef::Shuttle(*idx),
@@ -413,8 +421,7 @@ pub fn update_edge_rates(lg: &mut LoomGraph, loom: &LoomState) {
                         };
                         let available = source_rates.get(&src_ref).copied().unwrap_or(0.0);
                         let consumers = consumer_count.get(&src_ref).copied().unwrap_or(1).max(1);
-                        let share = available / consumers as f64;
-                        share.min(cap)
+                        available / consumers as f64
                     }
                 } else {
                     0.0
