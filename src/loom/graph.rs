@@ -238,7 +238,9 @@ pub fn build_graph(loom: &LoomState) -> LoomGraph {
                             LoomEdge {
                                 resource: req.resource,
                                 current_rate: 0.0,
-                                max_rate: req.required_rate,
+                                // max_rate = 0 means update_edge_rates will set it
+                                // dynamically. See particle speed fix below.
+                                max_rate: 0.0,
                             },
                         );
                     }
@@ -264,7 +266,7 @@ pub fn build_graph(loom: &LoomState) -> LoomGraph {
                                 LoomEdge {
                                     resource: req.resource,
                                     current_rate: 0.0,
-                                    max_rate: req.required_rate,
+                                    max_rate: 0.0, // updated dynamically per tick
                                 },
                             );
                         }
@@ -443,6 +445,11 @@ pub fn update_edge_rates(lg: &mut LoomGraph, loom: &LoomState) {
 
         if let Some(edge) = lg.graph.edge_weight_mut(edge_idx) {
             edge.current_rate = rate;
+            // For pattern sink edges, keep max_rate = current_rate so particles
+            // flow at full speed whenever there IS flow (utilization = 1.0).
+            if matches!(&target_node, LoomGraphNode::PatternSink(_)) {
+                edge.max_rate = rate.max(0.1);
+            }
         }
     }
 }
