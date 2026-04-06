@@ -101,7 +101,7 @@ pub fn node_level_multiplier(level: u32) -> f64 {
 /// Returns the effective production rate (native resource per hour) for a node,
 /// incorporating level and archetype passives.
 pub fn node_effective_rate(loom: &LoomState, node: &LoomNode) -> f64 {
-    if !node.unlocked {
+    if !node.unlocked || node.upgrading {
         return 0.0;
     }
     node.base_rate * node_level_multiplier(node.level) * node_throughput_multiplier(loom, node.id)
@@ -874,9 +874,7 @@ pub fn tick_shuttle_stall_detection(loom: &mut LoomState) {
         if r.under_construction {
             continue;
         }
-        if r.buffer >= r.buffer_capacity {
-            r.stalled = true;
-        }
+        r.stalled = r.buffer >= r.buffer_capacity;
     }
 }
 

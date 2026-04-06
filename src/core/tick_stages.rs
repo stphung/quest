@@ -1036,6 +1036,11 @@ pub(super) fn tick_loom(
         return;
     }
 
+    // Loom runs on wall-clock time — skip during Chrono Surge bursts.
+    if state.chrono_surge_active {
+        return;
+    }
+
     // Loom uses wall-clock time. Compute real elapsed seconds since last tick.
     let now = chrono::Utc::now();
     let wall_delta = match loom.last_tick_at {
@@ -1177,7 +1182,7 @@ pub(super) fn tick_loom(
                 .unwrap_or(0.0);
             let pr_per_day = crate::loom::wr_to_pr_per_day(wr_rate);
             if pr_per_day > 0 {
-                let fill_secs = 86400i64 / pr_per_day as i64;
+                let fill_secs = (86400i64 / pr_per_day as i64).max(1);
                 let last = loom.persistent.wr_pr_last_granted_at;
                 // Cap elapsed to 7 days to prevent exploits from bogus timestamps
                 let elapsed = (now - last).min(604800);
