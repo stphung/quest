@@ -196,7 +196,6 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                 let all_recipes = crate::loom::recipes::all_recipes();
                 let display_rows = build_recipe_display_rows(&build.available_recipes);
                 let cursor_row = cursor_to_display_row(&display_rows, *cursor);
-                let intake_cap = crate::loom::logic::shuttle_effective_intake_cap(build.tier, 1);
 
                 // ── Left column: tier tabs + scrollable recipe list ──
                 let avail_h = left_area.height as usize;
@@ -355,9 +354,9 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                         Style::default().fg(Color::Rgb(140, 110, 170)),
                     )));
 
-                    // Tier + intake cap.
+                    // Tier.
                     right_lines.push(Line::from(Span::styled(
-                        format!(" T{} \u{00b7} Intake cap: {:.0}/hr", r.tier, intake_cap),
+                        format!(" Tier {}", r.tier),
                         Style::default().fg(Color::Rgb(140, 110, 170)),
                     )));
 
@@ -535,7 +534,6 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
             }
             crate::loom::BuildStep::Confirm => {
                 let r = &recipes[build.recipe_index];
-                let intake_cap = crate::loom::logic::shuttle_effective_intake_cap(build.tier, 1);
                 let cost = crate::loom::shuttle_build_cost_public(build.tier);
                 vec![
                     Line::from(Span::styled(
@@ -552,8 +550,7 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                     )),
                     Line::from(Span::styled(
                         format!(
-                            " Step 4/4: Confirm  ~{:.0}/hr output  cost: {:.0} {} {}",
-                            intake_cap * r.amount,
+                            " Step 4/4: Confirm  cost: {:.0} {} {}",
                             cost,
                             resource_emoji(&r.input_a),
                             resource_name(&r.input_a),
@@ -874,8 +871,6 @@ fn render_bottom_panel_shuttle(
     loom: &LoomState,
     shuttle_idx: usize,
 ) {
-    use crate::loom::logic;
-
     let shuttle = match loom.persistent.shuttles.get(shuttle_idx) {
         Some(s) => s,
         None => {
@@ -989,11 +984,7 @@ fn render_bottom_panel_shuttle(
         ),
         Style::default().fg(Color::Rgb(100, 200, 120)),
     ))];
-    let cap = logic::shuttle_effective_intake_cap(shuttle.tier, shuttle.level);
-    mid_lines.push(Line::from(Span::styled(
-        format!(" Intake cap: {:.0}/hr", cap),
-        Style::default().fg(Color::Rgb(120, 100, 160)),
-    )));
+    // No intake cap — throughput limited by source rate and contention.
     mid_lines.truncate(mid_chunks[1].height as usize);
     frame.render_widget(
         Paragraph::new(mid_lines).style(Style::default().bg(LOOM_BG)),
