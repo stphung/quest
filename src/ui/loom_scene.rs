@@ -408,6 +408,24 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                         ),
                         Style::default().fg(b_color),
                     )));
+
+                    // Capacity warning if at max.
+                    let current_shuttles = loom.persistent.shuttles.len();
+                    let max_shuttles = loom.persistent.max_shuttles();
+                    if current_shuttles >= max_shuttles {
+                        right_lines.push(Line::from(""));
+                        right_lines.push(Line::from(Span::styled(
+                            format!(
+                                " \u{26a0} At capacity ({}/{})",
+                                current_shuttles, max_shuttles
+                            ),
+                            Style::default().fg(Color::Rgb(220, 160, 60)),
+                        )));
+                        right_lines.push(Line::from(Span::styled(
+                            " Demolish a shuttle first",
+                            Style::default().fg(Color::Rgb(160, 120, 60)),
+                        )));
+                    }
                 }
 
                 frame.render_widget(
