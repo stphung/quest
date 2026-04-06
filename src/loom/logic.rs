@@ -562,7 +562,7 @@ fn source_available_rate(
 
 /// Compute a node's effective rate without needing the full LoomState borrow.
 fn node_effective_rate_from_node(node: &LoomNode, throughput_multiplier: f64) -> f64 {
-    if !node.unlocked {
+    if !node.unlocked || node.upgrading {
         return 0.0;
     }
     node.base_rate * node_level_multiplier(node.level) * throughput_multiplier
@@ -622,40 +622,6 @@ pub fn codex_hint_indices(codex: &[crate::loom::types::CodexEntry]) -> Vec<usize
         })
         .collect();
     recipes::adjacent_recipe_indices(&discovered_registry_indices)
-}
-
-/// Compute a Loom production multiplier from external systems.
-///
-/// Each contributing system provides a small additive bonus that is meaningful
-/// early (before the player has built up Loom infrastructure) but becomes
-/// negligible relative to Loom upgrades at endgame.
-///
-/// # Parameters
-/// - `deep_layer`: The player's deepest Deep layer reached (0 = not started).
-/// - `haven_tree_level`: Total Haven skill tree points invested (0 = no Haven).
-/// - `sigil_count`: Number of Storm Sigils currently etched (0–12).
-/// - `ascension_level`: Current Ascension level (0 = not ascended).
-///
-/// # Returns
-/// A multiplier ≥ 1.0 to apply to every node's effective production rate.
-/// The formula is `1.0 + sum_of_bonuses` where each system contributes:
-/// - Deep: +0.5% per layer (capped at layer 30 → +15%)
-/// - Haven: +0.3% per tree level (capped at 50 levels → +15%)
-/// - Sigils: +1.0% per etched sigil (capped at 12 → +12%)
-/// - Ascension: +2.0% per ascension level (capped at level 10 → +20%)
-///
-/// Total cap: roughly +62% at absolute max investment across all systems.
-pub fn loom_production_bonus(
-    deep_layer: u32,
-    haven_tree_level: u32,
-    sigil_count: u32,
-    ascension_level: u32,
-) -> f64 {
-    let deep_bonus = (deep_layer.min(30) as f64) * 0.005;
-    let haven_bonus = (haven_tree_level.min(50) as f64) * 0.003;
-    let sigil_bonus = (sigil_count.min(12) as f64) * 0.010;
-    let ascension_bonus = (ascension_level.min(10) as f64) * 0.020;
-    1.0 + deep_bonus + haven_bonus + sigil_bonus + ascension_bonus
 }
 
 /// Construction ticks by tier: T1=2h, T2=4h, T3=6h (at 100ms/tick).
@@ -1651,98 +1617,6 @@ mod tests {
         assert!(codex[0].discovered);
     }
 
-    // ── loom_production_bonus ──────────────────────────────────────────────────
-
-    #[test]
-    fn test_loom_production_bonus_zero_inputs_is_one() {
-        let bonus = loom_production_bonus(0, 0, 0, 0);
-        assert!(
-            (bonus - 1.0).abs() < 1e-9,
-            "no bonuses should return 1.0, got {}",
-            bonus
-        );
-    }
-
-    #[test]
-    fn test_loom_production_bonus_deep_layer_contribution() {
-        // 10 deep layers → +5%
-        let bonus = loom_production_bonus(10, 0, 0, 0);
-        assert!(
-            (bonus - 1.05).abs() < 1e-9,
-            "10 deep layers should give 1.05, got {}",
-            bonus
-        );
-    }
-
-    #[test]
-    fn test_loom_production_bonus_haven_tree_contribution() {
-        // 10 haven tree levels → +3%
-        let bonus = loom_production_bonus(0, 10, 0, 0);
-        assert!(
-            (bonus - 1.03).abs() < 1e-9,
-            "10 haven levels should give 1.03, got {}",
-            bonus
-        );
-    }
-
-    #[test]
-    fn test_loom_production_bonus_sigil_contribution() {
-        // 6 sigils → +6%
-        let bonus = loom_production_bonus(0, 0, 6, 0);
-        assert!(
-            (bonus - 1.06).abs() < 1e-9,
-            "6 sigils should give 1.06, got {}",
-            bonus
-        );
-    }
-
-    #[test]
-    fn test_loom_production_bonus_ascension_contribution() {
-        // 3 ascension levels → +6%
-        let bonus = loom_production_bonus(0, 0, 0, 3);
-        assert!(
-            (bonus - 1.06).abs() < 1e-9,
-            "3 ascension levels should give 1.06, got {}",
-            bonus
-        );
-    }
-
-    #[test]
-    fn test_loom_production_bonus_all_systems_additive() {
-        // 10 deep + 10 haven + 6 sigils + 3 ascension = 5% + 3% + 6% + 6% = 20%
-        let bonus = loom_production_bonus(10, 10, 6, 3);
-        assert!(
-            (bonus - 1.20).abs() < 1e-9,
-            "combined bonus should be 1.20, got {}",
-            bonus
-        );
-    }
-
-    #[test]
-    fn test_loom_production_bonus_caps_are_enforced() {
-        // Values beyond the caps should give same result as capped values.
-        let capped = loom_production_bonus(30, 50, 12, 10);
-        let over_cap = loom_production_bonus(100, 200, 50, 50);
-        assert!(
-            (capped - over_cap).abs() < 1e-9,
-            "over-cap inputs should equal capped: {} vs {}",
-            capped,
-            over_cap
-        );
-        // Max bonus: 15% + 15% + 12% + 20% = 62%
-        assert!(
-            (capped - 1.62).abs() < 1e-9,
-            "max bonus should be 1.62, got {}",
-            capped
-        );
-    }
-
-    #[test]
-    fn test_loom_production_bonus_always_at_least_one() {
-        assert!(loom_production_bonus(0, 0, 0, 0) >= 1.0);
-        assert!(loom_production_bonus(1, 1, 1, 1) >= 1.0);
-    }
-
     // ── node_effective_rate ───────────────────────────────────────────────────
 
     #[test]
@@ -2205,167 +2079,12 @@ mod tests {
     }
 }
 
-// ---------------------------------------------------------------------------
-// External system bonuses — granular per-aspect bonuses (Task #20 supplement)
-// ---------------------------------------------------------------------------
-
-/// Pre-computed bonuses from existing game systems that boost Loom production.
-///
-/// Breaks external bonuses into two separate axes so callers can apply them
-/// only where relevant (production rate, buffer capacity).
-/// Passed via explicit parameters following the Haven bonus injection pattern —
-/// Loom logic never imports Haven/Deep/Stormglass/Ascension directly.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct LoomExternalBonuses {
-    /// Additive fraction bonus on all node base production rates (e.g. 0.10 = +10%).
-    pub production_rate_bonus: f64,
-    /// Additive fraction bonus on buffer capacity for all nodes (e.g. 0.20 = +20%).
-    pub buffer_capacity_bonus: f64,
-}
-
-/// Compute granular Loom bonuses from the current state of existing game systems.
-///
-/// # Parameters
-/// - `haven_damage_percent`: Haven Armory damage bonus (0-25.0). Each 5% maps to
-///   +1% production rate (max +5% at 25%).
-/// - `deep_guild_rank`: Deep guild rank 1-5. Each rank above 1 adds +5% buffer
-///   capacity (max +20% at rank 5).
-/// - `ascension_level`: Current ascension level (0 = none). Reserved for future use.
-/// - `stormglass_balance`: Current Stormglass balance. Every 100k SG adds +1%
-///   production rate, capped at +5% (500k SG).
-///
-/// All bonuses are additive within their category and independent of each other.
-/// Haven and Stormglass bonuses stack additively into `production_rate_bonus`.
-pub fn loom_external_bonuses(
-    haven_damage_percent: f64,
-    deep_guild_rank: u8,
-    _ascension_level: u32,
-    stormglass_balance: u64,
-) -> LoomExternalBonuses {
-    // Haven Armory: up to +25% damage maps linearly to up to +5% production rate.
-    let haven_production = (haven_damage_percent / 5.0).min(5.0) / 100.0;
-
-    // Stormglass: +1% per 100k balance, capped at +5% (500k).
-    let sg_production = (stormglass_balance as f64 / 100_000.0).min(5.0) / 100.0;
-
-    let production_rate_bonus = haven_production + sg_production;
-
-    // Deep guild rank: +5% buffer capacity per rank above 1, capped at +20% (rank 5).
-    let rank_above_one = deep_guild_rank.saturating_sub(1) as f64;
-    let buffer_capacity_bonus = (rank_above_one * 5.0).min(20.0) / 100.0;
-
-    LoomExternalBonuses {
-        production_rate_bonus,
-        buffer_capacity_bonus,
-    }
-}
-
-/// Apply external bonuses to a node's effective base production rate.
-pub fn effective_node_base_rate(node: &LoomNode, bonuses: &LoomExternalBonuses) -> f64 {
-    node.base_rate * (1.0 + bonuses.production_rate_bonus)
-}
-
-/// Apply external bonuses to a node's effective buffer capacity.
-pub fn effective_buffer_capacity(node: &LoomNode, bonuses: &LoomExternalBonuses) -> f64 {
-    node.buffer_capacity * (1.0 + bonuses.buffer_capacity_bonus)
-}
-
 #[cfg(test)]
-mod external_bonus_tests {
+mod shuttle_tests {
     use super::*;
 
-    #[test]
-    fn test_no_bonuses_when_all_systems_at_minimum() {
-        let b = loom_external_bonuses(0.0, 1, 0, 0);
-        assert!((b.production_rate_bonus).abs() < 1e-9);
-        assert!((b.buffer_capacity_bonus).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_haven_armory_max_gives_five_percent_production() {
-        let b = loom_external_bonuses(25.0, 1, 0, 0);
-        assert!((b.production_rate_bonus - 0.05).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_haven_bonus_capped_at_five_percent() {
-        let b = loom_external_bonuses(200.0, 1, 0, 0);
-        assert!((b.production_rate_bonus - 0.05).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_deep_guild_rank_2_gives_five_percent_buffer() {
-        let b = loom_external_bonuses(0.0, 2, 0, 0);
-        assert!((b.buffer_capacity_bonus - 0.05).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_deep_guild_rank_5_gives_twenty_percent_buffer() {
-        let b = loom_external_bonuses(0.0, 5, 0, 0);
-        assert!((b.buffer_capacity_bonus - 0.20).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_deep_guild_rank_1_gives_no_buffer_bonus() {
-        let b = loom_external_bonuses(0.0, 1, 0, 0);
-        assert!((b.buffer_capacity_bonus).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_stormglass_100k_gives_one_percent_production() {
-        let b = loom_external_bonuses(0.0, 1, 0, 100_000);
-        assert!((b.production_rate_bonus - 0.01).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_stormglass_500k_gives_five_percent_production() {
-        let b = loom_external_bonuses(0.0, 1, 0, 500_000);
-        assert!((b.production_rate_bonus - 0.05).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_stormglass_capped_at_five_percent() {
-        let b = loom_external_bonuses(0.0, 1, 0, 2_000_000);
-        assert!((b.production_rate_bonus - 0.05).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_haven_and_stormglass_stack_additively() {
-        // Haven T3 (25 dmg% -> 5%) + 500k SG (5%) = 10%
-        let b = loom_external_bonuses(25.0, 1, 0, 500_000);
-        assert!((b.production_rate_bonus - 0.10).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_all_systems_at_max_gives_correct_totals() {
-        let b = loom_external_bonuses(25.0, 5, 6, 500_000);
-        assert!((b.production_rate_bonus - 0.10).abs() < 1e-9);
-        assert!((b.buffer_capacity_bonus - 0.20).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_effective_node_base_rate_applies_production_bonus() {
-        let mut node = LoomNode::new(NodeId::EmberSpindle);
-        node.base_rate = 10.0;
-        let b = LoomExternalBonuses {
-            production_rate_bonus: 0.10,
-            ..Default::default()
-        };
-        assert!((effective_node_base_rate(&node, &b) - 11.0).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_effective_buffer_capacity_applies_buffer_bonus() {
-        let mut node = LoomNode::new(NodeId::EmberSpindle);
-        node.buffer_capacity = 20.0;
-        let b = LoomExternalBonuses {
-            buffer_capacity_bonus: 0.20,
-            ..Default::default()
-        };
-        assert!((effective_buffer_capacity(&node, &b) - 24.0).abs() < 1e-9);
-    }
-
     // Helper: populate patterns via complete_discovery and mark the first N as completed.
+
     fn setup_patterns(loom: &mut LoomState, completed_count: usize) {
         crate::loom::discovery::complete_discovery(loom);
         for p in loom.persistent.patterns.iter_mut().take(completed_count) {

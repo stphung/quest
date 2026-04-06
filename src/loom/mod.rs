@@ -13,8 +13,7 @@ pub use discovery::{complete_discovery, pattern_chapter};
 #[allow(unused_imports)]
 pub use logic::{
     archetype_nodes, build_shuttle, check_node_stall, codex_hint_indices, demolish_shuttle,
-    effective_buffer_capacity, effective_node_base_rate, eligible_sources_for_tier,
-    initialize_loom, loom_external_bonuses, loom_production_bonus, loom_zone_cap_for_patterns,
+    eligible_sources_for_tier, initialize_loom, loom_zone_cap_for_patterns,
     node_conversion_multiplier, node_effective_rate, node_level_multiplier, node_native_resource,
     node_neighbor_unlock_count, node_neighbor_unlock_speed_multiplier, node_neighbors,
     node_throughput_multiplier, node_upgrade_cost, node_upgrade_cost_multiplier,
@@ -23,8 +22,8 @@ pub use logic::{
     tick_loom_staggered_unlock, tick_neighbor_unlocking, tick_node_upgrades,
     tick_shuttle_construction, tick_shuttle_pull, tick_shuttle_stall_detection,
     tick_stall_detection, try_upgrade_node, unlocked_tiers, upgrade_shuttle, wr_to_pr_per_day,
-    LoomExternalBonuses, ShuttleError, ShuttleUpgradeError, MAX_NODE_LEVEL,
-    SECOND_NODE_UNLOCK_SECONDS, SHUTTLE_CONSTRUCTION_TICKS,
+    ShuttleError, ShuttleUpgradeError, MAX_NODE_LEVEL, SECOND_NODE_UNLOCK_SECONDS,
+    SHUTTLE_CONSTRUCTION_TICKS,
 };
 pub use milestones::PatternMilestone;
 #[allow(unused_imports)]
