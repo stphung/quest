@@ -123,8 +123,10 @@ pub struct Shuttle {
     /// Output resource produced.
     pub output: Resource,
     /// Output amount multiplier from the recipe.
+    #[serde(default = "default_shuttle_amount")]
     pub amount: f64,
     /// Recipe tier (1, 2, or 3).
+    #[serde(default = "default_shuttle_tier")]
     pub tier: u8,
     /// Current buffer level (holds output resource).
     #[serde(default)]
@@ -221,6 +223,14 @@ fn default_node_level() -> u32 {
 
 fn default_buffer_capacity() -> f64 {
     250.0
+}
+
+fn default_shuttle_amount() -> f64 {
+    1.0
+}
+
+fn default_shuttle_tier() -> u8 {
+    1
 }
 
 fn default_base_rate() -> f64 {

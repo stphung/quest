@@ -217,7 +217,7 @@ pub fn render_graph_canvas(
 
             // 2. Draw edge labels (only for edges connected to selected node).
             // Smooth sine-wave fade over ~2 second cycle.
-            let pulse = ((frame_count as f64 * 0.15).sin() * 0.5 + 0.5) as f64; // 0.0..1.0
+            let pulse = (frame_count as f64 * 0.15).sin() * 0.5 + 0.5; // 0.0..1.0
             let lo = (60.0, 50.0, 80.0);
             let hi = (220.0, 210.0, 255.0);
             let label_color = Color::Rgb(
@@ -354,6 +354,7 @@ fn display_width(s: &str) -> usize {
 const GAUGE_FULL: char = '▰';
 const GAUGE_EMPTY: char = '▱';
 
+#[allow(clippy::too_many_arguments)]
 fn build_node_render_info(
     ni: NodeIndex,
     node: &LoomGraphNode,
@@ -425,21 +426,6 @@ fn build_node_render_info(
             }
         }
         LoomGraphNode::Shuttle(idx) => {
-            if *idx == usize::MAX {
-                return NodeRenderInfo {
-                    ni,
-                    cx,
-                    cy,
-                    label: "NEW".to_string(),
-                    label_display_width: 3,
-                    color: Color::Rgb(100, 100, 100),
-                    fill: 0.0,
-                    rate_text: String::new(),
-                    gauge_width,
-                    is_sustaining: false,
-                    req_lines: vec![],
-                };
-            }
             if *idx < loom.persistent.shuttles.len() {
                 let s = &loom.persistent.shuttles[*idx];
                 let out_emoji = resource_emoji(s.output);
@@ -896,7 +882,7 @@ fn compute_particles(path: &[(f64, f64)], phase: f64) -> Vec<ParticleWithTrail> 
             }
             accum += seg_len;
         }
-        *path.last().unwrap()
+        path.last().copied().unwrap_or(path[0])
     };
 
     let mut particles = Vec::with_capacity(num_particles);

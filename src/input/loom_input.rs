@@ -380,7 +380,9 @@ fn handle_build_input(
                         };
                         return InputResult::Continue;
                     }
-                    let recipe_idx = build.available_recipes[*cursor];
+                    let Some(&recipe_idx) = build.available_recipes.get(*cursor) else {
+                        return InputResult::Continue;
+                    };
                     build.recipe_index = recipe_idx;
                     let recipe = &recipes[recipe_idx];
                     // Compute eligible sources for input A.
@@ -414,12 +416,8 @@ fn handle_build_input(
                         return InputResult::Continue;
                     }
                     let toggle = vec![false; sources_a.len()];
-                    // TODO(ghost-node): After sources are confirmed and recipe selected,
-                    // insert a ghost node into loom_ui.loom_graph here to preview the
-                    // new shuttle during SelectSourcesA/B steps. Call
-                    // loom::graph::insert_ghost_node() with the selected sources and
-                    // recipe output resource, store the returned NodeIndex in BuildState,
-                    // then call remove_ghost_node() on cancel (Esc) or build completion.
+                    // TODO(ghost-node): Insert a ghost node into the graph here to
+                    // preview the planned shuttle during source selection steps.
                     build.step = BuildStep::SelectSourcesA { cursor: 0, toggle };
                 }
                 _ => {}
@@ -437,8 +435,9 @@ fn handle_build_input(
                     }
                 }
                 KeyCode::Char(' ') => {
-                    // Toggle source selection.
-                    toggle[*cursor] = !toggle[*cursor];
+                    if let Some(val) = toggle.get_mut(*cursor) {
+                        *val = !*val;
+                    }
                 }
                 KeyCode::Enter => {
                     let selected: Vec<LoomNodeRef> = build
@@ -475,7 +474,9 @@ fn handle_build_input(
                     }
                 }
                 KeyCode::Char(' ') => {
-                    toggle[*cursor] = !toggle[*cursor];
+                    if let Some(val) = toggle.get_mut(*cursor) {
+                        *val = !*val;
+                    }
                 }
                 KeyCode::Enter => {
                     let selected: Vec<LoomNodeRef> = build

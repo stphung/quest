@@ -298,48 +298,6 @@ pub fn visible_pattern_indices(loom: &LoomState) -> Vec<usize> {
     }
 }
 
-/// Insert a temporary ghost node for build preview.
-/// Uses usize::MAX as sentinel index to indicate a not-yet-built shuttle.
-/// Called by `loom_input` build flow once the ghost-node TODO is implemented.
-#[allow(dead_code)]
-pub fn insert_ghost_node(
-    lg: &mut LoomGraph,
-    _tier: u8,
-    sources: &[super::types::LoomNodeRef],
-    output_resource: super::types::Resource,
-) -> NodeIndex {
-    let ghost = LoomGraphNode::Shuttle(usize::MAX);
-    let idx = lg.graph.add_node(ghost.clone());
-    lg.node_indices.insert(ghost, idx);
-
-    // Add edges from sources to ghost node
-    for source_ref in sources {
-        let source_gn = match source_ref {
-            super::types::LoomNodeRef::Extractor(id) => LoomGraphNode::Extractor(*id),
-            super::types::LoomNodeRef::Shuttle(i) => LoomGraphNode::Shuttle(*i),
-        };
-        if let Some(&source_idx) = lg.node_indices.get(&source_gn) {
-            lg.graph.add_edge(
-                source_idx,
-                idx,
-                LoomEdge {
-                    resource: output_resource,
-                    current_rate: 0.0,
-                    max_rate: 0.0,
-                },
-            );
-        }
-    }
-    idx
-}
-
-/// Remove the ghost node and its edges.
-#[allow(dead_code)]
-pub fn remove_ghost_node(lg: &mut LoomGraph, ghost_idx: NodeIndex) {
-    lg.graph.remove_node(ghost_idx);
-    lg.node_indices.retain(|_, &mut v| v != ghost_idx);
-}
-
 /// Update edge rates using contention-aware flow computation.
 ///
 /// Computes actual per-edge flow rates considering:

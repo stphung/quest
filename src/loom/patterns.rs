@@ -57,13 +57,19 @@ pub fn tick_pattern_sustain(
         return false;
     }
 
+    // Guard: negative or zero delta is a no-op.
+    if delta_seconds <= 0.0 {
+        return false;
+    }
+
     // Check if ALL incomplete requirements are currently meeting their rate threshold.
+    // NaN rates are treated as 0 (NaN >= threshold is always false).
     let all_met = pattern.requirements.iter().all(|req| {
         if req.completed {
             return true; // Already done — doesn't block others.
         }
         let rate = rates.get(&req.resource).copied().unwrap_or(0.0);
-        rate >= req.required_rate
+        rate.is_finite() && rate >= req.required_rate
     });
 
     // Only advance timers if every requirement is satisfied simultaneously.

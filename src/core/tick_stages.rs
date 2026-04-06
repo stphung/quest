@@ -1061,14 +1061,6 @@ pub(super) fn tick_loom(
     };
     let tick_seconds: f64 = wall_delta * warp;
 
-    // Tick staggered second-node unlock.
-    if loom.persistent.second_node_unlock_elapsed.is_some() {
-        let unlocked = crate::loom::tick_loom_staggered_unlock(loom, tick_seconds);
-        if unlocked {
-            result.loom_changed = true;
-        }
-    }
-
     // Tick shuttle construction (decrement timers, complete when done).
     let completed_shuttles = crate::loom::tick_shuttle_construction(loom, tick_seconds);
     if !completed_shuttles.is_empty() {

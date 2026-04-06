@@ -1,4 +1,7 @@
 mod loom_tests {
-    mod coverage_gaps_test;
+    mod helpers;
     mod pattern_solutions_test;
+    mod pattern_test;
+    mod production_test;
+    mod shuttle_test;
 }

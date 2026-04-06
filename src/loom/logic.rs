@@ -35,48 +35,8 @@ pub fn initialize_loom(loom: &mut LoomState) {
     loom.persistent.second_node_unlock_elapsed = None;
 }
 
-/// Legacy constant kept for save compatibility.
-pub const SECOND_NODE_UNLOCK_SECONDS: f64 = 14_400.0;
-
-/// Legacy: staggered unlock is disabled. Returns false always.
-pub fn tick_loom_staggered_unlock(_loom: &mut LoomState, _elapsed_seconds: f64) -> bool {
-    false
-}
-
-/// Returns the throughput multiplier for a node.
-/// Currently always 1.0 (archetype bonuses removed for rebalancing).
-pub fn node_throughput_multiplier(_loom: &LoomState, _node_id: NodeId) -> f64 {
-    1.0
-}
-
-/// Returns the conversion ratio multiplier for a node.
-/// Currently always 1.0 (archetype bonuses removed for rebalancing).
-pub fn node_conversion_multiplier(_loom: &LoomState, _node_id: NodeId) -> f64 {
-    1.0
-}
-
-/// Returns the number of neighbors that unlock when a node produces enough.
-pub fn node_neighbor_unlock_count(_loom: &LoomState, _node_id: NodeId) -> usize {
-    2
-}
-
-/// Returns the upgrade cost multiplier for a node.
-/// Currently always 1.0 (archetype bonuses removed for rebalancing).
-pub fn node_upgrade_cost_multiplier(_loom: &LoomState, _node_id: NodeId) -> f64 {
-    1.0
-}
-
-/// Returns the neighbor unlock speed multiplier for a node.
-/// Currently always 1.0 (archetype bonuses removed for rebalancing).
-pub fn node_neighbor_unlock_speed_multiplier(_loom: &LoomState, _node_id: NodeId) -> f64 {
-    1.0
-}
-
-/// Returns whether the Resonance Forge feedback loop passive is active.
-/// Currently always false (archetype bonuses removed for rebalancing).
-pub fn resonance_early_feedback_active(_loom: &LoomState) -> bool {
-    false
-}
+/// Number of cycle-neighbors each node unlocks simultaneously.
+const NEIGHBOR_UNLOCK_COUNT: usize = 2;
 
 // ── Phase 3: Node Base Production ─────────────────────────────────────────────
 
@@ -98,13 +58,12 @@ pub fn node_level_multiplier(level: u32) -> f64 {
     1.0 + (level.saturating_sub(1) as f64) * 0.5
 }
 
-/// Returns the effective production rate (native resource per hour) for a node,
-/// incorporating level and archetype passives.
-pub fn node_effective_rate(loom: &LoomState, node: &LoomNode) -> f64 {
+/// Returns the effective production rate (native resource per hour) for a node.
+pub fn node_effective_rate(_loom: &LoomState, node: &LoomNode) -> f64 {
     if !node.unlocked || node.upgrading {
         return 0.0;
     }
-    node.base_rate * node_level_multiplier(node.level) * node_throughput_multiplier(loom, node.id)
+    node.base_rate * node_level_multiplier(node.level)
 }
 
 /// Tick base production for all unlocked nodes.
@@ -119,6 +78,9 @@ pub fn tick_base_production(
     loom: &mut LoomState,
     delta_seconds: f64,
 ) -> std::collections::HashMap<Resource, f64> {
+    if delta_seconds <= 0.0 {
+        return std::collections::HashMap::new();
+    }
     let delta_hours = delta_seconds / 3600.0;
     let mut produced: std::collections::HashMap<Resource, f64> = std::collections::HashMap::new();
 
@@ -159,12 +121,10 @@ pub fn tick_base_production(
 // ── Phase 3: Node Upgrading ───────────────────────────────────────────────────
 
 /// Returns the upgrade cost (in the node's native resource) for going from current level to next.
-/// Base cost: 100 * level^1.2, rounded. Silence Well gets 25% discount at levels 1-5.
+/// Base cost: 100 * level^1.2, rounded.
 pub fn node_upgrade_cost(loom: &LoomState, node_id: NodeId) -> f64 {
     let node = &loom.persistent.nodes[node_id.index()];
-    let base_cost = 100.0 * (node.level as f64).powf(1.2);
-    let multiplier = node_upgrade_cost_multiplier(loom, node_id);
-    (base_cost * multiplier).round()
+    (100.0 * (node.level as f64).powf(1.2)).round()
 }
 
 /// Maximum extractor node level.
@@ -228,7 +188,7 @@ pub fn tick_node_upgrades(loom: &mut LoomState, delta_seconds: f64) {
         if node.upgrade_remaining_secs <= 0.0 {
             node.upgrading = false;
             node.upgrade_remaining_secs = 0.0;
-            node.level += 1;
+            node.level = (node.level + 1).min(MAX_NODE_LEVEL);
             node.buffer_capacity =
                 node.base_rate * node_level_multiplier(node.level) * BUFFER_HOURS;
             loom.graph_dirty = true;
@@ -282,8 +242,7 @@ pub fn tick_neighbor_unlocking(loom: &mut LoomState, delta_seconds: f64) -> Vec<
             continue;
         }
 
-        let speed_mult = node_neighbor_unlock_speed_multiplier(loom, *src_id);
-        let unlock_count = node_neighbor_unlock_count(loom, *src_id);
+        let unlock_count = NEIGHBOR_UNLOCK_COUNT;
         let neighbors = node_neighbors(*src_id);
 
         let locked_neighbors: Vec<NodeId> = neighbors
@@ -305,7 +264,7 @@ pub fn tick_neighbor_unlocking(loom: &mut LoomState, delta_seconds: f64) -> Vec<
                 .iter_mut()
                 .find(|n| n.id == neighbor_id)
             {
-                neighbor.unlock_progress += delta_hours * speed_mult;
+                neighbor.unlock_progress += delta_hours;
                 if neighbor.unlock_progress >= NEIGHBOR_UNLOCK_HOURS {
                     neighbor.unlocked = true;
                     neighbor.unlock_progress = 0.0;
@@ -453,14 +412,6 @@ pub fn tick_shuttle_pull(
     let delta_hours = delta_seconds / 3600.0;
     let mut produced: std::collections::HashMap<Resource, f64> = std::collections::HashMap::new();
 
-    // ── Pre-compute per-node throughput multipliers before mutable borrow ──
-    let node_multipliers: std::collections::HashMap<NodeId, f64> = loom
-        .persistent
-        .nodes
-        .iter()
-        .map(|n| (n.id, node_throughput_multiplier(loom, n.id)))
-        .collect();
-
     // ── Step 1: Count consumers per source across all non-construction shuttles ──
     let mut consumer_count: std::collections::HashMap<LoomNodeRef, usize> =
         std::collections::HashMap::new();
@@ -495,12 +446,8 @@ pub fn tick_shuttle_pull(
                 .sources_a
                 .iter()
                 .map(|&src| {
-                    let available = source_available_rate(
-                        src,
-                        &loom.persistent,
-                        &shuttle_output_rates,
-                        &node_multipliers,
-                    );
+                    let available =
+                        source_available_rate(src, &loom.persistent, &shuttle_output_rates);
                     let consumers = consumer_count.get(&src).copied().unwrap_or(1).max(1);
                     available / consumers as f64
                 })
@@ -511,12 +458,8 @@ pub fn tick_shuttle_pull(
                 .sources_b
                 .iter()
                 .map(|&src| {
-                    let available = source_available_rate(
-                        src,
-                        &loom.persistent,
-                        &shuttle_output_rates,
-                        &node_multipliers,
-                    );
+                    let available =
+                        source_available_rate(src, &loom.persistent, &shuttle_output_rates);
                     let consumers = consumer_count.get(&src).copied().unwrap_or(1).max(1);
                     available / consumers as f64
                 })
@@ -551,24 +494,22 @@ fn source_available_rate(
     src: LoomNodeRef,
     persistent: &super::types::LoomPersistent,
     shuttle_rates: &[f64],
-    node_multipliers: &std::collections::HashMap<NodeId, f64>,
 ) -> f64 {
     match src {
         LoomNodeRef::Extractor(node_id) => {
             let node = &persistent.nodes[node_id.index()];
-            let throughput_mult = node_multipliers.get(&node_id).copied().unwrap_or(1.0);
-            node_effective_rate_from_node(node, throughput_mult)
+            node_effective_rate_from_node(node)
         }
         LoomNodeRef::Shuttle(idx) => shuttle_rates.get(idx).copied().unwrap_or(0.0),
     }
 }
 
 /// Compute a node's effective rate without needing the full LoomState borrow.
-fn node_effective_rate_from_node(node: &LoomNode, throughput_multiplier: f64) -> f64 {
+fn node_effective_rate_from_node(node: &LoomNode) -> f64 {
     if !node.unlocked || node.upgrading {
         return 0.0;
     }
-    node.base_rate * node_level_multiplier(node.level) * throughput_multiplier
+    node.base_rate * node_level_multiplier(node.level)
 }
 
 /// Record a recipe discovery in the codex.
@@ -637,9 +578,6 @@ pub fn shuttle_construction_secs(tier: u8) -> f64 {
     }
 }
 
-/// Legacy constant kept for backward compat — prefer shuttle_construction_secs(tier).
-pub const SHUTTLE_CONSTRUCTION_TICKS: u32 = 72_000;
-
 /// Error conditions for shuttle building.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShuttleError {
@@ -691,7 +629,8 @@ pub fn available_resource(loom: &LoomState, resource: Resource) -> f64 {
     total
 }
 
-fn shuttle_build_cost(tier: u8) -> f64 {
+/// Returns the build cost for a shuttle of the given tier.
+pub fn shuttle_build_cost(tier: u8) -> f64 {
     match tier {
         1 => 250.0,
         2 => 150.0,
@@ -722,11 +661,6 @@ pub fn unlocked_tiers(loom: &LoomState) -> Vec<u8> {
         }
     }
     tiers
-}
-
-/// Returns the build cost for a shuttle of the given tier.
-pub fn shuttle_build_cost_public(tier: u8) -> f64 {
-    shuttle_build_cost(tier)
 }
 
 /// Returns all eligible source nodes for a given shuttle tier.
@@ -983,34 +917,6 @@ mod tests {
             }
         }
         assert_eq!(loom.persistent.second_node_unlock_elapsed, None);
-    }
-
-    #[test]
-    fn test_multipliers_are_neutral() {
-        let loom = LoomState::new();
-        // All multiplier functions return neutral values (archetype bonuses removed)
-        assert_eq!(node_throughput_multiplier(&loom, NodeId::EmberSpindle), 1.0);
-        assert_eq!(
-            node_conversion_multiplier(&loom, NodeId::VoidCondenser),
-            1.0
-        );
-        assert_eq!(node_neighbor_unlock_count(&loom, NodeId::ReflectionLens), 2);
-        assert_eq!(
-            node_upgrade_cost_multiplier(&loom, NodeId::SilenceWell),
-            1.0
-        );
-        assert_eq!(
-            node_neighbor_unlock_speed_multiplier(&loom, NodeId::EmberSpindle),
-            1.0
-        );
-        assert!(!resonance_early_feedback_active(&loom));
-    }
-
-    #[test]
-    fn test_staggered_unlock_is_noop() {
-        let mut loom = LoomState::new();
-        // Staggered unlock always returns false now
-        assert!(!tick_loom_staggered_unlock(&mut loom, 14400.0));
     }
 
     // ── Phase 3: Node Base Production tests ───────────────────────────────────
@@ -1888,33 +1794,6 @@ mod tests {
         let (first, second) = archetype_nodes(LoomArchetype::RunDeep);
         assert_eq!(first, NodeId::SilenceWell);
         assert_eq!(second, NodeId::ResonanceForge);
-    }
-
-    // ── node_neighbor_unlock_speed_multiplier ─────────────────────────────────
-
-    #[test]
-    fn test_ember_spindle_unlock_speed_is_normal() {
-        let mut loom = LoomState::new();
-        initialize_loom(&mut loom);
-        // No archetype bonus — speed is 1.0x for all nodes.
-        assert!(
-            (node_neighbor_unlock_speed_multiplier(&loom, NodeId::EmberSpindle) - 1.0).abs()
-                < 0.001
-        );
-    }
-
-    #[test]
-    fn test_other_nodes_unlock_speed_is_one() {
-        let mut loom = LoomState::new();
-        initialize_loom(&mut loom);
-        assert_eq!(
-            node_neighbor_unlock_speed_multiplier(&loom, NodeId::VoidCondenser),
-            1.0
-        );
-        assert_eq!(
-            node_neighbor_unlock_speed_multiplier(&loom, NodeId::SilenceWell),
-            1.0
-        );
     }
 
     // ── upgrade_cost scaling ──────────────────────────────────────────────────

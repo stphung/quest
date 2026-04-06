@@ -18,7 +18,6 @@ pub enum PatternMilestone {
     FinalWeave,
 }
 
-#[allow(dead_code)]
 impl PatternMilestone {
     /// Returns the milestone triggered by the given completed pattern count, if any.
     pub fn from_count(completed: usize) -> Option<Self> {

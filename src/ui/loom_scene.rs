@@ -461,7 +461,11 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                 ];
                 for (i, src) in build.eligible_sources_a.iter().enumerate() {
                     let marker = if i == *cursor { "\u{25b6}" } else { " " };
-                    let check = if toggle[i] { "[\u{2713}]" } else { "[ ]" };
+                    let check = if toggle.get(i).copied().unwrap_or(false) {
+                        "[\u{2713}]"
+                    } else {
+                        "[ ]"
+                    };
                     let name = source_name(src, loom);
                     let color = if i == *cursor {
                         Color::White
@@ -523,7 +527,11 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                 }
                 for (i, src) in build.eligible_sources_b.iter().enumerate() {
                     let marker = if i == *cursor { "\u{25b6}" } else { " " };
-                    let check = if toggle[i] { "[\u{2713}]" } else { "[ ]" };
+                    let check = if toggle.get(i).copied().unwrap_or(false) {
+                        "[\u{2713}]"
+                    } else {
+                        "[ ]"
+                    };
                     let name = source_name(src, loom);
                     let color = if i == *cursor {
                         Color::White
@@ -545,7 +553,7 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
             }
             crate::loom::BuildStep::Confirm => {
                 let r = &recipes[build.recipe_index];
-                let cost = crate::loom::shuttle_build_cost_public(build.tier);
+                let cost = crate::loom::shuttle_build_cost(build.tier);
                 vec![
                     Line::from(Span::styled(
                         format!(

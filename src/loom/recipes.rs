@@ -4,9 +4,9 @@
 //! Node nature acts as the hidden catalyst — the same two inputs piped into
 //! different nodes produce different outputs.
 //!
-//! Tier 1 (~15 recipes): Two base resources. Available from start.
-//! Tier 2 (~12 recipes): At least one confluence resource as input.
-//! Tier 3 (~10 recipes): Three inputs or tapestry-tier outputs. Late progression.
+//! Tier 1 (3 recipes): Base × Base → Confluence. Available from start.
+//! Tier 2 (3 recipes): Confluence × Base → Reaction product.
+//! Tier 3 (1 recipe): Reaction × Reaction → Woven Reality. Late progression.
 #![allow(dead_code)]
 use std::collections::HashMap;
 use std::sync::OnceLock;

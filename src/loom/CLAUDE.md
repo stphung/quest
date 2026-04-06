@@ -13,7 +13,7 @@ src/loom/
 ├── patterns.rs     — Woven Pattern sustain timer and completion tracking
 ├── discovery.rs    — 28 woven patterns defined in create_pattern_sequence()
 ├── milestones.rs   — Pattern milestone types and helpers for key pattern completion modals
-├── graph.rs        — petgraph DAG construction, rebuild logic, ghost nodes, rate updates
+├── graph.rs        — petgraph DAG construction, rebuild logic, rate updates
 ├── layout.rs       — Sugiyama layout engine: layer assignment, crossing minimization, coordinate assignment
 └── persistence.rs  — Save/load from ~/.quest/loom.json
 ```
@@ -28,7 +28,7 @@ src/loom/
 | `Shuttle` | Recipe-locked processing node: input_a/b, nature, output, amount, tier, buffer, sources_a/sources_b, construction state; `output_rate_tracker: RateTracker` (transient, not serialized) |
 | `Resource` | Enum of all resources: 6 base + confluence + reaction products |
 | `WovenPattern` | Pattern with resource requirements (sustained rate thresholds and durations), completion state |
-| `RateTracker` | 60-second rolling window rate measurement (transient, not serialized) |
+| `RateTracker` | 20-second rolling window rate measurement (200 ticks at 100ms/tick, transient, not serialized) |
 | `LoomState` | Top-level state: `persistent` (saved) + `ui_state` (transient) |
 | `LoomPersistent` | Saved state: nodes, shuttles, stockpile, codex, patterns |
 | `LoomGraphNode` | Graph node enum: `Extractor(NodeId)`, `Shuttle(usize)`, `PatternSink(usize)` |
@@ -93,9 +93,9 @@ Shuttles are recipe-locked processing nodes that create multi-step production ch
 **Construction**: Shuttles have a tier-based construction period. `tick_shuttle_construction()` decrements timers and marks them ready:
 | Tier | Construction time |
 |------|-------------------|
-| T1 | 2h (72000 ticks) |
-| T2 | 4h (144000 ticks) |
-| T3 | 6h (216000 ticks) |
+| T1 | 2h (7,200 seconds) |
+| T2 | 4h (14,400 seconds) |
+| T3 | 6h (21,600 seconds) |
 
 **Processing**: `tick_shuttle_pull(loom, delta_seconds)` runs the direct-pull simulation each tick, returning a map of `Resource → amount produced` for pattern tracking.
 
@@ -113,7 +113,7 @@ Woven Patterns use sustained production rates rather than accumulated totals:
 - `PatternRequirement::completed` — whether this individual requirement is complete (locks independently)
 - Pattern completes when all requirements have `completed = true`
 - Requirements must be met **simultaneously**: ALL resource rates must be at or above their thresholds at the same time for any timers to advance. If even one resource drops below its threshold, no requirement timers advance — the entire pattern is paused until all rates recover.
-- Rate measurement uses a 60-second rolling window (`RateTracker` struct, transient, not serialized)
+- Rate measurement uses a 20-second rolling window (`RateTracker` struct, 200 ticks at 100ms/tick, transient, not serialized)
 - Simple pause model: progress never decays, only pauses when any rate drops below threshold
 
 ## Production Chain Flow
@@ -223,7 +223,7 @@ When all 28 Woven Patterns are complete, the Loom converts Weave Rate (WR) into 
 
 - **Ticked by**: `src/core/tick_stages.rs` `tick_loom()` — calls base production, `tick_shuttle_pull`, shuttle construction, stall detection, pattern sustain
 - **Input from**: `src/input/loom_input.rs` dispatches keyboard events
-- **Rendered by**: `src/ui/loom_scene.rs` + `src/ui/loom_graph.rs` render GraphView and Codex views
+- **Rendered by**: `src/ui/loom_scene.rs` + `src/ui/loom_graph.rs` render GraphView
 - **Persisted to**: `~/.quest/loom.json` via `persistence.rs`
 - **Discovery**: Triggered by pattern completion milestones
 - **Ascension** (`ascension/types.rs`): `ascension_pattern_gate()` checks pattern count for VII-X eligibility; `max_shuttle_level()` gates shuttle upgrades by Ascension tier

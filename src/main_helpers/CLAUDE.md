@@ -14,7 +14,7 @@ Thin orchestration wrappers extracted from `main.rs` to keep the game loop reada
 | `character_screens.rs` | `ScreenTransition` enum and frame handlers for character creation, deletion, and rename screens; each draws UI, polls input, returns transition |
 | `cloud_ops.rs` | `reload_account_state()` -- reloads Haven, Enhancement, and Achievements from disk after cloud pull/resolve operations |
 | `input_routing.rs` | `InputAction` enum and `route_game_input()` -- maps `InputResult` variants to side effects (save, quit, etc.); bridges input handling and persistence |
-| `offline.rs` | `resolve_deep_offline()` -- resolves Deep missions completed while game was closed; `apply_offline_xp()` -- processes offline XP progression with combat log entries |
+| `offline.rs` | `resolve_deep_offline()` -- resolves Deep missions completed while game was closed; `apply_offline_xp()` -- processes offline XP progression with combat log entries; `resolve_loom_offline()` -- simulates Loom production while game was closed |
 | `overlay.rs` | `draw_game_overlays()` -- renders all active game overlays on top of the main UI (modals, Haven, Soulforge, Stormglass, Deep, Chrono Surge, debug menu, save indicator) |
 | `persistence.rs` | `save_all()` -- saves character, achievements, Haven, enhancement, and Deep state to disk; optionally creates a git history commit |
 | `scene.rs` | `is_realtime_minigame()`, `SceneKind` enum, `current_scene_kind()`, `is_wide_scene()` -- scene classification helpers for terminal redraw management |
@@ -32,8 +32,8 @@ Each file wraps a single concern that would otherwise clutter `main.rs`:
 
 ## Integration Points
 
-- **Bridges**: `main.rs` <-> domain modules (`character/`, `achievements/`, `haven/`, `enhancement/`, `deep/`, `history/`, `stormglass/`)
+- **Bridges**: `main.rs` <-> domain modules (`character/`, `achievements/`, `haven/`, `enhancement/`, `deep/`, `history/`, `stormglass/`, `loom/`)
 - **Input flow**: `main.rs` -> `input/mod.rs` (handle_game_input) -> `InputResult` -> `input_routing.rs` (route_game_input) -> `persistence.rs` (save_all)
 - **Rendering flow**: `main.rs` -> `overlay.rs` (draw_game_overlays) -> `ui/` scene modules
-- **Offline flow**: `main.rs` -> `offline.rs` (resolve_deep_offline, apply_offline_xp) -> domain modules
+- **Offline flow**: `main.rs` -> `offline.rs` (resolve_deep_offline, apply_offline_xp, resolve_loom_offline) -> domain modules
 - **Cloud flow**: `main.rs` -> `cloud_ops.rs` (reload_account_state) -> persistence modules
