@@ -50,7 +50,7 @@ fn make_t1_shuttle(
         vec![LoomNodeRef::Extractor(extractor_b)],
     );
     s.under_construction = false;
-    s.construction_ticks_remaining = 0;
+    s.construction_secs_remaining = 0.0;
     s
 }
 
@@ -74,7 +74,7 @@ fn make_t2_shuttle(
         vec![source_b],
     );
     s.under_construction = false;
-    s.construction_ticks_remaining = 0;
+    s.construction_secs_remaining = 0.0;
     s
 }
 
@@ -98,7 +98,7 @@ fn make_t3_shuttle(
         vec![source_b],
     );
     s.under_construction = false;
-    s.construction_ticks_remaining = 0;
+    s.construction_secs_remaining = 0.0;
     s
 }
 
@@ -672,7 +672,7 @@ fn test_under_construction_shuttle_excluded_from_contention() {
         Resource::ForgedLight,
     );
     s.under_construction = true;
-    s.construction_ticks_remaining = 50;
+    s.construction_secs_remaining = 50.0;
     loom.persistent.shuttles.push(s);
 
     run_ticks(&mut loom, 250);

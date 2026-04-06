@@ -1065,7 +1065,7 @@ pub(super) fn tick_loom(
     }
 
     // Tick shuttle construction (decrement timers, complete when done).
-    let completed_shuttles = crate::loom::tick_shuttle_construction(loom);
+    let completed_shuttles = crate::loom::tick_shuttle_construction(loom, tick_seconds);
     if !completed_shuttles.is_empty() {
         result.loom_changed = true;
     }

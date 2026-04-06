@@ -108,15 +108,9 @@ pub fn render_loom_overlay(
     // Refresh graph data before rendering.
     // Layout bounds must match the canvas coordinate space used by the renderer
     // (Braille: 2 dots/cell horizontal, 4 dots/cell vertical, on the top area).
-    let build_active = ui.build.is_some();
-    let graph_pct_f64 = if build_active { 0.5 } else { 0.7 };
-    let graph_area_height = (inner.height as f64 * graph_pct_f64) as f64;
-    let canvas_width = (inner.width as f64) * 2.0; // Braille 2x horizontal
-    let canvas_height = graph_area_height * 4.0; // Braille 4x vertical
-    crate::loom::graph::refresh_graph(ui, loom_state, canvas_width, canvas_height);
-
     // Split: graph canvas on top, detail panel on bottom.
     // During a build flow the bottom panel expands to 50% for the recipe browser.
+    let build_active = ui.build.is_some();
     let (graph_pct, panel_pct) = if build_active { (50, 50) } else { (70, 30) };
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -125,6 +119,12 @@ pub fn render_loom_overlay(
             Constraint::Percentage(panel_pct),
         ])
         .split(inner);
+
+    // Refresh graph data before rendering.
+    // Use actual chunks[0] dimensions so layout bounds match exactly what the renderer uses.
+    let canvas_width = chunks[0].width as f64 * 2.0; // Braille 2x horizontal
+    let canvas_height = chunks[0].height as f64 * 4.0; // Braille 4x vertical
+    crate::loom::graph::refresh_graph(ui, loom_state, canvas_width, canvas_height);
 
     // Render graph canvas if graph and layout are cached.
     if let (Some(ref graph), Some(ref layout_data)) = (&ui.loom_graph, &ui.loom_layout) {
@@ -907,16 +907,14 @@ fn render_bottom_panel_shuttle(
     };
 
     if shuttle.under_construction {
-        let ticks = shuttle.construction_ticks_remaining;
-        let warp = loom.time_warp.max(1.0) as u32;
-        let secs = ticks / (10 * warp);
+        let secs = shuttle.construction_secs_remaining;
         let lines = vec![
             Line::from(Span::styled(
                 format!(" Shuttle {} \u{2014} Under Construction", shuttle_idx),
                 Style::default().fg(Color::Rgb(160, 120, 200)),
             )),
             Line::from(Span::styled(
-                format!(" ~{}s remaining", secs),
+                format!(" ~{:.0}s remaining", secs),
                 Style::default().fg(Color::Rgb(100, 80, 130)),
             )),
         ];

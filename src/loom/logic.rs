@@ -624,17 +624,17 @@ pub fn codex_hint_indices(codex: &[crate::loom::types::CodexEntry]) -> Vec<usize
     recipes::adjacent_recipe_indices(&discovered_registry_indices)
 }
 
-/// Construction ticks by tier: T1=2h, T2=4h, T3=6h (at 100ms/tick).
-pub fn shuttle_construction_ticks(tier: u8) -> u32 {
+/// Construction duration in seconds by tier: T1=2h, T2=4h, T3=6h.
+pub fn shuttle_construction_secs(tier: u8) -> f64 {
     match tier {
-        1 => 72_000,  // 2 hours
-        2 => 144_000, // 4 hours
-        3 => 216_000, // 6 hours
-        _ => 72_000,
+        1 => 7200.0,  // 2 hours
+        2 => 14400.0, // 4 hours
+        3 => 21600.0, // 6 hours
+        _ => 7200.0,
     }
 }
 
-/// Legacy constant kept for tests — use shuttle_construction_ticks(tier) instead.
+/// Legacy constant kept for backward compat — prefer shuttle_construction_secs(tier).
 pub const SHUTTLE_CONSTRUCTION_TICKS: u32 = 72_000;
 
 /// Error conditions for shuttle building.
@@ -812,7 +812,7 @@ pub fn build_shuttle(
         sources_b,
     );
     r.under_construction = true;
-    r.construction_ticks_remaining = shuttle_construction_ticks(recipe.tier);
+    r.construction_secs_remaining = shuttle_construction_secs(recipe.tier);
     loom.persistent.shuttles.push(r);
     loom.graph_dirty = true;
     Ok(loom.persistent.shuttles.len() - 1)
@@ -820,16 +820,16 @@ pub fn build_shuttle(
 
 /// Tick construction for all shuttles under construction.
 /// Returns indices of shuttles that completed this tick.
-pub fn tick_shuttle_construction(loom: &mut LoomState) -> Vec<usize> {
-    let warp = (loom.time_warp as u32).max(1);
+pub fn tick_shuttle_construction(loom: &mut LoomState, delta_seconds: f64) -> Vec<usize> {
     let mut completed = Vec::new();
     for (i, r) in loom.persistent.shuttles.iter_mut().enumerate() {
         if !r.under_construction {
             continue;
         }
-        r.construction_ticks_remaining = r.construction_ticks_remaining.saturating_sub(warp);
-        if r.construction_ticks_remaining == 0 {
+        r.construction_secs_remaining -= delta_seconds;
+        if r.construction_secs_remaining <= 0.0 {
             r.under_construction = false;
+            r.construction_secs_remaining = 0.0;
             completed.push(i);
         }
     }
@@ -1400,7 +1400,7 @@ mod tests {
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         );
         r.under_construction = true;
-        r.construction_ticks_remaining = 100;
+        r.construction_secs_remaining = 100.0;
         loom.persistent.shuttles.push(r);
 
         let produced = tick_shuttle_pull(&mut loom, 3600.0);
@@ -1966,11 +1966,11 @@ mod tests {
                 vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
             );
             r.under_construction = true;
-            r.construction_ticks_remaining = 1;
+            r.construction_secs_remaining = 0.5;
             r
         });
 
-        let completed = tick_shuttle_construction(&mut loom);
+        let completed = tick_shuttle_construction(&mut loom, 1.0);
         assert_eq!(completed.len(), 1);
         assert!(!loom.persistent.shuttles[0].under_construction);
     }

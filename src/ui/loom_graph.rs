@@ -457,15 +457,14 @@ fn build_node_render_info(
                 };
                 let (fill, rate_text) = if s.under_construction {
                     // Show construction progress.
-                    let total = crate::loom::logic::shuttle_construction_ticks(s.tier) as f64;
-                    let elapsed = total - s.construction_ticks_remaining as f64;
+                    let total = crate::loom::logic::shuttle_construction_secs(s.tier);
+                    let elapsed = total - s.construction_secs_remaining;
                     let progress = if total > 0.0 {
                         (elapsed / total).clamp(0.0, 1.0)
                     } else {
                         1.0
                     };
-                    // Convert remaining ticks to seconds (100ms per tick), adjusted for warp.
-                    let remaining_secs = s.construction_ticks_remaining as f64 * 0.1 / warp;
+                    let remaining_secs = s.construction_secs_remaining;
                     (
                         progress,
                         format!("\u{23f3}{}", format_duration(remaining_secs)),
@@ -680,7 +679,7 @@ fn render_gauge_node(
         // 」
     }
 
-    let bracket_extra = if is_selected { 2 } else { 0 }; // 「」 are 1 wide each
+    let bracket_extra = if is_selected { 4 } else { 0 }; // 「」 are 2 columns each (East Asian Wide)
     let label_display_w = info.label_display_width + 1 + info.gauge_width + bracket_extra;
     let half_w_px = label_display_w as f64 * char_w / 2.0;
 

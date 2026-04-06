@@ -180,7 +180,7 @@ fn simulate_loom_step(loom_state: &mut loom::LoomState, delta_seconds: f64) {
     }
 
     // Shuttle construction.
-    loom::tick_shuttle_construction(loom_state);
+    loom::tick_shuttle_construction(loom_state, delta_seconds);
 
     // Shuttle direct-pull processing.
     let shuttle_produced = loom::tick_shuttle_pull(loom_state, delta_seconds);

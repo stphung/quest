@@ -141,9 +141,9 @@ pub struct Shuttle {
     /// Whether currently under construction.
     #[serde(default)]
     pub under_construction: bool,
-    /// Ticks remaining for construction.
-    #[serde(default)]
-    pub construction_ticks_remaining: u32,
+    /// Seconds remaining for construction (wall-clock time).
+    #[serde(default, alias = "construction_ticks_remaining")]
+    pub construction_secs_remaining: f64,
     /// Sources for input A — extractors or lower-tier shuttles.
     #[serde(default)]
     pub sources_a: Vec<LoomNodeRef>,
@@ -179,7 +179,7 @@ impl Shuttle {
             level: 1,
             stalled: false,
             under_construction: false,
-            construction_ticks_remaining: 0,
+            construction_secs_remaining: 0.0,
             sources_a,
             sources_b,
             output_rate_tracker: RateTracker::new(),

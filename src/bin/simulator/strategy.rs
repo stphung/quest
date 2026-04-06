@@ -547,7 +547,7 @@ fn ensure_resource_production(
             // Skip construction delay — make shuttle immediately operational
             let shuttle = &mut loom.persistent.shuttles[idx];
             shuttle.under_construction = false;
-            shuttle.construction_ticks_remaining = 0;
+            shuttle.construction_secs_remaining = 0.0;
 
             if verbose {
                 println!(
@@ -628,7 +628,7 @@ fn auto_build_loom(loom: &mut LoomState, ascension_level: u32, verbose: bool, ti
                     ) {
                         let shuttle = &mut loom.persistent.shuttles[idx];
                         shuttle.under_construction = false;
-                        shuttle.construction_ticks_remaining = 0;
+                        shuttle.construction_secs_remaining = 0.0;
                         if verbose {
                             println!(
                                 "[t={tick:>6}] LOOM: Built extra T{} shuttle #{idx} for {:?} (rate target: {:.0}/hr)",
