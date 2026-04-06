@@ -133,14 +133,8 @@ pub fn render_graph_canvas(
                 Vec::new()
             };
 
-            // Edge label: rate + resource emoji at midpoint.
-            // current_rate is already un-warped (normalized in update_edge_rates).
-            let rate = edge.current_rate;
-            let label = if rate > 0.5 {
-                format!("{} {:.0}/hr", resource_emoji(edge.resource), rate)
-            } else {
-                String::new()
-            };
+            // Edge label computed live during rendering (current_rate updates per tick).
+            let edge_resource = edge.resource;
             // Midpoint of the path.
             let mid_idx = points.len() / 2;
             let label_pos = if points.len() >= 2 {
@@ -162,7 +156,8 @@ pub fn render_graph_canvas(
                 color,
                 particles,
                 particle_color,
-                label,
+                resource: edge_resource,
+                current_rate: edge.current_rate,
                 label_pos,
                 show_label: connected_to_selected,
             })
@@ -231,11 +226,13 @@ pub fn render_graph_canvas(
                 (lo.2 + (hi.2 - lo.2) * pulse) as u8,
             );
             for seg in &edge_segments {
-                if seg.show_label && !seg.label.is_empty() {
-                    let lbl = Line::from(Span::styled(
-                        seg.label.clone(),
-                        Style::default().fg(label_color),
-                    ));
+                if seg.show_label && seg.current_rate > 0.5 {
+                    let label = format!(
+                        "{} {:.0}/hr",
+                        resource_emoji(seg.resource),
+                        seg.current_rate
+                    );
+                    let lbl = Line::from(Span::styled(label, Style::default().fg(label_color)));
                     // Offset slightly above the edge midpoint so it doesn't sit on the line.
                     ctx.print(seg.label_pos.0, seg.label_pos.1 + 3.0, lbl);
                 }
@@ -704,9 +701,11 @@ struct EdgeSegment {
     particles: Vec<ParticleWithTrail>,
     /// Color for particles (source node's resource color).
     particle_color: Color,
-    /// Rate label text (e.g., "42🔥/hr"). Empty if rate ~0.
-    label: String,
-    /// Canvas position for the label (30% along edge path).
+    /// Resource flowing through this edge (for label generation).
+    resource: Resource,
+    /// Live current_rate for label display (updated per tick via edge weight).
+    current_rate: f64,
+    /// Canvas position for the label midpoint.
     label_pos: (f64, f64),
     /// Whether to show the label (only for edges connected to selected node).
     show_label: bool,

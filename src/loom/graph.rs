@@ -367,7 +367,6 @@ pub fn update_edge_rates(lg: &mut LoomGraph, loom: &LoomState) {
     // Step 2: Compute source production rates (un-warped).
     // Extractors: use node_effective_rate (base * level_mult * throughput_mult).
     // Shuttles: use output_rate_tracker / warp.
-    let warp = loom.time_warp.max(1.0);
     let source_rates: HashMap<LoomNodeRef, f64> = {
         let mut rates = HashMap::new();
         for node in &persistent.nodes {
@@ -384,7 +383,9 @@ pub fn update_edge_rates(lg: &mut LoomGraph, loom: &LoomState) {
             let rate = if shuttle.under_construction {
                 0.0
             } else {
-                shuttle.output_rate_tracker.rate_per_hour() / warp
+                // output_rate_tracker already stores un-warped values
+                // (divided by warp on push in tick_shuttle_pull).
+                shuttle.output_rate_tracker.rate_per_hour()
             };
             rates.insert(LoomNodeRef::Shuttle(i), rate);
         }
