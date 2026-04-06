@@ -618,9 +618,8 @@ fn render_gauge_node(
             })
             .collect()
     } else {
-        std::iter::repeat(GAUGE_FULL)
-            .take(filled)
-            .chain(std::iter::repeat(GAUGE_EMPTY).take(empty))
+        std::iter::repeat_n(GAUGE_FULL, filled)
+            .chain(std::iter::repeat_n(GAUGE_EMPTY, empty))
             .collect()
     };
 
@@ -628,7 +627,7 @@ fn render_gauge_node(
     // (effective_color already incorporates the build-mode override or dim.)
     let base_color = if info.is_sustaining && effective_color == info.color {
         // Only pulse when using the node's own color (not dimmed/highlighted by build mode).
-        if (frame_count / 5) % 2 == 0 {
+        if (frame_count / 5).is_multiple_of(2) {
             Color::Rgb(255, 220, 100) // bright gold
         } else {
             Color::Rgb(255, 255, 200) // bright white-gold
