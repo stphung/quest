@@ -446,9 +446,10 @@ pub fn update_edge_rates(lg: &mut LoomGraph, loom: &LoomState) {
 
         if let Some(edge) = lg.graph.edge_weight_mut(edge_idx) {
             edge.current_rate = rate;
-            // For pattern sink edges, keep max_rate = current_rate so particles
-            // flow at full speed whenever there IS flow (utilization = 1.0).
-            if matches!(&target_node, LoomGraphNode::PatternSink(_)) {
+            // Keep max_rate in sync for edges that were initialized with max_rate=0
+            // (shuttle→shuttle, pattern sink edges). This ensures the utilization
+            // ratio (current/max) stays ~1.0 so particles flow at full speed.
+            if edge.max_rate < 0.1 || matches!(&target_node, LoomGraphNode::PatternSink(_)) {
                 edge.max_rate = rate.max(0.1);
             }
         }
