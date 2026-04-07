@@ -819,7 +819,7 @@ pub fn tick_shuttle_stall_detection(loom: &mut LoomState) {
 /// - 10–25 WR/hr: 10 PR per WR/hr per day
 /// - 25+ WR/hr: 15 PR per WR/hr per day
 pub fn wr_to_pr_per_day(wr_per_hour: f64) -> u32 {
-    if wr_per_hour <= 0.0 {
+    if !wr_per_hour.is_finite() || wr_per_hour <= 0.0 {
         return 0;
     }
     let mut pr = 0.0;

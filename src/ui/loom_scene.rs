@@ -183,6 +183,15 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
     // ── Build flow active ────────────────────────────────────────────────────
     if let Some(build) = &ui.build {
         let recipes = crate::loom::recipes::all_recipes();
+        if build.recipe_index >= recipes.len()
+            && !matches!(
+                build.step,
+                crate::loom::BuildStep::SelectRecipe { .. }
+                    | crate::loom::BuildStep::Blocked { .. }
+            )
+        {
+            return;
+        }
         let lines: Vec<Line> = match &build.step {
             crate::loom::BuildStep::SelectRecipe { cursor } => {
                 // Two-column layout: left = scrollable recipe list, right = detail sidebar.

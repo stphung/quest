@@ -156,7 +156,10 @@ pub fn build_graph(loom: &LoomState) -> LoomGraph {
                 let resource = match source_ref {
                     super::types::LoomNodeRef::Extractor(nid) => node_native_resource(*nid),
                     super::types::LoomNodeRef::Shuttle(idx) => {
-                        loom.persistent.shuttles[*idx].output
+                        match loom.persistent.shuttles.get(*idx) {
+                            Some(s) => s.output,
+                            None => continue, // Stale reference — skip edge
+                        }
                     }
                 };
                 // max_rate = source effective rate / number of sources in this slot
@@ -190,7 +193,10 @@ pub fn build_graph(loom: &LoomState) -> LoomGraph {
                 let resource = match source_ref {
                     super::types::LoomNodeRef::Extractor(nid) => node_native_resource(*nid),
                     super::types::LoomNodeRef::Shuttle(idx) => {
-                        loom.persistent.shuttles[*idx].output
+                        match loom.persistent.shuttles.get(*idx) {
+                            Some(s) => s.output,
+                            None => continue, // Stale reference — skip edge
+                        }
                     }
                 };
                 // max_rate = source effective rate / number of sources in this slot
