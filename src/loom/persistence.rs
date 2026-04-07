@@ -20,6 +20,10 @@ pub fn load_loom_from_path(path: &Path) -> LoomState {
     match fs::read_to_string(path) {
         Ok(json) => {
             let mut state: LoomState = serde_json::from_str(&json).unwrap_or_default();
+            // Reset outdated saves — pattern definitions and features have changed.
+            if state.persistent.version < super::types::LOOM_SAVE_VERSION {
+                return LoomState::new();
+            }
             sanitize_on_load(&mut state);
             state
         }

@@ -309,9 +309,15 @@ pub struct PatternRequirement {
     pub accumulated: f64,
 }
 
+/// Current save format version. Bump when breaking changes require a fresh start.
+pub const LOOM_SAVE_VERSION: u32 = 2;
+
 /// All persistent Loom state (saved to loom.json).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoomPersistent {
+    /// Save format version. Old saves (version 0/1) are auto-reset on load.
+    #[serde(default)]
+    pub version: u32,
     #[serde(default)]
     pub discovered: bool,
     #[serde(default)]
@@ -373,6 +379,7 @@ fn default_nodes() -> Vec<LoomNode> {
 impl Default for LoomPersistent {
     fn default() -> Self {
         Self {
+            version: LOOM_SAVE_VERSION,
             discovered: false,
             archetype: None,
             nodes: default_nodes(),
