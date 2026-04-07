@@ -182,6 +182,8 @@ pub struct InjectionState {
     pub last_deep_layer_tick: u64,
     pub deep_started: bool,
     pub loom_started: bool,
+    /// Tick at which the last Loom pattern was completed (for pacing injection).
+    pub last_loom_pattern_tick: u64,
     /// Starting prestige rank (doesn't reset on auto-prestige).
     pub starting_prestige: u32,
 }
@@ -198,6 +200,7 @@ impl InjectionState {
             last_deep_layer_tick: 0,
             deep_started: false,
             loom_started: false,
+            last_loom_pattern_tick: 0,
             starting_prestige,
         }
     }
@@ -337,16 +340,9 @@ pub fn inject_outcomes(
             for node in &mut loom.persistent.nodes {
                 node.unlocked = true;
             }
-            // Seed stockpiles for shuttle construction costs
-            for res in [
-                Resource::Ember,
-                Resource::Reflection,
-                Resource::VoidEssence,
-                Resource::Memory,
-                Resource::Silence,
-                Resource::Resonance,
-            ] {
-                *loom.persistent.stockpiles.entry(res).or_insert(0.0) += 10000.0;
+            // Seed extractor buffers for shuttle construction costs
+            for node in &mut loom.persistent.nodes {
+                node.buffer = node.buffer_capacity;
             }
             if verbose {
                 println!("[t={tick:>6}] INJECT: Loom discovered, all extractors unlocked");
@@ -354,6 +350,12 @@ pub fn inject_outcomes(
         }
 
         auto_build_loom(loom, state.ascension_level, verbose, tick);
+
+        // -- Loom pattern completion injection --
+        // The Loom uses wall-clock time for pattern sustain, which doesn't advance
+        // meaningfully in the headless simulator. Inject pattern completions at a
+        // pace matching the pattern's sustain duration compressed to tick intervals.
+        inject_pattern_completions(profile, loom, state, achievements, injection, tick, verbose);
     }
 
     // -- Ascension --
@@ -527,20 +529,13 @@ fn ensure_resource_production(
         return false;
     }
 
-    // Ensure stockpile has build cost
+    // Ensure buffer has build cost
     let cost = match recipe.tier {
         1 => 250.0,
         2 => 150.0,
         _ => 100.0,
     };
-    let stockpile = loom
-        .persistent
-        .stockpiles
-        .entry(recipe.input_a)
-        .or_insert(0.0);
-    if *stockpile < cost {
-        *stockpile += cost; // Top up if needed
-    }
+    inject_resource_to_buffer(loom, recipe.input_a, cost);
 
     let sources_a = eligible_sources_for_tier(loom, recipe.tier, recipe.input_a);
     let sources_b = eligible_sources_for_tier(loom, recipe.tier, recipe.input_b);
@@ -561,7 +556,7 @@ fn ensure_resource_production(
             // Skip construction delay — make shuttle immediately operational
             let shuttle = &mut loom.persistent.shuttles[idx];
             shuttle.under_construction = false;
-            shuttle.construction_ticks_remaining = 0;
+            shuttle.construction_secs_remaining = 0.0;
 
             if verbose {
                 println!(
@@ -628,14 +623,7 @@ fn auto_build_loom(loom: &mut LoomState, ascension_level: u32, verbose: bool, ti
                     2 => 150.0,
                     _ => 100.0,
                 };
-                let stockpile = loom
-                    .persistent
-                    .stockpiles
-                    .entry(recipe.input_a)
-                    .or_insert(0.0);
-                if *stockpile < cost {
-                    *stockpile += cost;
-                }
+                inject_resource_to_buffer(loom, recipe.input_a, cost);
                 let sources_a = eligible_sources_for_tier(loom, recipe.tier, recipe.input_a);
                 let sources_b = eligible_sources_for_tier(loom, recipe.tier, recipe.input_b);
                 if !sources_a.is_empty() && !sources_b.is_empty() {
@@ -649,7 +637,7 @@ fn auto_build_loom(loom: &mut LoomState, ascension_level: u32, verbose: bool, ti
                     ) {
                         let shuttle = &mut loom.persistent.shuttles[idx];
                         shuttle.under_construction = false;
-                        shuttle.construction_ticks_remaining = 0;
+                        shuttle.construction_secs_remaining = 0.0;
                         if verbose {
                             println!(
                                 "[t={tick:>6}] LOOM: Built extra T{} shuttle #{idx} for {:?} (rate target: {:.0}/hr)",
@@ -693,13 +681,13 @@ fn auto_build_loom(loom: &mut LoomState, ascension_level: u32, verbose: bool, ti
         }
     }
 
-    // Upgrade shuttles — top up buffer to cover cost before draining
+    // Upgrade shuttles — top up buffer to cover cost
     let max_level = quest::ascension::types::max_shuttle_level(ascension_level);
     for i in 0..loom.persistent.shuttles.len() {
         if max_level > 1 {
             let shuttle = &mut loom.persistent.shuttles[i];
             if !shuttle.under_construction && shuttle.level < max_level {
-                let cost = 100.0 * (shuttle.level as f64).powf(1.5);
+                let cost = 100.0 * (shuttle.level as f64).powf(1.2);
                 if shuttle.buffer < cost {
                     shuttle.buffer = cost;
                 }
@@ -713,23 +701,132 @@ fn auto_build_loom(loom: &mut LoomState, ascension_level: u32, verbose: bool, ti
             );
         }
     }
+}
 
-    // Drain shuttle buffers to prevent stalling (in real game, patterns/stockpile consume output)
-    for shuttle in &mut loom.persistent.shuttles {
-        if shuttle.buffer > shuttle.buffer_capacity * 0.5 {
-            let drain = shuttle.buffer * 0.8;
-            *loom
-                .persistent
-                .stockpiles
-                .entry(shuttle.output)
-                .or_insert(0.0) += drain;
-            shuttle.buffer -= drain;
-            shuttle.stalled = false;
-        }
+/// Inject pattern completions to compensate for the Loom's wall-clock time model.
+///
+/// The Loom uses `chrono::Utc::now()` for production rates and pattern sustain timers,
+/// which means it barely progresses in a headless simulator where ticks run at CPU speed.
+/// This function directly completes patterns at a pace derived from each pattern's
+/// sustain duration, compressed into tick intervals.
+fn inject_pattern_completions(
+    profile: &StrategyProfile,
+    loom: &mut LoomState,
+    state: &mut GameState,
+    achievements: &mut Achievements,
+    injection: &mut InjectionState,
+    tick: u64,
+    verbose: bool,
+) {
+    if !loom.persistent.discovered {
+        return;
+    }
+
+    let active_idx = loom.persistent.active_pattern;
+    if active_idx >= loom.persistent.patterns.len() {
+        return;
+    }
+    if loom.persistent.patterns[active_idx].completed {
+        return;
+    }
+
+    // Determine the tick interval for completing this pattern.
+    // Each pattern's sustain duration (in hours) is compressed to a tick interval.
+    // The compression rate varies by strategy profile.
+    let max_sustain_hours = loom.persistent.patterns[active_idx]
+        .requirements
+        .iter()
+        .filter(|r| !r.completed)
+        .map(|r| r.sustain_duration_secs / 3600.0)
+        .fold(0.0_f64, f64::max);
+
+    // Ticks per game-hour: 36,000 ticks = 1 hour of game time.
+    // We compress the pattern sustain time by a factor that varies by strategy.
+    let compression_factor = match profile {
+        StrategyProfile::Casual => 3.0,   // 3x slower than real time
+        StrategyProfile::Optimal => 1.5,  // 1.5x slower than real time
+        StrategyProfile::Speedrun => 1.0, // Real-time pace
+    };
+    let ticks_for_pattern = (max_sustain_hours * 36_000.0 * compression_factor) as u64;
+    let min_ticks = 3_600; // At least 6 minutes of game time per pattern
+
+    let interval = ticks_for_pattern.max(min_ticks);
+
+    if injection.last_loom_pattern_tick == 0 {
+        // First pattern — start the clock from Loom discovery.
+        injection.last_loom_pattern_tick = tick;
+        return;
+    }
+
+    if tick - injection.last_loom_pattern_tick < interval {
+        return;
+    }
+
+    // Complete the active pattern.
+    let pattern = &mut loom.persistent.patterns[active_idx];
+    for req in &mut pattern.requirements {
+        req.sustained_secs = req.sustain_duration_secs;
+        req.completed = true;
+    }
+    pattern.completed = true;
+
+    // Advance to next pattern.
+    let next = active_idx + 1;
+    if next < loom.persistent.patterns.len() {
+        loom.persistent.active_pattern = next;
+    }
+
+    injection.last_loom_pattern_tick = tick;
+
+    let completed_count = loom.persistent.completed_pattern_count();
+    achievements.on_loom_pattern_completed(completed_count, Some("Simulator"));
+
+    // Sync zone unlocks.
+    let loom_zone_cap = quest::loom::loom_zone_cap_for_patterns(completed_count);
+    state.cached_loom_zone_cap = loom_zone_cap;
+    let storms_end_unlocked =
+        achievements.is_unlocked(quest::achievements::AchievementId::TheStormbreaker);
+    sync_account_zone_unlocks(
+        &mut state.zone_progression,
+        storms_end_unlocked,
+        state.cached_fracture_zone_cap,
+        state.prestige_rank,
+        loom_zone_cap,
+        state.ascension_level,
+    );
+    state.invalidate_bonuses();
+
+    if verbose {
+        println!(
+            "[t={tick:>6}] INJECT: Loom pattern #{active_idx} '{}' completed ({completed_count}/28, zone cap Z{loom_zone_cap})",
+            loom.persistent.patterns[active_idx].name
+        );
     }
 }
 
 /// Etch sigils per profile spec.
+/// Ensure a resource buffer has at least `amount` available (for simulator injection).
+fn inject_resource_to_buffer(loom: &mut LoomState, resource: Resource, amount: f64) {
+    // Try extractor first.
+    for node in &mut loom.persistent.nodes {
+        if node.unlocked && quest::loom::logic::node_native_resource(node.id) == resource {
+            if node.buffer < amount {
+                node.buffer = amount.min(node.buffer_capacity);
+            }
+            return;
+        }
+    }
+    // Try shuttle buffer.
+    for shuttle in &mut loom.persistent.shuttles {
+        if !shuttle.under_construction && shuttle.output == resource {
+            if shuttle.buffer < amount {
+                shuttle.buffer = amount.min(shuttle.buffer_capacity);
+            }
+            return;
+        }
+    }
+}
+
 fn inject_sigils(profile: &StrategyProfile, state: &mut GameState) {
     use SigilEffectType::*;
     use SigilGrade::*;

@@ -1201,8 +1201,27 @@ fn main() -> io::Result<()> {
                                     && !haven_ui.showing
                                     && !soulforge_ui.open
                                     && !exchange_ui.open
+                                    && !loom_ui.open
                                 {
-                                    overlay = pending_overlays.pop_front().unwrap();
+                                    let mut next = pending_overlays.pop_front().unwrap();
+                                    // Coalesce consecutive achievement modals into one.
+                                    if let GameOverlay::AchievementUnlocked {
+                                        ref mut achievements,
+                                    } = next
+                                    {
+                                        while let Some(GameOverlay::AchievementUnlocked {
+                                            ..
+                                        }) = pending_overlays.front()
+                                        {
+                                            if let Some(GameOverlay::AchievementUnlocked {
+                                                achievements: more,
+                                            }) = pending_overlays.pop_front()
+                                            {
+                                                achievements.extend(more);
+                                            }
+                                        }
+                                    }
+                                    overlay = next;
                                 }
                             }
                             last_tick = Instant::now();

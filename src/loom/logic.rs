@@ -35,48 +35,8 @@ pub fn initialize_loom(loom: &mut LoomState) {
     loom.persistent.second_node_unlock_elapsed = None;
 }
 
-/// Legacy constant kept for save compatibility.
-pub const SECOND_NODE_UNLOCK_SECONDS: f64 = 14_400.0;
-
-/// Legacy: staggered unlock is disabled. Returns false always.
-pub fn tick_loom_staggered_unlock(_loom: &mut LoomState, _elapsed_seconds: f64) -> bool {
-    false
-}
-
-/// Returns the throughput multiplier for a node.
-/// Currently always 1.0 (archetype bonuses removed for rebalancing).
-pub fn node_throughput_multiplier(_loom: &LoomState, _node_id: NodeId) -> f64 {
-    1.0
-}
-
-/// Returns the conversion ratio multiplier for a node.
-/// Currently always 1.0 (archetype bonuses removed for rebalancing).
-pub fn node_conversion_multiplier(_loom: &LoomState, _node_id: NodeId) -> f64 {
-    1.0
-}
-
-/// Returns the number of neighbors that unlock when a node produces enough.
-pub fn node_neighbor_unlock_count(_loom: &LoomState, _node_id: NodeId) -> usize {
-    2
-}
-
-/// Returns the upgrade cost multiplier for a node.
-/// Currently always 1.0 (archetype bonuses removed for rebalancing).
-pub fn node_upgrade_cost_multiplier(_loom: &LoomState, _node_id: NodeId) -> f64 {
-    1.0
-}
-
-/// Returns the neighbor unlock speed multiplier for a node.
-/// Currently always 1.0 (archetype bonuses removed for rebalancing).
-pub fn node_neighbor_unlock_speed_multiplier(_loom: &LoomState, _node_id: NodeId) -> f64 {
-    1.0
-}
-
-/// Returns whether the Resonance Forge feedback loop passive is active.
-/// Currently always false (archetype bonuses removed for rebalancing).
-pub fn resonance_early_feedback_active(_loom: &LoomState) -> bool {
-    false
-}
+/// Number of cycle-neighbors each node unlocks simultaneously.
+const NEIGHBOR_UNLOCK_COUNT: usize = 2;
 
 // ── Phase 3: Node Base Production ─────────────────────────────────────────────
 
@@ -98,13 +58,12 @@ pub fn node_level_multiplier(level: u32) -> f64 {
     1.0 + (level.saturating_sub(1) as f64) * 0.5
 }
 
-/// Returns the effective production rate (native resource per hour) for a node,
-/// incorporating level and archetype passives.
-pub fn node_effective_rate(loom: &LoomState, node: &LoomNode) -> f64 {
-    if !node.unlocked {
+/// Returns the effective production rate (native resource per hour) for a node.
+pub fn node_effective_rate(_loom: &LoomState, node: &LoomNode) -> f64 {
+    if !node.unlocked || node.upgrading {
         return 0.0;
     }
-    node.base_rate * node_level_multiplier(node.level) * node_throughput_multiplier(loom, node.id)
+    node.base_rate * node_level_multiplier(node.level)
 }
 
 /// Tick base production for all unlocked nodes.
@@ -112,13 +71,16 @@ pub fn node_effective_rate(loom: &LoomState, node: &LoomNode) -> f64 {
 /// `delta_seconds` is the wall-clock time elapsed since the last tick (typically 0.1s).
 /// Each unlocked node produces its native resource at its effective rate and stores
 /// the output in the node's buffer (capped at buffer_capacity).
-/// Full buffers auto-drain (excess is discarded); extractors never stall.
+/// Full buffers cap at buffer_capacity; extractors never stall.
 ///
 /// Returns a map of resource → total produced this tick (for pattern rate tracking).
 pub fn tick_base_production(
     loom: &mut LoomState,
     delta_seconds: f64,
 ) -> std::collections::HashMap<Resource, f64> {
+    if delta_seconds <= 0.0 {
+        return std::collections::HashMap::new();
+    }
     let delta_hours = delta_seconds / 3600.0;
     let mut produced: std::collections::HashMap<Resource, f64> = std::collections::HashMap::new();
 
@@ -139,6 +101,9 @@ pub fn tick_base_production(
             continue;
         }
         let node = &mut loom.persistent.nodes[idx];
+        if node.upgrading {
+            continue; // Nodes produce nothing while upgrading.
+        }
 
         let amount = rate * delta_hours;
         node.buffer = (node.buffer + amount).min(capacity);
@@ -156,41 +121,79 @@ pub fn tick_base_production(
 // ── Phase 3: Node Upgrading ───────────────────────────────────────────────────
 
 /// Returns the upgrade cost (in the node's native resource) for going from current level to next.
-/// Base cost: 10 * level^1.5, rounded. Silence Well gets 25% discount at levels 1-5.
+/// Base cost: 100 * level^1.2, rounded.
 pub fn node_upgrade_cost(loom: &LoomState, node_id: NodeId) -> f64 {
     let node = &loom.persistent.nodes[node_id.index()];
-    let base_cost = 100.0 * (node.level as f64).powf(1.5);
-    let multiplier = node_upgrade_cost_multiplier(loom, node_id);
-    (base_cost * multiplier).round()
+    (100.0 * (node.level as f64).powf(1.2)).round()
 }
 
 /// Maximum extractor node level.
 pub const MAX_NODE_LEVEL: u32 = 20;
 
-/// Attempt to upgrade a node's level.
-/// Costs `node_upgrade_cost()` units of the node's native resource from the node's buffer.
+/// Buffer capacity multiplier: 10 hours of production at current level's rate.
+const BUFFER_HOURS: f64 = 10.0;
+
+/// Upgrade duration in seconds for going from current_level to next.
+/// Linear 2h per level: L1→L2 = 2h, L2→L3 = 4h, L3→L4 = 6h, etc.
+/// Time warp accelerates this (delta_seconds includes warp).
+pub fn node_upgrade_duration(level: u32) -> f64 {
+    7200.0 * level as f64 // 2h, 4h, 6h, 8h... (level * 2 hours)
+}
+
+/// Attempt to start upgrading a node's level.
+/// Drains 50% of buffer capacity as cost and starts a lockout timer.
+/// The node produces nothing while upgrading. When the timer expires,
+/// the node's level increases.
 /// Capped at `MAX_NODE_LEVEL` (level 20 = 525/hr).
-/// Returns true if the upgrade succeeded.
+/// Returns true if the upgrade was initiated.
 pub fn try_upgrade_node(loom: &mut LoomState, node_id: NodeId) -> bool {
     let node = &loom.persistent.nodes[node_id.index()];
-    if node.level >= MAX_NODE_LEVEL {
+    if node.level >= MAX_NODE_LEVEL || !node.unlocked || node.upgrading {
         return false;
     }
 
-    let cost = node_upgrade_cost(loom, node_id);
+    let drain = node.buffer_capacity * 0.5;
 
     let node = &mut loom.persistent.nodes[node_id.index()];
-
-    if !node.unlocked || node.buffer < cost {
+    if node.buffer < drain {
         return false;
     }
 
-    node.buffer -= cost;
-    node.level += 1;
-    // Buffer capacity scales with level: 4 hours of production at new level's rate.
-    node.buffer_capacity = node.base_rate * node_level_multiplier(node.level) * 4.0;
+    // Drain 50% of buffer capacity as upgrade cost.
+    node.buffer = (node.buffer - drain).max(0.0);
+
+    // Start upgrade lockout.
+    node.upgrading = true;
+    node.upgrade_remaining_secs = node_upgrade_duration(node.level);
+    loom.graph_dirty = true;
+
+    // Clear the rate tracker so the rate drops to 0 immediately
+    // (instead of decaying over the 20-second rolling window).
+    let resource = node_native_resource(node_id);
+    loom.rate_trackers
+        .entry(resource)
+        .and_modify(|t| *t = super::types::RateTracker::new());
 
     true
+}
+
+/// Tick upgrade timers for all nodes. Called each game tick.
+/// When an upgrade completes, the node's level increases and production resumes.
+pub fn tick_node_upgrades(loom: &mut LoomState, delta_seconds: f64) {
+    for node in &mut loom.persistent.nodes {
+        if !node.upgrading {
+            continue;
+        }
+        node.upgrade_remaining_secs -= delta_seconds;
+        if node.upgrade_remaining_secs <= 0.0 {
+            node.upgrading = false;
+            node.upgrade_remaining_secs = 0.0;
+            node.level = (node.level + 1).min(MAX_NODE_LEVEL);
+            node.buffer_capacity =
+                node.base_rate * node_level_multiplier(node.level) * BUFFER_HOURS;
+            loom.graph_dirty = true;
+        }
+    }
 }
 
 // ── Phase 3: Neighbor Unlocking ───────────────────────────────────────────────
@@ -239,8 +242,7 @@ pub fn tick_neighbor_unlocking(loom: &mut LoomState, delta_seconds: f64) -> Vec<
             continue;
         }
 
-        let speed_mult = node_neighbor_unlock_speed_multiplier(loom, *src_id);
-        let unlock_count = node_neighbor_unlock_count(loom, *src_id);
+        let unlock_count = NEIGHBOR_UNLOCK_COUNT;
         let neighbors = node_neighbors(*src_id);
 
         let locked_neighbors: Vec<NodeId> = neighbors
@@ -262,7 +264,7 @@ pub fn tick_neighbor_unlocking(loom: &mut LoomState, delta_seconds: f64) -> Vec<
                 .iter_mut()
                 .find(|n| n.id == neighbor_id)
             {
-                neighbor.unlock_progress += delta_hours * speed_mult;
+                neighbor.unlock_progress += delta_hours;
                 if neighbor.unlock_progress >= NEIGHBOR_UNLOCK_HOURS {
                     neighbor.unlocked = true;
                     neighbor.unlock_progress = 0.0;
@@ -308,6 +310,7 @@ pub fn tick_stall_detection(loom: &mut LoomState) -> Vec<NodeId> {
 // ── Phase 6: Direct-Pull Shuttle Tick ────────────────────────────────────────
 
 /// Max intake rate per input slot, by shuttle tier (units/hour).
+/// NOTE: Display-only — no longer used for simulation (intake cap removed).
 pub fn tier_intake_cap(tier: u8) -> f64 {
     match tier {
         1 => 20.0,
@@ -318,6 +321,7 @@ pub fn tier_intake_cap(tier: u8) -> f64 {
 }
 
 /// Effective intake cap for a shuttle, applying the level multiplier.
+/// NOTE: Display-only — no longer used for simulation (intake cap removed).
 pub fn shuttle_effective_intake_cap(tier: u8, level: u32) -> f64 {
     tier_intake_cap(tier) * node_level_multiplier(level)
 }
@@ -331,8 +335,9 @@ pub enum ShuttleUpgradeError {
     InsufficientBuffer { needed: f64, have: f64 },
 }
 
-/// Upgrade a shuttle's level. Cost: 100 × level^1.5 from shuttle buffer.
+/// Upgrade a shuttle's level. Cost: 100 × level^1.2 from the shuttle's own buffer.
 /// Max level capped by Ascension level via max_shuttle_level().
+/// Buffer capacity scales with level after upgrade.
 pub fn upgrade_shuttle(
     loom: &mut LoomState,
     shuttle_idx: usize,
@@ -356,7 +361,7 @@ pub fn upgrade_shuttle(
         return Err(ShuttleUpgradeError::AtMaxLevel);
     }
 
-    let cost = 100.0 * (shuttle.level as f64).powf(1.5);
+    let cost = 100.0 * (shuttle.level as f64).powf(1.2);
     if shuttle.buffer < cost {
         return Err(ShuttleUpgradeError::InsufficientBuffer {
             needed: cost,
@@ -367,6 +372,8 @@ pub fn upgrade_shuttle(
     let shuttle = loom.persistent.shuttles.get_mut(shuttle_idx).unwrap();
     shuttle.buffer -= cost;
     shuttle.level += 1;
+    shuttle.buffer_capacity = 500.0 * node_level_multiplier(shuttle.level);
+    loom.graph_dirty = true;
     Ok(())
 }
 
@@ -393,7 +400,7 @@ pub fn valid_source_for_tier(source: LoomNodeRef, shuttle_tier: u8, shuttles: &[
 /// 2. Process shuttles by tier order (T1 first, then T2, then T3).
 /// 3. For each shuttle: calculate available pull for each input slot.
 ///    - For each source: `share = source_available / num_consumers_of_that_source`
-///    - `actual_pull = min(tier_intake_cap, share)` summed across all sources for that slot
+///    - No per-tier intake cap — throughput limited only by source rate and contention.
 /// 4. `output_rate = min(total_pull_a, total_pull_b) * recipe_amount`
 /// 5. Add output to shuttle buffer (capped at capacity).
 ///
@@ -404,14 +411,6 @@ pub fn tick_shuttle_pull(
 ) -> std::collections::HashMap<Resource, f64> {
     let delta_hours = delta_seconds / 3600.0;
     let mut produced: std::collections::HashMap<Resource, f64> = std::collections::HashMap::new();
-
-    // ── Pre-compute per-node throughput multipliers before mutable borrow ──
-    let node_multipliers: std::collections::HashMap<NodeId, f64> = loom
-        .persistent
-        .nodes
-        .iter()
-        .map(|n| (n.id, node_throughput_multiplier(loom, n.id)))
-        .collect();
 
     // ── Step 1: Count consumers per source across all non-construction shuttles ──
     let mut consumer_count: std::collections::HashMap<LoomNodeRef, usize> =
@@ -441,59 +440,48 @@ pub fn tick_shuttle_pull(
 
         for idx in indices {
             let r = &loom.persistent.shuttles[idx];
-            let cap = shuttle_effective_intake_cap(r.tier, r.level);
 
-            // Calculate available pull for input A.
+            // Calculate available pull for input A (no intake cap — limited only by source rate and contention).
             let pull_a: f64 = r
                 .sources_a
                 .iter()
                 .map(|&src| {
-                    let available = source_available_rate(
-                        src,
-                        &loom.persistent,
-                        &shuttle_output_rates,
-                        &node_multipliers,
-                    );
+                    let available =
+                        source_available_rate(src, &loom.persistent, &shuttle_output_rates);
                     let consumers = consumer_count.get(&src).copied().unwrap_or(1).max(1);
-                    let share = available / consumers as f64;
-                    share.min(cap)
+                    available / consumers as f64
                 })
-                .sum::<f64>()
-                .min(cap);
+                .sum();
 
-            // Calculate available pull for input B.
+            // Calculate available pull for input B (no intake cap — limited only by source rate and contention).
             let pull_b: f64 = r
                 .sources_b
                 .iter()
                 .map(|&src| {
-                    let available = source_available_rate(
-                        src,
-                        &loom.persistent,
-                        &shuttle_output_rates,
-                        &node_multipliers,
-                    );
+                    let available =
+                        source_available_rate(src, &loom.persistent, &shuttle_output_rates);
                     let consumers = consumer_count.get(&src).copied().unwrap_or(1).max(1);
-                    let share = available / consumers as f64;
-                    share.min(cap)
+                    available / consumers as f64
                 })
-                .sum::<f64>()
-                .min(cap);
+                .sum();
 
             // Output rate for this tick = min(pull_a, pull_b) * recipe_amount.
             let output_rate = pull_a.min(pull_b) * r.amount;
             shuttle_output_rates[idx] = output_rate;
 
-            // Add to buffer.
+            // Add to buffer (capped); excess is discarded but still counted for rate tracking.
             let output_this_tick = output_rate * delta_hours;
             if output_this_tick > 0.0 {
                 let r = &mut loom.persistent.shuttles[idx];
-                let space = (r.buffer_capacity - r.buffer).max(0.0);
-                let actual = output_this_tick.min(space);
-                r.buffer += actual;
-                r.stalled = r.buffer >= r.buffer_capacity;
-                if actual > 0.0 {
-                    *produced.entry(r.output).or_insert(0.0) += actual;
-                }
+                r.buffer = (r.buffer + output_this_tick).min(r.buffer_capacity);
+                r.stalled = false;
+                *produced.entry(r.output).or_insert(0.0) += output_this_tick;
+                // Push un-warped amount so rate_per_hour() reflects logical rate,
+                // consistent with extractor rate_trackers in tick_stages.rs.
+                let warp = loom.time_warp.max(1.0);
+                r.output_rate_tracker.push(output_this_tick / warp);
+            } else {
+                loom.persistent.shuttles[idx].output_rate_tracker.push(0.0);
             }
         }
     }
@@ -506,24 +494,22 @@ fn source_available_rate(
     src: LoomNodeRef,
     persistent: &super::types::LoomPersistent,
     shuttle_rates: &[f64],
-    node_multipliers: &std::collections::HashMap<NodeId, f64>,
 ) -> f64 {
     match src {
         LoomNodeRef::Extractor(node_id) => {
             let node = &persistent.nodes[node_id.index()];
-            let throughput_mult = node_multipliers.get(&node_id).copied().unwrap_or(1.0);
-            node_effective_rate_from_node(node, throughput_mult)
+            node_effective_rate_from_node(node)
         }
         LoomNodeRef::Shuttle(idx) => shuttle_rates.get(idx).copied().unwrap_or(0.0),
     }
 }
 
 /// Compute a node's effective rate without needing the full LoomState borrow.
-fn node_effective_rate_from_node(node: &LoomNode, throughput_multiplier: f64) -> f64 {
-    if !node.unlocked {
+fn node_effective_rate_from_node(node: &LoomNode) -> f64 {
+    if !node.unlocked || node.upgrading {
         return 0.0;
     }
-    node.base_rate * node_level_multiplier(node.level) * throughput_multiplier
+    node.base_rate * node_level_multiplier(node.level)
 }
 
 /// Record a recipe discovery in the codex.
@@ -582,42 +568,15 @@ pub fn codex_hint_indices(codex: &[crate::loom::types::CodexEntry]) -> Vec<usize
     recipes::adjacent_recipe_indices(&discovered_registry_indices)
 }
 
-/// Compute a Loom production multiplier from external systems.
-///
-/// Each contributing system provides a small additive bonus that is meaningful
-/// early (before the player has built up Loom infrastructure) but becomes
-/// negligible relative to Loom upgrades at endgame.
-///
-/// # Parameters
-/// - `deep_layer`: The player's deepest Deep layer reached (0 = not started).
-/// - `haven_tree_level`: Total Haven skill tree points invested (0 = no Haven).
-/// - `sigil_count`: Number of Storm Sigils currently etched (0–12).
-/// - `ascension_level`: Current Ascension level (0 = not ascended).
-///
-/// # Returns
-/// A multiplier ≥ 1.0 to apply to every node's effective production rate.
-/// The formula is `1.0 + sum_of_bonuses` where each system contributes:
-/// - Deep: +0.5% per layer (capped at layer 30 → +15%)
-/// - Haven: +0.3% per tree level (capped at 50 levels → +15%)
-/// - Sigils: +1.0% per etched sigil (capped at 12 → +12%)
-/// - Ascension: +2.0% per ascension level (capped at level 10 → +20%)
-///
-/// Total cap: roughly +62% at absolute max investment across all systems.
-pub fn loom_production_bonus(
-    deep_layer: u32,
-    haven_tree_level: u32,
-    sigil_count: u32,
-    ascension_level: u32,
-) -> f64 {
-    let deep_bonus = (deep_layer.min(30) as f64) * 0.005;
-    let haven_bonus = (haven_tree_level.min(50) as f64) * 0.003;
-    let sigil_bonus = (sigil_count.min(12) as f64) * 0.010;
-    let ascension_bonus = (ascension_level.min(10) as f64) * 0.020;
-    1.0 + deep_bonus + haven_bonus + sigil_bonus + ascension_bonus
+/// Construction duration in seconds by tier: T1=2h, T2=4h, T3=6h.
+pub fn shuttle_construction_secs(tier: u8) -> f64 {
+    match tier {
+        1 => 7200.0,  // 2 hours
+        2 => 14400.0, // 4 hours
+        3 => 21600.0, // 6 hours
+        _ => 7200.0,
+    }
 }
-
-/// Ticks required for a shuttle to finish construction (2 hours at 100ms/tick = 72000 ticks).
-pub const SHUTTLE_CONSTRUCTION_TICKS: u32 = 72_000;
 
 /// Error conditions for shuttle building.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -629,7 +588,49 @@ pub enum ShuttleError {
     InvalidSource,
 }
 
-fn shuttle_build_cost(tier: u8) -> f64 {
+/// Deduct `amount` from the buffer that holds `resource`.
+/// Checks extractors first (for base resources), then shuttle buffers (for confluence/reaction).
+/// Returns true if the deduction succeeded.
+fn deduct_from_resource_buffer(
+    persistent: &mut super::types::LoomPersistent,
+    resource: Resource,
+    amount: f64,
+) -> bool {
+    // Check extractors.
+    for node in &mut persistent.nodes {
+        if node.unlocked && node_native_resource(node.id) == resource && node.buffer >= amount {
+            node.buffer -= amount;
+            return true;
+        }
+    }
+    // Check shuttle buffers.
+    for shuttle in &mut persistent.shuttles {
+        if !shuttle.under_construction && shuttle.output == resource && shuttle.buffer >= amount {
+            shuttle.buffer -= amount;
+            return true;
+        }
+    }
+    false
+}
+
+/// Returns the available amount of a resource across all buffers (for UI display).
+pub fn available_resource(loom: &LoomState, resource: Resource) -> f64 {
+    let mut total = 0.0;
+    for node in &loom.persistent.nodes {
+        if node.unlocked && node_native_resource(node.id) == resource {
+            total += node.buffer;
+        }
+    }
+    for shuttle in &loom.persistent.shuttles {
+        if !shuttle.under_construction && shuttle.output == resource {
+            total += shuttle.buffer;
+        }
+    }
+    total
+}
+
+/// Returns the build cost for a shuttle of the given tier.
+pub fn shuttle_build_cost(tier: u8) -> f64 {
     match tier {
         1 => 250.0,
         2 => 150.0,
@@ -660,11 +661,6 @@ pub fn unlocked_tiers(loom: &LoomState) -> Vec<u8> {
         }
     }
     tiers
-}
-
-/// Returns the build cost for a shuttle of the given tier.
-pub fn shuttle_build_cost_public(tier: u8) -> f64 {
-    shuttle_build_cost(tier)
 }
 
 /// Returns all eligible source nodes for a given shuttle tier.
@@ -735,11 +731,12 @@ pub fn build_shuttle(
     }
 
     let cost = shuttle_build_cost(recipe.tier);
-    let stockpile = loom.persistent.stockpiles.entry(input_a).or_insert(0.0);
-    if *stockpile < cost {
+    // Draw build cost from the buffer that holds the input_a resource.
+    // For base resources: the matching extractor's buffer.
+    // For confluence/reaction resources: a shuttle buffer that outputs it.
+    if !deduct_from_resource_buffer(&mut loom.persistent, input_a, cost) {
         return Err(ShuttleError::InsufficientResources);
     }
-    *stockpile -= cost;
 
     let mut r = Shuttle::new(
         recipe.input_a,
@@ -752,22 +749,24 @@ pub fn build_shuttle(
         sources_b,
     );
     r.under_construction = true;
-    r.construction_ticks_remaining = SHUTTLE_CONSTRUCTION_TICKS;
+    r.construction_secs_remaining = shuttle_construction_secs(recipe.tier);
     loom.persistent.shuttles.push(r);
+    loom.graph_dirty = true;
     Ok(loom.persistent.shuttles.len() - 1)
 }
 
 /// Tick construction for all shuttles under construction.
 /// Returns indices of shuttles that completed this tick.
-pub fn tick_shuttle_construction(loom: &mut LoomState) -> Vec<usize> {
+pub fn tick_shuttle_construction(loom: &mut LoomState, delta_seconds: f64) -> Vec<usize> {
     let mut completed = Vec::new();
     for (i, r) in loom.persistent.shuttles.iter_mut().enumerate() {
         if !r.under_construction {
             continue;
         }
-        r.construction_ticks_remaining = r.construction_ticks_remaining.saturating_sub(1);
-        if r.construction_ticks_remaining == 0 {
+        r.construction_secs_remaining -= delta_seconds;
+        if r.construction_secs_remaining <= 0.0 {
             r.under_construction = false;
+            r.construction_secs_remaining = 0.0;
             completed.push(i);
         }
     }
@@ -789,6 +788,7 @@ pub fn demolish_shuttle(loom: &mut LoomState, idx: usize) {
         reindex_sources(&mut r.sources_a, idx);
         reindex_sources(&mut r.sources_b, idx);
     }
+    loom.graph_dirty = true;
 }
 
 fn reindex_sources(sources: &mut Vec<LoomNodeRef>, removed_idx: usize) {
@@ -808,43 +808,30 @@ pub fn tick_shuttle_stall_detection(loom: &mut LoomState) {
         if r.under_construction {
             continue;
         }
-        if r.buffer >= r.buffer_capacity {
-            r.stalled = true;
-        }
+        r.stalled = r.buffer >= r.buffer_capacity;
     }
 }
 
 /// Calculate PR generated per day from a given WR production rate (units/hr).
 ///
 /// Tiered brackets:
-/// - 0–10 WR/hr: 5 PR per WR/hr per day
-/// - 10–25 WR/hr: 10 PR per WR/hr per day
-/// - 25+ WR/hr: 15 PR per WR/hr per day
-pub fn wr_to_pr_per_day(wr_per_hour: f64) -> u32 {
-    if wr_per_hour <= 0.0 {
+/// Convert Weave Rate (WR/hr) to Prestige Ranks per hour.
+///
+/// Formula: `PR/hr = WR × (1 + WR/100)`
+/// Starts ~1:1 at low rates, scales superlinearly as WR increases.
+/// At 50 WR/hr → 75 PR/hr, at 131 WR/hr → 302 PR/hr.
+pub fn wr_to_pr_per_hour(wr_per_hour: f64) -> u32 {
+    if !wr_per_hour.is_finite() || wr_per_hour <= 0.0 {
         return 0;
     }
-    let mut pr = 0.0;
-    let mut remaining = wr_per_hour;
-
-    // Bracket 1: 0–10 at 5 PR per WR/hr
-    let b1 = remaining.min(10.0);
-    pr += b1 * 5.0;
-    remaining -= b1;
-
-    // Bracket 2: 10–25 at 10 PR per WR/hr
-    if remaining > 0.0 {
-        let b2 = remaining.min(15.0);
-        pr += b2 * 10.0;
-        remaining -= b2;
-    }
-
-    // Bracket 3: 25+ at 15 PR per WR/hr
-    if remaining > 0.0 {
-        pr += remaining * 15.0;
-    }
-
+    let pr = wr_per_hour * (1.0 + wr_per_hour / 100.0);
     pr.round() as u32
+}
+
+/// Returns the multiplier applied to WR rate (for UI display).
+/// `multiplier = 1 + WR/100`
+pub fn wr_pr_multiplier(wr_per_hour: f64) -> f64 {
+    1.0 + wr_per_hour / 100.0
 }
 
 /// Returns the highest zone ID unlocked by the given number of completed Woven Patterns.
@@ -881,29 +868,40 @@ mod tests {
     }
 
     #[test]
-    fn test_wr_to_pr_per_day_zero_rate() {
-        assert_eq!(wr_to_pr_per_day(0.0), 0);
+    fn test_wr_to_pr_per_hour_zero_rate() {
+        assert_eq!(wr_to_pr_per_hour(0.0), 0);
     }
 
     #[test]
-    fn test_wr_to_pr_per_day_low_bracket() {
-        assert_eq!(wr_to_pr_per_day(5.0), 25);
+    fn test_wr_to_pr_per_hour_nan() {
+        assert_eq!(wr_to_pr_per_hour(f64::NAN), 0);
+        assert_eq!(wr_to_pr_per_hour(f64::INFINITY), 0);
+        assert_eq!(wr_to_pr_per_hour(-1.0), 0);
     }
 
     #[test]
-    fn test_wr_to_pr_per_day_mid_bracket() {
-        assert_eq!(wr_to_pr_per_day(20.0), 150);
+    fn test_wr_to_pr_per_hour_low_rate() {
+        // PR = 10 * (1 + 10/100) = 10 * 1.1 = 11
+        assert_eq!(wr_to_pr_per_hour(10.0), 11);
     }
 
     #[test]
-    fn test_wr_to_pr_per_day_high_bracket() {
-        assert_eq!(wr_to_pr_per_day(60.0), 725);
+    fn test_wr_to_pr_per_hour_pattern28_rate() {
+        // PR = 50 * (1 + 50/100) = 50 * 1.5 = 75
+        assert_eq!(wr_to_pr_per_hour(50.0), 75);
     }
 
     #[test]
-    fn test_wr_to_pr_per_day_exact_bracket_boundary() {
-        assert_eq!(wr_to_pr_per_day(10.0), 50);
-        assert_eq!(wr_to_pr_per_day(25.0), 200);
+    fn test_wr_to_pr_per_hour_max_rate() {
+        // PR = 131 * (1 + 131/100) = 131 * 2.31 = 302.61 → 303
+        assert_eq!(wr_to_pr_per_hour(131.0), 303);
+    }
+
+    #[test]
+    fn test_wr_to_pr_per_hour_starts_near_one_to_one() {
+        // At low rates, multiplier ≈ 1.0 so PR ≈ WR
+        assert_eq!(wr_to_pr_per_hour(1.0), 1); // 1 * 1.01 = 1.01 → 1
+        assert_eq!(wr_to_pr_per_hour(5.0), 5); // 5 * 1.05 = 5.25 → 5
     }
 
     #[test]
@@ -919,34 +917,6 @@ mod tests {
             }
         }
         assert_eq!(loom.persistent.second_node_unlock_elapsed, None);
-    }
-
-    #[test]
-    fn test_multipliers_are_neutral() {
-        let loom = LoomState::new();
-        // All multiplier functions return neutral values (archetype bonuses removed)
-        assert_eq!(node_throughput_multiplier(&loom, NodeId::EmberSpindle), 1.0);
-        assert_eq!(
-            node_conversion_multiplier(&loom, NodeId::VoidCondenser),
-            1.0
-        );
-        assert_eq!(node_neighbor_unlock_count(&loom, NodeId::ReflectionLens), 2);
-        assert_eq!(
-            node_upgrade_cost_multiplier(&loom, NodeId::SilenceWell),
-            1.0
-        );
-        assert_eq!(
-            node_neighbor_unlock_speed_multiplier(&loom, NodeId::EmberSpindle),
-            1.0
-        );
-        assert!(!resonance_early_feedback_active(&loom));
-    }
-
-    #[test]
-    fn test_staggered_unlock_is_noop() {
-        let mut loom = LoomState::new();
-        // Staggered unlock always returns false now
-        assert!(!tick_loom_staggered_unlock(&mut loom, 14400.0));
     }
 
     // ── Phase 3: Node Base Production tests ───────────────────────────────────
@@ -993,10 +963,10 @@ mod tests {
             .iter()
             .find(|n| n.id == NodeId::EmberSpindle)
             .unwrap();
-        // 50/hr base * 1.0x (no archetype bonus). After 1 hr: 50.0 units.
+        // 25/hr base * 1.0x (no archetype bonus). After 1 hr: 25.0 units.
         assert!(
-            (ember.buffer - 50.0).abs() < 0.001,
-            "buffer should be ~50.0, got {}",
+            (ember.buffer - 25.0).abs() < 0.001,
+            "buffer should be ~25.0, got {}",
             ember.buffer
         );
     }
@@ -1096,36 +1066,36 @@ mod tests {
     fn test_upgrade_cost_level1() {
         let loom = LoomState::new();
         let cost = node_upgrade_cost(&loom, NodeId::EmberSpindle);
-        assert_eq!(cost, 100.0); // 100 * 1^1.5 = 100
+        assert_eq!(cost, 100.0); // 100 * 1^1.2 = 100
     }
 
     #[test]
-    fn test_upgrade_succeeds_with_sufficient_buffer() {
+    fn test_upgrade_succeeds_with_sufficient_stockpile() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
 
-        let ember = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap();
-        ember.buffer = 500.0;
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
 
         let result = try_upgrade_node(&mut loom, NodeId::EmberSpindle);
         assert!(result);
 
-        let ember = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap();
+        let ember = &loom.persistent.nodes[NodeId::EmberSpindle.index()];
+        // Upgrade is now deferred — node should be upgrading, still level 1.
+        assert!(ember.upgrading);
+        assert_eq!(ember.level, 1);
+        assert!(ember.upgrade_remaining_secs > 0.0);
+
+        // Complete the upgrade by ticking past the duration.
+        let remaining = ember.upgrade_remaining_secs;
+        tick_node_upgrades(&mut loom, remaining + 1.0);
+
+        let ember = &loom.persistent.nodes[NodeId::EmberSpindle.index()];
+        assert!(!ember.upgrading);
         assert_eq!(ember.level, 2);
     }
 
     #[test]
-    fn test_upgrade_fails_with_insufficient_buffer() {
+    fn test_upgrade_fails_with_insufficient_stockpile() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
 
@@ -1144,13 +1114,7 @@ mod tests {
     #[test]
     fn test_upgrade_fails_for_locked_node() {
         let mut loom = LoomState::new();
-        let void_n = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::VoidCondenser)
-            .unwrap();
-        void_n.buffer = 100.0;
+        loom.persistent.nodes[NodeId::VoidCondenser.index()].buffer = 500.0;
 
         let result = try_upgrade_node(&mut loom, NodeId::VoidCondenser);
         assert!(!result);
@@ -1162,7 +1126,7 @@ mod tests {
         initialize_loom(&mut loom);
 
         // No archetype discount — cost is base cost * 1.0
-        let base_cost = 100.0_f64 * 1.0_f64.powf(1.5);
+        let base_cost = 100.0_f64 * 1.0_f64.powf(1.2);
         let expected = (base_cost * 1.0).round();
         let cost = node_upgrade_cost(&loom, NodeId::SilenceWell);
         assert_eq!(cost, expected);
@@ -1343,7 +1307,7 @@ mod tests {
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         );
         r.under_construction = true;
-        r.construction_ticks_remaining = 100;
+        r.construction_secs_remaining = 100.0;
         loom.persistent.shuttles.push(r);
 
         let produced = tick_shuttle_pull(&mut loom, 3600.0);
@@ -1507,12 +1471,12 @@ mod tests {
             Resource::Ember,
             Resource::VoidEssence,
             super::super::types::NodeNature::Heat,
-            Resource::CondensedEmber,
-            0.5,
+            Resource::ForgedLight,
+            1.0,
         );
         assert_eq!(codex.len(), 1);
         assert!(codex[0].discovered);
-        assert_eq!(codex[0].output, Resource::CondensedEmber);
+        assert_eq!(codex[0].output, Resource::ForgedLight);
     }
 
     #[test]
@@ -1521,8 +1485,8 @@ mod tests {
         let mut codex = vec![CodexEntry {
             inputs: vec![Resource::Ember, Resource::VoidEssence],
             node_nature: NodeNature::Heat,
-            output: Resource::CondensedEmber,
-            output_amount: 0.5,
+            output: Resource::ForgedLight,
+            output_amount: 1.0,
             discovered: false,
         }];
         record_codex_discovery(
@@ -1530,8 +1494,8 @@ mod tests {
             Resource::Ember,
             Resource::VoidEssence,
             NodeNature::Heat,
-            Resource::CondensedEmber,
-            0.5,
+            Resource::ForgedLight,
+            1.0,
         );
         assert_eq!(codex.len(), 1, "should not duplicate");
         assert!(codex[0].discovered);
@@ -1543,8 +1507,8 @@ mod tests {
         let mut codex = vec![CodexEntry {
             inputs: vec![Resource::Ember, Resource::VoidEssence],
             node_nature: NodeNature::Heat,
-            output: Resource::CondensedEmber,
-            output_amount: 0.5,
+            output: Resource::ForgedLight,
+            output_amount: 1.0,
             discovered: false,
         }];
         // Reverse input order — should still match.
@@ -1553,103 +1517,11 @@ mod tests {
             Resource::VoidEssence,
             Resource::Ember,
             NodeNature::Heat,
-            Resource::CondensedEmber,
-            0.5,
+            Resource::ForgedLight,
+            1.0,
         );
         assert_eq!(codex.len(), 1, "commutative match should not duplicate");
         assert!(codex[0].discovered);
-    }
-
-    // ── loom_production_bonus ──────────────────────────────────────────────────
-
-    #[test]
-    fn test_loom_production_bonus_zero_inputs_is_one() {
-        let bonus = loom_production_bonus(0, 0, 0, 0);
-        assert!(
-            (bonus - 1.0).abs() < 1e-9,
-            "no bonuses should return 1.0, got {}",
-            bonus
-        );
-    }
-
-    #[test]
-    fn test_loom_production_bonus_deep_layer_contribution() {
-        // 10 deep layers → +5%
-        let bonus = loom_production_bonus(10, 0, 0, 0);
-        assert!(
-            (bonus - 1.05).abs() < 1e-9,
-            "10 deep layers should give 1.05, got {}",
-            bonus
-        );
-    }
-
-    #[test]
-    fn test_loom_production_bonus_haven_tree_contribution() {
-        // 10 haven tree levels → +3%
-        let bonus = loom_production_bonus(0, 10, 0, 0);
-        assert!(
-            (bonus - 1.03).abs() < 1e-9,
-            "10 haven levels should give 1.03, got {}",
-            bonus
-        );
-    }
-
-    #[test]
-    fn test_loom_production_bonus_sigil_contribution() {
-        // 6 sigils → +6%
-        let bonus = loom_production_bonus(0, 0, 6, 0);
-        assert!(
-            (bonus - 1.06).abs() < 1e-9,
-            "6 sigils should give 1.06, got {}",
-            bonus
-        );
-    }
-
-    #[test]
-    fn test_loom_production_bonus_ascension_contribution() {
-        // 3 ascension levels → +6%
-        let bonus = loom_production_bonus(0, 0, 0, 3);
-        assert!(
-            (bonus - 1.06).abs() < 1e-9,
-            "3 ascension levels should give 1.06, got {}",
-            bonus
-        );
-    }
-
-    #[test]
-    fn test_loom_production_bonus_all_systems_additive() {
-        // 10 deep + 10 haven + 6 sigils + 3 ascension = 5% + 3% + 6% + 6% = 20%
-        let bonus = loom_production_bonus(10, 10, 6, 3);
-        assert!(
-            (bonus - 1.20).abs() < 1e-9,
-            "combined bonus should be 1.20, got {}",
-            bonus
-        );
-    }
-
-    #[test]
-    fn test_loom_production_bonus_caps_are_enforced() {
-        // Values beyond the caps should give same result as capped values.
-        let capped = loom_production_bonus(30, 50, 12, 10);
-        let over_cap = loom_production_bonus(100, 200, 50, 50);
-        assert!(
-            (capped - over_cap).abs() < 1e-9,
-            "over-cap inputs should equal capped: {} vs {}",
-            capped,
-            over_cap
-        );
-        // Max bonus: 15% + 15% + 12% + 20% = 62%
-        assert!(
-            (capped - 1.62).abs() < 1e-9,
-            "max bonus should be 1.62, got {}",
-            capped
-        );
-    }
-
-    #[test]
-    fn test_loom_production_bonus_always_at_least_one() {
-        assert!(loom_production_bonus(0, 0, 0, 0) >= 1.0);
-        assert!(loom_production_bonus(1, 1, 1, 1) >= 1.0);
     }
 
     // ── node_effective_rate ───────────────────────────────────────────────────
@@ -1691,10 +1563,10 @@ mod tests {
             .find(|n| n.id == NodeId::SilenceWell)
             .unwrap();
         let rate = node_effective_rate(&loom, well);
-        // base_rate 50.0 * level_mult(2) 1.5 * throughput_mult 1.0 = 75.0
+        // base_rate 25.0 * level_mult(2) 1.5 * throughput_mult 1.0 = 37.5
         assert!(
-            (rate - 75.0).abs() < 0.001,
-            "expected 75.0/hr, got {}",
+            (rate - 37.5).abs() < 0.001,
+            "expected 37.5/hr, got {}",
             rate
         );
     }
@@ -1718,10 +1590,10 @@ mod tests {
             .find(|n| n.id == NodeId::EmberSpindle)
             .unwrap();
         let rate = node_effective_rate(&loom, ember);
-        // base_rate 50.0 * level_mult(3) 2.0 * throughput_mult 1.0 = 100.0
+        // base_rate 25.0 * level_mult(3) 2.0 * throughput_mult 1.0 = 50.0
         assert!(
-            (rate - 100.0).abs() < 0.001,
-            "expected 100.0/hr, got {}",
+            (rate - 50.0).abs() < 0.001,
+            "expected 50.0/hr, got {}",
             rate
         );
     }
@@ -1732,30 +1604,16 @@ mod tests {
     fn test_upgrade_node_increases_buffer_capacity() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
-        let old_capacity = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap()
-            .buffer_capacity;
+        let old_capacity = loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer_capacity;
 
-        let ember = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap();
-        ember.buffer = 500.0;
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
         try_upgrade_node(&mut loom, NodeId::EmberSpindle);
 
-        let new_capacity = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap()
-            .buffer_capacity;
+        // Complete the upgrade by ticking past the duration.
+        let remaining = loom.persistent.nodes[NodeId::EmberSpindle.index()].upgrade_remaining_secs;
+        tick_node_upgrades(&mut loom, remaining + 1.0);
+
+        let new_capacity = loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer_capacity;
         assert!(
             new_capacity > old_capacity,
             "buffer_capacity should grow after upgrade: {} -> {}",
@@ -1765,28 +1623,18 @@ mod tests {
     }
 
     #[test]
-    fn test_upgrade_node_deducts_cost_from_buffer() {
+    fn test_upgrade_node_deducts_cost_from_stockpile() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
-        let cost = node_upgrade_cost(&loom, NodeId::EmberSpindle);
-        let starting_buffer = cost + 5.0;
 
-        let ember = loom
-            .persistent
-            .nodes
-            .iter_mut()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap();
-        ember.buffer = starting_buffer;
+        // Upgrade now drains 50% of buffer_capacity (500 * 0.5 = 250).
+        let drain = loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer_capacity * 0.5;
+        let starting_buffer = drain + 5.0;
+
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = starting_buffer;
         try_upgrade_node(&mut loom, NodeId::EmberSpindle);
 
-        let remaining = loom
-            .persistent
-            .nodes
-            .iter()
-            .find(|n| n.id == NodeId::EmberSpindle)
-            .unwrap()
-            .buffer;
+        let remaining = loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer;
         assert!(
             (remaining - 5.0).abs() < 0.001,
             "expected 5.0 remaining, got {}",
@@ -1808,10 +1656,10 @@ mod tests {
             "produced map should include Ember"
         );
         let ember_amount = produced[&Resource::Ember];
-        // 50/hr base * 1.0x (no archetype bonus); after 1hr = 50.0 units
+        // 25/hr base * 1.0x (no archetype bonus); after 1hr = 25.0 units
         assert!(
-            (ember_amount - 50.0).abs() < 0.001,
-            "expected 50.0 Ember produced, got {}",
+            (ember_amount - 25.0).abs() < 0.001,
+            "expected 25.0 Ember produced, got {}",
             ember_amount
         );
     }
@@ -1948,33 +1796,6 @@ mod tests {
         assert_eq!(second, NodeId::ResonanceForge);
     }
 
-    // ── node_neighbor_unlock_speed_multiplier ─────────────────────────────────
-
-    #[test]
-    fn test_ember_spindle_unlock_speed_is_normal() {
-        let mut loom = LoomState::new();
-        initialize_loom(&mut loom);
-        // No archetype bonus — speed is 1.0x for all nodes.
-        assert!(
-            (node_neighbor_unlock_speed_multiplier(&loom, NodeId::EmberSpindle) - 1.0).abs()
-                < 0.001
-        );
-    }
-
-    #[test]
-    fn test_other_nodes_unlock_speed_is_one() {
-        let mut loom = LoomState::new();
-        initialize_loom(&mut loom);
-        assert_eq!(
-            node_neighbor_unlock_speed_multiplier(&loom, NodeId::VoidCondenser),
-            1.0
-        );
-        assert_eq!(
-            node_neighbor_unlock_speed_multiplier(&loom, NodeId::SilenceWell),
-            1.0
-        );
-    }
-
     // ── upgrade_cost scaling ──────────────────────────────────────────────────
 
     #[test]
@@ -2025,11 +1846,11 @@ mod tests {
                 vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
             );
             r.under_construction = true;
-            r.construction_ticks_remaining = 1;
+            r.construction_secs_remaining = 0.5;
             r
         });
 
-        let completed = tick_shuttle_construction(&mut loom);
+        let completed = tick_shuttle_construction(&mut loom, 1.0);
         assert_eq!(completed.len(), 1);
         assert!(!loom.persistent.shuttles[0].under_construction);
     }
@@ -2116,13 +1937,13 @@ mod tests {
         ));
         loom.persistent.shuttles.push(Shuttle::new(
             Resource::ForgedLight,
-            Resource::Reflection,
+            Resource::Memory,
             NodeNature::Form,
-            Resource::EchoGlass,
+            Resource::EmberEcho,
             1.0,
             2,
             vec![LoomNodeRef::Shuttle(0)],
-            vec![LoomNodeRef::Extractor(NodeId::ReflectionLens)],
+            vec![LoomNodeRef::Extractor(NodeId::MemoryArchive)],
         ));
         // Insert a T1 shuttle before index 0 — then demolish it.
         // Actually insert at index 0 by inserting first, shifting second to index 1.
@@ -2138,167 +1959,12 @@ mod tests {
     }
 }
 
-// ---------------------------------------------------------------------------
-// External system bonuses — granular per-aspect bonuses (Task #20 supplement)
-// ---------------------------------------------------------------------------
-
-/// Pre-computed bonuses from existing game systems that boost Loom production.
-///
-/// Breaks external bonuses into two separate axes so callers can apply them
-/// only where relevant (production rate, buffer capacity).
-/// Passed via explicit parameters following the Haven bonus injection pattern —
-/// Loom logic never imports Haven/Deep/Stormglass/Ascension directly.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct LoomExternalBonuses {
-    /// Additive fraction bonus on all node base production rates (e.g. 0.10 = +10%).
-    pub production_rate_bonus: f64,
-    /// Additive fraction bonus on buffer capacity for all nodes (e.g. 0.20 = +20%).
-    pub buffer_capacity_bonus: f64,
-}
-
-/// Compute granular Loom bonuses from the current state of existing game systems.
-///
-/// # Parameters
-/// - `haven_damage_percent`: Haven Armory damage bonus (0-25.0). Each 5% maps to
-///   +1% production rate (max +5% at 25%).
-/// - `deep_guild_rank`: Deep guild rank 1-5. Each rank above 1 adds +5% buffer
-///   capacity (max +20% at rank 5).
-/// - `ascension_level`: Current ascension level (0 = none). Reserved for future use.
-/// - `stormglass_balance`: Current Stormglass balance. Every 100k SG adds +1%
-///   production rate, capped at +5% (500k SG).
-///
-/// All bonuses are additive within their category and independent of each other.
-/// Haven and Stormglass bonuses stack additively into `production_rate_bonus`.
-pub fn loom_external_bonuses(
-    haven_damage_percent: f64,
-    deep_guild_rank: u8,
-    _ascension_level: u32,
-    stormglass_balance: u64,
-) -> LoomExternalBonuses {
-    // Haven Armory: up to +25% damage maps linearly to up to +5% production rate.
-    let haven_production = (haven_damage_percent / 5.0).min(5.0) / 100.0;
-
-    // Stormglass: +1% per 100k balance, capped at +5% (500k).
-    let sg_production = (stormglass_balance as f64 / 100_000.0).min(5.0) / 100.0;
-
-    let production_rate_bonus = haven_production + sg_production;
-
-    // Deep guild rank: +5% buffer capacity per rank above 1, capped at +20% (rank 5).
-    let rank_above_one = deep_guild_rank.saturating_sub(1) as f64;
-    let buffer_capacity_bonus = (rank_above_one * 5.0).min(20.0) / 100.0;
-
-    LoomExternalBonuses {
-        production_rate_bonus,
-        buffer_capacity_bonus,
-    }
-}
-
-/// Apply external bonuses to a node's effective base production rate.
-pub fn effective_node_base_rate(node: &LoomNode, bonuses: &LoomExternalBonuses) -> f64 {
-    node.base_rate * (1.0 + bonuses.production_rate_bonus)
-}
-
-/// Apply external bonuses to a node's effective buffer capacity.
-pub fn effective_buffer_capacity(node: &LoomNode, bonuses: &LoomExternalBonuses) -> f64 {
-    node.buffer_capacity * (1.0 + bonuses.buffer_capacity_bonus)
-}
-
 #[cfg(test)]
-mod external_bonus_tests {
+mod shuttle_tests {
     use super::*;
 
-    #[test]
-    fn test_no_bonuses_when_all_systems_at_minimum() {
-        let b = loom_external_bonuses(0.0, 1, 0, 0);
-        assert!((b.production_rate_bonus).abs() < 1e-9);
-        assert!((b.buffer_capacity_bonus).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_haven_armory_max_gives_five_percent_production() {
-        let b = loom_external_bonuses(25.0, 1, 0, 0);
-        assert!((b.production_rate_bonus - 0.05).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_haven_bonus_capped_at_five_percent() {
-        let b = loom_external_bonuses(200.0, 1, 0, 0);
-        assert!((b.production_rate_bonus - 0.05).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_deep_guild_rank_2_gives_five_percent_buffer() {
-        let b = loom_external_bonuses(0.0, 2, 0, 0);
-        assert!((b.buffer_capacity_bonus - 0.05).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_deep_guild_rank_5_gives_twenty_percent_buffer() {
-        let b = loom_external_bonuses(0.0, 5, 0, 0);
-        assert!((b.buffer_capacity_bonus - 0.20).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_deep_guild_rank_1_gives_no_buffer_bonus() {
-        let b = loom_external_bonuses(0.0, 1, 0, 0);
-        assert!((b.buffer_capacity_bonus).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_stormglass_100k_gives_one_percent_production() {
-        let b = loom_external_bonuses(0.0, 1, 0, 100_000);
-        assert!((b.production_rate_bonus - 0.01).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_stormglass_500k_gives_five_percent_production() {
-        let b = loom_external_bonuses(0.0, 1, 0, 500_000);
-        assert!((b.production_rate_bonus - 0.05).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_stormglass_capped_at_five_percent() {
-        let b = loom_external_bonuses(0.0, 1, 0, 2_000_000);
-        assert!((b.production_rate_bonus - 0.05).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_haven_and_stormglass_stack_additively() {
-        // Haven T3 (25 dmg% -> 5%) + 500k SG (5%) = 10%
-        let b = loom_external_bonuses(25.0, 1, 0, 500_000);
-        assert!((b.production_rate_bonus - 0.10).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_all_systems_at_max_gives_correct_totals() {
-        let b = loom_external_bonuses(25.0, 5, 6, 500_000);
-        assert!((b.production_rate_bonus - 0.10).abs() < 1e-9);
-        assert!((b.buffer_capacity_bonus - 0.20).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_effective_node_base_rate_applies_production_bonus() {
-        let mut node = LoomNode::new(NodeId::EmberSpindle);
-        node.base_rate = 10.0;
-        let b = LoomExternalBonuses {
-            production_rate_bonus: 0.10,
-            ..Default::default()
-        };
-        assert!((effective_node_base_rate(&node, &b) - 11.0).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_effective_buffer_capacity_applies_buffer_bonus() {
-        let mut node = LoomNode::new(NodeId::EmberSpindle);
-        node.buffer_capacity = 20.0;
-        let b = LoomExternalBonuses {
-            buffer_capacity_bonus: 0.20,
-            ..Default::default()
-        };
-        assert!((effective_buffer_capacity(&node, &b) - 24.0).abs() < 1e-9);
-    }
-
     // Helper: populate patterns via complete_discovery and mark the first N as completed.
+
     fn setup_patterns(loom: &mut LoomState, completed_count: usize) {
         crate::loom::discovery::complete_discovery(loom);
         for p in loom.persistent.patterns.iter_mut().take(completed_count) {
@@ -2311,11 +1977,7 @@ mod external_bonus_tests {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
         setup_patterns(&mut loom, 1);
-        *loom
-            .persistent
-            .stockpiles
-            .entry(Resource::Ember)
-            .or_insert(0.0) += 500.0;
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
 
         let result = build_shuttle(
             &mut loom,
@@ -2370,11 +2032,7 @@ mod external_bonus_tests {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
         setup_patterns(&mut loom, 1);
-        *loom
-            .persistent
-            .stockpiles
-            .entry(Resource::Ember)
-            .or_insert(0.0) += 50.0;
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 50.0;
 
         let result = build_shuttle(
             &mut loom,
@@ -2393,22 +2051,13 @@ mod external_bonus_tests {
         initialize_loom(&mut loom);
         // Only 1 completed pattern; Tier 2 recipes require 8 → TierLocked.
         setup_patterns(&mut loom, 1);
-        *loom
-            .persistent
-            .stockpiles
-            .entry(Resource::ForgedLight)
-            .or_insert(0.0) += 50.0;
-        *loom
-            .persistent
-            .stockpiles
-            .entry(Resource::EchoGlass)
-            .or_insert(0.0) += 50.0;
+        // Resources don't matter — tier check fails first (T2 needs 8 patterns).
 
         let result = build_shuttle(
             &mut loom,
             Resource::ForgedLight,
             Resource::EchoGlass,
-            NodeNature::Heat,
+            NodeNature::Vibration,
             vec![],
             vec![],
         );
@@ -2439,12 +2088,12 @@ mod external_bonus_tests {
         let produced = tick_shuttle_pull(&mut loom, 3600.0);
         let forged = produced.get(&Resource::ForgedLight).copied().unwrap_or(0.0);
 
-        // T1 intake cap = 20.0/hr. EmberSpindle = 50.0/hr, VoidCondenser = 50.0/hr.
-        // pull_a = min(50.0, 20.0 cap) = 20.0; pull_b = min(50.0, 20.0 cap) = 20.0
-        // output = min(20.0, 20.0) * 1.0 = 20.0/hr => 20.0 in 1 hour.
+        // No intake cap. EmberSpindle = 25.0/hr, VoidCondenser = 25.0/hr.
+        // pull_a = 25.0; pull_b = 25.0
+        // output = min(25.0, 25.0) * 1.0 = 25.0/hr => 25.0 in 1 hour.
         assert!(
-            (forged - 20.0).abs() < 0.01,
-            "expected ~20.0 ForgedLight, got {forged}"
+            (forged - 25.0).abs() < 0.01,
+            "expected ~25.0 ForgedLight, got {forged}"
         );
     }
 
@@ -2474,12 +2123,12 @@ mod external_bonus_tests {
         let produced = tick_shuttle_pull(&mut loom, 3600.0);
         let forged = produced.get(&Resource::ForgedLight).copied().unwrap_or(0.0);
 
-        // EmberSpindle effective = 50.0/hr, split 2 ways = 25.0 each, capped at 20.0.
-        // VoidCondenser = 50.0/hr, split 2 ways = 25.0 each, capped at 20.0.
-        // Each shuttle: min(20.0, 20.0) * 1.0 = 20.0/hr. Total = 40.0/hr => 40.0 in 1 hour.
+        // EmberSpindle effective = 25.0/hr, split 2 ways = 12.5 each (no intake cap).
+        // VoidCondenser = 25.0/hr, split 2 ways = 12.5 each.
+        // Each shuttle: min(12.5, 12.5) * 1.0 = 12.5/hr. Total = 25.0/hr => 25.0 in 1 hour.
         assert!(
-            (forged - 40.0).abs() < 0.01,
-            "expected ~40.0 ForgedLight from two shuttles, got {forged}"
+            (forged - 25.0).abs() < 0.01,
+            "expected ~25.0 ForgedLight from two shuttles, got {forged}"
         );
     }
 
@@ -2519,11 +2168,7 @@ mod external_bonus_tests {
         for node in loom.persistent.nodes.iter_mut() {
             node.unlocked = true;
         }
-        *loom
-            .persistent
-            .stockpiles
-            .entry(Resource::Ember)
-            .or_insert(0.0) += 500.0;
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
         let _ = build_shuttle(
             &mut loom,
             Resource::Ember,
@@ -2532,8 +2177,9 @@ mod external_bonus_tests {
             vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         );
-        loom.persistent.shuttles[0].buffer = 500.0;
         loom.persistent.shuttles[0].under_construction = false;
+        // Upgrade costs come from shuttle's own buffer
+        loom.persistent.shuttles[0].buffer = 500.0;
 
         let result = upgrade_shuttle(&mut loom, 0, 7);
         assert!(result.is_ok());
@@ -2548,11 +2194,7 @@ mod external_bonus_tests {
         for node in loom.persistent.nodes.iter_mut() {
             node.unlocked = true;
         }
-        *loom
-            .persistent
-            .stockpiles
-            .entry(Resource::Ember)
-            .or_insert(0.0) += 500.0;
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
         let _ = build_shuttle(
             &mut loom,
             Resource::Ember,
@@ -2561,9 +2203,9 @@ mod external_bonus_tests {
             vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         );
-        loom.persistent.shuttles[0].buffer = 5000.0;
         loom.persistent.shuttles[0].under_construction = false;
         loom.persistent.shuttles[0].level = 3;
+        loom.persistent.shuttles[0].buffer = 5000.0;
 
         let result = upgrade_shuttle(&mut loom, 0, 7); // max for Asc VII is 3
         assert!(result.is_err());
@@ -2577,11 +2219,7 @@ mod external_bonus_tests {
         for node in loom.persistent.nodes.iter_mut() {
             node.unlocked = true;
         }
-        *loom
-            .persistent
-            .stockpiles
-            .entry(Resource::Ember)
-            .or_insert(0.0) += 500.0;
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
         let _ = build_shuttle(
             &mut loom,
             Resource::Ember,
@@ -2590,10 +2228,39 @@ mod external_bonus_tests {
             vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         );
-        loom.persistent.shuttles[0].buffer = 5000.0;
         loom.persistent.shuttles[0].under_construction = false;
+        loom.persistent.shuttles[0].buffer = 5000.0;
 
         let result = upgrade_shuttle(&mut loom, 0, 6); // Asc VI, no shuttle upgrades
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_shuttle_output_rate_tracker_updates_per_tick() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        for node in &mut loom.persistent.nodes {
+            node.unlocked = true;
+            node.buffer = 100.0;
+        }
+        setup_patterns(&mut loom, 1);
+        loom.persistent.shuttles.push(Shuttle::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        ));
+        for _ in 0..10 {
+            tick_shuttle_pull(&mut loom, 0.1);
+        }
+        let tracker = &loom.persistent.shuttles[0].output_rate_tracker;
+        assert!(
+            tracker.rate_per_hour() > 0.0,
+            "Shuttle rate tracker should record production"
+        );
     }
 }

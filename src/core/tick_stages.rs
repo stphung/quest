@@ -1036,24 +1036,39 @@ pub(super) fn tick_loom(
         return;
     }
 
-    const TICK_SECONDS: f64 = 0.1; // 100ms tick interval
-
-    // Tick staggered second-node unlock.
-    if loom.persistent.second_node_unlock_elapsed.is_some() {
-        let unlocked = crate::loom::tick_loom_staggered_unlock(loom, TICK_SECONDS);
-        if unlocked {
-            result.loom_changed = true;
-        }
+    // Loom runs on wall-clock time — skip during Chrono Surge bursts.
+    if state.chrono_surge_active {
+        return;
     }
 
+    // Loom uses wall-clock time. Compute real elapsed seconds since last tick.
+    let now = chrono::Utc::now();
+    let wall_delta = match loom.last_tick_at {
+        Some(prev) => {
+            let elapsed = (now - prev).num_milliseconds().max(0) as f64 / 1000.0;
+            // Cap at 1 second to avoid huge jumps on resume/load.
+            elapsed.min(1.0)
+        }
+        None => 0.1, // First tick after load — use nominal 100ms.
+    };
+    loom.last_tick_at = Some(now);
+
+    // Apply debug time warp to wall delta (for testing only).
+    let warp = if loom.time_warp > 1.0 {
+        loom.time_warp
+    } else {
+        1.0
+    };
+    let tick_seconds: f64 = wall_delta * warp;
+
     // Tick shuttle construction (decrement timers, complete when done).
-    let completed_shuttles = crate::loom::tick_shuttle_construction(loom);
+    let completed_shuttles = crate::loom::tick_shuttle_construction(loom, tick_seconds);
     if !completed_shuttles.is_empty() {
         result.loom_changed = true;
     }
 
     // Tick direct-pull shuttle processing.
-    let shuttle_produced = crate::loom::tick_shuttle_pull(loom, TICK_SECONDS);
+    let shuttle_produced = crate::loom::tick_shuttle_pull(loom, tick_seconds);
 
     // Update stall flags for UI display.
     crate::loom::tick_stall_detection(loom);
@@ -1061,8 +1076,11 @@ pub(super) fn tick_loom(
     // Update shuttle stall flags.
     crate::loom::tick_shuttle_stall_detection(loom);
 
+    // Tick extractor upgrade timers (before base production so completed upgrades apply immediately).
+    crate::loom::tick_node_upgrades(loom, tick_seconds);
+
     // Tick base production for all unlocked nodes.
-    let mut produced = crate::loom::tick_base_production(loom, TICK_SECONDS);
+    let mut produced = crate::loom::tick_base_production(loom, tick_seconds);
 
     // Merge shuttle production into base production map for pattern sustain.
     for (resource, amount) in shuttle_produced {
@@ -1070,17 +1088,20 @@ pub(super) fn tick_loom(
     }
 
     // Tick neighbor unlocking.
-    let newly_unlocked = crate::loom::tick_neighbor_unlocking(loom, TICK_SECONDS);
+    let newly_unlocked = crate::loom::tick_neighbor_unlocking(loom, tick_seconds);
     if !newly_unlocked.is_empty() {
         result.loom_changed = true;
+        loom.graph_dirty = true;
     }
 
     // Push per-tick production amounts into rate trackers.
+    // Divide by time_warp so the rolling-window rate reflects the logical (un-warped)
+    // production rate. The actual buffers already received the full warped amount.
     for (resource, &amount) in &produced {
         loom.rate_trackers
             .entry(*resource)
             .or_default()
-            .push(amount);
+            .push(amount / warp);
     }
     // Push 0.0 for resources not produced this tick (so their rate decays naturally).
     let all_resources = [
@@ -1112,9 +1133,10 @@ pub(super) fn tick_loom(
         .collect();
 
     let pattern_completed =
-        crate::loom::tick_pattern_sustain(&mut loom.persistent, &rates, TICK_SECONDS);
+        crate::loom::tick_pattern_sustain(&mut loom.persistent, &rates, tick_seconds);
     if pattern_completed {
         result.loom_changed = true;
+        loom.graph_dirty = true;
         let completed_count = loom.persistent.completed_pattern_count();
         achievements.on_loom_pattern_completed(completed_count, Some(&state.character_name));
         // Sync Loom zone unlocks on pattern completion
@@ -1151,9 +1173,9 @@ pub(super) fn tick_loom(
                 .get(&crate::loom::Resource::WovenReality)
                 .map(|t| t.rate_per_hour())
                 .unwrap_or(0.0);
-            let pr_per_day = crate::loom::wr_to_pr_per_day(wr_rate);
-            if pr_per_day > 0 {
-                let fill_secs = 86400i64 / pr_per_day as i64;
+            let pr_per_hour = crate::loom::wr_to_pr_per_hour(wr_rate);
+            if pr_per_hour > 0 {
+                let fill_secs = (3600i64 / pr_per_hour as i64).max(1);
                 let last = loom.persistent.wr_pr_last_granted_at;
                 // Cap elapsed to 7 days to prevent exploits from bogus timestamps
                 let elapsed = (now - last).min(604800);

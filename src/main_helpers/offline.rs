@@ -169,18 +169,16 @@ pub fn resolve_loom_offline(
         .collect();
     loom_state.persistent.pending_pattern_milestones = milestones;
 
+    // Force UI graph rebuild after offline changes (neighbor unlocks, construction completions).
+    loom_state.graph_dirty = true;
+
     Some(LoomOfflineReport { patterns_completed })
 }
 
 /// Run one simulation step of the Loom production chain.
 fn simulate_loom_step(loom_state: &mut loom::LoomState, delta_seconds: f64) {
-    // Staggered unlock (legacy, currently no-op).
-    if loom_state.persistent.second_node_unlock_elapsed.is_some() {
-        loom::tick_loom_staggered_unlock(loom_state, delta_seconds);
-    }
-
     // Shuttle construction.
-    loom::tick_shuttle_construction(loom_state);
+    loom::tick_shuttle_construction(loom_state, delta_seconds);
 
     // Shuttle direct-pull processing.
     let shuttle_produced = loom::tick_shuttle_pull(loom_state, delta_seconds);
@@ -196,20 +194,98 @@ fn simulate_loom_step(loom_state: &mut loom::LoomState, delta_seconds: f64) {
     // Neighbor unlocking.
     loom::tick_neighbor_unlocking(loom_state, delta_seconds);
 
-    // Push production into rate trackers for pattern sustain.
-    for (resource, &amount) in &produced {
-        loom_state
-            .rate_trackers
-            .entry(*resource)
-            .or_default()
-            .push(amount);
+    // Compute instantaneous rates directly for pattern sustain.
+    // RateTracker assumes each push() = one 100ms tick (TICKS_PER_HOUR = 36,000),
+    // but offline steps are 10 seconds — pushing raw amounts would inflate rates 100x.
+    // Instead, derive rates from production amounts and step duration.
+    let mut rates = std::collections::HashMap::new();
+    if delta_seconds > 0.0 {
+        for (resource, &amount) in &produced {
+            rates.insert(*resource, amount / delta_seconds * 3600.0);
+        }
+    }
+    loom::tick_pattern_sustain(&mut loom_state.persistent, &rates, delta_seconds);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verify that offline Loom simulation computes correct production rates.
+    ///
+    /// Before the fix, RateTracker was used with 10-second steps but assumed 100ms
+    /// ticks, inflating rates 100x and causing patterns to complete instantly.
+    #[test]
+    fn test_offline_loom_rates_not_inflated() {
+        let mut loom_state = loom::LoomState::new();
+        loom::discovery::complete_discovery(&mut loom_state);
+
+        // First pattern: Ember at 25.0/hr sustained for 2 hours (7200 seconds).
+        // Extractors start at base rate 25/hr at level 1.
+        assert!(!loom_state.persistent.patterns.is_empty());
+        let sustain_secs = loom_state.persistent.patterns[0].requirements[0].sustain_duration_secs;
+        assert!(
+            sustain_secs > 3600.0,
+            "First pattern requires hours of sustained production, got {sustain_secs}s"
+        );
+        assert!(!loom_state.persistent.patterns[0].completed);
+
+        // Simulate 60 seconds offline — far too short to complete a 2-hour sustain.
+        // Before the fix, inflated rates would cause instant completion.
+        let report = resolve_loom_offline(&mut loom_state, 60);
+        assert!(report.is_some());
+
+        // Pattern should NOT complete after only 60 seconds (needs 2 hours).
+        assert!(
+            !loom_state.persistent.patterns[0].completed,
+            "Pattern should not complete after only 60s offline (needs {}s)",
+            sustain_secs
+        );
+        assert_eq!(report.unwrap().patterns_completed, 0);
+
+        // But the sustain timer should have advanced by ~60 seconds.
+        let sustained = loom_state.persistent.patterns[0].requirements[0].sustained_secs;
+        assert!(
+            sustained > 50.0 && sustained <= 60.0,
+            "Sustain timer should advance ~60s, got {sustained}s"
+        );
     }
 
-    // Read measured rates and advance pattern sustain.
-    let rates: std::collections::HashMap<loom::Resource, f64> = loom_state
-        .rate_trackers
-        .iter()
-        .map(|(resource, tracker)| (*resource, tracker.rate_per_hour()))
-        .collect();
-    loom::tick_pattern_sustain(&mut loom_state.persistent, &rates, delta_seconds);
+    /// Verify that offline Loom simulation completes patterns given enough time.
+    #[test]
+    fn test_offline_loom_completes_with_enough_time() {
+        let mut loom_state = loom::LoomState::new();
+        loom::discovery::complete_discovery(&mut loom_state);
+
+        // Simulate 3 hours offline — enough to complete the first pattern (2h sustain).
+        let report = resolve_loom_offline(&mut loom_state, 3 * 3600);
+        assert!(report.is_some());
+        assert!(
+            loom_state.persistent.patterns[0].completed,
+            "First pattern should complete after 3 hours offline"
+        );
+        assert!(report.unwrap().patterns_completed >= 1);
+    }
+
+    /// Verify that offline Loom simulation does NOT complete patterns when production
+    /// rate is below the threshold.
+    #[test]
+    fn test_offline_loom_no_false_completion() {
+        let mut loom_state = loom::LoomState::new();
+        loom::discovery::complete_discovery(&mut loom_state);
+
+        // Lock the Ember extractor (EmberSpindle = index 0) so it doesn't produce.
+        // The first pattern requires Ember at 25/hr, so it should NOT complete.
+        loom_state.persistent.nodes[0].upgrading = true;
+
+        // Even with 3 hours, pattern should not complete without Ember production.
+        let report = resolve_loom_offline(&mut loom_state, 3 * 3600);
+        assert!(report.is_some());
+
+        assert!(
+            !loom_state.persistent.patterns[0].completed,
+            "Pattern should not complete when required extractor is locked"
+        );
+        assert_eq!(report.unwrap().patterns_completed, 0);
+    }
 }

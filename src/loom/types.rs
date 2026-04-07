@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
+/// Maximum number of shuttles a player can build (balance cap).
+pub const MAX_SHUTTLES: usize = 5;
+
 /// Which archetype the player chose at Loom unlock.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LoomArchetype {
@@ -120,8 +123,10 @@ pub struct Shuttle {
     /// Output resource produced.
     pub output: Resource,
     /// Output amount multiplier from the recipe.
+    #[serde(default = "default_shuttle_amount")]
     pub amount: f64,
     /// Recipe tier (1, 2, or 3).
+    #[serde(default = "default_shuttle_tier")]
     pub tier: u8,
     /// Current buffer level (holds output resource).
     #[serde(default)]
@@ -138,15 +143,18 @@ pub struct Shuttle {
     /// Whether currently under construction.
     #[serde(default)]
     pub under_construction: bool,
-    /// Ticks remaining for construction.
-    #[serde(default)]
-    pub construction_ticks_remaining: u32,
+    /// Seconds remaining for construction (wall-clock time).
+    #[serde(default, alias = "construction_ticks_remaining")]
+    pub construction_secs_remaining: f64,
     /// Sources for input A — extractors or lower-tier shuttles.
     #[serde(default)]
     pub sources_a: Vec<LoomNodeRef>,
     /// Sources for input B — extractors or lower-tier shuttles.
     #[serde(default)]
     pub sources_b: Vec<LoomNodeRef>,
+    /// Per-shuttle output rate tracker (transient, not serialized).
+    #[serde(skip)]
+    pub output_rate_tracker: RateTracker,
 }
 
 impl Shuttle {
@@ -169,13 +177,14 @@ impl Shuttle {
             amount,
             tier,
             buffer: 0.0,
-            buffer_capacity: 200.0,
+            buffer_capacity: 500.0,
             level: 1,
             stalled: false,
             under_construction: false,
-            construction_ticks_remaining: 0,
+            construction_secs_remaining: 0.0,
             sources_a,
             sources_b,
+            output_rate_tracker: RateTracker::new(),
         }
     }
 }
@@ -200,6 +209,12 @@ pub struct LoomNode {
     /// When this reaches the threshold (2.0 hours), the node unlocks.
     #[serde(default)]
     pub unlock_progress: f64,
+    /// Whether the node is currently upgrading (locked out from production).
+    #[serde(default)]
+    pub upgrading: bool,
+    /// Remaining seconds until upgrade completes. Ticked down each game tick.
+    #[serde(default)]
+    pub upgrade_remaining_secs: f64,
 }
 
 fn default_node_level() -> u32 {
@@ -207,11 +222,23 @@ fn default_node_level() -> u32 {
 }
 
 fn default_buffer_capacity() -> f64 {
-    200.0
+    250.0
+}
+
+fn default_shuttle_amount() -> f64 {
+    1.0
+}
+
+fn default_shuttle_tier() -> u8 {
+    1
 }
 
 fn default_base_rate() -> f64 {
-    50.0
+    25.0
+}
+
+fn default_time_warp() -> f64 {
+    1.0
 }
 
 impl LoomNode {
@@ -221,10 +248,12 @@ impl LoomNode {
             level: 1,
             unlocked: false,
             buffer: 0.0,
-            buffer_capacity: 200.0, // 4 hours at 50/hr base
-            base_rate: 50.0,
+            buffer_capacity: 250.0, // 10 hours at 25/hr base
+            base_rate: 25.0,
             stalled: false,
             unlock_progress: 0.0,
+            upgrading: false,
+            upgrade_remaining_secs: 0.0,
         }
     }
 }
@@ -248,6 +277,12 @@ pub struct WovenPattern {
     pub requirements: Vec<PatternRequirement>,
     #[serde(default)]
     pub completed: bool,
+    /// Narrative flavor text displayed when this pattern is active.
+    #[serde(default)]
+    pub flavor: String,
+    /// Eternal patterns never complete — they act as endgame resource sinks.
+    #[serde(default)]
+    pub eternal: bool,
 }
 
 /// A single requirement within a woven pattern.
@@ -289,8 +324,9 @@ pub struct LoomPersistent {
     pub active_pattern: usize,
     #[serde(default)]
     pub patterns: Vec<WovenPattern>,
-    #[serde(default)]
-    pub stockpiles: HashMap<Resource, f64>,
+    /// Legacy field — previously held global resource stockpiles. Kept for serde compat.
+    #[serde(default, skip_serializing)]
+    pub _stockpiles_legacy: HashMap<Resource, f64>,
     #[serde(default)]
     pub second_node_unlock_elapsed: Option<f64>,
     /// Player-built shuttles (recipe-locked processing nodes).
@@ -306,15 +342,27 @@ pub struct LoomPersistent {
 }
 
 impl LoomPersistent {
-    /// Number of completed Woven Patterns.
+    /// Number of completed Woven Patterns (excludes eternal patterns).
     pub fn completed_pattern_count(&self) -> usize {
-        self.patterns.iter().filter(|p| p.completed).count()
+        self.patterns
+            .iter()
+            .filter(|p| p.completed && !p.eternal)
+            .count()
     }
 
     /// Maximum number of Shuttles the player can build.
-    /// Equal to the number of completed Woven Patterns.
+    /// Scales with completed Woven Patterns up to MAX_SHUTTLES.
     pub fn max_shuttles(&self) -> usize {
-        self.completed_pattern_count()
+        let patterns = self.completed_pattern_count();
+        let slots = match patterns {
+            0 => 0,
+            1..=3 => 1,
+            4..=7 => 2,
+            8..=11 => 3,
+            12..=14 => 4,
+            _ => MAX_SHUTTLES, // 5 at 15+ patterns
+        };
+        slots.min(MAX_SHUTTLES)
     }
 }
 
@@ -331,7 +379,7 @@ impl Default for LoomPersistent {
             codex: Vec::new(),
             active_pattern: 0,
             patterns: Vec::new(),
-            stockpiles: HashMap::new(),
+            _stockpiles_legacy: HashMap::new(),
             second_node_unlock_elapsed: None,
             shuttles: Vec::new(),
             wr_pr_last_granted_at: 0,
@@ -347,6 +395,16 @@ pub struct LoomState {
     /// Per-resource rolling rate trackers (transient, not serialized).
     #[serde(skip)]
     pub rate_trackers: HashMap<Resource, RateTracker>,
+    /// Debug time warp multiplier (1.0 = normal, 10/100/1000 = accelerated). Not saved.
+    #[serde(skip, default = "default_time_warp")]
+    pub time_warp: f64,
+    /// Signals the UI to rebuild the graph layout (set by tick-path logic, consumed by UI).
+    #[serde(skip)]
+    pub graph_dirty: bool,
+    /// Wall-clock timestamp of the last Loom tick, for computing real elapsed time.
+    /// Transient — initialized on first tick after load.
+    #[serde(skip)]
+    pub last_tick_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl LoomState {
@@ -354,6 +412,9 @@ impl LoomState {
         Self {
             persistent: LoomPersistent::default(),
             rate_trackers: HashMap::new(),
+            time_warp: 1.0,
+            graph_dirty: false,
+            last_tick_at: None,
         }
     }
 }
@@ -362,13 +423,6 @@ impl Default for LoomState {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// Which view the Loom UI is showing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LoomView {
-    FlowView,
-    Codex,
 }
 
 /// Which step of the shuttle build flow the player is on.
@@ -409,28 +463,36 @@ pub struct BuildState {
 #[derive(Debug)]
 pub struct LoomUiState {
     pub open: bool,
-    pub view: LoomView,
-    pub selected_node: usize,
-    /// Codex graph cursor: column (0=Base, 1=Confluence, 2=Terminal).
-    pub codex_column: usize,
-    /// Codex graph cursor: row within current column.
-    pub codex_row: usize,
+    /// Currently selected node in the graph view (None = no selection).
+    pub selected_graph_node: Option<petgraph::stable_graph::NodeIndex>,
+    /// Per-edge animation phase for flowing particle effects.
+    pub particle_phases: HashMap<petgraph::stable_graph::EdgeIndex, f64>,
     /// Frame counter for throbber animation (incremented each render call).
     pub throbber_frame: u32,
     /// Active build flow state, if any.
     pub build: Option<BuildState>,
+    /// Cached production graph (rebuilt when graph_dirty flag is set).
+    pub loom_graph: Option<super::graph::LoomGraph>,
+    /// Cached layout for the production graph.
+    pub loom_layout: Option<super::layout::LoomLayout>,
+    /// UI-side dirty flag for graph rebuild (e.g., after window resize).
+    pub graph_dirty: bool,
+    /// True when waiting for second D press to confirm shuttle demolish.
+    pub demolish_pending: bool,
 }
 
 impl LoomUiState {
     pub fn new() -> Self {
         Self {
             open: false,
-            view: LoomView::FlowView,
-            selected_node: 0,
-            codex_column: 0,
-            codex_row: 0,
+            selected_graph_node: None,
+            particle_phases: HashMap::new(),
             throbber_frame: 0,
             build: None,
+            loom_graph: None,
+            loom_layout: None,
+            graph_dirty: false,
+            demolish_pending: false,
         }
     }
 
@@ -445,12 +507,12 @@ impl Default for LoomUiState {
     }
 }
 
-/// Rolling window rate tracker for measuring resource production over 60 seconds.
+/// Rolling window rate tracker for measuring resource production over 20 seconds.
 ///
-/// Uses a circular buffer of 600 ticks (at 100ms/tick = 60 seconds).
+/// Uses a circular buffer of 200 ticks (at 100ms/tick = 20 seconds).
 /// The running sum gives O(1) per-tick updates. Not serialized — on load,
-/// it starts empty and ramps up over 60 seconds.
-const RATE_WINDOW_SIZE: usize = 600;
+/// it starts empty and ramps up over 20 seconds.
+const RATE_WINDOW_SIZE: usize = 200;
 const TICKS_PER_HOUR: f64 = 36_000.0;
 
 #[derive(Debug, Clone)]
@@ -479,8 +541,14 @@ impl RateTracker {
     }
 
     /// Returns the estimated production rate per hour based on the rolling window.
+    /// Divides by actual sample count (not window capacity) to avoid suppressed rates
+    /// during cold start / ramp-up.
     pub fn rate_per_hour(&self) -> f64 {
-        (self.sum / RATE_WINDOW_SIZE as f64) * TICKS_PER_HOUR
+        let count = self.buffer.len();
+        if count == 0 {
+            return 0.0;
+        }
+        (self.sum / count as f64) * TICKS_PER_HOUR
     }
 }
 
@@ -536,7 +604,7 @@ mod tests {
         assert_eq!(r.tier, 1);
         assert!(!r.stalled);
         assert!((r.buffer - 0.0).abs() < 0.001);
-        assert!((r.buffer_capacity - 200.0).abs() < 0.001);
+        assert!((r.buffer_capacity - 500.0).abs() < 0.001);
         assert_eq!(r.level, 1);
         assert_eq!(r.sources_a.len(), 1);
         assert_eq!(r.sources_b.len(), 1);
@@ -595,6 +663,8 @@ mod tests {
             name: "Test".to_string(),
             requirements: vec![],
             completed: false,
+            flavor: String::new(),
+            eternal: false,
         };
         assert!(!pattern.completed);
         assert_eq!(pattern.index, 0);
@@ -614,12 +684,16 @@ mod tests {
             name: "A".to_string(),
             requirements: vec![],
             completed: true,
+            flavor: String::new(),
+            eternal: false,
         });
         state.persistent.patterns.push(WovenPattern {
             index: 1,
             name: "B".to_string(),
             requirements: vec![],
             completed: false,
+            flavor: String::new(),
+            eternal: false,
         });
         assert_eq!(state.persistent.completed_pattern_count(), 1);
     }
@@ -635,7 +709,8 @@ mod tests {
         let mut tracker = RateTracker::new();
         tracker.push(1.0);
         let rate = tracker.rate_per_hour();
-        assert!((rate - 60.0).abs() < 1e-6, "rate was {}", rate);
+        // 1 sample of 1.0 unit per tick → 1.0 * 36000 ticks/hr = 36000/hr
+        assert!((rate - 36000.0).abs() < 1e-6, "rate was {}", rate);
     }
 
     #[test]

@@ -1,10 +1,9 @@
 //! Woven Pattern tracking, completion, and progression.
 //!
 //! Patterns are the sole progression gate in the Loom of Worlds.
-//! Each tick, the sustain timer advances for requirements whose production
-//! rate meets or exceeds the required threshold. When the timer reaches
-//! the target duration, the requirement completes. When all requirements
-//! complete, the pattern completes and the next pattern unlocks.
+//! ALL requirements must be met simultaneously for any progress to occur.
+//! If even one requirement is below its rate threshold, no timers advance.
+//! When all timers reach their target duration, the pattern completes.
 #![allow(dead_code)]
 
 use super::types::{LoomPersistent, Resource};
@@ -34,11 +33,15 @@ pub fn active_pattern_requirements_met(persistent: &LoomPersistent) -> bool {
 /// since the last tick (typically 0.1s for a 100ms tick interval).
 /// `rates` maps each resource to its current production rate in units/hour.
 ///
-/// For each incomplete requirement, if the current rate meets or exceeds
-/// the `required_rate` threshold, `sustained_secs` advances by `delta_seconds`.
-/// When `sustained_secs` reaches `sustain_duration_secs`, the requirement
-/// completes. If the rate drops below threshold, progress simply pauses
-/// (no decay).
+/// ALL incomplete requirements must simultaneously meet their rate
+/// thresholds for any progress to occur. If even one requirement is
+/// below its threshold, no timers advance. This ensures the player
+/// must design a production network that satisfies every condition
+/// at once, not one at a time.
+///
+/// When `sustained_secs` reaches `sustain_duration_secs` for a
+/// requirement, it completes. When all requirements complete, the
+/// pattern completes.
 ///
 /// Returns `true` if a pattern was completed during this tick (so the caller
 /// can emit a `TickEvent` and set `loom_changed = true`).
@@ -54,20 +57,46 @@ pub fn tick_pattern_sustain(
         return false;
     }
 
-    for req in &mut pattern.requirements {
+    // Guard: negative or zero delta is a no-op.
+    if delta_seconds <= 0.0 {
+        return false;
+    }
+
+    // Check if ALL incomplete requirements are currently meeting their rate threshold.
+    // NaN rates are treated as 0 (NaN >= threshold is always false).
+    let all_met = pattern.requirements.iter().all(|req| {
         if req.completed {
-            continue;
+            return true; // Already done — doesn't block others.
         }
         let rate = rates.get(&req.resource).copied().unwrap_or(0.0);
-        if rate >= req.required_rate {
+        rate.is_finite() && rate >= req.required_rate
+    });
+
+    // Eternal patterns never complete — they act as endgame sinks.
+    // Advance timer but never mark requirements or pattern as completed.
+    if pattern.eternal {
+        if all_met {
+            for req in &mut pattern.requirements {
+                req.sustained_secs += delta_seconds;
+            }
+        }
+        return false;
+    }
+
+    // Only advance timers if every requirement is satisfied simultaneously.
+    if all_met {
+        for req in &mut pattern.requirements {
+            if req.completed {
+                continue;
+            }
             req.sustained_secs += delta_seconds;
             if req.sustained_secs >= req.sustain_duration_secs {
                 req.sustained_secs = req.sustain_duration_secs;
                 req.completed = true;
             }
         }
-        // Simple pause: do nothing when rate < threshold. No decay.
     }
+    // If not all met, progress simply pauses (no decay).
 
     if pattern.requirements.iter().all(|req| req.completed) {
         complete_active_pattern(persistent);
@@ -108,9 +137,14 @@ fn advance_to_next_pattern(persistent: &mut LoomPersistent) {
 
 // ── Query helpers ──────────────────────────────────────────────────────────────
 
-/// Returns `true` if all 28 patterns have been completed.
+/// Returns `true` if all non-eternal patterns have been completed.
 pub fn all_patterns_complete(persistent: &LoomPersistent) -> bool {
-    !persistent.patterns.is_empty() && persistent.patterns.iter().all(|p| p.completed)
+    !persistent.patterns.is_empty()
+        && persistent
+            .patterns
+            .iter()
+            .filter(|p| !p.eternal)
+            .all(|p| p.completed)
 }
 
 /// Returns `(sustained_secs, sustain_duration_secs, completed)` for each requirement
@@ -362,23 +396,40 @@ mod tests {
     }
 
     #[test]
-    fn test_all_28_patterns_complete() {
+    fn test_all_28_non_eternal_patterns_complete() {
         let mut state = state_with_patterns();
         for p in &mut state.persistent.patterns {
-            p.completed = true;
+            if !p.eternal {
+                p.completed = true;
+            }
         }
         assert!(all_patterns_complete(&state.persistent));
-        assert_eq!(state.persistent.patterns.len(), 28);
+        assert_eq!(state.persistent.completed_pattern_count(), 28);
+        // 29 total patterns (28 normal + 1 eternal)
+        assert_eq!(state.persistent.patterns.len(), 29);
     }
 
     #[test]
-    fn test_28_patterns_not_complete_with_one_remaining() {
+    fn test_not_complete_with_one_non_eternal_remaining() {
         let mut state = state_with_patterns();
-        let n = state.persistent.patterns.len();
-        for p in state.persistent.patterns.iter_mut().take(n - 1) {
-            p.completed = true;
+        // Complete all non-eternal patterns except the last one (index 27)
+        for p in state.persistent.patterns.iter_mut().take(27) {
+            if !p.eternal {
+                p.completed = true;
+            }
         }
         assert!(!all_patterns_complete(&state.persistent));
+    }
+
+    #[test]
+    fn test_eternal_pattern_excluded_from_count() {
+        let mut state = state_with_patterns();
+        // Complete everything including eternal
+        for p in &mut state.persistent.patterns {
+            p.completed = true;
+        }
+        // Eternal pattern doesn't count
+        assert_eq!(state.persistent.completed_pattern_count(), 28);
     }
 
     #[test]
@@ -394,7 +445,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tick_advances_only_matching_resources() {
+    fn test_tick_no_progress_unless_all_requirements_met() {
         let mut state = state_with_patterns();
         // Pattern 4 "Mirror and Void": needs Reflection and VoidEssence
         for i in 0..4 {
@@ -402,12 +453,33 @@ mod tests {
         }
         state.persistent.active_pattern = 4;
 
-        // Only provide Reflection, not VoidEssence
+        // Only provide Reflection, not VoidEssence — nothing should advance
         let r = rates(&[(Resource::Reflection, 100.0)]);
         tick_pattern_sustain(&mut state.persistent, &r, 1.0);
 
-        // First req (Reflection) should advance, second (VoidEssence) should not
-        assert!(state.persistent.patterns[4].requirements[0].sustained_secs > 0.0);
-        assert!((state.persistent.patterns[4].requirements[1].sustained_secs).abs() < 1e-9);
+        assert!(
+            (state.persistent.patterns[4].requirements[0].sustained_secs).abs() < 1e-9,
+            "Reflection should NOT advance when VoidEssence is missing"
+        );
+        assert!(
+            (state.persistent.patterns[4].requirements[1].sustained_secs).abs() < 1e-9,
+            "VoidEssence should not advance either"
+        );
+
+        // Now provide BOTH — both should advance
+        let r = rates(&[
+            (Resource::Reflection, 100.0),
+            (Resource::VoidEssence, 100.0),
+        ]);
+        tick_pattern_sustain(&mut state.persistent, &r, 1.0);
+
+        assert!(
+            state.persistent.patterns[4].requirements[0].sustained_secs > 0.0,
+            "Reflection should advance when all requirements are met"
+        );
+        assert!(
+            state.persistent.patterns[4].requirements[1].sustained_secs > 0.0,
+            "VoidEssence should advance when all requirements are met"
+        );
     }
 }

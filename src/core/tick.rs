@@ -58,6 +58,9 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
     // ── 4. Update dungeon exploration ───────────────────────────
     tick_stages::process_dungeon_events(ctx.state, delta_time, &haven_bonuses, &mut result, rng);
 
+    // ── 4b. Loom of Worlds (wall-clock, runs regardless of fishing/combat) ──
+    tick_stages::tick_loom(ctx.deep, ctx.loom, ctx.state, ctx.achievements, &mut result);
+
     // ── 5. Update fishing (mutually exclusive with combat) ──────
     if tick_stages::process_fishing_tick(
         ctx.state,
@@ -134,9 +137,6 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
         rng,
     );
 
-    // ── 11e. Loom of Worlds discovery check ───────────────────────
-    tick_stages::tick_loom(ctx.deep, ctx.loom, ctx.state, ctx.achievements, &mut result);
-
     // ── 11d. Fracture region unlock consumption ──────────────────
     if let Some(region) = ctx.deep.persistent.pending_fracture_region_unlock.take() {
         let loom_cap = ctx.state.cached_loom_zone_cap;
@@ -183,12 +183,8 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
 
     // Sync cached zone caps for UI rendering
     ctx.state.cached_fracture_zone_cap = ctx.deep.persistent.fracture_zone_cap;
-    // Only recompute loom zone cap when loom state changed this tick;
-    // the value is already updated by tick_loom() and milestone consumption above.
-    if result.loom_changed {
-        ctx.state.cached_loom_zone_cap =
-            crate::loom::loom_zone_cap_for_patterns(ctx.loom.persistent.completed_pattern_count());
-    }
+    ctx.state.cached_loom_zone_cap =
+        crate::loom::loom_zone_cap_for_patterns(ctx.loom.persistent.completed_pattern_count());
 
     // ── 12a. Power Cores tick ─────────────────────────────────────
     crate::power_cores::tick::tick_power_cores(ctx.state, ctx.deep, ctx.achievements, &mut result);

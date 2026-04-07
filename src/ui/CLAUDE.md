@@ -60,7 +60,7 @@ src/ui/
 ├── soulforge_scene.rs          # Soulforge enhancement overlay (delegates to helpers below)
 ├── soulforge_effects.rs        # Soulforge hammering/success/failure animation effects
 ├── soulforge_slots.rs          # Soulforge slot selection menu
-├── loom_scene.rs               # Loom of Worlds overlay (FlowView, Codex)
+├── loom_scene.rs               # Loom of Worlds overlay (graph view + detail panel)
 ├── ascension_scene.rs          # Ascension overlay UI (level display, cost/gate info, ascend confirmation)
 ├── stormglass_scene.rs         # Stormglass Exchange overlay with animations (Invoke Trial rolling, Chrono Surge speed ramp/fast-forward, Storm Sigils daily rotation, Storm Lure)
 ├── time_vault_scene.rs         # Time Vault overlay (branch/commit browser, restore, fork, GitHub cloud sync)
