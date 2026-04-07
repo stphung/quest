@@ -58,6 +58,9 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
     // ── 4. Update dungeon exploration ───────────────────────────
     tick_stages::process_dungeon_events(ctx.state, delta_time, &haven_bonuses, &mut result, rng);
 
+    // ── 4b. Loom of Worlds (wall-clock, runs regardless of fishing/combat) ──
+    tick_stages::tick_loom(ctx.deep, ctx.loom, ctx.state, ctx.achievements, &mut result);
+
     // ── 5. Update fishing (mutually exclusive with combat) ──────
     if tick_stages::process_fishing_tick(
         ctx.state,
@@ -133,9 +136,6 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
         &mut result,
         rng,
     );
-
-    // ── 11e. Loom of Worlds discovery check ───────────────────────
-    tick_stages::tick_loom(ctx.deep, ctx.loom, ctx.state, ctx.achievements, &mut result);
 
     // ── 11d. Fracture region unlock consumption ──────────────────
     if let Some(region) = ctx.deep.persistent.pending_fracture_region_unlock.take() {
