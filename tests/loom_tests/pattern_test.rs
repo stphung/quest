@@ -3,7 +3,9 @@
 
 use super::helpers::*;
 use quest::loom::logic::loom_zone_cap_for_patterns;
-use quest::loom::patterns::{active_pattern_requirements_met, all_patterns_complete};
+use quest::loom::patterns::{
+    active_pattern_requirements_met, all_patterns_complete, tick_pattern_sustain,
+};
 use quest::loom::types::*;
 use std::collections::HashMap;
 
@@ -200,4 +202,63 @@ fn test_active_pattern_requirements_met_all_reqs_done() {
         "Pattern should not be marked complete yet"
     );
     assert!(active_pattern_requirements_met(&loom.persistent));
+}
+
+// ── The Eternal Weave ────────────────────────────────────────────────────────
+
+#[test]
+fn test_eternal_pattern_becomes_active_after_28_complete() {
+    let mut loom = setup_loom();
+    complete_n_patterns(&mut loom, 28);
+
+    // After completing all 28 non-eternal patterns, active_pattern should
+    // advance to the eternal pattern (index 28).
+    // Simulate the advance by calling tick_pattern_sustain on the last real pattern.
+    // complete_n_patterns already marks them complete, so advance manually:
+    loom.persistent.active_pattern = 28;
+
+    let eternal = &loom.persistent.patterns[28];
+    assert!(eternal.eternal, "Pattern 28 should be eternal");
+    assert!(
+        !eternal.completed,
+        "Eternal pattern should never be completed"
+    );
+}
+
+#[test]
+fn test_eternal_pattern_advances_timer_but_never_completes() {
+    let mut loom = setup_loom();
+    complete_n_patterns(&mut loom, 28);
+    loom.persistent.active_pattern = 28;
+
+    // Supply WR at sufficient rate
+    let mut rates = HashMap::new();
+    rates.insert(Resource::WovenReality, 50.0);
+
+    // Tick many times
+    for _ in 0..100 {
+        tick_pattern_sustain(&mut loom.persistent, &rates, 10.0);
+    }
+
+    let eternal = &loom.persistent.patterns[28];
+    assert!(!eternal.completed, "Eternal pattern must never complete");
+    // Timer should have advanced
+    assert!(
+        eternal.requirements[0].sustained_secs > 0.0,
+        "Eternal pattern timer should advance"
+    );
+}
+
+#[test]
+fn test_wr_to_pr_activates_with_eternal_pattern_active() {
+    let mut loom = setup_loom();
+    complete_n_patterns(&mut loom, 28);
+    loom.persistent.active_pattern = 28;
+
+    // All 28 non-eternal patterns complete — WR→PR should activate
+    assert!(
+        all_patterns_complete(&loom.persistent),
+        "all_patterns_complete should be true even with eternal pattern active"
+    );
+    assert_eq!(loom.persistent.completed_pattern_count(), 28);
 }
