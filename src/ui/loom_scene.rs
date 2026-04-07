@@ -1373,39 +1373,6 @@ fn eternal_weave_flavor(prestige_rank: u32, frame_counter: u32) -> &'static str 
     lines[idx]
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_eternal_weave_flavor_tiers() {
-        // Each tier returns a non-empty string.
-        let tiers = [0, 2_000, 5_000, 10_000, 25_000, 50_000, 75_000, 100_000];
-        for pr in tiers {
-            let text = eternal_weave_flavor(pr, 0);
-            assert!(!text.is_empty(), "Flavor empty at PR {pr}");
-        }
-    }
-
-    #[test]
-    fn test_eternal_weave_flavor_rotates() {
-        // Different frame counters within a tier produce different text.
-        let a = eternal_weave_flavor(0, 0);
-        let b = eternal_weave_flavor(0, 100);
-        let c = eternal_weave_flavor(0, 200);
-        // At least 2 of 3 should differ (3 lines per tier).
-        assert!(a != b || b != c, "Flavor should rotate across frames");
-    }
-
-    #[test]
-    fn test_eternal_weave_flavor_changes_with_pr() {
-        // Different PR tiers produce different text.
-        let early = eternal_weave_flavor(0, 0);
-        let late = eternal_weave_flavor(75_000, 0);
-        assert_ne!(early, late, "Flavor should differ between PR tiers");
-    }
-}
-
 /// Render bottom panel for The Eternal Weave — WR→PR conversion display.
 fn render_bottom_panel_eternal(
     frame: &mut Frame,
@@ -1678,4 +1645,33 @@ pub fn render_loom_discovery_modal(
     ])
     .alignment(Alignment::Center);
     frame.render_widget(text, inner);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_eternal_weave_flavor_tiers() {
+        let tiers = [0, 2_000, 5_000, 10_000, 25_000, 50_000, 75_000, 100_000];
+        for pr in tiers {
+            let text = eternal_weave_flavor(pr, 0);
+            assert!(!text.is_empty(), "Flavor empty at PR {pr}");
+        }
+    }
+
+    #[test]
+    fn test_eternal_weave_flavor_rotates() {
+        let a = eternal_weave_flavor(0, 0);
+        let b = eternal_weave_flavor(0, 100);
+        let c = eternal_weave_flavor(0, 200);
+        assert!(a != b || b != c, "Flavor should rotate across frames");
+    }
+
+    #[test]
+    fn test_eternal_weave_flavor_changes_with_pr() {
+        let early = eternal_weave_flavor(0, 0);
+        let late = eternal_weave_flavor(75_000, 0);
+        assert_ne!(early, late, "Flavor should differ between PR tiers");
+    }
 }
