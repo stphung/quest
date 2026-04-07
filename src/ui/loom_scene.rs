@@ -1384,13 +1384,26 @@ fn render_bottom_panel_eternal(
             .add_modifier(Modifier::BOLD),
     )));
 
-    // PR-gated flavor text.
-    lines.push(Line::from(Span::styled(
-        format!(" \u{201c}{}\u{201d}", flavor),
-        Style::default()
-            .fg(Color::Rgb(130, 110, 160))
-            .add_modifier(Modifier::ITALIC),
-    )));
+    // PR-gated flavor text — word-wrap to fit panel width.
+    let flavor_style = Style::default()
+        .fg(Color::Rgb(130, 110, 160))
+        .add_modifier(Modifier::ITALIC);
+    let max_width = area.width.saturating_sub(3) as usize; // 1 char indent + 1 char margin
+    let quoted = format!("\u{201c}{}\u{201d}", flavor);
+    let mut line_buf = String::from(" ");
+    for word in quoted.split_whitespace() {
+        if line_buf.len() + word.len() + 1 > max_width && line_buf.len() > 1 {
+            lines.push(Line::from(Span::styled(line_buf.clone(), flavor_style)));
+            line_buf = String::from(" ");
+        }
+        if line_buf.len() > 1 {
+            line_buf.push(' ');
+        }
+        line_buf.push_str(word);
+    }
+    if line_buf.len() > 1 {
+        lines.push(Line::from(Span::styled(line_buf, flavor_style)));
+    }
     lines.push(Line::from(""));
 
     // WR → PR conversion line.
@@ -1422,6 +1435,7 @@ fn render_bottom_panel_eternal(
     }
 
     // Gauge placeholder.
+    let gauge_row = lines.len() as u16;
     lines.push(Line::from(""));
 
     // Render text.
@@ -1431,7 +1445,6 @@ fn render_bottom_panel_eternal(
     );
 
     // Gauge: progress toward next PR grant.
-    let gauge_row = 4u16; // after title, flavor, blank, conversion line
     if gauge_row < area.height {
         let gauge_area = Rect::new(
             area.x + 1,
