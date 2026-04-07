@@ -255,4 +255,52 @@ mod tests {
         );
         assert!(state.persistent.shuttles[0].sources_b.is_empty());
     }
+
+    #[test]
+    fn test_old_save_without_version_resets_to_fresh() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("loom.json");
+
+        // Simulate an old save: discovered, has patterns, no version field.
+        // JSON without "version" → deserializes as version 0.
+        fs::write(
+            &path,
+            r#"{"persistent":{"discovered":true,"patterns":[{"index":0,"name":"Old","requirements":[],"completed":true}]}}"#,
+        )
+        .unwrap();
+
+        let loaded = load_loom_from_path(&path);
+
+        // Old save should be reset — discovered is false, no patterns.
+        assert!(!loaded.persistent.discovered, "Old save should reset");
+        assert!(
+            loaded.persistent.patterns.is_empty(),
+            "Patterns should be empty after reset"
+        );
+        assert_eq!(
+            loaded.persistent.version,
+            crate::loom::types::LOOM_SAVE_VERSION
+        );
+    }
+
+    #[test]
+    fn test_current_version_save_loads_normally() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("loom.json");
+
+        let mut state = LoomState::new();
+        state.persistent.discovered = true;
+
+        save_loom_to_path(&state, &path).unwrap();
+        let loaded = load_loom_from_path(&path);
+
+        assert!(
+            loaded.persistent.discovered,
+            "Current version save should load normally"
+        );
+        assert_eq!(
+            loaded.persistent.version,
+            crate::loom::types::LOOM_SAVE_VERSION
+        );
+    }
 }
