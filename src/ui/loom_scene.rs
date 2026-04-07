@@ -1363,13 +1363,14 @@ fn render_bottom_panel_eternal(
     } else {
         3600
     };
-    let elapsed = if last > 0 { (now - last).max(0) } else { 0 };
-    let gauge_ratio = if fill_secs > 0 {
-        (elapsed as f64 / fill_secs as f64).clamp(0.0, 1.0)
+    let (gauge_ratio, secs_remaining) = if pr_per_hour > 0 && last > 0 {
+        let elapsed = (now - last).max(0);
+        let ratio = (elapsed as f64 / fill_secs as f64).clamp(0.0, 1.0);
+        let remaining = (fill_secs - elapsed).max(0);
+        (ratio, remaining)
     } else {
-        0.0
+        (0.0, 0)
     };
-    let secs_remaining = (fill_secs - elapsed).max(0);
 
     let wr_emoji = resource_emoji(&crate::loom::Resource::WovenReality);
     let flavor = eternal_weave_flavor(prestige_rank);
