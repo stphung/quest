@@ -71,6 +71,7 @@ pub fn render_loom_overlay(
     area: Rect,
     loom_state: &mut LoomState,
     ui: &mut LoomUiState,
+    prestige_rank: u32,
 ) {
     ui.throbber_frame = ui.throbber_frame.wrapping_add(1);
     frame.render_widget(Clear, area);
@@ -144,7 +145,7 @@ pub fn render_loom_overlay(
         frame.render_widget(msg, chunks[0]);
     }
 
-    render_bottom_panel(frame, chunks[1], loom_state, ui);
+    render_bottom_panel(frame, chunks[1], loom_state, ui, prestige_rank);
     render_nav_hints(frame, area, &*ui);
 }
 
@@ -160,7 +161,13 @@ pub fn render_loom_overlay(
 /// - Shuttle node: recipe, tier, level, buffer, output rate, upgrade cost
 /// - Pattern sink: name, requirements with progress bars
 /// - Nothing selected: introductory guidance
-fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &LoomUiState) {
+fn render_bottom_panel(
+    frame: &mut Frame,
+    area: Rect,
+    loom: &LoomState,
+    ui: &LoomUiState,
+    prestige_rank: u32,
+) {
     use crate::loom::graph::LoomGraphNode;
 
     let current_shuttles = loom.persistent.shuttles.len();
@@ -729,7 +736,7 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
             }
         }
         LoomGraphNode::PatternSink(pat_idx) => {
-            render_bottom_panel_pattern(frame, inner, loom, ui, *pat_idx);
+            render_bottom_panel_pattern(frame, inner, loom, ui, *pat_idx, prestige_rank);
         }
     }
 }
@@ -1112,6 +1119,7 @@ fn render_bottom_panel_pattern(
     loom: &LoomState,
     ui: &LoomUiState,
     pat_idx: usize,
+    prestige_rank: u32,
 ) {
     let pattern = match loom.persistent.patterns.get(pat_idx) {
         Some(p) => p,
@@ -1120,7 +1128,7 @@ fn render_bottom_panel_pattern(
 
     // Eternal patterns get a special WR→PR conversion display.
     if pattern.eternal {
-        render_bottom_panel_eternal(frame, area, loom, ui);
+        render_bottom_panel_eternal(frame, area, loom, ui, prestige_rank);
         return;
     }
 
@@ -1315,8 +1323,64 @@ fn render_bottom_panel_pattern(
     }
 }
 
+/// PR-gated flavor text for The Eternal Weave — shifts tone as the player
+/// approaches the 100k PR Vessel launch gate.
+fn eternal_weave_flavor(prestige_rank: u32, frame_counter: u32) -> &'static str {
+    let lines: &[&str] = match prestige_rank {
+        0..=1_999 => &[
+            "There is no final thread. The Loom weaves on.",
+            "The silence after the last pattern is not emptiness. It is fullness, overflowing.",
+            "You sit with the Loom and listen. It has so much left to say.",
+        ],
+        2_000..=4_999 => &[
+            "The threads hum with a sound like breathing. Steady. Patient. Endless.",
+            "You are no longer weaving patterns. You are weaving yourself.",
+            "Days pass. The Loom does not count them. Neither do you, anymore.",
+        ],
+        5_000..=9_999 => &[
+            "The weave responds before you ask. You and the Loom think as one.",
+            "Sometimes the threads arrange themselves while you sleep. You pretend not to notice.",
+            "There is a rhythm beneath the rhythm. You are only now learning to hear it.",
+        ],
+        10_000..=24_999 => &[
+            "The Loom\u{2019}s rhythm has changed. Subtle, like a heartbeat skipping.",
+            "Some threads resist your touch now. They pull toward something distant.",
+            "The weave holds, but the edges fray where you cannot see.",
+        ],
+        25_000..=49_999 => &[
+            "Yggdrasil\u{2019}s branches grow thin at the periphery. The Loom knows.",
+            "The threads carry whispers now. A name you almost recognize.",
+            "Reality feels lighter than it should. The weave compensates, but barely.",
+        ],
+        50_000..=74_999 => &[
+            "The Loom trembles when you are not watching. Something stirs beyond the last thread.",
+            "You dream of distances. Ten thousand light-years of silence. The Loom dreams it too.",
+            "The branches are dying. Not all of them. Not yet. But enough.",
+        ],
+        75_000..=99_999 => &[
+            "The Vessel waits. You have always known this.",
+            "One hundred thousand threads, woven into purpose. The journey is almost ready.",
+            "Beyond the weave, beyond the branches, beyond everything you know \u{2014} a living world calls.",
+        ],
+        _ => &[
+            "The threads are ready. The Vessel is ready. Only the courage remains.",
+            "You have woven enough reality to reshape the world. But the world needs you to leave it.",
+            "The Loom will tend itself while you are gone. It learned that from you.",
+        ],
+    };
+    // Rotate through lines slowly (change every ~10 seconds at 10fps).
+    let idx = (frame_counter / 100) as usize % lines.len();
+    lines[idx]
+}
+
 /// Render bottom panel for The Eternal Weave — WR→PR conversion display.
-fn render_bottom_panel_eternal(frame: &mut Frame, area: Rect, loom: &LoomState, _ui: &LoomUiState) {
+fn render_bottom_panel_eternal(
+    frame: &mut Frame,
+    area: Rect,
+    loom: &LoomState,
+    ui: &LoomUiState,
+    prestige_rank: u32,
+) {
     let wr_rate = loom
         .rate_trackers
         .get(&crate::loom::Resource::WovenReality)
@@ -1343,6 +1407,7 @@ fn render_bottom_panel_eternal(frame: &mut Frame, area: Rect, loom: &LoomState, 
     let secs_remaining = (fill_secs - elapsed).max(0);
 
     let wr_emoji = resource_emoji(&crate::loom::Resource::WovenReality);
+    let flavor = eternal_weave_flavor(prestige_rank, ui.throbber_frame);
 
     let mut lines: Vec<Line> = Vec::new();
 
@@ -1354,9 +1419,9 @@ fn render_bottom_panel_eternal(frame: &mut Frame, area: Rect, loom: &LoomState, 
             .add_modifier(Modifier::BOLD),
     )));
 
-    // Flavor text.
+    // PR-gated flavor text.
     lines.push(Line::from(Span::styled(
-        " \u{201c}There is no final thread. The Loom weaves on.\u{201d}",
+        format!(" \u{201c}{}\u{201d}", flavor),
         Style::default()
             .fg(Color::Rgb(130, 110, 160))
             .add_modifier(Modifier::ITALIC),

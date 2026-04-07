@@ -238,7 +238,13 @@ pub fn draw_game_overlays(
 
     // Loom of Worlds overlay
     if ctx.loom_ui.open {
-        ui::loom_scene::render_loom_overlay(frame, area, ctx.loom_state, ctx.loom_ui);
+        ui::loom_scene::render_loom_overlay(
+            frame,
+            area,
+            ctx.loom_state,
+            ctx.loom_ui,
+            ctx.state.prestige_rank,
+        );
     }
 
     // Small modals render on top of all overlays (Haven, Deep, Loom, etc.)
