@@ -280,6 +280,9 @@ pub struct WovenPattern {
     /// Narrative flavor text displayed when this pattern is active.
     #[serde(default)]
     pub flavor: String,
+    /// Eternal patterns never complete — they act as endgame resource sinks.
+    #[serde(default)]
+    pub eternal: bool,
 }
 
 /// A single requirement within a woven pattern.
@@ -339,9 +342,12 @@ pub struct LoomPersistent {
 }
 
 impl LoomPersistent {
-    /// Number of completed Woven Patterns.
+    /// Number of completed Woven Patterns (excludes eternal patterns).
     pub fn completed_pattern_count(&self) -> usize {
-        self.patterns.iter().filter(|p| p.completed).count()
+        self.patterns
+            .iter()
+            .filter(|p| p.completed && !p.eternal)
+            .count()
     }
 
     /// Maximum number of Shuttles the player can build.
@@ -658,6 +664,7 @@ mod tests {
             requirements: vec![],
             completed: false,
             flavor: String::new(),
+            eternal: false,
         };
         assert!(!pattern.completed);
         assert_eq!(pattern.index, 0);
@@ -678,6 +685,7 @@ mod tests {
             requirements: vec![],
             completed: true,
             flavor: String::new(),
+            eternal: false,
         });
         state.persistent.patterns.push(WovenPattern {
             index: 1,
@@ -685,6 +693,7 @@ mod tests {
             requirements: vec![],
             completed: false,
             flavor: String::new(),
+            eternal: false,
         });
         assert_eq!(state.persistent.completed_pattern_count(), 1);
     }

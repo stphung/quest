@@ -507,16 +507,35 @@ fn build_node_render_info(
                     });
 
                 // C: Play/pause prefix.
-                let status_icon = if pat.completed {
-                    "\u{2713}" // ✓
-                } else if is_sustaining {
-                    "\u{25b6}" // ▶
+                let (label, rate_text) = if pat.eternal {
+                    let wr_rate = loom
+                        .rate_trackers
+                        .get(&crate::loom::Resource::WovenReality)
+                        .map(|t| t.rate_per_hour())
+                        .unwrap_or(0.0);
+                    let pr_hr = crate::loom::wr_to_pr_per_hour(wr_rate);
+                    (
+                        "\u{221e} Eternal Weave".to_string(),
+                        if pr_hr > 0 {
+                            format!("{} PR/hr", pr_hr)
+                        } else {
+                            String::new()
+                        },
+                    )
                 } else {
-                    "\u{23f8}" // ⏸
+                    let status_icon = if pat.completed {
+                        "\u{2713}" // ✓
+                    } else if is_sustaining {
+                        "\u{25b6}" // ▶
+                    } else {
+                        "\u{23f8}" // ⏸
+                    };
+                    (
+                        format!("{} {}", status_icon, pat.name),
+                        format_pattern_status(pat),
+                    )
                 };
-                let label = format!("{} {}", status_icon, pat.name);
                 let label_display_width = display_width(&label);
-                let rate_text = format_pattern_status(pat);
 
                 // R2: Build requirement lines for display below the node.
                 let req_lines: Vec<(String, Color)> = pat

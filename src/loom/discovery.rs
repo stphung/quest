@@ -254,6 +254,13 @@ fn create_pattern_sequence() -> Vec<WovenPattern> {
                 (Resource::Reflection, 125.0, 120.0),
             ],
         ),
+        // ── The Eternal Weave ── endgame sink, never completes ──
+        eternal_pattern(
+            28,
+            "The Eternal Weave",
+            "There is no final thread. The Loom weaves on.",
+            vec![(Resource::WovenReality, 1.0, 1.0)],
+        ),
     ]
 }
 
@@ -275,7 +282,19 @@ fn pattern(index: u32, name: &str, flavor: &str, reqs: Vec<(Resource, f64, f64)>
             })
             .collect(),
         completed: false,
+        eternal: false,
     }
+}
+
+fn eternal_pattern(
+    index: u32,
+    name: &str,
+    flavor: &str,
+    reqs: Vec<(Resource, f64, f64)>,
+) -> WovenPattern {
+    let mut p = pattern(index, name, flavor, reqs);
+    p.eternal = true;
+    p
 }
 
 /// Returns the narrative chapter name for a given pattern index (0-based).
@@ -284,6 +303,7 @@ pub fn pattern_chapter(index: u32) -> &'static str {
         0..=7 => "Chapter I: The Awakening",
         8..=15 => "Chapter II: The Deepening",
         16..=27 => "Chapter III: The Unraveling",
+        28 => "The Eternal Weave",
         _ => "",
     }
 }
@@ -300,7 +320,7 @@ mod tests {
         complete_discovery(&mut loom);
 
         assert!(loom.persistent.discovered);
-        assert_eq!(loom.persistent.patterns.len(), 28);
+        assert_eq!(loom.persistent.patterns.len(), 29);
     }
 
     #[test]
@@ -335,14 +355,14 @@ mod tests {
         let mut loom = LoomState::new();
         complete_discovery(&mut loom);
         assert!(loom.persistent.discovered);
-        assert_eq!(loom.persistent.patterns.len(), 28);
+        assert_eq!(loom.persistent.patterns.len(), 29);
 
         // Mark first pattern as having sustain progress.
         loom.persistent.patterns[0].requirements[0].sustained_secs = 0.5;
 
         // Calling again should be a no-op (re-entry guard).
         complete_discovery(&mut loom);
-        assert_eq!(loom.persistent.patterns.len(), 28);
+        assert_eq!(loom.persistent.patterns.len(), 29);
         assert!(
             (loom.persistent.patterns[0].requirements[0].sustained_secs - 0.5).abs() < 1e-9,
             "pattern progress must be preserved on re-call"
@@ -414,12 +434,14 @@ mod tests {
     }
 
     #[test]
-    fn test_final_pattern_has_longest_duration() {
+    fn test_final_non_eternal_pattern_has_longest_duration() {
         let mut loom = LoomState::new();
         complete_discovery(&mut loom);
-        let last = loom.persistent.patterns.last().unwrap();
-        let last_duration = last.requirements[0].sustain_duration_secs;
-        assert!((last_duration - 432_000.0).abs() < 1e-9); // 120 hours
+        // Mended Loom (index 27) is the last non-eternal pattern
+        let mended_loom = &loom.persistent.patterns[27];
+        assert_eq!(mended_loom.name, "Mended Loom");
+        let duration = mended_loom.requirements[0].sustain_duration_secs;
+        assert!((duration - 432_000.0).abs() < 1e-9); // 120 hours
     }
 
     // ── pattern name spot checks ──────────────────────────────────────────────
@@ -432,11 +454,12 @@ mod tests {
     }
 
     #[test]
-    fn test_last_pattern_name_is_mended_loom() {
+    fn test_last_pattern_is_eternal_weave() {
         let mut loom = LoomState::new();
         complete_discovery(&mut loom);
         let last = loom.persistent.patterns.last().unwrap();
-        assert_eq!(last.name, "Mended Loom");
+        assert_eq!(last.name, "The Eternal Weave");
+        assert!(last.eternal);
     }
 
     #[test]

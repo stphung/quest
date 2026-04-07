@@ -144,13 +144,21 @@ pub fn setup_loom() -> LoomState {
     loom
 }
 
-/// Mark the first N patterns as completed.
+/// Mark the first N non-eternal patterns as completed.
 pub fn complete_n_patterns(loom: &mut LoomState, n: usize) {
-    for i in 0..n.min(loom.persistent.patterns.len()) {
+    let mut completed = 0;
+    for i in 0..loom.persistent.patterns.len() {
+        if completed >= n {
+            break;
+        }
+        if loom.persistent.patterns[i].eternal {
+            continue;
+        }
         loom.persistent.patterns[i].completed = true;
         for req in &mut loom.persistent.patterns[i].requirements {
             req.completed = true;
         }
+        completed += 1;
     }
 }
 

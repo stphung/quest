@@ -87,6 +87,11 @@ pub fn tick_pattern_sustain(
     }
     // If not all met, progress simply pauses (no decay).
 
+    // Eternal patterns never complete — they act as endgame sinks.
+    if pattern.eternal {
+        return false;
+    }
+
     if pattern.requirements.iter().all(|req| req.completed) {
         complete_active_pattern(persistent);
         return true;
@@ -126,9 +131,14 @@ fn advance_to_next_pattern(persistent: &mut LoomPersistent) {
 
 // ── Query helpers ──────────────────────────────────────────────────────────────
 
-/// Returns `true` if all 28 patterns have been completed.
+/// Returns `true` if all non-eternal patterns have been completed.
 pub fn all_patterns_complete(persistent: &LoomPersistent) -> bool {
-    !persistent.patterns.is_empty() && persistent.patterns.iter().all(|p| p.completed)
+    !persistent.patterns.is_empty()
+        && persistent
+            .patterns
+            .iter()
+            .filter(|p| !p.eternal)
+            .all(|p| p.completed)
 }
 
 /// Returns `(sustained_secs, sustain_duration_secs, completed)` for each requirement
@@ -380,23 +390,40 @@ mod tests {
     }
 
     #[test]
-    fn test_all_28_patterns_complete() {
+    fn test_all_28_non_eternal_patterns_complete() {
         let mut state = state_with_patterns();
         for p in &mut state.persistent.patterns {
-            p.completed = true;
+            if !p.eternal {
+                p.completed = true;
+            }
         }
         assert!(all_patterns_complete(&state.persistent));
-        assert_eq!(state.persistent.patterns.len(), 28);
+        assert_eq!(state.persistent.completed_pattern_count(), 28);
+        // 29 total patterns (28 normal + 1 eternal)
+        assert_eq!(state.persistent.patterns.len(), 29);
     }
 
     #[test]
-    fn test_28_patterns_not_complete_with_one_remaining() {
+    fn test_not_complete_with_one_non_eternal_remaining() {
         let mut state = state_with_patterns();
-        let n = state.persistent.patterns.len();
-        for p in state.persistent.patterns.iter_mut().take(n - 1) {
-            p.completed = true;
+        // Complete all non-eternal patterns except the last one (index 27)
+        for p in state.persistent.patterns.iter_mut().take(27) {
+            if !p.eternal {
+                p.completed = true;
+            }
         }
         assert!(!all_patterns_complete(&state.persistent));
+    }
+
+    #[test]
+    fn test_eternal_pattern_excluded_from_count() {
+        let mut state = state_with_patterns();
+        // Complete everything including eternal
+        for p in &mut state.persistent.patterns {
+            p.completed = true;
+        }
+        // Eternal pattern doesn't count
+        assert_eq!(state.persistent.completed_pattern_count(), 28);
     }
 
     #[test]

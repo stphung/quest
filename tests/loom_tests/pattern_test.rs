@@ -94,6 +94,7 @@ fn test_simultaneous_requirements_no_advance_when_one_drops() {
         ],
         completed: false,
         flavor: String::new(),
+        eternal: false,
     };
     loom.persistent.active_pattern = 0;
 

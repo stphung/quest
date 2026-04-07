@@ -1118,6 +1118,12 @@ fn render_bottom_panel_pattern(
         None => return,
     };
 
+    // Eternal patterns get a special WR→PR conversion display.
+    if pattern.eternal {
+        render_bottom_panel_eternal(frame, area, loom, ui);
+        return;
+    }
+
     let title_color = if pattern.completed {
         Color::Rgb(100, 200, 120)
     } else {
@@ -1306,6 +1312,117 @@ fn render_bottom_panel_pattern(
                 .gauge_style(Style::default().fg(title_color).bg(Color::Rgb(30, 20, 40)));
             frame.render_widget(gauge, gauge_area);
         }
+    }
+}
+
+/// Render bottom panel for The Eternal Weave — WR→PR conversion display.
+fn render_bottom_panel_eternal(frame: &mut Frame, area: Rect, loom: &LoomState, _ui: &LoomUiState) {
+    let wr_rate = loom
+        .rate_trackers
+        .get(&crate::loom::Resource::WovenReality)
+        .map(|t| t.rate_per_hour())
+        .unwrap_or(0.0);
+
+    let pr_per_hour = crate::loom::wr_to_pr_per_hour(wr_rate);
+    let multiplier = crate::loom::wr_pr_multiplier(wr_rate);
+
+    // Compute gauge progress: fraction of time until next PR grant.
+    let now = chrono::Utc::now().timestamp();
+    let last = loom.persistent.wr_pr_last_granted_at;
+    let fill_secs = if pr_per_hour > 0 {
+        (3600i64 / pr_per_hour as i64).max(1)
+    } else {
+        3600
+    };
+    let elapsed = if last > 0 { (now - last).max(0) } else { 0 };
+    let gauge_ratio = if fill_secs > 0 {
+        (elapsed as f64 / fill_secs as f64).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let secs_remaining = (fill_secs - elapsed).max(0);
+
+    let wr_emoji = resource_emoji(&crate::loom::Resource::WovenReality);
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Title.
+    lines.push(Line::from(Span::styled(
+        " \u{221e} The Eternal Weave",
+        Style::default()
+            .fg(Color::Rgb(255, 200, 60))
+            .add_modifier(Modifier::BOLD),
+    )));
+
+    // Flavor text.
+    lines.push(Line::from(Span::styled(
+        " \u{201c}There is no final thread. The Loom weaves on.\u{201d}",
+        Style::default()
+            .fg(Color::Rgb(130, 110, 160))
+            .add_modifier(Modifier::ITALIC),
+    )));
+    lines.push(Line::from(""));
+
+    // WR → PR conversion line.
+    if pr_per_hour > 0 {
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!(" {} {}/hr", wr_emoji, wr_rate.round() as u32),
+                Style::default().fg(Color::Rgb(180, 140, 220)),
+            ),
+            Span::styled(
+                format!("  \u{00d7}{:.1}  \u{2500}\u{2500}\u{25b6}  ", multiplier),
+                Style::default().fg(Color::Rgb(120, 100, 150)),
+            ),
+            Span::styled(
+                format!("\u{29bf} {} PR/hr", pr_per_hour),
+                Style::default()
+                    .fg(Color::Rgb(100, 200, 120))
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]));
+    } else {
+        lines.push(Line::from(Span::styled(
+            format!(
+                " {} 0/hr  \u{2500}\u{2500}\u{25b6}  \u{29bf} 0 PR/hr",
+                wr_emoji
+            ),
+            Style::default().fg(Color::Rgb(80, 70, 100)),
+        )));
+    }
+
+    // Gauge placeholder.
+    lines.push(Line::from(""));
+
+    // Render text.
+    frame.render_widget(
+        Paragraph::new(lines).style(Style::default().bg(LOOM_BG)),
+        area,
+    );
+
+    // Gauge: progress toward next PR grant.
+    let gauge_row = 4u16; // after title, flavor, blank, conversion line
+    if gauge_row < area.height {
+        let gauge_area = Rect::new(
+            area.x + 1,
+            area.y + gauge_row,
+            area.width.saturating_sub(2),
+            1,
+        );
+        let gauge_label = if pr_per_hour > 0 {
+            format!("+1 PR in {}s", secs_remaining)
+        } else {
+            "no WR production".to_string()
+        };
+        let gauge = Gauge::default()
+            .ratio(gauge_ratio)
+            .label(gauge_label)
+            .gauge_style(
+                Style::default()
+                    .fg(Color::Rgb(255, 200, 60))
+                    .bg(Color::Rgb(30, 20, 40)),
+            );
+        frame.render_widget(gauge, gauge_area);
     }
 }
 
