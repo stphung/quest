@@ -20,8 +20,11 @@ pub fn load_loom_from_path(path: &Path) -> LoomState {
     match fs::read_to_string(path) {
         Ok(json) => {
             let mut state: LoomState = serde_json::from_str(&json).unwrap_or_default();
+            // Reset outdated saves — pattern definitions and features have changed.
+            if state.persistent.version < super::types::LOOM_SAVE_VERSION {
+                return LoomState::new();
+            }
             sanitize_on_load(&mut state);
-            migrate_eternal_weave(&mut state);
             state
         }
         Err(_) => LoomState::new(),
@@ -93,38 +96,6 @@ fn sanitize_on_load(state: &mut LoomState) {
         shuttle.sources_b.retain(
             |src| !matches!(src, super::types::LoomNodeRef::Shuttle(idx) if *idx >= num_shuttles),
         );
-    }
-}
-
-/// Migrate old saves (28 patterns) to include The Eternal Weave (pattern 29).
-/// TODO: Remove this migration after a few releases (added 2026-04-07).
-fn migrate_eternal_weave(state: &mut LoomState) {
-    if !state.persistent.discovered {
-        return;
-    }
-    // Already has the eternal pattern — no migration needed.
-    if state.persistent.patterns.iter().any(|p| p.eternal) {
-        return;
-    }
-    // Old save with patterns but no eternal weave — append it.
-    if !state.persistent.patterns.is_empty() {
-        let idx = state.persistent.patterns.len() as u32;
-        state.persistent.patterns.push(super::types::WovenPattern {
-            index: idx,
-            name: "The Eternal Weave".to_string(),
-            flavor: String::new(),
-            eternal: true,
-            completed: false,
-            requirements: vec![super::types::PatternRequirement {
-                resource: super::types::Resource::WovenReality,
-                required_rate: 1.0,
-                sustain_duration_secs: 3600.0,
-                sustained_secs: 0.0,
-                completed: false,
-                amount: 0.0,
-                accumulated: 0.0,
-            }],
-        });
     }
 }
 
