@@ -291,9 +291,11 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                             ),
                             Span::styled(
                                 format!(
-                                    "    \u{2190} {}+{}",
+                                    "  \u{2190} {} {} + {} {}",
                                     resource_emoji(&r.input_a),
+                                    resource_name(&r.input_a),
                                     resource_emoji(&r.input_b),
+                                    resource_name(&r.input_b),
                                 ),
                                 Style::default().fg(Color::Rgb(80, 70, 110)),
                             ),
