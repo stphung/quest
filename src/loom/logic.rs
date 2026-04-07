@@ -815,34 +815,23 @@ pub fn tick_shuttle_stall_detection(loom: &mut LoomState) {
 /// Calculate PR generated per day from a given WR production rate (units/hr).
 ///
 /// Tiered brackets:
-/// - 0–10 WR/hr: 5 PR per WR/hr per day
-/// - 10–25 WR/hr: 10 PR per WR/hr per day
-/// - 25+ WR/hr: 15 PR per WR/hr per day
-pub fn wr_to_pr_per_day(wr_per_hour: f64) -> u32 {
+/// Convert Weave Rate (WR/hr) to Prestige Ranks per hour.
+///
+/// Formula: `PR/hr = WR × (1 + WR/100)`
+/// Starts ~1:1 at low rates, scales superlinearly as WR increases.
+/// At 50 WR/hr → 75 PR/hr, at 131 WR/hr → 302 PR/hr.
+pub fn wr_to_pr_per_hour(wr_per_hour: f64) -> u32 {
     if !wr_per_hour.is_finite() || wr_per_hour <= 0.0 {
         return 0;
     }
-    let mut pr = 0.0;
-    let mut remaining = wr_per_hour;
-
-    // Bracket 1: 0–10 at 5 PR per WR/hr
-    let b1 = remaining.min(10.0);
-    pr += b1 * 5.0;
-    remaining -= b1;
-
-    // Bracket 2: 10–25 at 10 PR per WR/hr
-    if remaining > 0.0 {
-        let b2 = remaining.min(15.0);
-        pr += b2 * 10.0;
-        remaining -= b2;
-    }
-
-    // Bracket 3: 25+ at 15 PR per WR/hr
-    if remaining > 0.0 {
-        pr += remaining * 15.0;
-    }
-
+    let pr = wr_per_hour * (1.0 + wr_per_hour / 100.0);
     pr.round() as u32
+}
+
+/// Returns the multiplier applied to WR rate (for UI display).
+/// `multiplier = 1 + WR/100`
+pub fn wr_pr_multiplier(wr_per_hour: f64) -> f64 {
+    1.0 + wr_per_hour / 100.0
 }
 
 /// Returns the highest zone ID unlocked by the given number of completed Woven Patterns.
@@ -879,29 +868,40 @@ mod tests {
     }
 
     #[test]
-    fn test_wr_to_pr_per_day_zero_rate() {
-        assert_eq!(wr_to_pr_per_day(0.0), 0);
+    fn test_wr_to_pr_per_hour_zero_rate() {
+        assert_eq!(wr_to_pr_per_hour(0.0), 0);
     }
 
     #[test]
-    fn test_wr_to_pr_per_day_low_bracket() {
-        assert_eq!(wr_to_pr_per_day(5.0), 25);
+    fn test_wr_to_pr_per_hour_nan() {
+        assert_eq!(wr_to_pr_per_hour(f64::NAN), 0);
+        assert_eq!(wr_to_pr_per_hour(f64::INFINITY), 0);
+        assert_eq!(wr_to_pr_per_hour(-1.0), 0);
     }
 
     #[test]
-    fn test_wr_to_pr_per_day_mid_bracket() {
-        assert_eq!(wr_to_pr_per_day(20.0), 150);
+    fn test_wr_to_pr_per_hour_low_rate() {
+        // PR = 10 * (1 + 10/100) = 10 * 1.1 = 11
+        assert_eq!(wr_to_pr_per_hour(10.0), 11);
     }
 
     #[test]
-    fn test_wr_to_pr_per_day_high_bracket() {
-        assert_eq!(wr_to_pr_per_day(60.0), 725);
+    fn test_wr_to_pr_per_hour_pattern28_rate() {
+        // PR = 50 * (1 + 50/100) = 50 * 1.5 = 75
+        assert_eq!(wr_to_pr_per_hour(50.0), 75);
     }
 
     #[test]
-    fn test_wr_to_pr_per_day_exact_bracket_boundary() {
-        assert_eq!(wr_to_pr_per_day(10.0), 50);
-        assert_eq!(wr_to_pr_per_day(25.0), 200);
+    fn test_wr_to_pr_per_hour_max_rate() {
+        // PR = 131 * (1 + 131/100) = 131 * 2.31 = 302.61 → 303
+        assert_eq!(wr_to_pr_per_hour(131.0), 303);
+    }
+
+    #[test]
+    fn test_wr_to_pr_per_hour_starts_near_one_to_one() {
+        // At low rates, multiplier ≈ 1.0 so PR ≈ WR
+        assert_eq!(wr_to_pr_per_hour(1.0), 1); // 1 * 1.01 = 1.01 → 1
+        assert_eq!(wr_to_pr_per_hour(5.0), 5); // 5 * 1.05 = 5.25 → 5
     }
 
     #[test]

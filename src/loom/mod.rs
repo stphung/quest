@@ -18,8 +18,8 @@ pub use logic::{
     select_archetype, shuttle_build_cost, shuttle_construction_secs, shuttle_effective_intake_cap,
     tick_base_production, tick_neighbor_unlocking, tick_node_upgrades, tick_shuttle_construction,
     tick_shuttle_pull, tick_shuttle_stall_detection, tick_stall_detection, try_upgrade_node,
-    unlocked_tiers, upgrade_shuttle, wr_to_pr_per_day, ShuttleError, ShuttleUpgradeError,
-    MAX_NODE_LEVEL,
+    unlocked_tiers, upgrade_shuttle, wr_pr_multiplier, wr_to_pr_per_hour, ShuttleError,
+    ShuttleUpgradeError, MAX_NODE_LEVEL,
 };
 pub use milestones::PatternMilestone;
 #[allow(unused_imports)]

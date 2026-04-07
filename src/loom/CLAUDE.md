@@ -200,22 +200,24 @@ The Loom uses **wall-clock time** (`chrono::Utc::now()`) rather than tick-based 
 
 ## WR→PR Generation
 
-When all 28 Woven Patterns are complete, the Loom converts Weave Rate (WR) into Prestige Ranks (PR) per day using tiered brackets:
+When all 28 Woven Patterns are complete, the Loom converts Weave Rate (WR) into Prestige Ranks (PR) per hour using a self-multiplying formula:
 
-| WR/hr bracket | PR per WR/hr per day |
-|---------------|---------------------|
-| 0–10 | 5 |
-| 10–25 | 10 |
-| 25+ | 15 |
+`PR/hr = WR × (1 + WR/100)`
 
-- `wr_to_pr_per_day(wr_per_hour) -> u32` — calculates daily PR output from current weave rate
+Starts ~1:1 at low rates, scales superlinearly as WR increases:
+- 10 WR/hr → 11 PR/hr (×1.1)
+- 50 WR/hr → 75 PR/hr (×1.5) — typical at pattern 28 completion
+- 131 WR/hr → 303 PR/hr (×2.3) — max extractors at L20
+
+- `wr_to_pr_per_hour(wr_per_hour) -> u32` — calculates PR/hr from current weave rate
+- `wr_pr_multiplier(wr_per_hour) -> f64` — returns the multiplier (1 + WR/100) for UI display
 - Activation condition: `completed_pattern_count() >= 28`
 
 ## Key Functions (Power Integration)
 
 - `completed_pattern_count() -> usize` — count of fully completed Woven Patterns
 - `loom_zone_cap_for_patterns(completed_patterns) -> u32` — returns max zone ID unlocked by pattern count (Z31-50)
-- `wr_to_pr_per_day(wr_per_hour) -> u32` — tiered WR to PR/day conversion
+- `wr_to_pr_per_hour(wr_per_hour) -> u32` — self-multiplying WR to PR/hr conversion
 - `upgrade_shuttle(loom, idx)` — upgrade shuttle level, increasing effective intake cap
 - `shuttle_effective_intake_cap(tier, level) -> f64` — intake cap adjusted for shuttle level
 

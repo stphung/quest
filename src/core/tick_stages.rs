@@ -1172,9 +1172,9 @@ pub(super) fn tick_loom(
                 .get(&crate::loom::Resource::WovenReality)
                 .map(|t| t.rate_per_hour())
                 .unwrap_or(0.0);
-            let pr_per_day = crate::loom::wr_to_pr_per_day(wr_rate);
-            if pr_per_day > 0 {
-                let fill_secs = (86400i64 / pr_per_day as i64).max(1);
+            let pr_per_hour = crate::loom::wr_to_pr_per_hour(wr_rate);
+            if pr_per_hour > 0 {
+                let fill_secs = (3600i64 / pr_per_hour as i64).max(1);
                 let last = loom.persistent.wr_pr_last_granted_at;
                 // Cap elapsed to 7 days to prevent exploits from bogus timestamps
                 let elapsed = (now - last).min(604800);
