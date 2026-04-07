@@ -1,8 +1,8 @@
 //! Debug menu UI rendering.
 
-use crate::achievements::UiBorderStyle;
+use crate::achievements::{UiBorderStyle, SELECTABLE_UI_BORDER_STYLES};
 use crate::utils::debug_menu::{
-    option_count_for_category, option_label_for_index, DebugCategory, DebugMenu, DEBUG_CATEGORIES,
+    label_for_category_index, option_count_for_category, DebugCategory, DebugMenu, DEBUG_CATEGORIES,
 };
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -20,7 +20,8 @@ pub fn render_debug_menu(
     active_border_style: UiBorderStyle,
     _ctx: &super::responsive::LayoutContext,
 ) {
-    let visible_options = menu.visible_option_indices();
+    let category = menu.current_category();
+    let option_count = option_count_for_category(category);
     let max_options_in_any_tab = DEBUG_CATEGORIES
         .iter()
         .map(|category| option_count_for_category(*category))
@@ -179,7 +180,7 @@ pub fn render_debug_menu(
     }
 
     let (options_area, preview_area) = if is_border_category && list_area.height >= 10 {
-        let option_rows = (visible_options.len() as u16 + 1)
+        let option_rows = (option_count as u16 + 1)
             .min(list_area.height.saturating_sub(6))
             .max(3);
         let chunks = Layout::default()
@@ -197,16 +198,15 @@ pub fn render_debug_menu(
     } else {
         0
     };
-    let items: Vec<ListItem> = visible_options
-        .iter()
-        .enumerate()
+    let items: Vec<ListItem> = (0..option_count)
         .skip(start)
         .take(visible_rows)
-        .map(|(i, option_index)| {
+        .map(|i| {
             let prefix = if i == menu.selected_index { "> " } else { "  " };
-            let is_active_border_style =
-                crate::utils::debug_menu::border_style_for_option_index(*option_index)
-                    == Some(active_border_style);
+            let is_active_border_style = is_border_category
+                && SELECTABLE_UI_BORDER_STYLES
+                    .get(i)
+                    .is_some_and(|s| *s == active_border_style);
             let style = if i == menu.selected_index {
                 Style::default()
                     .fg(Color::Yellow)
@@ -224,7 +224,7 @@ pub fn render_debug_menu(
             ListItem::new(format!(
                 "{}{}{}",
                 prefix,
-                option_label_for_index(*option_index),
+                label_for_category_index(category, i),
                 active_tag
             ))
             .style(style)
@@ -235,7 +235,7 @@ pub fn render_debug_menu(
     frame.render_widget(list, options_area);
 
     // Scroll indicators: show ▲/▼ when items are clipped.
-    let total_items = visible_options.len();
+    let total_items = option_count;
     if total_items > visible_rows {
         if start > 0 {
             let arrow = Span::styled("\u{25b2}", Style::default().fg(Color::DarkGray));

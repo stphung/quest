@@ -71,155 +71,6 @@ enum DebugAction {
     TriggerVaultWardenChallenge,
 }
 
-const DEBUG_ACTIONS: &[DebugAction] = &[
-    DebugAction::TriggerDungeon,
-    DebugAction::TriggerFishing,
-    DebugAction::TriggerChessChallenge,
-    DebugAction::TriggerMorrisChallenge,
-    DebugAction::TriggerGomokuChallenge,
-    DebugAction::TriggerMinesweeperChallenge,
-    DebugAction::TriggerRuneChallenge,
-    DebugAction::TriggerGoChallenge,
-    DebugAction::TriggerFlappyChallenge,
-    DebugAction::TriggerJezzballChallenge,
-    DebugAction::TriggerSnakeChallenge,
-    DebugAction::TriggerRunicShiftChallenge,
-    DebugAction::TriggerShardFusionChallenge,
-    DebugAction::TriggerHavenDiscovery,
-    DebugAction::TriggerSoulforgeDiscovery,
-    DebugAction::TriggerForgeStormbreaker,
-    DebugAction::TriggerForgeAsprika,
-    DebugAction::TriggerForgeSleipnir,
-    DebugAction::TriggerForgeMegingjord,
-    DebugAction::TriggerGrantStormglass,
-    DebugAction::TriggerDiscoverStormglass,
-    DebugAction::TriggerGrant100kStormglass,
-    DebugAction::TriggerEtchRandomSigils,
-    DebugAction::TriggerEtchSPlusSigil,
-    DebugAction::TriggerForceOvercharge,
-    DebugAction::TriggerDeepDiscovery,
-    DebugAction::TriggerDeepGrantMarks,
-    DebugAction::TriggerDeepRefreshMissionPool,
-    DebugAction::TriggerDeepRefreshRecruits,
-    DebugAction::TriggerDeepClearFrontierLayer,
-    DebugAction::TriggerDeepCompleteActiveMissions,
-    DebugAction::UnlockDeepLayer(3),
-    DebugAction::UnlockDeepLayer(7),
-    DebugAction::UnlockDeepLayer(12),
-    DebugAction::UnlockDeepLayer(18),
-    DebugAction::UnlockDeepLayer(25),
-    DebugAction::UnlockDeepLayer(30),
-    // Zone travel actions
-    DebugAction::TravelToZone(1),
-    DebugAction::TravelToZone(2),
-    DebugAction::TravelToZone(3),
-    DebugAction::TravelToZone(4),
-    DebugAction::TravelToZone(5),
-    DebugAction::TravelToZone(6),
-    DebugAction::TravelToZone(7),
-    DebugAction::TravelToZone(8),
-    DebugAction::TravelToZone(9),
-    DebugAction::TravelToZone(10),
-    DebugAction::TravelToZone(11),
-    DebugAction::TravelToZone(12),
-    DebugAction::TravelToZone(13),
-    DebugAction::TravelToZone(14),
-    DebugAction::TravelToZone(15),
-    DebugAction::TravelToZone(16),
-    DebugAction::TravelToZone(17),
-    DebugAction::TravelToZone(18),
-    DebugAction::TravelToZone(19),
-    DebugAction::TravelToZone(20),
-    DebugAction::TravelToZone(21),
-    DebugAction::TravelToZone(22),
-    DebugAction::TravelToZone(23),
-    DebugAction::TravelToZone(24),
-    DebugAction::TravelToZone(25),
-    DebugAction::TravelToZone(26),
-    DebugAction::TravelToZone(27),
-    DebugAction::TravelToZone(28),
-    DebugAction::TravelToZone(29),
-    DebugAction::TravelToZone(30),
-    // Character actions (prestige, levels)
-    DebugAction::SetPrestige(1),
-    DebugAction::SetPrestige(5),
-    DebugAction::SetPrestige(25),
-    DebugAction::SetPrestige(50),
-    DebugAction::SetPrestige(100),
-    DebugAction::SetPrestige(250),
-    DebugAction::SetPrestige(500),
-    DebugAction::SetPrestige(1000),
-    DebugAction::SetPrestige(2500),
-    DebugAction::SetPrestige(5000),
-    DebugAction::SetLevel(1),
-    DebugAction::SetLevel(5),
-    DebugAction::SetLevel(25),
-    DebugAction::SetLevel(50),
-    DebugAction::SetLevel(100),
-    DebugAction::SetLevel(250),
-    DebugAction::SetLevel(500),
-    DebugAction::SetLevel(1000),
-    DebugAction::SetLevel(2500),
-    DebugAction::SetLevel(5000),
-    DebugAction::MaxAttributes,
-    // Soulforge enhancement actions
-    DebugAction::SetEnhancement(0),
-    DebugAction::SetEnhancement(1),
-    DebugAction::SetEnhancement(2),
-    DebugAction::SetEnhancement(3),
-    DebugAction::SetEnhancement(4),
-    DebugAction::SetEnhancement(5),
-    DebugAction::SetEnhancement(6),
-    DebugAction::SetEnhancement(7),
-    DebugAction::SetEnhancement(8),
-    DebugAction::SetEnhancement(9),
-    DebugAction::SetEnhancement(10),
-    // Loom of Worlds debug actions (indices 98–111)
-    DebugAction::TriggerLoomDiscovery,
-    DebugAction::LoomSelectArchetype(LoomArchetype::BurnBright),
-    DebugAction::LoomSelectArchetype(LoomArchetype::ReachWide),
-    DebugAction::LoomSelectArchetype(LoomArchetype::RunDeep),
-    DebugAction::LoomUnlockAllNodes,
-    DebugAction::LoomGrantResources,
-    DebugAction::LoomCompletePattern,
-    DebugAction::LoomAdvanceToPattern(0),
-    DebugAction::LoomAdvanceToPattern(1),
-    DebugAction::LoomAdvanceToPattern(2),
-    DebugAction::LoomAdvanceToPattern(3),
-    DebugAction::LoomAdvanceToPattern(4),
-    DebugAction::LoomAdvanceToPattern(5),
-    DebugAction::LoomAdvanceToPattern(6),
-    DebugAction::LoomAdvanceToPattern(7),
-    DebugAction::LoomAdvanceToPattern(8),
-    DebugAction::LoomAdvanceToPattern(9),
-    DebugAction::LoomAdvanceToPattern(10),
-    DebugAction::LoomAdvanceToPattern(11),
-    DebugAction::LoomAdvanceToPattern(12),
-    DebugAction::LoomAdvanceToPattern(13),
-    DebugAction::LoomAdvanceToPattern(14),
-    DebugAction::LoomAdvanceToPattern(15),
-    DebugAction::LoomAdvanceToPattern(16),
-    DebugAction::LoomAdvanceToPattern(17),
-    DebugAction::LoomAdvanceToPattern(18),
-    DebugAction::LoomAdvanceToPattern(19),
-    DebugAction::LoomAdvanceToPattern(20),
-    DebugAction::LoomAdvanceToPattern(21),
-    DebugAction::LoomAdvanceToPattern(22),
-    DebugAction::LoomAdvanceToPattern(23),
-    DebugAction::LoomAdvanceToPattern(24),
-    DebugAction::LoomAdvanceToPattern(25),
-    DebugAction::LoomAdvanceToPattern(26),
-    DebugAction::LoomAdvanceToPattern(27),
-    DebugAction::LoomAdvanceToPattern(28),
-    DebugAction::LoomBuildTestShuttleT1,
-    DebugAction::LoomBuildTestShuttleT2,
-    DebugAction::LoomClearShuttles,
-    DebugAction::LoomTimeWarp,
-    DebugAction::TriggerSudokuChallenge,
-    DebugAction::TriggerRunicLightsChallenge,
-    DebugAction::TriggerVaultWardenChallenge,
-];
-
 const CHALLENGE_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerChessChallenge,
     DebugAction::TriggerMorrisChallenge,
@@ -380,89 +231,8 @@ const LOOM_ACTIONS: &[DebugAction] = &[
     DebugAction::LoomBuildTestShuttleT2,
     DebugAction::LoomClearShuttles,
 ];
-const BORDER_OPTION_START_INDEX: usize = DEBUG_ACTIONS.len();
-
-const SET_VALUES: &[u32] = &[1, 5, 25, 50, 100, 250, 500, 1000, 2500, 5000];
-
-const fn set_value_index(value: u32) -> usize {
-    let mut i = 0;
-    while i < SET_VALUES.len() {
-        if SET_VALUES[i] == value {
-            return i;
-        }
-        i += 1;
-    }
-    0 // fallback
-}
 
 impl DebugAction {
-    const fn option_index(self) -> usize {
-        match self {
-            Self::TriggerDungeon => 0,
-            Self::TriggerFishing => 1,
-            Self::TriggerChessChallenge => 2,
-            Self::TriggerMorrisChallenge => 3,
-            Self::TriggerGomokuChallenge => 4,
-            Self::TriggerMinesweeperChallenge => 5,
-            Self::TriggerRuneChallenge => 6,
-            Self::TriggerGoChallenge => 7,
-            Self::TriggerFlappyChallenge => 8,
-            Self::TriggerJezzballChallenge => 9,
-            Self::TriggerSnakeChallenge => 10,
-            Self::TriggerRunicShiftChallenge => 11,
-            Self::TriggerShardFusionChallenge => 12,
-            Self::TriggerHavenDiscovery => 13,
-            Self::TriggerSoulforgeDiscovery => 14,
-            Self::TriggerForgeStormbreaker => 15,
-            Self::TriggerForgeAsprika => 16,
-            Self::TriggerForgeSleipnir => 17,
-            Self::TriggerForgeMegingjord => 18,
-            Self::TriggerGrantStormglass => 19,
-            Self::TriggerDiscoverStormglass => 20,
-            Self::TriggerGrant100kStormglass => 21,
-            Self::TriggerEtchRandomSigils => 22,
-            Self::TriggerEtchSPlusSigil => 23,
-            Self::TriggerForceOvercharge => 24,
-            Self::TriggerDeepDiscovery => 25,
-            Self::TriggerDeepGrantMarks => 26,
-            Self::TriggerDeepRefreshMissionPool => 27,
-            Self::TriggerDeepRefreshRecruits => 28,
-            Self::TriggerDeepClearFrontierLayer => 29,
-            Self::TriggerDeepCompleteActiveMissions => 30,
-            Self::UnlockDeepLayer(layer) => match layer {
-                3 => 31,
-                7 => 32,
-                12 => 33,
-                18 => 34,
-                25 => 35,
-                _ => 36, // 30
-            },
-            Self::TravelToZone(zone_id) => 37 + zone_id as usize - 1, // 37-66
-            Self::SetPrestige(amount) => 67 + set_value_index(amount),
-            Self::SetLevel(amount) => 77 + set_value_index(amount),
-            Self::MaxAttributes => 87,
-            Self::SetEnhancement(level) => 88 + level as usize,
-            // Loom actions: 99–109
-            Self::TriggerLoomDiscovery => 99,
-            Self::LoomSelectArchetype(a) => match a {
-                LoomArchetype::BurnBright => 100,
-                LoomArchetype::ReachWide => 101,
-                LoomArchetype::RunDeep => 102,
-            },
-            Self::LoomUnlockAllNodes => 103,
-            Self::LoomGrantResources => 104,
-            Self::LoomCompletePattern => 105,
-            Self::LoomAdvanceToPattern(n) => 106 + n,
-            Self::LoomBuildTestShuttleT1 => 136,
-            Self::LoomBuildTestShuttleT2 => 137,
-            Self::LoomClearShuttles => 138,
-            Self::LoomTimeWarp => 139,
-            Self::TriggerSudokuChallenge => 140,
-            Self::TriggerRunicLightsChallenge => 141,
-            Self::TriggerVaultWardenChallenge => 142,
-        }
-    }
-
     const fn label(self) -> &'static str {
         match self {
             Self::TriggerDungeon => "Trigger Dungeon",
@@ -841,29 +611,39 @@ impl DebugAction {
     }
 }
 
-fn action_for_option_index(option_index: usize) -> Option<DebugAction> {
-    DEBUG_ACTIONS.get(option_index).copied()
-}
-
-fn is_border_preview_option(option_index: usize) -> bool {
-    border_style_for_option_index(option_index).is_some()
-}
-
-pub fn border_style_for_option_index(option_index: usize) -> Option<UiBorderStyle> {
-    if option_index < BORDER_OPTION_START_INDEX {
-        return None;
+/// Returns the per-category action slice directly. For Borders, returns an
+/// empty slice — border handling uses `SELECTABLE_UI_BORDER_STYLES` directly.
+fn actions_for_category(category: DebugCategory) -> &'static [DebugAction] {
+    match category {
+        DebugCategory::Challenges => CHALLENGE_ACTIONS,
+        DebugCategory::World => WORLD_ACTIONS,
+        DebugCategory::Resources => RESOURCE_ACTIONS,
+        DebugCategory::Items => ITEM_ACTIONS,
+        DebugCategory::Deep => DEEP_ACTIONS,
+        DebugCategory::Zones => ZONE_ACTIONS,
+        DebugCategory::Character => CHARACTER_ACTIONS,
+        DebugCategory::Soulforge => SOULFORGE_ACTIONS,
+        DebugCategory::Loom => LOOM_ACTIONS,
+        DebugCategory::Borders => &[],
     }
-    let idx = option_index - BORDER_OPTION_START_INDEX;
-    SELECTABLE_UI_BORDER_STYLES.get(idx).copied()
 }
 
-pub fn option_label_for_index(option_index: usize) -> &'static str {
-    if let Some(action) = action_for_option_index(option_index) {
-        action.label()
-    } else if let Some(style) = border_style_for_option_index(option_index) {
-        style.debug_option_label()
+#[cfg(test)]
+fn action_for_category_index(category: DebugCategory, index: usize) -> Option<DebugAction> {
+    actions_for_category(category).get(index).copied()
+}
+
+pub fn label_for_category_index(category: DebugCategory, index: usize) -> &'static str {
+    if category == DebugCategory::Borders {
+        SELECTABLE_UI_BORDER_STYLES
+            .get(index)
+            .map(|s| s.debug_option_label())
+            .unwrap_or("Unknown border")
     } else {
-        "Unknown option"
+        actions_for_category(category)
+            .get(index)
+            .map(|a| a.label())
+            .unwrap_or("Unknown option")
     }
 }
 
@@ -961,15 +741,14 @@ impl DebugMenu {
         DEBUG_CATEGORIES[self.selected_category]
     }
 
-    pub fn visible_option_indices(&self) -> Vec<usize> {
-        let count = option_count_for_category(self.current_category());
-        (0..count)
-            .map(|i| self.global_option_index_for_visible(i))
-            .collect()
-    }
-
     pub fn selected_border_style(&self) -> Option<UiBorderStyle> {
-        border_style_for_option_index(self.selected_option_global_index())
+        if self.current_category() == DebugCategory::Borders {
+            SELECTABLE_UI_BORDER_STYLES
+                .get(self.selected_index)
+                .copied()
+        } else {
+            None
+        }
     }
 
     pub fn navigate_prev_category(&mut self) {
@@ -998,25 +777,6 @@ impl DebugMenu {
         }
     }
 
-    fn global_option_index_for_visible(&self, visible_index: usize) -> usize {
-        match self.current_category() {
-            DebugCategory::Challenges => CHALLENGE_ACTIONS[visible_index].option_index(),
-            DebugCategory::World => WORLD_ACTIONS[visible_index].option_index(),
-            DebugCategory::Resources => RESOURCE_ACTIONS[visible_index].option_index(),
-            DebugCategory::Items => ITEM_ACTIONS[visible_index].option_index(),
-            DebugCategory::Deep => DEEP_ACTIONS[visible_index].option_index(),
-            DebugCategory::Zones => ZONE_ACTIONS[visible_index].option_index(),
-            DebugCategory::Character => CHARACTER_ACTIONS[visible_index].option_index(),
-            DebugCategory::Soulforge => SOULFORGE_ACTIONS[visible_index].option_index(),
-            DebugCategory::Loom => LOOM_ACTIONS[visible_index].option_index(),
-            DebugCategory::Borders => BORDER_OPTION_START_INDEX + visible_index,
-        }
-    }
-
-    fn selected_option_global_index(&self) -> usize {
-        self.global_option_index_for_visible(self.selected_index)
-    }
-
     /// Trigger the selected debug action. Returns a message describing what happened.
     #[allow(clippy::too_many_arguments)]
     pub fn trigger_selected(
@@ -1029,16 +789,20 @@ impl DebugMenu {
         loom: &mut LoomState,
         loom_ui: &mut LoomUiState,
     ) -> &'static str {
-        let selected_option = self.selected_option_global_index();
-        if is_border_preview_option(selected_option) {
-            if let Some(style) = border_style_for_option_index(selected_option) {
-                achievements.ui_border_style = style;
+        let category = self.current_category();
+
+        // Borders category: set the border style directly
+        if category == DebugCategory::Borders {
+            if let Some(style) = SELECTABLE_UI_BORDER_STYLES.get(self.selected_index) {
+                achievements.ui_border_style = *style;
                 return style.border_set_message();
             }
             return "Border preview updated.";
         }
 
-        let msg = action_for_option_index(selected_option)
+        let actions = actions_for_category(category);
+        let msg = actions
+            .get(self.selected_index)
             .map(|action| action.run(state, haven, enhancement, deep, achievements, loom, loom_ui))
             .unwrap_or("Unknown option");
 
@@ -1751,17 +1515,22 @@ mod tests {
         menu.open();
         assert_eq!(menu.current_category(), DebugCategory::Challenges);
         assert_eq!(menu.selected_index, 0);
-        assert_eq!(menu.selected_option_global_index(), 2);
+        assert_eq!(
+            action_for_category_index(DebugCategory::Challenges, 0),
+            Some(DebugAction::TriggerChessChallenge)
+        );
 
         menu.navigate_down();
         assert_eq!(menu.selected_index, 1);
-        assert_eq!(menu.selected_option_global_index(), 3);
+        assert_eq!(
+            action_for_category_index(DebugCategory::Challenges, 1),
+            Some(DebugAction::TriggerMorrisChallenge)
+        );
 
         for _ in 0..32 {
             menu.navigate_down();
         }
         assert_eq!(menu.selected_index, CHALLENGE_ACTIONS.len() - 1);
-        assert_eq!(menu.selected_option_global_index(), 116);
 
         // Can't go past end
         menu.navigate_down();
@@ -1787,12 +1556,18 @@ mod tests {
         menu.navigate_next_category();
         assert_eq!(menu.current_category(), DebugCategory::World);
         assert_eq!(menu.selected_index, 0);
-        assert_eq!(menu.selected_option_global_index(), 0);
+        assert_eq!(
+            action_for_category_index(DebugCategory::World, 0),
+            Some(DebugAction::TriggerDungeon)
+        );
 
         menu.navigate_prev_category();
         assert_eq!(menu.current_category(), DebugCategory::Challenges);
         assert_eq!(menu.selected_index, 0);
-        assert_eq!(menu.selected_option_global_index(), 2);
+        assert_eq!(
+            action_for_category_index(DebugCategory::Challenges, 0),
+            Some(DebugAction::TriggerChessChallenge)
+        );
 
         menu.navigate_prev_category();
         assert_eq!(menu.current_category(), DebugCategory::Borders);
@@ -1850,16 +1625,15 @@ mod tests {
             option_count_for_category(DebugCategory::Borders),
             SELECTABLE_UI_BORDER_STYLES.len()
         );
-        for idx in BORDER_OPTION_START_INDEX
-            ..(BORDER_OPTION_START_INDEX + SELECTABLE_UI_BORDER_STYLES.len())
-        {
-            assert!(border_style_for_option_index(idx).is_some());
+        for (idx, style) in SELECTABLE_UI_BORDER_STYLES.iter().enumerate() {
+            assert_eq!(
+                label_for_category_index(DebugCategory::Borders, idx),
+                style.debug_option_label()
+            );
         }
         assert_eq!(
-            border_style_for_option_index(
-                BORDER_OPTION_START_INDEX + SELECTABLE_UI_BORDER_STYLES.len() - 1
-            ),
-            Some(UiBorderStyle::HeaderRail),
+            *SELECTABLE_UI_BORDER_STYLES.last().unwrap(),
+            UiBorderStyle::HeaderRail,
         );
     }
 
@@ -2371,21 +2145,10 @@ mod tests {
 
     fn select_action(menu: &mut DebugMenu, action: DebugAction) {
         // Navigate to the correct category and position for the given action
-        let global_idx = action.option_index();
-        // Find which category slice contains this action
-        let categories = [
-            (DebugCategory::Challenges, CHALLENGE_ACTIONS),
-            (DebugCategory::World, WORLD_ACTIONS),
-            (DebugCategory::Resources, RESOURCE_ACTIONS),
-            (DebugCategory::Items, ITEM_ACTIONS),
-            (DebugCategory::Deep, DEEP_ACTIONS),
-            (DebugCategory::Zones, ZONE_ACTIONS),
-            (DebugCategory::Character, CHARACTER_ACTIONS),
-        ];
-        for (cat, slice) in categories.iter() {
+        for cat in DEBUG_CATEGORIES {
+            let slice = actions_for_category(*cat);
             for (idx, a) in slice.iter().enumerate() {
-                if a.option_index() == global_idx {
-                    // Navigate to this category
+                if *a == action {
                     menu.open();
                     while menu.current_category() != *cat {
                         menu.navigate_next_category();
