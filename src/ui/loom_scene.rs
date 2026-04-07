@@ -345,84 +345,95 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                     let sources_b =
                         crate::loom::eligible_sources_for_tier(loom, build.tier, r.input_b);
 
-                    // Recipe summary: output first, then inputs.
+                    // Output name.
                     right_lines.push(Line::from(Span::styled(
                         format!(
                             " {} {}",
                             resource_emoji(&r.output),
-                            resource_name(&r.output),
+                            resource_name(&r.output)
                         ),
-                        Style::default().fg(Color::Rgb(180, 140, 220)),
+                        Style::default()
+                            .fg(Color::Rgb(180, 140, 220))
+                            .add_modifier(Modifier::BOLD),
                     )));
+
+                    // Tier, cost, build time on one line.
+                    let cost = crate::loom::shuttle_build_cost(r.tier);
+                    let build_secs = crate::loom::shuttle_construction_secs(r.tier);
+                    let build_hours = build_secs / 3600.0;
                     right_lines.push(Line::from(Span::styled(
                         format!(
-                            " \u{2190} {} {} + {} {}",
+                            " Tier {}  \u{00b7}  {:.0} {} cost  \u{00b7}  {:.0}h build",
+                            r.tier,
+                            cost,
                             resource_emoji(&r.input_a),
-                            resource_name(&r.input_a),
-                            resource_emoji(&r.input_b),
-                            resource_name(&r.input_b),
+                            build_hours,
                         ),
-                        Style::default().fg(Color::Rgb(140, 110, 170)),
+                        Style::default().fg(Color::Rgb(120, 100, 150)),
                     )));
 
-                    // Tier.
-                    right_lines.push(Line::from(Span::styled(
-                        format!(" Tier {}", r.tier),
-                        Style::default().fg(Color::Rgb(140, 110, 170)),
-                    )));
-
-                    // Output yield.
-                    right_lines.push(Line::from(Span::styled(
-                        format!(" Yield: {:.1}x", r.amount),
-                        Style::default().fg(Color::Rgb(140, 110, 170)),
-                    )));
-
-                    // Source availability.
+                    // Inputs section.
                     right_lines.push(Line::from(""));
+                    right_lines.push(Line::from(Span::styled(
+                        " Inputs:",
+                        Style::default().fg(Color::Rgb(100, 90, 130)),
+                    )));
 
                     let count_a = sources_a.len();
-                    let (a_suffix, a_color) = if count_a > 0 {
+                    let (a_status, a_color) = if count_a > 0 {
                         (
-                            format!("{} available \u{2713}", count_a),
+                            format!(
+                                "{} source{} \u{2713}",
+                                count_a,
+                                if count_a == 1 { "" } else { "s" }
+                            ),
                             Color::Rgb(100, 200, 120),
                         )
                     } else {
                         ("none \u{2717}".to_string(), Color::Rgb(200, 80, 80))
                     };
-                    right_lines.push(Line::from(Span::styled(
-                        format!(
-                            " Source A ({} {}): {}",
-                            resource_emoji(&r.input_a),
-                            resource_name(&r.input_a),
-                            a_suffix,
+                    right_lines.push(Line::from(vec![
+                        Span::styled(
+                            format!(
+                                "   {} {}",
+                                resource_emoji(&r.input_a),
+                                resource_name(&r.input_a)
+                            ),
+                            Style::default().fg(Color::Rgb(140, 110, 170)),
                         ),
-                        Style::default().fg(a_color),
-                    )));
+                        Span::styled(format!("  {}", a_status), Style::default().fg(a_color)),
+                    ]));
 
                     let count_b = sources_b.len();
-                    let (b_suffix, b_color) = if count_b > 0 {
+                    let (b_status, b_color) = if count_b > 0 {
                         (
-                            format!("{} available \u{2713}", count_b),
+                            format!(
+                                "{} source{} \u{2713}",
+                                count_b,
+                                if count_b == 1 { "" } else { "s" }
+                            ),
                             Color::Rgb(100, 200, 120),
                         )
                     } else {
                         ("none \u{2717}".to_string(), Color::Rgb(200, 80, 80))
                     };
-                    right_lines.push(Line::from(Span::styled(
-                        format!(
-                            " Source B ({} {}): {}",
-                            resource_emoji(&r.input_b),
-                            resource_name(&r.input_b),
-                            b_suffix,
+                    right_lines.push(Line::from(vec![
+                        Span::styled(
+                            format!(
+                                "   {} {}",
+                                resource_emoji(&r.input_b),
+                                resource_name(&r.input_b)
+                            ),
+                            Style::default().fg(Color::Rgb(140, 110, 170)),
                         ),
-                        Style::default().fg(b_color),
-                    )));
+                        Span::styled(format!("  {}", b_status), Style::default().fg(b_color)),
+                    ]));
 
-                    // Capacity warning if at max.
+                    // Slot count.
                     let current_shuttles = loom.persistent.shuttles.len();
                     let max_shuttles = loom.persistent.max_shuttles();
+                    right_lines.push(Line::from(""));
                     if current_shuttles >= max_shuttles {
-                        right_lines.push(Line::from(""));
                         right_lines.push(Line::from(Span::styled(
                             format!(
                                 " \u{26a0} At capacity ({}/{})",
@@ -433,6 +444,11 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                         right_lines.push(Line::from(Span::styled(
                             " Demolish a shuttle first",
                             Style::default().fg(Color::Rgb(160, 120, 60)),
+                        )));
+                    } else {
+                        right_lines.push(Line::from(Span::styled(
+                            format!(" Slots: {}/{}", current_shuttles, max_shuttles),
+                            Style::default().fg(Color::Rgb(100, 90, 130)),
                         )));
                     }
                 }
@@ -565,7 +581,19 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
             crate::loom::BuildStep::Confirm => {
                 let r = &recipes[build.recipe_index];
                 let cost = crate::loom::shuttle_build_cost(build.tier);
-                vec![
+                let build_secs = crate::loom::shuttle_construction_secs(build.tier);
+                let build_hours = build_secs / 3600.0;
+                let mut lines = vec![
+                    Line::from(Span::styled(
+                        format!(
+                            " Build {} {}",
+                            resource_emoji(&r.output),
+                            resource_name(&r.output),
+                        ),
+                        Style::default()
+                            .fg(Color::Rgb(180, 140, 220))
+                            .add_modifier(Modifier::BOLD),
+                    )),
                     Line::from(Span::styled(
                         format!(
                             " {} {} + {} {} \u{2192} {} {}",
@@ -576,18 +604,48 @@ fn render_bottom_panel(frame: &mut Frame, area: Rect, loom: &LoomState, ui: &Loo
                             resource_emoji(&r.output),
                             resource_name(&r.output),
                         ),
-                        Style::default().fg(Color::Rgb(180, 140, 220)),
+                        Style::default().fg(Color::Rgb(120, 100, 150)),
                     )),
-                    Line::from(Span::styled(
-                        format!(
-                            " Step 4/4: Confirm  cost: {:.0} {} {}",
-                            cost,
-                            resource_emoji(&r.input_a),
-                            resource_name(&r.input_a),
-                        ),
+                    Line::from(""),
+                ];
+                // Source summary.
+                let fmt_sources = |sources: &[crate::loom::LoomNodeRef]| -> String {
+                    sources
+                        .iter()
+                        .map(|s| source_name(s, loom))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                };
+                lines.push(Line::from(Span::styled(
+                    format!(" Source A: {}", fmt_sources(&build.selected_sources_a)),
+                    Style::default().fg(Color::Rgb(140, 110, 170)),
+                )));
+                lines.push(Line::from(Span::styled(
+                    format!(" Source B: {}", fmt_sources(&build.selected_sources_b)),
+                    Style::default().fg(Color::Rgb(140, 110, 170)),
+                )));
+                lines.push(Line::from(Span::styled(
+                    format!(
+                        " Cost: {:.0} {} {}  \u{00b7}  Build time: {:.0}h",
+                        cost,
+                        resource_emoji(&r.input_a),
+                        resource_name(&r.input_a),
+                        build_hours,
+                    ),
+                    Style::default().fg(Color::Rgb(120, 100, 150)),
+                )));
+                lines.push(Line::from(""));
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        " [Enter] Build",
                         Style::default().fg(Color::Rgb(100, 200, 120)),
-                    )),
-                ]
+                    ),
+                    Span::styled(
+                        "  [Esc] Cancel",
+                        Style::default().fg(Color::Rgb(120, 100, 150)),
+                    ),
+                ]));
+                lines
             }
             crate::loom::BuildStep::Blocked { message } => {
                 vec![
