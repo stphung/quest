@@ -229,7 +229,9 @@ pub fn build_graph(loom: &LoomState) -> LoomGraph {
         let pattern = &loom.persistent.patterns[pat_idx];
 
         for req in &pattern.requirements {
-            if req.completed {
+            // Skip completed requirements — except for eternal patterns, which
+            // always show their resource flow (the edge IS the visualization).
+            if req.completed && !pattern.eternal {
                 continue;
             }
             // Find shuttles that produce this resource

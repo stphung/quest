@@ -183,9 +183,34 @@ const DEBUG_ACTIONS: &[DebugAction] = &[
     DebugAction::LoomGrantResources,
     DebugAction::LoomCompletePattern,
     DebugAction::LoomAdvanceToPattern(0),
+    DebugAction::LoomAdvanceToPattern(1),
+    DebugAction::LoomAdvanceToPattern(2),
+    DebugAction::LoomAdvanceToPattern(3),
+    DebugAction::LoomAdvanceToPattern(4),
     DebugAction::LoomAdvanceToPattern(5),
+    DebugAction::LoomAdvanceToPattern(6),
+    DebugAction::LoomAdvanceToPattern(7),
+    DebugAction::LoomAdvanceToPattern(8),
+    DebugAction::LoomAdvanceToPattern(9),
     DebugAction::LoomAdvanceToPattern(10),
+    DebugAction::LoomAdvanceToPattern(11),
+    DebugAction::LoomAdvanceToPattern(12),
+    DebugAction::LoomAdvanceToPattern(13),
+    DebugAction::LoomAdvanceToPattern(14),
+    DebugAction::LoomAdvanceToPattern(15),
+    DebugAction::LoomAdvanceToPattern(16),
     DebugAction::LoomAdvanceToPattern(17),
+    DebugAction::LoomAdvanceToPattern(18),
+    DebugAction::LoomAdvanceToPattern(19),
+    DebugAction::LoomAdvanceToPattern(20),
+    DebugAction::LoomAdvanceToPattern(21),
+    DebugAction::LoomAdvanceToPattern(22),
+    DebugAction::LoomAdvanceToPattern(23),
+    DebugAction::LoomAdvanceToPattern(24),
+    DebugAction::LoomAdvanceToPattern(25),
+    DebugAction::LoomAdvanceToPattern(26),
+    DebugAction::LoomAdvanceToPattern(27),
+    DebugAction::LoomAdvanceToPattern(28),
     DebugAction::LoomBuildTestShuttleT1,
     DebugAction::LoomBuildTestShuttleT2,
     DebugAction::LoomClearShuttles,
@@ -315,8 +340,45 @@ const SOULFORGE_ACTIONS: &[DebugAction] = &[
 ];
 const LOOM_ACTIONS: &[DebugAction] = &[
     DebugAction::TriggerLoomDiscovery,
-    DebugAction::LoomCompletePattern,
     DebugAction::LoomTimeWarp,
+    DebugAction::LoomSelectArchetype(LoomArchetype::BurnBright),
+    DebugAction::LoomSelectArchetype(LoomArchetype::ReachWide),
+    DebugAction::LoomSelectArchetype(LoomArchetype::RunDeep),
+    DebugAction::LoomUnlockAllNodes,
+    DebugAction::LoomGrantResources,
+    DebugAction::LoomCompletePattern,
+    DebugAction::LoomAdvanceToPattern(0),
+    DebugAction::LoomAdvanceToPattern(1),
+    DebugAction::LoomAdvanceToPattern(2),
+    DebugAction::LoomAdvanceToPattern(3),
+    DebugAction::LoomAdvanceToPattern(4),
+    DebugAction::LoomAdvanceToPattern(5),
+    DebugAction::LoomAdvanceToPattern(6),
+    DebugAction::LoomAdvanceToPattern(7),
+    DebugAction::LoomAdvanceToPattern(8),
+    DebugAction::LoomAdvanceToPattern(9),
+    DebugAction::LoomAdvanceToPattern(10),
+    DebugAction::LoomAdvanceToPattern(11),
+    DebugAction::LoomAdvanceToPattern(12),
+    DebugAction::LoomAdvanceToPattern(13),
+    DebugAction::LoomAdvanceToPattern(14),
+    DebugAction::LoomAdvanceToPattern(15),
+    DebugAction::LoomAdvanceToPattern(16),
+    DebugAction::LoomAdvanceToPattern(17),
+    DebugAction::LoomAdvanceToPattern(18),
+    DebugAction::LoomAdvanceToPattern(19),
+    DebugAction::LoomAdvanceToPattern(20),
+    DebugAction::LoomAdvanceToPattern(21),
+    DebugAction::LoomAdvanceToPattern(22),
+    DebugAction::LoomAdvanceToPattern(23),
+    DebugAction::LoomAdvanceToPattern(24),
+    DebugAction::LoomAdvanceToPattern(25),
+    DebugAction::LoomAdvanceToPattern(26),
+    DebugAction::LoomAdvanceToPattern(27),
+    DebugAction::LoomAdvanceToPattern(28),
+    DebugAction::LoomBuildTestShuttleT1,
+    DebugAction::LoomBuildTestShuttleT2,
+    DebugAction::LoomClearShuttles,
 ];
 const BORDER_OPTION_START_INDEX: usize = DEBUG_ACTIONS.len();
 
@@ -390,19 +452,14 @@ impl DebugAction {
             Self::LoomUnlockAllNodes => 103,
             Self::LoomGrantResources => 104,
             Self::LoomCompletePattern => 105,
-            Self::LoomAdvanceToPattern(n) => match n {
-                0 => 106,
-                5 => 107,
-                10 => 108,
-                _ => 109, // 17
-            },
-            Self::LoomBuildTestShuttleT1 => 110,
-            Self::LoomBuildTestShuttleT2 => 111,
-            Self::LoomClearShuttles => 112,
-            Self::LoomTimeWarp => 113,
-            Self::TriggerSudokuChallenge => 114,
-            Self::TriggerRunicLightsChallenge => 115,
-            Self::TriggerVaultWardenChallenge => 116,
+            Self::LoomAdvanceToPattern(n) => 106 + n,
+            Self::LoomBuildTestShuttleT1 => 136,
+            Self::LoomBuildTestShuttleT2 => 137,
+            Self::LoomClearShuttles => 138,
+            Self::LoomTimeWarp => 139,
+            Self::TriggerSudokuChallenge => 140,
+            Self::TriggerRunicLightsChallenge => 141,
+            Self::TriggerVaultWardenChallenge => 142,
         }
     }
 
@@ -528,9 +585,34 @@ impl DebugAction {
             Self::LoomGrantResources => "Loom: Grant 100 to All Buffers",
             Self::LoomCompletePattern => "Loom: Complete Current Pattern",
             Self::LoomAdvanceToPattern(0) => "Loom: Reset to Pattern 1",
+            Self::LoomAdvanceToPattern(1) => "Loom: Jump to Pattern 2",
+            Self::LoomAdvanceToPattern(2) => "Loom: Jump to Pattern 3",
+            Self::LoomAdvanceToPattern(3) => "Loom: Jump to Pattern 4",
+            Self::LoomAdvanceToPattern(4) => "Loom: Jump to Pattern 5",
             Self::LoomAdvanceToPattern(5) => "Loom: Jump to Pattern 6",
+            Self::LoomAdvanceToPattern(6) => "Loom: Jump to Pattern 7",
+            Self::LoomAdvanceToPattern(7) => "Loom: Jump to Pattern 8",
+            Self::LoomAdvanceToPattern(8) => "Loom: Jump to Pattern 9",
+            Self::LoomAdvanceToPattern(9) => "Loom: Jump to Pattern 10",
             Self::LoomAdvanceToPattern(10) => "Loom: Jump to Pattern 11",
-            Self::LoomAdvanceToPattern(_) => "Loom: Jump to Final Pattern",
+            Self::LoomAdvanceToPattern(11) => "Loom: Jump to Pattern 12",
+            Self::LoomAdvanceToPattern(12) => "Loom: Jump to Pattern 13",
+            Self::LoomAdvanceToPattern(13) => "Loom: Jump to Pattern 14",
+            Self::LoomAdvanceToPattern(14) => "Loom: Jump to Pattern 15",
+            Self::LoomAdvanceToPattern(15) => "Loom: Jump to Pattern 16",
+            Self::LoomAdvanceToPattern(16) => "Loom: Jump to Pattern 17",
+            Self::LoomAdvanceToPattern(17) => "Loom: Jump to Pattern 18",
+            Self::LoomAdvanceToPattern(18) => "Loom: Jump to Pattern 19",
+            Self::LoomAdvanceToPattern(19) => "Loom: Jump to Pattern 20",
+            Self::LoomAdvanceToPattern(20) => "Loom: Jump to Pattern 21",
+            Self::LoomAdvanceToPattern(21) => "Loom: Jump to Pattern 22",
+            Self::LoomAdvanceToPattern(22) => "Loom: Jump to Pattern 23",
+            Self::LoomAdvanceToPattern(23) => "Loom: Jump to Pattern 24",
+            Self::LoomAdvanceToPattern(24) => "Loom: Jump to Pattern 25",
+            Self::LoomAdvanceToPattern(25) => "Loom: Jump to Pattern 26",
+            Self::LoomAdvanceToPattern(26) => "Loom: Jump to Pattern 27",
+            Self::LoomAdvanceToPattern(27) => "Loom: Jump to Pattern 28",
+            Self::LoomAdvanceToPattern(_) => "Loom: Jump to Eternal Weave",
             Self::LoomBuildTestShuttleT1 => "Build T1 Shuttle (Ember+Void\u{2192}ForgedLight)",
             Self::LoomBuildTestShuttleT2 => "Build T2 Shuttle (FrgLt+Refl\u{2192}EchoGlass)",
             Self::LoomClearShuttles => "Clear All Shuttles",
@@ -626,16 +708,27 @@ impl DebugAction {
             Self::LoomCompletePattern => {
                 let idx = loom.persistent.active_pattern;
                 if let Some(p) = loom.persistent.patterns.get_mut(idx) {
+                    if p.eternal {
+                        return "Cannot complete eternal pattern.";
+                    }
                     for req in &mut p.requirements {
-                        req.accumulated = req.amount;
+                        req.sustained_secs = req.sustain_duration_secs;
+                        req.completed = true;
                     }
                     p.completed = true;
                 }
-                if loom.persistent.active_pattern + 1 < loom.persistent.patterns.len() {
-                    loom.persistent.active_pattern += 1;
+                // Advance to next uncompleted pattern (matches advance_to_next_pattern logic).
+                let start = idx + 1;
+                for i in start..loom.persistent.patterns.len() {
+                    if !loom.persistent.patterns[i].completed {
+                        loom.persistent.active_pattern = i;
+                        break;
+                    }
                 }
+                loom.graph_dirty = true;
                 let count = loom.persistent.completed_pattern_count();
                 state.cached_loom_zone_cap = crate::loom::loom_zone_cap_for_patterns(count);
+                achievements.on_loom_pattern_completed(count, Some(&state.character_name));
                 match crate::loom::PatternMilestone::from_count(count) {
                     Some(crate::loom::PatternMilestone::ThreadWilds) => {
                         "Pattern milestone: Thread Wilds"
@@ -659,13 +752,21 @@ impl DebugAction {
                 let target = n.min(loom.persistent.patterns.len().saturating_sub(1));
                 for i in 0..target {
                     if let Some(p) = loom.persistent.patterns.get_mut(i) {
+                        if p.eternal {
+                            continue;
+                        }
                         for req in &mut p.requirements {
-                            req.accumulated = req.amount;
+                            req.sustained_secs = req.sustain_duration_secs;
+                            req.completed = true;
                         }
                         p.completed = true;
                     }
                 }
                 loom.persistent.active_pattern = target;
+                loom.graph_dirty = true;
+                let count = loom.persistent.completed_pattern_count();
+                state.cached_loom_zone_cap = crate::loom::loom_zone_cap_for_patterns(count);
+                achievements.on_loom_pattern_completed(count, Some(&state.character_name));
                 "Advanced to pattern."
             }
             Self::LoomBuildTestShuttleT1 => {

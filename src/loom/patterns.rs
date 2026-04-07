@@ -72,6 +72,17 @@ pub fn tick_pattern_sustain(
         rate.is_finite() && rate >= req.required_rate
     });
 
+    // Eternal patterns never complete — they act as endgame sinks.
+    // Advance timer but never mark requirements or pattern as completed.
+    if pattern.eternal {
+        if all_met {
+            for req in &mut pattern.requirements {
+                req.sustained_secs += delta_seconds;
+            }
+        }
+        return false;
+    }
+
     // Only advance timers if every requirement is satisfied simultaneously.
     if all_met {
         for req in &mut pattern.requirements {
@@ -86,11 +97,6 @@ pub fn tick_pattern_sustain(
         }
     }
     // If not all met, progress simply pauses (no decay).
-
-    // Eternal patterns never complete — they act as endgame sinks.
-    if pattern.eternal {
-        return false;
-    }
 
     if pattern.requirements.iter().all(|req| req.completed) {
         complete_active_pattern(persistent);
