@@ -1325,52 +1325,17 @@ fn render_bottom_panel_pattern(
 
 /// PR-gated flavor text for The Eternal Weave — shifts tone as the player
 /// approaches the 100k PR Vessel launch gate.
-fn eternal_weave_flavor(prestige_rank: u32, frame_counter: u32) -> &'static str {
-    let lines: &[&str] = match prestige_rank {
-        0..=1_999 => &[
-            "There is no final thread. The Loom weaves on.",
-            "The silence after the last pattern is not emptiness. It is fullness, overflowing.",
-            "You sit with the Loom and listen. It has so much left to say.",
-        ],
-        2_000..=4_999 => &[
-            "The threads hum with a sound like breathing. Steady. Patient. Endless.",
-            "You are no longer weaving patterns. You are weaving yourself.",
-            "Days pass. The Loom does not count them. Neither do you, anymore.",
-        ],
-        5_000..=9_999 => &[
-            "The weave responds before you ask. You and the Loom think as one.",
-            "Sometimes the threads arrange themselves while you sleep. You pretend not to notice.",
-            "There is a rhythm beneath the rhythm. You are only now learning to hear it.",
-        ],
-        10_000..=24_999 => &[
-            "The Loom\u{2019}s rhythm has changed. Subtle, like a heartbeat skipping.",
-            "Some threads resist your touch now. They pull toward something distant.",
-            "The weave holds, but the edges fray where you cannot see.",
-        ],
-        25_000..=49_999 => &[
-            "Yggdrasil\u{2019}s branches grow thin at the periphery. The Loom knows.",
-            "The threads carry whispers now. A name you almost recognize.",
-            "Reality feels lighter than it should. The weave compensates, but barely.",
-        ],
-        50_000..=74_999 => &[
-            "The Loom trembles when you are not watching. Something stirs beyond the last thread.",
-            "You dream of distances. Ten thousand light-years of silence. The Loom dreams it too.",
-            "The branches are dying. Not all of them. Not yet. But enough.",
-        ],
-        75_000..=99_999 => &[
-            "The Vessel waits. You have always known this.",
-            "One hundred thousand threads, woven into purpose. The journey is almost ready.",
-            "Beyond the weave, beyond the branches, beyond everything you know \u{2014} a living world calls.",
-        ],
-        _ => &[
-            "The threads are ready. The Vessel is ready. Only the courage remains.",
-            "You have woven enough reality to reshape the world. But the world needs you to leave it.",
-            "The Loom will tend itself while you are gone. It learned that from you.",
-        ],
-    };
-    // Rotate through lines slowly (change every ~10 seconds at 10fps).
-    let idx = (frame_counter / 100) as usize % lines.len();
-    lines[idx]
+fn eternal_weave_flavor(prestige_rank: u32) -> &'static str {
+    match prestige_rank {
+        0..=1_999 => "There is no final thread. The Loom weaves on. The silence after the last pattern is not emptiness. It is fullness, overflowing. You sit with the Loom and listen. It has so much left to say.",
+        2_000..=4_999 => "The threads hum with a sound like breathing. Steady. Patient. Endless. You are no longer weaving patterns. You are weaving yourself. Days pass. The Loom does not count them. Neither do you, anymore.",
+        5_000..=9_999 => "The weave responds before you ask. You and the Loom think as one. Sometimes the threads arrange themselves while you sleep. You pretend not to notice. There is a rhythm beneath the rhythm. You are only now learning to hear it.",
+        10_000..=24_999 => "The Loom\u{2019}s rhythm has changed. Subtle, like a heartbeat skipping. Some threads resist your touch now. They pull toward something distant. The weave holds, but the edges fray where you cannot see.",
+        25_000..=49_999 => "Yggdrasil\u{2019}s branches grow thin at the periphery. The Loom knows. The threads carry whispers now. A name you almost recognize. Reality feels lighter than it should. The weave compensates, but barely.",
+        50_000..=74_999 => "The Loom trembles when you are not watching. Something stirs beyond the last thread. You dream of distances. Ten thousand light-years of silence. The Loom dreams it too. The branches are dying. Not all of them. Not yet. But enough.",
+        75_000..=99_999 => "The Vessel waits. You have always known this. One hundred thousand threads, woven into purpose. The journey is almost ready. Beyond the weave, beyond the branches, beyond everything you know \u{2014} a living world calls.",
+        _ => "The threads are ready. The Vessel is ready. Only the courage remains. You have woven enough reality to reshape the world. But the world needs you to leave it. The Loom will tend itself while you are gone. It learned that from you.",
+    }
 }
 
 /// Render bottom panel for The Eternal Weave — WR→PR conversion display.
@@ -1378,7 +1343,7 @@ fn render_bottom_panel_eternal(
     frame: &mut Frame,
     area: Rect,
     loom: &LoomState,
-    ui: &LoomUiState,
+    _ui: &LoomUiState,
     prestige_rank: u32,
 ) {
     let wr_rate = loom
@@ -1407,7 +1372,7 @@ fn render_bottom_panel_eternal(
     let secs_remaining = (fill_secs - elapsed).max(0);
 
     let wr_emoji = resource_emoji(&crate::loom::Resource::WovenReality);
-    let flavor = eternal_weave_flavor(prestige_rank, ui.throbber_frame);
+    let flavor = eternal_weave_flavor(prestige_rank);
 
     let mut lines: Vec<Line> = Vec::new();
 
@@ -1655,23 +1620,15 @@ mod tests {
     fn test_eternal_weave_flavor_tiers() {
         let tiers = [0, 2_000, 5_000, 10_000, 25_000, 50_000, 75_000, 100_000];
         for pr in tiers {
-            let text = eternal_weave_flavor(pr, 0);
+            let text = eternal_weave_flavor(pr);
             assert!(!text.is_empty(), "Flavor empty at PR {pr}");
         }
     }
 
     #[test]
-    fn test_eternal_weave_flavor_rotates() {
-        let a = eternal_weave_flavor(0, 0);
-        let b = eternal_weave_flavor(0, 100);
-        let c = eternal_weave_flavor(0, 200);
-        assert!(a != b || b != c, "Flavor should rotate across frames");
-    }
-
-    #[test]
     fn test_eternal_weave_flavor_changes_with_pr() {
-        let early = eternal_weave_flavor(0, 0);
-        let late = eternal_weave_flavor(75_000, 0);
+        let early = eternal_weave_flavor(0);
+        let late = eternal_weave_flavor(75_000);
         assert_ne!(early, late, "Flavor should differ between PR tiers");
     }
 }
