@@ -1091,6 +1091,7 @@ pub(super) fn tick_loom(
     let newly_unlocked = crate::loom::tick_neighbor_unlocking(loom, tick_seconds);
     if !newly_unlocked.is_empty() {
         result.loom_changed = true;
+        loom.graph_dirty = true;
     }
 
     // Push per-tick production amounts into rate trackers.
