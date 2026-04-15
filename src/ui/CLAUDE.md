@@ -57,6 +57,8 @@ src/ui/
 ├── runic_shift_scene.rs        # Sigil Surge game (panel-matching, rune grid)
 ├── sudoku_scene.rs             # Sudoku (Sigil Matrix) puzzle with pencil marks
 ├── shard_fusion_scene.rs       # Shard Fusion (2048-style tile merging)
+├── runic_lights_scene.rs       # Runic Lights pattern puzzle
+├── vault_warden_scene.rs       # Vault Warden security puzzle
 ├── soulforge_scene.rs          # Soulforge enhancement overlay (delegates to helpers below)
 ├── soulforge_effects.rs        # Soulforge hammering/success/failure animation effects
 ├── soulforge_slots.rs          # Soulforge slot selection menu
