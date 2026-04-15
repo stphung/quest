@@ -328,13 +328,6 @@ pub fn process_combat_events<R: Rng>(
     result: &mut TickResult,
     rng: &mut R,
 ) {
-    let current_enemy_name = state
-        .combat_state
-        .current_enemy
-        .as_ref()
-        .map(|e| e.name.clone())
-        .unwrap_or_default();
-
     for event in combat_events {
         match event {
             CombatEvent::PlayerAttackBlocked { weapon_needed } => {
@@ -348,7 +341,12 @@ pub fn process_combat_events<R: Rng>(
                     .push(TickEvent::PlayerAttack { damage, was_crit });
             }
             CombatEvent::EnemyAttack { damage } => {
-                let enemy_name = current_enemy_name.clone();
+                let enemy_name = state
+                    .combat_state
+                    .current_enemy
+                    .as_ref()
+                    .map(|e| e.name.clone())
+                    .unwrap_or_default();
                 result
                     .events
                     .push(TickEvent::EnemyAttack { damage, enemy_name });
@@ -360,7 +358,12 @@ pub fn process_combat_events<R: Rng>(
                 result.events.push(TickEvent::RegenComplete { healed });
             }
             CombatEvent::EnemyDied { xp_gained } => {
-                let enemy_name = current_enemy_name.clone();
+                let enemy_name = state
+                    .combat_state
+                    .current_enemy
+                    .as_ref()
+                    .map(|e| e.name.clone())
+                    .unwrap_or_default();
                 result.events.push(TickEvent::EnemyDefeated {
                     xp_gained,
                     enemy_name,
@@ -383,7 +386,12 @@ pub fn process_combat_events<R: Rng>(
                 process_discoveries(state, rng, result);
             }
             CombatEvent::EliteDefeated { xp_gained } => {
-                let enemy_name = current_enemy_name.clone();
+                let enemy_name = state
+                    .combat_state
+                    .current_enemy
+                    .as_ref()
+                    .map(|e| e.name.clone())
+                    .unwrap_or_default();
                 result.events.push(TickEvent::DungeonEliteDefeated {
                     xp_gained,
                     enemy_name,
@@ -403,7 +411,12 @@ pub fn process_combat_events<R: Rng>(
                 }
             }
             CombatEvent::BossDefeated { xp_gained } => {
-                let enemy_name = current_enemy_name.clone();
+                let enemy_name = state
+                    .combat_state
+                    .current_enemy
+                    .as_ref()
+                    .map(|e| e.name.clone())
+                    .unwrap_or_default();
 
                 // Calculate boss bonus XP
                 let (bonus_xp, total_xp, items) = if let Some(dungeon) = &state.active_dungeon {
