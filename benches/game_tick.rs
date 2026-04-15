@@ -105,5 +105,97 @@ fn bench_game_tick(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_game_tick);
+/// Benchmark the achievement milestone check path — called every kill/level-up.
+/// Uses the public `on_enemy_killed` handler which calls `check_milestones`
+/// internally, exercising the early-exit fast path for already-unlocked entries.
+fn bench_achievement_milestones(c: &mut Criterion) {
+    let mut group = c.benchmark_group("achievement_milestones");
+
+    // Mid-game steady state: 1500 kills, first three Slayer milestones already
+    // unlocked (100, 500, 1000). Each call does 15 is_unlocked HashMap lookups
+    // (fast early-exit) and one counter increment.
+    group.bench_function("on_enemy_killed_mid_game_1500_kills", |b| {
+        let mut ach = Achievements::default();
+        // Advance to 1500 kills with the first milestones already unlocked
+        for _ in 0..1500 {
+            ach.on_enemy_killed(false, Some("Hero"));
+        }
+        b.iter(|| {
+            ach.on_enemy_killed(false, Some("Hero"));
+        });
+    });
+
+    // Boss kill path additionally traverses BOSS_HUNTER_MILESTONES.
+    group.bench_function("on_enemy_killed_boss_1000_bosses", |b| {
+        let mut ach = Achievements::default();
+        for _ in 0..1000 {
+            ach.on_enemy_killed(true, Some("Hero"));
+        }
+        b.iter(|| {
+            ach.on_enemy_killed(true, Some("Hero"));
+        });
+    });
+
+    group.finish();
+}
+
+/// Benchmark the combat event processing path — the hot path that fires
+/// on every player attack, enemy attack, and kill event.
+/// Runs 20 consecutive ticks to ensure at least one full attack cycle (1.5s = 15 ticks).
+fn bench_combat_event_processing(c: &mut Criterion) {
+    let mut group = c.benchmark_group("combat_event_processing");
+
+    group.bench_function("20_ticks_mid_game_combat", |b| {
+        let (mut state, mut haven, mut enhancement, mut deep, mut ach, mut loom) =
+            make_state(50, 10);
+        let mut tick_counter = 0u32;
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
+        b.iter(|| {
+            for _ in 0..20 {
+                let mut ctx = TickContext {
+                    state: &mut state,
+                    tick_counter: &mut tick_counter,
+                    haven: &mut haven,
+                    enhancement: &mut enhancement,
+                    deep: &mut deep,
+                    achievements: &mut ach,
+                    loom: &mut loom,
+                    debug_mode: false,
+                };
+                let _ = game_tick_with_context(&mut ctx, &mut rng);
+            }
+        });
+    });
+
+    group.bench_function("20_ticks_endgame_combat", |b| {
+        let (mut state, mut haven, mut enhancement, mut deep, mut ach, mut loom) =
+            make_state(100, 50);
+        let mut tick_counter = 0u32;
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
+        b.iter(|| {
+            for _ in 0..20 {
+                let mut ctx = TickContext {
+                    state: &mut state,
+                    tick_counter: &mut tick_counter,
+                    haven: &mut haven,
+                    enhancement: &mut enhancement,
+                    deep: &mut deep,
+                    achievements: &mut ach,
+                    loom: &mut loom,
+                    debug_mode: false,
+                };
+                let _ = game_tick_with_context(&mut ctx, &mut rng);
+            }
+        });
+    });
+
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    bench_game_tick,
+    bench_combat_event_processing,
+    bench_achievement_milestones
+);
 criterion_main!(benches);
