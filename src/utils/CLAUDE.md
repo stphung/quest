@@ -29,7 +29,7 @@ Activated with the `--debug` CLI flag. Press backtick (`) to toggle the overlay.
 
 | Category | Actions |
 |----------|---------|
-| Challenges | Trigger all 12 challenge minigames (Chess, Morris, Gomoku, Minesweeper, Rune, Go, Flappy, JezzBall, Snake, Sigil Surge, Sudoku, Shard Fusion) |
+| Challenges | Trigger all 14 challenge minigames (Chess, Morris, Gomoku, Minesweeper, Rune, Go, Flappy, JezzBall, Snake, Sigil Surge, Sudoku, Shard Fusion, Runic Lights, Vault Warden) |
 | World | Trigger Dungeon, Fishing, Haven Discovery, Soulforge Discovery |
 | Resources | Grant Stormglass (1k/100k), Discover Stormglass, Etch Random/S+ Sigils, Force Overcharge |
 | Items | Forge Stormbreaker, Forge God Items (Asprika, Sleipnir, Megingjord) |

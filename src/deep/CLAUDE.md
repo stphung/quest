@@ -169,7 +169,7 @@ pub enum MissionType {
     Expedition,              // 3-30h, medium risk, frontier
     Breakthrough,            // 4-40h, high risk, frontier (once per layer)
     Construction(Infrastructure), // 2-20h, no risk, cleared layers
-    GatewayExpedition,       // 48h, Layer 30 only, opens the Gateway (one-time)
+    GatewayExpedition,       // 72h (3 days), Layer 30 only, opens the Gateway (one-time)
 }
 ```
 
@@ -289,7 +289,7 @@ The game tick does **not** simulate mission progress. It only checks for pending
 
 ## Integration Points
 
-- **`core/tick.rs`**: `game_tick()` takes `deep: &mut DeepState`. Stage 13 checks for pending check-in events.
+- **`core/tick.rs`**: `game_tick()` takes `deep: &mut DeepState`. Stage 11c ticks Deep missions and checks for pending check-in events.
 - **`core/tick_stages.rs`**: `process_combat_events()` triggers Deep discovery on `BossDefeatResult::ExpanseCycle` when `!discovered && prestige_rank >= DEEP_MIN_PRESTIGE_RANK`. Emits `TickEvent::DeepDiscovered`, sets `deep_changed` flag.
 - **`core/tick_types.rs`**: `TickEvent::DeepDiscovered` variant, `TickResult::deep_changed` flag
 - **`tick_events.rs`**: `TickFlags::deep_discovered` field, combat log message on discovery
