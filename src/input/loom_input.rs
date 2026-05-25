@@ -362,10 +362,8 @@ fn handle_build_input(
                 KeyCode::Up => {
                     *cursor = cursor.saturating_sub(1);
                 }
-                KeyCode::Down => {
-                    if *cursor + 1 < build.available_recipes.len() {
-                        *cursor += 1;
-                    }
+                KeyCode::Down if *cursor + 1 < build.available_recipes.len() => {
+                    *cursor += 1;
                 }
                 KeyCode::Enter => {
                     // Check capacity before proceeding.
@@ -429,10 +427,8 @@ fn handle_build_input(
                 KeyCode::Up => {
                     *cursor = cursor.saturating_sub(1);
                 }
-                KeyCode::Down => {
-                    if *cursor + 1 < toggle.len() {
-                        *cursor += 1;
-                    }
+                KeyCode::Down if *cursor + 1 < toggle.len() => {
+                    *cursor += 1;
                 }
                 KeyCode::Char(' ') => {
                     if let Some(val) = toggle.get_mut(*cursor) {
@@ -468,10 +464,8 @@ fn handle_build_input(
                 KeyCode::Up => {
                     *cursor = cursor.saturating_sub(1);
                 }
-                KeyCode::Down => {
-                    if *cursor + 1 < toggle.len() {
-                        *cursor += 1;
-                    }
+                KeyCode::Down if *cursor + 1 < toggle.len() => {
+                    *cursor += 1;
                 }
                 KeyCode::Char(' ') => {
                     if let Some(val) = toggle.get_mut(*cursor) {

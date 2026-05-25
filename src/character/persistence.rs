@@ -225,7 +225,7 @@ impl CharacterManager {
         }
 
         // Sort by last_save_time (most recent first)
-        characters.sort_by(|a, b| b.last_save_time.cmp(&a.last_save_time));
+        characters.sort_by_key(|c| std::cmp::Reverse(c.last_save_time));
 
         Ok(characters)
     }

@@ -377,23 +377,21 @@ pub fn update_edge_rates(lg: &mut LoomGraph, loom: &LoomState) {
         let rate = match (&source_node, &target_node) {
             // Extractor/Shuttle → Shuttle: use contention-aware flow.
             // Under-construction shuttles can't pull — zero flow on all incoming edges.
-            (_, LoomGraphNode::Shuttle(shuttle_idx)) => {
-                if *shuttle_idx < persistent.shuttles.len() {
-                    let shuttle = &persistent.shuttles[*shuttle_idx];
-                    if shuttle.under_construction {
-                        0.0
-                    } else {
-                        let src_ref = match &source_node {
-                            LoomGraphNode::Extractor(id) => LoomNodeRef::Extractor(*id),
-                            LoomGraphNode::Shuttle(idx) => LoomNodeRef::Shuttle(*idx),
-                            _ => continue,
-                        };
-                        let available = source_rates.get(&src_ref).copied().unwrap_or(0.0);
-                        let consumers = consumer_count.get(&src_ref).copied().unwrap_or(1).max(1);
-                        available / consumers as f64
-                    }
-                } else {
+            (_, LoomGraphNode::Shuttle(shuttle_idx))
+                if *shuttle_idx < persistent.shuttles.len() =>
+            {
+                let shuttle = &persistent.shuttles[*shuttle_idx];
+                if shuttle.under_construction {
                     0.0
+                } else {
+                    let src_ref = match &source_node {
+                        LoomGraphNode::Extractor(id) => LoomNodeRef::Extractor(*id),
+                        LoomGraphNode::Shuttle(idx) => LoomNodeRef::Shuttle(*idx),
+                        _ => continue,
+                    };
+                    let available = source_rates.get(&src_ref).copied().unwrap_or(0.0);
+                    let consumers = consumer_count.get(&src_ref).copied().unwrap_or(1).max(1);
+                    available / consumers as f64
                 }
             }
             // Anything → PatternSink: use the source's full production rate.

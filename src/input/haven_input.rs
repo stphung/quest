@@ -100,10 +100,8 @@ pub(super) fn handle_haven(
                 KeyCode::Up => {
                     haven_ui.selected_room = haven_ui.selected_room.saturating_sub(1);
                 }
-                KeyCode::Down => {
-                    if haven_ui.selected_room + 1 < haven::HavenRoomId::ALL.len() {
-                        haven_ui.selected_room += 1;
-                    }
+                KeyCode::Down if haven_ui.selected_room + 1 < haven::HavenRoomId::ALL.len() => {
+                    haven_ui.selected_room += 1;
                 }
                 KeyCode::Enter => {
                     let room = haven::HavenRoomId::ALL[haven_ui.selected_room];

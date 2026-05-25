@@ -265,8 +265,7 @@ impl Widget for DungeonLegendWidget {
             (symbols::CLEARED, "Cleared", Color::DarkGray),
         ];
 
-        let mut y = area.y;
-        for (sym, label, color) in legends {
+        for (y, (sym, label, color)) in (area.y..).zip(legends) {
             if y >= area.y + area.height {
                 break;
             }
@@ -288,8 +287,6 @@ impl Widget for DungeonLegendWidget {
                         .set_style(Style::default().fg(Color::White));
                 }
             }
-
-            y += 1;
         }
     }
 }
