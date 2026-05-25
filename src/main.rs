@@ -1338,15 +1338,15 @@ fn main() -> io::Result<()> {
                                             }
                                         }
                                     }
-                                    input::SoulforgePhase::ResultSuccess => {
-                                        if soulforge_ui.animation_tick < 20 {
-                                            soulforge_ui.animation_tick += 1;
-                                        }
+                                    input::SoulforgePhase::ResultSuccess
+                                        if soulforge_ui.animation_tick < 20 =>
+                                    {
+                                        soulforge_ui.animation_tick += 1;
                                     }
-                                    input::SoulforgePhase::ResultFailure => {
-                                        if soulforge_ui.animation_tick < 15 {
-                                            soulforge_ui.animation_tick += 1;
-                                        }
+                                    input::SoulforgePhase::ResultFailure
+                                        if soulforge_ui.animation_tick < 15 =>
+                                    {
+                                        soulforge_ui.animation_tick += 1;
                                     }
                                     _ => {}
                                 }

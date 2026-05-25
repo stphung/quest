@@ -660,8 +660,7 @@ pub fn run_update_command() -> Result<bool, Box<dyn Error>> {
             print!("       ");
             io::stdout().flush()?;
             download_file(download_url, &archive_path, |downloaded, total| {
-                if total > 0 {
-                    let percent = (downloaded * 100) / total;
+                if let Some(percent) = (downloaded * 100).checked_div(total) {
                     print!("\r       {}%", percent);
                     let _ = io::stdout().flush();
                 }

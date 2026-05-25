@@ -163,10 +163,8 @@ impl SimStats {
                         .entry(current_zone)
                         .or_insert(tick);
                 }
-                TickEvent::PlayerAttack { was_crit, .. } => {
-                    if *was_crit {
-                        self.total_crits += 1;
-                    }
+                TickEvent::PlayerAttack { was_crit, .. } if *was_crit => {
+                    self.total_crits += 1;
                 }
                 TickEvent::ItemDropped {
                     rarity,

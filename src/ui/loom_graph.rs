@@ -758,9 +758,9 @@ fn compute_build_highlights(
     let dim_cyan = Color::Rgb(40, 100, 110); // Confirmed A (dimmed)
 
     match &build.step {
-        BuildStep::SelectRecipe { cursor } => {
+        BuildStep::SelectRecipe { cursor }
             // Highlight all potential sources for the selected recipe.
-            if *cursor < build.available_recipes.len() {
+            if *cursor < build.available_recipes.len() => {
                 let recipe_idx = build.available_recipes[*cursor];
                 let recipe = &recipes[recipe_idx];
 
@@ -781,7 +781,6 @@ fn compute_build_highlights(
                     }
                 }
             }
-        }
         BuildStep::SelectSourcesA { toggle, .. } => {
             let dim_a = Color::Rgb(40, 100, 110); // eligible but not toggled
             let has_any = toggle.iter().any(|&t| t);

@@ -837,8 +837,7 @@ fn render_active_missions_content(
         let log = &deep.prestige.warband_log;
         if !log.is_empty() && mid + 3 < content_bottom {
             render_section_rule(buffer, mid + 2, width, "WARBAND LOG", None);
-            let mut lr = mid + 3;
-            for entry in log.iter().rev().take(5) {
+            for (lr, entry) in (mid + 3..).zip(log.iter().rev().take(5)) {
                 if lr >= content_bottom {
                     break;
                 }
@@ -852,7 +851,6 @@ fn render_active_missions_content(
                     icon, entry.layer, entry.mission_name, entry.marks_earned
                 );
                 put_text(buffer, lr, 1, &line, color);
-                lr += 1;
             }
         }
         return;
@@ -1361,11 +1359,7 @@ fn render_new_mission_compact(
                 } else {
                     Color::LightRed
                 };
-                let ratio_pct = if min == 0 {
-                    999
-                } else {
-                    squad_power * 100 / min
-                };
+                let ratio_pct = (squad_power * 100).checked_div(min).unwrap_or(999);
 
                 // Archetype check line
                 let mut arch_info = String::new();
@@ -2176,11 +2170,7 @@ fn render_squad_summary_panel(
     } else {
         squad_power as f64 / min as f64
     };
-    let ratio_pct = if min == 0 {
-        999u32
-    } else {
-        squad_power * 100 / min
-    };
+    let ratio_pct = (squad_power * 100).checked_div(min).unwrap_or(999u32);
 
     let (bar_color, forecast_label, forecast_color) = if ui.staged_squad.is_empty() {
         (

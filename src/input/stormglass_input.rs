@@ -69,21 +69,19 @@ fn handle_menu(
         }
         KeyCode::Enter => {
             match exchange_ui.selected_item {
-                0 => {
+                0 if state.stormglass >= INVOKE_TRIAL_COST => {
                     // Invoke Challenge — show confirmation first
-                    if state.stormglass >= INVOKE_TRIAL_COST {
-                        // Guard: need at least 3 available types for meaningful pick-1-of-3
-                        let pending: Vec<_> = state
-                            .challenge_menu
-                            .challenges
-                            .iter()
-                            .map(|c| c.challenge_type.clone())
-                            .collect();
-                        if available_trial_types(&pending) < TRIAL_OPTION_COUNT {
-                            return InputResult::Continue;
-                        }
-                        exchange_ui.set_phase(ExchangePhase::InvokeTrialConfirm);
+                    // Guard: need at least 3 available types for meaningful pick-1-of-3
+                    let pending: Vec<_> = state
+                        .challenge_menu
+                        .challenges
+                        .iter()
+                        .map(|c| c.challenge_type.clone())
+                        .collect();
+                    if available_trial_types(&pending) < TRIAL_OPTION_COUNT {
+                        return InputResult::Continue;
                     }
+                    exchange_ui.set_phase(ExchangePhase::InvokeTrialConfirm);
                 }
                 1 => {
                     // Chrono Surge — enter duration selection
@@ -95,15 +93,13 @@ fn handle_menu(
                     exchange_ui.sigil_selected_slot = 0;
                     exchange_ui.set_phase(ExchangePhase::SigilsList);
                 }
-                3 => {
+                3 if state.stormglass >= STORM_LURE_COST
+                    && !state.fishing.storm_lure_active
+                    && !state.fishing.leviathan_caught
+                    && state.fishing.rank >= 40 =>
+                {
                     // Storm Lure — show confirmation
-                    if state.stormglass >= STORM_LURE_COST
-                        && !state.fishing.storm_lure_active
-                        && !state.fishing.leviathan_caught
-                        && state.fishing.rank >= 40
-                    {
-                        exchange_ui.set_phase(ExchangePhase::StormLureConfirm);
-                    }
+                    exchange_ui.set_phase(ExchangePhase::StormLureConfirm);
                 }
                 _ => {}
             }

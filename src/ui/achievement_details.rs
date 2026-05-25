@@ -260,14 +260,11 @@ fn build_stats_left_lines(
     let label_style = Style::default().fg(Color::DarkGray);
     let value_style = Style::default().fg(Color::Cyan);
 
-    let kill_boss_ratio = if achievements.total_bosses_defeated > 0 {
-        format!(
-            "{}:1",
-            achievements.total_kills / achievements.total_bosses_defeated
-        )
-    } else {
-        "N/A".to_string()
-    };
+    let kill_boss_ratio = achievements
+        .total_kills
+        .checked_div(achievements.total_bosses_defeated)
+        .map(|r| format!("{}:1", r))
+        .unwrap_or_else(|| "N/A".to_string());
 
     let prestige_tier = get_prestige_tier(achievements.highest_prestige_rank).name;
     let fishing_tier = fishing_tier_name(achievements.highest_fishing_rank);
