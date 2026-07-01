@@ -1,6 +1,6 @@
 ---
 name: drive-game
-description: Drive the real game in tmux against fixture save states to verify UI changes, and capture PNG screenshots for PR review. Use when verifying UI work end-to-end, when asked to "screenshot the game", "show me the change", "drive the game", or before opening a PR that touches src/ui/.
+description: Drive the real game in tmux against fixture save states, inspect PNG screenshots of the rendered TUI to verify your own UI changes, and iterate until they render correctly. Use PROACTIVELY after any change to src/ui/, when asked to "screenshot the game", "show me the change", "drive the game", or before opening a PR that touches UI.
 ---
 
 # Drive the Game
@@ -72,6 +72,36 @@ Notes:
 - Test responsive layouts by varying pane size: `-x 80 -y 24` vs `-x 200 -y 50`.
 - A new tmux session is needed to switch characters (no in-game logout).
 
+## Self-verification loop (the primary use)
+
+You can see the PNGs — Read the screenshot file and inspect the actual
+rendering. So after ANY UI change, close the loop yourself instead of
+assuming the code is right:
+
+```
+1. Make the UI change
+2. cargo build && relaunch the tmux session against a fixture
+3. Drive to the affected scene
+4. scripts/screenshot.sh quest /tmp/check.png, then Read /tmp/check.png
+5. LOOK: did the change render as intended? Alignment, truncation,
+   colors, overlap with modals/panels, artifacts at panel borders?
+6. If wrong: fix, go to 2. If right: capture the final PR screenshot.
+```
+
+Iteration tips:
+- For fast checks mid-loop, skip the PNG: `tmux capture-pane -p | grep ...`
+  asserts on text/layout instantly. Use the PNG when color, emoji width, or
+  visual polish matters — and always for the final look.
+- Verify at two pane sizes before calling it done (`-x 80 -y 24` smallest
+  supported, `-x 200 -y 50` large) — responsive bugs hide in the size you
+  didn't try.
+- For animated/transient UI (combat effects, ticker, modals), capture 2-3
+  frames a second apart and Read each — a single frame can miss flicker or
+  a stuck state.
+- Don't stop at "it compiles and the screenshot looks plausible" — check the
+  specific pixels/cells your change was supposed to affect, and at least one
+  neighboring panel for accidental layout shifts.
+
 ## Embedding screenshots in a PR
 
 GitHub's API cannot upload comment attachments, so commit the PNGs to the
@@ -92,8 +122,8 @@ rendering first (`git stash` or a worktree), then your change, same pane size.
 
 ## When to use
 
-- Before opening any PR that touches `src/ui/` — attach at least one
-  screenshot of the affected scene.
+- After EVERY change to `src/ui/` — run the self-verification loop before
+  considering the change done, then attach at least one screenshot to the PR.
 - To reproduce/verify UI bug reports: build the closest fixture, drive to the
   scene, compare against the report.
 - Sanity-checking rendering at multiple terminal sizes.
