@@ -186,6 +186,9 @@ pub struct InjectionState {
     pub last_loom_pattern_tick: u64,
     /// Starting prestige rank (doesn't reset on auto-prestige).
     pub starting_prestige: u32,
+    /// Number of auto-prestiges performed (PR balance can be spent back to 0,
+    /// so this is the only reliable record that the prestige loop cycled).
+    pub prestige_count: u32,
 }
 
 impl InjectionState {
@@ -202,6 +205,7 @@ impl InjectionState {
             loom_started: false,
             last_loom_pattern_tick: 0,
             starting_prestige,
+            prestige_count: 0,
         }
     }
 }
@@ -403,6 +407,7 @@ pub fn inject_outcomes(
     if tick - injection.last_new_zone_tick >= profile.prestige_stuck_ticks() && can_prestige(state)
     {
         perform_prestige(state);
+        injection.prestige_count += 1;
         injection.last_new_zone_tick = tick;
         injection.last_zone_id = state.zone_progression.current_zone_id;
         state.invalidate_bonuses();

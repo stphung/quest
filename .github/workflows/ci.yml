@@ -49,6 +49,19 @@ jobs:
           key: test
       - run: cargo test --quiet
 
+  balance:
+    name: Balance
+    if: github.event_name == 'pull_request'
+    needs: [fmt]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: balance
+      - run: cargo run --release --quiet --bin simulator -- --check-progression
+
   audit:
     name: Audit
     if: github.event_name == 'pull_request'
@@ -82,12 +95,12 @@ jobs:
   ci-pass:
     name: Check & Test
     if: always() && github.event_name == 'pull_request'
-    needs: [fmt, clippy, test, audit, coverage]
+    needs: [fmt, clippy, test, balance, audit, coverage]
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs passed
         run: |
-          results=("${{ needs.fmt.result }}" "${{ needs.clippy.result }}" "${{ needs.test.result }}" "${{ needs.audit.result }}" "${{ needs.coverage.result }}")
+          results=("${{ needs.fmt.result }}" "${{ needs.clippy.result }}" "${{ needs.test.result }}" "${{ needs.balance.result }}" "${{ needs.audit.result }}" "${{ needs.coverage.result }}")
           for r in "${results[@]}"; do
             if [[ "$r" != "success" ]]; then
               echo "One or more CI jobs failed"

@@ -25,7 +25,7 @@ This runs all PR quality checks:
 1. Format checking (`cargo fmt --check`)
 2. Clippy linting (`cargo clippy --all-targets -- -D warnings`)
 3. All tests (`cargo test`)
-4. Build verification (`cargo build --all-targets`)
+4. Progression check (`cargo run --release --bin simulator -- --check-progression`)
 5. Security audit (`cargo audit --deny yanked`)
 
 **Auto-fix formatting:**
@@ -97,7 +97,9 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 
 ### Simulators
 
-**Game Simulator** (`src/bin/simulator/`): Headless game balance simulator calling `game_tick_with_context()` with no UI/delay. Supports `--ticks`, `--seed`, `--prestige`, `--runs`, `--strategy <profile>` (casual/optimal/speedrun), `--stormbreaker`, `--assertions`. Strategy profiles inject challenge wins, enhancement, sigils, ascension, and auto-prestige.
+**Game Simulator** (`src/bin/simulator/`): Headless game balance simulator calling `game_tick_with_context()` with no UI/delay. Supports `--ticks`, `--seed`, `--prestige`, `--runs`, `--strategy <profile>` (casual/optimal/speedrun), `--stormbreaker`, `--assertions`, `--check-progression`. Strategy profiles inject challenge wins, enhancement, sigils, ascension, and auto-prestige.
+
+**Progression check** (`simulator --check-progression`): CI gate asserting the game still progresses. Runs 3 scenarios across multiple seeds — early-game (2h at P0), prestige-economy (6h, optimal strategy), endgame-systems (30h at P200 speedrun) — and asserts coarse progression facts (zone/level pacing, PR economy, Deep/Loom/Ascension unlocks). Scenarios and thresholds live in `src/bin/simulator/scenarios.rs`; thresholds carry ~2x headroom because the tick loop is not perfectly deterministic. Runs as the `Balance` job on every PR and as step 4 of `make check`.
 
 **Deep Simulator** (`src/bin/deep_simulator.rs`): Headless Deep expedition simulator. Supports `--hours`, `--seed`, `--strategy` (rush/balanced/infrastructure), `--guild-rank`.
 

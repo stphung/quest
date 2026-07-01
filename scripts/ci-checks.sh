@@ -14,17 +14,17 @@ if ! command -v cargo-audit &> /dev/null; then
     echo ""
 fi
 
-echo "📝 1/4 Checking formatting..."
+echo "📝 1/5 Checking formatting..."
 cargo fmt --check
 echo "✅ Format check passed"
 echo ""
 
-echo "🔎 2/4 Running clippy..."
+echo "🔎 2/5 Running clippy..."
 cargo clippy --all-targets --quiet -- -D warnings
 echo "✅ Clippy passed"
 echo ""
 
-echo "🧪 3/4 Running tests..."
+echo "🧪 3/5 Running tests..."
 cargo test --quiet
 # Screenshot-pipeline converter (scripts/screenshot.sh dependency)
 if command -v python3 &> /dev/null; then
@@ -33,7 +33,12 @@ fi
 echo "✅ Tests passed"
 echo ""
 
-echo "🔒 4/4 Running security audit..."
+echo "🎮 4/5 Running progression check (simulator)..."
+cargo run --release --quiet --bin simulator -- --check-progression
+echo "✅ Progression check passed"
+echo ""
+
+echo "🔒 5/5 Running security audit..."
 cargo audit --deny yanked --quiet
 echo "✅ Audit passed"
 echo ""
