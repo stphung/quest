@@ -150,6 +150,10 @@ pub fn print_summary(stats: &SimStats, seed: u64, config: &SimConfig) {
         stats.total_boss_kills, stats.total_crits,
     );
     println!(
+        "Retreats: {}  |  Boss enrages: {}  |  Frontier backoffs: {}",
+        stats.combat_retreats, stats.boss_enrages, stats.frontier_backoffs,
+    );
+    println!(
         "Total XP: {}  |  Avg XP/kill: {:.0}",
         stats.total_xp_gained,
         if stats.total_kills > 0 {
@@ -305,6 +309,28 @@ pub fn print_summary(stats: &SimStats, seed: u64, config: &SimConfig) {
         println!("--- Deaths by Zone ---");
         for ((z, s), count) in &death_zones {
             println!("  Zone {z}-{s}: {count} deaths");
+        }
+        println!();
+    }
+
+    // Combat retreats by destination zone
+    if !stats.retreats_per_zone.is_empty() {
+        let mut retreat_zones: Vec<_> = stats.retreats_per_zone.iter().collect();
+        retreat_zones.sort_by_key(|&(k, _)| (k.0, k.1));
+        println!("--- Retreats (by destination zone) ---");
+        for ((z, s), count) in &retreat_zones {
+            println!("  Zone {z}-{s}: {count} retreats");
+        }
+        println!();
+    }
+
+    // Boss enrages by zone
+    if !stats.enrages_per_zone.is_empty() {
+        let mut enrage_zones: Vec<_> = stats.enrages_per_zone.iter().collect();
+        enrage_zones.sort_by_key(|&(k, _)| (k.0, k.1));
+        println!("--- Boss Enrages by Zone ---");
+        for ((z, s), count) in &enrage_zones {
+            println!("  Zone {z}-{s}: {count} enrages");
         }
         println!();
     }

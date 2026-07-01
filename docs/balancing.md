@@ -1049,6 +1049,7 @@ HAVEN_MIN_PRESTIGE_RANK: u32 = 10;
 // Combat Fitness (death loop / stalemate prevention)
 DEATH_LOOP_THRESHOLD: u32 = 3;                   // Consecutive boss deaths trigger retreat
 MOB_FIGHT_TIMEOUT_SECONDS: f64 = 30.0;           // Stalemate prevention timer
+FRONTIER_BACKOFF_MAX_CYCLES: u32 = 8;            // Max safe-zone cycles before retrying a zone that caused a death-loop retreat
 STORMGLASS_MIN_PRESTIGE_RANK: u32 = 15;
 
 // Soulforge Discovery (in src/enhancement/types.rs)

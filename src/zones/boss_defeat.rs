@@ -33,6 +33,9 @@ pub enum BossDefeatResult {
     FractureCycle { zone_id: u32 },
     /// Completed a loom cap zone cycle, loops back to subzone 1.
     LoomZoneCycle { zone_id: u32 },
+    /// Completed the zone but the next zone recently caused a death-loop
+    /// retreat — cycling here until the frontier cooldown is consumed.
+    FrontierBackoff { zone_id: u32, blocked_zone_id: u32 },
 }
 
 impl ZoneProgression {
@@ -154,6 +157,12 @@ impl ZoneProgression {
 
         self.defeat_boss(zone_id, subzone_id);
 
+        // Defeating any boss in the zone we last retreated from proves the
+        // player can survive it — clear the death-retreat memory.
+        if self.death_retreat_zone == Some(zone_id) {
+            self.clear_death_retreat();
+        }
+
         if !is_zone_boss {
             self.advance_to_next_subzone();
             return BossDefeatResult::SubzoneComplete {
@@ -170,6 +179,20 @@ impl ZoneProgression {
             self.current_zone_id = EXPANSE_ZONE_ID;
             self.current_subzone_id = 1;
             return BossDefeatResult::StormsEnd;
+        }
+
+        // Frontier backoff: the next zone recently death-looped us. Consume one
+        // cooldown cycle and loop this zone instead of auto-advancing back into
+        // the zone that keeps killing us (#576).
+        let next_zone_id = zone_id + 1;
+        if self.frontier_backoff_blocks(next_zone_id) {
+            self.frontier_cooldown_cycles -= 1;
+            self.current_subzone_id = 1;
+            self.kills_in_subzone = 0;
+            return BossDefeatResult::FrontierBackoff {
+                zone_id,
+                blocked_zone_id: next_zone_id,
+            };
         }
 
         // Zone 11 (Expanse) with no fracture zones unlocked: classic cycle
@@ -664,6 +687,103 @@ mod tests {
         assert_eq!(prog.current_zone_id, 31);
         assert_eq!(prog.current_subzone_id, 1);
         assert_eq!(prog.kills_in_subzone, 0);
+    }
+
+    // =========================================================================
+    // FRONTIER BACKOFF TESTS (death loop at zone frontiers, #576)
+    // =========================================================================
+
+    /// Puts the progression at zone 1's final subzone, fighting the zone boss,
+    /// with earlier subzone bosses defeated.
+    fn setup_zone_1_boss_fight(prog: &mut ZoneProgression) {
+        prog.defeat_boss(1, 1);
+        prog.defeat_boss(1, 2);
+        prog.current_zone_id = 1;
+        prog.current_subzone_id = 3;
+        prog.fighting_boss = true;
+    }
+
+    #[test]
+    fn test_frontier_backoff_cycles_instead_of_advancing() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // Simulate two death-loop retreats from zone 2
+        prog.current_zone_id = 2;
+        prog.record_death_retreat();
+        prog.record_death_retreat();
+        assert_eq!(prog.frontier_cooldown_cycles, 2);
+
+        // Defeat zone 1's boss — should cycle zone 1, not advance into zone 2
+        setup_zone_1_boss_fight(&mut prog);
+        let result = prog.on_boss_defeated_with_cap(0, &mut achievements, 11, 30);
+        assert_eq!(
+            result,
+            BossDefeatResult::FrontierBackoff {
+                zone_id: 1,
+                blocked_zone_id: 2
+            }
+        );
+        assert_eq!(prog.current_zone_id, 1);
+        assert_eq!(prog.current_subzone_id, 1);
+        assert_eq!(prog.frontier_cooldown_cycles, 1);
+
+        // Second cycle consumes the last cooldown
+        setup_zone_1_boss_fight(&mut prog);
+        let result = prog.on_boss_defeated_with_cap(0, &mut achievements, 11, 30);
+        assert!(matches!(result, BossDefeatResult::FrontierBackoff { .. }));
+        assert_eq!(prog.frontier_cooldown_cycles, 0);
+
+        // Cooldown exhausted — now advances into zone 2 again
+        setup_zone_1_boss_fight(&mut prog);
+        let result = prog.on_boss_defeated_with_cap(0, &mut achievements, 11, 30);
+        assert!(
+            matches!(
+                result,
+                BossDefeatResult::ZoneComplete { new_zone_id: 2, .. }
+            ),
+            "Expected ZoneComplete after cooldown exhausted, got {:?}",
+            result
+        );
+        assert_eq!(prog.current_zone_id, 2);
+    }
+
+    #[test]
+    fn test_boss_defeat_in_retreat_zone_clears_memory() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // Retreated from zone 2 once, then re-entered and beat a boss there
+        prog.current_zone_id = 2;
+        prog.record_death_retreat();
+        assert_eq!(prog.death_retreat_zone, Some(2));
+
+        prog.current_subzone_id = 1;
+        prog.fighting_boss = true;
+        let result = prog.on_boss_defeated_with_cap(0, &mut achievements, 11, 30);
+        assert!(matches!(
+            result,
+            BossDefeatResult::SubzoneComplete { new_subzone_id: 2 }
+        ));
+        assert_eq!(prog.death_retreat_zone, None);
+        assert_eq!(prog.frontier_cooldown_cycles, 0);
+    }
+
+    #[test]
+    fn test_frontier_backoff_does_not_block_other_zones() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // Retreated from zone 5 — advancing 1 -> 2 must be unaffected
+        prog.current_zone_id = 5;
+        prog.record_death_retreat();
+
+        setup_zone_1_boss_fight(&mut prog);
+        let result = prog.on_boss_defeated_with_cap(0, &mut achievements, 11, 30);
+        assert!(matches!(
+            result,
+            BossDefeatResult::ZoneComplete { new_zone_id: 2, .. }
+        ));
     }
 
     #[test]

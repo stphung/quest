@@ -50,7 +50,8 @@ pub fn update_combat<R: Rng>(
     if !state.zone_progression.fighting_boss {
         state.combat_state.current_fight_elapsed += delta_time;
         if state.combat_state.current_fight_elapsed >= MOB_FIGHT_TIMEOUT_SECONDS {
-            events.extend(resolve_combat_retreat(state));
+            // Stalemate, not a death loop — retreat without frontier backoff
+            events.extend(resolve_combat_retreat(state, false));
             return events;
         }
     }
@@ -102,7 +103,16 @@ pub fn update_combat<R: Rng>(
 ///
 /// Called when mob fight timeout or death loop threshold is reached.
 /// Finds the highest zone with a defeated boss and travels there.
-pub fn resolve_combat_retreat(state: &mut GameState) -> Vec<CombatEvent> {
+///
+/// `triggered_by_death` marks death-loop retreats: those record the zone for
+/// frontier backoff so boss-defeat advancement stops bouncing the player back
+/// into a zone that keeps killing them (#576). Stalemate (timeout) retreats
+/// don't — the player survives those and retrying is cheap.
+pub fn resolve_combat_retreat(state: &mut GameState, triggered_by_death: bool) -> Vec<CombatEvent> {
+    if triggered_by_death {
+        state.zone_progression.record_death_retreat();
+    }
+
     // Find last safe zone: highest zone_id with a defeated boss
     let safe_zone_id = state
         .zone_progression
@@ -200,7 +210,7 @@ mod tests {
         state.combat_state.current_fight_elapsed = 12.0;
         state.consecutive_deaths = 4;
 
-        let events = resolve_combat_retreat(&mut state);
+        let events = resolve_combat_retreat(&mut state, true);
 
         assert!(matches!(
             events.as_slice(),
@@ -216,6 +226,25 @@ mod tests {
         );
         assert!(state.combat_state.current_enemy.is_none());
         assert_eq!(state.consecutive_deaths, 0);
+        // Death-triggered retreat records the zone for frontier backoff
+        assert_eq!(state.zone_progression.death_retreat_zone, Some(6));
+        assert_eq!(state.zone_progression.death_retreat_count, 1);
+        assert_eq!(state.zone_progression.frontier_cooldown_cycles, 1);
+    }
+
+    #[test]
+    fn resolve_combat_retreat_stalemate_does_not_record_backoff() {
+        let mut state = state_with_enemy("Dire Wolf");
+        state.zone_progression.current_zone_id = 6;
+
+        let events = resolve_combat_retreat(&mut state, false);
+
+        assert!(matches!(
+            events.as_slice(),
+            [CombatEvent::CombatRetreat { .. }]
+        ));
+        assert_eq!(state.zone_progression.death_retreat_zone, None);
+        assert_eq!(state.zone_progression.frontier_cooldown_cycles, 0);
     }
 
     #[test]
@@ -224,7 +253,7 @@ mod tests {
         state.zone_progression.defeated_bosses.insert((3, 3));
         state.zone_progression.defeated_bosses.insert((5, 2));
 
-        let events = resolve_combat_retreat(&mut state);
+        let events = resolve_combat_retreat(&mut state, true);
         let expected_zone = crate::zones::get_zone(5).unwrap().name.to_string();
 
         assert!(matches!(

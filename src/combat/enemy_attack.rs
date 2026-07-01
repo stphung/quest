@@ -102,13 +102,13 @@ pub(crate) fn resolve_enemy_attack<R: Rng>(
             if !in_dungeon {
                 if state.zone_progression.fighting_boss {
                     // Boss death: retreat immediately
-                    return super::orchestration::resolve_combat_retreat(state);
+                    return super::orchestration::resolve_combat_retreat(state, true);
                 }
 
                 // Mob death: track consecutive deaths, retreat after threshold
                 state.consecutive_deaths += 1;
                 if state.consecutive_deaths >= DEATH_LOOP_THRESHOLD {
-                    return super::orchestration::resolve_combat_retreat(state);
+                    return super::orchestration::resolve_combat_retreat(state, true);
                 }
 
                 if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
