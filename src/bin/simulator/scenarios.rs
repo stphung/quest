@@ -120,10 +120,12 @@ fn early_game_assertions() -> Vec<Assertion> {
 fn prestige_economy_assertions() -> Vec<Assertion> {
     vec![
         Assertion {
-            name: "Auto-prestige reaches P1+ in 6h (observed P1-P3)",
-            metric: |s| s.final_prestige as f64,
+            // PR doubles as spendable currency, so final prestige balance can
+            // legitimately hit 0 — count prestige events instead.
+            name: "Auto-prestige fires 3+ times in 6h (observed ~14-15)",
+            metric: |s| s.prestiges_performed as f64,
             op: AssertionOp::GreaterOrEqual,
-            value: 1.0,
+            value: 3.0,
         },
         Assertion {
             name: "At least 15 PR earned in 6h (observed 28-46)",

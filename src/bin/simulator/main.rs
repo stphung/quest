@@ -372,6 +372,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState, Option
         }
     }
 
+    stats.prestiges_performed = injection_state.prestige_count;
     stats.finalize(&state, &deep_state, &loom);
     (stats, state, tick_profile)
 }
