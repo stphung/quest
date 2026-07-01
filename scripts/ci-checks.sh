@@ -26,6 +26,10 @@ echo ""
 
 echo "🧪 3/4 Running tests..."
 cargo test --quiet
+# Screenshot-pipeline converter (scripts/screenshot.sh dependency)
+if command -v python3 &> /dev/null; then
+    python3 "$(dirname "$0")/ansi2html.py" --self-test
+fi
 echo "✅ Tests passed"
 echo ""
 

@@ -3,11 +3,24 @@
 use std::io;
 use std::path::PathBuf;
 
-/// Returns the path to the quest save directory (`~/.quest`).
+/// Environment variable that overrides the save directory location.
+/// Used by test harnesses and fixture tooling to run the game against
+/// an isolated state directory instead of the player's real saves.
+pub const QUEST_DIR_ENV: &str = "QUEST_DIR";
+
+/// Returns the path to the quest save directory.
+///
+/// Defaults to `~/.quest`. Set the `QUEST_DIR` environment variable to
+/// point at a different directory (must be non-empty).
 ///
 /// All persistence modules must use this function instead of independently
 /// calling `dirs::home_dir()` and constructing the path themselves.
 pub fn get_quest_dir() -> io::Result<PathBuf> {
+    if let Ok(dir) = std::env::var(QUEST_DIR_ENV) {
+        if !dir.trim().is_empty() {
+            return Ok(PathBuf::from(dir));
+        }
+    }
     let home_dir = dirs::home_dir().ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::NotFound,
@@ -15,4 +28,36 @@ pub fn get_quest_dir() -> io::Result<PathBuf> {
         )
     })?;
     Ok(home_dir.join(".quest"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Env vars are process-global, so override, empty, and fallback cases
+    /// share one test to keep set/restore ordering deterministic.
+    #[test]
+    fn test_quest_dir_env_override() {
+        let saved = std::env::var(QUEST_DIR_ENV).ok();
+
+        std::env::set_var(QUEST_DIR_ENV, "/tmp/quest-test-override");
+        assert_eq!(
+            get_quest_dir().unwrap(),
+            PathBuf::from("/tmp/quest-test-override")
+        );
+
+        // Empty and whitespace-only values fall back to the default.
+        std::env::set_var(QUEST_DIR_ENV, "");
+        let dir = get_quest_dir().unwrap();
+        assert!(dir.ends_with(".quest"), "got {dir:?}");
+        std::env::set_var(QUEST_DIR_ENV, "   ");
+        assert!(get_quest_dir().unwrap().ends_with(".quest"));
+
+        std::env::remove_var(QUEST_DIR_ENV);
+        assert!(get_quest_dir().unwrap().ends_with(".quest"));
+
+        if let Some(v) = saved {
+            std::env::set_var(QUEST_DIR_ENV, v);
+        }
+    }
 }
