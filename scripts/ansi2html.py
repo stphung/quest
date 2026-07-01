@@ -138,7 +138,35 @@ def convert(text: str) -> str:
     return "".join(out)
 
 
+def self_test():
+    # 16-color foreground
+    out = convert("\x1b[31mred\x1b[0m")
+    assert 'color:#cd3131">red</span>' in out, out
+    # bright background + reverse swaps fg/bg
+    out = convert("\x1b[7;93mrev\x1b[0m")
+    assert f"color:{DEFAULT_BG}" in out and "background-color:#f5f543" in out, out
+    # 256-color: cube entries 196 = #ff0000, 160 = #d70000; grayscale 244 = #808080
+    out = convert("\x1b[38;5;196mx\x1b[38;5;160m\x1b[48;5;244my")
+    assert "color:#ff0000" in out and "color:#d70000" in out, out
+    assert "background-color:#808080" in out, out
+    # truecolor
+    out = convert("\x1b[38;2;18;52;86mz")
+    assert "color:#123456" in out, out
+    # bold resets with 22; text and HTML escaping survive
+    out = convert("\x1b[1mB\x1b[22m<&>")
+    assert "font-weight:bold" in out and "&lt;&amp;&gt;" in out, out
+    # non-SGR sequences (cursor moves, charset) are stripped
+    out = convert("\x1b[2Jclean\x1b(B\x1b[1;5H")
+    assert ">clean</span>" in out and "\x1b" not in out, out
+    # multi-line output preserves newlines for <pre>
+    assert convert("a\nb").count("\n") == 2
+    print("ansi2html self-test passed")
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "--self-test":
+        self_test()
+        return
     text = open(sys.argv[1], encoding="utf-8", errors="replace").read() if len(sys.argv) > 1 else sys.stdin.read()
     body = convert(text)
     print(f"""<!DOCTYPE html>

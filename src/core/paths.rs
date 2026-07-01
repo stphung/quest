@@ -29,3 +29,35 @@ pub fn get_quest_dir() -> io::Result<PathBuf> {
     })?;
     Ok(home_dir.join(".quest"))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Env vars are process-global, so override, empty, and fallback cases
+    /// share one test to keep set/restore ordering deterministic.
+    #[test]
+    fn test_quest_dir_env_override() {
+        let saved = std::env::var(QUEST_DIR_ENV).ok();
+
+        std::env::set_var(QUEST_DIR_ENV, "/tmp/quest-test-override");
+        assert_eq!(
+            get_quest_dir().unwrap(),
+            PathBuf::from("/tmp/quest-test-override")
+        );
+
+        // Empty and whitespace-only values fall back to the default.
+        std::env::set_var(QUEST_DIR_ENV, "");
+        let dir = get_quest_dir().unwrap();
+        assert!(dir.ends_with(".quest"), "got {dir:?}");
+        std::env::set_var(QUEST_DIR_ENV, "   ");
+        assert!(get_quest_dir().unwrap().ends_with(".quest"));
+
+        std::env::remove_var(QUEST_DIR_ENV);
+        assert!(get_quest_dir().unwrap().ends_with(".quest"));
+
+        if let Some(v) = saved {
+            std::env::set_var(QUEST_DIR_ENV, v);
+        }
+    }
+}

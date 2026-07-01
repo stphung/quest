@@ -351,3 +351,138 @@ fn sync_hp(state: &mut GameState) {
     let hp = 50 + state.character_level * 10;
     state.combat_state = CombatState::new(hp);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn test_parse_overrides_all_flags() {
+        let o = parse_overrides(&args(&[
+            "--name",
+            "Hero",
+            "--level",
+            "60",
+            "--prestige",
+            "12",
+            "--ascension",
+            "3",
+            "--attrs",
+            "70",
+            "--zone",
+            "9",
+            "--subzone",
+            "3",
+            "--gear",
+            "epic",
+            "--ilvl",
+            "95",
+            "--stormglass",
+            "3000",
+            "--stormbreaker",
+            "--boss-ready",
+        ]));
+        assert_eq!(o.name.as_deref(), Some("Hero"));
+        assert_eq!(o.level, Some(60));
+        assert_eq!(o.prestige, Some(12));
+        assert_eq!(o.ascension, Some(3));
+        assert_eq!(o.attrs, Some(70));
+        assert_eq!(o.zone, Some(9));
+        assert_eq!(o.subzone, Some(3));
+        assert_eq!(o.gear, Some(Rarity::Epic));
+        assert_eq!(o.ilvl, Some(95));
+        assert_eq!(o.stormglass, Some(3000));
+        assert!(o.stormbreaker);
+        assert!(o.boss_ready);
+    }
+
+    #[test]
+    fn test_apply_overrides_composes_state() {
+        let mut state = build_fresh("T".into());
+        apply_overrides(
+            &mut state,
+            &parse_overrides(&args(&[
+                "--level",
+                "60",
+                "--prestige",
+                "12",
+                "--zone",
+                "9",
+                "--subzone",
+                "3",
+                "--gear",
+                "epic",
+                "--stormglass",
+                "500",
+                "--boss-ready",
+            ])),
+        );
+        assert_eq!(state.character_level, 60);
+        assert_eq!(state.prestige_rank, 12);
+        assert_eq!(state.zone_progression.current_zone_id, 9);
+        assert_eq!(state.zone_progression.current_subzone_id, 3);
+        assert!(state.zone_progression.unlocked_zones.contains(&9));
+        assert_eq!(state.zone_progression.kills_in_subzone, KILLS_FOR_BOSS);
+        assert!(state.zone_progression.should_spawn_boss());
+        assert_eq!(state.stormglass, 500);
+        assert!(state.stormglass_discovered);
+        assert_eq!(state.equipment.iter_equipped().count(), 7);
+        // --ilvl omitted: gear defaults to zone * 10.
+        for item in state.equipment.iter_equipped() {
+            assert_eq!(item.ilvl, 90);
+        }
+    }
+
+    #[test]
+    fn test_attrs_clamped_to_prestige_cap() {
+        let mut state = build_fresh("T".into());
+        apply_overrides(
+            &mut state,
+            &parse_overrides(&args(&["--prestige", "2", "--attrs", "999"])),
+        );
+        // Cap at P2 is 20 + 2*5 = 30.
+        let cap = state.get_attribute_cap();
+        assert_eq!(cap, 30);
+        for attr in AttributeType::all() {
+            assert_eq!(state.attributes.get(attr), cap);
+        }
+    }
+
+    #[test]
+    fn test_advance_to_zone_defeats_prior_bosses() {
+        let mut state = build_fresh("T".into());
+        advance_to_zone(&mut state, 3, 2);
+        // Every subzone boss in zones 1-2 and subzone 1 of zone 3 is defeated.
+        for z in 1..=2 {
+            for sub in &get_zone(z).unwrap().subzones {
+                assert!(state
+                    .zone_progression
+                    .defeated_bosses
+                    .contains(&(z, sub.id)));
+            }
+        }
+        assert!(state.zone_progression.defeated_bosses.contains(&(3, 1)));
+        assert!(!state.zone_progression.defeated_bosses.contains(&(3, 2)));
+    }
+
+    #[test]
+    fn test_presets_roundtrip_through_save_json() {
+        // Fixtures must serialize cleanly through the same serde path the
+        // game's persistence uses.
+        for scenario in SCENARIOS {
+            let state = (scenario.build)("Roundtrip".into());
+            let json = serde_json::to_string(&state).expect(scenario.name);
+            let back: GameState = serde_json::from_str(&json).expect(scenario.name);
+            assert_eq!(back.character_level, state.character_level);
+            assert_eq!(back.prestige_rank, state.prestige_rank);
+            assert_eq!(
+                back.zone_progression.current_zone_id,
+                state.zone_progression.current_zone_id
+            );
+        }
+    }
+}
