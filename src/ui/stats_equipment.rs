@@ -100,6 +100,9 @@ pub(super) fn draw_equipment_names_only(
     };
 
     let mut equip_rows = Vec::new();
+    // Widest ⚡base[+bonus] string across slots; the column sizes to fit so
+    // 4-digit bonuses don't get truncated (issue #601).
+    let mut power_col_width: u16 = 0;
 
     for (idx, slot_enum) in slot_order.iter().enumerate() {
         let item = game_state.equipment.get(*slot_enum);
@@ -124,15 +127,17 @@ pub(super) fn draw_equipment_names_only(
             let base_power = item.power();
             let enh_mult = crate::enhancement::enhancement_multiplier(enh_level);
             let enh_bonus = (base_power as f64 * enh_mult).round() as u32 - base_power;
-            let mut power_spans = vec![Span::styled(
-                format!("\u{26A1}{}", base_power),
-                Style::default().fg(Color::Cyan),
-            )];
-            if enh_bonus > 0 {
-                power_spans.push(Span::styled(
-                    format!("+{}", enh_bonus),
-                    enhancement_style(enh_level),
-                ));
+            let base_text = format!("\u{26A1}{}", base_power);
+            let bonus_text = if enh_bonus > 0 {
+                format!("+{}", enh_bonus)
+            } else {
+                String::new()
+            };
+            let cell_width = (super::scene_fx::display_width(&base_text) + bonus_text.len()) as u16;
+            power_col_width = power_col_width.max(cell_width);
+            let mut power_spans = vec![Span::styled(base_text, Style::default().fg(Color::Cyan))];
+            if !bonus_text.is_empty() {
+                power_spans.push(Span::styled(bonus_text, enhancement_style(enh_level)));
             }
 
             equip_rows.push(Row::new([
@@ -174,12 +179,12 @@ pub(super) fn draw_equipment_names_only(
     }
 
     let equip_widths = [
-        Constraint::Length(6),  // Slot
-        Constraint::Min(4),     // Name (fills remaining)
-        Constraint::Length(9),  // Rarity
-        Constraint::Length(2),  // Tier
-        Constraint::Length(3),  // Zone
-        Constraint::Length(10), // Power
+        Constraint::Length(6),               // Slot
+        Constraint::Min(4),                  // Name (fills remaining)
+        Constraint::Length(9),               // Rarity
+        Constraint::Length(2),               // Tier
+        Constraint::Length(3),               // Zone
+        Constraint::Length(power_col_width), // Power (sized to widest ⚡base+bonus)
     ];
     let equip_table = Table::new(equip_rows, equip_widths).column_spacing(1);
     frame.render_widget(equip_table, equip_area);
