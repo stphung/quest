@@ -1192,7 +1192,8 @@ fn render_bottom_panel_pattern(
     }
 
     // Diamond progress trail: ◇◇◇◇◆◇◇◇ showing position in sequence.
-    let total_patterns = loom.persistent.patterns.len();
+    // The eternal pattern (always last) has its own panel and is excluded here.
+    let total_patterns = loom.persistent.woven_pattern_count();
     if total_patterns > 0 {
         let mut diamond_spans: Vec<Span> = vec![Span::raw(" ")];
         for i in 0..total_patterns {
