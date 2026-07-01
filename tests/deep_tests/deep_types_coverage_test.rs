@@ -384,7 +384,7 @@ fn test_mercenary_is_available_for_each_status() {
         3,
         MercArchetype::Medic,
         MercStatus::Injured {
-            missions_remaining: 3,
+            recover_at: chrono::Utc::now() + chrono::Duration::hours(6),
         },
     );
     assert!(!injured.is_available());
@@ -749,7 +749,7 @@ fn test_deep_prestige_available_merc_count_mixed_statuses() {
             4,
             MercArchetype::Arcanist,
             MercStatus::Injured {
-                missions_remaining: 2,
+                recover_at: chrono::Utc::now() + chrono::Duration::hours(6),
             },
         ),
         (5, MercArchetype::Saboteur, MercStatus::Lost),

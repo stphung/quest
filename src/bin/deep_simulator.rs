@@ -21,14 +21,14 @@
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use quest::deep::{
-    build_infrastructure, effective_concurrent_missions, effective_duration_secs,
-    generate_mercenary, generate_mission_pool, generate_recruit_pool, generate_starter_roster,
-    guild_upgrade_cost, infrastructure_build_cost, is_daily_supply_run_available,
-    mark_layer_cleared, mission_launch_cost, mission_power_threshold, purge_lost_mercs,
-    roster_has_capacity, start_mission, tick_all_missions, tick_merc_injury,
-    try_upgrade_guild_rank, validate_squad_assignment, AvailableMission, DeepPersistent,
-    DeepPrestige, GuildRank, Infrastructure, LayerTier, MercArchetype, MercQuality, MercStatus,
-    MissionOutcome, MissionStatus, MissionType, RecruitPool,
+    build_infrastructure, check_injury_recovery, effective_concurrent_missions,
+    effective_duration_secs, generate_mercenary, generate_mission_pool, generate_recruit_pool,
+    generate_starter_roster, guild_upgrade_cost, infrastructure_build_cost,
+    is_daily_supply_run_available, mark_layer_cleared, mission_launch_cost,
+    mission_power_threshold, purge_lost_mercs, roster_has_capacity, start_mission,
+    tick_all_missions, try_upgrade_guild_rank, validate_squad_assignment, AvailableMission,
+    DeepPersistent, DeepPrestige, GuildRank, Infrastructure, LayerTier, MercArchetype, MercQuality,
+    MercStatus, MissionOutcome, MissionStatus, MissionType, RecruitPool,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -893,12 +893,8 @@ fn run_simulation(config: &DeepSimConfig, seed: u64) -> DeepSimStats {
             }
         }
 
-        // Tick injuries for mercs who just completed missions.
-        for merc in prestige.roster.values_mut() {
-            if matches!(merc.status, MercStatus::Injured { .. }) {
-                tick_merc_injury(merc);
-            }
-        }
+        // Heal injuries whose wall-clock recovery time has elapsed (simulated time).
+        check_injury_recovery(&mut prestige.roster, now);
 
         // Purge lost mercs.
         purge_lost_mercs(&mut prestige.roster);
@@ -1028,15 +1024,11 @@ fn run_simulation(config: &DeepSimConfig, seed: u64) -> DeepSimStats {
 
         if next <= now {
             // Deadlock prevention: if all mercs injured and no missions active,
-            // advance by 6 hours and tick injuries.
+            // advance by 6 hours so wall-clock injury recovery can catch up.
             stall_count += 1;
             if stall_count > 10 {
                 now += Duration::hours(6);
-                for merc in prestige.roster.values_mut() {
-                    if matches!(merc.status, MercStatus::Injured { .. }) {
-                        tick_merc_injury(merc);
-                    }
-                }
+                check_injury_recovery(&mut prestige.roster, now);
                 stall_count = 0;
                 continue;
             }
@@ -1062,7 +1054,8 @@ fn run_simulation(config: &DeepSimConfig, seed: u64) -> DeepSimStats {
     stats
 }
 
-/// Compute the next event time: the earliest mission.ends_at among active missions.
+/// Compute the next event time: the earliest mission.ends_at among active
+/// missions, or the earliest injury recovery time when nothing is running.
 fn next_event_time(
     prestige: &DeepPrestige,
     now: DateTime<Utc>,
@@ -1080,10 +1073,26 @@ fn next_event_time(
         .map(|m| m.ends_at)
         .min();
 
-    match next_mission {
-        Some(t) if t > now => t,
-        _ => {
-            // No active missions: advance 1 minute to retry AI decisions.
+    // Wall-clock injury recovery is also a schedulable event.
+    let next_recovery = prestige
+        .roster
+        .values()
+        .filter_map(|m| match m.status {
+            MercStatus::Injured { recover_at } => Some(recover_at),
+            _ => None,
+        })
+        .min();
+
+    let next_event = [next_mission, next_recovery]
+        .into_iter()
+        .flatten()
+        .filter(|&t| t > now)
+        .min();
+
+    match next_event {
+        Some(t) => t.min(sim_end),
+        None => {
+            // No scheduled events: advance 1 minute to retry AI decisions.
             let advance = now + Duration::minutes(1);
             advance.min(sim_end)
         }

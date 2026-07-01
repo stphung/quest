@@ -56,13 +56,24 @@ fn archetype_role_desc(archetype: MercArchetype) -> (&'static str, &'static str)
     }
 }
 
-/// Injury severity label and color from missions_remaining.
-pub(super) fn injury_severity_display(missions_remaining: u32) -> (&'static str, Color) {
-    match missions_remaining {
-        1 => ("Light", Color::Yellow),
-        2 => ("Moderate", Color::LightRed),
-        _ => ("Severe", Color::Red),
+/// Injury status label with remaining recovery time (e.g. "Injured 3h 42m")
+/// and a color that eases from red toward yellow as recovery approaches.
+pub(super) fn injury_status_display(
+    recover_at: chrono::DateTime<Utc>,
+    now: chrono::DateTime<Utc>,
+) -> (String, Color) {
+    let remaining = (recover_at - now).num_seconds().max(0);
+    if remaining == 0 {
+        return ("Recovering".to_string(), Color::Yellow);
     }
+    let color = if remaining <= 4 * 3600 {
+        Color::Yellow
+    } else if remaining <= 10 * 3600 {
+        Color::LightRed
+    } else {
+        Color::Red
+    };
+    (format!("Injured {}", format_countdown(remaining)), color)
 }
 
 // Roster rendering is handled inline in deep_missions.rs (Status tab).

@@ -10,18 +10,19 @@
 //! - apply_merc_xp level application and stat proportional scaling
 //! - Roster capacity by guild rank
 //! - available_mercs filtering
-//! - Injury system (injure_merc, tick_merc_injury, severities)
+//! - Injury system (injure_merc, check_injury_recovery, severities)
 //! - Mark lost and purge pipeline
 //! - roll_recruit_cost rounding and ordering by quality
 //! - generate_merc_name format
 //! - DeepState::on_prestige() — resets prestige, preserves persistent
 
+use chrono::Utc;
 use quest::deep::{
-    apply_merc_xp, available_mercs, generate_merc_name, generate_mercenary, generate_recruit_pool,
-    generate_starter_roster, injure_merc, mark_merc_lost, purge_lost_mercs, recruit_pool_size,
-    roll_recruit_cost, roll_recruit_quality, roster_has_capacity, stats_at_level, tick_merc_injury,
-    xp_to_next_level, DeepPrestige, DeepState, GuildRank, InjurySeverity, MercArchetype,
-    MercQuality, MercStatus, Mercenary,
+    apply_merc_xp, available_mercs, check_injury_recovery, generate_merc_name, generate_mercenary,
+    generate_recruit_pool, generate_starter_roster, injure_merc, mark_merc_lost, purge_lost_mercs,
+    recruit_pool_size, roll_recruit_cost, roll_recruit_quality, roster_has_capacity,
+    stats_at_level, xp_to_next_level, DeepPrestige, DeepState, GuildRank, InjurySeverity,
+    MercArchetype, MercQuality, MercStatus, Mercenary,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -916,7 +917,7 @@ fn test_available_mercs_filters_all_status_variants() {
     let m4 = generate_mercenary(4, MercArchetype::Arcanist, MercQuality::Common, &mut rng);
     m1.status = MercStatus::OnMission(1);
     m2.status = MercStatus::Injured {
-        missions_remaining: 3,
+        recover_at: chrono::Utc::now() + chrono::Duration::hours(6),
     };
     m3.status = MercStatus::Lost;
     // m4 remains Available.
@@ -958,17 +959,18 @@ fn test_available_mercs_all_on_mission_returns_empty() {
 }
 
 // =============================================================================
-// Injury system — injure_merc, tick_merc_injury
+// Injury system — injure_merc, check_injury_recovery (wall-clock)
 // =============================================================================
 
 #[test]
 fn test_injure_merc_light_sets_injured_status() {
     let mut rng = seeded_rng(700);
+    let now = Utc::now();
     let mut merc = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
-    injure_merc(&mut merc, InjurySeverity::Light, &mut rng);
+    injure_merc(&mut merc, InjurySeverity::Light, now, &mut rng);
     assert!(
-        matches!(merc.status, MercStatus::Injured { missions_remaining } if missions_remaining >= 1),
-        "Light injury should set Injured status with at least 1 mission remaining"
+        matches!(merc.status, MercStatus::Injured { recover_at } if recover_at > now),
+        "Light injury should set Injured status with a future recovery time"
     );
     assert!(!merc.is_available(), "Injured merc should not be available");
 }
@@ -982,7 +984,7 @@ fn test_injure_merc_all_severities_produce_injured_status() {
     ] {
         let mut rng = seeded_rng(701);
         let mut merc = generate_mercenary(1, MercArchetype::Scout, MercQuality::Common, &mut rng);
-        injure_merc(&mut merc, severity, &mut rng);
+        injure_merc(&mut merc, severity, Utc::now(), &mut rng);
         assert!(
             matches!(merc.status, MercStatus::Injured { .. }),
             "{:?} injury should set Injured status",
@@ -992,118 +994,154 @@ fn test_injure_merc_all_severities_produce_injured_status() {
 }
 
 #[test]
-fn test_injure_merc_severe_averages_more_missions_than_light() {
+fn test_injure_merc_severe_averages_longer_recovery_than_light() {
     let n = 100;
-    let mut light_sum = 0u64;
-    let mut severe_sum = 0u64;
+    let now = Utc::now();
+    let mut light_sum = 0i64;
+    let mut severe_sum = 0i64;
     for seed in 0..n {
         let mut rng = seeded_rng(seed + 702);
         let mut merc1 = generate_mercenary(1, MercArchetype::Medic, MercQuality::Common, &mut rng);
-        injure_merc(&mut merc1, InjurySeverity::Light, &mut rng);
-        if let MercStatus::Injured { missions_remaining } = merc1.status {
-            light_sum += missions_remaining as u64;
+        injure_merc(&mut merc1, InjurySeverity::Light, now, &mut rng);
+        if let MercStatus::Injured { recover_at } = merc1.status {
+            light_sum += (recover_at - now).num_seconds();
         }
 
         let mut rng = seeded_rng(seed + 702);
         let mut merc2 = generate_mercenary(1, MercArchetype::Medic, MercQuality::Common, &mut rng);
-        injure_merc(&mut merc2, InjurySeverity::Severe, &mut rng);
-        if let MercStatus::Injured { missions_remaining } = merc2.status {
-            severe_sum += missions_remaining as u64;
+        injure_merc(&mut merc2, InjurySeverity::Severe, now, &mut rng);
+        if let MercStatus::Injured { recover_at } = merc2.status {
+            severe_sum += (recover_at - now).num_seconds();
         }
     }
     assert!(
         severe_sum >= light_sum,
-        "Severe injury sum ({}) should be >= Light injury sum ({})",
+        "Severe recovery sum ({}) should be >= Light recovery sum ({})",
         severe_sum,
         light_sum
     );
 }
 
 #[test]
-fn test_tick_merc_injury_recovery_at_1_mission_remaining() {
+fn test_injure_merc_recovery_within_severity_range() {
+    let now = Utc::now();
+    for severity in [
+        InjurySeverity::Light,
+        InjurySeverity::Moderate,
+        InjurySeverity::Severe,
+    ] {
+        let (min, max) = severity.recovery_secs();
+        for seed in 0..50 {
+            let mut rng = seeded_rng(seed + 750);
+            let mut merc =
+                generate_mercenary(1, MercArchetype::Scout, MercQuality::Common, &mut rng);
+            injure_merc(&mut merc, severity, now, &mut rng);
+            let MercStatus::Injured { recover_at } = merc.status else {
+                panic!("Merc should be Injured");
+            };
+            let secs = (recover_at - now).num_seconds();
+            assert!(
+                (min as i64..=max as i64).contains(&secs),
+                "{:?} recovery {}s should be in [{}, {}]",
+                severity,
+                secs,
+                min,
+                max
+            );
+        }
+    }
+}
+
+#[test]
+fn test_check_injury_recovery_heals_when_time_elapsed() {
     let mut rng = seeded_rng(800);
+    let now = Utc::now();
     let mut merc = generate_mercenary(1, MercArchetype::Scout, MercQuality::Common, &mut rng);
     merc.status = MercStatus::Injured {
-        missions_remaining: 1,
+        recover_at: now - chrono::Duration::seconds(1),
     };
-    let recovered = tick_merc_injury(&mut merc);
+    let mut roster: std::collections::HashMap<u64, Mercenary> =
+        vec![(1, merc)].into_iter().collect();
+    let recovered = check_injury_recovery(&mut roster, now);
+    assert_eq!(recovered, 1, "Merc past recover_at should heal");
     assert!(
-        recovered,
-        "Merc should recover when missions_remaining hits 0"
+        roster[&1].is_available(),
+        "Recovered merc should be Available"
     );
-    assert!(merc.is_available(), "Recovered merc should be Available");
 }
 
 #[test]
-fn test_tick_merc_injury_decrements_counter() {
+fn test_check_injury_recovery_heals_at_exact_recovery_time() {
     let mut rng = seeded_rng(801);
+    let now = Utc::now();
     let mut merc = generate_mercenary(1, MercArchetype::Scout, MercQuality::Common, &mut rng);
-    merc.status = MercStatus::Injured {
-        missions_remaining: 4,
-    };
-    let recovered = tick_merc_injury(&mut merc);
-    assert!(!recovered, "Should not recover when missions_remaining > 1");
-    assert!(
-        matches!(
-            merc.status,
-            MercStatus::Injured {
-                missions_remaining: 3
-            }
-        ),
-        "missions_remaining should decrement to 3"
-    );
+    merc.status = MercStatus::Injured { recover_at: now };
+    let mut roster: std::collections::HashMap<u64, Mercenary> =
+        vec![(1, merc)].into_iter().collect();
+    let recovered = check_injury_recovery(&mut roster, now);
+    assert_eq!(recovered, 1, "Merc should heal exactly at recover_at");
+    assert!(roster[&1].is_available());
 }
 
 #[test]
-fn test_tick_merc_injury_full_countdown_sequence() {
+fn test_check_injury_recovery_leaves_pending_injuries() {
     let mut rng = seeded_rng(802);
+    let now = Utc::now();
+    let recover_at = now + chrono::Duration::hours(3);
     let mut merc = generate_mercenary(1, MercArchetype::Medic, MercQuality::Common, &mut rng);
-    merc.status = MercStatus::Injured {
-        missions_remaining: 3,
-    };
-    assert!(!tick_merc_injury(&mut merc));
-    assert!(matches!(
-        merc.status,
-        MercStatus::Injured {
-            missions_remaining: 2
-        }
-    ));
-    assert!(!tick_merc_injury(&mut merc));
-    assert!(matches!(
-        merc.status,
-        MercStatus::Injured {
-            missions_remaining: 1
-        }
-    ));
-    let recovered = tick_merc_injury(&mut merc);
-    assert!(recovered, "Should recover after 3 ticks");
-    assert!(merc.is_available());
+    merc.status = MercStatus::Injured { recover_at };
+    let mut roster: std::collections::HashMap<u64, Mercenary> =
+        vec![(1, merc)].into_iter().collect();
+    let recovered = check_injury_recovery(&mut roster, now);
+    assert_eq!(recovered, 0, "Merc with time remaining should stay injured");
+    assert!(
+        matches!(roster[&1].status, MercStatus::Injured { recover_at: t } if t == recover_at),
+        "Pending injury must remain untouched"
+    );
 }
 
 #[test]
-fn test_tick_merc_injury_noop_on_available() {
+fn test_check_injury_recovery_heals_multiple_and_no_missions_needed() {
+    // Soft-lock regression (issue #462): recovery must not depend on missions.
     let mut rng = seeded_rng(803);
-    let mut merc = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
-    assert!(matches!(merc.status, MercStatus::Available));
-    let recovered = tick_merc_injury(&mut merc);
-    assert!(
-        !recovered,
-        "tick_merc_injury on Available merc should return false"
-    );
-    assert!(merc.is_available(), "Status should remain Available");
+    let now = Utc::now();
+    let mut m1 = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+    let mut m2 = generate_mercenary(2, MercArchetype::Scout, MercQuality::Common, &mut rng);
+    let mut m3 = generate_mercenary(3, MercArchetype::Medic, MercQuality::Common, &mut rng);
+    m1.status = MercStatus::Injured {
+        recover_at: now - chrono::Duration::hours(1),
+    };
+    m2.status = MercStatus::Injured {
+        recover_at: now - chrono::Duration::minutes(5),
+    };
+    m3.status = MercStatus::Injured {
+        recover_at: now + chrono::Duration::hours(8),
+    };
+    let mut roster: std::collections::HashMap<u64, Mercenary> =
+        vec![(1, m1), (2, m2), (3, m3)].into_iter().collect();
+    let recovered = check_injury_recovery(&mut roster, now);
+    assert_eq!(recovered, 2, "Both elapsed injuries should heal");
+    assert!(roster[&1].is_available());
+    assert!(roster[&2].is_available());
+    assert!(!roster[&3].is_available());
 }
 
 #[test]
-fn test_tick_merc_injury_noop_on_lost() {
+fn test_check_injury_recovery_noop_on_available_and_lost() {
     let mut rng = seeded_rng(804);
-    let mut merc = generate_mercenary(1, MercArchetype::Saboteur, MercQuality::Common, &mut rng);
-    merc.status = MercStatus::Lost;
-    let recovered = tick_merc_injury(&mut merc);
+    let now = Utc::now();
+    let m1 = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+    let mut m2 = generate_mercenary(2, MercArchetype::Saboteur, MercQuality::Common, &mut rng);
+    m2.status = MercStatus::Lost;
+    let mut roster: std::collections::HashMap<u64, Mercenary> =
+        vec![(1, m1), (2, m2)].into_iter().collect();
+    let recovered = check_injury_recovery(&mut roster, now);
+    assert_eq!(recovered, 0);
+    assert!(roster[&1].is_available(), "Available merc stays Available");
     assert!(
-        !recovered,
-        "tick_merc_injury on Lost merc should return false"
+        matches!(roster[&2].status, MercStatus::Lost),
+        "Lost merc stays Lost"
     );
-    assert!(matches!(merc.status, MercStatus::Lost));
 }
 
 // =============================================================================
@@ -1432,7 +1470,7 @@ fn test_deep_prestige_available_merc_count() {
     let mut m1 = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
     let m2 = generate_mercenary(2, MercArchetype::Scout, MercQuality::Common, &mut rng);
     m1.status = MercStatus::Injured {
-        missions_remaining: 1,
+        recover_at: chrono::Utc::now() + chrono::Duration::hours(6),
     };
     prestige.roster = vec![(m1.id, m1), (m2.id, m2)].into_iter().collect();
     assert_eq!(prestige.available_merc_count(), 1);

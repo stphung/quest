@@ -23,7 +23,7 @@ use super::layers::{
     mission_power_threshold, watchtower_auto_resolve_bonus, FamiliarityLevel,
 };
 use super::mercenaries::{
-    generate_recruit_pool, injure_merc, mark_merc_lost, purge_lost_mercs, tick_merc_injury,
+    check_injury_recovery, generate_recruit_pool, injure_merc, mark_merc_lost, purge_lost_mercs,
 };
 use super::types::{
     effective_concurrent_missions, AvailableMission, DeepPersistent, DeepPrestige, GuildRank,
@@ -805,7 +805,9 @@ fn ensure_emergency_recruit(prestige: &mut DeepPrestige) -> bool {
 
 /// Emergency fallback when all mercs are injured and no mission can run.
 ///
-/// Promotes one least-injured merc to available so the warband cannot deadlock.
+/// Promotes the merc closest to recovery to available so the warband cannot
+/// deadlock. Injuries also heal on their own via wall-clock recovery
+/// (`check_injury_recovery`); this is a belt-and-suspenders quality-of-life net.
 fn ensure_emergency_recovery_merc(prestige: &mut DeepPrestige) -> bool {
     if !prestige.active_missions.is_empty() || prestige.available_merc_count() > 0 {
         return false;
@@ -815,10 +817,10 @@ fn ensure_emergency_recovery_merc(prestige: &mut DeepPrestige) -> bool {
         .roster
         .values()
         .filter_map(|merc| match merc.status {
-            MercStatus::Injured { missions_remaining } => Some((merc.id, missions_remaining)),
+            MercStatus::Injured { recover_at } => Some((merc.id, recover_at)),
             _ => None,
         })
-        .min_by_key(|(_, missions_remaining)| *missions_remaining)
+        .min_by_key(|(_, recover_at)| *recover_at)
     else {
         return false;
     };
@@ -827,15 +829,6 @@ fn ensure_emergency_recovery_merc(prestige: &mut DeepPrestige) -> bool {
         merc.status = MercStatus::Available;
     }
     true
-}
-
-/// Progress injury recovery counters once per completed mission globally.
-fn progress_injuries_after_completions(prestige: &mut DeepPrestige, completed_count: usize) {
-    for _ in 0..completed_count {
-        for merc in prestige.roster.values_mut() {
-            let _ = tick_merc_injury(merc);
-        }
-    }
 }
 
 /// Compute effective mission duration from the S2 table, reduced by layer
@@ -1232,6 +1225,10 @@ pub fn tick_all_missions(
     let mut summary = MissionTickSummary::default();
     let mut completed_ids: Vec<u64> = Vec::new();
 
+    // Wall-clock injury recovery: heal injured mercs whose recovery time has
+    // elapsed, independent of mission activity (prevents the all-injured soft-lock).
+    summary.mercs_recovered = check_injury_recovery(&mut prestige.roster, now) as usize;
+
     for mission in &mut prestige.active_missions {
         if !matches!(
             mission.status,
@@ -1297,7 +1294,7 @@ pub fn tick_all_missions(
     for id in completed_ids {
         if let Some(idx) = prestige.active_missions.iter().position(|m| m.id == id) {
             let mut mission = prestige.active_missions.remove(idx);
-            resolve_mission(&mut mission, prestige, persistent, rng);
+            resolve_mission(&mut mission, prestige, persistent, now, rng);
             summary.missions_completed += 1;
 
             // Populate achievement signals from the resolved mission.
@@ -1319,8 +1316,6 @@ pub fn tick_all_missions(
         }
     }
 
-    progress_injuries_after_completions(prestige, summary.missions_completed);
-
     summary
 }
 
@@ -1334,6 +1329,8 @@ pub struct MissionTickSummary {
     pub breakthroughs: Vec<u32>,
     /// Number of mercenaries permanently lost across all resolved missions.
     pub mercs_lost: usize,
+    /// Number of injured mercenaries who recovered (wall-clock) this tick.
+    pub mercs_recovered: usize,
     /// Whether a GatewayExpedition completed successfully this tick.
     pub gateway_opened: bool,
 }
@@ -1461,10 +1458,12 @@ fn compute_outcome(
 ///
 /// Mutates `mission.result` and updates mercs in `prestige`.
 /// Also applies layer state changes (familiarity, clearing) to `persistent`.
+/// `now` anchors wall-clock injury recovery times (pass simulated time in tests).
 pub fn resolve_mission(
     mission: &mut Mission,
     prestige: &mut DeepPrestige,
     persistent: &mut DeepPersistent,
+    now: DateTime<Utc>,
     rng: &mut impl Rng,
 ) {
     // Special handling for First Orders starter mission
@@ -1494,7 +1493,7 @@ pub fn resolve_mission(
 
     // Determine injuries and losses based on outcome.
     let (injured_mercs, lost_mercs) =
-        apply_mission_casualties(mission, prestige, persistent, &outcome, rng);
+        apply_mission_casualties(mission, prestige, persistent, &outcome, now, rng);
 
     // Apply merc progression and level-ups from mission completion count.
     let merc_level_ups = apply_squad_progression(mission, prestige);
@@ -1562,7 +1561,7 @@ pub fn resolve_mission(
         layer: mission.layer,
         outcome: log_outcome,
         marks_earned,
-        timestamp: Utc::now(),
+        timestamp: now,
     });
     const MAX_WARBAND_LOG: usize = 10;
     if prestige.warband_log.len() > MAX_WARBAND_LOG {
@@ -1638,6 +1637,7 @@ fn apply_mission_casualties(
     prestige: &mut DeepPrestige,
     _persistent: &DeepPersistent,
     outcome: &MissionOutcome,
+    now: DateTime<Utc>,
     rng: &mut impl Rng,
 ) -> (Vec<u64>, Vec<u64>) {
     let mut injured = Vec::new();
@@ -1705,7 +1705,7 @@ fn apply_mission_casualties(
             } else {
                 injured.push(id);
                 if let Some(m) = prestige.find_merc_mut(id) {
-                    injure_merc(m, super::mercenaries::InjurySeverity::Moderate, rng);
+                    injure_merc(m, super::mercenaries::InjurySeverity::Moderate, now, rng);
                 }
             }
         }
@@ -1788,7 +1788,11 @@ pub fn resolve_offline_missions(
     rng: &mut impl Rng,
 ) -> OfflineResolutionSummary {
     let now = Utc::now();
-    let mut summary = OfflineResolutionSummary::default();
+    // Offline catch-up: heal injuries that expired while the game was closed.
+    let mut summary = OfflineResolutionSummary {
+        mercs_recovered: check_injury_recovery(&mut prestige.roster, now) as usize,
+        ..Default::default()
+    };
 
     let mut completed_ids: Vec<u64> = Vec::new();
 
@@ -1827,11 +1831,13 @@ pub fn resolve_offline_missions(
         }
     }
 
-    // Resolve completed missions.
+    // Resolve completed missions. Injuries are anchored at the mission's actual
+    // end time so recovery credit accrues for the remainder of the offline window.
     for id in completed_ids {
         if let Some(idx) = prestige.active_missions.iter().position(|m| m.id == id) {
             let mut mission = prestige.active_missions.remove(idx);
-            resolve_mission(&mut mission, prestige, persistent, rng);
+            let completed_at = mission.ends_at.min(now);
+            resolve_mission(&mut mission, prestige, persistent, completed_at, rng);
             summary.missions_resolved += 1;
             if let Some(ref result) = mission.result {
                 summary.total_marks_earned += result.marks_earned;
@@ -1841,7 +1847,8 @@ pub fn resolve_offline_missions(
         }
     }
 
-    progress_injuries_after_completions(prestige, summary.missions_resolved);
+    // Injuries rolled above may already have expired within the offline window.
+    summary.mercs_recovered += check_injury_recovery(&mut prestige.roster, now) as usize;
 
     summary
 }
@@ -1853,6 +1860,8 @@ pub struct OfflineResolutionSummary {
     pub missions_resolved: usize,
     /// Number of check-in events auto-resolved during offline catch-up.
     pub events_auto_resolved: usize,
+    /// Number of injured mercs whose recovery elapsed while offline.
+    pub mercs_recovered: usize,
     /// Total Warband Marks awarded from completed missions.
     pub total_marks_earned: u32,
     /// Total character XP awarded.
@@ -2522,11 +2531,11 @@ mod tests {
 
         let mut m1 = make_merc(1, MercArchetype::Vanguard, 30);
         m1.status = MercStatus::Injured {
-            missions_remaining: 2,
+            recover_at: now + Duration::hours(12),
         };
         let mut m2 = make_merc(2, MercArchetype::Scout, 28);
         m2.status = MercStatus::Injured {
-            missions_remaining: 1,
+            recover_at: now + Duration::hours(4),
         };
         prestige.roster = vec![(1, m1), (2, m2)].into_iter().collect();
 
@@ -2535,6 +2544,11 @@ mod tests {
         assert!(
             prestige.available_merc_count() >= 1,
             "Emergency safeguard should guarantee one deployable merc"
+        );
+        // The merc closest to recovery is the one released.
+        assert!(
+            prestige.roster[&2].is_available(),
+            "Safeguard should free the merc closest to recovery"
         );
     }
 
@@ -2943,7 +2957,13 @@ mod tests {
             is_first_orders: false,
         };
 
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            &mut rng,
+        );
 
         let result = mission.result.as_ref().unwrap();
         assert_eq!(result.outcome, MissionOutcome::Success);
@@ -2984,7 +3004,13 @@ mod tests {
             is_first_orders: false,
         };
 
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            &mut rng,
+        );
 
         assert!(
             prestige.warband_marks > initial_marks,
@@ -3022,6 +3048,7 @@ mod tests {
             &mut mission,
             &mut prestige,
             &mut persistent,
+            Utc::now(),
             &mut success_rng,
         );
 
@@ -3065,7 +3092,13 @@ mod tests {
             is_first_orders: false,
         };
 
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            &mut rng,
+        );
 
         // After supply run (always success, no casualties), merc should be available.
         let merc_status = &prestige.find_merc(1).unwrap().status;
@@ -3077,46 +3110,39 @@ mod tests {
     }
 
     #[test]
-    fn test_tick_all_missions_progresses_injury_counters() {
+    fn test_tick_all_missions_heals_elapsed_injuries_without_missions() {
+        // Soft-lock regression (issue #462): injuries must heal on wall-clock
+        // time even when no missions are running.
         let mut rng = seeded_rng();
         let mut persistent = DeepPersistent::new();
         let _ = persistent.layer_record_mut(1);
 
-        let mut injured = make_merc(1, MercArchetype::Vanguard, 30);
-        injured.status = MercStatus::Injured {
-            missions_remaining: 2,
-        };
-        let runner = make_merc(2, MercArchetype::Scout, 24);
-        let mut prestige = make_prestige_with_mercs(vec![injured, runner]);
-        if let Some(merc) = prestige.find_merc_mut(2) {
-            merc.status = MercStatus::OnMission(42);
-        }
-
         let now = Utc::now();
-        prestige.active_missions.push(Mission {
-            id: 42,
-            mission_type: MissionType::SupplyRun,
-            layer: 1,
-            squad: vec![2],
-            started_at: now - Duration::hours(3),
-            ends_at: now - Duration::minutes(1),
-            events: vec![],
-            pending_event_index: 0,
-            status: MissionStatus::Active,
-            result: None,
-            is_first_orders: false,
-        });
+        let mut healed = make_merc(1, MercArchetype::Vanguard, 30);
+        healed.status = MercStatus::Injured {
+            recover_at: now - Duration::minutes(1),
+        };
+        let mut still_injured = make_merc(2, MercArchetype::Scout, 24);
+        let pending_recover_at = now + Duration::hours(5);
+        still_injured.status = MercStatus::Injured {
+            recover_at: pending_recover_at,
+        };
+        let mut prestige = make_prestige_with_mercs(vec![healed, still_injured]);
+        assert!(prestige.active_missions.is_empty());
 
         let summary = tick_all_missions(&mut prestige, &mut persistent, now, &mut rng);
-        assert_eq!(summary.missions_completed, 1);
+        assert_eq!(summary.missions_completed, 0);
+        assert_eq!(summary.mercs_recovered, 1);
+        assert!(
+            prestige.roster[&1].is_available(),
+            "Merc past recover_at should heal with no missions running"
+        );
         assert!(
             matches!(
-                prestige.find_merc(1).map(|m| &m.status),
-                Some(&MercStatus::Injured {
-                    missions_remaining: 1
-                })
+                prestige.roster[&2].status,
+                MercStatus::Injured { recover_at } if recover_at == pending_recover_at
             ),
-            "One completed mission should decrement injury countdown"
+            "Merc with time remaining should stay injured"
         );
     }
 

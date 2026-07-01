@@ -152,15 +152,60 @@ impl MercArchetype {
 
 /// Current availability status of a mercenary.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(from = "MercStatusCompat")]
 pub enum MercStatus {
     /// Ready to be assigned to a mission.
     Available,
     /// Assigned to an active mission (mission id stored for lookup).
     OnMission(u64),
-    /// Injured — cannot take missions for the given number of missions.
-    Injured { missions_remaining: u32 },
+    /// Injured — cannot take missions until the wall-clock recovery time passes.
+    Injured { recover_at: DateTime<Utc> },
     /// Permanently lost (kept in roster only for death notification; purged after acknowledged).
     Lost,
+}
+
+/// Legacy saves stored injuries as a `missions_remaining` counter that only
+/// decremented when a mission completed — a soft-lock when no missions could
+/// run.  Convert at 6 hours per mission-equivalent from load time.
+const LEGACY_HOURS_PER_MISSION: i64 = 6;
+
+/// Deserialization shim accepting both the legacy `missions_remaining` counter
+/// and the current wall-clock `recover_at` timestamp for `MercStatus::Injured`.
+#[derive(Deserialize)]
+enum MercStatusCompat {
+    Available,
+    OnMission(u64),
+    Injured {
+        #[serde(default)]
+        recover_at: Option<DateTime<Utc>>,
+        #[serde(default)]
+        missions_remaining: Option<u32>,
+    },
+    Lost,
+}
+
+impl From<MercStatusCompat> for MercStatus {
+    fn from(compat: MercStatusCompat) -> Self {
+        match compat {
+            MercStatusCompat::Available => MercStatus::Available,
+            MercStatusCompat::OnMission(id) => MercStatus::OnMission(id),
+            MercStatusCompat::Injured {
+                recover_at: Some(recover_at),
+                ..
+            } => MercStatus::Injured { recover_at },
+            MercStatusCompat::Injured {
+                recover_at: None,
+                missions_remaining,
+            } => {
+                let missions = missions_remaining.unwrap_or(1).max(1) as i64;
+                MercStatus::Injured {
+                    recover_at: Utc::now()
+                        + chrono::Duration::hours(missions * LEGACY_HOURS_PER_MISSION),
+                }
+            }
+            MercStatusCompat::Lost => MercStatus::Lost,
+        }
+    }
 }
 
 /// Type of mission.
@@ -355,6 +400,15 @@ impl Mercenary {
     /// Whether this mercenary is available for assignment.
     pub fn is_available(&self) -> bool {
         matches!(self.status, MercStatus::Available)
+    }
+
+    /// Remaining injury recovery time in seconds, clamped to 0 when due.
+    /// Returns `None` when the merc is not injured.
+    pub fn injury_remaining_secs(&self, now: DateTime<Utc>) -> Option<i64> {
+        match self.status {
+            MercStatus::Injured { recover_at } => Some((recover_at - now).num_seconds().max(0)),
+            _ => None,
+        }
     }
 
     /// Effective power accounting for level bonuses.
@@ -1497,7 +1551,7 @@ mod tests {
         assert!(!on_mission.is_available());
         let injured = Mercenary {
             status: MercStatus::Injured {
-                missions_remaining: 2,
+                recover_at: Utc::now() + chrono::Duration::hours(6),
             },
             ..base.clone()
         };
@@ -1507,6 +1561,82 @@ mod tests {
             ..base
         };
         assert!(!lost.is_available());
+    }
+
+    // ── MercStatus serde migration ───────────────────────────────────────────
+
+    #[test]
+    fn test_merc_status_injured_roundtrip() {
+        let recover_at = Utc::now() + chrono::Duration::hours(9);
+        let status = MercStatus::Injured { recover_at };
+        let json = serde_json::to_string(&status).unwrap();
+        let loaded: MercStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded, status);
+    }
+
+    #[test]
+    fn test_merc_status_legacy_missions_remaining_migrates_to_wall_clock() {
+        // Old saves stored `Injured { missions_remaining }`. It must deserialize
+        // to a future wall-clock recovery time (6h per mission-equivalent).
+        let json = r#"{"Injured":{"missions_remaining":2}}"#;
+        let before = Utc::now();
+        let loaded: MercStatus = serde_json::from_str(json).unwrap();
+        let MercStatus::Injured { recover_at } = loaded else {
+            panic!(
+                "Legacy injured status should stay Injured, got {:?}",
+                loaded
+            );
+        };
+        let remaining = (recover_at - before).num_seconds();
+        // 2 missions * 6h = 12h, allow slack for test execution time.
+        assert!(
+            (11 * 3600..=12 * 3600 + 60).contains(&remaining),
+            "Legacy 2-mission injury should recover in ~12h, got {}s",
+            remaining
+        );
+    }
+
+    #[test]
+    fn test_merc_status_non_injured_variants_roundtrip() {
+        for status in [
+            MercStatus::Available,
+            MercStatus::OnMission(42),
+            MercStatus::Lost,
+        ] {
+            let json = serde_json::to_string(&status).unwrap();
+            let loaded: MercStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(loaded, status);
+        }
+    }
+
+    #[test]
+    fn test_injury_remaining_secs() {
+        let now = Utc::now();
+        let merc = Mercenary {
+            id: 1,
+            name: "Test".to_string(),
+            archetype: MercArchetype::Vanguard,
+            power: 14,
+            resilience: 12,
+            expertise: 4,
+            level: 1,
+            missions_completed: 0,
+            quality: MercQuality::Common,
+            status: MercStatus::Injured {
+                recover_at: now + chrono::Duration::hours(2),
+            },
+        };
+        assert_eq!(merc.injury_remaining_secs(now), Some(2 * 3600));
+        // Past-due injuries clamp to zero.
+        assert_eq!(
+            merc.injury_remaining_secs(now + chrono::Duration::hours(3)),
+            Some(0)
+        );
+        let available = Mercenary {
+            status: MercStatus::Available,
+            ..merc
+        };
+        assert_eq!(available.injury_remaining_secs(now), None);
     }
 
     // ── CheckInEvent ─────────────────────────────────────────────────────────

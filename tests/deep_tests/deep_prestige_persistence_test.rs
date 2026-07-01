@@ -646,7 +646,7 @@ fn test_prestige_with_injured_mercs_preserves_roster() {
     // Injure a merc
     let first_id = *deep.prestige.roster.keys().next().unwrap();
     deep.prestige.roster.get_mut(&first_id).unwrap().status = MercStatus::Injured {
-        missions_remaining: 5,
+        recover_at: chrono::Utc::now() + chrono::Duration::hours(6),
     };
     let roster_len = deep.prestige.roster.len();
     deep.on_prestige();
