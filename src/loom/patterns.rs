@@ -422,6 +422,14 @@ mod tests {
     }
 
     #[test]
+    fn test_woven_pattern_count_excludes_eternal() {
+        let state = state_with_patterns();
+        // 29 patterns exist, but the display total excludes the eternal one.
+        assert_eq!(state.persistent.patterns.len(), 29);
+        assert_eq!(state.persistent.woven_pattern_count(), 28);
+    }
+
+    #[test]
     fn test_eternal_pattern_excluded_from_count() {
         let mut state = state_with_patterns();
         // Complete everything including eternal

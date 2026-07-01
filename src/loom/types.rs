@@ -348,6 +348,11 @@ pub struct LoomPersistent {
 }
 
 impl LoomPersistent {
+    /// Total number of Woven Patterns (excludes eternal patterns).
+    pub fn woven_pattern_count(&self) -> usize {
+        self.patterns.iter().filter(|p| !p.eternal).count()
+    }
+
     /// Number of completed Woven Patterns (excludes eternal patterns).
     pub fn completed_pattern_count(&self) -> usize {
         self.patterns
