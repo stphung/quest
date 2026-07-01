@@ -24,10 +24,24 @@ color PNG screenshots to embed in PRs.
 - `midgame` — level 45, P5, Zone 8, rare/epic gear, stormglass
 - `endgame` — level 80, P25, Ascension III, Zone 11 (The Expanse), Stormbreaker
 - `boss` — midgame with the subzone boss spawning on the first tick
+- `custom` — fresh character shaped entirely by override flags
+
+Every scenario accepts override flags, so arbitrary states compose from the
+command line without editing code:
+
+```bash
+mkstate custom --level 60 --prestige 12 --zone 9 --subzone 3 --gear epic --boss-ready
+mkstate midgame --zone 3 --attrs 25 --stormglass 100
+```
+
+Flags: `--name --level --prestige --ascension --attrs --zone --subzone
+--gear <rarity> --ilvl --stormglass --stormbreaker --boss-ready`
+(run `mkstate --help` for details).
 
 Fixtures cover the character save only; account-level systems (Haven, Deep,
-Loom, enhancement) start undiscovered. Use the debug menu to trigger those,
-or extend `src/bin/mkstate.rs` with a new scenario.
+Loom, enhancement) start undiscovered — so `--zone` beyond 11 is not honored
+without Deep state. Use the debug menu to trigger account systems, or extend
+`src/bin/mkstate.rs` with a new scenario/flag when a state can't be reached.
 
 ## Recipe
 

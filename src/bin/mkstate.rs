@@ -10,6 +10,14 @@
 //! QUEST_DIR=/tmp/fx cargo run  # then pick the character on the select screen
 //! ```
 //!
+//! Every preset accepts override flags, and the `custom` scenario starts from
+//! a fresh character, so arbitrary states compose from the command line:
+//!
+//! ```sh
+//! mkstate custom --level 60 --prestige 12 --zone 9 --gear epic --boss-ready
+//! mkstate midgame --zone 3 --subzone 2 --attrs 25
+//! ```
+//!
 //! Scenarios only write the character save file. Account-level state
 //! (haven.json, deep.json, loom, enhancement) is not generated yet — the game
 //! treats those systems as undiscovered, which is a valid state.
@@ -50,36 +58,177 @@ const SCENARIOS: &[Scenario] = &[
         description: "Midgame state with the subzone boss ready to spawn on the first tick",
         build: build_boss,
     },
+    Scenario {
+        name: "custom",
+        description: "Fresh character shaped entirely by override flags",
+        build: build_fresh,
+    },
 ];
+
+#[derive(Default)]
+struct Overrides {
+    name: Option<String>,
+    level: Option<u32>,
+    prestige: Option<u32>,
+    ascension: Option<u32>,
+    attrs: Option<u32>,
+    zone: Option<u32>,
+    subzone: Option<u32>,
+    gear: Option<Rarity>,
+    ilvl: Option<u32>,
+    stormglass: Option<u64>,
+    stormbreaker: bool,
+    boss_ready: bool,
+}
+
+fn usage() -> ! {
+    eprintln!("Usage: mkstate <scenario> [overrides]\n");
+    eprintln!("Scenarios:");
+    for s in SCENARIOS {
+        eprintln!("  {:<10} {}", s.name, s.description);
+    }
+    eprintln!(
+        "\nOverrides (apply on top of any scenario):\n\
+         \x20 --name <name>        Character name (defaults to the scenario name)\n\
+         \x20 --level <n>          Character level\n\
+         \x20 --prestige <n>       Prestige rank\n\
+         \x20 --ascension <n>      Ascension level\n\
+         \x20 --attrs <n>          All six attributes (clamped to the prestige cap)\n\
+         \x20 --zone <n>           Current zone (1-11; 12+ needs Deep account state)\n\
+         \x20 --subzone <n>        Current subzone (default 1)\n\
+         \x20 --gear <rarity>      Equip all slots: common|magic|rare|epic|legendary|mythic\n\
+         \x20 --ilvl <n>           Item level for --gear (default zone * 10)\n\
+         \x20 --stormglass <n>     Stormglass balance (also marks it discovered)\n\
+         \x20 --stormbreaker       Grant Stormbreaker (Zone 10 boss gate)\n\
+         \x20 --boss-ready         Subzone boss spawns on the first tick\n\
+         \nSet QUEST_DIR to write into an isolated directory."
+    );
+    std::process::exit(1);
+}
+
+fn parse_overrides(args: &[String]) -> Overrides {
+    fn value<'a>(args: &'a [String], i: &mut usize, flag: &str) -> &'a str {
+        *i += 1;
+        args.get(*i).unwrap_or_else(|| {
+            eprintln!("error: {flag} requires a value");
+            std::process::exit(1);
+        })
+    }
+    fn num<T: std::str::FromStr>(args: &[String], i: &mut usize, flag: &str) -> T {
+        let v = value(args, i, flag);
+        v.parse().unwrap_or_else(|_| {
+            eprintln!("error: invalid value for {flag}: {v}");
+            std::process::exit(1);
+        })
+    }
+
+    let mut o = Overrides::default();
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--name" => o.name = Some(value(args, &mut i, "--name").to_string()),
+            "--level" => o.level = Some(num(args, &mut i, "--level")),
+            "--prestige" => o.prestige = Some(num(args, &mut i, "--prestige")),
+            "--ascension" => o.ascension = Some(num(args, &mut i, "--ascension")),
+            "--attrs" => o.attrs = Some(num(args, &mut i, "--attrs")),
+            "--zone" => o.zone = Some(num(args, &mut i, "--zone")),
+            "--subzone" => o.subzone = Some(num(args, &mut i, "--subzone")),
+            "--ilvl" => o.ilvl = Some(num(args, &mut i, "--ilvl")),
+            "--stormglass" => o.stormglass = Some(num(args, &mut i, "--stormglass")),
+            "--stormbreaker" => o.stormbreaker = true,
+            "--boss-ready" => o.boss_ready = true,
+            "--gear" => {
+                o.gear = Some(match value(args, &mut i, "--gear") {
+                    "common" => Rarity::Common,
+                    "magic" => Rarity::Magic,
+                    "rare" => Rarity::Rare,
+                    "epic" => Rarity::Epic,
+                    "legendary" => Rarity::Legendary,
+                    "mythic" => Rarity::Mythic,
+                    other => {
+                        eprintln!("error: unknown rarity: {other}");
+                        std::process::exit(1);
+                    }
+                })
+            }
+            other => {
+                eprintln!("error: unknown flag: {other}");
+                usage();
+            }
+        }
+        i += 1;
+    }
+    o
+}
+
+fn apply_overrides(state: &mut GameState, o: &Overrides) {
+    if let Some(p) = o.prestige {
+        state.prestige_rank = p;
+        state.total_prestige_count = state.total_prestige_count.max(p as u64);
+    }
+    if let Some(level) = o.level {
+        state.character_level = level;
+        sync_hp(state);
+    }
+    if let Some(asc) = o.ascension {
+        state.ascension_level = asc;
+    }
+    if let Some(attrs) = o.attrs {
+        set_attributes(state, attrs.min(state.get_attribute_cap()));
+    }
+    if o.zone.is_some() || o.subzone.is_some() {
+        let zone = o.zone.unwrap_or(state.zone_progression.current_zone_id);
+        if get_zone(zone).is_none() {
+            eprintln!("error: zone {zone} does not exist");
+            std::process::exit(1);
+        }
+        if zone > 11 {
+            eprintln!(
+                "warning: zones 12+ are gated by Deep account state, which \
+                 mkstate does not generate; the game may not honor this placement"
+            );
+        }
+        advance_to_zone(state, zone, o.subzone.unwrap_or(1));
+    }
+    if let Some(rarity) = o.gear {
+        let ilvl = o
+            .ilvl
+            .unwrap_or(state.zone_progression.current_zone_id * 10);
+        equip_all(state, rarity, rarity, ilvl);
+    }
+    if let Some(sg) = o.stormglass {
+        state.stormglass = sg;
+        state.stormglass_discovered = true;
+    }
+    if o.stormbreaker {
+        state.zone_progression.has_stormbreaker = true;
+    }
+    if o.boss_ready {
+        state.zone_progression.kills_in_subzone = KILLS_FOR_BOSS;
+    }
+}
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
-    if args.len() < 2 || args[1] == "--list" || args[1] == "-l" {
-        eprintln!("Usage: mkstate <scenario> [--name <character-name>]\n");
-        eprintln!("Scenarios:");
-        for s in SCENARIOS {
-            eprintln!("  {:<10} {}", s.name, s.description);
-        }
-        eprintln!("\nSet QUEST_DIR to write into an isolated directory.");
-        std::process::exit(if args.len() < 2 { 1 } else { 0 });
+    if args.len() < 2 || args[1] == "--list" || args[1] == "-l" || args[1] == "--help" {
+        usage();
     }
 
     let scenario_name = args[1].as_str();
-    let char_name = args
-        .iter()
-        .position(|a| a == "--name")
-        .and_then(|i| args.get(i + 1))
-        .cloned()
-        .unwrap_or_else(|| default_name(scenario_name));
-
     let Some(scenario) = SCENARIOS.iter().find(|s| s.name == scenario_name) else {
-        eprintln!("Unknown scenario: {scenario_name}");
-        eprintln!("Run 'mkstate --list' to see available scenarios.");
-        std::process::exit(1);
+        eprintln!("Unknown scenario: {scenario_name}\n");
+        usage();
     };
 
-    let state = (scenario.build)(char_name.clone());
+    let overrides = parse_overrides(&args[2..]);
+    let char_name = overrides
+        .name
+        .clone()
+        .unwrap_or_else(|| default_name(scenario_name));
+
+    let mut state = (scenario.build)(char_name.clone());
+    apply_overrides(&mut state, &overrides);
 
     let manager = CharacterManager::new().expect("failed to open quest dir");
     manager
