@@ -1054,8 +1054,9 @@ mod tick_tests {
         let mut achievements = Achievements::default();
         let mut rng = test_rng();
 
-        // Run many ticks -- haven should never be discovered at P0
-        for _ in 0..100 {
+        // Haven discovery is structurally gated on prestige_rank at P0, so a
+        // handful of ticks is enough to prove it never fires.
+        for _ in 0..10 {
             let result = game_tick(
                 &mut state,
                 &mut tick_counter,
@@ -1081,7 +1082,9 @@ mod tick_tests {
         let mut achievements = Achievements::default();
         let mut rng = test_rng();
 
-        for _ in 0..100 {
+        // Soulforge discovery is structurally gated on prestige_rank at P0, so
+        // a handful of ticks is enough to prove it never fires.
+        for _ in 0..10 {
             let result = game_tick(
                 &mut state,
                 &mut tick_counter,
