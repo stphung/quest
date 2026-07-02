@@ -230,4 +230,4 @@ Starts ~1:1 at low rates, scales superlinearly as WR increases:
 - **Discovery**: Triggered by pattern completion milestones
 - **Ascension** (`ascension/types.rs`): `ascension_pattern_gate()` checks pattern count for VII-X eligibility; `max_shuttle_level()` gates shuttle upgrades by Ascension tier
 - **Zones** (`zones/`): `loom_zone_cap_for_patterns()` unlocks Loom Zones 31-50 based on completed pattern count
-- **petgraph 0.7**: DAG construction and traversal in `graph.rs`; layout computed in `layout.rs`
+- **petgraph 0.8**: DAG construction and traversal in `graph.rs`; layout computed in `layout.rs`

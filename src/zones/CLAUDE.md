@@ -50,8 +50,8 @@ Each subzone has a named boss. The final subzone's boss has `is_zone_boss: true`
 ### `ZoneProgression` (`progression.rs`)
 Serializable state tracking the player's position and progress:
 - `current_zone_id` / `current_subzone_id` -- current location
-- `defeated_bosses: Vec<(u32, u32)>` -- (zone_id, subzone_id) pairs
-- `unlocked_zones: Vec<u32>` -- zones the player can enter
+- `defeated_bosses: BTreeSet<(u32, u32)>` -- (zone_id, subzone_id) pairs
+- `unlocked_zones: BTreeSet<u32>` -- zones the player can enter
 - `kills_in_subzone: u32` -- kill counter toward boss spawn (resets on boss defeat or death)
 - `fighting_boss: bool` -- whether a boss fight is active
 - `has_stormbreaker: bool` -- legacy flag (achievement-based check preferred)
@@ -78,7 +78,7 @@ Named fracture chapters, each containing 3-4 zones:
 - `WailingReach` (Zones 24-26, unlocked by P200 + Deep Layer 25)
 - `OriginWound` (Zones 27-30, unlocked by P300 + Deep Layer 30)
 
-Methods: `start_zone_id()`, `end_zone_id()`, `unlock_layer()`, `from_layer()`, `unlock_headline()`, `unlock_atmospheric()`, `power_core_narrative()`, `unlock_mechanical()`, `unlock_log_line()`, `unlock_ticker_text()`
+Methods: `start_zone_id()`, `end_zone_id()`, `unlock_layer()`, `from_layer()`, `unlock_headline()`, `unlock_atmospheric()`, `power_core_narrative()`, `unlock_mechanical()`, `unlock_log_line()`, `unlock_ticker_text()`, `ascension_narrative()` -- narrative bridge text tying the fracture to Ascension, `ascension_level_unlocked()` -- the Ascension level (I-VI) that becomes newly available at this region's unlock
 
 ## Zone Tiers and Prestige Requirements
 

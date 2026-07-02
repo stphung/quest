@@ -63,7 +63,7 @@ Characters are saved as individual JSON files in `~/.quest/`:
 `manager.rs` defines the `CharacterManager` struct, `CharacterSaveData`, and `CharacterInfo` types. `persistence.rs` implements the file I/O methods on `CharacterManager`.
 
 ### Character CRUD Operations
-- `create_character(name)` — Creates new character with base attributes, validates name uniqueness
+- Character creation flows through `creation.rs::process_creation_input()` → `GameState::new()` → `persistence.rs::save_character()` (no standalone `create_character()` function)
 - `load_character(name)` — Loads from JSON file (`persistence.rs`)
 - `save_character(state)` — Serializes GameState to JSON (`persistence.rs`)
 - `delete_character(name)` — Removes JSON file (`persistence.rs`)

@@ -108,7 +108,8 @@ Zone 11 has dramatically higher stats than Zone 10 (~6.2x HP, ~4.6x DMG, ~4.8x D
 
 ## Combat Pipelines (Quick Reference)
 
-- **Damage pipeline**: base damage --> Giant's Might % --> Haven Armory % --> prestige flat damage --> ascension multiplier --> enemy defense --> min 1 --> Divine Bulwark DR --> crit (2x)
+- **Damage pipeline**: base damage --> Giant's Might % --> Haven Armory % --> prestige flat damage --> ascension multiplier --> enemy defense --> min 1 --> crit (2x)
+- **Enemy damage pipeline**: enemy.damage --> subtract (defense + prestige flat_defense) --> min 1 --> Divine Bulwark DR % --> min 1
 - **Defense pipeline**: base defense --> prestige flat defense --> ascension multiplier --> damage reduction %
 - **Ascension multiplier**: Also applied to player max HP in `core/tick.rs` (default 1.0x, up to 64x+ at Ascension VI)
 - **Boss enrage timer**: Bosses enrage after 60 seconds of combat, increasing damage output (instant kill)

@@ -451,22 +451,29 @@ pub struct TickResult {
 
 | Stage | What it does | File |
 |-------|-------------|------|
-| 1. Challenge AI | Ticks AI thinking for active Chess, Morris, Gomoku, or Go games | tick.rs |
-| 2. Challenge discovery | Rolls for new challenge discovery (P1+ required, Haven bonus applied) | tick.rs |
+| 0. Merged bonuses | Computes merged Haven + Sigil bonuses for the tick | tick.rs |
+| 1. Challenge AI | Ticks AI thinking for active minigames | tick.rs |
+| 2. Challenge discovery | Rolls for new challenge discovery (P1+ required, Haven bonus applied, skipped during Chrono Surge) | tick.rs |
 | 3. Sync player HP | Recalculates DerivedStats and updates player_max_hp | tick.rs |
 | 4. Dungeon exploration | Processes room entry, treasure, keys, boss unlock, completion/failure | tick_stages.rs |
+| 4b. Loom of Worlds | Checks Loom discovery (fires when Deep's Gateway at Layer 30 opens), then if discovered ticks shuttle construction/pull, base production, neighbor unlocking, pattern sustain, and WR->PR conversion. Runs on wall-clock time regardless of whether fishing or combat runs this tick | tick_stages.rs |
 | 5. Fishing | If fishing active: ticks session, handles catches/items/rank-ups/Leviathan, **returns early** (skips combat) | tick_stages.rs |
 | 6. Combat | Maps CombatEvent to TickEvent, applies XP, handles kills/deaths, processes item drops and discoveries | tick_stages.rs |
+| 6b. HUD decay | Decays combat HUD flash timers | tick.rs |
 | 7. Enemy spawn | Spawns enemy if no enemy and not regenerating | tick.rs |
 | 8. Play time | Increments tick counter; at 10 ticks, increments play_time_seconds | tick.rs |
 | 9. Achievement collection | Drains newly unlocked achievements into TickResult.events | tick.rs |
 | 10. Haven discovery | Rolls for Haven discovery (P10+, no active content) | tick.rs |
 | 11. Soulforge discovery | Rolls for Soulforge discovery (P15+, no active content) | tick.rs |
-| 12. Deep discovery hook | No per-tick roll; discovery is triggered during Stage 6 combat processing on first Expanse cycle boss kill at P15+ | tick.rs / tick_stages.rs |
-| 13. Deep missions | Ticks active Deep missions, processes completions and events | tick.rs |
-| 14. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display | tick.rs |
+| 11b. Deep discovery | No per-tick roll; discovery is triggered during Stage 6 combat processing on first Expanse cycle boss kill at P15+ | tick.rs / tick_stages.rs |
+| 11c. Deep mission tick | Ticks Deep missions (check-ins, completions, breakthroughs triggering fracture region unlocks) | tick.rs |
+| 11d. Fracture region unlock | Consumes pending fracture region unlock, syncs zone unlocks, emits FractureRegionUnlocked | tick.rs |
+| 11f. Pattern milestones | Consumes pending pattern milestones, syncs zone unlocks, emits PatternMilestoneReached | tick.rs |
+| 12a. Power Cores | Ticks Power Cores for passive PR generation | tick.rs |
+| 12b. Passive prestige tracking | Reports passive PR gains this tick (Power Cores, WR->PR) to the achievement system | tick.rs |
+| 12. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display | tick.rs |
 
-**Important**: Stage 5 (fishing) returns early, skipping stages 6-7. Fishing and combat are mutually exclusive.
+**Important**: Stage 5 (fishing) returns early when fishing is active, skipping stages 6 through 12 (combat, HUD decay, enemy spawn, play time, Haven/Soulforge discovery, Deep missions, fracture/pattern unlock consumption, Power Cores). The stage-8 play-time increment and HUD decay are instead handled inline inside `process_fishing_tick()` itself. Stage 9 (achievement collection) and stage 12b (passive prestige tracking) are specially re-invoked right before the early return, since Stage 4b (Loom) may have granted PR via WR->PR conversion even on a fishing tick. Fishing and combat remain mutually exclusive within a tick.
 
 ### Event Mapping (tick_events.rs)
 
