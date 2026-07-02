@@ -11,7 +11,7 @@ src/loom/
 ├── logic.rs        — Node upgrades, base production, stall detection, reactions, shuttle building/demolishing, direct-pull tick
 ├── recipes.rs      — Recipe registry, lookup_recipe(a, b, nature), recipes_by_nature()
 ├── patterns.rs     — Woven Pattern sustain timer and completion tracking
-├── discovery.rs    — 28 woven patterns defined in create_pattern_sequence()
+├── discovery.rs    — 28 completable + 1 eternal pattern (29 total) defined in create_pattern_sequence()
 ├── milestones.rs   — Pattern milestone types and helpers for key pattern completion modals
 ├── graph.rs        — petgraph DAG construction, rebuild logic, rate updates
 ├── layout.rs       — Sugiyama layout engine: layer assignment, crossing minimization, coordinate assignment
@@ -115,6 +115,8 @@ Woven Patterns use sustained production rates rather than accumulated totals:
 - Requirements must be met **simultaneously**: ALL resource rates must be at or above their thresholds at the same time for any timers to advance. If even one resource drops below its threshold, no requirement timers advance — the entire pattern is paused until all rates recover.
 - Rate measurement uses a 20-second rolling window (`RateTracker` struct, 200 ticks at 100ms/tick, transient, not serialized)
 - Simple pause model: progress never decays, only pauses when any rate drops below threshold
+
+**Eternal Pattern**: `create_pattern_sequence()` defines a 29th pattern (index 28, `eternal_pattern()`) flagged `eternal: true`. It never completes and is excluded from `completed_pattern_count()` — an intentional endgame sink that keeps sustained production meaningful after all 28 standard patterns are done.
 
 ## Production Chain Flow
 

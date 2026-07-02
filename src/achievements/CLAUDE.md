@@ -45,7 +45,7 @@ Nine categories for browsing: `Combat`, `Level`, `Prestige`, `Progression`, `Cha
 
 ### `AchievementDef` (`data.rs`)
 
-Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 240 achievements total.
+Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 240 achievements total. Note: `VaultWardenJourneyman` is currently set to 15 points (`data.rs`), which doesn't match any tier — the other three Vault Warden achievements follow Trivial/Easy/Medium (5/10/25), so this looks like a data entry slip rather than an intentional off-tier value; left as-is pending a balance decision.
 
 Achievement score is computed at runtime by summing the point values of all unlocked achievements. Score is displayed in four locations: browser title bar, achievement unlock modal, achievement detail panel, and stats view.
 
