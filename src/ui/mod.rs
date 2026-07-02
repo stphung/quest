@@ -1079,6 +1079,8 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
 }
 
 /// Renders a damage flash right-aligned in the given area.
+/// Resets the background so the text stays readable when drawn over a
+/// filled gauge (which paints cell backgrounds with its fill color).
 fn render_flash(frame: &mut Frame, area: Rect, flash: Option<&crate::combat::types::DamageFlash>) {
     if let Some(flash) = flash {
         let progress = 1.0 - (flash.remaining / crate::combat::types::DAMAGE_FLASH_DURATION);
@@ -1093,7 +1095,7 @@ fn render_flash(frame: &mut Frame, area: Rect, flash: Option<&crate::combat::typ
             }
             s
         };
-        let text = Paragraph::new(Span::styled(&flash.text, style))
+        let text = Paragraph::new(Span::styled(&flash.text, style.bg(Color::Reset)))
             .alignment(ratatui::layout::Alignment::Right);
         frame.render_widget(text, area);
     }

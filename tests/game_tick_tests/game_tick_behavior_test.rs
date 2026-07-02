@@ -1072,3 +1072,74 @@ fn test_fishing_with_haven_bonuses() {
     let _ = result.caught_storm_leviathan;
     let _ = result.leviathan_encounter;
 }
+
+// =============================================================================
+// 18. First Enemy Hit → Damage Events (issue #215)
+// =============================================================================
+// The player HP bar damage flash is fed by TickEvent::EnemyAttack (mapped from
+// CombatEvent::EnemyAttack). These tests lock in that the first enemy hit of a
+// fight produces those events, so the flash has data to render in all layouts.
+
+#[test]
+fn test_first_enemy_hit_emits_combat_event() {
+    // Fresh (weak) character so the first enemy survives long enough to swing
+    let mut state = GameState::new("FirstHit".to_string(), 0);
+    let mut achievements = Achievements::default();
+    let mut rng = seeded_rng();
+
+    // Enemy attack interval is 2.0s (20 ticks); 200 ticks is ample
+    let mut first_hit_damage = None;
+    'ticks: for _ in 0..200 {
+        let events = simulate_combat_tick(&mut rng, &mut state, &mut achievements);
+        for event in events {
+            if let CombatEvent::EnemyAttack { damage } = event {
+                first_hit_damage = Some(damage);
+                break 'ticks;
+            }
+        }
+    }
+
+    let damage = first_hit_damage.expect("first enemy hit should emit CombatEvent::EnemyAttack");
+    assert!(damage > 0, "Enemy hit damage must be positive");
+    assert!(
+        state.combat_state.player_current_hp < state.combat_state.player_max_hp,
+        "First enemy hit should reduce player HP below max"
+    );
+}
+
+#[test]
+fn test_first_enemy_hit_emits_tick_event() {
+    use quest::core::tick::{game_tick_with_context, TickEvent};
+    use quest::core::tick_context::TickContext;
+
+    let mut state = GameState::new("FirstHitTick".to_string(), 0);
+    let mut tick_counter = 0u32;
+    let mut haven = quest::haven::Haven::default();
+    let mut enhancement = quest::enhancement::EnhancementProgress::new();
+    let mut deep = quest::deep::DeepState::new();
+    let mut achievements = Achievements::default();
+    let mut loom = quest::loom::LoomState::new();
+    let mut rng = seeded_rng();
+
+    for _ in 0..200 {
+        let mut ctx = TickContext {
+            state: &mut state,
+            tick_counter: &mut tick_counter,
+            haven: &mut haven,
+            enhancement: &mut enhancement,
+            deep: &mut deep,
+            achievements: &mut achievements,
+            loom: &mut loom,
+            debug_mode: false,
+        };
+        let result = game_tick_with_context(&mut ctx, &mut rng);
+        for event in &result.events {
+            if let TickEvent::EnemyAttack { damage, enemy_name } = event {
+                assert!(*damage > 0, "Enemy hit damage must be positive");
+                assert!(!enemy_name.is_empty(), "Enemy name must be non-empty");
+                return;
+            }
+        }
+    }
+    panic!("first enemy hit should emit TickEvent::EnemyAttack");
+}
