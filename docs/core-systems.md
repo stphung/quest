@@ -428,7 +428,7 @@ pub struct TickResult {
     pub enhancement_changed: bool,
     pub god_items_changed: bool,
     pub deep_changed: bool,
-    pub power_cores_changed: bool,
+    pub loom_changed: bool,
     pub achievement_modal_ready: Vec<AchievementId>,
 }
 ```

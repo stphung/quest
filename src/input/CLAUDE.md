@@ -34,14 +34,16 @@ Keyboard input routing for the Game screen, dispatching to overlay handlers, min
 4. **Step 0.85**: Time Vault overlay (delegates to `time_vault_input`)
 5. **Step 1**: Discovery/celebration modals (Haven, Soulforge, Stormglass, Deep, achievement unlock, fracture region, ascension confirm) -- Enter/Esc dismisses
 6. **Step 2**: Full-screen overlays (Haven, Soulforge, Stormglass Exchange, The Deep) -- each delegates to its own handler
-7. **Step 3**: Vault item selection (prestige equipment preservation)
-8. **Step 4**: Prestige confirmation dialog
-9. **Step 4.5**: Quit confirmation (pending challenges warning)
-10. **Step 5**: Debug menu (backtick toggles, Tab/arrows navigate, Enter triggers)
-11. **Step 6**: Active minigame (delegates to `minigame_input`)
-12. **Step 7**: Challenge menu (open/navigate/select)
-13. **Step 8**: Tab opens challenge menu
-14. **Step 9**: Base game hotkeys (P=prestige, H=haven, S=soulforge, G=stormglass, D=deep, A=achievements, T=time vault, U=ascension, W=wiki, !=bug report)
+7. **Step 2.9**: Loom of Worlds overlay (delegates to `loom_input::handle_loom` when `loom_ui.open`)
+8. **Step 3**: Vault item selection (prestige equipment preservation)
+9. **Step 4**: Prestige confirmation dialog
+10. **Step 4.5**: Quit confirmation (pending challenges warning)
+11. **Step 5**: Debug menu (backtick toggles, Tab/arrows navigate, Enter triggers)
+12. **Step 6**: Active minigame (delegates to `minigame_input`)
+13. **Step 7**: Challenge menu (open/navigate/select)
+14. **Step 8**: Tab opens challenge menu
+15. **Step 8.5**: Loom of Worlds toggle (`l`/`L` opens the Loom overlay, gated on `loom_state.persistent.discovered`)
+16. **Step 9**: Base game hotkeys (P=prestige, H=haven, S=soulforge, G=stormglass, D=deep, A=achievements, T=time vault, U=ascension, W=wiki, !=bug report)
 
 **Key pattern**: Overlays intercept before game input. Higher-numbered steps only execute if all earlier overlays/modals are inactive. This ensures modals always block background input.
 
@@ -56,6 +58,6 @@ The **forfeit pattern** (first Esc sets `forfeit_pending`, second Esc confirms) 
 
 ## Integration Points
 
-- **Imports from**: `challenges/` (menu processing, all 12 minigame input handlers), `character/prestige` (can_prestige, perform_prestige), `haven/` (try_build_room, can_forge_stormbreaker), `enhancement/` (roll_enhancement, costs), `deep/` (mission management, guild rank), `stormglass/` (sigils, spending), `achievements/` (browser, titles, sync), `ascension/` (ascend), `zones/` (sync_account_zone_unlocks), `utils/debug_menu` (DebugMenu), `history/` (SaveEvent)
+- **Imports from**: `challenges/` (menu processing, all 14 minigame input handlers), `character/prestige` (can_prestige, perform_prestige), `haven/` (try_build_room, can_forge_stormbreaker), `enhancement/` (roll_enhancement, costs), `deep/` (mission management, guild rank), `stormglass/` (sigils, spending), `achievements/` (browser, titles, sync), `ascension/` (ascend), `zones/` (sync_account_zone_unlocks), `loom/` (Loom of Worlds state), `utils/debug_menu` (DebugMenu), `history/` (SaveEvent)
 - **Consumed by**: `main.rs` and `main_helpers/input_routing.rs` call `handle_game_input()` and route the `InputResult`
 - **UI coupling**: References `ui::achievement_browser_scene`, `ui::title_browser_scene`, `ui::time_vault_scene`, `ui::stats_prestige` for type imports only (no rendering)

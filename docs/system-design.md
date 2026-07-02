@@ -80,7 +80,7 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 | Crate | Purpose |
 |-------|---------|
 | ratatui 0.30 | Terminal UI framework |
-| crossterm 0.27 | Terminal backend |
+| crossterm (transitive, ~0.29) | Terminal backend (pulled in via ratatui, not a direct dependency) |
 | serde / serde_json | JSON serialization |
 | rand | RNG for procedural systems |
 | rand_chacha | Deterministic RNG for simulator and tests |
@@ -177,7 +177,7 @@ pub struct TickResult {
     pub enhancement_changed: bool,
     pub god_items_changed: bool,
     pub deep_changed: bool,
-    pub power_cores_changed: bool,
+    pub loom_changed: bool,
     pub achievement_modal_ready: Vec<AchievementId>,
 }
 ```

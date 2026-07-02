@@ -7,7 +7,7 @@ Passive prestige rank generation tied to Deep layer milestones. Six Power Cores,
 ```
 src/power_cores/
 ├── mod.rs           # Public re-exports
-├── types.rs         # PowerCoreDef, PowerCoreState, ALL_POWER_CORES, helper functions
+├── types.rs         # PowerCoreDef, ALL_POWER_CORES, helper functions
 └── tick.rs          # Per-tick processing (tick_power_cores), offline catchup (apply_offline_power_cores), init_new_core
 ```
 
@@ -32,9 +32,7 @@ Const slice of 6 core definitions:
 
 Total at all 6 cores active: 48 PR/day.
 
-### `PowerCoreState` (`types.rs`)
-
-Runtime state: `last_granted_at: HashMap<AchievementId, i64>` — Unix timestamp per core for when it last granted a PR. Missing entries treated as "never granted" (timestamp = 0).
+There is no separate `PowerCoreState` runtime struct. Core-grant timestamps live directly on `DeepPersistent.power_core_last_granted: HashMap<AchievementId, i64>` — a Unix timestamp per core for when it last granted a PR. Missing entries are treated as "never granted" (timestamp = 0). See "Persistence" below for details.
 
 ## Key Functions
 
@@ -46,9 +44,9 @@ Runtime state: `last_granted_at: HashMap<AchievementId, i64>` — Unix timestamp
 
 ### `tick.rs`
 
-- `tick_power_cores(state, power_core_state, achievements, result)` — Per-tick processing. For each unlocked core, checks if fill timer elapsed and grants +1 PR per completed cycle. Sets `result.power_cores_changed`.
-- `apply_offline_power_cores(state, power_core_state, achievements) -> u32` — Offline catchup. Returns total PR granted.
-- `init_new_core(power_core_state, achievement_id)` — Initialise a newly unlocked core's timestamp to now.
+- `tick_power_cores(state, deep, achievements, result)` — Per-tick processing. For each unlocked core, checks if fill timer elapsed (using `deep.persistent.power_core_last_granted`) and grants +1 PR per completed cycle. Sets `result.deep_changed`.
+- `apply_offline_power_cores(state, deep, achievements) -> u32` — Offline catchup. Returns total PR granted.
+- `init_new_core(deep, achievement_id)` — Initialise a newly unlocked core's timestamp to now.
 
 ## Tick Behavior
 
@@ -57,7 +55,7 @@ Each game tick (100ms):
 2. For each unlocked core:
    - If `last_granted_at == 0`: initialise to now (first cycle starts from unlock moment)
    - If elapsed >= fill duration: grant `completed_cycles` PR, advance timestamp, emit `PowerCoreGranted` events
-3. Set `power_cores_changed = true` if any grant occurred
+3. Set `deep_changed = true` if any grant occurred
 
 ## Persistence
 
@@ -65,7 +63,7 @@ Power Cores state is persisted as part of the Deep system. `DeepState.persistent
 
 ## Integration Points
 
-- **Core** (`core/tick_types.rs`): `TickEvent::PowerCoreGranted { core_name }` variant; `TickResult::power_cores_changed` flag
+- **Core** (`core/tick_types.rs`): `TickEvent::PowerCoreGranted { core_name }` variant; `TickResult::deep_changed` flag
 - **Achievements** (`achievements/types.rs`): `PowerCoreI` through `PowerCoreVI` achievement IDs unlock each core
 - **Deep** (`deep/`): Deep layer breakthroughs unlock the corresponding Power Core achievements
 - **Main** (`main.rs`): Calls `tick_power_cores()` each tick, `apply_offline_power_cores()` on character load, saves state on change

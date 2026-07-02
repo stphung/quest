@@ -49,18 +49,18 @@ pub struct GameState {
     pub active_dungeon: Option<Dungeon>,
     pub fishing: FishingState,
     pub zone_progression: ZoneProgression,
-    pub chess_stats: ChessStats,
     pub stormglass: u64,                   // Stormglass currency balance
     pub stormglass_discovered: bool,
     pub storm_sigils: StormSigils,
-    pub consecutive_deaths: u32,           // Death loop tracking
     pub ascension_level: u32,              // Ascension level (0 = no ascension, persists through prestige)
 
     // Transient (serde(skip), reset on load)
     pub active_fishing: Option<FishingSession>,
     pub challenge_menu: ChallengeMenu,
+    pub chess_stats: ChessStats,           // Reset to default() every load, not part of FlatGameState
     pub active_minigame: Option<ActiveMinigame>,
     pub session_kills: u64,
+    pub consecutive_deaths: u32,           // Death loop tracking; reset to 0 every load
     pub recent_drops: VecDeque<RecentDrop>,  // Capped at 10
     pub last_minigame_win: Option<MinigameWinInfo>,
     pub xp_rate_samples: VecDeque<u64>,    // Rolling 15-min XP/sec window
@@ -78,6 +78,7 @@ pub struct GameState {
     pub cached_haven_bonuses: HavenBonuses,   // Cached merged Haven bonuses (recomputed when bonuses_dirty)
     pub cached_sigil_bonuses: SigilBonuses,   // Cached merged Sigil bonuses (recomputed when bonuses_dirty)
     pub bonuses_dirty: bool,                  // Set when Haven rooms, Storm Sigils, or prestige rank change
+    pub cached_god_item_bonuses: CachedGodItemBonuses, // Cached god item bonuses (recomputed when derived_stats_dirty)
     pub debug_force_overcharge: bool,         // Debug: force next Chrono Surge to be overcharged
 }
 ```

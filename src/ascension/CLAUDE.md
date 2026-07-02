@@ -20,6 +20,7 @@ Returned by `ascend()`:
 - `InsufficientPR { needed, have }` -- not enough prestige ranks
 - `DeepGateNotMet { needed_layer, current_layer }` -- Deep layer requirement not reached (levels I-VI)
 - `PatternGateNotMet { needed_patterns, current_patterns }` -- Woven Pattern requirement not reached (levels VII-X)
+- `MaxLevelReached` -- already at `MAX_ASCENSION_LEVEL` (10)
 
 ## Key Functions
 
