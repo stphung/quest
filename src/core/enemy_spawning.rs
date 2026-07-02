@@ -282,8 +282,8 @@ mod tests {
         for _ in 0..samples {
             let regular = generate_dungeon_enemy(zone_id);
             let elite = generate_dungeon_elite(zone_id);
-            elite_hp += elite.max_hp as u64;
-            regular_hp += regular.max_hp as u64;
+            elite_hp += elite.max_hp;
+            regular_hp += regular.max_hp;
         }
 
         assert!(
@@ -302,8 +302,8 @@ mod tests {
         for _ in 0..samples {
             let elite = generate_dungeon_elite(zone_id);
             let boss = generate_dungeon_boss(zone_id);
-            boss_hp += boss.max_hp as u64;
-            elite_hp += elite.max_hp as u64;
+            boss_hp += boss.max_hp;
+            elite_hp += elite.max_hp;
         }
 
         assert!(

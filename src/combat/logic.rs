@@ -856,10 +856,10 @@ mod tests {
         for _ in 0..samples {
             let regular = generate_dungeon_enemy(zone_id);
             let elite = generate_dungeon_elite(zone_id);
-            elite_hp_sum += elite.max_hp as u64;
-            regular_hp_sum += regular.max_hp as u64;
-            elite_dmg_sum += elite.damage as u64;
-            regular_dmg_sum += regular.damage as u64;
+            elite_hp_sum += elite.max_hp;
+            regular_hp_sum += regular.max_hp;
+            elite_dmg_sum += elite.damage;
+            regular_dmg_sum += regular.damage;
         }
 
         assert!(
@@ -885,10 +885,10 @@ mod tests {
         for _ in 0..samples {
             let elite = generate_dungeon_elite(zone_id);
             let boss = generate_dungeon_boss(zone_id);
-            boss_hp_sum += boss.max_hp as u64;
-            elite_hp_sum += elite.max_hp as u64;
-            boss_dmg_sum += boss.damage as u64;
-            elite_dmg_sum += elite.damage as u64;
+            boss_hp_sum += boss.max_hp;
+            elite_hp_sum += elite.max_hp;
+            boss_dmg_sum += boss.damage;
+            elite_dmg_sum += elite.damage;
         }
 
         assert!(
