@@ -788,7 +788,7 @@ mod tests {
         state.combat_state.current_enemy = Some(Enemy::new("Weakling".to_string(), 50, 1));
 
         let mut enemy_died = false;
-        let mut total_player_damage = 0u32;
+        let mut total_player_damage = 0u64;
         let mut turns = 0;
 
         // Simulate up to 20 attack cycles
@@ -1149,7 +1149,7 @@ mod tests {
         let derived =
             DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
         let base_damage = derived.total_damage();
-        let expected_crit_damage = (base_damage as f64 * 3.0) as u32; // 3x with +100%
+        let expected_crit_damage = (base_damage as f64 * 3.0) as u64; // 3x with +100%
 
         state.combat_state.current_enemy = Some(Enemy::new("Dummy".to_string(), 10000, 0));
         state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
@@ -1472,7 +1472,7 @@ mod tests {
         let derived =
             DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
         let player_damage = derived.total_damage();
-        let reflected_damage = (enemy_damage as f64 * 0.5) as u32; // 50% reflection
+        let reflected_damage = (enemy_damage as f64 * 0.5) as u64; // 50% reflection
 
         // Enemy HP = max - player_attack - reflected
         let expected_hp = enemy_max_hp - player_damage - reflected_damage;
@@ -1583,7 +1583,7 @@ mod tests {
         let enemy = state.combat_state.current_enemy.as_ref().unwrap();
         let derived =
             DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
-        let reflected = 1u32; // 100% of 1 min-floor damage
+        let reflected = 1u64; // 100% of 1 min-floor damage
         let expected_hp = enemy_max_hp - derived.total_damage() - reflected;
         assert_eq!(enemy.current_hp, expected_hp);
     }
@@ -1661,7 +1661,7 @@ mod tests {
             .unwrap_or(0);
 
         // Damage should be 50% higher
-        let expected = (damage_no_bonus as f64 * 1.5) as u32;
+        let expected = (damage_no_bonus as f64 * 1.5) as u64;
         assert_eq!(
             damage_with_bonus, expected,
             "Haven +50% damage should increase {} to {}",
@@ -2664,7 +2664,7 @@ mod tests {
             30,
         );
         let hp_lost_with_dr = initial_hp - state.combat_state.player_current_hp;
-        let expected_dr_damage = ((post_defense_damage as f64) * 0.70) as u32;
+        let expected_dr_damage = ((post_defense_damage as f64) * 0.70) as u64;
         let expected_dr_damage = expected_dr_damage.max(1);
         assert_eq!(
             hp_lost_with_dr, expected_dr_damage,

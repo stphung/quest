@@ -44,7 +44,7 @@ fn seeded_rng() -> rand_chacha::ChaCha8Rng {
 }
 
 /// Creates a state with a specific enemy.
-fn state_with_enemy(hp: u32, dmg: u32, def: u32) -> GameState {
+fn state_with_enemy(hp: u64, dmg: u64, def: u64) -> GameState {
     let mut state = fresh_state();
     state.combat_state.current_enemy = Some(Enemy::new_with_defense(
         "Test Enemy".to_string(),
@@ -584,7 +584,7 @@ fn divine_bulwark_reduces_incoming_damage_by_30_percent() {
         .expect("Should produce an EnemyAttack event (with DR)");
 
     // With 30% DR: effective = no_dr * 0.7 (at least 1)
-    let expected = ((damage_no_dr as f64) * 0.7) as u32;
+    let expected = ((damage_no_dr as f64) * 0.7) as u64;
     let expected = expected.max(1);
     assert_eq!(
         damage_with_dr, expected,
@@ -995,12 +995,12 @@ fn max_prestige_flat_damage_bonus() {
     // Simulate max prestige flat_damage — ensure no overflow
     let mut rng = seeded_rng();
     let bonuses = CombatBonuses {
-        flat_damage: u32::MAX / 2, // Near-max prestige flat damage
+        flat_damage: u64::from(u32::MAX) / 2, // Near-max prestige flat damage
         ..CombatBonuses::default()
     };
 
     // Enemy with very high HP so we don't accidentally kill it
-    let mut state = state_with_enemy(u32::MAX, 100, 0);
+    let mut state = state_with_enemy(u64::from(u32::MAX), 100, 0);
     state.attributes.set(AttributeType::Dexterity, 10);
 
     let events = force_player_attack(&mut rng, &mut state, &bonuses);
@@ -1059,11 +1059,11 @@ fn high_prestige_combined_bonuses_no_overflow() {
     let mut rng = seeded_rng();
 
     // P50 flat damage: floor(5.0 * 50^0.7) ≈ floor(5.0 * 21.1) ≈ 105
-    let flat_damage = (5.0_f64 * 50.0_f64.powf(0.7)).floor() as u32;
+    let flat_damage = (5.0_f64 * 50.0_f64.powf(0.7)).floor() as u64;
     // P50 flat defense: floor(3.0 * 50^0.6) ≈ floor(3.0 * 14.0) ≈ 42
-    let flat_defense = (3.0_f64 * 50.0_f64.powf(0.6)).floor() as u32;
+    let flat_defense = (3.0_f64 * 50.0_f64.powf(0.6)).floor() as u64;
     // P50 flat HP: floor(15.0 * 50^0.6) ≈ floor(15.0 * 14.0) ≈ 210
-    let flat_hp = (15.0_f64 * 50.0_f64.powf(0.6)).floor() as u32;
+    let flat_hp = (15.0_f64 * 50.0_f64.powf(0.6)).floor() as u64;
 
     let bonuses = CombatBonuses {
         flat_damage,
@@ -1132,7 +1132,7 @@ fn enemy_killed_resets_consecutive_deaths() {
 // Helper Functions
 // ═══════════════════════════════════════════════════════════════════
 
-fn extract_first_attack_damage(events: &[CombatEvent]) -> Option<u32> {
+fn extract_first_attack_damage(events: &[CombatEvent]) -> Option<u64> {
     events.iter().find_map(|e| {
         if let CombatEvent::PlayerAttack { damage, .. } = e {
             Some(*damage)
@@ -1142,7 +1142,7 @@ fn extract_first_attack_damage(events: &[CombatEvent]) -> Option<u32> {
     })
 }
 
-fn extract_enemy_attack_damage(events: &[CombatEvent]) -> Option<u32> {
+fn extract_enemy_attack_damage(events: &[CombatEvent]) -> Option<u64> {
     events.iter().find_map(|e| {
         if let CombatEvent::EnemyAttack { damage } = e {
             Some(*damage)

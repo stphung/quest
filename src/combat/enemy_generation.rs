@@ -28,18 +28,18 @@ pub fn generate_enemy_name() -> String {
 
 /// Looks up zone base stats. Returns (base_hp, hp_step, base_dmg, dmg_step, base_def, def_step).
 /// Zone IDs are 1-indexed; defaults to Zone 1 for invalid IDs.
-fn zone_base_stats(zone_id: u32) -> (u32, u32, u32, u32, u32, u32) {
+fn zone_base_stats(zone_id: u32) -> (u64, u64, u64, u64, u64, u64) {
     let index = (zone_id.saturating_sub(1) as usize).min(ZONE_ENEMY_STATS.len() - 1);
     ZONE_ENEMY_STATS[index]
 }
 
 /// Calculates enemy stats for a given zone and subzone depth (1-based).
 /// Returns (hp, damage, defense) with variance applied.
-fn calc_zone_enemy_stats(zone_id: u32, subzone_depth: u32) -> (u32, u32, u32) {
+fn calc_zone_enemy_stats(zone_id: u32, subzone_depth: u32) -> (u64, u64, u64) {
     let mut rng = rand::rng();
     let (base_hp, hp_step, base_dmg, dmg_step, base_def, def_step) = zone_base_stats(zone_id);
 
-    let depth_offset = subzone_depth.saturating_sub(1);
+    let depth_offset = subzone_depth.saturating_sub(1) as u64;
     let raw_hp = base_hp.saturating_add(depth_offset.saturating_mul(hp_step));
     let raw_dmg = base_dmg.saturating_add(depth_offset.saturating_mul(dmg_step));
     let raw_def = base_def.saturating_add(depth_offset.saturating_mul(def_step));
@@ -47,8 +47,8 @@ fn calc_zone_enemy_stats(zone_id: u32, subzone_depth: u32) -> (u32, u32, u32) {
     let hp_var = rng.random_range(ENEMY_STAT_VARIANCE_MIN..ENEMY_STAT_VARIANCE_MAX);
     let dmg_var = rng.random_range(ENEMY_STAT_VARIANCE_MIN..ENEMY_STAT_VARIANCE_MAX);
 
-    let hp = ((raw_hp as f64) * hp_var).max(1.0) as u32;
-    let damage = ((raw_dmg as f64) * dmg_var).max(1.0) as u32;
+    let hp = ((raw_hp as f64) * hp_var).max(1.0) as u64;
+    let damage = ((raw_dmg as f64) * dmg_var).max(1.0) as u64;
 
     (hp, damage, raw_def)
 }
@@ -67,9 +67,9 @@ pub fn generate_dungeon_elite(zone_id: u32) -> Enemy {
     let name = format!("Elite {}", generate_enemy_name());
     Enemy::new_with_defense(
         name,
-        (hp as f64 * hp_m).max(1.0) as u32,
-        (damage as f64 * dmg_m).max(1.0) as u32,
-        (defense as f64 * def_m) as u32,
+        (hp as f64 * hp_m).max(1.0) as u64,
+        (damage as f64 * dmg_m).max(1.0) as u64,
+        (defense as f64 * def_m) as u64,
     )
 }
 
@@ -80,9 +80,9 @@ pub fn generate_dungeon_boss(zone_id: u32) -> Enemy {
     let name = format!("Boss {}", generate_enemy_name());
     Enemy::new_with_defense(
         name,
-        (hp as f64 * hp_m).max(1.0) as u32,
-        (damage as f64 * dmg_m).max(1.0) as u32,
-        (defense as f64 * def_m) as u32,
+        (hp as f64 * hp_m).max(1.0) as u64,
+        (damage as f64 * dmg_m).max(1.0) as u64,
+        (defense as f64 * def_m) as u64,
     )
 }
 
@@ -299,9 +299,9 @@ pub fn generate_subzone_boss(zone: &Zone, subzone: &Subzone) -> Enemy {
         SUBZONE_BOSS_MULTIPLIERS
     };
 
-    let boss_hp = (base_hp as f64 * hp_mult).max(1.0) as u32;
-    let boss_damage = (base_damage as f64 * dmg_mult).max(1.0) as u32;
-    let boss_defense = (base_defense as f64 * def_mult) as u32;
+    let boss_hp = (base_hp as f64 * hp_mult).max(1.0) as u64;
+    let boss_damage = (base_damage as f64 * dmg_mult).max(1.0) as u64;
+    let boss_defense = (base_defense as f64 * def_mult) as u64;
 
     Enemy::new_with_defense(
         subzone.boss.name.to_string(),
@@ -331,9 +331,9 @@ pub fn generate_boss_for_current_zone(zone_id: u32, subzone_id: u32) -> Enemy {
     let (hp_m, dmg_m, def_m) = ZONE_BOSS_MULTIPLIERS;
     Enemy::new_with_defense(
         "Unknown Boss".to_string(),
-        (hp as f64 * hp_m) as u32,
-        (damage as f64 * dmg_m) as u32,
-        (defense as f64 * def_m) as u32,
+        (hp as f64 * hp_m) as u64,
+        (damage as f64 * dmg_m) as u64,
+        (defense as f64 * def_m) as u64,
     )
 }
 
@@ -492,6 +492,50 @@ mod tests {
         // e3 should be generally higher but with variance, just check it's valid
         assert!(e1.max_hp >= 1);
         assert!(e3.max_hp >= 1);
+    }
+
+    #[test]
+    fn test_endgame_boss_stats_exceed_u32_range() {
+        use crate::zones::get_all_zones;
+
+        let zones = get_all_zones();
+        let zone50 = zones.iter().find(|z| z.id == 50).unwrap();
+        let last_subzone = zone50.subzones.last().unwrap();
+        assert!(last_subzone.boss.is_zone_boss);
+
+        // Zone 50 depth-5 raw HP (~4.3B) x zone boss multiplier (5.0) far
+        // exceeds u32::MAX; before the u64 migration this clamped at ~4.29B.
+        let boss = generate_subzone_boss(zone50, last_subzone);
+        assert!(
+            boss.max_hp > u32::MAX as u64,
+            "Zone 50 boss HP {} should exceed u32::MAX",
+            boss.max_hp
+        );
+    }
+
+    #[test]
+    fn test_endgame_zone_boss_hp_monotonically_increases() {
+        use crate::zones::get_all_zones;
+
+        // Loom zones scale 1.25x per zone, which beats the worst-case
+        // variance spread (0.9/1.1), so boss HP must strictly increase.
+        // Under u32 saturation, zones 45-50 all flattened at u32::MAX.
+        let zones = get_all_zones();
+        let mut prev_hp = 0u64;
+        for zone_id in 43..=50 {
+            let zone = zones.iter().find(|z| z.id == zone_id).unwrap();
+            let last_subzone = zone.subzones.last().unwrap();
+            let boss = generate_subzone_boss(zone, last_subzone);
+            assert!(
+                boss.max_hp > prev_hp,
+                "Zone {} boss HP {} should exceed zone {} boss HP {}",
+                zone_id,
+                boss.max_hp,
+                zone_id - 1,
+                prev_hp
+            );
+            prev_hp = boss.max_hp;
+        }
     }
 
     #[test]

@@ -46,7 +46,7 @@ pub(crate) fn process_regen(
         let start_hp = state.combat_state.player_current_hp;
         let target_hp = state.combat_state.player_max_hp;
         state.combat_state.player_current_hp =
-            start_hp + ((target_hp - start_hp) as f64 * regen_progress) as u32;
+            start_hp + ((target_hp - start_hp) as f64 * regen_progress) as u64;
 
         // Emit periodic heal floats every 0.5s so they align with HP bar fill
         const REGEN_FLOAT_INTERVAL: f64 = 0.5;

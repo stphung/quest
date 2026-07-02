@@ -951,9 +951,9 @@ fn draw_status_strip_dungeon(frame: &mut Frame, row0: Rect, row1: Rect, game_sta
 
 /// Formats an HP label like "HP:340/500" or "Goblin:12.4K/25K" using short
 /// number formatting for values >= 10,000.
-fn format_hp_label(name: &str, current: u32, max: u32) -> String {
-    let cur_s = game_common::format_number_short(current as u64);
-    let max_s = game_common::format_number_short(max as u64);
+fn format_hp_label(name: &str, current: u64, max: u64) -> String {
+    let cur_s = game_common::format_number_short(current);
+    let max_s = game_common::format_number_short(max);
     format!("{}:{}/{}", name, cur_s, max_s)
 }
 

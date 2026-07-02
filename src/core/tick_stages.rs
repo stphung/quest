@@ -770,12 +770,12 @@ pub(super) fn sync_derived_stats(
     // Apply Ascension multiplier
     let ascension_mult = crate::ascension::ascension_combat_multiplier(state.ascension_level);
     if ascension_mult > 1.0 {
-        max_hp = (max_hp as f64 * ascension_mult) as u32;
+        max_hp = (max_hp as f64 * ascension_mult) as u64;
     }
 
     // Apply sigil max HP% bonus
     if sigil_bonuses.max_hp_percent > 0.0 {
-        max_hp = (max_hp as f64 * (1.0 + sigil_bonuses.max_hp_percent / 100.0)) as u32;
+        max_hp = (max_hp as f64 * (1.0 + sigil_bonuses.max_hp_percent / 100.0)) as u64;
     }
 
     state.combat_state.update_max_hp(max_hp);

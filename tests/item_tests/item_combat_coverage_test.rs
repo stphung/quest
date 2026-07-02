@@ -101,15 +101,15 @@ fn prestige_bonuses_monotonic_scaling() {
 fn prestige_bonuses_damage_formula() {
     // flat_damage = floor(5.0 * rank^0.7)
     let b5 = PrestigeCombatBonuses::from_rank(5);
-    let expected_5 = (5.0_f64 * 5.0_f64.powf(0.7)).floor() as u32;
+    let expected_5 = (5.0_f64 * 5.0_f64.powf(0.7)).floor() as u64;
     assert_eq!(b5.flat_damage, expected_5);
 
     let b10 = PrestigeCombatBonuses::from_rank(10);
-    let expected_10 = (5.0_f64 * 10.0_f64.powf(0.7)).floor() as u32;
+    let expected_10 = (5.0_f64 * 10.0_f64.powf(0.7)).floor() as u64;
     assert_eq!(b10.flat_damage, expected_10);
 
     let b20 = PrestigeCombatBonuses::from_rank(20);
-    let expected_20 = (5.0_f64 * 20.0_f64.powf(0.7)).floor() as u32;
+    let expected_20 = (5.0_f64 * 20.0_f64.powf(0.7)).floor() as u64;
     assert_eq!(b20.flat_damage, expected_20);
 }
 
@@ -117,7 +117,7 @@ fn prestige_bonuses_damage_formula() {
 fn prestige_bonuses_defense_formula() {
     // flat_defense = floor(3.0 * rank^0.6)
     let b10 = PrestigeCombatBonuses::from_rank(10);
-    let expected = (3.0_f64 * 10.0_f64.powf(0.6)).floor() as u32;
+    let expected = (3.0_f64 * 10.0_f64.powf(0.6)).floor() as u64;
     assert_eq!(b10.flat_defense, expected);
 }
 
@@ -154,7 +154,7 @@ fn prestige_bonuses_crit_capped_at_15() {
 fn prestige_bonuses_hp_formula() {
     // flat_hp = floor(15.0 * rank^0.6)
     let b5 = PrestigeCombatBonuses::from_rank(5);
-    let expected = (15.0_f64 * 5.0_f64.powf(0.6)).floor() as u32;
+    let expected = (15.0_f64 * 5.0_f64.powf(0.6)).floor() as u64;
     assert_eq!(b5.flat_hp, expected);
 }
 

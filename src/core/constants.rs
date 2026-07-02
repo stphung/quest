@@ -110,7 +110,7 @@ pub const FRONTIER_BACKOFF_MAX_CYCLES: u32 = 8;
 // Zone enemy base stats: (base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)
 // Index 0 = Zone 1, Index 10 = Zone 11 (The Expanse)
 // hp_step/dmg_step/def_step are per-subzone depth increments above depth 1
-pub const ZONE_ENEMY_STATS: [(u32, u32, u32, u32, u32, u32); 50] = [
+pub const ZONE_ENEMY_STATS: [(u64, u64, u64, u64, u64, u64); 50] = [
     (55, 9, 7, 2, 0, 0),           // Zone 1: Meadow
     (90, 14, 13, 3, 2, 1),         // Zone 2: Dark Forest
     (160, 22, 22, 4, 6, 2),        // Zone 3: Mountain Pass

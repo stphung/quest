@@ -26,11 +26,11 @@ src/combat/
 ```rust
 pub struct Enemy {
     pub name: String,
-    pub max_hp: u32,
-    pub current_hp: u32,
-    pub damage: u32,
+    pub max_hp: u64,
+    pub current_hp: u64,
+    pub damage: u64,
     #[serde(default)]
-    pub defense: u32,
+    pub defense: u64,
 }
 ```
 
