@@ -512,6 +512,9 @@ pub fn process_combat_events<R: Rng>(
             CombatEvent::CombatRetreat { zone_name } => {
                 result.events.push(TickEvent::CombatRetreat { zone_name });
             }
+            CombatEvent::DungeonRetreat => {
+                result.events.push(TickEvent::DungeonFailed);
+            }
         }
     }
 }
@@ -1298,6 +1301,7 @@ mod tests {
                 CombatEvent::CombatRetreat {
                     zone_name: "Meadow".to_string(),
                 },
+                CombatEvent::DungeonRetreat,
             ],
             &haven_bonuses,
             &mut achievements,
@@ -1307,7 +1311,7 @@ mod tests {
             &mut rng,
         );
 
-        assert_eq!(result.events.len(), 8);
+        assert_eq!(result.events.len(), 9);
         assert!(matches!(
             result.events[0],
             TickEvent::PlayerAttackBlocked { .. }
@@ -1345,6 +1349,7 @@ mod tests {
                 ..
             } if zone_name == "Meadow"
         ));
+        assert!(matches!(result.events[8], TickEvent::DungeonFailed));
     }
 
     #[test]

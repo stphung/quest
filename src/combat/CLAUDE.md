@@ -112,6 +112,7 @@ Zone 11 has dramatically higher stats than Zone 10 (~6.2x HP, ~4.6x DMG, ~4.8x D
 - **Defense pipeline**: base defense --> prestige flat defense --> ascension multiplier --> damage reduction %
 - **Ascension multiplier**: Also applied to player max HP in `core/tick.rs` (default 1.0x, up to 64x+ at Ascension VI)
 - **Boss enrage timer**: Bosses enrage after 60 seconds of combat, increasing damage output (instant kill)
+- **Stalemate timeouts**: Non-boss fights auto-retreat to the last safe zone after `MOB_FIGHT_TIMEOUT_SECONDS` (30s); dungeon fights use `DUNGEON_FIGHT_TIMEOUT_SECONDS` (60s, elites/bosses have up to 3.5x HP). Retreating while inside a dungeon abandons it (emits `DungeonRetreat` → `TickEvent::DungeonFailed`, no prestige loss) so the uncleared room cannot respawn its enemy in an endless loop
 
 See "Unified Combat Bonuses" below for the full field-level breakdown of `CombatBonuses`.
 

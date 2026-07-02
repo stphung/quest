@@ -99,6 +99,9 @@ pub const KILLS_FOR_BOSS: u32 = 10;
 // Combat fitness: death loop and stalemate prevention
 pub const DEATH_LOOP_THRESHOLD: u32 = 3;
 pub const MOB_FIGHT_TIMEOUT_SECONDS: f64 = 30.0;
+// Dungeon fights get a longer stalemate limit: elites/bosses have up to 3.5x HP,
+// so the 30s overworld limit would fail winnable fights (matches BOSS_ENRAGE_SECONDS)
+pub const DUNGEON_FIGHT_TIMEOUT_SECONDS: f64 = 60.0;
 // Frontier backoff: after a death-loop retreat, the safe zone must be cycled
 // this many times (growing per repeated retreat, capped) before auto-advancing
 // back into the zone that triggered the retreat.
