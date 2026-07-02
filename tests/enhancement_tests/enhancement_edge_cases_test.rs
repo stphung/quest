@@ -4,7 +4,7 @@
 //!
 //! - Exact success rate values at each level: verified statistically
 //! - Failure penalty of -1 (levels +5 to +9) and -2 (level +10)
-//! - Soul Tithe: only available at +5/+6/+7, with exact PR costs
+//! - Soul Tithe: available at +5 through +10, with exact PR costs
 //! - Enhancement costs: exact values at each target level
 //! - Discovery chance: formula, exact values at P15 and above
 //! - All 7 slots independent: no cross-contamination
@@ -338,18 +338,18 @@ fn test_roll_enhancement_at_max_level_is_no_op() {
 }
 
 // =============================================================================
-// Soul Tithe: only at +5/+6/+7, correct costs
+// Soul Tithe: available at +5 through +10, correct costs
 // =============================================================================
 
 #[test]
-fn test_soul_tithe_only_available_at_levels_5_6_7() {
+fn test_soul_tithe_available_at_levels_5_through_10() {
     // +1-+4: no soul tithe (already guaranteed)
     assert_eq!(soul_tithe_cost(1), None, "+1 should have no soul tithe");
     assert_eq!(soul_tithe_cost(2), None, "+2 should have no soul tithe");
     assert_eq!(soul_tithe_cost(3), None, "+3 should have no soul tithe");
     assert_eq!(soul_tithe_cost(4), None, "+4 should have no soul tithe");
 
-    // +5-+7: soul tithe available with exact PR costs
+    // +5-+10: soul tithe available with exact PR costs
     assert_eq!(
         soul_tithe_cost(5),
         Some(4),
@@ -365,11 +365,21 @@ fn test_soul_tithe_only_available_at_levels_5_6_7() {
         Some(8),
         "+7 soul tithe should cost 8 PR"
     );
-
-    // +8-+10: no soul tithe (too risky)
-    assert_eq!(soul_tithe_cost(8), None, "+8 should have no soul tithe");
-    assert_eq!(soul_tithe_cost(9), None, "+9 should have no soul tithe");
-    assert_eq!(soul_tithe_cost(10), None, "+10 should have no soul tithe");
+    assert_eq!(
+        soul_tithe_cost(8),
+        Some(25),
+        "+8 soul tithe should cost 25 PR"
+    );
+    assert_eq!(
+        soul_tithe_cost(9),
+        Some(85),
+        "+9 soul tithe should cost 85 PR"
+    );
+    assert_eq!(
+        soul_tithe_cost(10),
+        Some(750),
+        "+10 soul tithe should cost 750 PR"
+    );
 }
 
 #[test]
@@ -381,21 +391,49 @@ fn test_soul_tithe_cost_out_of_range_returns_none() {
 
 #[test]
 fn test_soul_tithe_costs_increase_with_level() {
-    let cost5 = soul_tithe_cost(5).unwrap();
-    let cost6 = soul_tithe_cost(6).unwrap();
-    let cost7 = soul_tithe_cost(7).unwrap();
-    assert!(
-        cost5 < cost6,
-        "soul tithe cost for +5 ({}) should be less than +6 ({})",
-        cost5,
-        cost6
-    );
-    assert!(
-        cost6 < cost7,
-        "soul tithe cost for +6 ({}) should be less than +7 ({})",
-        cost6,
-        cost7
-    );
+    for target in 5..=9u8 {
+        let cost = soul_tithe_cost(target).unwrap();
+        let next_cost = soul_tithe_cost(target + 1).unwrap();
+        assert!(
+            cost < next_cost,
+            "soul tithe cost for +{} ({}) should be less than +{} ({})",
+            target,
+            cost,
+            target + 1,
+            next_cost
+        );
+    }
+}
+
+/// Soul Tithe prices at +8-+10 are derived from the expected PR cost of
+/// gambling that step: attempt fees plus re-buying levels lost to failures
+/// via the tithes below. This test recomputes that expectation from the
+/// rate/cost/penalty tables and asserts each tithe stays a discount on it
+/// (roughly 0.6x-0.9x), so retuning rates or penalties without repricing
+/// the tithes fails loudly instead of silently breaking the economy.
+#[test]
+fn test_soul_tithe_high_tier_prices_track_expected_gamble_cost() {
+    for target in 8..=10u8 {
+        let p = success_rate(target);
+        let penalty = fail_penalty(target);
+        // Cheapest re-climb after a failure: tithe back each lost level.
+        let reclimb: u32 = (target - penalty..target)
+            .map(|lvl| soul_tithe_cost(lvl).expect("tithe available for re-climb levels"))
+            .sum();
+        let expected_gamble_cost =
+            (enhancement_cost(target) as f64 + (1.0 - p) * reclimb as f64) / p;
+
+        let tithe = soul_tithe_cost(target).unwrap() as f64;
+        let ratio = tithe / expected_gamble_cost;
+        assert!(
+            (0.6..=0.9).contains(&ratio),
+            "+{} tithe ({}) should be 0.6x-0.9x its expected gamble cost ({:.0}), got {:.2}x",
+            target,
+            tithe,
+            expected_gamble_cost,
+            ratio
+        );
+    }
 }
 
 // =============================================================================

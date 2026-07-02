@@ -1257,14 +1257,10 @@ fn test_soul_tithe_cost_all_levels() {
     assert_eq!(soul_tithe_cost(5), Some(4));
     assert_eq!(soul_tithe_cost(6), Some(6));
     assert_eq!(soul_tithe_cost(7), Some(8));
-    // +8-10: no soul tithe available
-    for lvl in 8..=10 {
-        assert_eq!(
-            soul_tithe_cost(lvl),
-            None,
-            "Level +{lvl} should have no soul tithe"
-        );
-    }
+    // +8: 25 PR, +9: 85 PR, +10: 750 PR
+    assert_eq!(soul_tithe_cost(8), Some(25));
+    assert_eq!(soul_tithe_cost(9), Some(85));
+    assert_eq!(soul_tithe_cost(10), Some(750));
 }
 
 #[test]
