@@ -67,8 +67,9 @@ impl CharacterManager {
     }
 
     /// Creates a CharacterManager with a custom directory path.
-    /// Useful for testing with isolated temp directories.
-    #[cfg(test)]
+    /// Used by tests (isolated temp directories, the save-compat corpus);
+    /// the game itself resolves the directory via `get_quest_dir()`.
+    #[allow(dead_code)]
     pub fn with_dir(quest_dir: PathBuf) -> io::Result<Self> {
         fs::create_dir_all(&quest_dir)?;
         Ok(Self { quest_dir })

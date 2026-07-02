@@ -1,0 +1,375 @@
+{
+  "version": 2,
+  "character_id": "00000000-0000-0000-0000-000000000003",
+  "character_name": "Boss",
+  "character_level": 45,
+  "character_xp": 0,
+  "attributes": {
+    "values": [
+      40,
+      40,
+      40,
+      40,
+      40,
+      40
+    ]
+  },
+  "prestige_rank": 5,
+  "total_prestige_count": 5,
+  "last_save_time": 1782980364,
+  "play_time_seconds": 108000,
+  "combat_state": {
+    "current_enemy": null,
+    "player_current_hp": 500,
+    "player_max_hp": 500,
+    "player_attack_timer": 0.0,
+    "enemy_attack_timer": 0.0,
+    "regen_timer": 0.0,
+    "is_regenerating": false
+  },
+  "equipment": {
+    "weapon": {
+      "slot": "Weapon",
+      "rarity": "Epic",
+      "ilvl": 80,
+      "tier": 3,
+      "base_name": "Armored Sword",
+      "display_name": "Armored Sword",
+      "attributes": {
+        "str": 6,
+        "dex": 0,
+        "con": 0,
+        "int": 8,
+        "wis": 0,
+        "cha": 0
+      },
+      "affixes": [
+        {
+          "affix_type": "DamageReduction",
+          "value": 11.0
+        },
+        {
+          "affix_type": "AttackSpeed",
+          "value": 3.0
+        },
+        {
+          "affix_type": "DamageReflection",
+          "value": 11.0
+        }
+      ],
+      "god_item_id": null
+    },
+    "armor": {
+      "slot": "Armor",
+      "rarity": "Rare",
+      "ilvl": 80,
+      "tier": 3,
+      "base_name": "Wise Chain Mail",
+      "display_name": "Wise Chain Mail",
+      "attributes": {
+        "str": 0,
+        "dex": 0,
+        "con": 4,
+        "int": 0,
+        "wis": 0,
+        "cha": 0
+      },
+      "affixes": [
+        {
+          "affix_type": "XPGain",
+          "value": 5.0
+        },
+        {
+          "affix_type": "HPRegen",
+          "value": 7.0
+        },
+        {
+          "affix_type": "DamageReflection",
+          "value": 7.0
+        }
+      ],
+      "god_item_id": null
+    },
+    "helmet": {
+      "slot": "Helmet",
+      "rarity": "Rare",
+      "ilvl": 80,
+      "tier": 3,
+      "base_name": "Coif of Precision",
+      "display_name": "Coif of Precision",
+      "attributes": {
+        "str": 4,
+        "dex": 0,
+        "con": 0,
+        "int": 0,
+        "wis": 0,
+        "cha": 4
+      },
+      "affixes": [
+        {
+          "affix_type": "CritChance",
+          "value": 7.0
+        },
+        {
+          "affix_type": "HPBonus",
+          "value": 59.0
+        }
+      ],
+      "god_item_id": null
+    },
+    "gloves": {
+      "slot": "Gloves",
+      "rarity": "Rare",
+      "ilvl": 80,
+      "tier": 3,
+      "base_name": "Cruel Handwraps",
+      "display_name": "Cruel Handwraps",
+      "attributes": {
+        "str": 0,
+        "dex": 4,
+        "con": 0,
+        "int": 0,
+        "wis": 6,
+        "cha": 0
+      },
+      "affixes": [
+        {
+          "affix_type": "DamagePercent",
+          "value": 6.0
+        },
+        {
+          "affix_type": "DamageReflection",
+          "value": 5.0
+        }
+      ],
+      "god_item_id": null
+    },
+    "boots": {
+      "slot": "Boots",
+      "rarity": "Rare",
+      "ilvl": 80,
+      "tier": 2,
+      "base_name": "Sabatons of Precision",
+      "display_name": "Sabatons of Precision",
+      "attributes": {
+        "str": 0,
+        "dex": 0,
+        "con": 4,
+        "int": 0,
+        "wis": 5,
+        "cha": 0
+      },
+      "affixes": [
+        {
+          "affix_type": "CritChance",
+          "value": 4.0
+        },
+        {
+          "affix_type": "XPGain",
+          "value": 6.0
+        },
+        {
+          "affix_type": "HPBonus",
+          "value": 50.0
+        }
+      ],
+      "god_item_id": null
+    },
+    "amulet": {
+      "slot": "Amulet",
+      "rarity": "Rare",
+      "ilvl": 80,
+      "tier": 0,
+      "base_name": "Vicious Necklace",
+      "display_name": "Vicious Necklace",
+      "attributes": {
+        "str": 0,
+        "dex": 4,
+        "con": 4,
+        "int": 0,
+        "wis": 0,
+        "cha": 0
+      },
+      "affixes": [
+        {
+          "affix_type": "CritMultiplier",
+          "value": 0.17
+        },
+        {
+          "affix_type": "AttackSpeed",
+          "value": 1.0
+        },
+        {
+          "affix_type": "CritChance",
+          "value": 5.0
+        }
+      ],
+      "god_item_id": null
+    },
+    "ring": {
+      "slot": "Ring",
+      "rarity": "Rare",
+      "ilvl": 80,
+      "tier": 5,
+      "base_name": "Deadly Circle",
+      "display_name": "Deadly Circle",
+      "attributes": {
+        "str": 0,
+        "dex": 0,
+        "con": 5,
+        "int": 0,
+        "wis": 14,
+        "cha": 0
+      },
+      "affixes": [
+        {
+          "affix_type": "CritChance",
+          "value": 6.0
+        },
+        {
+          "affix_type": "CritMultiplier",
+          "value": 0.34
+        }
+      ],
+      "god_item_id": null
+    }
+  },
+  "fishing": {
+    "rank": 1,
+    "total_fish_caught": 0,
+    "fish_toward_next_rank": 0,
+    "legendary_catches": 0
+  },
+  "zone_progression": {
+    "current_zone_id": 8,
+    "current_subzone_id": 2,
+    "defeated_bosses": [
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        7,
+        1
+      ],
+      [
+        7,
+        2
+      ],
+      [
+        7,
+        3
+      ],
+      [
+        7,
+        4
+      ],
+      [
+        8,
+        1
+      ]
+    ],
+    "unlocked_zones": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "kills_in_subzone": 10,
+    "fighting_boss": false,
+    "has_stormbreaker": false
+  },
+  "stormglass": 750,
+  "stormglass_discovered": true,
+  "storm_sigils": {
+    "slots_unlocked": 0,
+    "sigils": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "ascension_level": 0
+}
