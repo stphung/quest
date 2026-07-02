@@ -27,7 +27,14 @@ All four must be met:
 | Zone 50 conquered | The Origin Thread reveals the dying branch |
 | 100,000 PR spent | Fuel for the transformation |
 
-At endgame PR generation (~750-1,400 PR/day from WR->PR + Power Cores), this represents roughly 70-130 days of buildup after completing all other gates.
+Fuel-phase duration depends heavily on Loom investment. WR→PR is `PR/hr = WR × (1 + WR/100)` (`src/loom/logic.rs`), plus Power Cores at up to 48 PR/day:
+
+| Loom state | WR rate | PR/day | Days to 100,000 |
+|-----------|---------|--------|-----------------|
+| Typical at pattern-28 completion | 50 WR/hr | ~1,850 | ~54 |
+| Maxed (all 6 extractors L20 → 131 WR/hr) | 131 WR/hr | ~7,320 | ~14 |
+
+So the construction watch runs **two weeks to two months** — upgrading extractors during the fuel phase is the player's main lever, which conveniently gives the phase something to do. (Challenge wins grant only 1-2 PR each — negligible at these rates.)
 
 ## Mode Shift
 
