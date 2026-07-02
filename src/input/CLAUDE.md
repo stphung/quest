@@ -47,7 +47,7 @@ Keyboard input routing for the Game screen, dispatching to overlay handlers, min
 
 ## Minigame Input Pattern
 
-Each of the 12 minigames follows the same structure in `minigame_input.rs`:
+Each of the 14 minigames follows the same structure in `minigame_input.rs`:
 1. Check if game result exists -- if so, apply result and dismiss after 2s cooldown
 2. Map `KeyCode` to minigame-specific input enum (e.g., `ChessInput::Up`)
 3. Call the minigame's `process_input()` function
