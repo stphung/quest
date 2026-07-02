@@ -89,8 +89,10 @@ fn test_haven_discovery_requires_prestige_10_or_higher() {
     let mut haven = Haven::default();
     let mut rng = seeded_rng(42);
 
-    // P9 should never discover Haven (structurally blocked by prestige check)
-    for _ in 0..100 {
+    // P9 should never discover Haven (structurally blocked by prestige check).
+    // Chance is 0.0 by code structure below the prestige gate, so a handful of
+    // calls is enough to prove it -- no need to burn cycles on hundreds.
+    for _ in 0..5 {
         assert!(
             !try_discover_haven(&mut haven, 9, &mut rng),
             "P9 should not discover Haven"
@@ -165,7 +167,9 @@ fn test_haven_discovery_idempotent() {
     };
     let mut rng = seeded_rng(42);
 
-    for _ in 0..100 {
+    // Once discovered, the early-return path is unconditional -- a handful of
+    // calls is enough to prove it, no need to burn cycles on hundreds.
+    for _ in 0..5 {
         assert!(
             !try_discover_haven(&mut haven, 20, &mut rng),
             "Should not rediscover Haven"

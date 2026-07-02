@@ -974,8 +974,9 @@ fn test_try_drop_item_produces_valid_equippable_items() {
     game_state.prestige_rank = 5;
 
     let mut items_equipped = 0;
-    // Run many trials to collect some actual drops
-    for _ in 0..1000 {
+    // Run enough trials to collect some actual drops. At a ~20% drop rate the
+    // odds of zero successes in 100 trials are already ~1 in 5 billion.
+    for _ in 0..100 {
         if let Some(item) = try_drop_from_mob(&game_state, 1, 0.0, 0.0) {
             // Verify basic item validity
             assert!(!item.display_name.is_empty());
@@ -997,7 +998,7 @@ fn test_try_drop_item_produces_valid_equippable_items() {
         }
     }
 
-    // We should have equipped at least a few items from 1000 trials at 20% drop rate
+    // We should have equipped at least a few items from 100 trials at 20% drop rate
     assert!(
         items_equipped > 0,
         "Should have equipped at least one item from drops"

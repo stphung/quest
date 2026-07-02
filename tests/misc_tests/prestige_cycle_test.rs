@@ -295,8 +295,8 @@ fn test_combat_to_prestige_full_loop() {
 
         // Safety: ensure we don't infinite loop
         assert!(
-            tick < 199_999,
-            "Should reach level {} within 200k ticks",
+            tick < 19_999,
+            "Should reach level {} within 20k ticks",
             target_level
         );
     }
