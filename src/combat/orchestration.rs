@@ -49,7 +49,12 @@ pub fn update_combat<R: Rng>(
     // --- Phase 1c: Mob fight timeout ---
     if !state.zone_progression.fighting_boss {
         state.combat_state.current_fight_elapsed += delta_time;
-        if state.combat_state.current_fight_elapsed >= MOB_FIGHT_TIMEOUT_SECONDS {
+        let timeout = if state.active_dungeon.is_some() {
+            DUNGEON_FIGHT_TIMEOUT_SECONDS
+        } else {
+            MOB_FIGHT_TIMEOUT_SECONDS
+        };
+        if state.combat_state.current_fight_elapsed >= timeout {
             // Stalemate, not a death loop — retreat without frontier backoff
             events.extend(resolve_combat_retreat(state, false));
             return events;
@@ -109,8 +114,18 @@ pub fn update_combat<R: Rng>(
 /// into a zone that keeps killing them (#576). Stalemate (timeout) retreats
 /// don't — the player survives those and retrying is cheap.
 pub fn resolve_combat_retreat(state: &mut GameState, triggered_by_death: bool) -> Vec<CombatEvent> {
+    let mut events = Vec::new();
+
     if triggered_by_death {
         state.zone_progression.record_death_retreat();
+    }
+
+    // Retreating while inside a dungeon abandons it entirely (safe exit, no
+    // prestige loss). Otherwise the uncleared room respawns its enemy at full
+    // HP and the fight timeout loops forever.
+    if state.active_dungeon.is_some() {
+        state.active_dungeon = None;
+        events.push(CombatEvent::DungeonRetreat);
     }
 
     // Find last safe zone: highest zone_id with a defeated boss
@@ -142,7 +157,8 @@ pub fn resolve_combat_retreat(state: &mut GameState, triggered_by_death: bool) -
     // Reset death counter
     state.consecutive_deaths = 0;
 
-    vec![CombatEvent::CombatRetreat { zone_name }]
+    events.push(CombatEvent::CombatRetreat { zone_name });
+    events
 }
 
 /// Resolves boss enrage: instant kills the player and resets combat state.
@@ -261,6 +277,90 @@ mod tests {
             [CombatEvent::CombatRetreat { zone_name }] if zone_name == &expected_zone
         ));
         assert_eq!(state.zone_progression.current_zone_id, 5);
+    }
+
+    #[test]
+    fn resolve_combat_retreat_abandons_active_dungeon() {
+        let mut state = state_with_enemy("Boss Gorehowl");
+        state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(10, 0, 1));
+
+        let events = resolve_combat_retreat(&mut state, false);
+
+        assert!(
+            state.active_dungeon.is_none(),
+            "Retreat should abandon the dungeon so its room can't respawn the enemy"
+        );
+        assert!(matches!(
+            events.as_slice(),
+            [
+                CombatEvent::DungeonRetreat,
+                CombatEvent::CombatRetreat { .. }
+            ]
+        ));
+        assert!(state.combat_state.current_enemy.is_none());
+    }
+
+    #[test]
+    fn update_combat_dungeon_fight_survives_mob_timeout() {
+        let mut rng = ChaCha8Rng::seed_from_u64(7);
+        let mut state = state_with_enemy("Boss Gorehowl");
+        state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(10, 0, 1));
+        state.combat_state.current_fight_elapsed = MOB_FIGHT_TIMEOUT_SECONDS + 5.0;
+
+        let events = update_combat(
+            &mut rng,
+            &mut state,
+            0.1,
+            &CombatBonuses::default(),
+            &mut Achievements::default(),
+            &DerivedStats::default(),
+            11,
+            30,
+        );
+
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, CombatEvent::CombatRetreat { .. })),
+            "Dungeon fights should use the longer dungeon timeout, not the mob timeout"
+        );
+        assert!(state.active_dungeon.is_some());
+    }
+
+    #[test]
+    fn update_combat_dungeon_timeout_exits_dungeon() {
+        let mut rng = ChaCha8Rng::seed_from_u64(7);
+        let mut state = state_with_enemy("Boss Gorehowl");
+        state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(10, 0, 1));
+        state.combat_state.current_fight_elapsed = DUNGEON_FIGHT_TIMEOUT_SECONDS - 0.05;
+
+        let events = update_combat(
+            &mut rng,
+            &mut state,
+            0.1,
+            &CombatBonuses::default(),
+            &mut Achievements::default(),
+            &DerivedStats::default(),
+            11,
+            30,
+        );
+
+        assert!(matches!(
+            events.as_slice(),
+            [
+                CombatEvent::DungeonRetreat,
+                CombatEvent::CombatRetreat { .. }
+            ]
+        ));
+        assert!(
+            state.active_dungeon.is_none(),
+            "Timing out against a dungeon enemy should exit the dungeon"
+        );
+        assert!(state.combat_state.current_enemy.is_none());
+        assert_eq!(
+            state.combat_state.player_current_hp,
+            state.combat_state.player_max_hp
+        );
     }
 
     #[test]

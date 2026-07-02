@@ -116,4 +116,7 @@ pub enum CombatEvent {
     CombatRetreat {
         zone_name: String,
     },
+    /// Player was overwhelmed inside a dungeon and abandoned it
+    /// (safe exit, no prestige loss). Followed by a CombatRetreat.
+    DungeonRetreat,
 }

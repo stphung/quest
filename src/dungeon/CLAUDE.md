@@ -97,6 +97,7 @@ pub fn generate_dungeon(level: u32, prestige_rank: u32, zone_id: u32) -> Dungeon
 - Death in dungeon exits the dungeon entirely
 - No prestige loss (safe death)
 - Dungeon progress is lost (no saving mid-dungeon)
+- Stalemate protection: a dungeon fight that lasts 60s (`DUNGEON_FIGHT_TIMEOUT_SECONDS`) triggers a combat retreat that abandons the dungeon the same way (safe exit, no prestige loss)
 
 ## Integration Points
 
