@@ -1,5 +1,10 @@
 # Vessel Crew System
 
+> **⚠ SUPERSEDED (2026-07-02).** Act 2's direction changed to *The Pilgrimage
+> of Souls* — see the rewritten parent spec and
+> [2026-07-02-act2-voyage-experience-exploration.md](2026-07-02-act2-voyage-experience-exploration.md).
+> Rewritten as The Souls (spec 3): arcs, hope, and memorial replace stat multipliers. Capacity, injury, and offline-protection bones survive. Kept for salvage, not for implementation.
+
 **Parent spec:** `docs/superpowers/specs/2026-03-27-the-vessel-design.md`
 **Sub-project:** 5 of 7
 **Depends on:** Sub-project 3 (Room System & Ship Stats)

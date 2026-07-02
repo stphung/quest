@@ -1,5 +1,10 @@
 # Vessel Room System & Ship Stats
 
+> **⚠ SUPERSEDED (2026-07-02).** Act 2's direction changed to *The Pilgrimage
+> of Souls* — see the rewritten parent spec and
+> [2026-07-02-act2-voyage-experience-exploration.md](2026-07-02-act2-voyage-experience-exploration.md).
+> Replaced by waypoint Refits (spec 5: The Vessel Underway). Ship XP/levels, the room grid, and the Reactor power budget are cut. Kept for salvage, not for implementation.
+
 **Parent spec:** `docs/superpowers/specs/2026-03-27-the-vessel-design.md`
 **Sub-project:** 3 of 7
 **Depends on:** Sub-project 2 (Voyage Shell)

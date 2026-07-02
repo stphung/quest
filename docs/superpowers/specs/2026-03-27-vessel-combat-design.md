@@ -1,5 +1,10 @@
 # Vessel Auto-Combat
 
+> **⚠ SUPERSEDED (2026-07-02).** Act 2's direction changed to *The Pilgrimage
+> of Souls* — see the rewritten parent spec and
+> [2026-07-02-act2-voyage-experience-exploration.md](2026-07-02-act2-voyage-experience-exploration.md).
+> Replaced by leg ambience and named waypoint threats (spec 5: The Vessel Underway). The enemy-tier ladder and scaling formulas are cut. Kept for salvage, not for implementation.
+
 **Parent spec:** `docs/superpowers/specs/2026-03-27-the-vessel-design.md`
 **Sub-project:** 4 of 7
 **Depends on:** Sub-project 3 (Room System & Ship Stats)
