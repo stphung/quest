@@ -1,0 +1,28 @@
+{
+  "expanse_cycles_completed": 0,
+  "highest_deep_layer": 0,
+  "highest_fishing_rank": 0,
+  "highest_guild_rank": 0,
+  "highest_level": 80,
+  "highest_prestige_rank": 25,
+  "progress": {},
+  "selected_title": null,
+  "total_bosses_defeated": 0,
+  "total_deep_missions_completed": 0,
+  "total_dungeons_completed": 0,
+  "total_fish_caught": 0,
+  "total_kills": 12345,
+  "total_minigame_wins": 0,
+  "ui_border_style": "Classic",
+  "unlocked": {
+    "PowerCoreI": {
+      "character_name": null,
+      "unlocked_at": 1750000000
+    },
+    "PowerCoreII": {
+      "character_name": null,
+      "unlocked_at": 1750000000
+    }
+  },
+  "zones_fully_cleared": 0
+}

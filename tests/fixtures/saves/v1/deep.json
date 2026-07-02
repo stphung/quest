@@ -1,0 +1,52 @@
+{
+  "persistent": {
+    "deepest_layer_reached": 12,
+    "discovered": true,
+    "first_orders_queued": false,
+    "fracture_zone_cap": 11,
+    "gateway_opened": false,
+    "generation_counter": 0,
+    "generation_records": [],
+    "guild_rank": 1,
+    "guild_upgrade_cost": 500,
+    "layers": [],
+    "merc_id_counter": 0,
+    "mission_id_counter": 0,
+    "pending_fracture_region_unlock": null,
+    "power_core_last_granted": {
+      "PowerCoreI": 1749978400
+    }
+  },
+  "prestige": {
+    "active_missions": [
+      {
+        "ends_at": "2025-06-15T17:06:40.123Z",
+        "events": [],
+        "id": 1,
+        "is_first_orders": false,
+        "layer": 12,
+        "mission_type": "Expedition",
+        "pending_event_index": 0,
+        "result": null,
+        "squad": [],
+        "started_at": "2025-06-15T12:06:40.123Z",
+        "status": "Active"
+      }
+    ],
+    "available_missions": [],
+    "generation_number": 0,
+    "pending_results": [],
+    "pool_refreshed_at": null,
+    "recruit_pool": {
+      "candidates": [],
+      "recruit_costs": [],
+      "refreshed_at": "2026-07-02T08:19:24.667144864Z"
+    },
+    "roster": [],
+    "total_marks_earned": 0,
+    "total_mercs_lost": 0,
+    "total_missions_completed": 0,
+    "warband_log": [],
+    "warband_marks": 45
+  }
+}

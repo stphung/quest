@@ -1,0 +1,70 @@
+{
+  "version": 2,
+  "character_id": "00000000-0000-0000-0000-000000000000",
+  "character_name": "Fresh",
+  "character_level": 1,
+  "character_xp": 0,
+  "attributes": {
+    "values": [
+      10,
+      10,
+      10,
+      10,
+      10,
+      10
+    ]
+  },
+  "prestige_rank": 0,
+  "total_prestige_count": 0,
+  "last_save_time": 1782980364,
+  "play_time_seconds": 0,
+  "combat_state": {
+    "current_enemy": null,
+    "player_current_hp": 50,
+    "player_max_hp": 50,
+    "player_attack_timer": 0.0,
+    "enemy_attack_timer": 0.0,
+    "regen_timer": 0.0,
+    "is_regenerating": false
+  },
+  "equipment": {
+    "weapon": null,
+    "armor": null,
+    "helmet": null,
+    "gloves": null,
+    "boots": null,
+    "amulet": null,
+    "ring": null
+  },
+  "fishing": {
+    "rank": 1,
+    "total_fish_caught": 0,
+    "fish_toward_next_rank": 0,
+    "legendary_catches": 0
+  },
+  "zone_progression": {
+    "current_zone_id": 1,
+    "current_subzone_id": 1,
+    "defeated_bosses": [],
+    "unlocked_zones": [
+      1,
+      2
+    ],
+    "kills_in_subzone": 0,
+    "fighting_boss": false,
+    "has_stormbreaker": false
+  },
+  "stormglass": 0,
+  "stormglass_discovered": false,
+  "storm_sigils": {
+    "slots_unlocked": 0,
+    "sigils": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "ascension_level": 0
+}

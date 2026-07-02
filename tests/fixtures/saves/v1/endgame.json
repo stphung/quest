@@ -1,0 +1,458 @@
+{
+  "version": 2,
+  "character_id": "00000000-0000-0000-0000-000000000002",
+  "character_name": "Endgame",
+  "character_level": 80,
+  "character_xp": 0,
+  "attributes": {
+    "values": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+    ]
+  },
+  "prestige_rank": 25,
+  "total_prestige_count": 32,
+  "last_save_time": 1782980364,
+  "play_time_seconds": 1440000,
+  "combat_state": {
+    "current_enemy": null,
+    "player_current_hp": 850,
+    "player_max_hp": 850,
+    "player_attack_timer": 0.0,
+    "enemy_attack_timer": 0.0,
+    "regen_timer": 0.0,
+    "is_regenerating": false
+  },
+  "equipment": {
+    "weapon": {
+      "slot": "Weapon",
+      "rarity": "Legendary",
+      "ilvl": 110,
+      "tier": 0,
+      "base_name": "Swift Mace",
+      "display_name": "Swift Mace",
+      "attributes": {
+        "str": 0,
+        "dex": 16,
+        "con": 0,
+        "int": 0,
+        "wis": 0,
+        "cha": 0
+      },
+      "affixes": [
+        {
+          "affix_type": "AttackSpeed",
+          "value": 4.0
+        },
+        {
+          "affix_type": "AttackSpeed",
+          "value": 5.0
+        },
+        {
+          "affix_type": "DamageReflection",
+          "value": 14.0
+        },
+        {
+          "affix_type": "XPGain",
+          "value": 17.0
+        },
+        {
+          "affix_type": "HPBonus",
+          "value": 131.0
+        }
+      ],
+      "god_item_id": null
+    },
+    "armor": {
+      "slot": "Armor",
+      "rarity": "Epic",
+      "ilvl": 110,
+      "tier": 8,
+      "base_name": "Leather Armor of Renewal",
+      "display_name": "Leather Armor of Renewal",
+      "attributes": {
+        "str": 12,
+        "dex": 16,
+        "con": 12,
+        "int": 0,
+        "wis": 0,
+        "cha": 0
+      },
+      "affixes": [
+        {
+          "affix_type": "HPRegen",
+          "value": 21.0
+        },
+        {
+          "affix_type": "DamageReflection",
+          "value": 20.0
+        },
+        {
+          "affix_type": "DamagePercent",
+          "value": 19.0
+        }
+      ],
+      "god_item_id": null
+    },
+    "helmet": {
+      "slot": "Helmet",
+      "rarity": "Epic",
+      "ilvl": 110,
+      "tier": 2,
+      "base_name": "Wise Coif",
+      "display_name": "Wise Coif",
+      "attributes": {
+        "str": 0,
+        "dex": 7,
+        "con": 9,
+        "int": 0,
+        "wis": 0,
+        "cha": 9
+      },
+      "affixes": [
+        {
+          "affix_type": "XPGain",
+          "value": 14.0
+        },
+        {
+          "affix_type": "HPBonus",
+          "value": 71.0
+        },
+        {
+          "affix_type": "CritChance",
+          "value": 14.0
+        },
+        {
+          "affix_type": "CritMultiplier",
+          "value": 0.44
+        }
+      ],
+      "god_item_id": null
+    },
+    "gloves": {
+      "slot": "Gloves",
+      "rarity": "Epic",
+      "ilvl": 110,
+      "tier": 1,
+      "base_name": "Gauntlets of Learning",
+      "display_name": "Gauntlets of Learning",
+      "attributes": {
+        "str": 6,
+        "dex": 6,
+        "con": 0,
+        "int": 0,
+        "wis": 6,
+        "cha": 0
+      },
+      "affixes": [
+        {
+          "affix_type": "XPGain",
+          "value": 9.0
+        },
+        {
+          "affix_type": "CritMultiplier",
+          "value": 0.5
+        },
+        {
+          "affix_type": "HPBonus",
+          "value": 95.0
+        },
+        {
+          "affix_type": "AttackSpeed",
+          "value": 3.0
+        }
+      ],
+      "god_item_id": null
+    },
+    "boots": {
+      "slot": "Boots",
+      "rarity": "Epic",
+      "ilvl": 110,
+      "tier": 2,
+      "base_name": "Greaves of Haste",
+      "display_name": "Greaves of Haste",
+      "attributes": {
+        "str": 0,
+        "dex": 9,
+        "con": 0,
+        "int": 0,
+        "wis": 9,
+        "cha": 9
+      },
+      "affixes": [
+        {
+          "affix_type": "AttackSpeed",
+          "value": 4.0
+        },
+        {
+          "affix_type": "CritChance",
+          "value": 10.0
+        },
+        {
+          "affix_type": "XPGain",
+          "value": 12.0
+        }
+      ],
+      "god_item_id": null
+    },
+    "amulet": {
+      "slot": "Amulet",
+      "rarity": "Epic",
+      "ilvl": 110,
+      "tier": 1,
+      "base_name": "Talisman of Haste",
+      "display_name": "Talisman of Haste",
+      "attributes": {
+        "str": 0,
+        "dex": 0,
+        "con": 0,
+        "int": 8,
+        "wis": 0,
+        "cha": 6
+      },
+      "affixes": [
+        {
+          "affix_type": "AttackSpeed",
+          "value": 4.0
+        },
+        {
+          "affix_type": "CritChance",
+          "value": 10.0
+        },
+        {
+          "affix_type": "CritMultiplier",
+          "value": 0.44
+        },
+        {
+          "affix_type": "DamageReflection",
+          "value": 11.0
+        }
+      ],
+      "god_item_id": null
+    },
+    "ring": {
+      "slot": "Ring",
+      "rarity": "Epic",
+      "ilvl": 110,
+      "tier": 1,
+      "base_name": "Swift Circle",
+      "display_name": "Swift Circle",
+      "attributes": {
+        "str": 0,
+        "dex": 0,
+        "con": 6,
+        "int": 6,
+        "wis": 0,
+        "cha": 6
+      },
+      "affixes": [
+        {
+          "affix_type": "AttackSpeed",
+          "value": 4.0
+        },
+        {
+          "affix_type": "HPBonus",
+          "value": 74.0
+        },
+        {
+          "affix_type": "XPGain",
+          "value": 9.0
+        },
+        {
+          "affix_type": "DamageReflection",
+          "value": 12.0
+        }
+      ],
+      "god_item_id": null
+    }
+  },
+  "fishing": {
+    "rank": 1,
+    "total_fish_caught": 0,
+    "fish_toward_next_rank": 0,
+    "legendary_catches": 0
+  },
+  "zone_progression": {
+    "current_zone_id": 11,
+    "current_subzone_id": 1,
+    "defeated_bosses": [
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        7,
+        1
+      ],
+      [
+        7,
+        2
+      ],
+      [
+        7,
+        3
+      ],
+      [
+        7,
+        4
+      ],
+      [
+        8,
+        1
+      ],
+      [
+        8,
+        2
+      ],
+      [
+        8,
+        3
+      ],
+      [
+        8,
+        4
+      ],
+      [
+        9,
+        1
+      ],
+      [
+        9,
+        2
+      ],
+      [
+        9,
+        3
+      ],
+      [
+        9,
+        4
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        10,
+        2
+      ],
+      [
+        10,
+        3
+      ],
+      [
+        10,
+        4
+      ]
+    ],
+    "unlocked_zones": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ],
+    "kills_in_subzone": 0,
+    "fighting_boss": false,
+    "has_stormbreaker": true
+  },
+  "stormglass": 25000,
+  "stormglass_discovered": true,
+  "storm_sigils": {
+    "slots_unlocked": 0,
+    "sigils": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "ascension_level": 3
+}

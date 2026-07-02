@@ -1,0 +1,112 @@
+{
+  "persistent": {
+    "active_pattern": 0,
+    "archetype": null,
+    "codex": [],
+    "discovered": true,
+    "nodes": [
+      {
+        "base_rate": 25.0,
+        "buffer": 120.0,
+        "buffer_capacity": 250.0,
+        "id": "EmberSpindle",
+        "level": 1,
+        "stalled": false,
+        "unlock_progress": 0.0,
+        "unlocked": true,
+        "upgrade_remaining_secs": 0.0,
+        "upgrading": false
+      },
+      {
+        "base_rate": 25.0,
+        "buffer": 0.0,
+        "buffer_capacity": 250.0,
+        "id": "ReflectionLens",
+        "level": 1,
+        "stalled": false,
+        "unlock_progress": 0.0,
+        "unlocked": false,
+        "upgrade_remaining_secs": 0.0,
+        "upgrading": false
+      },
+      {
+        "base_rate": 25.0,
+        "buffer": 120.0,
+        "buffer_capacity": 250.0,
+        "id": "VoidCondenser",
+        "level": 1,
+        "stalled": false,
+        "unlock_progress": 0.0,
+        "unlocked": true,
+        "upgrade_remaining_secs": 0.0,
+        "upgrading": false
+      },
+      {
+        "base_rate": 25.0,
+        "buffer": 0.0,
+        "buffer_capacity": 250.0,
+        "id": "MemoryArchive",
+        "level": 1,
+        "stalled": false,
+        "unlock_progress": 0.0,
+        "unlocked": false,
+        "upgrade_remaining_secs": 0.0,
+        "upgrading": false
+      },
+      {
+        "base_rate": 25.0,
+        "buffer": 0.0,
+        "buffer_capacity": 250.0,
+        "id": "SilenceWell",
+        "level": 1,
+        "stalled": false,
+        "unlock_progress": 0.0,
+        "unlocked": false,
+        "upgrade_remaining_secs": 0.0,
+        "upgrading": false
+      },
+      {
+        "base_rate": 25.0,
+        "buffer": 0.0,
+        "buffer_capacity": 250.0,
+        "id": "ResonanceForge",
+        "level": 1,
+        "stalled": false,
+        "unlock_progress": 0.0,
+        "unlocked": false,
+        "upgrade_remaining_secs": 0.0,
+        "upgrading": false
+      }
+    ],
+    "patterns": [],
+    "second_node_unlock_elapsed": null,
+    "shuttles": [
+      {
+        "amount": 1.0,
+        "buffer": 42.0,
+        "buffer_capacity": 500.0,
+        "construction_secs_remaining": 0.0,
+        "input_a": "Ember",
+        "input_b": "VoidEssence",
+        "level": 1,
+        "nature": "Heat",
+        "output": "ForgedLight",
+        "sources_a": [
+          {
+            "Extractor": "EmberSpindle"
+          }
+        ],
+        "sources_b": [
+          {
+            "Extractor": "VoidCondenser"
+          }
+        ],
+        "stalled": false,
+        "tier": 1,
+        "under_construction": false
+      }
+    ],
+    "version": 2,
+    "wr_pr_last_granted_at": 0
+  }
+}
