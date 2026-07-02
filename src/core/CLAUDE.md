@@ -135,7 +135,7 @@ Enum with 48 variants describing everything that can happen in a single tick. Th
 - **The Deep**: `DeepMissionComplete`, `DeepEventPending`, `DeepMercInjured`, `DeepMercLost`, `DeepBreakthrough`, `DeepGuildRankUp`
 - **Stormglass**: `StormglassSalvaged`, `StormglassDungeonCache`
 - **Fracture Zones**: `FractureRegionUnlocked` (with `FractureRegion`)
-- **Ascension**: `Ascended` (with level and message)
+- **Ascension**: `Ascended` (with level)
 - **Achievements**: `AchievementUnlocked`
 - **Level Up**: `LeveledUp`
 - **Power Cores**: `PowerCoreGranted` (with `core_name`)
@@ -358,7 +358,7 @@ Zone 11 (The Expanse) is an endgame wall: `(5000, 400, 500, 80, 250, 30)` — ro
 ## Integration Points
 
 ### tick.rs depends on (inputs)
-- **combat** (`combat::logic`): `update_combat(rng, state, dt, &bonuses, achievements, derived, fracture_zone_cap)` returns `Vec<CombatEvent>`, `CombatBonuses` unified struct
+- **combat** (`combat::logic`): `update_combat(rng, state, dt, &bonuses, achievements, derived, fracture_zone_cap, loom_zone_cap)` returns `Vec<CombatEvent>`, `CombatBonuses` unified struct
 - **character** (`character::prestige`): `PrestigeCombatBonuses::from_rank()` — computed each tick for combat bonuses
 - **character** (`character::derived_stats`): `DerivedStats::calculate_derived_stats()`
 - **dungeon** (`dungeon::logic`): `update_dungeon()`, `on_room_enemy_defeated()`, `on_elite_defeated()`, `on_boss_defeated()`, `add_dungeon_xp()`, `calculate_boss_xp_reward()`, `on_treasure_room_entered()`

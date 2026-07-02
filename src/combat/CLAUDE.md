@@ -39,11 +39,11 @@ Constructors:
 - `Enemy::new_with_defense(name, max_hp, damage, defense)` -- Full constructor
 
 ### `CombatState` (`types.rs`)
-State machine for combat flow:
-- **Idle**: No enemy, waiting for spawn
-- **Fighting**: Active combat (turns every 1.5s for player, variable for enemies by tier)
-- **Regen**: HP regenerating after kill (2.5s)
-- **Dead**: Player died (triggers reset or dungeon exit)
+Struct whose fields encode the combat flow:
+- **Idle**: `current_enemy` is `None`, waiting for spawn
+- **Fighting**: `current_enemy` is `Some` (turns every 1.5s for player, variable for enemies by tier)
+- **Regen**: `is_regenerating` is `true`, HP regenerating after kill (2.5s)
+- **Dead**: Player death is event-driven (triggers reset or dungeon exit), not a stored state
 
 ## Combat Flow
 

@@ -164,7 +164,7 @@ Nineteen zones across six chapters, unlocked by Deep layer breakthroughs. Enemy 
 - Zone 30 becomes the permanent fracture loop cap
 - Fracture zones have prestige requirements: P50 (Z12-14), P75 (Z15-17), P100 (Z18-20), P150 (Z21-23), P200 (Z24-26), P300 (Z27-30) — enforced alongside Deep layer gates by `sync_account_zone_unlocks()`
 
-**Boss defeat with cap awareness:** `on_boss_defeated_with_cap(prestige_rank, achievements, fracture_zone_cap)` extends the original `on_boss_defeated()` to handle fracture cycling logic.
+**Boss defeat with cap awareness:** `on_boss_defeated_with_cap(prestige_rank, achievements, fracture_zone_cap, loom_zone_cap)` extends the original `on_boss_defeated()` to handle fracture cycling logic.
 
 ## Loom Zones 31-50
 
@@ -188,9 +188,9 @@ Twenty zones across five chapters, triple-gated by pattern completion, ascension
 
 ## Zone Access Sync (`access.rs`)
 
-`sync_account_zone_unlocks(prog, storms_end_unlocked, fracture_zone_cap, prestige_rank, loom_zone_cap)`:
+`sync_account_zone_unlocks(prog, storms_end_unlocked, fracture_zone_cap, prestige_rank, loom_zone_cap, ascension_level)`:
 - Called at: character load, prestige reset, StormsEnd, fracture region unlock, pattern completion
-- If `storms_end_unlocked`, unlocks Zone 11
+- If `storms_end_unlocked` and prestige rank >= P25, unlocks Zone 11
 - Unlocks every zone in `12..=fracture_zone_cap`
 - Unlocks every Loom zone in `31..=loom_zone_cap` if prestige requirement met
 - Never unlocks above cap, never removes earlier unlocks
