@@ -16,7 +16,9 @@ use crate::character::{AttributeType, Attributes};
 use crate::combat::{CombatState, Enemy};
 use crate::core::GameState;
 use crate::deep::{DeepState, Mission, MissionStatus, MissionType};
+use crate::haven::{Haven, HavenRoomId};
 use crate::items::{generate_item_with_rng, EquipmentSlot, Rarity};
+use crate::loom::types::{LoomNodeRef, LoomState, NodeId, NodeNature, Resource, Shuttle};
 use crate::power_cores::ALL_POWER_CORES;
 use crate::zones::{get_zone, ZoneProgression};
 use chrono::{DateTime, Duration, Utc};
@@ -274,6 +276,45 @@ pub fn deep_state_active(now: DateTime<Utc>) -> DeepState {
         is_first_orders: false,
     });
     deep
+}
+
+/// A discovered Loom with two unlocked extractors feeding one built T1
+/// shuttle (Ember + VoidEssence -> ForgedLight), so the graph renderer has
+/// nodes and edges to draw instead of the empty-loom placeholder.
+pub fn loom_state_with_shuttle() -> LoomState {
+    let mut loom = LoomState::new();
+    loom.persistent.discovered = true;
+    for node in loom.persistent.nodes.iter_mut() {
+        if matches!(node.id, NodeId::EmberSpindle | NodeId::VoidCondenser) {
+            node.unlocked = true;
+            node.buffer = 120.0;
+        }
+    }
+    let mut shuttle = Shuttle::new(
+        Resource::Ember,
+        Resource::VoidEssence,
+        NodeNature::Heat,
+        Resource::ForgedLight,
+        1.0,
+        1,
+        vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+        vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+    );
+    shuttle.buffer = 42.0;
+    loom.persistent.shuttles.push(shuttle);
+    loom
+}
+
+/// A discovered Haven with a spread of room tiers (assigned along the
+/// fixed `HavenRoomId::ALL` order, so the layout is deterministic).
+pub fn haven_built() -> Haven {
+    let mut haven = Haven::new();
+    haven.discovered = true;
+    let tiers: [u8; 12] = [4, 3, 2, 2, 1, 1, 0, 3, 1, 2, 4, 1];
+    for (room, tier) in HavenRoomId::ALL.iter().zip(tiers) {
+        haven.rooms.insert(*room, tier);
+    }
+    haven
 }
 
 /// Unlocks the first `count` Power Cores directly (bypassing the unlock

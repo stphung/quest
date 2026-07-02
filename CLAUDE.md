@@ -110,7 +110,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 
 ### UI Snapshot Tests (`src/ui/snapshot_tests.rs`)
 
-Deterministic full-frame TUI snapshot tests (insta + ratatui `TestBackend`) covering each responsive size tier across fixture scenarios; committed snapshots live in `src/ui/snapshots/`. Part of `cargo test`, so they gate CI. After an intentional UI change: review the diff, re-bless with `INSTA_UPDATE=always cargo test snapshot`, and commit the `.snap` changes. This is the first line of verification for any `src/ui/` change — use the `drive-game` skill for visual/e2e confirmation. Determinism rules (freezable `ui/clock.rs`, no direct wall-clock reads in render code) are documented in [src/ui/CLAUDE.md](src/ui/CLAUDE.md).
+Deterministic full-frame TUI snapshot tests (insta + ratatui `TestBackend`) covering each responsive size tier across fixture scenarios, plus the full-screen overlays (Haven, Deep, Loom, Soulforge, Stormglass, Time Vault) in `src/ui/overlay_snapshot_tests.rs`; committed snapshots live in `src/ui/snapshots/`. Part of `cargo test`, so they gate CI. After an intentional UI change: review the diff, re-bless with `INSTA_UPDATE=always cargo test snapshot`, and commit the `.snap` changes. This is the first line of verification for any `src/ui/` change — use the `drive-game` skill for visual/e2e confirmation. Determinism rules (freezable `ui/clock.rs`, no direct wall-clock reads in render code) are documented in [src/ui/CLAUDE.md](src/ui/CLAUDE.md).
 
 ### Library Crate (`src/lib.rs`)
 
