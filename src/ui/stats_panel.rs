@@ -68,9 +68,9 @@ impl DeepIndicatorStatus {
         if !discovered {
             return Self::Hidden;
         }
-        let has_events = deep.prestige.has_any_pending_event();
-        let has_results = !deep.prestige.pending_results.is_empty();
-        let has_active = deep.prestige.active_mission_count() > 0;
+        let has_events = deep.session.has_any_pending_event();
+        let has_results = !deep.session.pending_results.is_empty();
+        let has_active = deep.session.active_mission_count() > 0;
         if has_events {
             Self::EventPending
         } else if has_results {

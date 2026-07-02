@@ -267,7 +267,7 @@ pub(super) fn draw_deep_panel(
     {
         let dw = super::scene_fx::display_width;
         let rank_name = deep.persistent.guild_rank.display_name();
-        let marks = deep.prestige.warband_marks;
+        let marks = deep.session.warband_marks;
         let marks_str = format!("\u{25c6} {} Warband Marks", marks);
         let rank_part = format!("\u{2b21} {}", rank_name);
         let padding = width.saturating_sub(dw(&rank_part) + dw(&marks_str));
@@ -286,15 +286,15 @@ pub(super) fn draw_deep_panel(
 
     // Row 2 data: Missions + progress gauge + ETA + events badge
     // (rendered separately below as a horizontal layout with a Gauge widget)
-    let active = deep.prestige.active_mission_count();
+    let active = deep.session.active_mission_count();
     let max_concurrent = crate::deep::effective_concurrent_missions(
         deep.persistent.guild_rank,
         deep.persistent.deepest_layer_reached,
     );
-    let events = pending_event_count(&deep.prestige);
+    let events = pending_event_count(&deep.session);
     let now_chrono = chrono::Utc::now();
     let nearest_mission = deep
-        .prestige
+        .session
         .active_missions
         .iter()
         .filter(|m| {
@@ -304,7 +304,7 @@ pub(super) fn draw_deep_panel(
             )
         })
         .min_by_key(|m| m.ends_at);
-    let eta = next_mission_eta_secs(&deep.prestige);
+    let eta = next_mission_eta_secs(&deep.session);
     let mission_progress = nearest_mission.map(|m| m.progress(now_chrono));
 
     // Build right-side text for Row 2
@@ -347,7 +347,7 @@ pub(super) fn draw_deep_panel(
         let mut on_mission_count: usize = 0;
         let mut injured_count: usize = 0;
 
-        for merc in deep.prestige.roster.values() {
+        for merc in deep.session.roster.values() {
             match merc.status {
                 crate::deep::MercStatus::Available => available_count += 1,
                 crate::deep::MercStatus::OnMission(_) => on_mission_count += 1,
@@ -557,7 +557,7 @@ pub(super) fn draw_deep_panel(
 }
 
 /// Returns seconds until the next active mission completes, or None if no active missions.
-fn next_mission_eta_secs(prestige: &crate::deep::DeepPrestige) -> Option<i64> {
+fn next_mission_eta_secs(prestige: &crate::deep::DeepSession) -> Option<i64> {
     let now = chrono::Utc::now();
     prestige
         .active_missions
@@ -573,7 +573,7 @@ fn next_mission_eta_secs(prestige: &crate::deep::DeepPrestige) -> Option<i64> {
 }
 
 /// Count of active missions with pending events needing player response.
-fn pending_event_count(prestige: &crate::deep::DeepPrestige) -> usize {
+fn pending_event_count(prestige: &crate::deep::DeepSession) -> usize {
     prestige
         .active_missions
         .iter()
@@ -739,13 +739,13 @@ mod tests {
 
     #[test]
     fn test_next_mission_eta_no_missions() {
-        let prestige = crate::deep::DeepPrestige::default();
+        let prestige = crate::deep::DeepSession::default();
         assert_eq!(next_mission_eta_secs(&prestige), None);
     }
 
     #[test]
     fn test_pending_event_count_no_events() {
-        let prestige = crate::deep::DeepPrestige::default();
+        let prestige = crate::deep::DeepSession::default();
         assert_eq!(pending_event_count(&prestige), 0);
     }
 

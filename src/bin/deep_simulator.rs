@@ -27,7 +27,7 @@ use quest::deep::{
     is_daily_supply_run_available, mark_layer_cleared, mission_launch_cost,
     mission_power_threshold, purge_lost_mercs, roster_has_capacity, start_mission,
     tick_all_missions, try_upgrade_guild_rank, validate_squad_assignment, AvailableMission,
-    DeepPersistent, DeepPrestige, GuildRank, Infrastructure, LayerTier, MercArchetype, MercQuality,
+    DeepPersistent, DeepSession, GuildRank, Infrastructure, LayerTier, MercArchetype, MercQuality,
     MercStatus, MissionOutcome, MissionStatus, MissionType, RecruitPool,
 };
 use rand::SeedableRng;
@@ -335,7 +335,7 @@ fn initialize_state(
     config: &DeepSimConfig,
     seed: u64,
     sim_start: DateTime<Utc>,
-) -> (DeepPersistent, DeepPrestige, ChaCha8Rng) {
+) -> (DeepPersistent, DeepSession, ChaCha8Rng) {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
 
     let mut persistent = DeepPersistent::new();
@@ -354,7 +354,7 @@ fn initialize_state(
         &mut rng,
     );
 
-    let mut prestige = DeepPrestige {
+    let mut prestige = DeepSession {
         warband_marks: config.starting_marks,
         roster: starter_roster.into_iter().map(|m| (m.id, m)).collect(),
         active_missions: Vec::new(),
@@ -393,7 +393,7 @@ fn initialize_state(
 /// Try to upgrade the guild rank if strategy says to.
 fn ai_upgrade_guild(
     persistent: &mut DeepPersistent,
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
     strategy: DeepStrategy,
     stats: &mut DeepSimStats,
     elapsed_hours: f64,
@@ -416,7 +416,7 @@ fn ai_upgrade_guild(
 /// Try to recruit mercs if strategy says to.
 fn ai_recruit(
     persistent: &mut DeepPersistent,
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
     strategy: DeepStrategy,
     stats: &mut DeepSimStats,
     now: DateTime<Utc>,
@@ -456,7 +456,7 @@ fn ai_recruit(
 }
 
 /// Find the best recruit candidate (cheapest that we can afford).
-fn find_best_recruit(prestige: &DeepPrestige) -> Option<usize> {
+fn find_best_recruit(prestige: &DeepSession) -> Option<usize> {
     let marks = prestige.warband_marks;
     prestige
         .recruit_pool
@@ -469,7 +469,7 @@ fn find_best_recruit(prestige: &DeepPrestige) -> Option<usize> {
 }
 
 /// Pick a squad for a given available mission.
-fn pick_squad(available: &AvailableMission, prestige: &DeepPrestige) -> Option<Vec<u64>> {
+fn pick_squad(available: &AvailableMission, prestige: &DeepSession) -> Option<Vec<u64>> {
     let mut candidates: Vec<_> = prestige
         .roster
         .values()
@@ -518,7 +518,7 @@ fn pick_squad(available: &AvailableMission, prestige: &DeepPrestige) -> Option<V
 /// the lowest-priority mission for the current strategy.
 fn ensure_breakthrough_in_pool(
     persistent: &DeepPersistent,
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
     strategy: DeepStrategy,
 ) {
     let frontier = persistent.frontier_layer();
@@ -584,7 +584,7 @@ fn ensure_breakthrough_in_pool(
 /// with available infrastructure slots.
 fn ensure_construction_in_pool(
     persistent: &DeepPersistent,
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
     strategy: DeepStrategy,
 ) {
     // Only inject if strategy cares about construction.
@@ -700,7 +700,7 @@ fn mission_priority_score(mt: MissionType, strategy: DeepStrategy) -> usize {
 #[allow(clippy::too_many_arguments)]
 fn ai_launch_missions(
     persistent: &mut DeepPersistent,
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
     strategy: DeepStrategy,
     stats: &mut DeepSimStats,
     now: DateTime<Utc>,
@@ -1057,7 +1057,7 @@ fn run_simulation(config: &DeepSimConfig, seed: u64) -> DeepSimStats {
 /// Compute the next event time: the earliest mission.ends_at among active
 /// missions, or the earliest injury recovery time when nothing is running.
 fn next_event_time(
-    prestige: &DeepPrestige,
+    prestige: &DeepSession,
     now: DateTime<Utc>,
     sim_end: DateTime<Utc>,
 ) -> DateTime<Utc> {

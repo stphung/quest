@@ -950,13 +950,9 @@ pub(super) fn tick_deep_missions(
     }
 
     let now = chrono::Utc::now();
-    let pending_before = deep.prestige.pending_results.len();
-    let summary = crate::deep::missions::tick_all_missions(
-        &mut deep.prestige,
-        &mut deep.persistent,
-        now,
-        rng,
-    );
+    let pending_before = deep.session.pending_results.len();
+    let summary =
+        crate::deep::missions::tick_all_missions(&mut deep.session, &mut deep.persistent, now, rng);
 
     if summary.missions_completed > 0 || summary.events_fired > 0 || summary.mercs_recovered > 0 {
         result.deep_changed = true;
@@ -993,7 +989,7 @@ pub(super) fn tick_deep_missions(
     }
 
     // Emit tick events for newly completed missions
-    for pending in deep.prestige.pending_results.iter().skip(pending_before) {
+    for pending in deep.session.pending_results.iter().skip(pending_before) {
         if let Some(ref res) = pending.result {
             let outcome_str = match res.outcome {
                 crate::deep::MissionOutcome::Success => "Success",
@@ -1012,7 +1008,7 @@ pub(super) fn tick_deep_missions(
 
     // Check whether the mission pool needs a 6-hour refresh.
     if crate::deep::missions::maybe_refresh_mission_pool(
-        &mut deep.prestige,
+        &mut deep.session,
         &deep.persistent,
         now,
         rng,
@@ -1021,7 +1017,7 @@ pub(super) fn tick_deep_missions(
     }
 
     if crate::deep::missions::run_softlock_safeguards(
-        &mut deep.prestige,
+        &mut deep.session,
         &mut deep.persistent,
         now,
         rng,

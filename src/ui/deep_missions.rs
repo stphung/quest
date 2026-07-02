@@ -57,7 +57,7 @@ fn render_section_rule(
 fn lead_merc_name(deep: &DeepState, squad: &[u64]) -> String {
     squad
         .first()
-        .and_then(|id| deep.prestige.find_merc(*id))
+        .and_then(|id| deep.session.find_merc(*id))
         .map(|m| m.name.clone())
         .unwrap_or_else(|| "Unknown".to_string())
 }
@@ -374,7 +374,7 @@ fn render_hub_roster(
     let roster_bottom = height as i32 - 2; // leave 2 rows for flash + footer
     let mut row = header_row;
 
-    let roster = &deep.prestige.roster;
+    let roster = &deep.session.roster;
 
     if roster.is_empty() {
         put_text_centered(
@@ -479,7 +479,7 @@ fn render_hub_roster(
         {
             if let Some(target) = merc.quality.next() {
                 let guild_rank = deep.persistent.guild_rank;
-                let marks = deep.prestige.warband_marks;
+                let marks = deep.session.warband_marks;
 
                 row += 1;
                 render_section_rule(buffer, row, width, "PROMOTE", None);
@@ -562,7 +562,7 @@ fn render_hub_roster(
     }
 
     // ── Warband log (below roster) ──
-    let log = &deep.prestige.warband_log;
+    let log = &deep.session.warband_log;
     if !log.is_empty() && row + 3 < roster_bottom {
         render_section_rule(buffer, row, width, "WARBAND LOG", None);
         row += 1;
@@ -670,7 +670,7 @@ pub(super) fn render_deploy(
     put_text(buffer, height as i32 - 1, 1, footer, Color::DarkGray);
 
     // Right-aligned marks
-    let marks_display = format!("\u{25c6} {} Warband Marks", deep.prestige.warband_marks);
+    let marks_display = format!("\u{25c6} {} Warband Marks", deep.session.warband_marks);
     let marks_col = (width as i32 - marks_display.len() as i32 - 2).max(1);
     let min_marks_col = footer.chars().count() as i32 + 3;
     if marks_col > min_marks_col {
@@ -686,7 +686,7 @@ pub(super) fn render_deploy(
     let content_top = 0i32;
     let content_bottom = height as i32 - 2;
     let content_height = (content_bottom - content_top).max(0) as usize;
-    let available = &deep.prestige.available_missions;
+    let available = &deep.session.available_missions;
 
     if available.is_empty() {
         let mid = content_top + content_height as i32 / 2;
@@ -697,8 +697,8 @@ pub(super) fn render_deploy(
             "No missions available.",
             Color::DarkGray,
         );
-        let active_count = deep.prestige.active_mission_count();
-        if active_count == 0 && deep.prestige.roster.is_empty() {
+        let active_count = deep.session.active_mission_count();
+        if active_count == 0 && deep.session.roster.is_empty() {
             put_text_centered(
                 buffer,
                 mid,
@@ -770,7 +770,7 @@ pub(super) fn render_roster(
     }
     if ui.promotion_pending {
         if let Some(merc) = deep
-            .prestige
+            .session
             .roster
             .values()
             .filter(|m| !matches!(m.status, crate::deep::MercStatus::Lost))
@@ -819,8 +819,8 @@ fn render_active_missions_content(
 ) {
     let now = Utc::now();
     let millis = current_millis();
-    let active = &deep.prestige.active_missions;
-    let completed = &deep.prestige.pending_results;
+    let active = &deep.session.active_missions;
+    let completed = &deep.session.pending_results;
     let mut row = content_top;
 
     if active.is_empty() && completed.is_empty() {
@@ -834,7 +834,7 @@ fn render_active_missions_content(
         );
 
         // Warband log
-        let log = &deep.prestige.warband_log;
+        let log = &deep.session.warband_log;
         if !log.is_empty() && mid + 3 < content_bottom {
             render_section_rule(buffer, mid + 2, width, "WARBAND LOG", None);
             for (lr, entry) in (mid + 3..).zip(log.iter().rev().take(5)) {
@@ -1189,7 +1189,7 @@ fn render_new_mission_compact(
             if row < content_bottom {
                 let mut detail = format!("Pwr: {}  ", m.min_squad_power);
                 if let Some(req) = m.required_archetype {
-                    let in_roster = deep.prestige.roster.values().any(|r| r.archetype == req);
+                    let in_roster = deep.session.roster.values().any(|r| r.archetype == req);
                     if in_roster {
                         detail.push_str(&format!("\u{2713} {} req  ", req.display_name()));
                     } else {
@@ -1197,7 +1197,7 @@ fn render_new_mission_compact(
                     }
                 }
                 if m.marks_cost > 0 {
-                    let marks = deep.prestige.warband_marks;
+                    let marks = deep.session.warband_marks;
                     let afford = if marks >= m.marks_cost { "" } else { " LOW" };
                     detail.push_str(&format!(
                         "{} Warband Marks (have {}{})",
@@ -1207,7 +1207,7 @@ fn render_new_mission_compact(
                 put_text(buffer, row, 1, &detail, Color::DarkGray);
                 // Color archetype warning
                 if let Some(req) = m.required_archetype {
-                    let in_roster = deep.prestige.roster.values().any(|r| r.archetype == req);
+                    let in_roster = deep.session.roster.values().any(|r| r.archetype == req);
                     if !in_roster {
                         if let Some(pos) = detail.find('\u{26a0}') {
                             put_text(
@@ -1258,7 +1258,7 @@ fn render_new_mission_compact(
 
                 // Available mercs (selectable)
                 let mut avail_idx = 0usize;
-                for merc in deep.prestige.roster.values() {
+                for merc in deep.session.roster.values() {
                     if !merc.is_available() {
                         continue;
                     }
@@ -1294,13 +1294,13 @@ fn render_new_mission_compact(
                 }
 
                 // Unavailable mercs (dimmed, not selectable)
-                let has_unavailable = deep.prestige.roster.values().any(|m| !m.is_available());
+                let has_unavailable = deep.session.roster.values().any(|m| !m.is_available());
                 if has_unavailable && row < content_bottom - 2 {
                     let sep_str: String = "\u{2500} ".repeat((width / 2).max(4));
                     let sep_display = truncate_text(&sep_str, width.saturating_sub(2));
                     put_text(buffer, row, 1, &sep_display, Color::Rgb(40, 60, 80));
                     row += 1;
-                    for merc in deep.prestige.roster.values() {
+                    for merc in deep.session.roster.values() {
                         if merc.is_available() {
                             continue;
                         }
@@ -1328,7 +1328,7 @@ fn render_new_mission_compact(
                 let squad_power: u32 = ui
                     .staged_squad
                     .iter()
-                    .filter_map(|id| deep.prestige.find_merc(*id))
+                    .filter_map(|id| deep.session.find_merc(*id))
                     .map(|m| m.effective_power())
                     .sum();
                 let min = m.min_squad_power;
@@ -1367,7 +1367,7 @@ fn render_new_mission_compact(
                     let squad_archs: Vec<MercArchetype> = ui
                         .staged_squad
                         .iter()
-                        .filter_map(|id| deep.prestige.find_merc(*id))
+                        .filter_map(|id| deep.session.find_merc(*id))
                         .map(|merc| merc.archetype)
                         .collect();
                     if squad_archs.contains(&req) {
@@ -1614,7 +1614,7 @@ fn render_squad_assembly_left(
 
     // Available mercs (selectable)
     let mut avail_idx = 0usize;
-    for merc in deep.prestige.roster.values() {
+    for merc in deep.session.roster.values() {
         if !merc.is_available() {
             continue;
         }
@@ -1660,14 +1660,14 @@ fn render_squad_assembly_left(
     }
 
     // Separator and unavailable mercs
-    let has_unavailable = deep.prestige.roster.values().any(|m| !m.is_available());
+    let has_unavailable = deep.session.roster.values().any(|m| !m.is_available());
     if has_unavailable && row < content_bottom - 1 {
         let sep_str: String = "\u{2500} ".repeat((list_width / 2).max(4));
         let sep_display = truncate_text(&sep_str, list_width);
         put_text(buffer, row, 1, &sep_display, Color::Rgb(40, 60, 80));
         row += 1;
 
-        for merc in deep.prestige.roster.values() {
+        for merc in deep.session.roster.values() {
             if merc.is_available() {
                 continue;
             }
@@ -1822,7 +1822,7 @@ fn render_mission_detail_phase1(
 
     // Cost
     if row < content_bottom {
-        let marks = deep.prestige.warband_marks;
+        let marks = deep.session.warband_marks;
         if mission.marks_cost > 0 {
             let cost_str = format!("  Cost         {} Marks", mission.marks_cost);
             put_text(buffer, row, detail_inner_left, &cost_str, MARKS_COLOR);
@@ -1875,7 +1875,7 @@ fn render_mission_detail_phase1(
     if let Some(req_arch) = mission.required_archetype {
         if row < content_bottom {
             let in_roster = deep
-                .prestige
+                .session
                 .roster
                 .values()
                 .any(|m| m.archetype == req_arch);
@@ -1904,7 +1904,7 @@ fn render_mission_detail_phase1(
     if let Some(rec_arch) = mission.recommended_archetype {
         if row < content_bottom {
             let in_roster = deep
-                .prestige
+                .session
                 .roster
                 .values()
                 .any(|m| m.archetype == rec_arch);
@@ -2064,11 +2064,11 @@ fn render_squad_summary_panel(
     let squad_power: u32 = ui
         .staged_squad
         .iter()
-        .filter_map(|id| deep.prestige.find_merc(*id))
+        .filter_map(|id| deep.session.find_merc(*id))
         .map(|m| m.effective_power())
         .sum();
     let min = mission.min_squad_power;
-    let marks = deep.prestige.warband_marks;
+    let marks = deep.session.warband_marks;
     let is_safe = matches!(
         mission.mission_type,
         MissionType::SupplyRun | MissionType::Construction(_)
@@ -2251,7 +2251,7 @@ fn render_squad_summary_panel(
         let squad_archetypes: Vec<crate::deep::MercArchetype> = ui
             .staged_squad
             .iter()
-            .filter_map(|id| deep.prestige.find_merc(*id))
+            .filter_map(|id| deep.session.find_merc(*id))
             .map(|m| m.archetype)
             .collect();
         let req_present = squad_archetypes.contains(&req_arch);
@@ -2277,7 +2277,7 @@ fn render_squad_summary_panel(
         let squad_archetypes: Vec<crate::deep::MercArchetype> = ui
             .staged_squad
             .iter()
-            .filter_map(|id| deep.prestige.find_merc(*id))
+            .filter_map(|id| deep.session.find_merc(*id))
             .map(|m| m.archetype)
             .collect();
         let rec_present = squad_archetypes.contains(&rec_arch);

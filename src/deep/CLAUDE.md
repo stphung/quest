@@ -32,19 +32,22 @@ Two-tier persistence, mirroring the Haven and Soulforge pattern:
 | Tier | Struct | Saved to | Survives prestige? |
 |------|--------|----------|--------------------|
 | Account-level | `DeepPersistent` | `~/.quest/deep.json` | Yes |
-| Operational | `DeepPrestige` | character save | Yes |
+| Operational | `DeepSession` | `~/.quest/deep.json` | Yes |
+
+Both tiers are saved together in `deep.json` (the whole `DeepState` is serialized); nothing Deep-related lives in the character save.
 
 Both tiers are combined in `DeepState` for convenience. **All Deep state persists across prestiges** — mercenaries, missions, marks, and recruit pools are never wiped. `DeepState::on_prestige()` only advances the generation counter and records stats.
 
 ## Key Types
 
 ### `DeepState` (`types.rs`)
-Top-level container. `persistent` is saved to `deep.json`; `prestige` is saved with the character.
+Top-level container, serialized as a whole to `deep.json`.
 
 ```rust
 pub struct DeepState {
     pub persistent: DeepPersistent,
-    pub prestige: DeepPrestige,
+    #[serde(rename = "prestige")] // on-disk key kept for save compatibility
+    pub session: DeepSession,
 }
 ```
 
@@ -65,8 +68,8 @@ Key methods:
 - `frontier_layer()` — The deepest uncleared layer, or `deepest_layer_reached + 1` when all are cleared
 - `next_merc_id()` / `next_mission_id()` — Monotonically increasing id assignment
 
-### `DeepPrestige` (`types.rs`)
-Per-prestige operational state. Persists across prestiges (only generation counter advances).
+### `DeepSession` (`types.rs`)
+Operational session state (roster, missions, marks). Persists across prestiges (only the generation counter advances) — there is no Deep-specific prestige/reset mechanic.
 
 Key fields (beyond roster, active_missions, warband_marks):
 - `pending_results: Vec<Mission>` — Completed missions awaiting player review
@@ -178,7 +181,7 @@ pub enum MissionType {
 Note: `Construction` carries the infrastructure type being built as a payload.
 
 ### `Mission` (`types.rs`)
-An active mission in `DeepPrestige::active_missions`. Uses wall-clock `DateTime<Utc>` for `started_at` / `ends_at`.
+An active mission in `DeepSession::active_missions`. Uses wall-clock `DateTime<Utc>` for `started_at` / `ends_at`.
 
 Key methods:
 - `progress(now)` — Fraction elapsed 0.0-1.0
@@ -274,7 +277,7 @@ pub enum DeepView { Hub, NewMission, Roster, Infrastructure, EventResponse, Recr
 - `is_frontier_layer(persistent, layer) -> bool` / `is_safe_layer(persistent, layer) -> bool` — Layer state queries
 
 ### `persistence.rs`
-- `load_deep() -> DeepState` — Read from `~/.quest/deep.json`, return default on error
+- `load_deep() -> DeepState` — Read from `~/.quest/deep.json`; on a parse error, backs up the file to `deep.json.bak` and returns default
 - `save_deep(deep) -> io::Result<()>` — Write pretty-printed JSON
 
 ## Discovery
@@ -303,7 +306,7 @@ The game tick does **not** simulate mission progress. It only checks for pending
 - **`main_helpers/persistence.rs`**: `save_all()` includes `deep` parameter, calls `save_deep()` when discovered
 - **`main_helpers/offline.rs`**: `resolve_deep_offline()` completes missions that finished while game was closed
 - **`ui/deep_scene.rs`**: Deep overlay rendering (Hub, NewMission, Roster, Infrastructure, EventResponse, Recruit views)
-- **`ui/stats_panel.rs`**: Pending event indicator when `deep.prestige.has_any_pending_event()`
+- **`ui/stats_panel.rs`**: Pending event indicator when `deep.session.has_any_pending_event()`
 - **`achievements/`**: Deep-related achievements (discovery, layer milestones, guild ranks)
 - **`items/types.rs`**: Abyssal affix types (`AbyssalMissionSpeed`, `AbyssalSupplyYield`, `AbyssalResilience`)
 

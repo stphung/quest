@@ -64,7 +64,7 @@ pub(super) fn handle_vault_selection(
                     haven.last_vault_selections = selected_slots.clone();
                     // Capture farewell data before prestige reset
                     deep_ui.farewell_mercs = deep
-                        .prestige
+                        .session
                         .roster
                         .values()
                         .map(|m| (m.name.clone(), m.level, m.missions_completed))
@@ -147,7 +147,7 @@ pub(super) fn handle_prestige_confirm(
             } else {
                 // Capture farewell data before prestige reset
                 deep_ui.farewell_mercs = deep
-                    .prestige
+                    .session
                     .roster
                     .values()
                     .map(|m| (m.name.clone(), m.level, m.missions_completed))

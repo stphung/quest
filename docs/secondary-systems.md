@@ -278,7 +278,7 @@ Storm Sigils are passive bonuses that rotate on a daily basis. Players spend Sto
 
 ### Overview
 
-An endgame system discovered at P15+ where players recruit and manage a mercenary company, sending squads on long-duration missions (2-24h wall-clock time) into a vast underground structure. Two-tier persistence model: `DeepPersistent` (guild rank, cleared layers, infrastructure, familiarity) survives prestige; `DeepPrestige` (mercenaries, active missions, Warband Marks) resets on prestige.
+An endgame system discovered at P15+ where players recruit and manage a mercenary company, sending squads on long-duration missions (2-24h wall-clock time) into a vast underground structure. Two-tier state model, both saved in `deep.json` and both surviving prestige: `DeepPersistent` (guild rank, cleared layers, infrastructure, familiarity) and `DeepSession` (mercenaries, active missions, Warband Marks). Only the generation counter advances on prestige.
 
 ### Discovery
 

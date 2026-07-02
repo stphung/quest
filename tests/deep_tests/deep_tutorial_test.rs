@@ -16,7 +16,7 @@
 //! tick_stage_coverage_test.rs and game_loop_orchestration_test.rs.
 
 use quest::deep::{
-    CheckInEvent, DeepPersistent, DeepPrestige, DeepState, DeepUiState, DeepView, EventChoice,
+    CheckInEvent, DeepPersistent, DeepSession, DeepState, DeepUiState, DeepView, EventChoice,
     GuildRank, Infrastructure, Layer, LayerTier, MercArchetype, MercQuality, MercStatus, Mercenary,
     MissionType,
 };
@@ -36,10 +36,10 @@ fn test_deep_initial_state() {
     assert_eq!(deep.persistent.guild_rank, GuildRank(1));
     assert_eq!(deep.persistent.deepest_layer_reached, 0);
     assert!(deep.persistent.layers.is_empty());
-    assert_eq!(deep.prestige.warband_marks, 0);
-    assert!(deep.prestige.roster.is_empty());
-    assert!(deep.prestige.active_missions.is_empty());
-    assert!(deep.prestige.available_missions.is_empty());
+    assert_eq!(deep.session.warband_marks, 0);
+    assert!(deep.session.roster.is_empty());
+    assert!(deep.session.active_missions.is_empty());
+    assert!(deep.session.available_missions.is_empty());
 }
 
 /// Guild Rank 1 (Freelancers) has correct roster cap and concurrent missions.
@@ -116,8 +116,8 @@ fn test_deep_prestige_preserves_operational_state() {
     deep.persistent.layer_record_mut(2).cleared = true;
 
     // Set up some operational state
-    deep.prestige.warband_marks = 9999;
-    deep.prestige.roster.insert(
+    deep.session.warband_marks = 9999;
+    deep.session.roster.insert(
         1,
         Mercenary {
             id: 1,
@@ -143,12 +143,12 @@ fn test_deep_prestige_preserves_operational_state() {
     assert!(deep.persistent.layers[1].cleared);
 
     // Operational state persists across prestiges
-    assert_eq!(deep.prestige.warband_marks, 9999);
-    assert_eq!(deep.prestige.roster.len(), 1);
+    assert_eq!(deep.session.warband_marks, 9999);
+    assert_eq!(deep.session.roster.len(), 1);
 
     // Generation counter advances
     assert_eq!(deep.persistent.generation_counter, 1);
-    assert_eq!(deep.prestige.generation_number, 1);
+    assert_eq!(deep.session.generation_number, 1);
 }
 
 /// Prestige should not affect layer infrastructure (persists across prestiges).
@@ -590,13 +590,13 @@ fn test_persistent_id_counters() {
 }
 
 // =============================================================================
-// 9. DeepPrestige — Economy
+// 9. DeepSession — Economy
 // =============================================================================
 
 /// Spending marks deducts the correct amount.
 #[test]
 fn test_prestige_spend_marks_success() {
-    let mut dp = DeepPrestige::new();
+    let mut dp = DeepSession::new();
     dp.warband_marks = 500;
 
     assert!(dp.spend_marks(200));
@@ -609,7 +609,7 @@ fn test_prestige_spend_marks_success() {
 /// Spending more marks than available fails without modifying the balance.
 #[test]
 fn test_prestige_spend_marks_insufficient() {
-    let mut dp = DeepPrestige::new();
+    let mut dp = DeepSession::new();
     dp.warband_marks = 100;
 
     assert!(!dp.spend_marks(200));
@@ -619,7 +619,7 @@ fn test_prestige_spend_marks_insufficient() {
 /// Find merc by id returns the correct mercenary.
 #[test]
 fn test_prestige_find_merc() {
-    let mut dp = DeepPrestige::new();
+    let mut dp = DeepSession::new();
     dp.roster.insert(
         42,
         Mercenary {
@@ -644,7 +644,7 @@ fn test_prestige_find_merc() {
 /// Available merc count only counts mercs with status Available.
 #[test]
 fn test_prestige_available_merc_count() {
-    let mut dp = DeepPrestige::new();
+    let mut dp = DeepSession::new();
     let base = Mercenary {
         id: 0,
         name: "M".to_string(),
@@ -821,7 +821,7 @@ fn test_deep_state_serde_roundtrip() {
     deep.persistent.discovered = true;
     deep.persistent.guild_rank = GuildRank(3);
     deep.persistent.deepest_layer_reached = 8;
-    deep.prestige.warband_marks = 1240;
+    deep.session.warband_marks = 1240;
     deep.persistent.layer_record_mut(1).cleared = true;
     deep.persistent
         .layer_record_mut(1)
@@ -834,7 +834,7 @@ fn test_deep_state_serde_roundtrip() {
     assert!(loaded.persistent.discovered);
     assert_eq!(loaded.persistent.guild_rank, GuildRank(3));
     assert_eq!(loaded.persistent.deepest_layer_reached, 8);
-    assert_eq!(loaded.prestige.warband_marks, 1240);
+    assert_eq!(loaded.session.warband_marks, 1240);
     assert!(loaded.persistent.layer_record(1).unwrap().cleared);
     assert!(loaded
         .persistent
@@ -903,12 +903,12 @@ fn test_deep_discovery_on_endless_kill() {
     quest::deep::complete_discovery(&mut deep, &mut rng);
 
     assert!(deep.persistent.discovered);
-    assert_eq!(deep.prestige.roster.len(), 3);
-    assert_eq!(deep.prestige.warband_marks, 50);
-    assert!(deep.prestige.active_missions.is_empty());
+    assert_eq!(deep.session.roster.len(), 3);
+    assert_eq!(deep.session.warband_marks, 50);
+    assert!(deep.session.active_missions.is_empty());
 
     // Verify starter archetypes
-    let archetypes: Vec<_> = deep.prestige.roster.values().map(|m| m.archetype).collect();
+    let archetypes: Vec<_> = deep.session.roster.values().map(|m| m.archetype).collect();
     assert!(archetypes.contains(&quest::deep::MercArchetype::Vanguard));
     assert!(archetypes.contains(&quest::deep::MercArchetype::Scout));
     assert!(archetypes.contains(&quest::deep::MercArchetype::Medic));
@@ -921,13 +921,13 @@ fn test_deep_discovery_is_idempotent() {
     let mut deep = DeepState::new();
 
     quest::deep::complete_discovery(&mut deep, &mut rng);
-    let roster_count = deep.prestige.roster.len();
-    let marks = deep.prestige.warband_marks;
+    let roster_count = deep.session.roster.len();
+    let marks = deep.session.warband_marks;
 
     // Second call should be a no-op
     quest::deep::complete_discovery(&mut deep, &mut rng);
-    assert_eq!(deep.prestige.roster.len(), roster_count);
-    assert_eq!(deep.prestige.warband_marks, marks);
+    assert_eq!(deep.session.roster.len(), roster_count);
+    assert_eq!(deep.session.warband_marks, marks);
 }
 
 /// Deep discovery should NOT happen via game_tick — it requires an Expanse boss kill.
@@ -976,11 +976,11 @@ fn test_initial_descent_is_first_mission() {
         &mut || deep.persistent.next_merc_id(),
         &mut rng,
     );
-    deep.prestige.roster = starter.into_iter().map(|m| (m.id, m)).collect();
+    deep.session.roster = starter.into_iter().map(|m| (m.id, m)).collect();
 
     let pool = quest::deep::generate_mission_pool(
         &deep.persistent,
-        &deep.prestige.active_missions,
+        &deep.session.active_missions,
         &mut rng,
     );
     assert!(!pool.is_empty(), "Mission pool should not be empty");
@@ -1003,7 +1003,7 @@ fn test_expanded_options_after_clearing_layer() {
 
     let pool = quest::deep::generate_mission_pool(
         &deep.persistent,
-        &deep.prestige.active_missions,
+        &deep.session.active_missions,
         &mut rng,
     );
     assert!(pool.len() >= 2, "Should have at least 2 missions at Rank 2");
@@ -1034,21 +1034,20 @@ fn test_supply_runs_are_always_safe() {
             &mut || deep.persistent.next_merc_id(),
             &mut rng,
         );
-        deep.prestige.roster = starter.into_iter().map(|m| (m.id, m)).collect();
-        deep.prestige.warband_marks = 1000;
+        deep.session.roster = starter.into_iter().map(|m| (m.id, m)).collect();
+        deep.session.warband_marks = 1000;
 
-        let pool =
-            generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
+        let pool = generate_mission_pool(&deep.persistent, &deep.session.active_missions, &mut rng);
         let supply_run = pool
             .iter()
             .find(|m| m.mission_type == MissionType::SupplyRun)
             .expect("Should have a supply run");
 
-        let merc_id = deep.prestige.roster.values().next().unwrap().id;
+        let merc_id = deep.session.roster.values().next().unwrap().id;
         let mut mission = start_mission(
             supply_run,
             &[merc_id],
-            &mut deep.prestige,
+            &mut deep.session,
             &mut deep.persistent,
             false,
             chrono::Utc::now() - chrono::Duration::hours(24),
@@ -1057,7 +1056,7 @@ fn test_supply_runs_are_always_safe() {
 
         resolve_mission(
             &mut mission,
-            &mut deep.prestige,
+            &mut deep.session,
             &mut deep.persistent,
             chrono::Utc::now(),
             &mut rng,
@@ -1094,18 +1093,18 @@ fn test_squad_assignment_validation() {
         &mut || deep.persistent.next_merc_id(),
         &mut rng,
     );
-    deep.prestige.roster = starter.into_iter().map(|m| (m.id, m)).collect();
+    deep.session.roster = starter.into_iter().map(|m| (m.id, m)).collect();
 
-    let pool = generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
+    let pool = generate_mission_pool(&deep.persistent, &deep.session.active_missions, &mut rng);
     let mission = &pool[0];
 
     // Empty squad should fail
-    let result = validate_squad_assignment(mission, &[], &deep.prestige, &deep.persistent, false);
+    let result = validate_squad_assignment(mission, &[], &deep.session, &deep.persistent, false);
     assert!(matches!(result, Err(SquadAssignmentError::EmptySquad)));
 
     // Invalid merc ID should fail
     let result =
-        validate_squad_assignment(mission, &[99999], &deep.prestige, &deep.persistent, false);
+        validate_squad_assignment(mission, &[99999], &deep.session, &deep.persistent, false);
     assert!(result.is_err(), "Invalid merc ID should fail validation");
 }
 
@@ -1125,39 +1124,39 @@ fn test_concurrent_mission_cap() {
         &mut || deep.persistent.next_merc_id(),
         &mut rng,
     );
-    deep.prestige.roster = starter.into_iter().map(|m| (m.id, m)).collect();
-    deep.prestige.warband_marks = 5000;
+    deep.session.roster = starter.into_iter().map(|m| (m.id, m)).collect();
+    deep.session.warband_marks = 5000;
 
-    let pool = generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
+    let pool = generate_mission_pool(&deep.persistent, &deep.session.active_missions, &mut rng);
     let first_mission = &pool[0];
 
     // Start first mission (use first merc) and push to active list
-    let mut roster_ids: Vec<u64> = deep.prestige.roster.keys().copied().collect();
+    let mut roster_ids: Vec<u64> = deep.session.roster.keys().copied().collect();
     roster_ids.sort();
     let merc1_id = roster_ids[0];
     let mission = start_mission(
         first_mission,
         &[merc1_id],
-        &mut deep.prestige,
+        &mut deep.session,
         &mut deep.persistent,
         false,
         chrono::Utc::now(),
         &mut rng,
     );
-    deep.prestige.active_missions.push(mission);
+    deep.session.active_missions.push(mission);
 
     // Now active_mission_count() should be 1, matching Rank 1 concurrent limit of 1
-    assert_eq!(deep.prestige.active_mission_count(), 1);
+    assert_eq!(deep.session.active_mission_count(), 1);
     assert_eq!(deep.persistent.guild_rank.concurrent_missions(), 1);
 
     // Try to start second mission — should hit concurrent limit
-    let pool2 = generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
+    let pool2 = generate_mission_pool(&deep.persistent, &deep.session.active_missions, &mut rng);
     assert!(!pool2.is_empty(), "Pool should have missions");
     let merc2_id = roster_ids[1];
     let result = validate_squad_assignment(
         &pool2[0],
         &[merc2_id],
-        &deep.prestige,
+        &deep.session,
         &deep.persistent,
         false,
     );

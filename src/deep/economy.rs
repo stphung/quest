@@ -10,7 +10,7 @@
 //! - Reward calculations for XP, Stormglass, and prestige rank fragments
 
 use crate::deep::layers::FamiliarityLevel;
-use crate::deep::types::{DeepPersistent, DeepPrestige, GuildRank, MissionOutcome, MissionType};
+use crate::deep::types::{DeepPersistent, DeepSession, GuildRank, MissionOutcome, MissionType};
 
 // ── Mark Earning Rates ────────────────────────────────────────────────────────
 
@@ -133,7 +133,7 @@ pub fn compute_mark_reward(params: &MarkRewardParams) -> u32 {
 
 /// Warband Marks cost to launch a mission on a given 1-based layer.
 ///
-/// One free daily Supply Run is handled by the caller (e.g., `DeepPrestige`
+/// One free daily Supply Run is handled by the caller (e.g., `DeepSession`
 /// tracks whether the daily free run has been used). This function always
 /// returns the paid cost; callers skip the deduction when the free run applies.
 ///
@@ -262,7 +262,7 @@ pub enum GuildUpgradeError {
 /// The upgrade is atomic: marks are only deducted if all checks pass.
 pub fn try_upgrade_guild_rank(
     persistent: &mut DeepPersistent,
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
 ) -> Result<GuildRank, GuildUpgradeError> {
     let current = persistent.guild_rank;
 
@@ -351,7 +351,7 @@ pub fn merc_xp_to_next_level(level: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::deep::types::{DeepPersistent, DeepPrestige, Infrastructure};
+    use crate::deep::types::{DeepPersistent, DeepSession, Infrastructure};
 
     // ── base_marks_earned ─────────────────────────────────────────────────────
 
@@ -594,7 +594,7 @@ mod tests {
         let mut persistent = persistent_with_rank(1);
         // Clear layer 3 (required for rank 2).
         persistent.layer_record_mut(3).cleared = true;
-        let mut prestige = DeepPrestige::new();
+        let mut prestige = DeepSession::new();
         prestige.warband_marks = 500;
 
         let result = try_upgrade_guild_rank(&mut persistent, &mut prestige);
@@ -606,7 +606,7 @@ mod tests {
     #[test]
     fn test_upgrade_guild_rank_fails_at_max() {
         let mut persistent = persistent_with_rank(5);
-        let mut prestige = DeepPrestige::new();
+        let mut prestige = DeepSession::new();
         prestige.warband_marks = 99999;
 
         let result = try_upgrade_guild_rank(&mut persistent, &mut prestige);
@@ -617,7 +617,7 @@ mod tests {
     fn test_upgrade_guild_rank_fails_without_layer_cleared() {
         let mut persistent = persistent_with_rank(1);
         // Layer 3 NOT cleared.
-        let mut prestige = DeepPrestige::new();
+        let mut prestige = DeepSession::new();
         prestige.warband_marks = 500;
 
         let result = try_upgrade_guild_rank(&mut persistent, &mut prestige);
@@ -633,7 +633,7 @@ mod tests {
     fn test_upgrade_guild_rank_fails_with_insufficient_marks() {
         let mut persistent = persistent_with_rank(1);
         persistent.layer_record_mut(3).cleared = true;
-        let mut prestige = DeepPrestige::new();
+        let mut prestige = DeepSession::new();
         prestige.warband_marks = 100; // Need 200
 
         let result = try_upgrade_guild_rank(&mut persistent, &mut prestige);
@@ -654,7 +654,7 @@ mod tests {
     fn test_upgrade_guild_rank_marks_not_deducted_on_failure() {
         let mut persistent = persistent_with_rank(2);
         // Layer 7 required for rank 3 — not cleared.
-        let mut prestige = DeepPrestige::new();
+        let mut prestige = DeepSession::new();
         prestige.warband_marks = 1000;
 
         let _ = try_upgrade_guild_rank(&mut persistent, &mut prestige);

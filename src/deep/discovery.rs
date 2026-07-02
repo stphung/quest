@@ -14,21 +14,21 @@ pub fn complete_discovery<R: Rng>(deep: &mut DeepState, rng: &mut R) {
         || deep.persistent.next_merc_id(),
         rng,
     );
-    deep.prestige
+    deep.session
         .roster
         .extend(starters.into_iter().map(|m| (m.id, m)));
-    deep.prestige.available_missions = super::missions::generate_mission_pool(
+    deep.session.available_missions = super::missions::generate_mission_pool(
         &deep.persistent,
-        &deep.prestige.active_missions,
+        &deep.session.active_missions,
         rng,
     );
-    deep.prestige.recruit_pool = generate_recruit_pool(
+    deep.session.recruit_pool = generate_recruit_pool(
         deep.persistent.guild_rank,
         || deep.persistent.next_merc_id(),
         rng,
     );
-    deep.prestige.pool_refreshed_at = Some(Utc::now());
-    deep.prestige.warband_marks = match deep.persistent.guild_rank.0 {
+    deep.session.pool_refreshed_at = Some(Utc::now());
+    deep.session.warband_marks = match deep.persistent.guild_rank.0 {
         1 => 50,
         2 => 100,
         3 => 200,

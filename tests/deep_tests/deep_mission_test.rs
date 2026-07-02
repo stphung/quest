@@ -28,7 +28,7 @@ use quest::deep::{
     event_trigger_points, generate_mission_events, generate_mission_pool,
     is_daily_supply_run_available, resolve_event, resolve_mission, resolve_offline_missions,
     start_mission, tick_mission_events, validate_squad_assignment, AvailableMission, CheckInEvent,
-    DeepPersistent, DeepPrestige, DeepState, EventChoice, GuildRank, Infrastructure, Layer,
+    DeepPersistent, DeepSession, DeepState, EventChoice, GuildRank, Infrastructure, Layer,
     LayerRecord, LayerTier, MercArchetype, MercQuality, MercStatus, Mercenary, Mission,
     MissionOutcome, MissionResult, MissionStatus, MissionType, SquadAssignmentError,
     AUTO_RESOLVE_TIMEOUT_HOURS,
@@ -514,19 +514,19 @@ fn test_deep_persistent_layer_record_read_only_after_mut_access() {
     assert!(dp.layer_record(4).is_none());
 }
 
-// ── DeepPrestige helpers ──────────────────────────────────────────────────────
+// ── DeepSession helpers ──────────────────────────────────────────────────────
 
 #[test]
-fn test_deep_prestige_spend_marks_success() {
-    let mut dp = DeepPrestige::new();
+fn test_deep_session_spend_marks_success() {
+    let mut dp = DeepSession::new();
     dp.warband_marks = 500;
     assert!(dp.spend_marks(200));
     assert_eq!(dp.warband_marks, 300);
 }
 
 #[test]
-fn test_deep_prestige_spend_marks_insufficient_leaves_balance_unchanged() {
-    let mut dp = DeepPrestige::new();
+fn test_deep_session_spend_marks_insufficient_leaves_balance_unchanged() {
+    let mut dp = DeepSession::new();
     dp.warband_marks = 100;
     let ok = dp.spend_marks(200);
     assert!(!ok);
@@ -534,16 +534,16 @@ fn test_deep_prestige_spend_marks_insufficient_leaves_balance_unchanged() {
 }
 
 #[test]
-fn test_deep_prestige_spend_marks_exact_amount_succeeds() {
-    let mut dp = DeepPrestige::new();
+fn test_deep_session_spend_marks_exact_amount_succeeds() {
+    let mut dp = DeepSession::new();
     dp.warband_marks = 250;
     assert!(dp.spend_marks(250));
     assert_eq!(dp.warband_marks, 0);
 }
 
 #[test]
-fn test_deep_prestige_available_merc_count() {
-    let mut dp = DeepPrestige::new();
+fn test_deep_session_available_merc_count() {
+    let mut dp = DeepSession::new();
     {
         let m = make_merc(1, MercArchetype::Vanguard, 20);
         dp.roster.insert(m.id, m);
@@ -562,7 +562,7 @@ fn test_deep_prestige_available_merc_count() {
 
 #[test]
 fn test_deep_prestige_active_mission_count_excludes_completed() {
-    let mut dp = DeepPrestige::new();
+    let mut dp = DeepSession::new();
     let t = base_time();
     let active = make_active_mission(1, MissionType::Recon, 5, vec![1], t, 4 * 3600);
     let mut completed = make_active_mission(2, MissionType::SupplyRun, 2, vec![2], t, 2 * 3600);
@@ -574,7 +574,7 @@ fn test_deep_prestige_active_mission_count_excludes_completed() {
 
 #[test]
 fn test_deep_prestige_has_any_pending_event() {
-    let mut dp = DeepPrestige::new();
+    let mut dp = DeepSession::new();
     let t = base_time();
     let mut event_mission =
         make_active_mission(1, MissionType::Expedition, 8, vec![1], t, 8 * 3600);
@@ -585,7 +585,7 @@ fn test_deep_prestige_has_any_pending_event() {
 
 #[test]
 fn test_deep_prestige_no_pending_events_when_all_active() {
-    let mut dp = DeepPrestige::new();
+    let mut dp = DeepSession::new();
     let t = base_time();
     dp.active_missions.push(make_active_mission(
         1,
@@ -605,21 +605,21 @@ fn test_deep_state_on_prestige_preserves_operational_state() {
     let mut ds = DeepState::new();
     ds.persistent.discovered = true;
     ds.persistent.guild_rank = GuildRank(3);
-    ds.prestige.warband_marks = 9_999;
+    ds.session.warband_marks = 9_999;
     {
         let m = make_merc(1, MercArchetype::Scout, 10);
-        ds.prestige.roster.insert(m.id, m);
+        ds.session.roster.insert(m.id, m);
     }
 
     ds.on_prestige();
 
     // Operational state persists across prestiges.
-    assert_eq!(ds.prestige.warband_marks, 9_999);
-    assert_eq!(ds.prestige.roster.len(), 1);
+    assert_eq!(ds.session.warband_marks, 9_999);
+    assert_eq!(ds.session.roster.len(), 1);
 
     // Generation counter advances.
     assert_eq!(ds.persistent.generation_counter, 1);
-    assert_eq!(ds.prestige.generation_number, 1);
+    assert_eq!(ds.session.generation_number, 1);
 
     // Persistent fields survive.
     assert!(ds.persistent.discovered);
@@ -639,14 +639,14 @@ fn test_deep_state_serde_roundtrip() {
     let mut ds = DeepState::new();
     ds.persistent.discovered = true;
     ds.persistent.guild_rank = GuildRank(2);
-    ds.prestige.warband_marks = 1_240;
+    ds.session.warband_marks = 1_240;
 
     let json = serde_json::to_string(&ds).expect("serialize");
     let restored: DeepState = serde_json::from_str(&json).expect("deserialize");
 
     assert!(restored.persistent.discovered);
     assert_eq!(restored.persistent.guild_rank, GuildRank(2));
-    assert_eq!(restored.prestige.warband_marks, 1_240);
+    assert_eq!(restored.session.warband_marks, 1_240);
 }
 
 // ── Mission progress and timing ───────────────────────────────────────────────
@@ -818,7 +818,7 @@ fn test_layer_tier_boundaries() {
 
 #[test]
 fn test_spend_marks_from_zero_balance_fails_gracefully() {
-    let mut dp = DeepPrestige::new();
+    let mut dp = DeepSession::new();
     dp.warband_marks = 0;
     assert!(!dp.spend_marks(1), "Cannot spend more than zero balance");
     assert_eq!(dp.warband_marks, 0);
@@ -1286,8 +1286,8 @@ fn make_available_mission_simple(mission_type: MissionType, layer: u32) -> Avail
     }
 }
 
-fn make_prestige_with_merc(merc: Mercenary) -> DeepPrestige {
-    let mut p = DeepPrestige::new();
+fn make_prestige_with_merc(merc: Mercenary) -> DeepSession {
+    let mut p = DeepSession::new();
     p.roster.insert(merc.id, merc);
     p
 }
@@ -1424,7 +1424,7 @@ fn test_valid_squad_accepted() {
 #[test]
 fn test_empty_squad_rejected() {
     let persistent = DeepPersistent::new();
-    let prestige = DeepPrestige::new();
+    let prestige = DeepSession::new();
     let available = make_available_mission_simple(MissionType::SupplyRun, 1);
 
     let result = validate_squad_assignment(&available, &[], &prestige, &persistent, false);
@@ -1920,7 +1920,7 @@ fn test_freelancer_rank_allows_only_1_concurrent_mission() {
     // GuildRank 1 = Freelancers = 1 concurrent slot.
     let merc1 = make_merc(1, MercArchetype::Scout, 20);
     let merc2 = make_merc(2, MercArchetype::Medic, 20);
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     prestige.roster.insert(merc1.id, merc1);
     prestige.roster.insert(merc2.id, merc2);
 
@@ -1952,7 +1952,7 @@ fn test_company_rank_allows_2_concurrent_missions() {
     let merc1 = make_merc(1, MercArchetype::Scout, 20);
     let merc2 = make_merc(2, MercArchetype::Medic, 20);
     let merc3 = make_merc(3, MercArchetype::Arcanist, 20);
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     prestige.roster.insert(merc1.id, merc1);
     prestige.roster.insert(merc2.id, merc2);
     prestige.roster.insert(merc3.id, merc3);

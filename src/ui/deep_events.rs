@@ -39,7 +39,7 @@ pub(super) fn render_event_modal(
     // Find the mission with the pending event
     let mission = ui
         .event_mission_id
-        .and_then(|id| deep.prestige.active_missions.iter().find(|m| m.id == id));
+        .and_then(|id| deep.session.active_missions.iter().find(|m| m.id == id));
 
     let Some(mission) = mission else {
         return;
@@ -122,7 +122,7 @@ pub(super) fn render_event_modal(
     let squad_names: Vec<String> = mission
         .squad
         .iter()
-        .filter_map(|id| deep.prestige.find_merc(*id))
+        .filter_map(|id| deep.session.find_merc(*id))
         .map(|m| format!("{} ({})", m.name, m.archetype.display_name()))
         .collect();
     if !squad_names.is_empty() {
@@ -206,7 +206,7 @@ pub(super) fn render_event_modal(
     let squad_archetypes: Vec<crate::deep::MercArchetype> = mission
         .squad
         .iter()
-        .filter_map(|id| deep.prestige.find_merc(*id))
+        .filter_map(|id| deep.session.find_merc(*id))
         .map(|m| m.archetype)
         .collect();
 

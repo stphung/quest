@@ -1,9 +1,10 @@
 #![allow(dead_code)] // Functions wired into the game loop incrementally
 //! The Deep — Mercenary Expedition System data structures.
 //!
-//! Two-tier persistence model (both persist across prestiges):
-//! - **Account-level**: Guild rank, layer breakthroughs, infrastructure, familiarity
-//! - **Operational**: Mercenaries, active missions, Warband Marks
+//! Two-tier state model (both tiers persist across prestiges and are saved
+//! together in `~/.quest/deep.json`):
+//! - **Account-level** (`DeepPersistent`): Guild rank, layer breakthroughs, infrastructure, familiarity
+//! - **Operational** (`DeepSession`): Mercenaries, active missions, Warband Marks
 
 use crate::achievements::AchievementId;
 use chrono::{DateTime, Utc};
@@ -874,9 +875,11 @@ impl DeepPersistent {
 
 /// Operational Deep state — mercenaries, missions, and marks.
 ///
-/// Persists across prestiges. Embedded in the character save file.
+/// Persists across prestiges (there is no Deep-specific reset); only the
+/// generation counter advances. Saved to `~/.quest/deep.json` as part of
+/// `DeepState`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DeepPrestige {
+pub struct DeepSession {
     /// Current Warband Marks balance.
     pub warband_marks: u32,
     /// The mercenary roster for this prestige cycle.
@@ -913,7 +916,7 @@ pub struct DeepPrestige {
     pub pool_refreshed_at: Option<DateTime<Utc>>,
 }
 
-impl Default for DeepPrestige {
+impl Default for DeepSession {
     fn default() -> Self {
         let now = Utc::now();
         Self {
@@ -937,7 +940,7 @@ impl Default for DeepPrestige {
     }
 }
 
-impl DeepPrestige {
+impl DeepSession {
     pub fn new() -> Self {
         Self::default()
     }
@@ -993,19 +996,21 @@ impl DeepPrestige {
 
 /// Combined runtime Deep state (both tiers in one place for convenience).
 ///
-/// `persistent` is saved to `~/.quest/deep.json`.
-/// `prestige` is saved alongside the character save.
+/// The whole struct — both tiers — is saved to `~/.quest/deep.json`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeepState {
     pub persistent: DeepPersistent,
-    pub prestige: DeepPrestige,
+    /// On-disk JSON key stays `"prestige"` for save compatibility (old and new
+    /// binaries both read/write the same format).
+    #[serde(rename = "prestige")]
+    pub session: DeepSession,
 }
 
 impl DeepState {
     pub fn new() -> Self {
         Self {
             persistent: DeepPersistent::new(),
-            prestige: DeepPrestige::new(),
+            session: DeepSession::new(),
         }
     }
 
@@ -1016,9 +1021,9 @@ impl DeepState {
 
         let record = GenerationRecord {
             generation: self.persistent.generation_counter,
-            marks_earned: self.prestige.total_marks_earned,
-            missions_completed: self.prestige.total_missions_completed,
-            mercs_lost: self.prestige.total_mercs_lost,
+            marks_earned: self.session.total_marks_earned,
+            missions_completed: self.session.total_missions_completed,
+            mercs_lost: self.session.total_mercs_lost,
             deepest_layer_reached: self.persistent.deepest_layer_reached,
             gateway_opened_this_generation: self.persistent.gateway_opened,
         };
@@ -1028,7 +1033,7 @@ impl DeepState {
             self.persistent.generation_records.drain(..excess);
         }
 
-        self.prestige.generation_number = self.persistent.generation_counter;
+        self.session.generation_number = self.persistent.generation_counter;
     }
 
     /// Whether The Deep is fully available (discovered and at least one mission possible).
@@ -1463,11 +1468,11 @@ mod tests {
         assert_eq!(id3, 1); // mission counter is independent
     }
 
-    // ── DeepPrestige ──────────────────────────────────────────────────────────
+    // ── DeepSession ──────────────────────────────────────────────────────────
 
     #[test]
-    fn test_deep_prestige_spend_marks() {
-        let mut dp = DeepPrestige::new();
+    fn test_deep_session_spend_marks() {
+        let mut dp = DeepSession::new();
         dp.warband_marks = 500;
         assert!(dp.spend_marks(200));
         assert_eq!(dp.warband_marks, 300);
@@ -1482,13 +1487,13 @@ mod tests {
         let mut ds = DeepState::new();
         ds.persistent.discovered = true;
         ds.persistent.guild_rank = GuildRank(3);
-        ds.prestige.warband_marks = 9999;
+        ds.session.warband_marks = 9999;
         ds.on_prestige();
         // Mercs, missions, and marks persist across prestiges.
-        assert_eq!(ds.prestige.warband_marks, 9999);
+        assert_eq!(ds.session.warband_marks, 9999);
         // Generation counter advances.
         assert_eq!(ds.persistent.generation_counter, 1);
-        assert_eq!(ds.prestige.generation_number, 1);
+        assert_eq!(ds.session.generation_number, 1);
         // Persistent state is untouched.
         assert!(ds.persistent.discovered);
         assert_eq!(ds.persistent.guild_rank, GuildRank(3));
@@ -1499,14 +1504,25 @@ mod tests {
         let mut ds = DeepState::new();
         ds.persistent.discovered = true;
         ds.persistent.guild_rank = GuildRank(2);
-        ds.prestige.warband_marks = 1240;
+        ds.session.warband_marks = 1240;
 
         let json = serde_json::to_string(&ds).unwrap();
         let loaded: DeepState = serde_json::from_str(&json).unwrap();
 
         assert!(loaded.persistent.discovered);
         assert_eq!(loaded.persistent.guild_rank, GuildRank(2));
-        assert_eq!(loaded.prestige.warband_marks, 1240);
+        assert_eq!(loaded.session.warband_marks, 1240);
+    }
+
+    #[test]
+    fn test_deep_state_session_serializes_as_prestige_key() {
+        // The on-disk JSON key must stay "prestige" so saves written by any
+        // version (before or after the DeepSession rename) stay readable in
+        // both directions. Changing this key breaks every existing deep.json.
+        let ds = DeepState::new();
+        let json = serde_json::to_string(&ds).unwrap();
+        assert!(json.contains("\"prestige\""));
+        assert!(!json.contains("\"session\""));
     }
 
     // ── Mercenary helpers ─────────────────────────────────────────────────────

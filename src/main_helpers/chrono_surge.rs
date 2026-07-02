@@ -85,7 +85,7 @@ pub fn run_chrono_surge_batch(
     if deep_state.persistent.discovered {
         let acceleration = Duration::milliseconds((batch as i64) * 100);
         let missions_done =
-            crate::deep::missions::accelerate_missions(&mut deep_state.prestige, acceleration);
+            crate::deep::missions::accelerate_missions(&mut deep_state.session, acceleration);
         if missions_done > 0 {
             surge.missions_completed += missions_done;
             needs_save = true;

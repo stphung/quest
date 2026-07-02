@@ -268,8 +268,8 @@ fn render_status_summary(
 ) {
     use chrono::Utc;
     let rank = deep.persistent.guild_rank;
-    let marks = deep.prestige.warband_marks;
-    let active = deep.prestige.active_mission_count() as u32;
+    let marks = deep.session.warband_marks;
+    let active = deep.session.active_mission_count() as u32;
     let max =
         crate::deep::effective_concurrent_missions(rank, deep.persistent.deepest_layer_reached);
 
@@ -319,13 +319,13 @@ fn render_status_summary(
     put_text(buffer, 0, col, "  \u{00b7}  ", separator_color);
     col += 5;
     let ready_mercs = deep
-        .prestige
+        .session
         .roster
         .values()
         .filter(|m| matches!(m.status, crate::deep::MercStatus::Available))
         .count();
     let injured_mercs = deep
-        .prestige
+        .session
         .roster
         .values()
         .filter(|m| matches!(m.status, crate::deep::MercStatus::Injured { .. }))
@@ -340,7 +340,7 @@ fn render_status_summary(
 
     // Events (if any pending)
     let pending_events = deep
-        .prestige
+        .session
         .active_missions
         .iter()
         .filter(|m| m.has_pending_event())
@@ -359,7 +359,7 @@ fn render_status_summary(
         ("\u{25f7} idle".to_string(), Color::Rgb(90, 108, 130))
     } else {
         let min_remaining = deep
-            .prestige
+            .session
             .active_missions
             .iter()
             .map(|m| (m.ends_at - now).num_seconds().max(0) as u64)
@@ -479,7 +479,7 @@ fn icon_label(view: DeepView, deep: &DeepState) -> String {
             format!("\u{26cf} Layers (L{})", depth) // ⛏ Layers (L7)
         }
         DeepView::Active => {
-            let active = deep.prestige.active_missions.len();
+            let active = deep.session.active_missions.len();
             let max = crate::deep::effective_concurrent_missions(
                 deep.persistent.guild_rank,
                 deep.persistent.deepest_layer_reached,
@@ -487,12 +487,12 @@ fn icon_label(view: DeepView, deep: &DeepState) -> String {
             format!("\u{25b6} Active {}/{}", active, max) // ▶ Active 2/3
         }
         DeepView::NewMission => {
-            let avail = deep.prestige.available_missions.len();
+            let avail = deep.session.available_missions.len();
             format!("\u{2694} Deploy ({})", avail) // ⚔ Deploy (5)
         }
         DeepView::Roster => {
             let alive = deep
-                .prestige
+                .session
                 .roster
                 .values()
                 .filter(|m| !matches!(m.status, crate::deep::MercStatus::Lost))
@@ -501,7 +501,7 @@ fn icon_label(view: DeepView, deep: &DeepState) -> String {
             format!("\u{265f} Roster {}/{}", alive, max) // ♟ Roster 5/7
         }
         DeepView::Recruit => {
-            let avail = deep.prestige.recruit_pool.candidates.len();
+            let avail = deep.session.recruit_pool.candidates.len();
             format!("\u{2726} Recruit ({})", avail) // ✦ Recruit (3)
         }
         DeepView::EventResponse => "Events".to_string(),
@@ -533,7 +533,7 @@ fn render_tab_bar(buffer: &mut [Vec<SceneCell>], width: usize, active: DeepView,
         .map(|&tab| match tab {
             DeepView::Active => {
                 let events = deep
-                    .prestige
+                    .session
                     .active_missions
                     .iter()
                     .filter(|m| m.has_pending_event())
@@ -770,7 +770,7 @@ pub fn render_deep_overlay(
         // Event badge footer reminder when not on Active tab
         if ui.view != DeepView::Active
             && ui.view != DeepView::Infrastructure
-            && deep.prestige.has_any_pending_event()
+            && deep.session.has_any_pending_event()
         {
             let reminder = "\u{26a1} Event pending \u{2014} [\u{2192}] to Active";
             let rem_col = (width as i32 - reminder.len() as i32) / 2;
@@ -798,8 +798,8 @@ pub fn render_deep_overlay(
     }
 
     // Mission results modal is layered on top if there are pending results
-    if !deep.prestige.pending_results.is_empty() {
-        if let Some(mission) = deep.prestige.pending_results.first() {
+    if !deep.session.pending_results.is_empty() {
+        if let Some(mission) = deep.session.pending_results.first() {
             super::deep_results::render_mission_results(frame, area, mission, deep, ctx);
         }
     }

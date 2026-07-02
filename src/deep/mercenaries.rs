@@ -12,7 +12,7 @@
 //! All functions take `rng: &mut impl Rng` — no local RNG is created internally.
 //! Follows the Haven bonus injection pattern: no global state, all context passed as params.
 
-use super::types::{DeepPrestige, GuildRank, MercArchetype, MercStatus, Mercenary, RecruitPool};
+use super::types::{DeepSession, GuildRank, MercArchetype, MercStatus, Mercenary, RecruitPool};
 use chrono::Utc;
 use rand::{Rng, RngExt};
 use serde::{Deserialize, Serialize};
@@ -186,7 +186,7 @@ fn apply_promotion_stats(merc: &mut Mercenary, target: MercQuality) {
 /// Returns the mark cost on success.
 pub fn promote_mercenary(
     merc: &mut Mercenary,
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
     guild_rank: GuildRank,
 ) -> Result<u32, PromotionError> {
     let (target, cost) = can_promote(merc, guild_rank, prestige.warband_marks)?;
@@ -201,7 +201,7 @@ pub fn promote_mercenary(
 /// Returns `(merc_name, quality_name, cost)` on success for UI display.
 pub fn promote_merc_by_id(
     merc_id: u64,
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
     guild_rank: GuildRank,
 ) -> Result<(String, &'static str, u32), PromotionError> {
     // Validate with immutable borrow first
@@ -1564,7 +1564,7 @@ mod tests {
 
     #[test]
     fn test_promote_mercenary_applies_stat_deltas() {
-        use crate::deep::types::DeepPrestige;
+        use crate::deep::types::DeepSession;
         let mut rng = seeded_rng(1);
         let mut merc =
             generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
@@ -1573,7 +1573,7 @@ mod tests {
         let pre_resilience = merc.resilience;
         let pre_expertise = merc.expertise;
 
-        let mut prestige = DeepPrestige {
+        let mut prestige = DeepSession {
             warband_marks: 1000,
             ..Default::default()
         };
@@ -1595,7 +1595,7 @@ mod tests {
 
     #[test]
     fn test_promote_mercenary_rare_to_elite() {
-        use crate::deep::types::DeepPrestige;
+        use crate::deep::types::DeepSession;
         let mut rng = seeded_rng(1);
         let mut merc = generate_mercenary(1, MercArchetype::Arcanist, MercQuality::Rare, &mut rng);
         merc.missions_completed = 15;
@@ -1603,7 +1603,7 @@ mod tests {
         let pre_resilience = merc.resilience;
         let pre_expertise = merc.expertise;
 
-        let mut prestige = DeepPrestige {
+        let mut prestige = DeepSession {
             warband_marks: 1000,
             ..Default::default()
         };
@@ -1621,7 +1621,7 @@ mod tests {
 
     #[test]
     fn test_promote_mercenary_uncommon_to_rare() {
-        use crate::deep::types::DeepPrestige;
+        use crate::deep::types::DeepSession;
         let mut rng = seeded_rng(1);
         let mut merc = generate_mercenary(1, MercArchetype::Scout, MercQuality::Uncommon, &mut rng);
         merc.missions_completed = 10;
@@ -1629,7 +1629,7 @@ mod tests {
         let pre_resilience = merc.resilience;
         let pre_expertise = merc.expertise;
 
-        let mut prestige = DeepPrestige {
+        let mut prestige = DeepSession {
             warband_marks: 1000,
             ..Default::default()
         };

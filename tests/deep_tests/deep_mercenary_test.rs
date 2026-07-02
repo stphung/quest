@@ -21,7 +21,7 @@ use quest::deep::{
     apply_merc_xp, available_mercs, check_injury_recovery, generate_merc_name, generate_mercenary,
     generate_recruit_pool, generate_starter_roster, injure_merc, mark_merc_lost, purge_lost_mercs,
     recruit_pool_size, roll_recruit_cost, roll_recruit_quality, roster_has_capacity,
-    stats_at_level, xp_to_next_level, DeepPrestige, DeepState, GuildRank, InjurySeverity,
+    stats_at_level, xp_to_next_level, DeepSession, DeepState, GuildRank, InjurySeverity,
     MercArchetype, MercQuality, MercStatus, Mercenary,
 };
 use rand::SeedableRng;
@@ -1357,11 +1357,11 @@ fn test_on_prestige_preserves_roster() {
     let mut ids = id_counter();
     let starters = generate_starter_roster(GuildRank(1), &mut ids, &mut rng);
     let count = starters.len();
-    state.prestige.roster = starters.into_iter().map(|m| (m.id, m)).collect();
-    assert!(!state.prestige.roster.is_empty());
+    state.session.roster = starters.into_iter().map(|m| (m.id, m)).collect();
+    assert!(!state.session.roster.is_empty());
     state.on_prestige();
     assert_eq!(
-        state.prestige.roster.len(),
+        state.session.roster.len(),
         count,
         "on_prestige() should preserve the roster"
     );
@@ -1370,10 +1370,10 @@ fn test_on_prestige_preserves_roster() {
 #[test]
 fn test_on_prestige_preserves_warband_marks() {
     let mut state = DeepState::new();
-    state.prestige.warband_marks = 500;
+    state.session.warband_marks = 500;
     state.on_prestige();
     assert_eq!(
-        state.prestige.warband_marks, 500,
+        state.session.warband_marks, 500,
         "on_prestige() should preserve warband_marks"
     );
 }
@@ -1383,7 +1383,7 @@ fn test_on_prestige_preserves_active_missions() {
     let mut state = DeepState::new();
     state.on_prestige();
     assert!(
-        state.prestige.active_missions.is_empty(),
+        state.session.active_missions.is_empty(),
         "on_prestige() should preserve active_missions (empty to start)"
     );
 }
@@ -1430,7 +1430,7 @@ fn test_on_prestige_preserves_merc_id_counter() {
     // Consume IDs for starters.
     let starters =
         generate_starter_roster(GuildRank(1), || state.persistent.next_merc_id(), &mut rng);
-    state.prestige.roster = starters.into_iter().map(|m| (m.id, m)).collect();
+    state.session.roster = starters.into_iter().map(|m| (m.id, m)).collect();
     let counter_before = state.persistent.merc_id_counter;
     assert_eq!(counter_before, 3, "Three IDs consumed");
     state.on_prestige();
@@ -1441,12 +1441,12 @@ fn test_on_prestige_preserves_merc_id_counter() {
 }
 
 // =============================================================================
-// DeepPrestige helper methods
+// DeepSession helper methods
 // =============================================================================
 
 #[test]
-fn test_deep_prestige_spend_marks_success_and_failure() {
-    let mut prestige = DeepPrestige::new();
+fn test_deep_session_spend_marks_success_and_failure() {
+    let mut prestige = DeepSession::new();
     prestige.warband_marks = 100;
     assert!(
         prestige.spend_marks(50),
@@ -1464,9 +1464,9 @@ fn test_deep_prestige_spend_marks_success_and_failure() {
 }
 
 #[test]
-fn test_deep_prestige_available_merc_count() {
+fn test_deep_session_available_merc_count() {
     let mut rng = seeded_rng(3000);
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     let mut m1 = generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
     let m2 = generate_mercenary(2, MercArchetype::Scout, MercQuality::Common, &mut rng);
     m1.status = MercStatus::Injured {
@@ -1477,9 +1477,9 @@ fn test_deep_prestige_available_merc_count() {
 }
 
 #[test]
-fn test_deep_prestige_find_merc_found_and_not_found() {
+fn test_deep_session_find_merc_found_and_not_found() {
     let mut rng = seeded_rng(3001);
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     let merc = generate_mercenary(7, MercArchetype::Medic, MercQuality::Common, &mut rng);
     prestige.roster = vec![(merc.id, merc)].into_iter().collect();
     assert!(
@@ -1493,9 +1493,9 @@ fn test_deep_prestige_find_merc_found_and_not_found() {
 }
 
 #[test]
-fn test_deep_prestige_find_merc_mut_modifies_in_place() {
+fn test_deep_session_find_merc_mut_modifies_in_place() {
     let mut rng = seeded_rng(3002);
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     let merc = generate_mercenary(7, MercArchetype::Medic, MercQuality::Common, &mut rng);
     prestige.roster = vec![(merc.id, merc)].into_iter().collect();
     let found = prestige.find_merc_mut(7).unwrap();

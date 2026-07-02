@@ -22,9 +22,8 @@ use chrono::{Duration, TimeZone, Utc};
 use quest::deep::{
     available_mission_count, generate_mission_pool, resolve_mission, resolve_offline_missions,
     start_mission, tick_all_missions, tick_mission, validate_squad_assignment, AvailableMission,
-    DeepPersistent, DeepPrestige, GuildRank, Infrastructure, MercArchetype, MercQuality,
-    MercStatus, Mercenary, Mission, MissionOutcome, MissionStatus, MissionType,
-    SquadAssignmentError,
+    DeepPersistent, DeepSession, GuildRank, Infrastructure, MercArchetype, MercQuality, MercStatus,
+    Mercenary, Mission, MissionOutcome, MissionStatus, MissionType, SquadAssignmentError,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -78,8 +77,8 @@ fn make_merc_resilient(
     }
 }
 
-fn make_prestige_with_mercs(mercs: Vec<Mercenary>) -> DeepPrestige {
-    let mut p = DeepPrestige::new();
+fn make_prestige_with_mercs(mercs: Vec<Mercenary>) -> DeepSession {
+    let mut p = DeepSession::new();
     p.roster = mercs.into_iter().map(|m| (m.id, m)).collect();
     p
 }
@@ -1295,7 +1294,7 @@ fn test_tick_all_missions_skips_non_active_status() {
     let mut persistent = DeepPersistent::new();
     let _ = persistent.layer_record_mut(1);
     let prestige_initial_marks = 0u32;
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     prestige.warband_marks = prestige_initial_marks;
 
     // A Completed mission should be ignored by tick_all_missions.
@@ -1398,7 +1397,7 @@ fn test_offline_resolution_multiple_missions_different_timings() {
 fn test_offline_resolution_no_missions_returns_zero() {
     let mut rng = seeded_rng(10001);
     let mut persistent = DeepPersistent::new();
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
 
     let summary = resolve_offline_missions(&mut prestige, &mut persistent, &mut rng);
 
@@ -1525,7 +1524,7 @@ fn test_total_marks_earned_and_missions_completed_incremented() {
 #[test]
 fn test_validate_squad_merc_not_in_roster_rejected() {
     let persistent = DeepPersistent::new();
-    let prestige = DeepPrestige::new(); // empty roster
+    let prestige = DeepSession::new(); // empty roster
     let available = make_available_mission(MissionType::SupplyRun, 1);
 
     let result = validate_squad_assignment(&available, &[42], &prestige, &persistent, true);

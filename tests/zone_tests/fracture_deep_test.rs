@@ -271,13 +271,13 @@ fn deep_with_breakthrough_power(layer: u32, initial_cap: u32, merc_power: u32) -
     let mission_id = 1;
     {
         let m = test_merc_with_power(1, mission_id, merc_power);
-        deep.prestige.roster.insert(m.id, m);
+        deep.session.roster.insert(m.id, m);
     }
     {
         let m = test_merc_with_power(2, mission_id, merc_power);
-        deep.prestige.roster.insert(m.id, m);
+        deep.session.roster.insert(m.id, m);
     }
-    deep.prestige
+    deep.session
         .active_missions
         .push(elapsed_breakthrough(mission_id, layer, vec![1, 2]));
 

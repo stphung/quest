@@ -32,7 +32,7 @@ pub(super) fn handle_deep(
     }
 
     // Mission-complete modal: capture Enter and block background input.
-    if !deep_state.prestige.pending_results.is_empty() {
+    if !deep_state.session.pending_results.is_empty() {
         if matches!(key.code, KeyCode::Enter)
             && collect_pending_result(deep_state, deep_ui, game_state, 0)
         {
@@ -96,7 +96,7 @@ enum HubSelection {
 fn hub_active_display_order(deep_state: &DeepState) -> Vec<usize> {
     let now = Utc::now();
     let mut order: Vec<(usize, bool, u64)> = deep_state
-        .prestige
+        .session
         .active_missions
         .iter()
         .enumerate()
@@ -113,7 +113,7 @@ fn hub_active_display_order(deep_state: &DeepState) -> Vec<usize> {
 /// Map hub cursor index to the UI-visible mission ordering.
 /// Hub render order is: completed results first, then sorted active missions.
 fn map_hub_selection(deep_state: &DeepState, selected_index: usize) -> Option<HubSelection> {
-    let pending_count = deep_state.prestige.pending_results.len();
+    let pending_count = deep_state.session.pending_results.len();
     if selected_index < pending_count {
         return Some(HubSelection::Completed(selected_index));
     }
@@ -139,7 +139,7 @@ fn handle_roster(
             KeyCode::Enter => {
                 let guild_rank = deep_state.persistent.guild_rank;
                 let merc_id = deep_state
-                    .prestige
+                    .session
                     .roster
                     .values()
                     .filter(|m| !matches!(m.status, MercStatus::Lost))
@@ -147,8 +147,7 @@ fn handle_roster(
                     .map(|m| m.id);
                 deep_ui.promotion_pending = false;
                 if let Some(id) = merc_id {
-                    match crate::deep::promote_merc_by_id(id, &mut deep_state.prestige, guild_rank)
-                    {
+                    match crate::deep::promote_merc_by_id(id, &mut deep_state.session, guild_rank) {
                         Ok((name, quality_name, cost)) => {
                             deep_ui.flash_message = Some(format!(
                                 "{} promoted to {}! (-{} Marks)",
@@ -188,7 +187,7 @@ fn handle_roster(
     match key.code {
         KeyCode::Char('p') | KeyCode::Char('P') => {
             if let Some(merc) = deep_state
-                .prestige
+                .session
                 .roster
                 .values()
                 .filter(|m| !matches!(m.status, MercStatus::Lost))
@@ -197,7 +196,7 @@ fn handle_roster(
                 match crate::deep::can_promote(
                     merc,
                     deep_state.persistent.guild_rank,
-                    deep_state.prestige.warband_marks,
+                    deep_state.session.warband_marks,
                 ) {
                     Ok(_) => {
                         deep_ui.promotion_pending = true;
@@ -226,7 +225,7 @@ fn handle_roster(
         KeyCode::Char('g') | KeyCode::Char('G') => {
             match crate::deep::try_upgrade_guild_rank(
                 &mut deep_state.persistent,
-                &mut deep_state.prestige,
+                &mut deep_state.session,
             ) {
                 Ok(new_rank) => {
                     _achievements.on_deep_guild_rank_up(new_rank.0 as u32, None);
@@ -266,7 +265,7 @@ fn handle_roster(
         }
         KeyCode::Down => {
             let count = deep_state
-                .prestige
+                .session
                 .roster
                 .values()
                 .filter(|m| !matches!(m.status, MercStatus::Lost))
@@ -296,7 +295,7 @@ fn handle_recruit(
             InputResult::Continue
         }
         KeyCode::Down => {
-            let count = deep_state.prestige.recruit_pool.candidates.len();
+            let count = deep_state.session.recruit_pool.candidates.len();
             if count > 0 && deep_ui.selected_index + 1 < count {
                 deep_ui.selected_index += 1;
             }
@@ -304,11 +303,11 @@ fn handle_recruit(
         }
         KeyCode::Enter => {
             let idx = deep_ui.selected_index;
-            let pool = &deep_state.prestige.recruit_pool;
+            let pool = &deep_state.session.recruit_pool;
             if idx < pool.candidates.len() {
                 let max_roster = deep_state.persistent.guild_rank.max_roster() as usize;
                 let occupied_slots = deep_state
-                    .prestige
+                    .session
                     .roster
                     .values()
                     .filter(|m| !matches!(m.status, MercStatus::Lost))
@@ -317,25 +316,25 @@ fn handle_recruit(
                     return InputResult::Continue;
                 }
                 let cost = pool.recruit_costs.get(idx).copied().unwrap_or(0);
-                if cost > 0 && !deep_state.prestige.spend_marks(cost) {
+                if cost > 0 && !deep_state.session.spend_marks(cost) {
                     return InputResult::Continue;
                 }
-                let mut merc = deep_state.prestige.recruit_pool.candidates.remove(idx);
-                deep_state.prestige.recruit_pool.recruit_costs.remove(idx);
+                let mut merc = deep_state.session.recruit_pool.candidates.remove(idx);
+                deep_state.session.recruit_pool.recruit_costs.remove(idx);
                 merc.id = deep_state.persistent.next_merc_id();
                 let merc_id = merc.id;
-                deep_state.prestige.roster.insert(merc_id, merc);
+                deep_state.session.roster.insert(merc_id, merc);
 
                 let now = Utc::now();
                 let mut rng = rand::rng();
                 let _ = crate::deep::missions::maybe_refresh_mission_pool(
-                    &mut deep_state.prestige,
+                    &mut deep_state.session,
                     &deep_state.persistent,
                     now,
                     &mut rng,
                 );
 
-                let remaining = deep_state.prestige.recruit_pool.candidates.len();
+                let remaining = deep_state.session.recruit_pool.candidates.len();
                 if deep_ui.selected_index >= remaining && remaining > 0 {
                     deep_ui.selected_index = remaining - 1;
                 }
@@ -358,29 +357,29 @@ fn collect_pending_result(
     game_state: &mut GameState,
     pending_idx: usize,
 ) -> bool {
-    if pending_idx >= deep_state.prestige.pending_results.len() {
+    if pending_idx >= deep_state.session.pending_results.len() {
         return false;
     }
 
     // Apply character rewards before removing the result.
-    let mission = &deep_state.prestige.pending_results[pending_idx];
+    let mission = &deep_state.session.pending_results[pending_idx];
     if let Some(ref result) = mission.result {
         if result.xp_earned > 0 {
             game_state.character_xp += result.xp_earned as u64;
         }
     }
 
-    deep_state.prestige.pending_results.remove(pending_idx);
+    deep_state.session.pending_results.remove(pending_idx);
 
     // Lost mercs remain visible until all result modals are acknowledged.
-    if deep_state.prestige.pending_results.is_empty() {
-        let _ = crate::deep::purge_lost_mercs(&mut deep_state.prestige.roster);
+    if deep_state.session.pending_results.is_empty() {
+        let _ = crate::deep::purge_lost_mercs(&mut deep_state.session.roster);
     }
 
     // Clamp selection on the Active tab.
     if matches!(deep_ui.view, DeepView::Active) {
         let total =
-            deep_state.prestige.active_missions.len() + deep_state.prestige.pending_results.len();
+            deep_state.session.active_missions.len() + deep_state.session.pending_results.len();
         if total == 0 {
             deep_ui.selected_index = 0;
         } else if deep_ui.selected_index >= total {
@@ -418,8 +417,8 @@ fn handle_active_missions(
             InputResult::Continue
         }
         KeyCode::Down => {
-            let mission_count = deep_state.prestige.active_missions.len()
-                + deep_state.prestige.pending_results.len();
+            let mission_count =
+                deep_state.session.active_missions.len() + deep_state.session.pending_results.len();
             if mission_count > 0 && deep_ui.selected_index + 1 < mission_count {
                 deep_ui.selected_index += 1;
             }
@@ -434,7 +433,7 @@ fn handle_active_missions(
                     }
                 }
                 Some(HubSelection::Active(active_idx)) => {
-                    if let Some(mission) = deep_state.prestige.active_missions.get(active_idx) {
+                    if let Some(mission) = deep_state.session.active_missions.get(active_idx) {
                         if mission.has_pending_event() {
                             deep_ui.event_mission_id = Some(mission.id);
                             deep_ui.event_choice_index = 0;
@@ -471,17 +470,17 @@ fn handle_mission_pool(
             InputResult::Continue
         }
         KeyCode::Down => {
-            let count = deep_state.prestige.available_missions.len();
+            let count = deep_state.session.available_missions.len();
             if count > 0 && deep_ui.selected_index + 1 < count {
                 deep_ui.selected_index += 1;
             }
             InputResult::Continue
         }
         KeyCode::Enter => {
-            let count = deep_state.prestige.available_missions.len();
+            let count = deep_state.session.available_missions.len();
             if deep_ui.selected_index < count {
                 // Check concurrent mission limit.
-                let active = deep_state.prestige.active_mission_count() as u32;
+                let active = deep_state.session.active_mission_count() as u32;
                 let max = crate::deep::effective_concurrent_missions(
                     deep_state.persistent.guild_rank,
                     deep_state.persistent.deepest_layer_reached,
@@ -515,7 +514,7 @@ fn handle_squad_assignment(
     deep_ui: &mut DeepUiState,
 ) -> InputResult {
     let available_mercs: Vec<u64> = deep_state
-        .prestige
+        .session
         .roster
         .values()
         .filter(|m| m.is_available())
@@ -555,20 +554,20 @@ fn handle_squad_assignment(
             }
 
             if let Some(mission_idx) = deep_ui.staging_mission_index {
-                if mission_idx < deep_state.prestige.available_missions.len() {
-                    let available = deep_state.prestige.available_missions.remove(mission_idx);
+                if mission_idx < deep_state.session.available_missions.len() {
+                    let available = deep_state.session.available_missions.remove(mission_idx);
 
                     // Check and deduct cost.
                     if available.marks_cost > 0
-                        && !deep_state.prestige.spend_marks(available.marks_cost)
+                        && !deep_state.session.spend_marks(available.marks_cost)
                     {
                         // Can't afford — put mission back.
                         deep_ui.flash_message = Some(format!(
                             "Not enough Marks! Need {} but have {}",
-                            available.marks_cost, deep_state.prestige.warband_marks
+                            available.marks_cost, deep_state.session.warband_marks
                         ));
                         deep_state
-                            .prestige
+                            .session
                             .available_missions
                             .insert(mission_idx, available);
                         return InputResult::Continue;
@@ -588,7 +587,7 @@ fn handle_squad_assignment(
 
                     // Mark squad mercs as on-mission.
                     for &merc_id in &deep_ui.staged_squad {
-                        if let Some(merc) = deep_state.prestige.find_merc_mut(merc_id) {
+                        if let Some(merc) = deep_state.session.find_merc_mut(merc_id) {
                             merc.status = crate::deep::MercStatus::OnMission(mission_id);
                         }
                     }
@@ -607,11 +606,11 @@ fn handle_squad_assignment(
                         is_first_orders: false,
                     };
 
-                    deep_state.prestige.active_missions.push(mission);
+                    deep_state.session.active_missions.push(mission);
                     // Rolling refill: keep mission roles balanced after each launch.
                     let mut refill_rng = rand::rng();
                     let _ = crate::deep::missions::maybe_refresh_mission_pool(
-                        &mut deep_state.prestige,
+                        &mut deep_state.session,
                         &deep_state.persistent,
                         now,
                         &mut refill_rng,
@@ -666,7 +665,7 @@ fn handle_event_response(
     };
 
     // Find the mission and its pending event.
-    let mission = match deep_state.prestige.find_mission_mut(mission_id) {
+    let mission = match deep_state.session.find_mission_mut(mission_id) {
         Some(m) => m,
         None => {
             deep_ui.event_modal_open = false;
@@ -854,7 +853,7 @@ mod tests {
     fn mission_result_modal_enter_collects_from_any_view() {
         let mut deep_state = DeepState::new();
         deep_state
-            .prestige
+            .session
             .pending_results
             .push(mission_with_result(125));
 
@@ -873,7 +872,7 @@ mod tests {
         );
 
         assert!(matches!(result, InputResult::NeedsSave));
-        assert!(deep_state.prestige.pending_results.is_empty());
+        assert!(deep_state.session.pending_results.is_empty());
         assert_eq!(game_state.character_xp, 125);
         assert_eq!(deep_ui.view, DeepView::NewMission);
     }
@@ -882,7 +881,7 @@ mod tests {
     fn mission_result_modal_blocks_background_navigation() {
         let mut deep_state = DeepState::new();
         deep_state
-            .prestige
+            .session
             .pending_results
             .push(mission_with_result(0));
 
@@ -901,7 +900,7 @@ mod tests {
         );
 
         assert!(matches!(result, InputResult::Continue));
-        assert_eq!(deep_state.prestige.pending_results.len(), 1);
+        assert_eq!(deep_state.session.pending_results.len(), 1);
         assert_eq!(deep_ui.view, DeepView::NewMission);
     }
 
@@ -930,9 +929,9 @@ mod tests {
     fn collect_pending_result_purges_lost_after_last_result() {
         let mut deep_state = DeepState::new();
         let lost_merc = make_lost_merc(7);
-        deep_state.prestige.roster.insert(7, lost_merc);
+        deep_state.session.roster.insert(7, lost_merc);
         deep_state
-            .prestige
+            .session
             .pending_results
             .push(mission_with_result(0));
         let mut deep_ui = DeepUiState::new();
@@ -940,9 +939,9 @@ mod tests {
 
         let collected = collect_pending_result(&mut deep_state, &mut deep_ui, &mut game_state, 0);
         assert!(collected);
-        assert!(deep_state.prestige.pending_results.is_empty());
+        assert!(deep_state.session.pending_results.is_empty());
         assert!(
-            deep_state.prestige.roster.is_empty(),
+            deep_state.session.roster.is_empty(),
             "Lost merc should be purged once all results are collected"
         );
     }
@@ -951,13 +950,13 @@ mod tests {
     fn collect_pending_result_keeps_lost_while_other_results_remain() {
         let mut deep_state = DeepState::new();
         let lost_merc = make_lost_merc(7);
-        deep_state.prestige.roster.insert(7, lost_merc);
+        deep_state.session.roster.insert(7, lost_merc);
         deep_state
-            .prestige
+            .session
             .pending_results
             .push(mission_with_result(0));
         deep_state
-            .prestige
+            .session
             .pending_results
             .push(mission_with_result(0));
         let mut deep_ui = DeepUiState::new();
@@ -965,14 +964,14 @@ mod tests {
 
         let collected = collect_pending_result(&mut deep_state, &mut deep_ui, &mut game_state, 0);
         assert!(collected);
-        assert_eq!(deep_state.prestige.pending_results.len(), 1);
+        assert_eq!(deep_state.session.pending_results.len(), 1);
         assert_eq!(
-            deep_state.prestige.roster.len(),
+            deep_state.session.roster.len(),
             1,
             "Lost merc should stay visible until all results are acknowledged"
         );
         assert!(matches!(
-            deep_state.prestige.roster[&7].status,
+            deep_state.session.roster[&7].status,
             MercStatus::Lost
         ));
     }

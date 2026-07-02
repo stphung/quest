@@ -26,7 +26,7 @@ use super::mercenaries::{
     check_injury_recovery, generate_recruit_pool, injure_merc, mark_merc_lost, purge_lost_mercs,
 };
 use super::types::{
-    effective_concurrent_missions, AvailableMission, DeepPersistent, DeepPrestige, GuildRank,
+    effective_concurrent_missions, AvailableMission, DeepPersistent, DeepSession, GuildRank,
     Infrastructure, LayerTier, MercArchetype, MercStatus, Mission, MissionOutcome, MissionResult,
     MissionStatus, MissionType, WarbandLogEntry, GATEWAY_LAYER,
 };
@@ -610,7 +610,7 @@ pub const POOL_REFRESH_INTERVAL_SECS: i64 = 6 * 3600;
 /// - Also called from `main_helpers/offline.rs` on game load for immediate catch-up.
 /// - `pool_refreshed_at` defaults to `None` for old saves, triggering an immediate refresh.
 pub fn maybe_refresh_mission_pool(
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
     persistent: &DeepPersistent,
     now: DateTime<Utc>,
     rng: &mut impl Rng,
@@ -663,7 +663,7 @@ pub fn maybe_refresh_mission_pool(
 /// This also guarantees an emergency free recruit when the warband has no
 /// deployable mercs and cannot afford any recruit candidate.
 pub fn maybe_refresh_recruit_pool(
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
     persistent: &mut DeepPersistent,
     now: DateTime<Utc>,
     rng: &mut impl Rng,
@@ -695,7 +695,7 @@ pub fn maybe_refresh_recruit_pool(
 /// - purge lost mercs after all pending results are acknowledged
 /// - emergency unlock if everyone is injured and no mission can be launched
 pub fn run_softlock_safeguards(
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
     persistent: &mut DeepPersistent,
     now: DateTime<Utc>,
     rng: &mut impl Rng,
@@ -720,7 +720,7 @@ pub fn run_softlock_safeguards(
 /// If the player cannot afford any currently-available mission, this converts one
 /// Supply Run in the pool to cost 0 so progress cannot deadlock at 0 Marks.
 fn ensure_emergency_supply_run(
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
     persistent: &DeepPersistent,
     rng: &mut impl Rng,
 ) -> bool {
@@ -770,7 +770,7 @@ fn ensure_emergency_supply_run(
 }
 
 /// Ensure at least one recruit is affordable when no deployable mercs remain.
-fn ensure_emergency_recruit(prestige: &mut DeepPrestige) -> bool {
+fn ensure_emergency_recruit(prestige: &mut DeepSession) -> bool {
     if !prestige.active_missions.is_empty() || prestige.available_merc_count() > 0 {
         return false;
     }
@@ -808,7 +808,7 @@ fn ensure_emergency_recruit(prestige: &mut DeepPrestige) -> bool {
 /// Promotes the merc closest to recovery to available so the warband cannot
 /// deadlock. Injuries also heal on their own via wall-clock recovery
 /// (`check_injury_recovery`); this is a belt-and-suspenders quality-of-life net.
-fn ensure_emergency_recovery_merc(prestige: &mut DeepPrestige) -> bool {
+fn ensure_emergency_recovery_merc(prestige: &mut DeepSession) -> bool {
     if !prestige.active_missions.is_empty() || prestige.available_merc_count() > 0 {
         return false;
     }
@@ -1008,7 +1008,7 @@ pub enum SquadAssignmentError {
 pub fn validate_squad_assignment(
     available: &AvailableMission,
     merc_ids: &[u64],
-    prestige: &DeepPrestige,
+    prestige: &DeepSession,
     persistent: &DeepPersistent,
     is_free_daily_supply_run: bool,
 ) -> Result<(), SquadAssignmentError> {
@@ -1082,7 +1082,7 @@ pub fn validate_squad_assignment(
 pub fn start_mission(
     available: &AvailableMission,
     merc_ids: &[u64],
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
     persistent: &mut DeepPersistent,
     is_free_daily_supply_run: bool,
     now: DateTime<Utc>,
@@ -1161,7 +1161,7 @@ pub fn start_mission(
 /// apply time deltas from event resolutions, and notify the player.
 pub fn tick_mission(
     mission: &mut Mission,
-    prestige: &DeepPrestige,
+    prestige: &DeepSession,
     now: DateTime<Utc>,
     rng: &mut impl Rng,
 ) -> EventTickResult {
@@ -1186,7 +1186,7 @@ pub fn tick_mission(
 /// Returns the number of missions whose `ends_at` fell into the past (became
 /// completable) during this acceleration. The caller tallies this for the surge
 /// summary. Actual mission resolution happens in `tick_all_missions`.
-pub fn accelerate_missions(prestige: &mut DeepPrestige, acceleration: Duration) -> u32 {
+pub fn accelerate_missions(prestige: &mut DeepSession, acceleration: Duration) -> u32 {
     let now = Utc::now();
     let mut newly_completed = 0u32;
 
@@ -1217,7 +1217,7 @@ pub fn accelerate_missions(prestige: &mut DeepPrestige, acceleration: Duration) 
 ///
 /// Returns a summary of what changed.
 pub fn tick_all_missions(
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
     persistent: &mut DeepPersistent,
     now: DateTime<Utc>,
     rng: &mut impl Rng,
@@ -1346,7 +1346,7 @@ pub struct MissionTickSummary {
 /// - Failure: squad power well below threshold or multiple critical failures
 fn compute_outcome(
     mission: &Mission,
-    prestige: &DeepPrestige,
+    prestige: &DeepSession,
     persistent: &DeepPersistent,
     rng: &mut impl Rng,
 ) -> MissionOutcome {
@@ -1461,7 +1461,7 @@ fn compute_outcome(
 /// `now` anchors wall-clock injury recovery times (pass simulated time in tests).
 pub fn resolve_mission(
     mission: &mut Mission,
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
     persistent: &mut DeepPersistent,
     now: DateTime<Utc>,
     rng: &mut impl Rng,
@@ -1577,7 +1577,7 @@ pub fn resolve_mission(
 /// Awards +30 familiarity on Layer 1 and 15 Warband Marks.
 fn resolve_first_orders(
     mission: &mut Mission,
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
     persistent: &mut DeepPersistent,
 ) {
     // Award +30 familiarity on Layer 1
@@ -1634,7 +1634,7 @@ fn item_ilvl_for_mission(mission: &Mission) -> Option<u32> {
 /// Returns (injured_ids, lost_ids).
 fn apply_mission_casualties(
     mission: &Mission,
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
     _persistent: &DeepPersistent,
     outcome: &MissionOutcome,
     now: DateTime<Utc>,
@@ -1728,7 +1728,7 @@ fn apply_mission_casualties(
 /// Release all squad members from `OnMission` status back to `Available`.
 ///
 /// Used for safe missions that never cause casualties.
-fn release_squad_from_mission(mission: &Mission, prestige: &mut DeepPrestige) {
+fn release_squad_from_mission(mission: &Mission, prestige: &mut DeepSession) {
     for &id in &mission.squad {
         if let Some(merc) = prestige.find_merc_mut(id) {
             if matches!(merc.status, MercStatus::OnMission(_)) {
@@ -1741,7 +1741,7 @@ fn release_squad_from_mission(mission: &Mission, prestige: &mut DeepPrestige) {
 /// Apply mission-count progression to squad members and compute level-ups.
 ///
 /// Returns a list of (merc_id, levels_gained) for the notification display.
-fn apply_squad_progression(mission: &Mission, prestige: &mut DeepPrestige) -> Vec<(u64, u32)> {
+fn apply_squad_progression(mission: &Mission, prestige: &mut DeepSession) -> Vec<(u64, u32)> {
     let mut level_ups = Vec::new();
 
     for &id in &mission.squad {
@@ -1783,7 +1783,7 @@ fn apply_squad_progression(mission: &Mission, prestige: &mut DeepPrestige) -> Ve
 ///
 /// Returns a summary of what was resolved for display in the post-load notification.
 pub fn resolve_offline_missions(
-    prestige: &mut DeepPrestige,
+    prestige: &mut DeepSession,
     persistent: &mut DeepPersistent,
     rng: &mut impl Rng,
 ) -> OfflineResolutionSummary {
@@ -1872,7 +1872,7 @@ pub struct OfflineResolutionSummary {
 
 /// Whether the daily free supply run slot has been used today (UTC calendar day).
 ///
-/// Callers should persist this flag alongside `DeepPrestige`.
+/// Callers should persist this flag alongside `DeepSession`.
 /// This function is a helper for calculating the reset; the actual flag is
 /// managed by the caller.
 pub fn daily_supply_run_resets_at(last_used_at: DateTime<Utc>) -> DateTime<Utc> {
@@ -1904,7 +1904,7 @@ mod tests {
     use super::*;
     use crate::deep::mercenaries::MercQuality;
     use crate::deep::types::{
-        DeepPersistent, DeepPrestige, GuildRank, MercArchetype, MercStatus, Mercenary,
+        DeepPersistent, DeepSession, GuildRank, MercArchetype, MercStatus, Mercenary,
         MissionOutcome, MissionStatus, MissionType,
     };
     use chrono::{TimeZone, Utc};
@@ -1930,8 +1930,8 @@ mod tests {
         }
     }
 
-    fn make_prestige_with_mercs(mercs: Vec<Mercenary>) -> DeepPrestige {
-        let mut p = DeepPrestige::new();
+    fn make_prestige_with_mercs(mercs: Vec<Mercenary>) -> DeepSession {
+        let mut p = DeepSession::new();
         p.roster = mercs.into_iter().map(|m| (m.id, m)).collect();
         p
     }
@@ -2212,7 +2212,7 @@ mod tests {
         persistent.layer_record_mut(1).cleared = true;
         persistent.deepest_layer_reached = 1;
 
-        let mut prestige = DeepPrestige::new();
+        let mut prestige = DeepSession::new();
         prestige.available_missions = vec![make_available_mission(MissionType::Breakthrough, 2)];
         prestige.pool_refreshed_at = Some(now - Duration::hours(1)); // fresh (not stale)
 
@@ -2257,7 +2257,7 @@ mod tests {
         let now = Utc::now();
         let persistent = DeepPersistent::new();
 
-        let mut prestige = DeepPrestige::new();
+        let mut prestige = DeepSession::new();
         prestige.warband_marks = 0;
         prestige.pool_refreshed_at = Some(now - Duration::hours(1)); // fresh
         prestige.available_missions = vec![
@@ -2323,7 +2323,7 @@ mod tests {
         let mut persistent = DeepPersistent::new();
         let _ = persistent.layer_record_mut(1);
 
-        let mut prestige = DeepPrestige::new();
+        let mut prestige = DeepSession::new();
         prestige.warband_marks = 0;
         prestige.pool_refreshed_at = Some(now - Duration::hours(1)); // fresh
         prestige.available_missions = vec![
@@ -2401,7 +2401,7 @@ mod tests {
         record.cleared = true;
         record.infrastructure.push(Infrastructure::Outpost);
 
-        let mut prestige = DeepPrestige::new();
+        let mut prestige = DeepSession::new();
         prestige.warband_marks = 200;
         prestige.pool_refreshed_at = Some(now - Duration::hours(1)); // fresh
         prestige.available_missions = vec![AvailableMission {
@@ -2429,7 +2429,7 @@ mod tests {
         let mut rng = seeded_rng();
         let mut persistent = DeepPersistent::new();
         let now = Utc::now();
-        let mut prestige = DeepPrestige::new();
+        let mut prestige = DeepSession::new();
 
         assert!(prestige.recruit_pool.candidates.is_empty());
         let changed = maybe_refresh_recruit_pool(&mut prestige, &mut persistent, now, &mut rng);
@@ -2450,7 +2450,7 @@ mod tests {
         let mut rng = seeded_rng();
         let mut persistent = DeepPersistent::new();
         let now = Utc::now();
-        let mut prestige = DeepPrestige::new();
+        let mut prestige = DeepSession::new();
         prestige.warband_marks = 0;
         prestige.recruit_pool.refreshed_at = now;
         prestige.recruit_pool.candidates = vec![
@@ -2476,7 +2476,7 @@ mod tests {
         let mut rng = seeded_rng();
         let mut persistent = DeepPersistent::new();
         let now = Utc::now();
-        let mut prestige = DeepPrestige::new();
+        let mut prestige = DeepSession::new();
         let mut lost = make_merc(7, MercArchetype::Vanguard, 30);
         lost.status = MercStatus::Lost;
         prestige.roster.insert(7, lost);
@@ -2494,7 +2494,7 @@ mod tests {
         let mut rng = seeded_rng();
         let mut persistent = DeepPersistent::new();
         let now = Utc::now();
-        let mut prestige = DeepPrestige::new();
+        let mut prestige = DeepSession::new();
         let mut lost = make_merc(7, MercArchetype::Vanguard, 30);
         lost.status = MercStatus::Lost;
         prestige.roster.insert(7, lost);
@@ -2527,7 +2527,7 @@ mod tests {
         let mut rng = seeded_rng();
         let mut persistent = DeepPersistent::new();
         let now = Utc::now();
-        let mut prestige = DeepPrestige::new();
+        let mut prestige = DeepSession::new();
 
         let mut m1 = make_merc(1, MercArchetype::Vanguard, 30);
         m1.status = MercStatus::Injured {
@@ -2557,7 +2557,7 @@ mod tests {
     #[test]
     fn test_validate_squad_empty_squad_fails() {
         let persistent = DeepPersistent::new();
-        let prestige = DeepPrestige::new();
+        let prestige = DeepSession::new();
         let available = make_available_mission(MissionType::Expedition, 1);
         let result = validate_squad_assignment(&available, &[], &prestige, &persistent, false);
         assert_eq!(result, Err(SquadAssignmentError::EmptySquad));
@@ -3330,7 +3330,7 @@ mod tests {
     #[test]
     fn test_accelerate_missions_shifts_ends_at() {
         let now = Utc::now();
-        let mut prestige = DeepPrestige::default();
+        let mut prestige = DeepSession::default();
         let acceleration = Duration::seconds(3600); // 1 hour
 
         // Create a mission that ends in 4 hours
@@ -3366,7 +3366,7 @@ mod tests {
     #[test]
     fn test_accelerate_missions_completes_mission() {
         let now = Utc::now();
-        let mut prestige = DeepPrestige::default();
+        let mut prestige = DeepSession::default();
         let acceleration = Duration::seconds(7200); // 2 hours
 
         // Create a mission that ends in 1 hour
@@ -3399,7 +3399,7 @@ mod tests {
     #[test]
     fn test_accelerate_missions_skips_non_active() {
         let now = Utc::now();
-        let mut prestige = DeepPrestige::default();
+        let mut prestige = DeepSession::default();
         let acceleration = Duration::seconds(3600);
 
         let mission = Mission {
@@ -3427,7 +3427,7 @@ mod tests {
     #[test]
     fn test_accelerate_missions_multiple() {
         let now = Utc::now();
-        let mut prestige = DeepPrestige::default();
+        let mut prestige = DeepSession::default();
         let acceleration = Duration::seconds(3600);
 
         for i in 1..=3 {

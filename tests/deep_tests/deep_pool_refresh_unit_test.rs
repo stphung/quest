@@ -21,7 +21,7 @@
 use chrono::{Duration, TimeZone, Utc};
 use quest::deep::{
     available_mission_count, generate_mission_pool, maybe_refresh_mission_pool, AvailableMission,
-    DeepPersistent, DeepPrestige, DeepState, GuildRank, Infrastructure, MissionType, GATEWAY_LAYER,
+    DeepPersistent, DeepSession, DeepState, GuildRank, Infrastructure, MissionType, GATEWAY_LAYER,
     POOL_REFRESH_INTERVAL_SECS,
 };
 use rand::SeedableRng;
@@ -52,10 +52,10 @@ fn make_persistent_with_frontier(frontier_layer: u32) -> DeepPersistent {
     p
 }
 
-/// Build a `DeepPrestige` with a non-empty pool and `pool_refreshed_at` set to
+/// Build a `DeepSession` with a non-empty pool and `pool_refreshed_at` set to
 /// `secs_ago` seconds before `now`.
-fn prestige_with_pool_age(now: chrono::DateTime<Utc>, secs_ago: i64) -> DeepPrestige {
-    let mut prestige = DeepPrestige::new();
+fn prestige_with_pool_age(now: chrono::DateTime<Utc>, secs_ago: i64) -> DeepSession {
+    let mut prestige = DeepSession::new();
     let persistent = make_persistent_with_frontier(1);
     prestige.available_missions = generate_mission_pool(&persistent, &[], &mut seeded_rng());
     prestige.pool_refreshed_at = Some(now - chrono::Duration::seconds(secs_ago));
@@ -72,7 +72,7 @@ fn prestige_with_pool_age(now: chrono::DateTime<Utc>, secs_ago: i64) -> DeepPres
 #[test]
 fn empty_pool_triggers_refresh() {
     let persistent = make_persistent_with_frontier(1);
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     // New state starts with None timestamp and empty pool — both trigger refresh.
     assert!(prestige.available_missions.is_empty());
 
@@ -89,7 +89,7 @@ fn empty_pool_triggers_refresh() {
 #[test]
 fn empty_pool_triggers_refresh_even_when_recently_generated() {
     let persistent = make_persistent_with_frontier(1);
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     prestige.available_missions.clear();
     // Set pool_refreshed_at to 1 minute ago — normally too fresh to trigger time-based refresh.
     let now = t0();
@@ -107,7 +107,7 @@ fn empty_pool_triggers_refresh_even_when_recently_generated() {
 #[test]
 fn empty_pool_refresh_return_value_is_true() {
     let persistent = make_persistent_with_frontier(1);
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     prestige.available_missions.clear();
 
     let now = t0();
@@ -156,7 +156,7 @@ fn none_pool_refreshed_at_triggers_refresh_on_non_empty_pool() {
     // Simulates a new prestige or old save file: pool_refreshed_at is None,
     // which guarantees an immediate refresh even if missions exist.
     let persistent = make_persistent_with_frontier(1);
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     prestige.available_missions = vec![AvailableMission {
         mission_type: MissionType::SupplyRun,
         layer: 1,
@@ -207,7 +207,7 @@ fn fresh_pool_one_hour_old_does_not_refresh() {
 fn fresh_pool_five_hours_59_minutes_old_does_not_refresh() {
     let persistent = make_persistent_with_frontier(1);
     let now = t0();
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     prestige.warband_marks = 10_000;
     prestige.available_missions = generate_mission_pool(&persistent, &[], &mut seeded_rng());
     // 5h 59m old = 21540 seconds — just under the 6h = 21600s threshold.
@@ -254,7 +254,7 @@ fn no_refresh_returns_false() {
 #[test]
 fn pool_refreshed_at_updated_after_empty_pool_refresh() {
     let persistent = make_persistent_with_frontier(1);
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     // None timestamp — will be updated on refresh.
     assert_eq!(prestige.pool_refreshed_at, None);
 
@@ -306,12 +306,12 @@ fn pool_refreshed_at_unchanged_when_no_refresh_occurs() {
 
 #[test]
 fn pool_refreshed_at_survives_serde_roundtrip_some() {
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     let ts = Utc.with_ymd_and_hms(2024, 6, 15, 12, 30, 0).unwrap();
     prestige.pool_refreshed_at = Some(ts);
 
     let json = serde_json::to_string(&prestige).expect("serialize");
-    let loaded: DeepPrestige = serde_json::from_str(&json).expect("deserialize");
+    let loaded: DeepSession = serde_json::from_str(&json).expect("deserialize");
 
     assert_eq!(
         loaded.pool_refreshed_at,
@@ -322,11 +322,11 @@ fn pool_refreshed_at_survives_serde_roundtrip_some() {
 
 #[test]
 fn pool_refreshed_at_survives_serde_roundtrip_none() {
-    let prestige = DeepPrestige::new();
+    let prestige = DeepSession::new();
     assert_eq!(prestige.pool_refreshed_at, None);
 
     let json = serde_json::to_string(&prestige).expect("serialize");
-    let loaded: DeepPrestige = serde_json::from_str(&json).expect("deserialize");
+    let loaded: DeepSession = serde_json::from_str(&json).expect("deserialize");
 
     assert_eq!(
         loaded.pool_refreshed_at, None,
@@ -336,7 +336,7 @@ fn pool_refreshed_at_survives_serde_roundtrip_none() {
 
 #[test]
 fn pool_refreshed_at_field_name_is_stable_for_save_files() {
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     prestige.pool_refreshed_at = Some(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap());
 
     let json = serde_json::to_string(&prestige).expect("serialize");
@@ -350,13 +350,13 @@ fn pool_refreshed_at_field_name_is_stable_for_save_files() {
 #[test]
 fn pool_refreshed_at_non_none_roundtrip_with_missions() {
     let ts = Utc.with_ymd_and_hms(2025, 3, 10, 8, 0, 0).unwrap();
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     prestige.pool_refreshed_at = Some(ts);
     prestige.available_missions =
         generate_mission_pool(&make_persistent_with_frontier(1), &[], &mut seeded_rng());
 
     let json = serde_json::to_string(&prestige).expect("serialize");
-    let loaded: DeepPrestige = serde_json::from_str(&json).expect("deserialize");
+    let loaded: DeepSession = serde_json::from_str(&json).expect("deserialize");
 
     assert_eq!(loaded.pool_refreshed_at, Some(ts));
     assert_eq!(
@@ -385,7 +385,7 @@ fn missing_pool_refreshed_at_deserializes_to_none() {
         "pending_results": []
     }"#;
 
-    let loaded: DeepPrestige = serde_json::from_str(json).expect("deserialize old save");
+    let loaded: DeepSession = serde_json::from_str(json).expect("deserialize old save");
 
     assert_eq!(
         loaded.pool_refreshed_at, None,
@@ -420,7 +420,7 @@ fn missing_pool_refreshed_at_triggers_immediate_refresh_on_load() {
         "pending_results": []
     }"#;
 
-    let mut prestige: DeepPrestige = serde_json::from_str(json).expect("deserialize old save");
+    let mut prestige: DeepSession = serde_json::from_str(json).expect("deserialize old save");
     assert_eq!(prestige.pool_refreshed_at, None);
 
     let persistent = make_persistent_with_frontier(1);
@@ -459,7 +459,7 @@ fn serde_default_attribute_present_on_pool_refreshed_at() {
         "total_mercs_lost": 2
     }"#;
 
-    let loaded: DeepPrestige = serde_json::from_str(json).expect("deserialize");
+    let loaded: DeepSession = serde_json::from_str(json).expect("deserialize");
 
     assert_eq!(loaded.pool_refreshed_at, None);
     assert_eq!(loaded.warband_marks, 200);
@@ -476,15 +476,15 @@ fn on_prestige_preserves_available_missions() {
     state.persistent.discovered = true;
 
     // Populate the pool.
-    state.prestige.available_missions =
+    state.session.available_missions =
         generate_mission_pool(&state.persistent.clone(), &[], &mut seeded_rng());
-    let count = state.prestige.available_missions.len();
+    let count = state.session.available_missions.len();
     assert!(count > 0);
 
     state.on_prestige();
 
     assert_eq!(
-        state.prestige.available_missions.len(),
+        state.session.available_missions.len(),
         count,
         "on_prestige must preserve available_missions"
     );
@@ -496,12 +496,12 @@ fn on_prestige_preserves_pool_refreshed_at() {
     state.persistent.discovered = true;
     // Set a non-None timestamp.
     let ts = Some(Utc.with_ymd_and_hms(2024, 9, 1, 12, 0, 0).unwrap());
-    state.prestige.pool_refreshed_at = ts;
+    state.session.pool_refreshed_at = ts;
 
     state.on_prestige();
 
     assert_eq!(
-        state.prestige.pool_refreshed_at, ts,
+        state.session.pool_refreshed_at, ts,
         "on_prestige must preserve pool_refreshed_at"
     );
 }
@@ -511,7 +511,7 @@ fn on_prestige_pool_continues_normal_refresh_cycle() {
     let mut state = DeepState::new();
     state.persistent.discovered = true;
     // Populate a fresh pool.
-    state.prestige.available_missions = vec![AvailableMission {
+    state.session.available_missions = vec![AvailableMission {
         mission_type: MissionType::SupplyRun,
         layer: 1,
         duration_secs: 7200,
@@ -521,18 +521,18 @@ fn on_prestige_pool_continues_normal_refresh_cycle() {
         recommended_archetype: None,
         description: String::new(),
     }];
-    state.prestige.pool_refreshed_at = Some(t0());
+    state.session.pool_refreshed_at = Some(t0());
 
     state.on_prestige();
 
     // After prestige: pool and timestamp persist.
-    assert_eq!(state.prestige.available_missions.len(), 1);
-    assert_eq!(state.prestige.pool_refreshed_at, Some(t0()));
+    assert_eq!(state.session.available_missions.len(), 1);
+    assert_eq!(state.session.pool_refreshed_at, Some(t0()));
 
     // Normal time-based refresh still works after sufficient time.
     let later = t0() + Duration::hours(25);
     let refreshed = maybe_refresh_mission_pool(
-        &mut state.prestige,
+        &mut state.session,
         &state.persistent,
         later,
         &mut seeded_rng(),
@@ -540,7 +540,7 @@ fn on_prestige_pool_continues_normal_refresh_cycle() {
 
     // The pool should eventually refresh based on normal time interval.
     if refreshed {
-        assert!(!state.prestige.available_missions.is_empty());
+        assert!(!state.session.available_missions.is_empty());
     }
 }
 
@@ -549,13 +549,13 @@ fn on_prestige_pool_refreshed_at_is_preserved_not_cleared() {
     let mut state = DeepState::new();
     state.persistent.discovered = true;
     let ts = Some(Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap());
-    state.prestige.pool_refreshed_at = ts;
+    state.session.pool_refreshed_at = ts;
 
     state.on_prestige();
 
     // Must be preserved, not cleared to None.
     assert_eq!(
-        state.prestige.pool_refreshed_at, ts,
+        state.session.pool_refreshed_at, ts,
         "on_prestige must preserve pool_refreshed_at"
     );
 }
@@ -571,7 +571,7 @@ fn pool_after_refresh_contains_safe_mission_for_cleared_layer() {
     persistent.layer_record_mut(1).cleared = true;
     persistent.deepest_layer_reached = 1;
 
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     let now = t0();
     maybe_refresh_mission_pool(&mut prestige, &persistent, now, &mut seeded_rng());
 
@@ -597,7 +597,7 @@ fn pool_after_refresh_contains_breakthrough_for_frontier_layer() {
     persistent.layer_record_mut(1).cleared = true;
     persistent.deepest_layer_reached = 1;
 
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     let now = t0();
     maybe_refresh_mission_pool(&mut prestige, &persistent, now, &mut seeded_rng());
 
@@ -620,7 +620,7 @@ fn pool_after_refresh_contains_breakthrough_for_frontier_layer() {
 #[test]
 fn pool_size_matches_guild_rank_one() {
     let persistent = make_persistent_with_frontier(1);
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     prestige.warband_marks = 10_000;
     let now = t0();
     maybe_refresh_mission_pool(&mut prestige, &persistent, now, &mut seeded_rng());
@@ -641,7 +641,7 @@ fn pool_size_matches_guild_rank_five() {
     persistent.layer_record_mut(1).cleared = true;
     persistent.deepest_layer_reached = 1;
 
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     prestige.warband_marks = 10_000;
     let now = t0();
     maybe_refresh_mission_pool(&mut prestige, &persistent, now, &mut seeded_rng());
@@ -661,7 +661,7 @@ fn pool_missions_reflect_outpost_infrastructure_shorter_duration() {
     persistent_no_outpost.guild_rank = GuildRank(4);
 
     let now = t0();
-    let mut prestige_a = DeepPrestige::new();
+    let mut prestige_a = DeepSession::new();
     maybe_refresh_mission_pool(
         &mut prestige_a,
         &persistent_no_outpost,
@@ -683,7 +683,7 @@ fn pool_missions_reflect_outpost_infrastructure_shorter_duration() {
         .infrastructure
         .push(Infrastructure::Outpost);
 
-    let mut prestige_b = DeepPrestige::new();
+    let mut prestige_b = DeepSession::new();
     maybe_refresh_mission_pool(
         &mut prestige_b,
         &persistent_with_outpost,
@@ -716,11 +716,11 @@ fn pool_refresh_with_same_seed_is_deterministic() {
     let persistent = make_persistent_with_frontier(1);
     let now = t0();
 
-    let mut prestige_a = DeepPrestige::new();
+    let mut prestige_a = DeepSession::new();
     let mut rng_a = ChaCha8Rng::seed_from_u64(99);
     maybe_refresh_mission_pool(&mut prestige_a, &persistent, now, &mut rng_a);
 
-    let mut prestige_b = DeepPrestige::new();
+    let mut prestige_b = DeepSession::new();
     let mut rng_b = ChaCha8Rng::seed_from_u64(99);
     maybe_refresh_mission_pool(&mut prestige_b, &persistent, now, &mut rng_b);
 
@@ -743,7 +743,7 @@ fn pool_refresh_with_same_seed_is_deterministic() {
 #[test]
 fn all_pool_missions_have_valid_layer() {
     let persistent = make_persistent_with_frontier(1);
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     let now = t0();
     maybe_refresh_mission_pool(&mut prestige, &persistent, now, &mut seeded_rng());
 
@@ -759,7 +759,7 @@ fn all_pool_missions_have_valid_layer() {
 #[test]
 fn all_pool_missions_have_positive_duration() {
     let persistent = make_persistent_with_frontier(1);
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     let now = t0();
     maybe_refresh_mission_pool(&mut prestige, &persistent, now, &mut seeded_rng());
 
@@ -793,11 +793,11 @@ fn gateway_expedition_survives_rolling_rebalance_past_layer_30() {
     let now = t0();
 
     // 1. Full refresh: gate expedition should appear.
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     prestige.warband_marks = 100_000;
     maybe_refresh_mission_pool(&mut prestige, &persistent, now, &mut seeded_rng());
 
-    let has_gate = |p: &DeepPrestige| {
+    let has_gate = |p: &DeepSession| {
         p.available_missions
             .iter()
             .any(|m| matches!(m.mission_type, MissionType::GatewayExpedition))
@@ -840,7 +840,7 @@ fn gateway_expedition_injected_into_pool_missing_it_on_load() {
     let now = t0();
 
     // Manually build a pool with a Breakthrough (Progression role) but no gate.
-    let mut prestige = DeepPrestige::new();
+    let mut prestige = DeepSession::new();
     prestige.warband_marks = 100_000;
     prestige.available_missions = vec![AvailableMission {
         mission_type: MissionType::Breakthrough,

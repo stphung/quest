@@ -21,7 +21,7 @@ use rand_chacha::ChaCha8Rng;
 
 use quest::deep::{
     complete_discovery, generate_mission_pool, mark_layer_cleared, maybe_refresh_mission_pool,
-    DeepPrestige, DeepState, GuildRank, MissionType, POOL_REFRESH_INTERVAL_SECS,
+    DeepSession, DeepState, GuildRank, MissionType, POOL_REFRESH_INTERVAL_SECS,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ fn test_discovery_sets_pool_refreshed_at() {
 
     // After discovery, pool_refreshed_at should be Some (not None).
     assert!(
-        deep.prestige.pool_refreshed_at.is_some(),
+        deep.session.pool_refreshed_at.is_some(),
         "pool_refreshed_at must be Some after discovery (not None)"
     );
 }
@@ -66,7 +66,7 @@ fn test_discovery_timestamp_is_recent() {
     let after = Utc::now();
 
     let ts = deep
-        .prestige
+        .session
         .pool_refreshed_at
         .expect("must be Some after discovery");
     assert!(
@@ -86,7 +86,7 @@ fn test_discovery_pool_missions_target_layer_one() {
     // After discovery (no layers cleared yet), frontier = 1.
     // Re-generate the pool the same way discovery does.
     let mut rng = seeded_rng(42);
-    let pool = generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
+    let pool = generate_mission_pool(&deep.persistent, &deep.session.active_missions, &mut rng);
 
     // All missions on a fresh state target layer 1 (frontier = 1).
     for mission in &pool {
@@ -104,7 +104,7 @@ fn test_discovery_pool_always_contains_supply_run() {
     force_discover(&mut deep);
 
     let mut rng = seeded_rng(7);
-    let pool = generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
+    let pool = generate_mission_pool(&deep.persistent, &deep.session.active_missions, &mut rng);
     assert!(
         pool.iter()
             .any(|m| m.mission_type == MissionType::SupplyRun),
@@ -122,20 +122,20 @@ fn test_empty_pool_triggers_refresh() {
     force_discover(&mut deep);
 
     // Drain the pool.
-    deep.prestige.available_missions.clear();
+    deep.session.available_missions.clear();
     assert!(
-        deep.prestige.available_missions.is_empty(),
+        deep.session.available_missions.is_empty(),
         "Pool should be empty after draining"
     );
 
     // Apply refresh — empty pool should always trigger.
     let mut rng = seeded_rng(10);
     let now = t0();
-    let refreshed = maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, now, &mut rng);
+    let refreshed = maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, now, &mut rng);
 
     assert!(refreshed, "Empty pool must trigger a refresh");
     assert!(
-        !deep.prestige.available_missions.is_empty(),
+        !deep.session.available_missions.is_empty(),
         "Pool must be non-empty after refresh"
     );
 }
@@ -145,14 +145,14 @@ fn test_empty_pool_regenerates_correct_count() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
-    deep.prestige.available_missions.clear();
+    deep.session.available_missions.clear();
 
     let mut rng = seeded_rng(11);
-    maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, t0(), &mut rng);
+    maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, t0(), &mut rng);
 
     // At initial frontier (layer 1), valid unique mission types are capped at 4.
     assert_eq!(
-        deep.prestige.available_missions.len(),
+        deep.session.available_missions.len(),
         4,
         "Rank 1 pool should generate 4 unique valid missions at initial frontier"
     );
@@ -164,21 +164,20 @@ fn test_none_timestamp_triggers_refresh_even_with_non_empty_pool() {
     force_discover(&mut deep);
 
     // Override pool_refreshed_at to None (simulates old save or post-prestige state).
-    deep.prestige.pool_refreshed_at = None;
+    deep.session.pool_refreshed_at = None;
     // Keep a non-empty pool to test that None timestamp triggers refresh regardless.
-    let old_pool_len = deep.prestige.available_missions.len();
+    let old_pool_len = deep.session.available_missions.len();
     assert!(old_pool_len > 0, "Pool should be non-empty for this test");
 
     let mut rng = seeded_rng(12);
-    let refreshed =
-        maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, t0(), &mut rng);
+    let refreshed = maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, t0(), &mut rng);
 
     assert!(
         refreshed,
         "None pool_refreshed_at must trigger a refresh even when pool is non-empty"
     );
     assert!(
-        deep.prestige.pool_refreshed_at.is_some(),
+        deep.session.pool_refreshed_at.is_some(),
         "pool_refreshed_at must be set to Some after refresh"
     );
 }
@@ -190,17 +189,16 @@ fn test_non_empty_pool_does_not_refresh_before_interval() {
 
     // Set pool_refreshed_at to 1 hour ago — should not refresh (1h < 6h).
     let one_hour_ago = t0() - Duration::hours(1);
-    deep.prestige.pool_refreshed_at = Some(one_hour_ago);
+    deep.session.pool_refreshed_at = Some(one_hour_ago);
     let pool_before: Vec<_> = deep
-        .prestige
+        .session
         .available_missions
         .iter()
         .map(|m| m.mission_type)
         .collect();
 
     let mut rng = seeded_rng(13);
-    let refreshed =
-        maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, t0(), &mut rng);
+    let refreshed = maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, t0(), &mut rng);
 
     assert!(
         !refreshed,
@@ -208,7 +206,7 @@ fn test_non_empty_pool_does_not_refresh_before_interval() {
     );
     // Pool content unchanged.
     let pool_after: Vec<_> = deep
-        .prestige
+        .session
         .available_missions
         .iter()
         .map(|m| m.mission_type)
@@ -231,18 +229,17 @@ fn test_pool_refreshes_after_six_hours() {
     let interval_hours = POOL_REFRESH_INTERVAL_SECS / 3600;
     // Simulate pool refreshed exactly 6 hours ago.
     let six_hours_ago = t0() - Duration::seconds(POOL_REFRESH_INTERVAL_SECS);
-    deep.prestige.pool_refreshed_at = Some(six_hours_ago);
+    deep.session.pool_refreshed_at = Some(six_hours_ago);
     // Manually set pool as non-empty (old content).
     let old_missions = generate_mission_pool(
         &deep.persistent,
-        &deep.prestige.active_missions,
+        &deep.session.active_missions,
         &mut seeded_rng(99),
     );
-    deep.prestige.available_missions = old_missions;
+    deep.session.available_missions = old_missions;
 
     let mut rng = seeded_rng(20);
-    let refreshed =
-        maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, t0(), &mut rng);
+    let refreshed = maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, t0(), &mut rng);
 
     assert!(
         refreshed,
@@ -250,11 +247,11 @@ fn test_pool_refreshes_after_six_hours() {
         interval_hours, POOL_REFRESH_INTERVAL_SECS
     );
     assert!(
-        !deep.prestige.available_missions.is_empty(),
+        !deep.session.available_missions.is_empty(),
         "Pool must not be empty after 6-hour refresh"
     );
     assert_eq!(
-        deep.prestige.pool_refreshed_at,
+        deep.session.pool_refreshed_at,
         Some(t0()),
         "pool_refreshed_at must be updated to the refresh time"
     );
@@ -268,17 +265,16 @@ fn test_pool_does_not_refresh_at_five_hours_fifty_nine_minutes() {
     // Just under 6 hours — should not refresh.
     let almost_six_hours =
         t0() - Duration::seconds(POOL_REFRESH_INTERVAL_SECS) + Duration::minutes(1);
-    deep.prestige.pool_refreshed_at = Some(almost_six_hours);
+    deep.session.pool_refreshed_at = Some(almost_six_hours);
     // Pool must be non-empty for this to test the timer correctly.
-    deep.prestige.available_missions = generate_mission_pool(
+    deep.session.available_missions = generate_mission_pool(
         &deep.persistent,
-        &deep.prestige.active_missions,
+        &deep.session.active_missions,
         &mut seeded_rng(98),
     );
 
     let mut rng = seeded_rng(21);
-    let refreshed =
-        maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, t0(), &mut rng);
+    let refreshed = maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, t0(), &mut rng);
 
     assert!(
         !refreshed,
@@ -292,14 +288,14 @@ fn test_refreshed_pool_missions_target_current_frontier() {
     force_discover(&mut deep);
 
     // Frontier = layer 1 on fresh state. Force a refresh.
-    deep.prestige.pool_refreshed_at = None;
-    deep.prestige.available_missions = vec![]; // drain
+    deep.session.pool_refreshed_at = None;
+    deep.session.available_missions = vec![]; // drain
 
     let mut rng = seeded_rng(22);
-    maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, t0(), &mut rng);
+    maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, t0(), &mut rng);
 
     // All missions should target the current frontier (layer 1).
-    for mission in &deep.prestige.available_missions {
+    for mission in &deep.session.available_missions {
         assert_eq!(
             mission.layer, 1,
             "Refreshed pool missions must target the frontier (layer 1)"
@@ -313,14 +309,14 @@ fn test_pool_refresh_updates_timestamp() {
     force_discover(&mut deep);
 
     let refresh_time = t0() + Duration::hours(7);
-    deep.prestige.pool_refreshed_at = None;
-    deep.prestige.available_missions.clear(); // force empty
+    deep.session.pool_refreshed_at = None;
+    deep.session.available_missions.clear(); // force empty
 
     let mut rng = seeded_rng(23);
-    maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, refresh_time, &mut rng);
+    maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, refresh_time, &mut rng);
 
     assert_eq!(
-        deep.prestige.pool_refreshed_at,
+        deep.session.pool_refreshed_at,
         Some(refresh_time),
         "pool_refreshed_at must be updated to the time of refresh"
     );
@@ -344,18 +340,17 @@ fn test_pool_refresh_reflects_cleared_layer_frontier() {
     );
 
     // Force a refresh.
-    deep.prestige.pool_refreshed_at = None;
-    deep.prestige.available_missions.clear();
+    deep.session.pool_refreshed_at = None;
+    deep.session.available_missions.clear();
 
     let mut rng = seeded_rng(30);
-    let refreshed =
-        maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, t0(), &mut rng);
+    let refreshed = maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, t0(), &mut rng);
 
     assert!(refreshed, "Pool must refresh after clearing a layer");
 
     // Breakthrough remains frontier-only and must target layer 2.
     let breakthrough_missions: Vec<_> = deep
-        .prestige
+        .session
         .available_missions
         .iter()
         .filter(|m| matches!(m.mission_type, MissionType::Breakthrough))
@@ -385,15 +380,15 @@ fn test_pool_refresh_reflects_multiple_cleared_layers() {
     mark_layer_cleared(&mut deep.persistent, 2);
     assert_eq!(deep.persistent.frontier_layer(), 3);
 
-    deep.prestige.pool_refreshed_at = None;
-    deep.prestige.available_missions.clear();
+    deep.session.pool_refreshed_at = None;
+    deep.session.available_missions.clear();
 
     let mut rng = seeded_rng(31);
-    maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, t0(), &mut rng);
+    maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, t0(), &mut rng);
 
     // Breakthrough remains frontier-only and must target layer 3.
     let frontier_targets: Vec<u32> = deep
-        .prestige
+        .session
         .available_missions
         .iter()
         .filter(|m| matches!(m.mission_type, MissionType::Breakthrough))
@@ -416,14 +411,14 @@ fn test_safe_mission_targets_cleared_layer_after_refresh() {
     // Clear layer 1 -> safe missions should target a cleared layer.
     mark_layer_cleared(&mut deep.persistent, 1);
 
-    deep.prestige.available_missions.clear();
-    deep.prestige.pool_refreshed_at = None;
+    deep.session.available_missions.clear();
+    deep.session.pool_refreshed_at = None;
 
     let mut rng = seeded_rng(32);
-    maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, t0(), &mut rng);
+    maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, t0(), &mut rng);
 
     let safe_missions: Vec<_> = deep
-        .prestige
+        .session
         .available_missions
         .iter()
         .filter(|m| {
@@ -471,17 +466,17 @@ fn test_pool_refresh_after_offline_8_hours() {
 
     // Simulate pool refreshed 8 hours ago (game was closed for 8 hours).
     let eight_hours_ago = t0() - Duration::hours(8);
-    deep.prestige.pool_refreshed_at = Some(eight_hours_ago);
-    deep.prestige.available_missions = generate_mission_pool(
+    deep.session.pool_refreshed_at = Some(eight_hours_ago);
+    deep.session.available_missions = generate_mission_pool(
         &deep.persistent,
-        &deep.prestige.active_missions,
+        &deep.session.active_missions,
         &mut seeded_rng(40),
     );
 
     // On load, simulate the offline refresh check.
     let now = t0();
     let mut rng = seeded_rng(41);
-    let refreshed = maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, now, &mut rng);
+    let refreshed = maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, now, &mut rng);
 
     let interval_hours = POOL_REFRESH_INTERVAL_SECS / 3600;
     assert!(
@@ -490,7 +485,7 @@ fn test_pool_refresh_after_offline_8_hours() {
         interval_hours
     );
     assert_eq!(
-        deep.prestige.pool_refreshed_at,
+        deep.session.pool_refreshed_at,
         Some(now),
         "pool_refreshed_at must be updated to load time after offline refresh"
     );
@@ -503,16 +498,15 @@ fn test_pool_not_refreshed_after_offline_3_hours() {
 
     // Simulate pool refreshed 3 hours ago (within refresh window).
     let three_hours_ago = t0() - Duration::hours(3);
-    deep.prestige.pool_refreshed_at = Some(three_hours_ago);
-    deep.prestige.available_missions = generate_mission_pool(
+    deep.session.pool_refreshed_at = Some(three_hours_ago);
+    deep.session.available_missions = generate_mission_pool(
         &deep.persistent,
-        &deep.prestige.active_missions,
+        &deep.session.active_missions,
         &mut seeded_rng(42),
     );
 
     let mut rng = seeded_rng(43);
-    let refreshed =
-        maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, t0(), &mut rng);
+    let refreshed = maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, t0(), &mut rng);
 
     assert!(
         !refreshed,
@@ -526,16 +520,15 @@ fn test_pool_none_timestamp_triggers_immediate_refresh() {
     force_discover(&mut deep);
 
     // pool_refreshed_at = None (new prestige or old save) → must trigger refresh immediately.
-    deep.prestige.pool_refreshed_at = None;
-    deep.prestige.available_missions = generate_mission_pool(
+    deep.session.pool_refreshed_at = None;
+    deep.session.available_missions = generate_mission_pool(
         &deep.persistent,
-        &deep.prestige.active_missions,
+        &deep.session.active_missions,
         &mut seeded_rng(50),
     );
 
     let mut rng = seeded_rng(51);
-    let refreshed =
-        maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, t0(), &mut rng);
+    let refreshed = maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, t0(), &mut rng);
 
     assert!(
         refreshed,
@@ -554,10 +547,10 @@ fn test_prestige_preserves_pool_refreshed_at() {
 
     // Set a non-None timestamp before prestige.
     let ts = Some(t0());
-    deep.prestige.pool_refreshed_at = ts;
-    deep.prestige.available_missions = generate_mission_pool(
+    deep.session.pool_refreshed_at = ts;
+    deep.session.available_missions = generate_mission_pool(
         &deep.persistent,
-        &deep.prestige.active_missions,
+        &deep.session.active_missions,
         &mut seeded_rng(60),
     );
 
@@ -565,7 +558,7 @@ fn test_prestige_preserves_pool_refreshed_at() {
 
     // After prestige, pool_refreshed_at persists (no forced refresh).
     assert_eq!(
-        deep.prestige.pool_refreshed_at, ts,
+        deep.session.pool_refreshed_at, ts,
         "pool_refreshed_at must persist across prestiges"
     );
 }
@@ -575,18 +568,18 @@ fn test_prestige_preserves_available_missions_pool() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
-    deep.prestige.available_missions = generate_mission_pool(
+    deep.session.available_missions = generate_mission_pool(
         &deep.persistent,
-        &deep.prestige.active_missions,
+        &deep.session.active_missions,
         &mut seeded_rng(61),
     );
-    let count = deep.prestige.available_missions.len();
+    let count = deep.session.available_missions.len();
     assert!(count > 0, "Pool should be non-empty before prestige");
 
     deep.on_prestige();
 
     assert_eq!(
-        deep.prestige.available_missions.len(),
+        deep.session.available_missions.len(),
         count,
         "available_missions pool must persist across prestiges"
     );
@@ -599,12 +592,12 @@ fn test_pool_normal_refresh_still_works_after_prestige() {
 
     // Build up some progression.
     mark_layer_cleared(&mut deep.persistent, 1);
-    deep.prestige.available_missions = generate_mission_pool(
+    deep.session.available_missions = generate_mission_pool(
         &deep.persistent,
-        &deep.prestige.active_missions,
+        &deep.session.active_missions,
         &mut seeded_rng(62),
     );
-    deep.prestige.pool_refreshed_at = Some(t0());
+    deep.session.pool_refreshed_at = Some(t0());
 
     deep.on_prestige();
 
@@ -612,12 +605,12 @@ fn test_pool_normal_refresh_still_works_after_prestige() {
     let mut rng = seeded_rng(63);
     let later = t0() + Duration::hours(25); // well past any refresh interval
     let refreshed =
-        maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, later, &mut rng);
+        maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, later, &mut rng);
 
     // Whether it refreshes depends on time elapsed vs refresh interval.
     // The point is the system doesn't crash or behave oddly after prestige.
     if refreshed {
-        assert!(!deep.prestige.available_missions.is_empty());
+        assert!(!deep.session.available_missions.is_empty());
     }
     // Frontier layer should still reflect cleared layers.
     assert_eq!(deep.persistent.frontier_layer(), 2);
@@ -629,26 +622,26 @@ fn test_two_prestige_cycles_pool_persists() {
     force_discover(&mut deep);
 
     // Generate a pool.
-    deep.prestige.available_missions = generate_mission_pool(
+    deep.session.available_missions = generate_mission_pool(
         &deep.persistent,
-        &deep.prestige.active_missions,
+        &deep.session.active_missions,
         &mut seeded_rng(70),
     );
-    deep.prestige.pool_refreshed_at = Some(t0());
+    deep.session.pool_refreshed_at = Some(t0());
 
     // Simulate two prestige cycles — pool should persist through both.
     for cycle in 1u32..=2 {
-        let count_before = deep.prestige.available_missions.len();
+        let count_before = deep.session.available_missions.len();
         deep.on_prestige();
 
         assert_eq!(
-            deep.prestige.available_missions.len(),
+            deep.session.available_missions.len(),
             count_before,
             "Cycle {}: pool must persist across prestiges",
             cycle
         );
         assert!(
-            deep.prestige.pool_refreshed_at.is_some(),
+            deep.session.pool_refreshed_at.is_some(),
             "Cycle {}: pool_refreshed_at must persist across prestiges",
             cycle
         );
@@ -680,7 +673,7 @@ fn test_pool_refreshed_at_defaults_to_none_for_old_saves() {
         "total_mercs_lost": 0
     }"#;
 
-    let prestige: DeepPrestige = serde_json::from_str(json).unwrap();
+    let prestige: DeepSession = serde_json::from_str(json).unwrap();
 
     assert_eq!(
         prestige.pool_refreshed_at, None,
@@ -695,19 +688,19 @@ fn test_pool_none_on_old_save_triggers_refresh() {
     deep.persistent.discovered = true;
 
     // None from old save deserialization default.
-    assert_eq!(deep.prestige.pool_refreshed_at, None);
+    assert_eq!(deep.session.pool_refreshed_at, None);
 
     // Old save has some missions in the pool.
-    deep.prestige.available_missions = generate_mission_pool(
+    deep.session.available_missions = generate_mission_pool(
         &deep.persistent,
-        &deep.prestige.active_missions,
+        &deep.session.active_missions,
         &mut seeded_rng(80),
     );
 
     // On load, apply refresh — None should trigger a refresh.
     let mut rng = seeded_rng(81);
     let refreshed =
-        maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, Utc::now(), &mut rng);
+        maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, Utc::now(), &mut rng);
 
     assert!(
         refreshed,
@@ -725,13 +718,13 @@ fn test_pool_refreshed_at_roundtrip() {
     force_discover(&mut deep);
 
     let expected_ts = Utc.with_ymd_and_hms(2024, 6, 15, 14, 30, 0).unwrap();
-    deep.prestige.pool_refreshed_at = Some(expected_ts);
+    deep.session.pool_refreshed_at = Some(expected_ts);
 
     let json = serde_json::to_string_pretty(&deep).unwrap();
     let loaded: DeepState = serde_json::from_str(&json).unwrap();
 
     let loaded_ts = loaded
-        .prestige
+        .session
         .pool_refreshed_at
         .expect("pool_refreshed_at must survive roundtrip as Some");
 
@@ -747,13 +740,13 @@ fn test_pool_refreshed_at_roundtrip() {
 #[test]
 fn test_pool_refreshed_at_none_roundtrip() {
     let mut deep = DeepState::new();
-    deep.prestige.pool_refreshed_at = None;
+    deep.session.pool_refreshed_at = None;
 
     let json = serde_json::to_string_pretty(&deep).unwrap();
     let loaded: DeepState = serde_json::from_str(&json).unwrap();
 
     assert_eq!(
-        loaded.prestige.pool_refreshed_at, None,
+        loaded.session.pool_refreshed_at, None,
         "None pool_refreshed_at must survive serde roundtrip"
     );
 }
@@ -764,10 +757,10 @@ fn test_pool_refreshed_at_preserved_across_full_state_roundtrip() {
     force_discover(&mut deep);
 
     let ts = t0() + Duration::hours(3);
-    deep.prestige.pool_refreshed_at = Some(ts);
-    deep.prestige.available_missions = generate_mission_pool(
+    deep.session.pool_refreshed_at = Some(ts);
+    deep.session.available_missions = generate_mission_pool(
         &deep.persistent,
-        &deep.prestige.active_missions,
+        &deep.session.active_missions,
         &mut seeded_rng(90),
     );
 
@@ -775,7 +768,7 @@ fn test_pool_refreshed_at_preserved_across_full_state_roundtrip() {
     let loaded: DeepState = serde_json::from_str(&json).unwrap();
 
     let loaded_ts = loaded
-        .prestige
+        .session
         .pool_refreshed_at
         .expect("pool_refreshed_at must be Some after roundtrip");
     let diff = (loaded_ts - ts).num_seconds().abs();
@@ -784,8 +777,8 @@ fn test_pool_refreshed_at_preserved_across_full_state_roundtrip() {
         "pool_refreshed_at must be preserved in full DeepState roundtrip"
     );
     assert_eq!(
-        loaded.prestige.available_missions.len(),
-        deep.prestige.available_missions.len(),
+        loaded.session.available_missions.len(),
+        deep.session.available_missions.len(),
         "available_missions must be preserved across serde roundtrip"
     );
 }
@@ -800,24 +793,24 @@ fn test_higher_rank_pool_has_more_missions() {
     force_discover(&mut deep);
 
     // Rank 1: 3 missions.
-    deep.prestige.available_missions.clear();
-    deep.prestige.pool_refreshed_at = None;
+    deep.session.available_missions.clear();
+    deep.session.pool_refreshed_at = None;
     let mut rng1 = seeded_rng(100);
-    maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, t0(), &mut rng1);
-    let rank1_count = deep.prestige.available_missions.len();
+    maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, t0(), &mut rng1);
+    let rank1_count = deep.session.available_missions.len();
 
     // Rank 5: 7 missions.
     deep.persistent.guild_rank = GuildRank(5);
-    deep.prestige.available_missions.clear();
-    deep.prestige.pool_refreshed_at = None;
+    deep.session.available_missions.clear();
+    deep.session.pool_refreshed_at = None;
     let mut rng5 = seeded_rng(101);
     maybe_refresh_mission_pool(
-        &mut deep.prestige,
+        &mut deep.session,
         &deep.persistent,
         t0() + Duration::hours(7),
         &mut rng5,
     );
-    let rank5_count = deep.prestige.available_missions.len();
+    let rank5_count = deep.session.available_missions.len();
 
     assert!(
         rank5_count >= rank1_count,
@@ -834,18 +827,18 @@ fn test_pool_always_contains_supply_run_after_refresh() {
 
     // Run 5 consecutive refresh cycles.
     for i in 0..5u64 {
-        deep.prestige.available_missions.clear();
-        deep.prestige.pool_refreshed_at = None;
+        deep.session.available_missions.clear();
+        deep.session.pool_refreshed_at = None;
         let mut rng = seeded_rng(110 + i);
         maybe_refresh_mission_pool(
-            &mut deep.prestige,
+            &mut deep.session,
             &deep.persistent,
             t0() + Duration::hours(i as i64 * 7),
             &mut rng,
         );
 
         assert!(
-            deep.prestige
+            deep.session
                 .available_missions
                 .iter()
                 .any(|m| m.mission_type == MissionType::SupplyRun),
@@ -860,12 +853,12 @@ fn test_refreshed_pool_missions_have_positive_duration() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
-    deep.prestige.available_missions.clear();
-    deep.prestige.pool_refreshed_at = None;
+    deep.session.available_missions.clear();
+    deep.session.pool_refreshed_at = None;
     let mut rng = seeded_rng(120);
-    maybe_refresh_mission_pool(&mut deep.prestige, &deep.persistent, t0(), &mut rng);
+    maybe_refresh_mission_pool(&mut deep.session, &deep.persistent, t0(), &mut rng);
 
-    for mission in &deep.prestige.available_missions {
+    for mission in &deep.session.available_missions {
         assert!(
             mission.duration_secs > 0,
             "Every mission in the refreshed pool must have positive duration"
@@ -877,28 +870,28 @@ fn test_refreshed_pool_missions_have_positive_duration() {
 fn test_pool_refresh_deterministic_with_same_seed() {
     let mut deep1 = DeepState::new();
     force_discover(&mut deep1);
-    deep1.prestige.available_missions.clear();
-    deep1.prestige.pool_refreshed_at = None;
+    deep1.session.available_missions.clear();
+    deep1.session.pool_refreshed_at = None;
 
     let mut deep2 = DeepState::new();
     force_discover(&mut deep2);
-    deep2.prestige.available_missions.clear();
-    deep2.prestige.pool_refreshed_at = None;
+    deep2.session.available_missions.clear();
+    deep2.session.pool_refreshed_at = None;
 
     let mut rng1 = seeded_rng(130);
     let mut rng2 = seeded_rng(130);
 
-    maybe_refresh_mission_pool(&mut deep1.prestige, &deep1.persistent, t0(), &mut rng1);
-    maybe_refresh_mission_pool(&mut deep2.prestige, &deep2.persistent, t0(), &mut rng2);
+    maybe_refresh_mission_pool(&mut deep1.session, &deep1.persistent, t0(), &mut rng1);
+    maybe_refresh_mission_pool(&mut deep2.session, &deep2.persistent, t0(), &mut rng2);
 
     let types1: Vec<_> = deep1
-        .prestige
+        .session
         .available_missions
         .iter()
         .map(|m| m.mission_type)
         .collect();
     let types2: Vec<_> = deep2
-        .prestige
+        .session
         .available_missions
         .iter()
         .map(|m| m.mission_type)

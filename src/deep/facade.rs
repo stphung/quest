@@ -31,12 +31,8 @@ pub fn tick_deep_facade<R: Rng>(
     }
 
     let now = chrono::Utc::now();
-    let summary = crate::deep::missions::tick_all_missions(
-        &mut deep.prestige,
-        &mut deep.persistent,
-        now,
-        rng,
-    );
+    let summary =
+        crate::deep::missions::tick_all_missions(&mut deep.session, &mut deep.persistent, now, rng);
 
     if summary.missions_completed > 0 || summary.events_fired > 0 {
         result.deep_changed = true;

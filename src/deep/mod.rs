@@ -6,14 +6,17 @@
 //!
 //! # Persistence Model
 //!
-//! Two-tier persistence, mirroring the pattern used by Haven and Soulforge:
+//! Two-tier state model; both tiers are saved together in `~/.quest/deep.json`
+//! and both survive prestige:
 //!
 //! | State | Where | Survives prestige? |
 //! |---|---|---|
 //! | [`DeepPersistent`] | `~/.quest/deep.json` | Yes |
-//! | [`DeepPrestige`] | character save | No |
+//! | [`DeepSession`] | `~/.quest/deep.json` | Yes |
 //!
-//! Both tiers are combined in [`DeepState`] for convenience.
+//! Both tiers are combined in [`DeepState`] for convenience. There is no
+//! Deep-specific prestige/reset mechanic — `DeepState::on_prestige()` only
+//! advances the generation counter and records stats.
 //!
 //! # Module Layout
 //!
@@ -47,7 +50,7 @@ pub use types::{
     AvailableMission,
     CheckInEvent,
     DeepPersistent,
-    DeepPrestige,
+    DeepSession,
     DeepState,
     DeepUiState,
     // Enums

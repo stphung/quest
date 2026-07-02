@@ -50,7 +50,7 @@ fn make_elapsed_supply_run(deep: &mut DeepState) -> Mission {
     let now = Utc::now();
     let id = deep.persistent.next_mission_id();
     let merc_id = deep
-        .prestige
+        .session
         .roster
         .values()
         .next()
@@ -76,7 +76,7 @@ fn make_active_supply_run(deep: &mut DeepState) -> Mission {
     let now = Utc::now();
     let id = deep.persistent.next_mission_id();
     let merc_id = deep
-        .prestige
+        .session
         .roster
         .values()
         .next()
@@ -107,7 +107,7 @@ fn test_save_load_roundtrip_in_memory() {
     deep.persistent.deepest_layer_reached = 7;
     deep.persistent.merc_id_counter = 12;
     deep.persistent.mission_id_counter = 8;
-    deep.prestige.warband_marks = 1_240;
+    deep.session.warband_marks = 1_240;
 
     // Add a layer record so we test Vec serialization too.
     {
@@ -125,7 +125,7 @@ fn test_save_load_roundtrip_in_memory() {
     assert_eq!(loaded.persistent.deepest_layer_reached, 7);
     assert_eq!(loaded.persistent.merc_id_counter, 12);
     assert_eq!(loaded.persistent.mission_id_counter, 8);
-    assert_eq!(loaded.prestige.warband_marks, 1_240);
+    assert_eq!(loaded.session.warband_marks, 1_240);
 
     let rec = loaded.persistent.layer_record(3).expect("layer 3 present");
     assert!(rec.cleared);
@@ -147,7 +147,7 @@ fn test_missing_save_file_returns_default_state() {
     assert!(!result.persistent.discovered);
     assert_eq!(result.persistent.guild_rank, GuildRank(1));
     assert!(result.persistent.layers.is_empty());
-    assert_eq!(result.prestige.warband_marks, 0);
+    assert_eq!(result.session.warband_marks, 0);
 }
 
 // ── 3. Corrupted save — graceful fallback ─────────────────────────────────────
@@ -159,7 +159,7 @@ fn test_corrupted_save_falls_back_to_default() {
 
     assert!(!result.persistent.discovered);
     assert_eq!(result.persistent.guild_rank, GuildRank::MIN);
-    assert!(result.prestige.roster.is_empty());
+    assert!(result.session.roster.is_empty());
 }
 
 #[test]
@@ -185,10 +185,10 @@ fn test_complete_discovery_requires_not_discovered() {
     assert!(deep.persistent.discovered);
 
     // Second call is a no-op (already discovered).
-    let roster_before = deep.prestige.roster.len();
+    let roster_before = deep.session.roster.len();
     complete_discovery(&mut deep, &mut rng);
     assert_eq!(
-        deep.prestige.roster.len(),
+        deep.session.roster.len(),
         roster_before,
         "complete_discovery must be idempotent"
     );
@@ -201,9 +201,9 @@ fn test_deep_discovery_on_endless_kill() {
     assert!(!deep.persistent.discovered);
     quest::deep::complete_discovery(&mut deep, &mut rng);
     assert!(deep.persistent.discovered);
-    assert_eq!(deep.prestige.roster.len(), 3);
-    assert_eq!(deep.prestige.warband_marks, 50);
-    assert!(deep.prestige.active_missions.is_empty());
+    assert_eq!(deep.session.roster.len(), 3);
+    assert_eq!(deep.session.warband_marks, 50);
+    assert!(deep.session.active_missions.is_empty());
 }
 
 #[test]
@@ -211,9 +211,9 @@ fn test_deep_discovery_is_idempotent() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut deep = DeepState::new();
     quest::deep::complete_discovery(&mut deep, &mut rng);
-    let roster_count = deep.prestige.roster.len();
+    let roster_count = deep.session.roster.len();
     quest::deep::complete_discovery(&mut deep, &mut rng);
-    assert_eq!(deep.prestige.roster.len(), roster_count);
+    assert_eq!(deep.session.roster.len(), roster_count);
 }
 
 // ── 6. Discovery creates correct initial state ────────────────────────────────
@@ -228,11 +228,11 @@ fn test_discovery_creates_initial_state() {
 
     // Exactly 3 starter mercs, all at base level and available.
     assert_eq!(
-        deep.prestige.roster.len(),
+        deep.session.roster.len(),
         3,
         "Starter roster must have exactly 3 mercs"
     );
-    for merc in deep.prestige.roster.values() {
+    for merc in deep.session.roster.values() {
         assert_eq!(merc.level, 1, "Starter mercs must be level 1");
         assert_eq!(merc.missions_completed, 0);
         assert!(
@@ -242,7 +242,7 @@ fn test_discovery_creates_initial_state() {
     }
 
     // Warband Marks start at 50 (seed money for first missions).
-    assert_eq!(deep.prestige.warband_marks, 50);
+    assert_eq!(deep.session.warband_marks, 50);
 }
 
 #[test]
@@ -251,7 +251,7 @@ fn test_discovery_starter_roster_archetypes() {
     force_discover(&mut deep);
 
     let archetypes: Vec<MercArchetype> =
-        deep.prestige.roster.values().map(|m| m.archetype).collect();
+        deep.session.roster.values().map(|m| m.archetype).collect();
 
     assert!(
         archetypes.contains(&MercArchetype::Vanguard),
@@ -272,12 +272,12 @@ fn test_discovery_merc_ids_are_unique_and_sequential() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
-    let mut ids: Vec<u64> = deep.prestige.roster.values().map(|m| m.id).collect();
+    let mut ids: Vec<u64> = deep.session.roster.values().map(|m| m.id).collect();
     ids.sort();
     // IDs should be 1, 2, 3 (counter starts at 0 and increments before assignment).
     assert_eq!(ids, vec![1, 2, 3]);
     let expected_counter =
-        deep.prestige.roster.len() as u64 + deep.prestige.recruit_pool.candidates.len() as u64;
+        deep.session.roster.len() as u64 + deep.session.recruit_pool.candidates.len() as u64;
     assert_eq!(deep.persistent.merc_id_counter, expected_counter);
 }
 
@@ -290,7 +290,7 @@ fn test_prestige_preserves_guild_rank() {
 
     // Advance guild rank to 2.
     deep.persistent.guild_rank = GuildRank(2);
-    deep.prestige.warband_marks = 5_000;
+    deep.session.warband_marks = 5_000;
 
     deep.on_prestige();
 
@@ -391,12 +391,12 @@ fn test_prestige_preserves_roster() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
-    assert_eq!(deep.prestige.roster.len(), 3, "Should start with 3 mercs");
+    assert_eq!(deep.session.roster.len(), 3, "Should start with 3 mercs");
 
     deep.on_prestige();
 
     assert_eq!(
-        deep.prestige.roster.len(),
+        deep.session.roster.len(),
         3,
         "Roster must persist across prestiges"
     );
@@ -410,15 +410,15 @@ fn test_prestige_preserves_available_missions() {
     // Populate available_missions pool.
     let mut rng = seeded_rng();
     mark_layer_cleared(&mut deep.persistent, 1);
-    deep.prestige.available_missions =
-        generate_mission_pool(&deep.persistent, &deep.prestige.active_missions, &mut rng);
-    let count = deep.prestige.available_missions.len();
+    deep.session.available_missions =
+        generate_mission_pool(&deep.persistent, &deep.session.active_missions, &mut rng);
+    let count = deep.session.available_missions.len();
     assert!(count > 0);
 
     deep.on_prestige();
 
     assert_eq!(
-        deep.prestige.available_missions.len(),
+        deep.session.available_missions.len(),
         count,
         "Available mission pool must persist across prestiges"
     );
@@ -431,12 +431,12 @@ fn test_prestige_preserves_warband_marks() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
-    deep.prestige.warband_marks = 99_999;
+    deep.session.warband_marks = 99_999;
 
     deep.on_prestige();
 
     assert_eq!(
-        deep.prestige.warband_marks, 99_999,
+        deep.session.warband_marks, 99_999,
         "Warband Marks must persist across prestiges"
     );
 }
@@ -451,19 +451,19 @@ fn test_prestige_preserves_active_missions() {
     // Inject an active mission directly.
     let mission = make_active_supply_run(&mut deep);
     let mission_id = mission.id;
-    deep.prestige.active_missions.push(mission);
+    deep.session.active_missions.push(mission);
 
     // Mark the merc as on this mission.
-    if let Some(merc) = deep.prestige.roster.values_mut().next() {
+    if let Some(merc) = deep.session.roster.values_mut().next() {
         merc.status = MercStatus::OnMission(mission_id);
     }
 
-    assert_eq!(deep.prestige.active_missions.len(), 1);
+    assert_eq!(deep.session.active_missions.len(), 1);
 
     deep.on_prestige();
 
     assert_eq!(
-        deep.prestige.active_missions.len(),
+        deep.session.active_missions.len(),
         1,
         "Active missions must persist across prestiges"
     );
@@ -477,28 +477,28 @@ fn test_offline_mission_resolution_completes_elapsed_mission() {
     force_discover(&mut deep);
 
     // Ensure the roster merc is available.
-    let _merc_id = deep.prestige.roster.values().next().unwrap().id;
+    let _merc_id = deep.session.roster.values().next().unwrap().id;
 
     // Create a mission whose timer has elapsed.
     let mission = make_elapsed_supply_run(&mut deep);
-    deep.prestige.active_missions.push(mission);
+    deep.session.active_missions.push(mission);
 
     // Mark merc as on the mission.
-    if let Some(merc) = deep.prestige.roster.values_mut().next() {
+    if let Some(merc) = deep.session.roster.values_mut().next() {
         merc.status = MercStatus::OnMission(1);
     }
 
     let mut rng = seeded_rng();
-    let summary = resolve_offline_missions(&mut deep.prestige, &mut deep.persistent, &mut rng);
+    let summary = resolve_offline_missions(&mut deep.session, &mut deep.persistent, &mut rng);
 
     assert_eq!(
         summary.missions_resolved, 1,
         "One elapsed mission should be resolved offline"
     );
     // The resolved mission should have moved to pending_results.
-    assert_eq!(deep.prestige.pending_results.len(), 1);
+    assert_eq!(deep.session.pending_results.len(), 1);
     // Active missions should be empty now.
-    assert!(deep.prestige.active_missions.is_empty());
+    assert!(deep.session.active_missions.is_empty());
 }
 
 #[test]
@@ -508,21 +508,21 @@ fn test_offline_resolution_does_not_complete_active_missions() {
 
     // Mission that hasn't ended yet.
     let mission = make_active_supply_run(&mut deep);
-    deep.prestige.active_missions.push(mission);
+    deep.session.active_missions.push(mission);
 
     let mut rng = seeded_rng();
-    let summary = resolve_offline_missions(&mut deep.prestige, &mut deep.persistent, &mut rng);
+    let summary = resolve_offline_missions(&mut deep.session, &mut deep.persistent, &mut rng);
 
     assert_eq!(
         summary.missions_resolved, 0,
         "Still-active mission must not be resolved offline"
     );
     assert_eq!(
-        deep.prestige.active_missions.len(),
+        deep.session.active_missions.len(),
         1,
         "Active mission should still be active"
     );
-    assert!(deep.prestige.pending_results.is_empty());
+    assert!(deep.session.pending_results.is_empty());
 }
 
 // ── 15. Offline event auto-resolve ───────────────────────────────────────────
@@ -534,10 +534,10 @@ fn test_offline_resolve_does_not_panic_without_events() {
     force_discover(&mut deep);
 
     let mission = make_elapsed_supply_run(&mut deep);
-    deep.prestige.active_missions.push(mission);
+    deep.session.active_missions.push(mission);
 
     let mut rng = seeded_rng();
-    let summary = resolve_offline_missions(&mut deep.prestige, &mut deep.persistent, &mut rng);
+    let summary = resolve_offline_missions(&mut deep.session, &mut deep.persistent, &mut rng);
 
     // events_auto_resolved should be 0 for a supply run (no events).
     assert_eq!(
@@ -566,9 +566,9 @@ fn test_three_prestige_cycles_preserves_persistent_state() {
 
     // Run 3 prestige cycles, adding marks/missions each time.
     for cycle in 1..=3 {
-        deep.prestige.warband_marks = cycle * 1_000;
+        deep.session.warband_marks = cycle * 1_000;
         let mission = make_active_supply_run(&mut deep);
-        deep.prestige.active_missions.push(mission);
+        deep.session.active_missions.push(mission);
 
         deep.on_prestige();
 
@@ -612,7 +612,7 @@ fn test_three_prestige_cycles_preserves_persistent_state() {
         // Operational state persists across prestiges — marks accumulate.
         // Each cycle sets marks to cycle * 1000 and adds a mission.
         assert_eq!(
-            deep.prestige.warband_marks,
+            deep.session.warband_marks,
             cycle * 1_000,
             "Cycle {}: marks must persist",
             cycle
@@ -622,7 +622,7 @@ fn test_three_prestige_cycles_preserves_persistent_state() {
     // After 3 cycles, merc_id_counter must remain monotonic and retain the
     // allocations made during discovery (starters + initial recruit pool).
     let expected_counter =
-        deep.prestige.roster.len() as u64 + deep.prestige.recruit_pool.candidates.len() as u64;
+        deep.session.roster.len() as u64 + deep.session.recruit_pool.candidates.len() as u64;
     assert_eq!(deep.persistent.merc_id_counter, expected_counter);
 }
 
@@ -699,9 +699,9 @@ fn test_deep_state_new_has_correct_defaults() {
     assert!(ds.persistent.layers.is_empty());
     assert_eq!(ds.persistent.merc_id_counter, 0);
     assert_eq!(ds.persistent.mission_id_counter, 0);
-    assert_eq!(ds.prestige.warband_marks, 0);
-    assert!(ds.prestige.roster.is_empty());
-    assert!(ds.prestige.active_missions.is_empty());
+    assert_eq!(ds.session.warband_marks, 0);
+    assert!(ds.session.roster.is_empty());
+    assert!(ds.session.active_missions.is_empty());
     assert!(!ds.is_active());
 }
 
@@ -724,7 +724,7 @@ fn test_discovery_blocked_when_already_discovered() {
     deep.persistent.discovered = true;
     complete_discovery(&mut deep, &mut rng);
     // Should not add more mercs
-    assert!(deep.prestige.roster.is_empty());
+    assert!(deep.session.roster.is_empty());
 }
 
 #[test]
@@ -732,7 +732,7 @@ fn test_discovery_assigns_starter_marks() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut deep = DeepState::new();
     complete_discovery(&mut deep, &mut rng);
-    assert_eq!(deep.prestige.warband_marks, 50); // Guild rank 1 = 50 marks
+    assert_eq!(deep.session.warband_marks, 50); // Guild rank 1 = 50 marks
 }
 
 // =========================================================================
@@ -790,7 +790,7 @@ fn test_first_orders_not_auto_queued_on_discovery() {
         "First Orders flag should remain unset on discovery"
     );
     assert!(
-        deep.prestige.active_missions.is_empty(),
+        deep.session.active_missions.is_empty(),
         "No First Orders mission should be auto-queued"
     );
 }
@@ -808,7 +808,7 @@ fn test_first_orders_not_added_when_flag_pre_set() {
     assert!(deep.persistent.discovered);
     assert!(deep.persistent.first_orders_queued);
     assert!(
-        deep.prestige.active_missions.is_empty(),
+        deep.session.active_missions.is_empty(),
         "First Orders should not be auto-queued"
     );
 }
@@ -819,7 +819,7 @@ fn test_first_orders_mission_not_created_on_discovery() {
     force_discover(&mut deep);
 
     assert!(
-        deep.prestige
+        deep.session
             .active_missions
             .iter()
             .all(|m| !m.is_first_orders),
@@ -836,7 +836,7 @@ fn test_first_orders_persists_across_serde() {
     let loaded: DeepState = serde_json::from_str(&json).expect("deserialize");
 
     assert!(!loaded.persistent.first_orders_queued);
-    assert!(loaded.prestige.active_missions.is_empty());
+    assert!(loaded.session.active_missions.is_empty());
 }
 
 // =========================================================================
@@ -849,9 +849,9 @@ fn test_generation_record_created_on_prestige() {
     force_discover(&mut deep);
 
     // Simulate some activity before prestige
-    deep.prestige.total_marks_earned = 500;
-    deep.prestige.total_missions_completed = 10;
-    deep.prestige.total_mercs_lost = 2;
+    deep.session.total_marks_earned = 500;
+    deep.session.total_missions_completed = 10;
+    deep.session.total_mercs_lost = 2;
     deep.persistent.deepest_layer_reached = 5;
 
     deep.on_prestige();
@@ -871,15 +871,15 @@ fn test_generation_records_accumulate_across_prestiges() {
     force_discover(&mut deep);
 
     // First prestige
-    deep.prestige.total_marks_earned = 100;
-    deep.prestige.total_missions_completed = 5;
-    deep.prestige.total_mercs_lost = 1;
+    deep.session.total_marks_earned = 100;
+    deep.session.total_missions_completed = 5;
+    deep.session.total_mercs_lost = 1;
     deep.on_prestige();
 
     // Second prestige
-    deep.prestige.total_marks_earned = 200;
-    deep.prestige.total_missions_completed = 8;
-    deep.prestige.total_mercs_lost = 0;
+    deep.session.total_marks_earned = 200;
+    deep.session.total_missions_completed = 8;
+    deep.session.total_mercs_lost = 0;
     deep.on_prestige();
 
     assert_eq!(deep.persistent.generation_records.len(), 2);
@@ -895,9 +895,9 @@ fn test_generation_records_capped_at_10() {
     force_discover(&mut deep);
 
     for i in 0..15u32 {
-        deep.prestige.total_marks_earned = (i + 1) * 100;
-        deep.prestige.total_missions_completed = i + 1;
-        deep.prestige.total_mercs_lost = 0;
+        deep.session.total_marks_earned = (i + 1) * 100;
+        deep.session.total_missions_completed = i + 1;
+        deep.session.total_mercs_lost = 0;
         deep.on_prestige();
     }
 
@@ -921,12 +921,12 @@ fn test_generation_record_preserves_deepest_layer_at_snapshot_time() {
     force_discover(&mut deep);
 
     deep.persistent.deepest_layer_reached = 5;
-    deep.prestige.total_marks_earned = 100;
+    deep.session.total_marks_earned = 100;
     deep.on_prestige();
 
     // Advance deeper in next generation
     deep.persistent.deepest_layer_reached = 8;
-    deep.prestige.total_marks_earned = 200;
+    deep.session.total_marks_earned = 200;
     deep.on_prestige();
 
     // First record should have the depth at the time of that prestige
@@ -945,23 +945,23 @@ fn test_prestige_tracking_fields_persist_after_prestige() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
-    deep.prestige.total_marks_earned = 500;
-    deep.prestige.total_missions_completed = 10;
-    deep.prestige.total_mercs_lost = 2;
+    deep.session.total_marks_earned = 500;
+    deep.session.total_missions_completed = 10;
+    deep.session.total_mercs_lost = 2;
 
     deep.on_prestige();
 
     // After prestige, tracking fields persist (recorded in generation record)
     assert_eq!(
-        deep.prestige.total_marks_earned, 500,
+        deep.session.total_marks_earned, 500,
         "total_marks_earned must persist across prestiges"
     );
     assert_eq!(
-        deep.prestige.total_missions_completed, 10,
+        deep.session.total_missions_completed, 10,
         "total_missions_completed must persist across prestiges"
     );
     assert_eq!(
-        deep.prestige.total_mercs_lost, 2,
+        deep.session.total_mercs_lost, 2,
         "total_mercs_lost must persist across prestiges"
     );
 }
@@ -1001,9 +1001,9 @@ fn test_serde_generation_records_roundtrip() {
     let mut deep = DeepState::new();
     force_discover(&mut deep);
 
-    deep.prestige.total_marks_earned = 300;
-    deep.prestige.total_missions_completed = 7;
-    deep.prestige.total_mercs_lost = 1;
+    deep.session.total_marks_earned = 300;
+    deep.session.total_missions_completed = 7;
+    deep.session.total_mercs_lost = 1;
     deep.persistent.deepest_layer_reached = 4;
     deep.on_prestige();
 
@@ -1021,9 +1021,9 @@ fn test_serde_generation_records_roundtrip() {
 
 #[test]
 fn test_serde_backward_compat_prestige_without_tracking_fields() {
-    // DeepPrestige JSON from before tracking fields were added
+    // DeepSession JSON from before tracking fields were added
     let json = r#"{"warband_marks":100,"roster":[],"active_missions":[],"available_missions":[],"recruit_pool":{"candidates":[],"refreshed_at":"2026-01-01T00:00:00Z","recruit_costs":[]},"pending_results":[],"generation_number":0,"warband_log":[]}"#;
-    let prestige: quest::deep::DeepPrestige = serde_json::from_str(json).unwrap();
+    let prestige: quest::deep::DeepSession = serde_json::from_str(json).unwrap();
     assert_eq!(
         prestige.total_marks_earned, 0,
         "total_marks_earned must default to 0 for old saves"

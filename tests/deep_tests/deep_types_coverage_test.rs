@@ -10,7 +10,7 @@
 //!  - `Infrastructure::display_name()`, `description()`, `duration_reduction()`
 //!  - `LayerTier::display_name()` — all six tiers
 //!  - `DeepPersistent` id counters and frontier edge cases
-//!  - `DeepPrestige` find/count/event helpers with mixed-status rosters
+//!  - `DeepSession` find/count/event helpers with mixed-status rosters
 //!  - `Mercenary` effective stat scaling and `missions_to_next_level` curve
 //!  - `GuildRank` out-of-range, advancement helpers
 //!  - `Mission::progress()`, `is_time_elapsed()`, `unresolved_event_count()`
@@ -699,12 +699,12 @@ fn test_deep_persistent_frontier_layer_deepest_zero_fallback() {
 }
 
 // =============================================================================
-// DeepPrestige — roster/mission helpers
+// DeepSession — roster/mission helpers
 // =============================================================================
 
 #[test]
-fn test_deep_prestige_find_merc_success_and_failure() {
-    let mut dp = DeepPrestige::new();
+fn test_deep_session_find_merc_success_and_failure() {
+    let mut dp = DeepSession::new();
     {
         let m = make_merc(10, MercArchetype::Vanguard, MercStatus::Available);
         dp.roster.insert(m.id, m);
@@ -722,8 +722,8 @@ fn test_deep_prestige_find_merc_success_and_failure() {
 }
 
 #[test]
-fn test_deep_prestige_find_merc_mut_success_and_failure() {
-    let mut dp = DeepPrestige::new();
+fn test_deep_session_find_merc_mut_success_and_failure() {
+    let mut dp = DeepSession::new();
     {
         let m = make_merc(5, MercArchetype::Medic, MercStatus::Available);
         dp.roster.insert(m.id, m);
@@ -739,8 +739,8 @@ fn test_deep_prestige_find_merc_mut_success_and_failure() {
 }
 
 #[test]
-fn test_deep_prestige_available_merc_count_mixed_statuses() {
-    let mut dp = DeepPrestige::new();
+fn test_deep_session_available_merc_count_mixed_statuses() {
+    let mut dp = DeepSession::new();
     for (id, arch, status) in [
         (1, MercArchetype::Vanguard, MercStatus::Available),
         (2, MercArchetype::Scout, MercStatus::OnMission(1)),
@@ -762,14 +762,14 @@ fn test_deep_prestige_available_merc_count_mixed_statuses() {
 }
 
 #[test]
-fn test_deep_prestige_available_merc_count_empty_roster() {
-    let dp = DeepPrestige::new();
+fn test_deep_session_available_merc_count_empty_roster() {
+    let dp = DeepSession::new();
     assert_eq!(dp.available_merc_count(), 0);
 }
 
 #[test]
-fn test_deep_prestige_available_merc_count_all_available() {
-    let mut dp = DeepPrestige::new();
+fn test_deep_session_available_merc_count_all_available() {
+    let mut dp = DeepSession::new();
     for i in 0..3 {
         let m = make_merc(i, MercArchetype::Vanguard, MercStatus::Available);
         dp.roster.insert(m.id, m);
@@ -779,7 +779,7 @@ fn test_deep_prestige_available_merc_count_all_available() {
 
 #[test]
 fn test_deep_prestige_active_mission_count() {
-    let mut dp = DeepPrestige::new();
+    let mut dp = DeepSession::new();
 
     let mut m1 = make_active_mission(1, MissionType::SupplyRun, 1, vec![1]);
     m1.status = MissionStatus::Active;
@@ -800,13 +800,13 @@ fn test_deep_prestige_active_mission_count() {
 
 #[test]
 fn test_deep_prestige_active_mission_count_empty() {
-    let dp = DeepPrestige::new();
+    let dp = DeepSession::new();
     assert_eq!(dp.active_mission_count(), 0);
 }
 
 #[test]
 fn test_deep_prestige_has_any_pending_event_false_when_none() {
-    let mut dp = DeepPrestige::new();
+    let mut dp = DeepSession::new();
     let mut m = make_active_mission(1, MissionType::Recon, 1, vec![1]);
     m.status = MissionStatus::Active;
     dp.active_missions.push(m);
@@ -815,7 +815,7 @@ fn test_deep_prestige_has_any_pending_event_false_when_none() {
 
 #[test]
 fn test_deep_prestige_has_any_pending_event_true_when_some() {
-    let mut dp = DeepPrestige::new();
+    let mut dp = DeepSession::new();
     let mut m = make_active_mission(1, MissionType::Recon, 1, vec![1]);
     m.status = MissionStatus::EventPending;
     dp.active_missions.push(m);
@@ -823,32 +823,32 @@ fn test_deep_prestige_has_any_pending_event_true_when_some() {
 }
 
 #[test]
-fn test_deep_prestige_spend_marks_success() {
-    let mut dp = DeepPrestige::new();
+fn test_deep_session_spend_marks_success() {
+    let mut dp = DeepSession::new();
     dp.warband_marks = 100;
     assert!(dp.spend_marks(60));
     assert_eq!(dp.warband_marks, 40);
 }
 
 #[test]
-fn test_deep_prestige_spend_marks_exact_balance() {
-    let mut dp = DeepPrestige::new();
+fn test_deep_session_spend_marks_exact_balance() {
+    let mut dp = DeepSession::new();
     dp.warband_marks = 50;
     assert!(dp.spend_marks(50));
     assert_eq!(dp.warband_marks, 0);
 }
 
 #[test]
-fn test_deep_prestige_spend_marks_insufficient_leaves_balance_unchanged() {
-    let mut dp = DeepPrestige::new();
+fn test_deep_session_spend_marks_insufficient_leaves_balance_unchanged() {
+    let mut dp = DeepSession::new();
     dp.warband_marks = 30;
     assert!(!dp.spend_marks(31));
     assert_eq!(dp.warband_marks, 30);
 }
 
 #[test]
-fn test_deep_prestige_spend_marks_zero_always_succeeds() {
-    let mut dp = DeepPrestige::new();
+fn test_deep_session_spend_marks_zero_always_succeeds() {
+    let mut dp = DeepSession::new();
     dp.warband_marks = 0;
     assert!(dp.spend_marks(0));
     assert_eq!(dp.warband_marks, 0);
@@ -1068,21 +1068,21 @@ fn test_deep_state_on_prestige_preserves_all_state() {
     ds.persistent.discovered = true;
     ds.persistent.guild_rank = GuildRank(3);
     ds.persistent.deepest_layer_reached = 7;
-    ds.prestige.warband_marks = 5000;
+    ds.session.warband_marks = 5000;
     {
         let m = make_merc(1, MercArchetype::Vanguard, MercStatus::Available);
-        ds.prestige.roster.insert(m.id, m);
+        ds.session.roster.insert(m.id, m);
     }
 
     ds.on_prestige();
 
     // Operational state persists across prestiges
-    assert_eq!(ds.prestige.warband_marks, 5000);
-    assert_eq!(ds.prestige.roster.len(), 1);
+    assert_eq!(ds.session.warband_marks, 5000);
+    assert_eq!(ds.session.roster.len(), 1);
 
     // Generation counter advances
     assert_eq!(ds.persistent.generation_counter, 1);
-    assert_eq!(ds.prestige.generation_number, 1);
+    assert_eq!(ds.session.generation_number, 1);
 
     // Persistent state preserved
     assert!(ds.persistent.discovered);
@@ -1098,15 +1098,15 @@ fn test_deep_state_on_prestige_increments_generation_counter() {
     assert_eq!(ds.persistent.generation_counter, 1);
     ds.on_prestige();
     assert_eq!(ds.persistent.generation_counter, 2);
-    assert_eq!(ds.prestige.generation_number, 2);
+    assert_eq!(ds.session.generation_number, 2);
 }
 
 #[test]
 fn test_deep_state_on_prestige_generation_record_captures_stats() {
     let mut ds = DeepState::new();
-    ds.prestige.total_marks_earned = 1500;
-    ds.prestige.total_missions_completed = 12;
-    ds.prestige.total_mercs_lost = 2;
+    ds.session.total_marks_earned = 1500;
+    ds.session.total_missions_completed = 12;
+    ds.session.total_mercs_lost = 2;
     ds.persistent.deepest_layer_reached = 5;
 
     ds.on_prestige();
@@ -1144,7 +1144,7 @@ fn test_deep_state_serde_roundtrip() {
     ds.persistent.discovered = true;
     ds.persistent.guild_rank = GuildRank(4);
     ds.persistent.deepest_layer_reached = 12;
-    ds.prestige.warband_marks = 999;
+    ds.session.warband_marks = 999;
 
     let json = serde_json::to_string(&ds).unwrap();
     let loaded: DeepState = serde_json::from_str(&json).unwrap();
@@ -1152,7 +1152,7 @@ fn test_deep_state_serde_roundtrip() {
     assert!(loaded.persistent.discovered);
     assert_eq!(loaded.persistent.guild_rank, GuildRank(4));
     assert_eq!(loaded.persistent.deepest_layer_reached, 12);
-    assert_eq!(loaded.prestige.warband_marks, 999);
+    assert_eq!(loaded.session.warband_marks, 999);
 }
 
 #[test]
@@ -1188,8 +1188,8 @@ fn test_deep_state_serde_missing_fields_use_defaults() {
     assert!(!loaded.persistent.gateway_opened);
     assert!(!loaded.persistent.first_orders_queued);
     assert!(loaded.persistent.generation_records.is_empty());
-    assert_eq!(loaded.prestige.generation_number, 0);
-    assert!(loaded.prestige.warband_log.is_empty());
+    assert_eq!(loaded.session.generation_number, 0);
+    assert!(loaded.session.warband_log.is_empty());
 }
 
 // =============================================================================

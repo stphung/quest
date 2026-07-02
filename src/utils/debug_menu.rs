@@ -1154,7 +1154,7 @@ fn trigger_deep_grant_marks(deep: &mut DeepState) -> &'static str {
     if !deep.persistent.discovered {
         return "Discover The Deep first!";
     }
-    deep.prestige.warband_marks = deep.prestige.warband_marks.saturating_add(10_000);
+    deep.session.warband_marks = deep.session.warband_marks.saturating_add(10_000);
     "Granted 10,000 Warband Marks!"
 }
 
@@ -1163,12 +1163,12 @@ fn trigger_deep_refresh_mission_pool(deep: &mut DeepState) -> &'static str {
         return "Discover The Deep first!";
     }
     let mut rng = rand::rng();
-    deep.prestige.available_missions = crate::deep::generate_mission_pool(
+    deep.session.available_missions = crate::deep::generate_mission_pool(
         &deep.persistent,
-        &deep.prestige.active_missions,
+        &deep.session.active_missions,
         &mut rng,
     );
-    deep.prestige.pool_refreshed_at = Some(Utc::now());
+    deep.session.pool_refreshed_at = Some(Utc::now());
     "Deep mission pool refreshed!"
 }
 
@@ -1178,7 +1178,7 @@ fn trigger_deep_refresh_recruit_pool(deep: &mut DeepState) -> &'static str {
     }
     let mut rng = rand::rng();
     let guild_rank = deep.persistent.guild_rank;
-    deep.prestige.recruit_pool =
+    deep.session.recruit_pool =
         crate::deep::generate_recruit_pool(guild_rank, || deep.persistent.next_merc_id(), &mut rng);
     "Deep recruit pool refreshed!"
 }
@@ -1190,12 +1190,12 @@ fn trigger_deep_clear_frontier_layer(deep: &mut DeepState) -> &'static str {
     let frontier = deep.persistent.frontier_layer();
     crate::deep::mark_layer_cleared(&mut deep.persistent, frontier);
     let mut rng = rand::rng();
-    deep.prestige.available_missions = crate::deep::generate_mission_pool(
+    deep.session.available_missions = crate::deep::generate_mission_pool(
         &deep.persistent,
-        &deep.prestige.active_missions,
+        &deep.session.active_missions,
         &mut rng,
     );
-    deep.prestige.pool_refreshed_at = Some(Utc::now());
+    deep.session.pool_refreshed_at = Some(Utc::now());
     "Cleared current Deep frontier layer!"
 }
 
@@ -1203,13 +1203,13 @@ fn trigger_deep_complete_active_missions(deep: &mut DeepState) -> &'static str {
     if !deep.persistent.discovered {
         return "Discover The Deep first!";
     }
-    if deep.prestige.active_missions.is_empty() {
+    if deep.session.active_missions.is_empty() {
         return "No active Deep missions.";
     }
     let mut rng = rand::rng();
     let now = Utc::now() + Duration::days(7);
     let summary =
-        crate::deep::tick_all_missions(&mut deep.prestige, &mut deep.persistent, now, &mut rng);
+        crate::deep::tick_all_missions(&mut deep.session, &mut deep.persistent, now, &mut rng);
     if summary.missions_completed > 0 {
         "Completed active Deep missions!"
     } else {
@@ -1258,12 +1258,12 @@ fn trigger_unlock_deep_layer(
 
     // Refresh mission pool for new layers
     let mut rng = rand::rng();
-    deep.prestige.available_missions = crate::deep::generate_mission_pool(
+    deep.session.available_missions = crate::deep::generate_mission_pool(
         &deep.persistent,
-        &deep.prestige.active_missions,
+        &deep.session.active_missions,
         &mut rng,
     );
-    deep.prestige.pool_refreshed_at = Some(Utc::now());
+    deep.session.pool_refreshed_at = Some(Utc::now());
 
     match target_layer {
         3 => "Cleared to Deep L3 \u{2014} Red Fault unlocked (Z12-14)!",
@@ -1881,10 +1881,10 @@ mod tests {
         let mut deep = DeepState::new();
         let mut rng = rand::rng();
         crate::deep::complete_discovery(&mut deep, &mut rng);
-        let before = deep.prestige.warband_marks;
+        let before = deep.session.warband_marks;
         let msg = trigger_deep_grant_marks(&mut deep);
         assert_eq!(msg, "Granted 10,000 Warband Marks!");
-        assert_eq!(deep.prestige.warband_marks, before + 10_000);
+        assert_eq!(deep.session.warband_marks, before + 10_000);
     }
 
     #[test]

@@ -109,10 +109,10 @@ pub(super) fn render_recruit(
     }
 
     let rank = deep.persistent.guild_rank;
-    let roster_count = deep.prestige.roster.len();
+    let roster_count = deep.session.roster.len();
     let max_roster = rank.max_roster() as usize;
-    let pool = &deep.prestige.recruit_pool;
-    let marks = deep.prestige.warband_marks;
+    let pool = &deep.session.recruit_pool;
+    let marks = deep.session.warband_marks;
 
     // ── Summary header ──
     let now = Utc::now();
@@ -255,7 +255,7 @@ fn render_recruit_compact(
     roster_count: usize,
     max_roster: usize,
 ) {
-    let pool = &deep.prestige.recruit_pool;
+    let pool = &deep.session.recruit_pool;
     let mut row = content_top;
 
     // Column header
@@ -360,7 +360,7 @@ fn render_recruit_split(
     roster_count: usize,
     max_roster: usize,
 ) {
-    let pool = &deep.prestige.recruit_pool;
+    let pool = &deep.session.recruit_pool;
     let list_width = (width * 50 / 100).max(24).min(width.saturating_sub(20));
     let detail_left = list_width as i32;
     let detail_inner_left = detail_left + 1;
@@ -520,7 +520,7 @@ fn render_recruit_split(
     row += 1;
     // Find the best roster merc of the same archetype for comparison
     let best_same_arch = deep
-        .prestige
+        .session
         .roster
         .values()
         .filter(|m| m.archetype == candidate.archetype)

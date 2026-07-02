@@ -28,7 +28,7 @@ use quest::deep::{
     RecruitQuality,
 };
 use quest::deep::{
-    DeepPersistent, DeepPrestige, DeepState, GuildRank, Infrastructure, LayerTier, MissionOutcome,
+    DeepPersistent, DeepSession, DeepState, GuildRank, Infrastructure, LayerTier, MissionOutcome,
     MissionType,
 };
 
@@ -41,9 +41,9 @@ fn persistent_at_rank(rank: u8) -> DeepPersistent {
     p
 }
 
-/// Create a `DeepPrestige` with the given Warband Marks balance.
-fn prestige_with_marks(marks: u32) -> DeepPrestige {
-    let mut p = DeepPrestige::new();
+/// Create a `DeepSession` with the given Warband Marks balance.
+fn prestige_with_marks(marks: u32) -> DeepSession {
+    let mut p = DeepSession::new();
     p.warband_marks = marks;
     p
 }
@@ -653,10 +653,10 @@ fn supply_cache_roi_holds_at_layer_25() {
 #[test]
 fn prestige_preserves_warband_marks() {
     let mut state = DeepState::new();
-    state.prestige.warband_marks = 5000;
+    state.session.warband_marks = 5000;
     state.on_prestige();
     assert_eq!(
-        state.prestige.warband_marks, 5000,
+        state.session.warband_marks, 5000,
         "Warband Marks must persist across prestiges"
     );
 }
@@ -728,11 +728,11 @@ fn prestige_resets_roster_and_active_missions() {
     // Verifying that on_prestige() clears them structurally.
     state.on_prestige();
     assert!(
-        state.prestige.roster.is_empty(),
+        state.session.roster.is_empty(),
         "Roster must reset on prestige"
     );
     assert!(
-        state.prestige.active_missions.is_empty(),
+        state.session.active_missions.is_empty(),
         "Active missions must reset on prestige"
     );
 }

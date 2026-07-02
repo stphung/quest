@@ -19,7 +19,7 @@ pub fn resolve_deep_offline(
 
     let now = chrono::Utc::now();
     let summary = crate::deep::missions::tick_all_missions(
-        &mut deep.prestige,
+        &mut deep.session,
         &mut deep.persistent,
         now,
         &mut rng,
@@ -50,14 +50,14 @@ pub fn resolve_deep_offline(
     // After offline resolution, refresh the mission pool if stale or empty.
     // This ensures players always have missions available when they return.
     crate::deep::missions::maybe_refresh_mission_pool(
-        &mut deep.prestige,
+        &mut deep.session,
         &deep.persistent,
         now,
         &mut rng,
     );
 
     crate::deep::missions::run_softlock_safeguards(
-        &mut deep.prestige,
+        &mut deep.session,
         &mut deep.persistent,
         now,
         &mut rng,

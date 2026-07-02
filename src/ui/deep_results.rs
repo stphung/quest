@@ -122,7 +122,7 @@ pub(super) fn render_mission_results(
     )));
 
     for merc_id in &mission.squad {
-        if let Some(merc) = deep.prestige.find_merc(*merc_id) {
+        if let Some(merc) = deep.session.find_merc(*merc_id) {
             let level_up = result
                 .merc_level_ups
                 .iter()
@@ -200,19 +200,19 @@ pub(super) fn render_mission_results(
 
     // Post-mission totals snapshot
     let ready_count = deep
-        .prestige
+        .session
         .roster
         .values()
         .filter(|m| matches!(m.status, MercStatus::Available))
         .count();
     let injured_count = deep
-        .prestige
+        .session
         .roster
         .values()
         .filter(|m| matches!(m.status, MercStatus::Injured { .. }))
         .count();
     let lost_count = deep
-        .prestige
+        .session
         .roster
         .values()
         .filter(|m| matches!(m.status, MercStatus::Lost))
@@ -231,7 +231,7 @@ pub(super) fn render_mission_results(
             Style::default().fg(Color::DarkGray),
         ),
         Span::styled(
-            deep.prestige.warband_marks.to_string(),
+            deep.session.warband_marks.to_string(),
             Style::default().fg(Color::Rgb(220, 180, 60)),
         ),
     ]));
