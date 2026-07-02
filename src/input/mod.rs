@@ -711,7 +711,7 @@ fn handle_base_game(
             InputResult::Continue
         }
         KeyCode::Char('v') | KeyCode::Char('V') => {
-            if state.vessel_signal_discovered {
+            if state.vessel_signal_discovered && crate::vessel::act2_enabled() {
                 *overlay = GameOverlay::Vessel {
                     confirm_pending: false,
                 };

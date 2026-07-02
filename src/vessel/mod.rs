@@ -7,6 +7,25 @@
 
 use crate::core::game_state::GameState;
 
+/// Release kill-switch for Act 2. While `false`, the Vessel is fully
+/// invisible: no discovery modal, no ticker whispers, no stats-panel row,
+/// no `[V]` hotkey — and therefore no path to the launch burn.
+///
+/// Zone 50 detection still records `vessel_signal_discovered` in saves so
+/// that already-qualified players light up the moment Act 2 is enabled.
+///
+/// **Enabling Act 2 is a one-line change: flip this to `true`.**
+/// For previewing on a release build without recompiling (or driving the
+/// game in tests/screenshots), set the `QUEST_ACT2=1` environment variable.
+pub const ACT2_ENABLED: bool = false;
+
+/// Runtime check for the Act 2 kill-switch: the compiled default, or the
+/// `QUEST_ACT2=1` environment override (read once).
+pub fn act2_enabled() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| ACT2_ENABLED || std::env::var("QUEST_ACT2").is_ok_and(|v| v == "1"))
+}
+
 /// Prestige rank cost of launching the Vessel, burned in one action.
 pub const LAUNCH_PR_COST: u32 = 100_000;
 
@@ -67,6 +86,19 @@ mod tests {
         state.ascension_level = 10;
         state.prestige_rank = 100_000;
         state
+    }
+
+    /// Release guard: Act 2 ships dark. Enabling it is a deliberate
+    /// two-line change — flip `ACT2_ENABLED` to `true` AND update this
+    /// assertion. This test failing on a PR means someone flipped the
+    /// switch; make sure that was the intent.
+    #[test]
+    #[allow(clippy::assertions_on_constants)] // The constant IS the thing under test.
+    fn act2_kill_switch_is_off_for_release() {
+        assert!(
+            !ACT2_ENABLED,
+            "Act 2 kill-switch is ON — if this is the launch PR, update this test too"
+        );
     }
 
     #[test]

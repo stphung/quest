@@ -621,28 +621,35 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                 );
             }
             TickEvent::VesselSignalDiscovered => {
-                vessel_signal_discovered = true;
-                game_state.combat_state.add_log_entry(
-                    "\u{2726} A signal from beyond the branches. The Loom resonates...".to_string(),
-                    false,
-                    true,
-                );
-                game_state.ticker.push(TickerEntry {
-                    icon: "\u{2726}",
-                    text: "A signal from beyond".to_string(),
-                    color: Color::Rgb(150, 120, 200),
-                    bold: true,
-                    segments: None,
-                });
+                // Act 2 kill-switch: the flag still persists on GameState
+                // (set in tick_stages), but nothing is shown while disabled.
+                if crate::vessel::act2_enabled() {
+                    vessel_signal_discovered = true;
+                    game_state.combat_state.add_log_entry(
+                        "\u{2726} A signal from beyond the branches. The Loom resonates..."
+                            .to_string(),
+                        false,
+                        true,
+                    );
+                    game_state.ticker.push(TickerEntry {
+                        icon: "\u{2726}",
+                        text: "A signal from beyond".to_string(),
+                        color: Color::Rgb(150, 120, 200),
+                        bold: true,
+                        segments: None,
+                    });
+                }
             }
             TickEvent::VesselWhisper { message } => {
-                game_state.ticker.push(TickerEntry {
-                    icon: "\u{2726}",
-                    text: (*message).to_string(),
-                    color: Color::Rgb(120, 90, 160),
-                    bold: false,
-                    segments: None,
-                });
+                if crate::vessel::act2_enabled() {
+                    game_state.ticker.push(TickerEntry {
+                        icon: "\u{2726}",
+                        text: (*message).to_string(),
+                        color: Color::Rgb(120, 90, 160),
+                        bold: false,
+                        segments: None,
+                    });
+                }
             }
             TickEvent::DeepMissionComplete { message } => {
                 game_state

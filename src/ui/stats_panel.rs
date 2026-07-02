@@ -101,7 +101,7 @@ pub fn draw_stats_panel(
             if game_state.ascension_level > 0 {
                 hero_height += 1; // Ascension row
             }
-            if game_state.vessel_signal_discovered {
+            if game_state.vessel_signal_discovered && crate::vessel::act2_enabled() {
                 hero_height += 1; // Vessel signal row
             }
             let deep_panel_height: u16 = if deep.persistent.discovered { 13 } else { 0 };
@@ -299,8 +299,8 @@ fn draw_hero_panel(
         ]));
     }
 
-    // Prestige row 2b (optional): Vessel signal
-    if game_state.vessel_signal_discovered {
+    // Prestige row 2b (optional): Vessel signal (Act 2 kill-switch gated)
+    if game_state.vessel_signal_discovered && crate::vessel::act2_enabled() {
         let violet = Color::Rgb(150, 120, 200);
         let hint_bright = super::clock::now_millis() % 1600 < 800;
         let hint_style = if hint_bright {

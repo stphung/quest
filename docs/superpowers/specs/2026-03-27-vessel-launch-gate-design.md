@@ -176,6 +176,22 @@ Row 17:    Footer ([Enter] Launch / [Esc] Close)
 | `src/ui/stats_panel.rs` | Show vessel indicator line |
 | `src/main.rs` | Wire vessel overlay into render loop |
 
+## Release Staging (kill-switch)
+
+Sub-project 1 can merge to main **dark**: `vessel::ACT2_ENABLED = false` keeps the entire feature invisible until Act 2 is deliberately launched.
+
+| Layer | Behavior while disabled |
+|-------|------------------------|
+| Z50 detection | **Still records** `vessel_signal_discovered` in saves (silently) — qualified players light up the instant Act 2 is enabled, no re-kill needed |
+| Discovery modal, log line, ticker entry | Suppressed (`src/tick_events.rs`) |
+| Ticker whispers | Suppressed (stage 12c gate in `src/core/tick.rs`) |
+| Stats panel row | Hidden (`src/ui/stats_panel.rs`) |
+| `[V]` hotkey | Inert (`src/input/mod.rs`) — with no overlay, the launch burn is unreachable |
+
+**To launch Act 2:** flip `ACT2_ENABLED` to `true` in `src/vessel/mod.rs` and update the `act2_kill_switch_is_off_for_release` release-guard test in the same file (deliberately a two-line change so the switch can't flip by accident). The push-to-main release pipeline ships it like any other change.
+
+**To preview on any build** (dev, beta testers, drive-game screenshots): run with `QUEST_ACT2=1` in the environment — the runtime check `vessel::act2_enabled()` honors the override without recompiling.
+
 ## Testing
 
 - Unit test: `can_launch` requires all four gates (signal, Ascension X, 28 patterns, 100,000 PR)
