@@ -96,12 +96,14 @@ pub fn draw_stats_panel(
 ) {
     match ctx.height_tier {
         SizeTier::XL | SizeTier::L => {
-            // Hero panel: 2 border + 2 header + 1 XP gauge + (4 or 5) prestige (incl sep) + 1 prestige gauge + 1 sep + 3 attrs
-            let hero_height: u16 = if game_state.ascension_level > 0 {
-                15 // 2 + 2 + 1 + 5 + 1 + 1 + 3
-            } else {
-                14 // 2 + 2 + 1 + 4 + 1 + 1 + 3
-            };
+            // Hero panel: 2 border + 2 header + 1 XP gauge + (4-6) prestige (incl sep) + 1 prestige gauge + 1 sep + 3 attrs
+            let mut hero_height: u16 = 14; // 2 + 2 + 1 + 4 + 1 + 1 + 3
+            if game_state.ascension_level > 0 {
+                hero_height += 1; // Ascension row
+            }
+            if game_state.vessel_signal_discovered {
+                hero_height += 1; // Vessel signal row
+            }
             let deep_panel_height: u16 = if deep.persistent.discovered { 13 } else { 0 };
 
             let mut constraints = vec![
