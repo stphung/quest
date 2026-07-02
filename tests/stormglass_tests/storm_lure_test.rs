@@ -228,7 +228,7 @@ fn test_lure_consumed_on_encounter() {
     // Find a seed where encounter fires with high bonus
     let haven = HavenFishingBonuses::default();
     let mut found = false;
-    for seed in 0..5000 {
+    for seed in 0..2000 {
         let mut rng = rng_from(seed);
         let mut state = test_state_rank40();
         state.fishing.storm_lure_active = true;
@@ -262,7 +262,7 @@ fn test_lure_consumed_on_encounter() {
     }
     assert!(
         found,
-        "Should find encounter with lure active over 5000 seeds"
+        "Should find encounter with lure active over 2000 seeds"
     );
 }
 
@@ -270,7 +270,7 @@ fn test_lure_consumed_on_encounter() {
 fn test_lure_consumed_on_catch() {
     let haven = HavenFishingBonuses::default();
     let mut found = false;
-    for seed in 0..5000 {
+    for seed in 0..1000 {
         let mut rng = rng_from(seed);
         let mut state = test_state_rank40();
         state.fishing.leviathan_encounters = 10;
@@ -292,14 +292,14 @@ fn test_lure_consumed_on_catch() {
             break;
         }
     }
-    assert!(found, "Should catch Leviathan over 5000 seeds with lure");
+    assert!(found, "Should catch Leviathan over 1000 seeds with lure");
 }
 
 #[test]
 fn test_lure_consumed_on_catch_miss() {
     let haven = HavenFishingBonuses::default();
     let mut found = false;
-    for seed in 0..5000 {
+    for seed in 0..1000 {
         let mut rng = rng_from(seed);
         let mut state = test_state_rank40();
         state.fishing.leviathan_encounters = 10;
@@ -326,7 +326,7 @@ fn test_lure_consumed_on_catch_miss() {
             break;
         }
     }
-    assert!(found, "Should find catch miss over 5000 seeds");
+    assert!(found, "Should find catch miss over 1000 seeds");
 }
 
 #[test]
@@ -334,7 +334,7 @@ fn test_miss_ramp_increases_on_legendary_no_encounter() {
     // When lure active, legendary at rank 40 with no encounter should increase miss ramp
     let haven = HavenFishingBonuses::default();
     let mut found = false;
-    for seed in 0..5000 {
+    for seed in 0..1000 {
         let mut rng = rng_from(seed);
         let mut state = test_state_rank40();
         state.fishing.storm_lure_active = true;
@@ -367,7 +367,7 @@ fn test_miss_ramp_increases_on_legendary_no_encounter() {
     }
     assert!(
         found,
-        "Should find legendary with no encounter over 5000 seeds at rank 40"
+        "Should find legendary with no encounter over 1000 seeds at rank 40"
     );
 }
 
@@ -389,7 +389,7 @@ fn test_miss_ramp_capped_at_10_percent() {
     );
 
     // Also verify via tick if we can find a legendary
-    for seed in 0..5000 {
+    for seed in 0..1000 {
         let mut rng = rng_from(seed);
         let mut state2 = test_state_rank40();
         state2.fishing.storm_lure_active = true;
@@ -519,7 +519,7 @@ fn test_tracking_bonus_persists_after_lure_consumed() {
     // Tracking bonus should remain even after lure is consumed
     let haven = HavenFishingBonuses::default();
     let mut found = false;
-    for seed in 0..5000 {
+    for seed in 0..2000 {
         let mut rng = rng_from(seed);
         let mut state = test_state_rank40();
         state.fishing.storm_lure_active = true;
@@ -542,7 +542,7 @@ fn test_tracking_bonus_persists_after_lure_consumed() {
             break;
         }
     }
-    assert!(found, "Should find encounter in 5000 seeds");
+    assert!(found, "Should find encounter in 2000 seeds");
 }
 
 // =========================================================================

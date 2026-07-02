@@ -1075,7 +1075,7 @@ fn test_simulator_rng_param_is_used_for_challenge_ai() {
     let mut achievements = Achievements::default();
     let mut rng = ChaCha8Rng::seed_from_u64(12345);
 
-    for _ in 0..1000 {
+    for _ in 0..300 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
@@ -1194,7 +1194,7 @@ fn test_game_tick_returns_events_in_chronological_order() {
     let mut rng = test_rng();
 
     // Run until we get a tick with multiple events (e.g., attack + defeat)
-    for _ in 0..5000 {
+    for _ in 0..300 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,

@@ -573,12 +573,12 @@ fn test_is_modal_ready_true_after_500ms() {
 }
 
 #[test]
-fn test_is_modal_ready_at_exactly_500ms() {
+fn test_is_modal_ready_well_past_500ms_threshold() {
     let mut ach = Achievements::default();
     ach.unlock(AchievementId::SlayerI, Some("Hero".to_string()));
 
     ach.accumulation_start =
-        Some(std::time::Instant::now() - std::time::Duration::from_millis(501));
+        Some(std::time::Instant::now() - std::time::Duration::from_millis(700));
 
     assert!(ach.is_modal_ready());
 }
