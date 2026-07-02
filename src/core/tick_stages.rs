@@ -955,7 +955,7 @@ pub(super) fn tick_deep_missions(
         rng,
     );
 
-    if summary.missions_completed > 0 || summary.events_fired > 0 {
+    if summary.missions_completed > 0 || summary.events_fired > 0 || summary.mercs_recovered > 0 {
         result.deep_changed = true;
     }
 

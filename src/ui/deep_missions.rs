@@ -415,12 +415,12 @@ fn render_hub_roster(
             let (q_glyph, q_color) = super::deep_roster::quality_glyph(merc);
             let class_name = merc.archetype.display_name();
             let (status_label, status_color) = match &merc.status {
-                MercStatus::Available => ("Ready", Color::Green),
-                MercStatus::OnMission(_) => ("On Mission", Color::Cyan),
-                MercStatus::Injured {
-                    missions_remaining, ..
-                } => super::deep_roster::injury_severity_display(*missions_remaining),
-                MercStatus::Lost => ("Lost", Color::Red),
+                MercStatus::Available => ("Ready".to_string(), Color::Green),
+                MercStatus::OnMission(_) => ("On Mission".to_string(), Color::Cyan),
+                MercStatus::Injured { recover_at } => {
+                    super::deep_roster::injury_status_display(*recover_at, chrono::Utc::now())
+                }
+                MercStatus::Lost => ("Lost".to_string(), Color::Red),
             };
 
             if is_selected {
@@ -465,7 +465,7 @@ fn render_hub_roster(
                 &format!("{:3}", merc.effective_resilience()),
                 Color::White,
             );
-            put_text(buffer, row, col_status, status_label, status_color);
+            put_text(buffer, row, col_status, &status_label, status_color);
             row += 1;
         }
     }
@@ -1676,8 +1676,10 @@ fn render_squad_assembly_left(
             }
             let avail_str = match &merc.status {
                 MercStatus::OnMission(_) => "(on mission)".to_string(),
-                MercStatus::Injured { missions_remaining } => {
-                    format!("(injured: {})", missions_remaining)
+                MercStatus::Injured { recover_at } => {
+                    let (label, _) =
+                        super::deep_roster::injury_status_display(*recover_at, chrono::Utc::now());
+                    format!("({})", label.to_lowercase())
                 }
                 MercStatus::Lost => "(lost)".to_string(),
                 _ => String::new(),

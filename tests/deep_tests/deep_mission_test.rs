@@ -350,7 +350,7 @@ fn test_merc_is_available_only_in_available_status() {
 
     let injured = Mercenary {
         status: MercStatus::Injured {
-            missions_remaining: 2,
+            recover_at: chrono::Utc::now() + chrono::Duration::hours(6),
         },
         ..base.clone()
     };
@@ -1436,7 +1436,7 @@ fn test_injured_merc_rejected_from_squad() {
     let persistent = DeepPersistent::new();
     let mut merc = make_merc(1, MercArchetype::Vanguard, 50);
     merc.status = MercStatus::Injured {
-        missions_remaining: 1,
+        recover_at: chrono::Utc::now() + chrono::Duration::hours(6),
     };
     let prestige = make_prestige_with_merc(merc);
     let available = make_available_mission_simple(MissionType::SupplyRun, 1);
@@ -1647,7 +1647,13 @@ fn test_supply_run_always_succeeds() {
             now - Duration::hours(3),
             3 * 3600,
         );
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            &mut rng,
+        );
 
         let result = mission.result.as_ref().unwrap();
         assert_eq!(
@@ -1676,7 +1682,13 @@ fn test_supply_run_never_injures_mercs() {
         now - Duration::hours(3),
         3 * 3600,
     );
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
 
     let result = mission.result.as_ref().unwrap();
     assert!(
@@ -1708,7 +1720,13 @@ fn test_resolve_mission_awards_marks() {
         now - Duration::hours(3),
         3 * 3600,
     );
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
 
     assert!(
         prestige.warband_marks > initial_marks,
@@ -1739,7 +1757,13 @@ fn test_breakthrough_success_clears_layer() {
             now - Duration::hours(20),
             20 * 3600,
         );
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            &mut rng,
+        );
 
         let result = mission.result.as_ref().unwrap();
         if matches!(result.outcome, MissionOutcome::Success) {
@@ -1779,7 +1803,13 @@ fn test_resolve_mission_merc_returns_available_after_safe_mission() {
         now - Duration::hours(3),
         3 * 3600,
     );
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
 
     let merc_status = prestige.find_merc(1).unwrap().status.clone();
     assert_eq!(
@@ -1836,7 +1866,13 @@ fn test_offline_resolution_completes_elapsed_mission() {
         .position(|m| m.id == elapsed_mission_id)
         .unwrap();
     let mut mission = prestige.active_missions.remove(idx);
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
     prestige.pending_results.push(mission);
 
     assert!(
@@ -2007,7 +2043,13 @@ fn test_danger_bonus_xp_disabled_when_underpowered() {
         now - Duration::hours(12),
         12 * 3600,
     );
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
 
     let result = mission.result.as_ref().unwrap();
     assert!(
@@ -2037,7 +2079,13 @@ fn test_no_danger_bonus_xp_when_overpowered() {
         now - Duration::hours(3),
         3 * 3600,
     );
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
 
     let result = mission.result.as_ref().unwrap();
     assert!(

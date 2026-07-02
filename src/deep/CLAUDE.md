@@ -125,11 +125,13 @@ Archetype availability by guild rank: Rank 1 = Vanguard/Scout/Medic, Rank 2 adds
 pub enum MercStatus {
     Available,
     OnMission(u64),          // holds mission id
-    Injured { missions_remaining: u32 },
+    Injured { recover_at: DateTime<Utc> },  // wall-clock recovery time
     Lost,
 }
 ```
 Lost mercs are kept in roster for death notification display, then removed via `purge_lost_mercs()`.
+
+Injuries recover on wall-clock time (like missions), so a fully-injured roster can never soft-lock the warband. Legacy saves that stored `Injured { missions_remaining }` are migrated on load via a serde shim (`MercStatusCompat`) at 6 hours per mission-equivalent.
 
 ### `LayerTier` (`types.rs`)
 Computed from 1-based layer index via `LayerTier::from_layer(layer)`:
@@ -241,9 +243,9 @@ pub enum DeepView { Hub, NewMission, Roster, Infrastructure, EventResponse, Recr
 - `apply_merc_xp(merc, levels_gained) -> u32` — Apply level-ups, scale stats proportionally preserving quality variance
 
 **Injuries:**
-- `injure_merc(merc, severity, rng)` — Set injury status with recovery countdown (Light: 4-8h, Moderate: 8-12h, Severe: 12-16h)
+- `injure_merc(merc, severity, now, rng)` — Set injury status with a wall-clock `recover_at` (Light: 4-8h, Moderate: 8-12h, Severe: 12-16h from `now`)
 - `mark_merc_lost(merc)` — Mark as permanently lost
-- `tick_merc_injury(merc) -> bool` — Decrement injury counter, return true if recovered
+- `check_injury_recovery(roster, now) -> u32` — Heal all injured mercs whose `recover_at` has passed; returns count recovered. Called every tick from `tick_all_missions()` and on load
 
 **Roster:**
 - `roster_has_capacity(roster, guild_rank) -> bool` — Whether roster is below max
@@ -443,4 +445,4 @@ When a breakthrough clears one of these layers, `DeepPersistent.fracture_zone_ca
 - **`layer_record(0)` returns `None`** — Layers are 1-based throughout. Index 0 is explicitly handled.
 - **Serde for `DateTime<Utc>`** — Requires the `serde` feature in the `chrono` dependency (`Cargo.toml`).
 - **Recruit cost rounding** — All Warband Marks costs for recruits are rounded to the nearest 5 for cleaner display.
-- **Injury recovery uses missions-remaining, not wall-clock** — Despite missions being wall-clock, injury countdown is in missions (1 mission ~ 6 hours average).
+- **Injury recovery is wall-clock** — Injuries store a `recover_at: DateTime<Utc>` and heal via `check_injury_recovery()` each tick and on load, even when no missions run. Legacy `missions_remaining` counters migrate on deserialization (6h per mission).
