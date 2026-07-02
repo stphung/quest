@@ -108,10 +108,12 @@ pub fn poll_cloud_result(
             cloud.username = Some(config.username.clone());
             cloud.config = Some(config);
             match history::cloud::check_divergence(quest_dir) {
-                Ok(Some(_div)) => {
+                Ok(Some(div)) => {
                     cloud.status = CloudStatus::OutOfSync;
                     if let GameOverlay::TimeVault { ref mut browser } = overlay {
-                        browser.cloud_divergence = Some(_div);
+                        browser.cloud_divergence = Some(div);
+                        browser.mode =
+                            crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
                     }
                 }
                 _ => {

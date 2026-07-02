@@ -834,6 +834,7 @@ pub fn show_startup_splash_screen(
                                 *cloud_status = CloudStatus::OutOfSync;
                                 if let Some(ref mut browser) = time_vault_browser {
                                     browser.cloud_divergence = Some(div);
+                                    browser.mode = crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
                                 }
                             }
                             _ => {
