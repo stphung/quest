@@ -99,6 +99,10 @@ pub const KILLS_FOR_BOSS: u32 = 10;
 // Combat fitness: death loop and stalemate prevention
 pub const DEATH_LOOP_THRESHOLD: u32 = 3;
 pub const MOB_FIGHT_TIMEOUT_SECONDS: f64 = 30.0;
+// Frontier backoff: after a death-loop retreat, the safe zone must be cycled
+// this many times (growing per repeated retreat, capped) before auto-advancing
+// back into the zone that triggered the retreat.
+pub const FRONTIER_BACKOFF_MAX_CYCLES: u32 = 8;
 
 // Zone enemy base stats: (base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)
 // Index 0 = Zone 1, Index 10 = Zone 11 (The Expanse)

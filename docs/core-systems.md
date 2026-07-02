@@ -593,6 +593,7 @@ Enhancement state (`EnhancementProgress`) is saved to `~/.quest/enhancement.json
 | Stormglass prestige gate | `STORMGLASS_MIN_PRESTIGE_RANK = 15` |
 | Death loop threshold | `DEATH_LOOP_THRESHOLD = 3` (consecutive boss deaths trigger retreat) |
 | Mob fight timeout | `MOB_FIGHT_TIMEOUT_SECONDS = 30.0` (stalemate prevention) |
+| Frontier backoff cap | `FRONTIER_BACKOFF_MAX_CYCLES = 8` (max safe-zone cycles before retrying a death-loop zone) |
 | Prestige mult formula | `1.0 + 0.5 * rank^0.7` |
 | Base max fishing rank | 30 (40 with Fishing Dock T4) |
 | Fracture zone stat multiplier | `FRACTURE_ZONE_STAT_MULTIPLIER = 1.6` (per zone from Z11 base) |

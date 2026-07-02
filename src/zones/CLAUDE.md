@@ -55,6 +55,7 @@ Serializable state tracking the player's position and progress:
 - `kills_in_subzone: u32` -- kill counter toward boss spawn (resets on boss defeat or death)
 - `fighting_boss: bool` -- whether a boss fight is active
 - `has_stormbreaker: bool` -- legacy flag (achievement-based check preferred)
+- `death_retreat_zone: Option<u32>` / `death_retreat_count: u32` / `frontier_cooldown_cycles: u32` -- transient (`serde(skip)`) frontier backoff state; set by `record_death_retreat()` when a death-triggered combat retreat fires (stalemate/timeout retreats don't record), cleared by any boss defeat in the recorded zone or prestige reset
 
 ### `BossDefeatResult` (`boss_defeat.rs`)
 Enum returned by `on_boss_defeated()` / `on_boss_defeated_with_cap()`:
@@ -66,6 +67,7 @@ Enum returned by `on_boss_defeated()` / `on_boss_defeated_with_cap()`:
 - **ExpanseCycle** -- completed Zone 11 cycle, loops back to subzone 1
 - **FractureCycle { zone_id }** -- completed a fracture cap zone cycle, loops back to subzone 1
 - **LoomZoneCycle { zone_id }** -- completed a Loom cap zone cycle, loops back to subzone 1
+- **FrontierBackoff { zone_id, blocked_zone_id }** -- zone completed, but the next zone recently caused a death-loop retreat; cycles the current zone until the frontier cooldown is consumed (max `FRONTIER_BACKOFF_MAX_CYCLES` cycles, growing with repeated retreats)
 
 ### `FractureRegion` (`fracture.rs`)
 Named fracture chapters, each containing 3-4 zones:
