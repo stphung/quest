@@ -24,6 +24,7 @@ pub mod loom;
 pub mod power_cores;
 pub mod stormglass;
 pub mod utils;
+pub mod vessel;
 pub mod zones;
 
 // UI module is not exposed as it's tightly coupled to the terminal

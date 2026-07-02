@@ -2409,3 +2409,125 @@ fn test_xp_rate_samples_capped_at_900() {
         "Oldest (0) popped"
     );
 }
+
+// =============================================================================
+// Stage 6: process_combat_events — Vessel signal on Zone 50 boss kill
+// =============================================================================
+
+fn run_boss_kill(state: &mut GameState, defeat_result: BossDefeatResult) -> TickResult {
+    state.combat_state.current_enemy = Some(quest::Enemy::new("Cap Boss".into(), 500, 30));
+    let mut result = TickResult::default();
+    let mut ach = Achievements::default();
+    let mut rng = seeded_rng(1);
+    let bonuses = default_haven_bonuses();
+    let mut deep = DeepState::new();
+
+    let events = vec![CombatEvent::SubzoneBossDefeated {
+        xp_gained: 600,
+        result: defeat_result,
+    }];
+
+    tick_stages::process_combat_events(
+        state,
+        events,
+        &bonuses,
+        &mut ach,
+        &mut deep,
+        false,
+        &mut result,
+        &mut rng,
+    );
+    result
+}
+
+#[test]
+fn test_z50_boss_kill_sets_vessel_signal() {
+    let mut state = fresh_state();
+    assert!(!state.vessel_signal_discovered);
+
+    let result = run_boss_kill(&mut state, BossDefeatResult::LoomZoneCycle { zone_id: 50 });
+
+    assert!(state.vessel_signal_discovered);
+    assert!(has_event(&result, |e| matches!(
+        e,
+        TickEvent::VesselSignalDiscovered
+    )));
+}
+
+#[test]
+fn test_z50_boss_kill_signal_is_one_time() {
+    let mut state = fresh_state();
+    let _ = run_boss_kill(&mut state, BossDefeatResult::LoomZoneCycle { zone_id: 50 });
+    assert!(state.vessel_signal_discovered);
+
+    let second = run_boss_kill(&mut state, BossDefeatResult::LoomZoneCycle { zone_id: 50 });
+    assert!(!has_event(&second, |e| matches!(
+        e,
+        TickEvent::VesselSignalDiscovered
+    )));
+}
+
+#[test]
+fn test_non_z50_loom_cycle_does_not_set_signal() {
+    let mut state = fresh_state();
+    let result = run_boss_kill(&mut state, BossDefeatResult::LoomZoneCycle { zone_id: 34 });
+    assert!(!state.vessel_signal_discovered);
+    assert!(!has_event(&result, |e| matches!(
+        e,
+        TickEvent::VesselSignalDiscovered
+    )));
+}
+
+// =============================================================================
+// Stage 12c: tick_vessel_whispers
+// =============================================================================
+
+#[test]
+fn test_vessel_whispers_fire_every_interval() {
+    let mut state = fresh_state();
+    state.vessel_signal_discovered = true;
+    state.play_time_seconds = 60;
+
+    let mut result = TickResult::default();
+    tick_stages::tick_vessel_whispers(&mut state, &mut result);
+    assert!(has_event(&result, |e| matches!(
+        e,
+        TickEvent::VesselWhisper { .. }
+    )));
+    assert_eq!(state.vessel_last_whisper_at, 60);
+
+    // Same second: no duplicate whisper.
+    let mut result2 = TickResult::default();
+    tick_stages::tick_vessel_whispers(&mut state, &mut result2);
+    assert!(!has_event(&result2, |e| matches!(
+        e,
+        TickEvent::VesselWhisper { .. }
+    )));
+
+    // 60 seconds later: next whisper.
+    state.play_time_seconds = 120;
+    let mut result3 = TickResult::default();
+    tick_stages::tick_vessel_whispers(&mut state, &mut result3);
+    assert!(has_event(&result3, |e| matches!(
+        e,
+        TickEvent::VesselWhisper { .. }
+    )));
+}
+
+#[test]
+fn test_vessel_whispers_require_signal_and_stop_after_launch() {
+    let mut state = fresh_state();
+    state.play_time_seconds = 600;
+
+    // No signal: silent.
+    let mut result = TickResult::default();
+    tick_stages::tick_vessel_whispers(&mut state, &mut result);
+    assert!(result.events.is_empty());
+
+    // Launched: silent.
+    state.vessel_signal_discovered = true;
+    state.vessel_launched = true;
+    let mut result2 = TickResult::default();
+    tick_stages::tick_vessel_whispers(&mut state, &mut result2);
+    assert!(result2.events.is_empty());
+}

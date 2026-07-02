@@ -96,12 +96,14 @@ pub fn draw_stats_panel(
 ) {
     match ctx.height_tier {
         SizeTier::XL | SizeTier::L => {
-            // Hero panel: 2 border + 2 header + 1 XP gauge + (4 or 5) prestige (incl sep) + 1 prestige gauge + 1 sep + 3 attrs
-            let hero_height: u16 = if game_state.ascension_level > 0 {
-                15 // 2 + 2 + 1 + 5 + 1 + 1 + 3
-            } else {
-                14 // 2 + 2 + 1 + 4 + 1 + 1 + 3
-            };
+            // Hero panel: 2 border + 2 header + 1 XP gauge + (4-6) prestige (incl sep) + 1 prestige gauge + 1 sep + 3 attrs
+            let mut hero_height: u16 = 14; // 2 + 2 + 1 + 4 + 1 + 1 + 3
+            if game_state.ascension_level > 0 {
+                hero_height += 1; // Ascension row
+            }
+            if game_state.vessel_signal_discovered && crate::vessel::act2_enabled() {
+                hero_height += 1; // Vessel signal row
+            }
             let deep_panel_height: u16 = if deep.persistent.discovered { 13 } else { 0 };
 
             let mut constraints = vec![
@@ -294,6 +296,26 @@ fn draw_hero_panel(
                 format!("\u{00d7}{:.1} power", asc_mult),
                 Style::default().fg(Color::Rgb(255, 215, 0)),
             ),
+        ]));
+    }
+
+    // Prestige row 2b (optional): Vessel signal (Act 2 kill-switch gated)
+    if game_state.vessel_signal_discovered && crate::vessel::act2_enabled() {
+        let violet = Color::Rgb(150, 120, 200);
+        let hint_bright = super::clock::now_millis() % 1600 < 800;
+        let hint_style = if hint_bright {
+            Style::default().fg(violet).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Rgb(100, 75, 135))
+        };
+        let label = if game_state.vessel_launched {
+            "\u{2726} The Vessel awaits "
+        } else {
+            "\u{2726} The branch withers... "
+        };
+        prestige_lines.push(Line::from(vec![
+            Span::styled(label, Style::default().fg(violet)),
+            Span::styled("[V] Vessel", hint_style),
         ]));
     }
 

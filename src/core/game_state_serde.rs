@@ -35,6 +35,10 @@ pub(crate) struct FlatGameState {
     pub storm_sigils: crate::stormglass::sigils::StormSigils,
     #[serde(default)]
     pub ascension_level: u32,
+    #[serde(default)]
+    pub vessel_signal_discovered: bool,
+    #[serde(default)]
+    pub vessel_launched: bool,
 }
 
 impl From<&crate::core::game_state::GameState> for FlatGameState {
@@ -58,6 +62,8 @@ impl From<&crate::core::game_state::GameState> for FlatGameState {
             stormglass_discovered: state.stormglass_discovered,
             storm_sigils: state.storm_sigils.clone(),
             ascension_level: state.ascension_level,
+            vessel_signal_discovered: state.vessel_signal_discovered,
+            vessel_launched: state.vessel_launched,
         }
     }
 }
@@ -92,7 +98,10 @@ impl FlatGameState {
             stormglass_discovered: self.stormglass_discovered,
             storm_sigils: self.storm_sigils,
             ascension_level: self.ascension_level,
+            vessel_signal_discovered: self.vessel_signal_discovered,
+            vessel_launched: self.vessel_launched,
             // Transient fields — defaults
+            vessel_last_whisper_at: 0,
             active_fishing: None,
             challenge_menu: ChallengeMenu::new(),
             chess_stats: ChessStats::default(),

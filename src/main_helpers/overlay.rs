@@ -168,6 +168,16 @@ pub fn draw_game_overlays(
         GameOverlay::TimeVault { ref browser } => {
             ui::time_vault_scene::draw_time_vault(frame, area, browser, layout_ctx);
         }
+        GameOverlay::Vessel { confirm_pending } => {
+            ui::vessel_scene::render_vessel_overlay(
+                frame,
+                area,
+                state,
+                ctx.loom_state,
+                *confirm_pending,
+                layout_ctx,
+            );
+        }
         _ => {} // Small modals render after all overlays below.
     }
 
@@ -322,6 +332,9 @@ pub fn draw_game_overlays(
         }
         GameOverlay::LoomDiscovery => {
             ui::loom_scene::render_loom_discovery_modal(frame, area, layout_ctx);
+        }
+        GameOverlay::VesselDiscovery => {
+            ui::vessel_scene::render_vessel_discovery_modal(frame, area, layout_ctx);
         }
         GameOverlay::PatternMilestoneUnlock { milestone } => {
             ui::combat_scene::render_pattern_milestone_modal(

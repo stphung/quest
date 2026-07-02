@@ -25,6 +25,7 @@ mod stormglass;
 mod tick_events;
 mod ui;
 mod utils;
+mod vessel;
 mod zones;
 
 use character::manager::CharacterManager;
@@ -1180,6 +1181,9 @@ fn main() -> io::Result<()> {
                                 }
                                 if tick_flags.loom_discovered {
                                     pending_overlays.push_back(GameOverlay::LoomDiscovery);
+                                }
+                                if tick_flags.vessel_signal_discovered {
+                                    pending_overlays.push_back(GameOverlay::VesselDiscovery);
                                 }
                                 if let Some(region) = tick_flags.fracture_region_unlocked {
                                     pending_overlays

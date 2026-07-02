@@ -115,6 +115,13 @@ pub enum GameOverlay {
     },
     /// Loom of Worlds discovery celebration modal
     LoomDiscovery,
+    /// Vessel signal discovery celebration modal (Zone 50 final boss)
+    VesselDiscovery,
+    /// The Vessel construction overlay ([V]); `confirm_pending` is the
+    /// all-or-nothing launch confirmation modal
+    Vessel {
+        confirm_pending: bool,
+    },
     /// Pattern milestone unlock celebration modal
     PatternMilestoneUnlock {
         milestone: crate::loom::PatternMilestone,

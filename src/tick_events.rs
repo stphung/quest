@@ -22,6 +22,7 @@ pub struct TickEventFlags {
     pub stormglass_discovered: bool,
     pub deep_discovered: bool,
     pub loom_discovered: bool,
+    pub vessel_signal_discovered: bool,
     pub fracture_region_unlocked: Option<crate::zones::FractureRegion>,
     pub pattern_milestone_reached: Option<crate::loom::PatternMilestone>,
 }
@@ -34,6 +35,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
     let mut stormglass_discovered = false;
     let mut deep_discovered = false;
     let mut loom_discovered = false;
+    let mut vessel_signal_discovered = false;
     let mut fracture_region_unlocked = None;
     let mut pattern_milestone_reached = None;
     for event in events {
@@ -618,6 +620,37 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                     true,
                 );
             }
+            TickEvent::VesselSignalDiscovered => {
+                // Act 2 kill-switch: the flag still persists on GameState
+                // (set in tick_stages), but nothing is shown while disabled.
+                if crate::vessel::act2_enabled() {
+                    vessel_signal_discovered = true;
+                    game_state.combat_state.add_log_entry(
+                        "\u{2726} A signal from beyond the branches. The Loom resonates..."
+                            .to_string(),
+                        false,
+                        true,
+                    );
+                    game_state.ticker.push(TickerEntry {
+                        icon: "\u{2726}",
+                        text: "A signal from beyond".to_string(),
+                        color: Color::Rgb(150, 120, 200),
+                        bold: true,
+                        segments: None,
+                    });
+                }
+            }
+            TickEvent::VesselWhisper { message } => {
+                if crate::vessel::act2_enabled() {
+                    game_state.ticker.push(TickerEntry {
+                        icon: "\u{2726}",
+                        text: (*message).to_string(),
+                        color: Color::Rgb(120, 90, 160),
+                        bold: false,
+                        segments: None,
+                    });
+                }
+            }
             TickEvent::DeepMissionComplete { message } => {
                 game_state
                     .combat_state
@@ -815,6 +848,7 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
         stormglass_discovered,
         deep_discovered,
         loom_discovered,
+        vessel_signal_discovered,
         fracture_region_unlocked,
         pattern_milestone_reached,
     }
