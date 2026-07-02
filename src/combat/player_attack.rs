@@ -47,14 +47,14 @@ pub(crate) fn resolve_player_attack<R: Rng>(
     let base_damage = derived.total_damage();
     // 1b. Apply early damage percent (e.g. Giant's Might): +% base damage
     let early_boosted_damage =
-        (base_damage as f64 * (1.0 + bonuses.early_damage_percent / 100.0)) as u32;
+        (base_damage as f64 * (1.0 + bonuses.early_damage_percent / 100.0)) as u64;
     // 2. Apply damage percent multiplier (e.g. Haven Armory): +% damage
     let boosted_damage =
-        (early_boosted_damage as f64 * (1.0 + bonuses.damage_percent / 100.0)) as u32;
+        (early_boosted_damage as f64 * (1.0 + bonuses.damage_percent / 100.0)) as u64;
     // 3. Apply flat damage bonus (e.g. prestige), added after % bonuses, before defense
-    let pre_defense_damage = boosted_damage + bonuses.flat_damage;
+    let pre_defense_damage = boosted_damage.saturating_add(bonuses.flat_damage);
     // 4. Apply Ascension multiplier to damage
-    let pre_crit_damage = (pre_defense_damage as f64 * bonuses.ascension_multiplier) as u32;
+    let pre_crit_damage = (pre_defense_damage as f64 * bonuses.ascension_multiplier) as u64;
     // 5. Apply enemy defense: min damage floor of 1
     let enemy_def = state
         .combat_state
@@ -68,7 +68,7 @@ pub(crate) fn resolve_player_attack<R: Rng>(
     let total_crit_chance = derived.crit_chance_percent as f64 + bonuses.crit_chance_percent;
     let crit_roll = rng.random_range(0..100);
     if (crit_roll as f64) < total_crit_chance {
-        damage = (damage as f64 * derived.crit_multiplier) as u32;
+        damage = (damage as f64 * derived.crit_multiplier) as u64;
         was_crit = true;
     }
 

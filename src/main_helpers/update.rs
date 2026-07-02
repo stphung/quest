@@ -1653,7 +1653,7 @@ fn load_character_for_game(
             // Sanity check: clear stale enemy if HP is impossibly high
             let derived = state.cached_derived_stats;
             if let Some(enemy) = &state.combat_state.current_enemy {
-                if enemy.max_hp > (derived.max_hp as f64 * 2.5) as u32 {
+                if enemy.max_hp > (derived.max_hp as f64 * 2.5) as u64 {
                     state.combat_state.current_enemy = None;
                 }
             }

@@ -56,10 +56,10 @@ fn make_state_at_level(level: u32, prestige_rank: u32) -> GameState {
 #[test]
 fn combat_bonuses_exact_values_at_rank_5() {
     let b = PrestigeCombatBonuses::from_rank(5);
-    let expected_damage = (5.0_f64 * 5.0_f64.powf(0.7)).floor() as u32;
-    let expected_defense = (3.0_f64 * 5.0_f64.powf(0.6)).floor() as u32;
+    let expected_damage = (5.0_f64 * 5.0_f64.powf(0.7)).floor() as u64;
+    let expected_defense = (3.0_f64 * 5.0_f64.powf(0.6)).floor() as u64;
     let expected_crit = 5.0 * 0.5;
-    let expected_hp = (15.0_f64 * 5.0_f64.powf(0.6)).floor() as u32;
+    let expected_hp = (15.0_f64 * 5.0_f64.powf(0.6)).floor() as u64;
 
     assert_eq!(b.flat_damage, expected_damage);
     assert_eq!(b.flat_defense, expected_defense);
@@ -70,10 +70,10 @@ fn combat_bonuses_exact_values_at_rank_5() {
 #[test]
 fn combat_bonuses_exact_values_at_rank_20() {
     let b = PrestigeCombatBonuses::from_rank(20);
-    let expected_damage = (5.0_f64 * 20.0_f64.powf(0.7)).floor() as u32;
-    let expected_defense = (3.0_f64 * 20.0_f64.powf(0.6)).floor() as u32;
+    let expected_damage = (5.0_f64 * 20.0_f64.powf(0.7)).floor() as u64;
+    let expected_defense = (3.0_f64 * 20.0_f64.powf(0.6)).floor() as u64;
     let expected_crit = (20.0_f64 * 0.5).min(15.0);
-    let expected_hp = (15.0_f64 * 20.0_f64.powf(0.6)).floor() as u32;
+    let expected_hp = (15.0_f64 * 20.0_f64.powf(0.6)).floor() as u64;
 
     assert_eq!(b.flat_damage, expected_damage);
     assert_eq!(b.flat_defense, expected_defense);

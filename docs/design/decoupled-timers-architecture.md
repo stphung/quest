@@ -18,8 +18,8 @@ Decouple the single shared `attack_timer` in `CombatState` into independent play
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CombatState {
     pub current_enemy: Option<Enemy>,
-    pub player_current_hp: u32,
-    pub player_max_hp: u32,
+    pub player_current_hp: u64,
+    pub player_max_hp: u64,
     pub attack_timer: f64,        // <-- single shared timer
     pub regen_timer: f64,
     pub is_regenerating: bool,
@@ -77,8 +77,8 @@ The UI shows a countdown to the next attack based on the single timer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CombatState {
     pub current_enemy: Option<Enemy>,
-    pub player_current_hp: u32,
-    pub player_max_hp: u32,
+    pub player_current_hp: u64,
+    pub player_max_hp: u64,
 
     /// Player's independent attack timer. Accumulates delta_time each tick.
     /// Player attacks when this reaches the effective player attack interval.
@@ -258,7 +258,7 @@ fn update_combat(state, delta_time, haven, achievements) -> Vec<CombatEvent>:
 
         // Damage reflection
         if derived.damage_reflection_percent > 0.0 && enemy_damage > 0:
-            reflected = (enemy_damage * reflection_pct / 100) as u32
+            reflected = (enemy_damage * reflection_pct / 100) as u64
             enemy.take_damage(reflected)
             // Check if reflection killed the enemy
             if !enemy.is_alive():

@@ -116,10 +116,10 @@ Flat combat bonuses computed from prestige rank, applied during combat each tick
 ```rust
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PrestigeCombatBonuses {
-    pub flat_damage: u32,    // Added after Haven % bonus, before enemy defense
-    pub flat_defense: u32,   // Added to DEX-based defense
+    pub flat_damage: u64,    // Added after Haven % bonus, before enemy defense
+    pub flat_defense: u64,   // Added to DEX-based defense
     pub crit_chance: f64,    // Added to DEX-based crit (capped at 15%)
-    pub flat_hp: u32,        // Added to combat max HP (not DerivedStats)
+    pub flat_hp: u64,        // Added to combat max HP (not DerivedStats)
 }
 ```
 

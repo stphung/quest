@@ -34,12 +34,12 @@ pub(crate) fn resolve_enemy_attack<R: Rng>(
     state.combat_state.enemy_attack_timer = 0.0;
 
     if let Some(enemy) = state.combat_state.current_enemy.as_mut() {
-        let base_defense = derived.defense + bonuses.flat_defense;
-        let total_defense = (base_defense as f64 * bonuses.ascension_multiplier) as u32;
+        let base_defense = derived.defense.saturating_add(bonuses.flat_defense);
+        let total_defense = (base_defense as f64 * bonuses.ascension_multiplier) as u64;
         let base_damage = enemy.damage.saturating_sub(total_defense).max(1);
         // Apply damage reduction (e.g. Divine Bulwark)
         let enemy_damage = if bonuses.damage_reduction_percent > 0.0 {
-            (((base_damage as f64) * (1.0 - bonuses.damage_reduction_percent / 100.0)) as u32)
+            (((base_damage as f64) * (1.0 - bonuses.damage_reduction_percent / 100.0)) as u64)
                 .max(1)
         } else {
             base_damage
@@ -56,7 +56,7 @@ pub(crate) fn resolve_enemy_attack<R: Rng>(
         // Damage reflection: reflect percentage of damage taken back to attacker
         if derived.damage_reflection_percent > 0.0 && enemy_damage > 0 {
             let reflected =
-                (enemy_damage as f64 * derived.damage_reflection_percent / 100.0) as u32;
+                (enemy_damage as f64 * derived.damage_reflection_percent / 100.0) as u64;
             if reflected > 0 {
                 enemy.take_damage(reflected);
                 events.push(CombatEvent::DamageReflected { damage: reflected });

@@ -101,15 +101,15 @@ fn prestige_bonuses_monotonic_scaling() {
 fn prestige_bonuses_damage_formula() {
     // flat_damage = floor(5.0 * rank^0.7)
     let b5 = PrestigeCombatBonuses::from_rank(5);
-    let expected_5 = (5.0_f64 * 5.0_f64.powf(0.7)).floor() as u32;
+    let expected_5 = (5.0_f64 * 5.0_f64.powf(0.7)).floor() as u64;
     assert_eq!(b5.flat_damage, expected_5);
 
     let b10 = PrestigeCombatBonuses::from_rank(10);
-    let expected_10 = (5.0_f64 * 10.0_f64.powf(0.7)).floor() as u32;
+    let expected_10 = (5.0_f64 * 10.0_f64.powf(0.7)).floor() as u64;
     assert_eq!(b10.flat_damage, expected_10);
 
     let b20 = PrestigeCombatBonuses::from_rank(20);
-    let expected_20 = (5.0_f64 * 20.0_f64.powf(0.7)).floor() as u32;
+    let expected_20 = (5.0_f64 * 20.0_f64.powf(0.7)).floor() as u64;
     assert_eq!(b20.flat_damage, expected_20);
 }
 
@@ -117,7 +117,7 @@ fn prestige_bonuses_damage_formula() {
 fn prestige_bonuses_defense_formula() {
     // flat_defense = floor(3.0 * rank^0.6)
     let b10 = PrestigeCombatBonuses::from_rank(10);
-    let expected = (3.0_f64 * 10.0_f64.powf(0.6)).floor() as u32;
+    let expected = (3.0_f64 * 10.0_f64.powf(0.6)).floor() as u64;
     assert_eq!(b10.flat_defense, expected);
 }
 
@@ -154,7 +154,7 @@ fn prestige_bonuses_crit_capped_at_15() {
 fn prestige_bonuses_hp_formula() {
     // flat_hp = floor(15.0 * rank^0.6)
     let b5 = PrestigeCombatBonuses::from_rank(5);
-    let expected = (15.0_f64 * 5.0_f64.powf(0.6)).floor() as u32;
+    let expected = (15.0_f64 * 5.0_f64.powf(0.6)).floor() as u64;
     assert_eq!(b5.flat_hp, expected);
 }
 
@@ -664,8 +664,8 @@ fn generate_subzone_boss_has_higher_stats() {
     for _ in 0..samples {
         let boss = generate_subzone_boss(zone, subzone);
         let mob = generate_zone_enemy(zone, subzone);
-        boss_hp_sum += boss.max_hp as u64;
-        mob_hp_sum += mob.max_hp as u64;
+        boss_hp_sum += boss.max_hp;
+        mob_hp_sum += mob.max_hp;
     }
     assert!(
         boss_hp_sum > mob_hp_sum,
@@ -711,8 +711,8 @@ fn generate_dungeon_elite_stronger_than_normal() {
     let mut normal_hp_sum = 0u64;
     let samples = 20;
     for _ in 0..samples {
-        elite_hp_sum += generate_dungeon_elite(5).max_hp as u64;
-        normal_hp_sum += generate_dungeon_enemy(5).max_hp as u64;
+        elite_hp_sum += generate_dungeon_elite(5).max_hp;
+        normal_hp_sum += generate_dungeon_enemy(5).max_hp;
     }
     assert!(
         elite_hp_sum > normal_hp_sum,
@@ -728,8 +728,8 @@ fn generate_dungeon_boss_stronger_than_elite() {
     let mut elite_hp_sum = 0u64;
     let samples = 20;
     for _ in 0..samples {
-        boss_hp_sum += generate_dungeon_boss(5).max_hp as u64;
-        elite_hp_sum += generate_dungeon_elite(5).max_hp as u64;
+        boss_hp_sum += generate_dungeon_boss(5).max_hp;
+        elite_hp_sum += generate_dungeon_elite(5).max_hp;
     }
     assert!(
         boss_hp_sum > elite_hp_sum,
@@ -778,8 +778,8 @@ fn zone_enemies_scale_with_zone() {
     let mut z5_hp = 0u64;
     let samples = 20;
     for _ in 0..samples {
-        z1_hp += generate_zone_enemy(zone1, &zone1.subzones[0]).max_hp as u64;
-        z5_hp += generate_zone_enemy(zone5, &zone5.subzones[0]).max_hp as u64;
+        z1_hp += generate_zone_enemy(zone1, &zone1.subzones[0]).max_hp;
+        z5_hp += generate_zone_enemy(zone5, &zone5.subzones[0]).max_hp;
     }
     assert!(
         z5_hp > z1_hp,

@@ -133,7 +133,7 @@ impl GameState {
 
         let character_id = Uuid::new_v4().to_string();
         let attributes = Attributes::new();
-        let combat_state = CombatState::new(crate::core::constants::BASE_HP as u32);
+        let combat_state = CombatState::new(crate::core::constants::BASE_HP as u64);
         let equipment = Equipment::new();
 
         Self {

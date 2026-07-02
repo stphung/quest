@@ -348,7 +348,7 @@ fn equip_all(state: &mut GameState, base: Rarity, weapon_rarity: Rarity, ilvl: u
 /// Gives the fixture a sane starting HP pool. The real max HP (with
 /// prestige/ascension bonuses) is recalculated by the first game tick.
 fn sync_hp(state: &mut GameState) {
-    let hp = 50 + state.character_level * 10;
+    let hp = 50 + state.character_level as u64 * 10;
     state.combat_state = CombatState::new(hp);
 }
 

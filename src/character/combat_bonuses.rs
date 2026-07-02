@@ -7,13 +7,13 @@ use crate::core::constants::*;
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PrestigeCombatBonuses {
     /// Flat damage added after Haven % multiplier, before crit
-    pub flat_damage: u32,
+    pub flat_damage: u64,
     /// Flat defense added to DEX-based defense
-    pub flat_defense: u32,
+    pub flat_defense: u64,
     /// Percentage points added to crit chance
     pub crit_chance: f64,
     /// Flat HP added to combat HP (NOT to DerivedStats.max_hp)
-    pub flat_hp: u32,
+    pub flat_hp: u64,
 }
 
 impl PrestigeCombatBonuses {
@@ -24,13 +24,13 @@ impl PrestigeCombatBonuses {
         Self {
             flat_damage: (PRESTIGE_FLAT_DAMAGE_FACTOR
                 * (rank as f64).powf(PRESTIGE_FLAT_DAMAGE_EXPONENT))
-            .floor() as u32,
+            .floor() as u64,
             flat_defense: (PRESTIGE_FLAT_DEFENSE_FACTOR
                 * (rank as f64).powf(PRESTIGE_FLAT_DEFENSE_EXPONENT))
-            .floor() as u32,
+            .floor() as u64,
             crit_chance: (rank as f64 * PRESTIGE_CRIT_PER_RANK).min(PRESTIGE_CRIT_CAP),
             flat_hp: (PRESTIGE_FLAT_HP_FACTOR * (rank as f64).powf(PRESTIGE_FLAT_HP_EXPONENT))
-                .floor() as u32,
+                .floor() as u64,
         }
     }
 }

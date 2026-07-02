@@ -317,7 +317,7 @@ All functions above are re-exported through `game_logic.rs` for backward compati
 ### Zone Enemy Stats
 | Constant | Value | Notes |
 |----------|-------|-------|
-| `ZONE_ENEMY_STATS` | `[(u32,u32,u32,u32,u32,u32); 50]` | Per-zone `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)`. Index 0=Zone 1, Index 49=Zone 50. Zones 12-30 scale at 1.6x per zone from Zone 11 base. Zones 31-50 scale at 1.25x per zone from Zone 30 base. Steps are per-subzone-depth increments above depth 1 |
+| `ZONE_ENEMY_STATS` | `[(u64,u64,u64,u64,u64,u64); 50]` | Per-zone `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)`. Index 0=Zone 1, Index 49=Zone 50. Zones 12-30 scale at 1.6x per zone from Zone 11 base. Zones 31-50 scale at 1.25x per zone from Zone 30 base. Steps are per-subzone-depth increments above depth 1 |
 
 Zone 11 (The Expanse) is an endgame wall: `(5000, 400, 500, 80, 250, 30)` — roughly 6.2x HP, 4.6x DMG, 4.8x DEF over Zone 10.
 

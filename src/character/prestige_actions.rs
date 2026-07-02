@@ -53,7 +53,7 @@ pub fn perform_prestige(state: &mut GameState) {
     state.active_minigame = None;
 
     // Reset combat state with base HP for fresh attributes
-    state.combat_state = CombatState::new(BASE_HP as u32);
+    state.combat_state = CombatState::new(BASE_HP as u64);
 
     // Increment prestige rank and total prestige count
     state.prestige_rank += 1;

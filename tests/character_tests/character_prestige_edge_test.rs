@@ -212,13 +212,13 @@ fn attribute_cap_increases_by_5_each_prestige_rank() {
 fn combat_bonuses_rank_1_exact_values() {
     let b = PrestigeCombatBonuses::from_rank(1);
     let expected_damage =
-        (PRESTIGE_FLAT_DAMAGE_FACTOR * 1.0_f64.powf(PRESTIGE_FLAT_DAMAGE_EXPONENT)).floor() as u32;
+        (PRESTIGE_FLAT_DAMAGE_FACTOR * 1.0_f64.powf(PRESTIGE_FLAT_DAMAGE_EXPONENT)).floor() as u64;
     let expected_defense = (PRESTIGE_FLAT_DEFENSE_FACTOR
         * 1.0_f64.powf(PRESTIGE_FLAT_DEFENSE_EXPONENT))
-    .floor() as u32;
+    .floor() as u64;
     let expected_crit = (1.0_f64 * PRESTIGE_CRIT_PER_RANK).min(PRESTIGE_CRIT_CAP);
     let expected_hp =
-        (PRESTIGE_FLAT_HP_FACTOR * 1.0_f64.powf(PRESTIGE_FLAT_HP_EXPONENT)).floor() as u32;
+        (PRESTIGE_FLAT_HP_FACTOR * 1.0_f64.powf(PRESTIGE_FLAT_HP_EXPONENT)).floor() as u64;
 
     assert_eq!(b.flat_damage, expected_damage, "P1 flat_damage mismatch");
     assert_eq!(b.flat_defense, expected_defense, "P1 flat_defense mismatch");
@@ -239,13 +239,13 @@ fn combat_bonuses_rank_1_exact_values() {
 fn combat_bonuses_rank_10_exact_values() {
     let b = PrestigeCombatBonuses::from_rank(10);
     let expected_damage =
-        (PRESTIGE_FLAT_DAMAGE_FACTOR * 10.0_f64.powf(PRESTIGE_FLAT_DAMAGE_EXPONENT)).floor() as u32;
+        (PRESTIGE_FLAT_DAMAGE_FACTOR * 10.0_f64.powf(PRESTIGE_FLAT_DAMAGE_EXPONENT)).floor() as u64;
     let expected_defense = (PRESTIGE_FLAT_DEFENSE_FACTOR
         * 10.0_f64.powf(PRESTIGE_FLAT_DEFENSE_EXPONENT))
-    .floor() as u32;
+    .floor() as u64;
     let expected_crit = (10.0_f64 * PRESTIGE_CRIT_PER_RANK).min(PRESTIGE_CRIT_CAP);
     let expected_hp =
-        (PRESTIGE_FLAT_HP_FACTOR * 10.0_f64.powf(PRESTIGE_FLAT_HP_EXPONENT)).floor() as u32;
+        (PRESTIGE_FLAT_HP_FACTOR * 10.0_f64.powf(PRESTIGE_FLAT_HP_EXPONENT)).floor() as u64;
 
     assert_eq!(b.flat_damage, expected_damage);
     assert_eq!(b.flat_defense, expected_defense);
