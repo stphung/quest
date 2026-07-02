@@ -1709,6 +1709,9 @@ fn load_character_for_game(
                 if let Some(ref mut report) = offline_report {
                     report.power_core_pr = power_core_pr;
                 }
+                // This grant happens after sync_from_game_state, so report the
+                // new rank to keep prestige achievement progress current (#597).
+                global_achievements.on_prestige(state.prestige_rank, Some(&state.character_name));
             }
 
             // Always sync last_save_time on load

@@ -43,12 +43,11 @@ pub fn log_synced_achievements(
 /// `tick.rs` or the relevant domain modules so that all achievement tracking is
 /// co-located with game logic.  That was deferred for the following reasons:
 ///
-/// **Prestige**: Prestige fires from user input (Enter on the prestige dialog),
-/// not from `game_tick()`.  Moving it to `tick.rs` would require either:
-/// (a) adding a `prestige_changed` flag to `TickResult`, or
-/// (b) having `tick.rs` compare the current and previous prestige rank each
-///     tick -- introducing a data-dependency the tick engine doesn't currently
-///     carry.  Both options expand `TickResult`'s interface for minimal gain.
+/// **Prestige**: Manual prestige fires from user input (Enter on the prestige
+/// dialog), not from `game_tick()`, so it is tracked here by comparing the
+/// rank before and after input handling.  Passive PR gains (Power Cores,
+/// WR→PR conversion) happen inside the tick and are tracked separately by
+/// `tick_stages::track_passive_prestige_gain` at the end of each tick.
 ///
 /// **Minigame wins**: `state.last_minigame_win` is set inside input handlers.
 /// `tick.rs` *could* drain it, but that would delay the achievement by one tick

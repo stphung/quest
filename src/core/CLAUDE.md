@@ -207,6 +207,7 @@ The old `game_tick()` function with individual parameters is `#[deprecated]` —
 | 11e. Loom discovery | Checks Loom of Worlds discovery and pattern milestone consumption |
 | 11f. Pattern milestones | Consumes pending pattern milestones, syncs zone unlocks, emits `PatternMilestoneReached` |
 | 12a. Power Cores | Ticks Power Cores for passive PR generation |
+| 12b. Passive prestige tracking | Reports passive PR gains this tick (Power Cores, WR→PR) to the achievement system; also runs before the fishing early-return |
 | 12. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display |
 
 **Important**: Stage 5 (fishing) returns early, skipping stages 6-7. Fishing and combat are mutually exclusive.

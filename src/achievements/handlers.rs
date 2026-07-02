@@ -90,14 +90,24 @@ impl Achievements {
         self.check_milestones(new_level as u64, LEVEL_MILESTONES, character_name);
     }
 
-    /// Called when the character prestiges.
+    /// Called when the character's prestige rank increases (manual prestige,
+    /// Power Cores, WR→PR conversion, challenge rewards, or load-time sync).
     /// Unlocks prestige milestone achievements.
+    ///
+    /// Milestones are checked against the account-wide high-water mark, not
+    /// the passed rank: PR is also a spendable currency (Ascension, Haven,
+    /// enhancement), so the current rank can drop below a milestone the
+    /// player already reached.
     pub fn on_prestige(&mut self, new_rank: u32, character_name: Option<&str>) {
         if new_rank > self.highest_prestige_rank {
             self.highest_prestige_rank = new_rank;
         }
 
-        self.check_milestones(new_rank as u64, PRESTIGE_MILESTONES, character_name);
+        self.check_milestones(
+            self.highest_prestige_rank as u64,
+            PRESTIGE_MILESTONES,
+            character_name,
+        );
     }
 
     /// Called when a zone is fully cleared (all subzones completed).
