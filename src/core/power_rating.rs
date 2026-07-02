@@ -18,7 +18,7 @@ use crate::core::constants::ATTACK_INTERVAL_SECONDS;
 pub fn compute_power_rating(
     derived: &DerivedStats,
     bonuses: &CombatBonuses,
-    player_max_hp: u32,
+    player_max_hp: u64,
 ) -> f64 {
     // ── Effective damage per hit (mirrors player_attack.rs pipeline) ──
     let base_dmg = derived.physical_damage.max(derived.magic_damage) as f64;

@@ -1192,7 +1192,8 @@ fn render_bottom_panel_pattern(
     }
 
     // Diamond progress trail: ◇◇◇◇◆◇◇◇ showing position in sequence.
-    let total_patterns = loom.persistent.patterns.len();
+    // The eternal pattern (always last) has its own panel and is excluded here.
+    let total_patterns = loom.persistent.woven_pattern_count();
     if total_patterns > 0 {
         let mut diamond_spans: Vec<Span> = vec![Span::raw(" ")];
         for i in 0..total_patterns {
@@ -1236,15 +1237,28 @@ fn render_bottom_panel_pattern(
     let gauge_ratio = overall_progress.clamp(0.0, 1.0);
     lines.push(Line::from("")); // placeholder for gauge row
 
-    // Flavor text (italic, muted purple, quoted).
+    // Flavor text (italic, muted purple, quoted) — word-wrap to fit panel width.
     if !pattern.flavor.is_empty() {
-        lines.push(Line::from(Span::styled(
-            format!(" \u{201c}{}\u{201d}", pattern.flavor),
-            Style::default()
-                .fg(Color::Rgb(130, 110, 160))
-                .add_modifier(Modifier::ITALIC),
-        )));
-        lines.push(Line::from(""))
+        let flavor_style = Style::default()
+            .fg(Color::Rgb(130, 110, 160))
+            .add_modifier(Modifier::ITALIC);
+        let max_width = area.width.saturating_sub(3) as usize;
+        let quoted = format!("\u{201c}{}\u{201d}", pattern.flavor);
+        let mut line_buf = String::from(" ");
+        for word in quoted.split_whitespace() {
+            if line_buf.len() + word.len() + 1 > max_width && line_buf.len() > 1 {
+                lines.push(Line::from(Span::styled(line_buf.clone(), flavor_style)));
+                line_buf = String::from(" ");
+            }
+            if line_buf.len() > 1 {
+                line_buf.push(' ');
+            }
+            line_buf.push_str(word);
+        }
+        if line_buf.len() > 1 {
+            lines.push(Line::from(Span::styled(line_buf, flavor_style)));
+        }
+        lines.push(Line::from(""));
     }
 
     // Check if all requirements are currently being met (for status indicator).
@@ -1356,7 +1370,7 @@ fn render_bottom_panel_eternal(
     let multiplier = crate::loom::wr_pr_multiplier(wr_rate);
 
     // Compute gauge progress: fraction of time until next PR grant.
-    let now = chrono::Utc::now().timestamp();
+    let now = super::clock::now_utc().timestamp();
     let last = loom.persistent.wr_pr_last_granted_at;
     let fill_secs = if pr_per_hour > 0 {
         (3600i64 / pr_per_hour as i64).max(1)

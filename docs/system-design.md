@@ -35,7 +35,7 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
                               ▼
                     ┌──────────────────────────┐
                     │  core/tick.rs             │
-                    │  game_tick<R: Rng>()      │
+                    │  game_tick_with_context() │
                     │  (Central Orchestrator)   │
                     └─────────┬────────────────┘
                               │ returns TickResult { events, flags }
@@ -46,7 +46,7 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
                     │  (Event → UI Bridge)      │
                     └──────────────────────────┘
 
-    game_tick() coordinates all game systems per tick:
+    game_tick_with_context() coordinates all game systems per tick:
 
     ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
     │ Combat   │ │ Fishing  │ │ Dungeon  │ │Challenges│
@@ -71,8 +71,8 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 
 ### Key Architectural Patterns
 
-- **Event-driven tick processing**: `game_tick()` returns a `TickResult` containing `Vec<TickEvent>` (45 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
-- **Generic RNG**: `game_tick<R: Rng>()` uses a generic type parameter because `rand::Rng` is not dyn-compatible. Production uses `thread_rng()`, tests use seeded `ChaCha8Rng` for determinism.
+- **Event-driven tick processing**: `game_tick_with_context()` returns a `TickResult` containing `Vec<TickEvent>` (48 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
+- **Generic RNG**: `game_tick_with_context<R: Rng>()` uses a generic type parameter because `rand::Rng` is not dyn-compatible. Production uses `thread_rng()`, tests use seeded `ChaCha8Rng` for determinism.
 - **Haven bonus injection**: Haven bonuses are passed as explicit parameters to game systems rather than accessed globally, keeping modules decoupled.
 
 ### Key Dependencies
@@ -80,7 +80,7 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 | Crate | Purpose |
 |-------|---------|
 | ratatui 0.30 | Terminal UI framework |
-| crossterm 0.27 | Terminal backend |
+| crossterm (transitive, ~0.29) | Terminal backend (pulled in via ratatui, not a direct dependency) |
 | serde / serde_json | JSON serialization |
 | rand | RNG for procedural systems |
 | rand_chacha | Deterministic RNG for simulator and tests |
@@ -93,32 +93,40 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 
 ## Core Game Loop
 
-The game runs at **10 ticks per second** (100ms intervals). Each tick is processed by `game_tick()` in `src/core/tick.rs`, which orchestrates all game systems through a 14-stage pipeline.
+The game runs at **10 ticks per second** (100ms intervals). Each tick is processed by `game_tick_with_context()` in `src/core/tick.rs`, which orchestrates all game systems through a 21-stage pipeline.
 
 ```
                     GAME TICK PIPELINE (core/tick.rs)
 
     ┌─────────────────────────────────────────────────────────┐
-    │  main.rs: Process Input → call game_tick() → Render     │
+    │  main.rs: Process Input → game_tick_with_context()      │
+    │           → Render                                      │
     └──────────────────────────┬──────────────────────────────┘
                                │
-               game_tick() 14-stage pipeline:
+          game_tick_with_context() pipeline:
                                │
     ┌──────────────────────────┴──────────────────────────────┐
-    │  1. Challenge AI        Tick AI thinking for active game │
-    │  2. Challenge Discovery Roll for new challenge (P1+)    │
-    │  3. Sync Player HP      Recalculate DerivedStats        │
-    │  4. Dungeon Exploration Process rooms, keys, boss       │
-    │  5. Fishing             Tick session (EARLY RETURN)     │
-    │  6. Combat              Attack cycle, kills, deaths     │
-    │  7. Enemy Spawn         Spawn if idle + not regen       │
-    │  8. Play Time           Increment tick/second counters  │
-    │  9. Achievement Collect Drain newly unlocked into events│
-    │ 10. Haven Discovery     Roll for Haven (P10+)           │
-    │ 11. Soulforge Discovery Roll for Soulforge (P15+)      │
-    │ 12. Deep Discovery      Trigger hook (no per-tick roll) │
-    │ 13. Deep Missions       Tick active missions, events    │
-    │ 14. Achievement Modal   Check 500ms accumulation window │
+    │  0.  Merged Bonuses     Compute merged Haven+Sigil bonuses│
+    │  1.  Challenge AI        Tick AI thinking for active game│
+    │  2.  Challenge Discovery Roll for new challenge (P1+)    │
+    │  3.  Sync Player HP      Recalculate DerivedStats        │
+    │  4.  Dungeon Exploration Process rooms, keys, boss       │
+    │  4b. Loom of Worlds     Discovery + shuttle/production tick│
+    │  5.  Fishing             Tick session (EARLY RETURN)     │
+    │  6.  Combat              Attack cycle, kills, deaths     │
+    │  6b. HUD Decay           Decay combat HUD flash timers   │
+    │  7.  Enemy Spawn         Spawn if idle + not regen       │
+    │  8.  Play Time           Increment tick/second counters  │
+    │  9.  Achievement Collect Drain newly unlocked into events│
+    │ 10.  Haven Discovery     Roll for Haven (P10+)           │
+    │ 11.  Soulforge Discovery Roll for Soulforge (P15+)      │
+    │ 11b. Deep Discovery      Trigger hook (no per-tick roll) │
+    │ 11c. Deep Mission Tick   Tick active missions, events    │
+    │ 11d. Fracture Unlock     Consume pending region unlock   │
+    │ 11f. Pattern Milestones  Consume pending pattern milestone│
+    │ 12a. Power Cores         Tick Power Cores passive PR gain│
+    │ 12b. Passive PR Tracking Report Power Core/WR→PR gains   │
+    │ 12.  Achievement Modal   Check 500ms accumulation window │
     └─────────────────────────────────────────────────────────┘
                                │
                                ▼
@@ -129,6 +137,7 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
                     │      changed: bool,  │
                     │    haven_changed,    │
                     │    deep_changed,     │
+                    │    loom_changed,     │
                     │    leviathan_        │
                     │      encounter,      │
                     │    achievement_      │
@@ -176,7 +185,7 @@ pub struct TickResult {
     pub enhancement_changed: bool,
     pub god_items_changed: bool,
     pub deep_changed: bool,
-    pub power_cores_changed: bool,
+    pub loom_changed: bool,
     pub achievement_modal_ready: Vec<AchievementId>,
 }
 ```
@@ -612,7 +621,7 @@ Endgame system gated at P15+. Players recruit and manage a mercenary company, se
 - 0.000014 per tick (~2 hour average)
 - Requires P1+ (not in dungeon, fishing, or another minigame)
 - Haven Library bonus: up to +50%
-- Weighted distribution (total weight 218): 12 challenge types with weights favoring quick games (Rune 30, Minesweeper 28, Snake 22, Flappy Bird 20, Sigil Surge 20, Shard Fusion 20, JezzBall 18, Sudoku 18, Gomoku 15, Morris 12, Chess 8, Go 7)
+- Weighted distribution (total weight 256): 14 challenge types with weights favoring quick games (Rune 30, Minesweeper 28, Snake 22, Flappy Bird 20, Sigil Surge 20, Shard Fusion 20, Runic Lights 20, JezzBall 18, Sudoku 18, Vault Warden 18, Gomoku 15, Morris 12, Chess 8, Go 7)
 
 ### Games & AI
 
@@ -630,6 +639,8 @@ Endgame system gated at P15+. Players recruit and manage a mercenary company, se
 | Sigil Surge | N/A (action-puzzle) | 6x12 grid, 5 colors, 3 lives |
 | Sudoku | N/A (puzzle) | 9x9 grid, pencil marks |
 | Shard Fusion | N/A (puzzle) | 4x4 grid, 2048-style |
+| Runic Lights | N/A (puzzle) | Lights Out, 3x3 to 6x6 |
+| Vault Warden | N/A (puzzle) | Sokoban, 5 restart attempts |
 
 All challenges use 4 difficulty levels: Novice, Apprentice, Journeyman, Master.
 
@@ -649,6 +660,8 @@ All challenges use 4 difficulty levels: Novice, Apprentice, Journeyman, Master.
 | Sigil Surge | +50% XP | +100% XP | +1 PR, +75% XP | +2 PR, +150% XP, +1 FR |
 | Sudoku | SG only | SG only | +1 PR | +2 PR |
 | Shard Fusion | SG only | SG only | +1 PR | +2 PR |
+| Runic Lights | SG only | SG only | +1 PR | +2 PR |
+| Vault Warden | SG only | SG only | +1 PR | +2 PR |
 
 PR = Prestige Rank, FR = Fishing Rank, XP% = percentage of current level's XP requirement. Challenge wins also award Stormglass currency (see [Secondary Systems](secondary-systems.md#stormglass-system)).
 
@@ -786,15 +799,18 @@ Endgame mercenary expedition system discovered on the first Expanse cycle boss k
 
 Per-character combat power multiplier purchased with prestige ranks, gated by Deep layer milestones. Survives prestige.
 
-| Level | PR Cost | Deep Gate | Multiplier |
-|-------|---------|-----------|------------|
+| Level | PR Cost | Gate | Multiplier |
+|-------|---------|------|------------|
 | I | 35 | Layer 3 | 2x |
 | II | 65 | Layer 7 | 4x |
 | III | 120 | Layer 12 | 8x |
 | IV | 200 | Layer 18 | 16x |
 | V | 325 | Layer 25 | 32x |
 | VI | 500 | Layer 30 | 64x |
-| VII+ | 500 + 75*(level-6) | None | 64 × 1.5^(level-6) |
+| VII | 1,500 | 8 Patterns | 96x |
+| VIII | 4,000 | 16 Patterns | 144x |
+| IX | 8,000 | 22 Patterns | 216x |
+| X | 15,000 | 28 Patterns | 324x |
 
 Total PR for I-VI: 1,245. Multiplier applies to damage, defense, and HP. Ascension level stored as `ascension_level: u32` on `GameState`.
 
@@ -830,7 +846,7 @@ make check    # Run all CI checks locally (same script as CI)
 cargo run --bin simulator -- [OPTIONS]
 ```
 
-Headless game balance simulator that runs `game_tick()` without UI:
+Headless game balance simulator that runs `game_tick_with_context()` without UI:
 - `--ticks N` -- Ticks to simulate (default: 36000 = 1 hour)
 - `--seed N` -- RNG seed for deterministic runs (default: 42)
 - `--prestige N` -- Starting prestige rank (default: 0)
@@ -844,13 +860,13 @@ Headless game balance simulator that runs `game_tick()` without UI:
 - Startup: Check GitHub API for latest release
 - Update: `quest update` downloads and replaces binary
 - Backup: Saves created before update in `~/.quest/backups/`
-- Check interval: every 30 min with +/-5 min jitter
+- Check interval: every 15 min with +/-5 min jitter
 
 ### Debug Menu
 
 Activated with `--debug` flag, toggle with backtick.
 
-Options organized in 8 tabs: Challenges (all 10 types), World (Dungeon, Fishing, Haven, Soulforge), Resources (Stormglass), Items (God Items), Deep (discovery, missions, marks), Zones, Character, Borders.
+Options organized in 8 tabs: Challenges (all 14 types), World (Dungeon, Fishing, Haven, Soulforge), Resources (Stormglass), Items (God Items), Deep (discovery, missions, marks), Zones, Character, Borders.
 
 ### Integration Tests
 
@@ -1002,13 +1018,13 @@ quest/
 │   │   └── update.rs        # Auto-update check handling, startup splash screen
 │   ├── tick_events.rs       # TickEvent → combat log + visual effects bridge
 │   ├── bin/
-│   │   ├── simulator.rs     # Headless balance simulator binary
+│   │   ├── simulator/       # Headless balance simulator binary (main.rs, scenarios.rs, report.rs, stats.rs, strategy.rs, assertions.rs)
 │   │   └── deep_simulator.rs # Headless Deep economy simulator binary
 │   ├── core/                # Core game systems
 │   │   ├── constants.rs     # All game balance constants
 │   │   ├── game_logic.rs    # Thin re-export wrapper for submodules
 │   │   ├── game_state.rs    # Main GameState struct
-│   │   ├── tick.rs          # game_tick() orchestrator
+│   │   ├── tick.rs          # game_tick_with_context() orchestrator
 │   │   ├── tick_types.rs    # TickEvent enum (48 variants), TickResult struct
 │   │   ├── tick_stages.rs   # Tick processing stages 4-6 + helpers
 │   │   ├── xp.rs            # XP calculation, leveling, combat kill XP
@@ -1204,7 +1220,7 @@ quest/
 
 Each major module has its own `CLAUDE.md` with implementation patterns, integration points, and extension guides:
 
-- `src/core/CLAUDE.md` -- GameState, TickEvent/TickResult, game_tick() stages, constants
+- `src/core/CLAUDE.md` -- GameState, TickEvent/TickResult, game_tick_with_context() stages, constants
 - `src/character/CLAUDE.md` -- Attributes, prestige, character persistence
 - `src/combat/CLAUDE.md` -- Combat state machine, enemy generation
 - `src/zones/CLAUDE.md` -- Zone tiers, progression, weapon gates

@@ -5,7 +5,7 @@
 
 use quest::core::constants::{ITEM_DROP_BASE_CHANCE, ITEM_DROP_MAX_CHANCE};
 use quest::items::drops::{drop_chance_for_prestige, roll_rarity_for_mob, try_drop_from_mob};
-use quest::items::generation::generate_item;
+use quest::items::generation::{generate_item, generate_item_with_rng};
 use quest::items::scoring::auto_equip_if_better;
 use quest::items::types::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
 use quest::GameState;
@@ -223,12 +223,13 @@ fn test_affix_count_contract_across_all_rarities() {
 
 #[test]
 fn test_higher_rarity_produces_higher_average_attribute_total() {
-    let sample_avg = |rarity: Rarity| -> f64 {
+    let mut rng = ChaCha8Rng::seed_from_u64(101);
+    let sample_avg = |rarity: Rarity, rng: &mut ChaCha8Rng| -> f64 {
         let n = 2000;
         // Use ilvl 50 so tier multiplier differences are meaningful
         let sum: u32 = (0..n)
             .map(|_| {
-                generate_item(EquipmentSlot::Weapon, rarity, 50)
+                generate_item_with_rng(EquipmentSlot::Weapon, rarity, 50, rng)
                     .attributes
                     .total()
             })
@@ -236,11 +237,11 @@ fn test_higher_rarity_produces_higher_average_attribute_total() {
         sum as f64 / n as f64
     };
 
-    let common_avg = sample_avg(Rarity::Common);
-    let magic_avg = sample_avg(Rarity::Magic);
-    let rare_avg = sample_avg(Rarity::Rare);
-    let epic_avg = sample_avg(Rarity::Epic);
-    let legendary_avg = sample_avg(Rarity::Legendary);
+    let common_avg = sample_avg(Rarity::Common, &mut rng);
+    let magic_avg = sample_avg(Rarity::Magic, &mut rng);
+    let rare_avg = sample_avg(Rarity::Rare, &mut rng);
+    let epic_avg = sample_avg(Rarity::Epic, &mut rng);
+    let legendary_avg = sample_avg(Rarity::Legendary, &mut rng);
 
     assert!(
         common_avg < magic_avg,
@@ -266,19 +267,20 @@ fn test_higher_rarity_produces_higher_average_attribute_total() {
 
 #[test]
 fn test_power_increases_with_rarity_on_average() {
-    let sample_avg_power = |rarity: Rarity| -> f64 {
+    let mut rng = ChaCha8Rng::seed_from_u64(202);
+    let sample_avg_power = |rarity: Rarity, rng: &mut ChaCha8Rng| -> f64 {
         let n = 2000;
         let sum: u32 = (0..n)
-            .map(|_| generate_item(EquipmentSlot::Weapon, rarity, 10).power())
+            .map(|_| generate_item_with_rng(EquipmentSlot::Weapon, rarity, 10, rng).power())
             .sum();
         sum as f64 / n as f64
     };
 
-    let common_avg = sample_avg_power(Rarity::Common);
-    let magic_avg = sample_avg_power(Rarity::Magic);
-    let rare_avg = sample_avg_power(Rarity::Rare);
-    let epic_avg = sample_avg_power(Rarity::Epic);
-    let legendary_avg = sample_avg_power(Rarity::Legendary);
+    let common_avg = sample_avg_power(Rarity::Common, &mut rng);
+    let magic_avg = sample_avg_power(Rarity::Magic, &mut rng);
+    let rare_avg = sample_avg_power(Rarity::Rare, &mut rng);
+    let epic_avg = sample_avg_power(Rarity::Epic, &mut rng);
+    let legendary_avg = sample_avg_power(Rarity::Legendary, &mut rng);
 
     assert!(
         common_avg < magic_avg,
@@ -813,11 +815,12 @@ fn test_roll_rarity_prestige_bonus_shifts_toward_higher_tiers() {
 #[test]
 fn test_affix_values_scale_with_rarity() {
     // Higher rarity items should have higher affix values on average
-    let avg_affix_value = |rarity: Rarity| -> f64 {
+    let mut rng = ChaCha8Rng::seed_from_u64(303);
+    let avg_affix_value = |rarity: Rarity, rng: &mut ChaCha8Rng| -> f64 {
         let mut total_value = 0.0;
         let mut total_affixes = 0;
         for _ in 0..200 {
-            let item = generate_item(EquipmentSlot::Weapon, rarity, 10);
+            let item = generate_item_with_rng(EquipmentSlot::Weapon, rarity, 10, rng);
             for affix in &item.affixes {
                 total_value += affix.value;
                 total_affixes += 1;
@@ -830,10 +833,10 @@ fn test_affix_values_scale_with_rarity() {
     };
 
     // Common has no affixes, so skip it
-    let magic_avg = avg_affix_value(Rarity::Magic);
-    let rare_avg = avg_affix_value(Rarity::Rare);
-    let epic_avg = avg_affix_value(Rarity::Epic);
-    let legendary_avg = avg_affix_value(Rarity::Legendary);
+    let magic_avg = avg_affix_value(Rarity::Magic, &mut rng);
+    let rare_avg = avg_affix_value(Rarity::Rare, &mut rng);
+    let epic_avg = avg_affix_value(Rarity::Epic, &mut rng);
+    let legendary_avg = avg_affix_value(Rarity::Legendary, &mut rng);
 
     assert!(
         magic_avg < rare_avg,
@@ -943,13 +946,12 @@ fn test_power_affix_only_item_is_positive() {
 fn test_pipeline_prestige_produces_better_average_power() {
     // Higher prestige shifts rarity distribution, so average item power should be better
     let avg_power = |prestige_rank: u32, seed: u64| -> f64 {
-        use rand::SeedableRng;
-        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+        let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let n = 3000;
         let sum: u32 = (0..n)
             .map(|_| {
                 let rarity = roll_rarity_for_mob(prestige_rank, 0.0, &mut rng);
-                generate_item(EquipmentSlot::Weapon, rarity, 10).power()
+                generate_item_with_rng(EquipmentSlot::Weapon, rarity, 10, &mut rng).power()
             })
             .sum();
         sum as f64 / n as f64
@@ -974,8 +976,9 @@ fn test_try_drop_item_produces_valid_equippable_items() {
     game_state.prestige_rank = 5;
 
     let mut items_equipped = 0;
-    // Run many trials to collect some actual drops
-    for _ in 0..1000 {
+    // Run enough trials to collect some actual drops. At a ~20% drop rate the
+    // odds of zero successes in 100 trials are already ~1 in 5 billion.
+    for _ in 0..100 {
         if let Some(item) = try_drop_from_mob(&game_state, 1, 0.0, 0.0) {
             // Verify basic item validity
             assert!(!item.display_name.is_empty());
@@ -997,7 +1000,7 @@ fn test_try_drop_item_produces_valid_equippable_items() {
         }
     }
 
-    // We should have equipped at least a few items from 1000 trials at 20% drop rate
+    // We should have equipped at least a few items from 100 trials at 20% drop rate
     assert!(
         items_equipped > 0,
         "Should have equipped at least one item from drops"
@@ -1133,9 +1136,10 @@ fn test_tier_default_for_legacy_items() {
 #[test]
 fn test_tier_distribution_across_many_items() {
     // Over many generated items, T0 should be most common and T9 very rare
+    let mut rng = ChaCha8Rng::seed_from_u64(404);
     let mut counts = [0u32; 10];
     for _ in 0..1000 {
-        let item = generate_item(EquipmentSlot::Armor, Rarity::Common, 10);
+        let item = generate_item_with_rng(EquipmentSlot::Armor, Rarity::Common, 10, &mut rng);
         counts[item.tier as usize] += 1;
     }
     // T0 should be most frequent

@@ -26,11 +26,11 @@ src/combat/
 ```rust
 pub struct Enemy {
     pub name: String,
-    pub max_hp: u32,
-    pub current_hp: u32,
-    pub damage: u32,
+    pub max_hp: u64,
+    pub current_hp: u64,
+    pub damage: u64,
     #[serde(default)]
-    pub defense: u32,
+    pub defense: u64,
 }
 ```
 
@@ -39,18 +39,18 @@ Constructors:
 - `Enemy::new_with_defense(name, max_hp, damage, defense)` -- Full constructor
 
 ### `CombatState` (`types.rs`)
-State machine for combat flow:
-- **Idle**: No enemy, waiting for spawn
-- **Fighting**: Active combat (turns every 1.5s for player, variable for enemies by tier)
-- **Regen**: HP regenerating after kill (2.5s)
-- **Dead**: Player died (triggers reset or dungeon exit)
+Struct whose fields encode the combat flow:
+- **Idle**: `current_enemy` is `None`, waiting for spawn
+- **Fighting**: `current_enemy` is `Some` (turns every 1.5s for player, variable for enemies by tier)
+- **Regen**: `is_regenerating` is `true`, HP regenerating after kill (2.5s)
+- **Dead**: Player death is event-driven (triggers reset or dungeon exit), not a stored state
 
 ## Combat Flow
 
 1. **Enemy spawn**: Triggered by zone progression or dungeon room entry
 2. **Turn loop**: Player attacks every 1.5s (15 ticks); enemy attack intervals vary by tier (2.0s normal, 1.8s boss, 1.5s zone boss, 1.6s dungeon elite, 1.4s dungeon boss)
-3. **Player damage pipeline**: base damage (from DerivedStats) -> Giant's Might % (god item) -> Haven % bonus (Armory) -> prestige flat damage -> subtract enemy defense -> min 1 -> crit roll (2x)
-4. **Enemy damage pipeline**: enemy.damage -> subtract (derived.defense + prestige flat_defense) -> min 1 -> Divine Bulwark DR % (god item) -> min 1
+3. **Player damage pipeline**: base damage (from DerivedStats) -> Giant's Might % (god item) -> Haven % bonus (Armory) -> prestige flat damage -> ascension multiplier -> subtract enemy defense -> min 1 -> crit roll (2x)
+4. **Enemy damage pipeline**: enemy.damage -> subtract total defense (derived.defense + prestige flat_defense, then x ascension multiplier) -> min 1 -> Divine Bulwark DR % (god item) -> min 1
 5. **Critical hits**: Chance from DEX modifier + prestige crit bonus (capped at 15%), deals 2x damage
 6. **Enemy death**: Awards XP, triggers item drop roll, enters Regen state
 7. **Player death**:
@@ -108,10 +108,12 @@ Zone 11 has dramatically higher stats than Zone 10 (~6.2x HP, ~4.6x DMG, ~4.8x D
 
 ## Combat Pipelines (Quick Reference)
 
-- **Damage pipeline**: base damage --> Giant's Might % --> Haven Armory % --> prestige flat damage --> ascension multiplier --> enemy defense --> min 1 --> Divine Bulwark DR --> crit (2x)
+- **Damage pipeline**: base damage --> Giant's Might % --> Haven Armory % --> prestige flat damage --> ascension multiplier --> enemy defense --> min 1 --> crit (2x)
+- **Enemy damage pipeline**: enemy.damage --> subtract total defense (defense + prestige flat_defense, then x ascension multiplier) --> min 1 --> Divine Bulwark DR % --> min 1
 - **Defense pipeline**: base defense --> prestige flat defense --> ascension multiplier --> damage reduction %
 - **Ascension multiplier**: Also applied to player max HP in `core/tick.rs` (default 1.0x, up to 64x+ at Ascension VI)
 - **Boss enrage timer**: Bosses enrage after 60 seconds of combat, increasing damage output (instant kill)
+- **Stalemate timeouts**: Non-boss fights auto-retreat to the last safe zone after `MOB_FIGHT_TIMEOUT_SECONDS` (30s); dungeon fights use `DUNGEON_FIGHT_TIMEOUT_SECONDS` (60s, elites/bosses have up to 3.5x HP). Retreating while inside a dungeon abandons it (emits `DungeonRetreat` → `TickEvent::DungeonFailed`, no prestige loss) so the uncleared room cannot respawn its enemy in an endless loop
 
 See "Unified Combat Bonuses" below for the full field-level breakdown of `CombatBonuses`.
 
@@ -121,7 +123,7 @@ See "Unified Combat Bonuses" below for the full field-level breakdown of `Combat
 - Boss defined in `zones/data.rs` with specific stats
 - Defeating boss advances to next subzone
 - Death to boss resets `kills_in_subzone = 0` (full 10 kills needed to retry)
-- Zone 10 final boss requires Stormbreaker weapon (checked via `TheStormbreaker` achievement in `zones/progression.rs`)
+- Zone 10 final boss requires Stormbreaker weapon (checked via `boss_weapon_blocked()` in `zones/gates.rs`)
 - **Boss enrage timer**: After 60 seconds of fighting a boss, it enrages and instantly kills the player. Emits a `BossEnrage` combat event (mapped to `TickEvent::BossEnrage`)
 
 ## Key Function: `update_combat()`

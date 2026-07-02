@@ -428,6 +428,7 @@ fn handle_active_missions(
         KeyCode::Enter => {
             match map_hub_selection(deep_state, deep_ui.selected_index) {
                 Some(HubSelection::Completed(pending_idx)) => {
+                    #[allow(clippy::collapsible_match)]
                     if collect_pending_result(deep_state, deep_ui, game_state, pending_idx) {
                         return InputResult::NeedsSave;
                     }

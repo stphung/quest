@@ -320,15 +320,18 @@ Per-character combat power multiplier purchased with prestige ranks and gated by
 
 ### Levels and Costs
 
-| Level | Multiplier | PR Cost | Deep Gate |
-|-------|-----------|---------|-----------|
+| Level | Multiplier | PR Cost | Gate |
+|-------|-----------|---------|------|
 | I | 2x | 35 | Layer 3 |
 | II | 4x | 65 | Layer 7 |
 | III | 8x | 120 | Layer 12 |
 | IV | 16x | 200 | Layer 18 |
 | V | 32x | 325 | Layer 25 |
 | VI | 64x | 500 | Layer 30 |
-| VII+ | 64 x 1.5^(level-6) | 500 + 75*(level-6) | None |
+| VII | 96x | 1,500 | 8 Patterns |
+| VIII | 144x | 4,000 | 16 Patterns |
+| IX | 216x | 8,000 | 22 Patterns |
+| X | 324x | 15,000 | 28 Patterns |
 
 Total PR cost for levels I-VI: 1,245 PR.
 
@@ -360,7 +363,7 @@ Account-level achievement system that persists across all characters. Stored in 
 - Ascension milestones: AscensionI through AscensionVI
 
 **Challenges:**
-- Per-game per-difficulty wins: ChessNovice through ChessMaster, MorrisNovice through MorrisMaster, etc. for all 12 challenge types (chess, morris, gomoku, minesweeper, rune, go, flappy_bird, snake, jezzball, runic_shift, sudoku, shard_fusion)
+- Per-game per-difficulty wins: ChessNovice through ChessMaster, MorrisNovice through MorrisMaster, etc. for all 14 challenge types (chess, morris, gomoku, minesweeper, rune, go, flappy_bird, snake, jezzball, runic_shift, sudoku, shard_fusion, runic_lights, vault_warden)
 - GrandChampion: 100 total minigame wins
 
 **Exploration:**
@@ -386,19 +389,21 @@ Each achievement has a `points` value assigned via a 7-tier system. Scores are c
 
 | Tier | Points | Count | Examples |
 |------|--------|-------|---------|
-| Trivial | 5 | 13 | First kills, first fish, first dungeon |
-| Easy | 10 | 25 | Early zones, novice challenges |
-| Medium | 25 | 26 | Mid-game milestones, apprentice challenges |
-| Hard | 50 | 28 | Late zones, journeyman challenges |
-| Very Hard | 100 | 25 | Zone 9-10, master challenges |
-| Elite | 250 | 18 | Stormbreaker, Chess/Go Master, Grand Champion |
-| Pinnacle | 500 | 14 | Eternal, Death Incarnate, The Absolute |
+| Trivial | 5 | 14 | First kills, first fish, first dungeon |
+| Easy | 10 | 35 | Early zones, novice challenges |
+| Medium | 25 | 41 | Mid-game milestones, apprentice challenges |
+| Hard | 50 | 44 | Late zones, journeyman challenges |
+| Very Hard | 100 | 42 | Zone 9-10, master challenges |
+| Elite | 250 | 30 | Stormbreaker, Chess/Go Master, Grand Champion |
+| Pinnacle | 500 | 33 | Eternal, Death Incarnate, The Absolute |
 
-**Max score** across 213 achievements. Methods: `achievement_score()` (unlocked total), `max_achievement_score()` (grand total). Displayed in: browser title bar (`X/Y pts, Z%`), unlock modal (`+N pts`), detail panel (`Worth N pts`), stats view (score line).
+One achievement (Vault Warden Journeyman) is worth 15 points, between the Easy and Medium tiers, bringing the total to 240.
+
+**Max score** across 240 achievements. Methods: `achievement_score()` (unlocked total), `max_achievement_score()` (grand total). Displayed in: browser title bar (`X/Y pts, Z%`), unlock modal (`+N pts`), detail panel (`Worth N pts`), stats view (score line).
 
 ### Title System
 
-Titles are display names earned by unlocking specific achievements. 63 curated titles across combat, challenges, exploration, enhancement, Deep, and ascension categories. Players select one title to display after their character name (e.g., "Hero, Godslayer"). Account-wide, persisted in `achievements.json`.
+Titles are display names earned by unlocking specific achievements. 64 curated titles across combat, challenges, exploration, enhancement, Deep, and ascension categories. Players select one title to display after their character name (e.g., "Hero, Godslayer"). Account-wide, persisted in `achievements.json`.
 
 - Title browser: overlay opened with [T] from achievement browser. Shows unlocked titles, preview, select with Enter, clear with Backspace
 - Titles shown in: stats panel header, character select screen, achievement browser (✦ indicator)

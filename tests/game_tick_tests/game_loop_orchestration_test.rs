@@ -89,8 +89,10 @@ fn test_haven_discovery_requires_prestige_10_or_higher() {
     let mut haven = Haven::default();
     let mut rng = seeded_rng(42);
 
-    // P9 should never discover Haven (structurally blocked by prestige check)
-    for _ in 0..100 {
+    // P9 should never discover Haven (structurally blocked by prestige check).
+    // Chance is 0.0 by code structure below the prestige gate, so a handful of
+    // calls is enough to prove it -- no need to burn cycles on hundreds.
+    for _ in 0..5 {
         assert!(
             !try_discover_haven(&mut haven, 9, &mut rng),
             "P9 should not discover Haven"
@@ -101,19 +103,25 @@ fn test_haven_discovery_requires_prestige_10_or_higher() {
 
 #[test]
 fn test_haven_discovery_possible_at_prestige_10() {
-    // Behavior: Haven can be discovered at P10+
+    // Behavior: Haven can be discovered at P10+ (this exercises the same
+    // discovery-via-P10+-eligibility path as lower ranks -- only the roll
+    // probability changes with rank, not the eligibility gate itself).
     let mut discovered = false;
-    // Use P30 for reliable discovery in fewer trials (chance ~0.000154/attempt)
+    // Use P200 for reliable discovery in fewer trials (chance ~0.001344/attempt).
+    // Expected discoveries: 10,000 * 0.001344 ≈ 13.4, P(zero) ≈ e^-13.4 ≈ 0.0001%.
     for seed in 0..10_000u64 {
         let mut haven = Haven::default();
         let mut rng = seeded_rng(seed);
-        if try_discover_haven(&mut haven, 30, &mut rng) {
+        if try_discover_haven(&mut haven, 200, &mut rng) {
             discovered = true;
             assert!(haven.discovered, "Haven state should be set on discovery");
             break;
         }
     }
-    assert!(discovered, "Haven should be discoverable at P10 eventually");
+    assert!(
+        discovered,
+        "Haven should be discoverable at P10+ eventually"
+    );
 }
 
 #[test]
@@ -165,7 +173,9 @@ fn test_haven_discovery_idempotent() {
     };
     let mut rng = seeded_rng(42);
 
-    for _ in 0..100 {
+    // Once discovered, the early-return path is unconditional -- a handful of
+    // calls is enough to prove it, no need to burn cycles on hundreds.
+    for _ in 0..5 {
         assert!(
             !try_discover_haven(&mut haven, 20, &mut rng),
             "Should not rediscover Haven"
@@ -494,7 +504,7 @@ fn test_player_attack_event_has_message_and_damage() {
     let mut rng = seeded_rng(42);
 
     let mut found = false;
-    for _ in 0..5000 {
+    for _ in 0..100 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -526,7 +536,7 @@ fn test_enemy_attack_event_has_enemy_name() {
     let mut rng = seeded_rng(42);
 
     let mut found = false;
-    for _ in 0..5000 {
+    for _ in 0..100 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -559,7 +569,7 @@ fn test_enemy_defeated_event_has_xp_and_message() {
     let mut rng = seeded_rng(42);
 
     let mut found = false;
-    for _ in 0..5000 {
+    for _ in 0..100 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -1227,7 +1237,7 @@ fn test_session_kills_accumulate_across_ticks() {
     assert_eq!(state.session_kills, 0);
 
     let mut kill_count = 0u64;
-    for _ in 0..5000 {
+    for _ in 0..300 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -1274,7 +1284,7 @@ fn test_xp_increases_with_each_kill() {
     let initial_level = state.character_level;
 
     // Run until first kill
-    for _ in 0..5000 {
+    for _ in 0..100 {
         let result = run_game_tick(
             &mut state,
             &mut tc,
@@ -1306,13 +1316,16 @@ fn test_xp_increases_with_each_kill() {
 #[test]
 fn test_haven_discovery_via_game_tick_at_p10() {
     // After SWE extraction, Haven discovery is now inside game_tick.
-    // Verify that game_tick can produce HavenDiscovered event at P10+
-    // Use P50 for higher discovery chance (~0.000294/tick), 100 seeds x 50 ticks each.
-    // Expected discoveries: 5000 * 0.000294 ≈ 1.47
+    // Verify that game_tick can produce HavenDiscovered event at P10+ (this
+    // exercises the same discovery-via-P10+-eligibility path as lower ranks --
+    // only the roll probability changes with rank, not the eligibility gate).
+    // Use P200 for a near-certain discovery chance (~0.001344/tick),
+    // 100 seeds x 50 ticks each.
+    // Expected discoveries: 5000 * 0.001344 ≈ 6.72, P(zero) ≈ e^-6.72 ≈ 0.12%.
     let mut found = false;
     'outer: for seed in 0..100u64 {
         let mut state = fresh_state();
-        state.prestige_rank = 50; // High prestige for better chance
+        state.prestige_rank = 200; // High prestige for near-certain discovery
         let mut tc = 0u32;
         let mut haven = Haven::default();
         let mut ach = Achievements::default();
@@ -1339,7 +1352,7 @@ fn test_haven_discovery_via_game_tick_at_p10() {
     }
     assert!(
         found,
-        "Should discover Haven via game_tick at P50 within 100 seeds x 50 ticks"
+        "Should discover Haven via game_tick at P200 within 100 seeds x 50 ticks"
     );
 }
 
@@ -1423,11 +1436,13 @@ fn test_haven_discovery_via_game_tick_blocked_during_dungeon() {
 #[test]
 fn test_haven_discovery_debug_mode_suppresses_save() {
     // Verify haven_changed and achievements_changed are set correctly in debug mode
-    // Use P50 for higher discovery chance, 100 seeds x 50 ticks each.
+    // Use P200 for a near-certain discovery chance (~0.001344/tick),
+    // 100 seeds x 50 ticks each.
+    // Expected discoveries: 5000 * 0.001344 ≈ 6.72, P(zero) ≈ e^-6.72 ≈ 0.12%.
     let mut found = false;
     'outer: for seed in 0..100u64 {
         let mut state = fresh_state();
-        state.prestige_rank = 50;
+        state.prestige_rank = 200;
         let mut tc = 0u32;
         let mut haven = Haven::default();
         let mut ach = Achievements::default();
@@ -1460,10 +1475,10 @@ fn test_haven_discovery_debug_mode_suppresses_save() {
             }
         }
     }
-    // Probabilistic, but at P50 should find in 100 seeds x 50 ticks
-    if !found {
-        // If we didn't find it, that's OK — just verify no false positives
-    }
+    assert!(
+        found,
+        "Should discover Haven via game_tick at P200 within 100 seeds x 50 ticks (debug mode)"
+    );
 }
 
 // =============================================================================

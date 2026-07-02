@@ -42,7 +42,7 @@ fn seeded_rng() -> rand_chacha::ChaCha8Rng {
 }
 
 /// Creates a state with an enemy set up for combat.
-fn state_with_enemy(enemy_hp: u32, enemy_dmg: u32, enemy_def: u32) -> GameState {
+fn state_with_enemy(enemy_hp: u64, enemy_dmg: u64, enemy_def: u64) -> GameState {
     let mut state = fresh_state();
     state.combat_state.current_enemy = Some(Enemy::new_with_defense(
         "Test Enemy".to_string(),
@@ -1496,7 +1496,7 @@ fn god_item_attack_speed_reduces_player_interval() {
 // Damage extraction helpers
 // ═══════════════════════════════════════════════════════════════════
 
-fn extract_player_damage(events: &[CombatEvent]) -> u32 {
+fn extract_player_damage(events: &[CombatEvent]) -> u64 {
     events
         .iter()
         .filter_map(|e| match e {
@@ -1506,7 +1506,7 @@ fn extract_player_damage(events: &[CombatEvent]) -> u32 {
         .sum()
 }
 
-fn extract_enemy_damage(events: &[CombatEvent]) -> u32 {
+fn extract_enemy_damage(events: &[CombatEvent]) -> u64 {
     events
         .iter()
         .filter_map(|e| match e {

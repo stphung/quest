@@ -18,11 +18,11 @@ src/dungeon/
 ## Key Types
 
 ### `RoomType` (`types.rs`)
-- **Entrance**: Starting room, no enemies
-- **Combat**: Standard combat encounter (60% spawn rate)
-- **Treasure**: Guaranteed item drop, no combat (20%)
-- **Elite**: Tough guardian that drops the boss key (15%)
-- **Boss**: Final encounter, requires key to unlock (5%)
+- **Entrance**: Starting room, no enemies (exactly 1)
+- **Combat**: Standard combat encounter (all remaining rooms)
+- **Treasure**: Guaranteed item drop, no combat (1-8 rooms by dungeon size)
+- **Elite**: Tough guardian that drops the boss key (exactly 1)
+- **Boss**: Final encounter, requires key to unlock (exactly 1)
 
 ### `RoomState` (`types.rs`)
 - **Hidden**: Not yet visible (fog of war)
@@ -72,12 +72,11 @@ pub fn generate_dungeon(level: u32, prestige_rank: u32, zone_id: u32) -> Dungeon
 1. Roll dungeon size from level and prestige rank
 2. Place Entrance at center of grid
 3. Use random walk / branching to carve out connected rooms
-4. Assign room types based on probability distribution (Combat 60%, Treasure 20%, Elite 15%, Boss 5%)
-5. Ensure exactly one Elite and one Boss room per dungeon
-6. Boss room placed far from entrance
-7. Set connections between adjacent rooms (up/right/down/left booleans)
-8. Entrance and adjacent rooms start Revealed; all others Hidden
-9. Store `zone_id` on the Dungeon for enemy scaling
+4. Place special rooms deterministically (`place_special_rooms()`): exactly one Boss at the dead end furthest from the entrance, exactly one Elite at a dead end far from the entrance, then `treasure_room_count()` Treasure rooms by size (Small 1, Medium 2, Large 3, Epic 5, Legendary 8) at random positions
+5. Remaining rooms stay Combat (default)
+6. Set connections between adjacent rooms (up/right/down/left booleans)
+7. Entrance and adjacent rooms start Revealed; all others Hidden
+8. Store `zone_id` on the Dungeon for enemy scaling
 
 ## Navigation & Clearing (`logic.rs`, `pathfinding.rs`)
 
@@ -97,6 +96,7 @@ pub fn generate_dungeon(level: u32, prestige_rank: u32, zone_id: u32) -> Dungeon
 - Death in dungeon exits the dungeon entirely
 - No prestige loss (safe death)
 - Dungeon progress is lost (no saving mid-dungeon)
+- Stalemate protection: a dungeon fight that lasts 60s (`DUNGEON_FIGHT_TIMEOUT_SECONDS`) triggers a combat retreat that abandons the dungeon the same way (safe exit, no prestige loss)
 
 ## Integration Points
 

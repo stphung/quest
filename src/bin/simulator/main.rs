@@ -17,6 +17,7 @@
 
 mod assertions;
 mod report;
+mod scenarios;
 mod stats;
 mod strategy;
 
@@ -52,6 +53,7 @@ pub struct SimConfig {
     pub strategy: Option<strategy::StrategyProfile>,
     pub assertions: bool,
     pub profile: bool,
+    pub check_progression: bool,
 }
 
 impl Default for SimConfig {
@@ -68,6 +70,7 @@ impl Default for SimConfig {
             strategy: None,
             assertions: false,
             profile: false,
+            check_progression: false,
         }
     }
 }
@@ -119,6 +122,7 @@ fn parse_args() -> SimConfig {
                 );
             }
             "--assertions" => config.assertions = true,
+            "--check-progression" => config.check_progression = true,
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -151,6 +155,7 @@ fn print_usage() {
          \x20 --stormbreaker  Unlock Stormbreaker achievement (access Zone 10 boss)\n\
          \x20 --strategy STR  Strategy profile: casual, optimal, speedrun\n\
          \x20 --assertions    Run balance assertions and exit with pass/fail\n\
+         \x20 --check-progression  Run the CI progression scenario suite and exit\n\
          \x20 --profile       Print per-tick timing profile\n\
          \x20 --help, -h      Show this help"
     );
@@ -367,6 +372,7 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState, Option
         }
     }
 
+    stats.prestiges_performed = injection_state.prestige_count;
     stats.finalize(&state, &deep_state, &loom);
     (stats, state, tick_profile)
 }
@@ -375,6 +381,13 @@ fn run_simulation(config: &SimConfig, seed: u64) -> (SimStats, GameState, Option
 
 fn main() {
     let config = parse_args();
+
+    if config.check_progression {
+        if !scenarios::run_progression_check() {
+            std::process::exit(1);
+        }
+        return;
+    }
 
     if !config.quiet {
         let strategy_str = config

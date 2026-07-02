@@ -9,6 +9,9 @@ mod deep;
 mod dungeon;
 mod enhancement;
 mod fishing;
+// Only exercised by the UI snapshot tests in this crate; the game itself
+// builds state through normal play. Shared with the lib for mkstate.
+mod fixtures;
 #[allow(dead_code)]
 mod god_items;
 mod haven;
@@ -1338,15 +1341,15 @@ fn main() -> io::Result<()> {
                                             }
                                         }
                                     }
-                                    input::SoulforgePhase::ResultSuccess => {
-                                        if soulforge_ui.animation_tick < 20 {
-                                            soulforge_ui.animation_tick += 1;
-                                        }
+                                    input::SoulforgePhase::ResultSuccess
+                                        if soulforge_ui.animation_tick < 20 =>
+                                    {
+                                        soulforge_ui.animation_tick += 1;
                                     }
-                                    input::SoulforgePhase::ResultFailure => {
-                                        if soulforge_ui.animation_tick < 15 {
-                                            soulforge_ui.animation_tick += 1;
-                                        }
+                                    input::SoulforgePhase::ResultFailure
+                                        if soulforge_ui.animation_tick < 15 =>
+                                    {
+                                        soulforge_ui.animation_tick += 1;
                                     }
                                     _ => {}
                                 }

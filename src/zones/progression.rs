@@ -28,6 +28,16 @@ pub struct ZoneProgression {
     /// Whether player has forged Stormbreaker (required to defeat Zone 10 boss)
     #[serde(default)]
     pub has_stormbreaker: bool,
+    /// Zone the player last death-loop retreated from (transient, like `consecutive_deaths`)
+    #[serde(skip)]
+    pub death_retreat_zone: Option<u32>,
+    /// Consecutive death-loop retreats from `death_retreat_zone` (transient)
+    #[serde(skip)]
+    pub death_retreat_count: u32,
+    /// Safe-zone boss cycles remaining before auto-advancing back into
+    /// `death_retreat_zone` (transient)
+    #[serde(skip)]
+    pub frontier_cooldown_cycles: u32,
 }
 
 impl Default for ZoneProgression {
@@ -47,7 +57,41 @@ impl ZoneProgression {
             kills_in_subzone: 0,
             fighting_boss: false,
             has_stormbreaker: false, // Must be forged to defeat Zone 10 boss
+            death_retreat_zone: None,
+            death_retreat_count: 0,
+            frontier_cooldown_cycles: 0,
         }
+    }
+
+    /// Records a death-loop retreat from the current zone.
+    ///
+    /// Repeated retreats from the same zone grow the frontier cooldown
+    /// (capped), so the player spends progressively longer in the safe zone
+    /// before auto-advancing back into the zone that keeps killing them.
+    pub fn record_death_retreat(&mut self) {
+        let zone = self.current_zone_id;
+        if self.death_retreat_zone == Some(zone) {
+            self.death_retreat_count += 1;
+        } else {
+            self.death_retreat_zone = Some(zone);
+            self.death_retreat_count = 1;
+        }
+        self.frontier_cooldown_cycles = self
+            .death_retreat_count
+            .min(crate::core::constants::FRONTIER_BACKOFF_MAX_CYCLES);
+    }
+
+    /// Returns true if auto-advancement into `zone_id` is blocked by frontier backoff.
+    pub fn frontier_backoff_blocks(&self, zone_id: u32) -> bool {
+        self.frontier_cooldown_cycles > 0 && self.death_retreat_zone == Some(zone_id)
+    }
+
+    /// Clears death-retreat memory (called when the player proves they can
+    /// survive the zone, or on prestige reset).
+    pub fn clear_death_retreat(&mut self) {
+        self.death_retreat_zone = None;
+        self.death_retreat_count = 0;
+        self.frontier_cooldown_cycles = 0;
     }
 
     /// Records a kill in the current subzone. Returns true if boss should spawn.
@@ -140,6 +184,60 @@ mod tests {
                 .count(),
             1 // BTreeSet naturally deduplicates
         );
+    }
+
+    #[test]
+    fn test_death_retreat_tracking() {
+        let mut prog = ZoneProgression::new();
+        assert_eq!(prog.death_retreat_zone, None);
+        assert!(!prog.frontier_backoff_blocks(1));
+
+        // Repeated retreats from the same zone grow the cooldown
+        prog.current_zone_id = 42;
+        prog.record_death_retreat();
+        assert_eq!(prog.death_retreat_zone, Some(42));
+        assert_eq!(prog.death_retreat_count, 1);
+        assert_eq!(prog.frontier_cooldown_cycles, 1);
+        assert!(prog.frontier_backoff_blocks(42));
+        assert!(!prog.frontier_backoff_blocks(41));
+
+        prog.record_death_retreat();
+        assert_eq!(prog.death_retreat_count, 2);
+        assert_eq!(prog.frontier_cooldown_cycles, 2);
+
+        // Cooldown is capped
+        for _ in 0..20 {
+            prog.record_death_retreat();
+        }
+        assert_eq!(
+            prog.frontier_cooldown_cycles,
+            crate::core::constants::FRONTIER_BACKOFF_MAX_CYCLES
+        );
+
+        // Retreating from a different zone resets the count
+        prog.current_zone_id = 30;
+        prog.record_death_retreat();
+        assert_eq!(prog.death_retreat_zone, Some(30));
+        assert_eq!(prog.death_retreat_count, 1);
+        assert_eq!(prog.frontier_cooldown_cycles, 1);
+        assert!(!prog.frontier_backoff_blocks(42));
+
+        prog.clear_death_retreat();
+        assert_eq!(prog.death_retreat_zone, None);
+        assert_eq!(prog.frontier_cooldown_cycles, 0);
+    }
+
+    #[test]
+    fn test_death_retreat_state_is_transient() {
+        let mut prog = ZoneProgression::new();
+        prog.current_zone_id = 42;
+        prog.record_death_retreat();
+
+        let json = serde_json::to_string(&prog).unwrap();
+        let loaded: ZoneProgression = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.death_retreat_zone, None);
+        assert_eq!(loaded.death_retreat_count, 0);
+        assert_eq!(loaded.frontier_cooldown_cycles, 0);
     }
 
     #[test]

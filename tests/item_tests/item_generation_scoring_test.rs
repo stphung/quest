@@ -576,8 +576,11 @@ fn test_boss_drop_ilvl_matches_zone() {
 
 #[test]
 fn test_boss_drop_not_common_nor_mythic() {
+    // roll_rarity_for_boss has no code path returning Common or Mythic for
+    // either branch -- this is P=0 by construction, so a handful of rolls is
+    // enough to exercise both match arms without burning cycles on hundreds.
     let mut rng = ChaCha8Rng::seed_from_u64(22222);
-    for _ in 0..500 {
+    for _ in 0..20 {
         match roll_rarity_for_boss(false, &mut rng) {
             Rarity::Common => panic!("Boss should never drop Common"),
             Rarity::Mythic => panic!("Boss should never drop Mythic (god items only via debug)"),

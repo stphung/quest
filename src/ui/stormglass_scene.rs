@@ -2030,7 +2030,7 @@ fn render_sigils_list(
         }
 
         // Countdown to next rotation (midnight UTC)
-        let now = chrono::Utc::now();
+        let now = super::clock::now_utc();
         let tomorrow = (now.date_naive() + chrono::Duration::days(1))
             .and_hms_opt(0, 0, 0)
             .unwrap();
@@ -2667,11 +2667,10 @@ fn render_rolling_phase2(
             let sigil_elapsed = phase_elapsed - sigil_start;
             // Time per character: distribute across available time
             let char_duration = (phase_duration - stagger_ms * 2) / total_chars.max(1) as u128;
-            let chars_visible = if char_duration == 0 {
-                total_chars
-            } else {
-                ((sigil_elapsed / char_duration) as usize).min(total_chars)
-            };
+            let chars_visible = sigil_elapsed
+                .checked_div(char_duration)
+                .map(|c| (c as usize).min(total_chars))
+                .unwrap_or(total_chars);
 
             let partial: String = display_str.chars().take(chars_visible).collect();
             // Match slots col: cursor marker (2) + start at col 3

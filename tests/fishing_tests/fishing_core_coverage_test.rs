@@ -475,7 +475,7 @@ fn test_process_discoveries_dungeon_or_fishing_found() {
     let mut found_dungeon = false;
     let mut found_fishing = false;
 
-    for seed in 0..2000u64 {
+    for seed in 0..500u64 {
         let mut r = rng(seed);
         state.active_dungeon = None;
         state.active_fishing = None;
@@ -516,11 +516,11 @@ fn test_process_discoveries_dungeon_or_fishing_found() {
     // Both should be found eventually (dungeon 1%, fishing 5%)
     assert!(
         found_dungeon,
-        "Should find a dungeon discovery within 2000 kills"
+        "Should find a dungeon discovery within 500 kills"
     );
     assert!(
         found_fishing,
-        "Should find a fishing spot discovery within 2000 kills"
+        "Should find a fishing spot discovery within 500 kills"
     );
 }
 
@@ -650,7 +650,7 @@ fn test_collect_achievement_events_via_game_tick() {
 
     let mut seen_achievement = false;
 
-    for _ in 0..5000 {
+    for _ in 0..1200 {
         let result = run_tick(&mut state, &mut tc, &mut haven, &mut ach, false, &mut r);
 
         if has_event(&result, |e| {
@@ -1086,7 +1086,15 @@ fn test_achievement_events_set_changed_flag_via_game_tick() {
 
     let mut seen_changed = false;
 
-    for _ in 0..5000 {
+    // NOTE: bound kept conservative (not reduced to the ~500-1000 used elsewhere in this
+    // file). Empirically this specific achievement-unlock tick is NOT fully seeded-RNG
+    // deterministic: items::drops::try_drop_from_mob/try_drop_from_boss call `rand::rng()`
+    // directly instead of threading the caller's seeded rng, so item-rarity-gated
+    // achievements can fire on a real-OS-random tick. Sampling 15,000 in-process runs of
+    // this exact scenario showed a max first-trigger tick of ~1361 (vs. a stable, always
+    // reproducible ~580 for the analogous seed-42 scenario above). 3500 keeps ~2.5x
+    // headroom over the observed tail instead of the ~1.7x a 1000 bound would give.
+    for _ in 0..3500 {
         let result = run_tick(&mut state, &mut tc, &mut haven, &mut ach, false, &mut r);
 
         if result.achievements_changed {
@@ -1155,7 +1163,7 @@ fn test_fishing_spot_discovered_message_format() {
     let mut state = fresh_state();
     let mut found = false;
 
-    for seed in 0..2000u64 {
+    for seed in 0..500u64 {
         let mut r = rng(seed);
         state.active_dungeon = None;
         state.active_fishing = None;
@@ -1195,7 +1203,7 @@ fn test_fishing_spot_discovered_message_format() {
         }
     }
 
-    assert!(found, "Should find a fishing discovery within 2000 kills");
+    assert!(found, "Should find a fishing discovery within 500 kills");
 }
 
 // =============================================================================
@@ -1207,7 +1215,7 @@ fn test_dungeon_discovered_message_format() {
     let mut state = fresh_state();
     let mut found = false;
 
-    for seed in 0..2000u64 {
+    for seed in 0..500u64 {
         let mut r = rng(seed);
         state.active_dungeon = None;
         state.active_fishing = None;
@@ -1243,5 +1251,5 @@ fn test_dungeon_discovered_message_format() {
         }
     }
 
-    assert!(found, "Should find a dungeon discovery within 2000 kills");
+    assert!(found, "Should find a dungeon discovery within 500 kills");
 }

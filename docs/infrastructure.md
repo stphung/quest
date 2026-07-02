@@ -19,9 +19,11 @@ Both local `make check` and CI run the exact same script:
 
 1. `cargo fmt --check` — Format checking
 2. `cargo clippy --all-targets -- -D warnings` — Lint checking
-3. `cargo test` — All tests
-4. `cargo build --all-targets` — Build verification
+3. `cargo test` — All tests (plus `scripts/ansi2html.py --self-test` if python3 is available)
+4. `cargo run --release --bin simulator -- --check-progression` — Progression check
 5. `cargo audit --deny yanked` — Security audit
+
+If `cargo-llvm-cov` is installed (always in CI, optional locally), a coverage check also runs: game logic line coverage must be >= 90%.
 
 ### CI Workflows
 
@@ -127,7 +129,7 @@ All backups kept permanently. Manual cleanup by user.
 
 ### Overview
 
-A separate binary (`src/bin/simulator.rs`) that runs the game tick loop without any UI, collecting metrics for game balance analysis. Uses the exact same `game_tick()` function as the real game, ensuring perfect fidelity.
+A separate binary (`src/bin/simulator/`, split into `main.rs`, `scenarios.rs`, `report.rs`, `stats.rs`, `strategy.rs`, `assertions.rs`) that runs the game tick loop without any UI, collecting metrics for game balance analysis. Uses the exact same `game_tick_with_context()` function as the real game, ensuring perfect fidelity.
 
 ### Usage
 
@@ -180,7 +182,7 @@ cargo run --bin deep_simulator -- [OPTIONS]
 |--------|---------|-------------|
 | `--hours N` | 168 | Hours to simulate |
 | `--seed N` | 42 | RNG seed for reproducibility |
-| `--strategy STR` | balanced | Strategy: `rush`, `balanced`, `infrastructure` |
+| `--strategy STR` | balanced | Strategy: `rush`, `farm`, `balanced`, `infrastructure` |
 | `--guild-rank N` | 1 | Starting guild rank |
 | `--verbose` | off | Detailed event logging |
 | `--quiet` | off | Only final summary line |
@@ -210,10 +212,10 @@ When active, a `[DEBUG]` indicator shows in the UI corner.
 
 ### Menu Options
 
-The debug menu uses a tabbed category structure with 8 tabs. Left/Right arrows switch tabs, Up/Down navigate within a tab, Enter triggers.
+The debug menu uses a tabbed category structure with 10 tabs. Left/Right arrows switch tabs, Up/Down navigate within a tab, Enter triggers.
 
 **Challenges tab:**
-- Trigger Chess, Morris, Gomoku, Minesweeper, Rune, Go, Flappy Bird, JezzBall, Snake, Sigil Surge challenges
+- Trigger Chess, Morris, Gomoku, Minesweeper, Rune, Go, Flappy Bird, JezzBall, Snake, Sigil Surge, Sudoku, Shard Fusion, Runic Lights, Vault Warden challenges
 
 **World tab:**
 - Trigger Dungeon, Trigger Fishing, Trigger Haven Discovery, Trigger Soulforge Discovery
@@ -232,6 +234,12 @@ The debug menu uses a tabbed category structure with 8 tabs. Left/Right arrows s
 
 **Character tab:**
 - Character-level debug options
+
+**Soulforge tab:**
+- Set enhancement level (0-10) for the equipped weapon
+
+**Loom tab:**
+- Trigger Loom discovery, time warp, select archetype (BurnBright/ReachWide/RunDeep), unlock all nodes, grant resources, complete pattern, advance to a specific pattern
 
 **Borders tab:**
 - Border style options for visual customization
@@ -308,7 +316,7 @@ Character JSON files contain the full `GameState` struct. Notable fields that pe
 | dirs | 6.0 | Platform-appropriate save paths |
 | git2 | 0.20 | Git operations for Time Vault history |
 | tar | 0.4 | Archive extraction for updates |
-| uuid | 1.21 | Character IDs |
+| uuid | 1.23 | Character IDs |
 | serde_json | 1.0 | JSON serialization |
 | chess-engine | 0.1 | Chess minigame AI |
 | ureq | - | HTTP client for auto-update |

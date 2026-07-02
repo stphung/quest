@@ -392,7 +392,7 @@ Individual JSON files per character stored in `~/.quest/`. Maximum 3 characters.
 
 ## Tick Architecture
 
-The game runs a 100ms tick loop. Each tick calls `game_tick()` in `src/core/tick.rs`, which orchestrates all game systems and returns a `TickResult`.
+The game runs a 100ms tick loop. Each tick calls `game_tick_with_context()` in `src/core/tick.rs`, which orchestrates all game systems and returns a `TickResult`.
 
 The tick implementation is split across several files:
 - `tick.rs` -- Orchestrator: calls each stage in order, returns `TickResult`
@@ -405,22 +405,13 @@ The tick implementation is split across several files:
 - `recent_drops.rs` -- RecentDrop struct and deque management
 - `ticker.rs` -- Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
 
-### game_tick() Signature
+### game_tick_with_context() Signature
 
 ```rust
-pub fn game_tick<R: Rng>(
-    state: &mut GameState,
-    tick_counter: &mut u32,
-    haven: &mut Haven,
-    enhancement: &mut EnhancementProgress,
-    achievements: &mut Achievements,
-    deep: &mut DeepState,
-    debug_mode: bool,
-    rng: &mut R,
-) -> TickResult
+pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> TickResult
 ```
 
-Generic `<R: Rng>` allows seeded RNG in tests (`ChaCha8Rng`) and `thread_rng()` in production.
+`TickContext` (`src/core/tick_context.rs`) bundles the mutable state: `state`, `tick_counter`, `haven`, `enhancement`, `deep`, `achievements`, `loom`, and `debug_mode`. Generic `<R: Rng>` allows seeded RNG in tests (`ChaCha8Rng`) and `thread_rng()` in production. The older `game_tick()` free-parameter wrapper is `#[deprecated]`.
 
 ### TickEvent and TickResult
 
@@ -437,7 +428,7 @@ pub struct TickResult {
     pub enhancement_changed: bool,
     pub god_items_changed: bool,
     pub deep_changed: bool,
-    pub power_cores_changed: bool,
+    pub loom_changed: bool,
     pub achievement_modal_ready: Vec<AchievementId>,
 }
 ```
@@ -460,22 +451,29 @@ pub struct TickResult {
 
 | Stage | What it does | File |
 |-------|-------------|------|
-| 1. Challenge AI | Ticks AI thinking for active Chess, Morris, Gomoku, or Go games | tick.rs |
-| 2. Challenge discovery | Rolls for new challenge discovery (P1+ required, Haven bonus applied) | tick.rs |
+| 0. Merged bonuses | Computes merged Haven + Sigil bonuses for the tick | tick.rs |
+| 1. Challenge AI | Ticks AI thinking for active minigames | tick.rs |
+| 2. Challenge discovery | Rolls for new challenge discovery (P1+ required, Haven bonus applied, skipped during Chrono Surge) | tick.rs |
 | 3. Sync player HP | Recalculates DerivedStats and updates player_max_hp | tick.rs |
 | 4. Dungeon exploration | Processes room entry, treasure, keys, boss unlock, completion/failure | tick_stages.rs |
+| 4b. Loom of Worlds | Checks Loom discovery (fires when Deep's Gateway at Layer 30 opens), then if discovered ticks shuttle construction/pull, base production, neighbor unlocking, pattern sustain, and WR->PR conversion. Runs on wall-clock time regardless of whether fishing or combat runs this tick | tick_stages.rs |
 | 5. Fishing | If fishing active: ticks session, handles catches/items/rank-ups/Leviathan, **returns early** (skips combat) | tick_stages.rs |
 | 6. Combat | Maps CombatEvent to TickEvent, applies XP, handles kills/deaths, processes item drops and discoveries | tick_stages.rs |
+| 6b. HUD decay | Decays combat HUD flash timers | tick.rs |
 | 7. Enemy spawn | Spawns enemy if no enemy and not regenerating | tick.rs |
 | 8. Play time | Increments tick counter; at 10 ticks, increments play_time_seconds | tick.rs |
 | 9. Achievement collection | Drains newly unlocked achievements into TickResult.events | tick.rs |
 | 10. Haven discovery | Rolls for Haven discovery (P10+, no active content) | tick.rs |
 | 11. Soulforge discovery | Rolls for Soulforge discovery (P15+, no active content) | tick.rs |
-| 12. Deep discovery hook | No per-tick roll; discovery is triggered during Stage 6 combat processing on first Expanse cycle boss kill at P15+ | tick.rs / tick_stages.rs |
-| 13. Deep missions | Ticks active Deep missions, processes completions and events | tick.rs |
-| 14. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display | tick.rs |
+| 11b. Deep discovery | No per-tick roll; discovery is triggered during Stage 6 combat processing on first Expanse cycle boss kill at P15+ | tick.rs / tick_stages.rs |
+| 11c. Deep mission tick | Ticks Deep missions (check-ins, completions, breakthroughs triggering fracture region unlocks) | tick.rs |
+| 11d. Fracture region unlock | Consumes pending fracture region unlock, syncs zone unlocks, emits FractureRegionUnlocked | tick.rs |
+| 11f. Pattern milestones | Consumes pending pattern milestones, syncs zone unlocks, emits PatternMilestoneReached | tick.rs |
+| 12a. Power Cores | Ticks Power Cores for passive PR generation | tick.rs |
+| 12b. Passive prestige tracking | Reports passive PR gains this tick (Power Cores, WR->PR) to the achievement system | tick.rs |
+| 12. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display | tick.rs |
 
-**Important**: Stage 5 (fishing) returns early, skipping stages 6-7. Fishing and combat are mutually exclusive.
+**Important**: Stage 5 (fishing) returns early when fishing is active, skipping stages 6 through 12 (combat, HUD decay, enemy spawn, play time, Haven/Soulforge discovery, Deep missions, fracture/pattern unlock consumption, Power Cores). The stage-8 play-time increment and HUD decay are instead handled inline inside `process_fishing_tick()` itself. Stage 9 (achievement collection) and stage 12b (passive prestige tracking) are specially re-invoked right before the early return, since Stage 4b (Loom) may have granted PR via WR->PR conversion even on a fishing tick. Fishing and combat remain mutually exclusive within a tick.
 
 ### Event Mapping (tick_events.rs)
 
@@ -532,7 +530,7 @@ Enhancement operates on the 7 equipment slots (Weapon, Armor, Helmet, Gloves, Bo
 | +9 | 20% | 4 PR | -1 level |
 | +10 | 10% | 5 PR | -2 levels |
 
-**Soul Tithe**: Levels +5/+6/+7 offer an alternative guaranteed-success option at higher PR cost (4/6/8 PR respectively) for 100% success rate.
+**Soul Tithe**: Levels +5 through +10 offer an alternative guaranteed-success option at higher PR cost (4/6/8 PR for +5/+6/+7, 25/85/750 PR for +8/+9/+10) for 100% success rate.
 
 ### Cumulative Bonus Multiplier
 
@@ -572,7 +570,7 @@ Enhancement state (`EnhancementProgress`) is saved to `~/.quest/enhancement.json
 | Attack interval | 1.5s (base) |
 | HP regen after kill | 2.5s (base) |
 | Autosave | 30s |
-| Update check interval | 30 min |
+| Update check interval | 15 min |
 | Offline XP multiplier | 0.25 (25%) |
 | Max offline time | 7 days (604,800s) |
 | Base drop rate | 15% |
@@ -593,10 +591,12 @@ Enhancement state (`EnhancementProgress`) is saved to `~/.quest/enhancement.json
 | Stormglass prestige gate | `STORMGLASS_MIN_PRESTIGE_RANK = 15` |
 | Death loop threshold | `DEATH_LOOP_THRESHOLD = 3` (consecutive boss deaths trigger retreat) |
 | Mob fight timeout | `MOB_FIGHT_TIMEOUT_SECONDS = 30.0` (stalemate prevention) |
+| Frontier backoff cap | `FRONTIER_BACKOFF_MAX_CYCLES = 8` (max safe-zone cycles before retrying a death-loop zone) |
 | Prestige mult formula | `1.0 + 0.5 * rank^0.7` |
 | Base max fishing rank | 30 (40 with Fishing Dock T4) |
 | Fracture zone stat multiplier | `FRACTURE_ZONE_STAT_MULTIPLIER = 1.6` (per zone from Z11 base) |
-| Max ascension level (I-VI table) | `MAX_ASCENSION_LEVEL = 6` |
+| Max ascension level | `MAX_ASCENSION_LEVEL = 10` |
 | Ascension PR costs (I-VI) | [35, 65, 120, 200, 325, 500] (total 1,245 PR) |
+| Ascension PR costs (VII-X) | [1500, 4000, 8000, 15000] (pattern-gated: 8/16/22/28 patterns) |
 | Ascension deep gates (I-VI) | [3, 7, 12, 18, 25, 30] layers |
 | Ascension multiplier | `2^level` for I-VI (2x-64x); `64 * 1.5^(level-6)` for VII+ |

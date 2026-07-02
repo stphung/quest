@@ -184,7 +184,8 @@ fn draw_combat_compact(
     draw_combat_status(frame, chunks[idx], game_state);
 }
 
-/// Draws the player HP bar (borderless, single line)
+/// Draws the player HP bar (borderless, single line) with the most recent
+/// damage/heal flash right-aligned on the bar (matches the S layout behavior)
 pub(super) fn draw_player_hp(frame: &mut Frame, area: Rect, game_state: &GameState) {
     let hp_ratio = game_state.combat_state.player_current_hp as f64
         / game_state.combat_state.player_max_hp as f64;
@@ -200,6 +201,12 @@ pub(super) fn draw_player_hp(frame: &mut Frame, area: Rect, game_state: &GameSta
         .ratio(hp_ratio);
 
     frame.render_widget(gauge, area);
+
+    super::render_flash(
+        frame,
+        area,
+        game_state.combat_state.player_damage_floats.last(),
+    );
 }
 
 /// Draws a regen throbber line below the player HP bar (spinner + flavor text).

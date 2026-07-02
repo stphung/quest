@@ -177,7 +177,9 @@ pub struct InjectionState {
     pub enhancement_applied: bool,
     pub sigils_etched: bool,
     pub last_new_zone_tick: u64,
-    pub last_zone_id: u32,
+    /// Highest zone reached since the last prestige (frontier death loops
+    /// bounce between zones, so any-zone-change is not a progress signal).
+    pub max_zone_id: u32,
     pub deep_layers_injected: u32,
     pub last_deep_layer_tick: u64,
     pub deep_started: bool,
@@ -186,6 +188,9 @@ pub struct InjectionState {
     pub last_loom_pattern_tick: u64,
     /// Starting prestige rank (doesn't reset on auto-prestige).
     pub starting_prestige: u32,
+    /// Number of auto-prestiges performed (PR balance can be spent back to 0,
+    /// so this is the only reliable record that the prestige loop cycled).
+    pub prestige_count: u32,
 }
 
 impl InjectionState {
@@ -195,13 +200,14 @@ impl InjectionState {
             enhancement_applied: false,
             sigils_etched: false,
             last_new_zone_tick: 0,
-            last_zone_id: 1,
+            max_zone_id: 1,
             deep_layers_injected: 0,
             last_deep_layer_tick: 0,
             deep_started: false,
             loom_started: false,
             last_loom_pattern_tick: 0,
             starting_prestige,
+            prestige_count: 0,
         }
     }
 }
@@ -394,17 +400,21 @@ pub fn inject_outcomes(
     }
 
     // -- Auto-prestige (stuck detection) --
+    // Progress means reaching a NEW highest zone. A frontier death loop bounces
+    // between the frontier and its safe zone; treating any zone change as
+    // progress would starve the stuck timer forever (#576).
     let current_zone = state.zone_progression.current_zone_id;
-    if current_zone != injection.last_zone_id {
+    if current_zone > injection.max_zone_id {
         injection.last_new_zone_tick = tick;
-        injection.last_zone_id = current_zone;
+        injection.max_zone_id = current_zone;
     }
 
     if tick - injection.last_new_zone_tick >= profile.prestige_stuck_ticks() && can_prestige(state)
     {
         perform_prestige(state);
+        injection.prestige_count += 1;
         injection.last_new_zone_tick = tick;
-        injection.last_zone_id = state.zone_progression.current_zone_id;
+        injection.max_zone_id = state.zone_progression.current_zone_id;
         state.invalidate_bonuses();
 
         if verbose {

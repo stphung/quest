@@ -1,7 +1,6 @@
 //! The Deep — Event response modal rendering.
 
 use crate::deep::{DeepState, DeepUiState};
-use chrono::Utc;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -50,7 +49,7 @@ pub(super) fn render_event_modal(
         return;
     };
 
-    let now = Utc::now();
+    let now = super::clock::now_utc();
     let seconds_since_fired = (now - event.fired_at).num_seconds().max(0) as u64;
     let remaining = AUTO_RESOLVE_SECS.saturating_sub(seconds_since_fired);
     let ratio = remaining as f64 / AUTO_RESOLVE_SECS as f64;

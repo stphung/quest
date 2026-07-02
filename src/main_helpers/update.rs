@@ -834,6 +834,7 @@ pub fn show_startup_splash_screen(
                                 *cloud_status = CloudStatus::OutOfSync;
                                 if let Some(ref mut browser) = time_vault_browser {
                                     browser.cloud_divergence = Some(div);
+                                    browser.mode = crate::ui::time_vault_scene::BrowserMode::DivergenceResolution;
                                 }
                             }
                             _ => {
@@ -1653,7 +1654,7 @@ fn load_character_for_game(
             // Sanity check: clear stale enemy if HP is impossibly high
             let derived = state.cached_derived_stats;
             if let Some(enemy) = &state.combat_state.current_enemy {
-                if enemy.max_hp > (derived.max_hp as f64 * 2.5) as u32 {
+                if enemy.max_hp > (derived.max_hp as f64 * 2.5) as u64 {
                     state.combat_state.current_enemy = None;
                 }
             }
@@ -1709,6 +1710,9 @@ fn load_character_for_game(
                 if let Some(ref mut report) = offline_report {
                     report.power_core_pr = power_core_pr;
                 }
+                // This grant happens after sync_from_game_state, so report the
+                // new rank to keep prestige achievement progress current (#597).
+                global_achievements.on_prestige(state.prestige_rank, Some(&state.character_name));
             }
 
             // Always sync last_save_time on load

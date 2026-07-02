@@ -4,10 +4,10 @@ use crate::items::Equipment;
 
 #[derive(Debug, Clone, Copy)]
 pub struct DerivedStats {
-    pub max_hp: u32,
-    pub physical_damage: u32,
-    pub magic_damage: u32,
-    pub defense: u32,
+    pub max_hp: u64,
+    pub physical_damage: u64,
+    pub magic_damage: u64,
+    pub defense: u64,
     pub crit_chance_percent: u32,
     pub crit_multiplier: f64,
     pub attack_speed_multiplier: f64,
@@ -47,7 +47,7 @@ impl DerivedStats {
         super::calculation::calculate_derived_stats(attrs, equipment, enhancement_levels)
     }
 
-    pub fn total_damage(&self) -> u32 {
+    pub fn total_damage(&self) -> u64 {
         self.physical_damage + self.magic_damage
     }
 

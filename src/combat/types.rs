@@ -6,16 +6,16 @@ use std::collections::VecDeque;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Enemy {
     pub name: String,
-    pub max_hp: u32,
-    pub current_hp: u32,
-    pub damage: u32,
+    pub max_hp: u64,
+    pub current_hp: u64,
+    pub damage: u64,
     #[serde(default)]
-    pub defense: u32,
+    pub defense: u64,
 }
 
 impl Enemy {
     #[allow(dead_code)]
-    pub fn new(name: String, max_hp: u32, damage: u32) -> Self {
+    pub fn new(name: String, max_hp: u64, damage: u64) -> Self {
         Self {
             name,
             current_hp: max_hp,
@@ -25,7 +25,7 @@ impl Enemy {
         }
     }
 
-    pub fn new_with_defense(name: String, max_hp: u32, damage: u32, defense: u32) -> Self {
+    pub fn new_with_defense(name: String, max_hp: u64, damage: u64, defense: u64) -> Self {
         Self {
             name,
             current_hp: max_hp,
@@ -39,7 +39,7 @@ impl Enemy {
         self.current_hp > 0
     }
 
-    pub fn take_damage(&mut self, amount: u32) {
+    pub fn take_damage(&mut self, amount: u64) {
         self.current_hp = self.current_hp.saturating_sub(amount);
     }
 
@@ -76,8 +76,8 @@ pub struct CombatLogEntry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CombatState {
     pub current_enemy: Option<Enemy>,
-    pub player_current_hp: u32,
-    pub player_max_hp: u32,
+    pub player_current_hp: u64,
+    pub player_max_hp: u64,
     /// Player's independent attack timer. Accumulates delta_time each tick.
     /// Player attacks when this reaches the effective player attack interval.
     #[serde(alias = "attack_timer")]
@@ -93,7 +93,7 @@ pub struct CombatState {
     #[serde(skip)]
     pub combat_log: VecDeque<CombatLogEntry>,
     #[serde(skip)]
-    pub regen_start_hp: u32,
+    pub regen_start_hp: u64,
     /// Accumulates time (seconds) the player has been fighting a boss.
     /// Resets on boss death, player death, or new boss encounter.
     /// When this exceeds `BOSS_ENRAGE_SECONDS`, the boss enrages and kills the player.
@@ -111,12 +111,12 @@ pub struct CombatState {
 
 impl Default for CombatState {
     fn default() -> Self {
-        Self::new(BASE_HP as u32)
+        Self::new(BASE_HP as u64)
     }
 }
 
 impl CombatState {
-    pub fn new(player_max_hp: u32) -> Self {
+    pub fn new(player_max_hp: u64) -> Self {
         Self {
             current_enemy: None,
             player_current_hp: player_max_hp,
@@ -147,7 +147,7 @@ impl CombatState {
         });
     }
 
-    pub fn update_max_hp(&mut self, new_max_hp: u32) {
+    pub fn update_max_hp(&mut self, new_max_hp: u64) {
         self.player_max_hp = new_max_hp;
         // If HP exceeds new max, cap it
         if self.player_current_hp > new_max_hp {

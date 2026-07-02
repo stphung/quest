@@ -155,7 +155,7 @@ Not all challenges are equally discoverable:
 
 ## Headless Game Simulator for Balance Testing
 
-**Decision**: Add a `src/bin/simulator.rs` binary that runs the game tick loop headlessly, collecting metrics for game balance analysis.
+**Decision**: Add a `src/bin/simulator/` binary that runs the game tick loop headlessly, collecting metrics for game balance analysis.
 
 **Rationale**: Balance testing previously required playing the game manually or writing one-off test harnesses. The simulator reuses the exact same `game_tick()` function, ensuring perfect fidelity with the real game. It supports:
 - Configurable tick count, RNG seed, starting prestige
@@ -242,7 +242,7 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 **Decision**: Introduce `impl_apply_game_result!` macro and extract remaining AI submodules.
 
 **What changed**:
-- Added `impl_apply_game_result!` macro in `src/challenges/mod.rs` to standardize reward application across all 12 challenge minigames
+- Added `impl_apply_game_result!` macro in `src/challenges/mod.rs` to standardize reward application across all challenge minigames (12 at the time, now 14)
 - Extracted `morris/ai.rs` and `gomoku/ai.rs` as separate AI submodules
 - Extracted `combat/enemy_generation.rs` for zone/dungeon enemy generators
 
@@ -265,6 +265,12 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 **Decision**: Add a combat retreat system (`DEATH_LOOP_THRESHOLD = 3`, `MOB_FIGHT_TIMEOUT_SECONDS = 30.0`) that automatically retreats the player to a safer zone when they die repeatedly or stall against a mob.
 
 **Rationale**: Without intervention, a player who enters a zone too early can get stuck in a death loop — dying instantly, respawning, and dying again. The retreat system detects consecutive deaths and mob fight timeouts, then moves the player back to a zone they can handle, preserving the gameplay loop.
+
+## Frontier Backoff: Macro Death Loop Prevention
+
+**Decision**: When a *death-triggered* combat retreat fires, remember the zone that caused it (`ZoneProgression::record_death_retreat()`). Boss-defeat advancement then cycles the safe zone instead of auto-advancing back into the recorded zone, consuming a cooldown that grows with repeated retreats (capped at `FRONTIER_BACKOFF_MAX_CYCLES = 8`). Defeating any boss inside the recorded zone — or prestiging — clears the memory.
+
+**Rationale**: The retreat system alone creates a macro loop at zone frontiers (#576): retreat sends the player to the zone they just cleared, they re-defeat its boss, auto-advance back into the killer zone, die three more times, and repeat indefinitely. Backoff converts the tight bounce into progressively longer farming stints in the safe zone, so the player keeps earning XP/levels until they can actually survive the frontier. Stalemate (mob timeout) retreats deliberately do *not* record backoff — the player survives those, retrying is cheap, and forcing extra safe-zone cycles for stalemates measurably starves leveling at the Loom frontier.
 
 ## Ascension System: Per-Character Prestige-Rank Multiplier
 

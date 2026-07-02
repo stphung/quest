@@ -25,6 +25,7 @@ petgraph = "0.8"
 [dev-dependencies]
 tempfile = "3"
 criterion = { version = "0.8", features = ["html_reports"] }
+insta = { version = "1", features = ["filters"] }
 
 # rand_chacha moved to [dependencies] for the simulator binary
 

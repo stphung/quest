@@ -305,7 +305,13 @@ fn test_resolve_first_orders_guaranteed_success() {
         let mut mission = past_mission(1, MissionType::SupplyRun, 1, vec![1], 1);
         mission.is_first_orders = true;
 
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            &mut rng,
+        );
 
         let result = mission.result.as_ref().unwrap();
         assert_eq!(
@@ -329,7 +335,13 @@ fn test_resolve_first_orders_awards_15_marks() {
     let mut mission = past_mission(1, MissionType::SupplyRun, 1, vec![1], 1);
     mission.is_first_orders = true;
 
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
 
     assert_eq!(
         prestige.warband_marks, 15,
@@ -348,7 +360,13 @@ fn test_resolve_first_orders_grants_familiarity_on_layer_1() {
     let mut mission = past_mission(1, MissionType::SupplyRun, 1, vec![1], 1);
     mission.is_first_orders = true;
 
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
 
     let familiarity = persistent
         .layer_record(1)
@@ -371,7 +389,13 @@ fn test_resolve_first_orders_no_injuries_no_losses() {
     let mut mission = past_mission(1, MissionType::SupplyRun, 1, vec![1], 1);
     mission.is_first_orders = true;
 
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
 
     let result = mission.result.as_ref().unwrap();
     assert!(result.injured_mercs.is_empty());
@@ -389,7 +413,13 @@ fn test_resolve_first_orders_releases_squad() {
     let mut mission = past_mission(1, MissionType::SupplyRun, 1, vec![1], 1);
     mission.is_first_orders = true;
 
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
 
     let merc_status = &prestige.find_merc(1).unwrap().status;
     assert_eq!(
@@ -410,7 +440,13 @@ fn test_resolve_first_orders_adds_warband_log_entry() {
     let mut mission = past_mission(1, MissionType::SupplyRun, 1, vec![1], 1);
     mission.is_first_orders = true;
 
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
 
     assert_eq!(
         prestige.warband_log.len(),
@@ -453,7 +489,13 @@ fn test_resolve_gateway_expedition_success_opens_gateway() {
             is_first_orders: false,
         };
 
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            &mut rng,
+        );
         let result = mission.result.as_ref().unwrap();
 
         if matches!(result.outcome, MissionOutcome::Success) {
@@ -500,7 +542,13 @@ fn test_resolve_gateway_expedition_failure_does_not_open_gateway() {
             is_first_orders: false,
         };
 
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            &mut rng,
+        );
         let result = mission.result.as_ref().unwrap();
 
         if matches!(result.outcome, MissionOutcome::Failure) {
@@ -541,7 +589,13 @@ fn test_gateway_expedition_item_ilvl_is_layer_times_10() {
         is_first_orders: false,
     };
 
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
     let result = mission.result.as_ref().unwrap();
 
     assert!(
@@ -564,7 +618,13 @@ fn test_item_ilvl_supply_run_is_none() {
     prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let mut mission = past_mission(1, MissionType::SupplyRun, 5, vec![1], 1);
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
 
     let result = mission.result.as_ref().unwrap();
     assert!(
@@ -583,7 +643,13 @@ fn test_item_ilvl_recon_is_none() {
     prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let mut mission = past_mission(1, MissionType::Recon, 3, vec![1], 1);
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
 
     let result = mission.result.as_ref().unwrap();
     assert!(
@@ -608,7 +674,13 @@ fn test_item_ilvl_construction_is_none() {
         vec![1],
         1,
     );
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
 
     let result = mission.result.as_ref().unwrap();
     assert!(
@@ -627,7 +699,13 @@ fn test_item_ilvl_expedition_is_none() {
     prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let mut mission = past_mission(1, MissionType::Expedition, 7, vec![1], 1);
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
 
     let result = mission.result.as_ref().unwrap();
     assert!(
@@ -646,7 +724,13 @@ fn test_item_ilvl_breakthrough_is_none() {
     prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let mut mission = past_mission(1, MissionType::Breakthrough, 4, vec![1], 1);
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
 
     let result = mission.result.as_ref().unwrap();
     assert!(
@@ -689,7 +773,13 @@ fn test_outcome_overpowered_ratio_mostly_success() {
             is_first_orders: false,
         };
 
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            &mut rng,
+        );
         if matches!(
             mission.result.as_ref().unwrap().outcome,
             MissionOutcome::Success
@@ -738,7 +828,13 @@ fn test_outcome_at_threshold_mostly_success() {
             is_first_orders: false,
         };
 
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            &mut rng,
+        );
         match mission.result.as_ref().unwrap().outcome {
             MissionOutcome::Success => successes += 1,
             MissionOutcome::Failure => failures += 1,
@@ -793,7 +889,13 @@ fn test_outcome_below_threshold_mixed_results() {
             is_first_orders: false,
         };
 
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            &mut rng,
+        );
         match mission.result.as_ref().unwrap().outcome {
             MissionOutcome::Success => successes += 1,
             MissionOutcome::PartialSuccess => partials += 1,
@@ -853,7 +955,13 @@ fn test_outcome_well_below_threshold_mostly_partial_or_failure() {
             is_first_orders: false,
         };
 
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            &mut rng,
+        );
         match mission.result.as_ref().unwrap().outcome {
             MissionOutcome::PartialSuccess | MissionOutcome::Failure => partial_or_failure += 1,
             _ => {}
@@ -906,7 +1014,13 @@ fn test_medic_in_squad_reduces_injury_rate_for_teammates() {
             is_first_orders: false,
         };
 
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            &mut rng,
+        );
         let result = mission.result.as_ref().unwrap();
         (result.injured_mercs.len() + result.lost_mercs.len()) as u32
     };
@@ -974,7 +1088,13 @@ fn test_danger_bonus_xp_disabled_when_underpowered() {
         is_first_orders: false,
     };
 
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
     let result = mission.result.as_ref().unwrap();
     assert!(
         !result.danger_bonus_xp,
@@ -1012,7 +1132,13 @@ fn test_lost_merc_not_in_level_up_list() {
             is_first_orders: false,
         };
 
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            &mut rng,
+        );
         let result = mission.result.as_ref().unwrap();
 
         if !result.lost_mercs.is_empty() {
@@ -1340,7 +1466,13 @@ fn test_warband_log_capped_at_10_entries() {
         // Reset merc status before each resolve.
         prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
         let mut mission = past_mission(1, MissionType::SupplyRun, 1, vec![1], 1);
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            &mut rng,
+        );
     }
 
     assert!(
@@ -1367,7 +1499,13 @@ fn test_total_marks_earned_and_missions_completed_incremented() {
     let initial_marks = prestige.total_marks_earned;
 
     let mut mission = past_mission(1, MissionType::SupplyRun, 1, vec![1], 2);
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
 
     assert_eq!(
         prestige.total_missions_completed,
@@ -1427,7 +1565,13 @@ fn test_construction_always_succeeds_regardless_of_power() {
             is_first_orders: false,
         };
 
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            &mut rng,
+        );
         let result = mission.result.as_ref().unwrap();
         assert_eq!(
             result.outcome,
@@ -1485,7 +1629,13 @@ fn test_resolve_mission_gains_familiarity() {
     prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
 
     let mut mission = past_mission(1, MissionType::SupplyRun, 1, vec![1], 2);
-    resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+    resolve_mission(
+        &mut mission,
+        &mut prestige,
+        &mut persistent,
+        Utc::now(),
+        &mut rng,
+    );
 
     let final_familiarity = persistent
         .layer_record(1)
@@ -1509,7 +1659,13 @@ fn test_resolve_recon_gains_more_familiarity_than_supply_run() {
         let mut prestige = make_prestige_with_mercs(vec![merc]);
         prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
         let mut mission = past_mission(1, mission_type, 1, vec![1], 2);
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            rng,
+        );
         persistent
             .layer_record(1)
             .map(|r| r.familiarity)
@@ -1559,7 +1715,13 @@ fn test_breakthrough_failure_layer_not_cleared() {
             is_first_orders: false,
         };
 
-        resolve_mission(&mut mission, &mut prestige, &mut persistent, &mut rng);
+        resolve_mission(
+            &mut mission,
+            &mut prestige,
+            &mut persistent,
+            Utc::now(),
+            &mut rng,
+        );
         let result = mission.result.as_ref().unwrap();
 
         if matches!(result.outcome, MissionOutcome::Failure) {

@@ -94,13 +94,12 @@ pub use layers::{
 };
 #[allow(unused_imports)]
 pub use mercenaries::{
-    apply_merc_xp, archetype_primary_flags, available_mercs, can_promote, generate_merc_name,
-    generate_mercenary, generate_recruit_pool, generate_starter_roster, injure_merc,
-    mark_merc_lost, promote_merc_by_id, promote_mercenary, promotion_cost,
+    apply_merc_xp, archetype_primary_flags, available_mercs, can_promote, check_injury_recovery,
+    generate_merc_name, generate_mercenary, generate_recruit_pool, generate_starter_roster,
+    injure_merc, mark_merc_lost, promote_merc_by_id, promote_mercenary, promotion_cost,
     promotion_guild_rank_required, promotion_missions_required, purge_lost_mercs,
     recruit_pool_size, roll_recruit_cost, roll_recruit_quality, roster_has_capacity,
-    stats_at_level, tick_merc_injury, xp_to_next_level, InjurySeverity, MercQuality,
-    PromotionError,
+    stats_at_level, xp_to_next_level, InjurySeverity, MercQuality, PromotionError,
 };
 #[allow(unused_imports)]
 pub use persistence::{deep_save_path, load_deep, save_deep};

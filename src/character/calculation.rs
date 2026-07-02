@@ -41,17 +41,17 @@ pub fn calculate_derived_stats(
     let wis_mod = total_attrs.modifier(AttributeType::Wisdom);
 
     // Max HP = BASE_HP + (CON_mod × HP_PER_CON_MODIFIER)
-    let mut max_hp = (BASE_HP + con_mod * HP_PER_CON_MODIFIER).max(1) as u32;
+    let mut max_hp = (BASE_HP + con_mod * HP_PER_CON_MODIFIER).max(1) as u64;
 
     // Physical Damage = BASE_PHYSICAL_DAMAGE + (STR_mod × DAMAGE_PER_STR_MODIFIER)
     let mut physical_damage =
-        (BASE_PHYSICAL_DAMAGE + str_mod * DAMAGE_PER_STR_MODIFIER).max(1) as u32;
+        (BASE_PHYSICAL_DAMAGE + str_mod * DAMAGE_PER_STR_MODIFIER).max(1) as u64;
 
     // Magic Damage = BASE_MAGIC_DAMAGE + (INT_mod × DAMAGE_PER_INT_MODIFIER)
-    let mut magic_damage = (BASE_MAGIC_DAMAGE + int_mod * DAMAGE_PER_INT_MODIFIER).max(1) as u32;
+    let mut magic_damage = (BASE_MAGIC_DAMAGE + int_mod * DAMAGE_PER_INT_MODIFIER).max(1) as u64;
 
     // Defense = 0 + (DEX_mod × 1)
-    let mut defense = dex_mod.max(0) as u32;
+    let mut defense = dex_mod.max(0) as u64;
 
     // Crit Chance = BASE_CRIT_CHANCE_PERCENT + (DEX_mod × 1%)
     let mut crit_chance_percent = (BASE_CRIT_CHANCE_PERCENT + dex_mod).max(0) as u32;
@@ -97,10 +97,10 @@ pub fn calculate_derived_stats(
     }
 
     // Apply multipliers to stats
-    max_hp = ((max_hp as f64 + hp_bonus) as u32).max(1);
-    physical_damage = ((physical_damage as f64 * damage_mult) as u32).max(1);
-    magic_damage = ((magic_damage as f64 * damage_mult) as u32).max(1);
-    defense = (defense as f64 * defense_mult) as u32;
+    max_hp = ((max_hp as f64 + hp_bonus) as u64).max(1);
+    physical_damage = ((physical_damage as f64 * damage_mult) as u64).max(1);
+    magic_damage = ((magic_damage as f64 * damage_mult) as u64).max(1);
+    defense = (defense as f64 * defense_mult) as u64;
     crit_chance_percent = (crit_chance_percent as f64 + crit_bonus) as u32;
     xp_multiplier *= xp_mult;
 

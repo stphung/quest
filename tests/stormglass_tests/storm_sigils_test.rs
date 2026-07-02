@@ -622,7 +622,7 @@ fn force_player_attack_damage(
     rng: &mut ChaCha8Rng,
     state: &mut GameState,
     bonuses: &CombatBonuses,
-) -> u32 {
+) -> u64 {
     let d = DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7]);
     state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
     state.combat_state.enemy_attack_timer = 0.0;
@@ -721,7 +721,7 @@ fn test_sigil_dr_bonus_reduces_enemy_damage() {
         11,
         30,
     );
-    let damage_base: u32 = events_base
+    let damage_base: u64 = events_base
         .iter()
         .filter_map(|e| match e {
             CombatEvent::EnemyAttack { damage, .. } => Some(*damage),
@@ -749,7 +749,7 @@ fn test_sigil_dr_bonus_reduces_enemy_damage() {
         11,
         30,
     );
-    let damage_with: u32 = events_with
+    let damage_with: u64 = events_with
         .iter()
         .filter_map(|e| match e {
             CombatEvent::EnemyAttack { damage, .. } => Some(*damage),
@@ -965,7 +965,7 @@ fn test_multiple_sigils_stack_in_game_tick() {
     let hp_stacked = state.combat_state.player_max_hp;
 
     // 3x 10% = 30% boost
-    let expected_min = (hp_base as f64 * 1.29) as u32; // at least 29% (rounding)
+    let expected_min = (hp_base as f64 * 1.29) as u64; // at least 29% (rounding)
     assert!(
         hp_stacked >= expected_min,
         "3x MaxHpPercent sigils should stack: got {} (base={}, expected >= {})",

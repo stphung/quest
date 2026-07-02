@@ -512,6 +512,9 @@ pub fn process_combat_events<R: Rng>(
             CombatEvent::CombatRetreat { zone_name } => {
                 result.events.push(TickEvent::CombatRetreat { zone_name });
             }
+            CombatEvent::DungeonRetreat => {
+                result.events.push(TickEvent::DungeonFailed);
+            }
         }
     }
 }
@@ -659,10 +662,24 @@ pub(super) fn process_zone_achievements(
             achievements.on_zone_fully_cleared(11, Some(character_name));
         }
         BossDefeatResult::FractureCycle { zone_id }
-        | BossDefeatResult::LoomZoneCycle { zone_id } => {
+        | BossDefeatResult::LoomZoneCycle { zone_id }
+        | BossDefeatResult::FrontierBackoff { zone_id, .. } => {
             achievements.on_zone_fully_cleared(*zone_id, Some(character_name));
         }
         _ => {}
+    }
+}
+
+/// Track prestige rank gained passively during this tick (Power Cores,
+/// WR→PR conversion). Manual prestige and challenge rewards are input-driven
+/// and tracked by `main_helpers::achievements::track_input_achievements`.
+pub(super) fn track_passive_prestige_gain(
+    state: &GameState,
+    achievements: &mut Achievements,
+    prestige_before: u32,
+) {
+    if state.prestige_rank > prestige_before {
+        achievements.on_prestige(state.prestige_rank, Some(&state.character_name));
     }
 }
 
@@ -753,12 +770,12 @@ pub(super) fn sync_derived_stats(
     // Apply Ascension multiplier
     let ascension_mult = crate::ascension::ascension_combat_multiplier(state.ascension_level);
     if ascension_mult > 1.0 {
-        max_hp = (max_hp as f64 * ascension_mult) as u32;
+        max_hp = (max_hp as f64 * ascension_mult) as u64;
     }
 
     // Apply sigil max HP% bonus
     if sigil_bonuses.max_hp_percent > 0.0 {
-        max_hp = (max_hp as f64 * (1.0 + sigil_bonuses.max_hp_percent / 100.0)) as u32;
+        max_hp = (max_hp as f64 * (1.0 + sigil_bonuses.max_hp_percent / 100.0)) as u64;
     }
 
     state.combat_state.update_max_hp(max_hp);
@@ -954,7 +971,7 @@ pub(super) fn tick_deep_missions(
         rng,
     );
 
-    if summary.missions_completed > 0 || summary.events_fired > 0 {
+    if summary.missions_completed > 0 || summary.events_fired > 0 || summary.mercs_recovered > 0 {
         result.deep_changed = true;
     }
 
@@ -1297,6 +1314,7 @@ mod tests {
                 CombatEvent::CombatRetreat {
                     zone_name: "Meadow".to_string(),
                 },
+                CombatEvent::DungeonRetreat,
             ],
             &haven_bonuses,
             &mut achievements,
@@ -1306,7 +1324,7 @@ mod tests {
             &mut rng,
         );
 
-        assert_eq!(result.events.len(), 8);
+        assert_eq!(result.events.len(), 9);
         assert!(matches!(
             result.events[0],
             TickEvent::PlayerAttackBlocked { .. }
@@ -1344,6 +1362,7 @@ mod tests {
                 ..
             } if zone_name == "Meadow"
         ));
+        assert!(matches!(result.events[8], TickEvent::DungeonFailed));
     }
 
     #[test]

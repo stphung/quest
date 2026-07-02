@@ -264,7 +264,7 @@ fn get_ordered_candidates(
             .into_iter()
             .map(|(r, c)| ((r, c), score_move_quick(board, r, c, player)))
             .collect();
-        scored.sort_by(|a, b| b.1.cmp(&a.1)); // Descending by score
+        scored.sort_by_key(|b| std::cmp::Reverse(b.1)); // Descending by score
         return scored.into_iter().map(|(pos, _)| pos).collect();
     }
 
@@ -278,7 +278,7 @@ fn get_ordered_candidates(
         .into_iter()
         .map(|(r, c)| ((r, c), score_move_quick(board, r, c, player)))
         .collect();
-    scored.sort_by(|a, b| b.1.cmp(&a.1)); // Descending by score
+    scored.sort_by_key(|b| std::cmp::Reverse(b.1)); // Descending by score
     scored
         .into_iter()
         .take(MAX_CANDIDATES)

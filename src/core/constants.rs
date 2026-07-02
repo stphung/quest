@@ -99,11 +99,18 @@ pub const KILLS_FOR_BOSS: u32 = 10;
 // Combat fitness: death loop and stalemate prevention
 pub const DEATH_LOOP_THRESHOLD: u32 = 3;
 pub const MOB_FIGHT_TIMEOUT_SECONDS: f64 = 30.0;
+// Dungeon fights get a longer stalemate limit: elites/bosses have up to 3.5x HP,
+// so the 30s overworld limit would fail winnable fights (matches BOSS_ENRAGE_SECONDS)
+pub const DUNGEON_FIGHT_TIMEOUT_SECONDS: f64 = 60.0;
+// Frontier backoff: after a death-loop retreat, the safe zone must be cycled
+// this many times (growing per repeated retreat, capped) before auto-advancing
+// back into the zone that triggered the retreat.
+pub const FRONTIER_BACKOFF_MAX_CYCLES: u32 = 8;
 
 // Zone enemy base stats: (base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)
 // Index 0 = Zone 1, Index 10 = Zone 11 (The Expanse)
 // hp_step/dmg_step/def_step are per-subzone depth increments above depth 1
-pub const ZONE_ENEMY_STATS: [(u32, u32, u32, u32, u32, u32); 50] = [
+pub const ZONE_ENEMY_STATS: [(u64, u64, u64, u64, u64, u64); 50] = [
     (55, 9, 7, 2, 0, 0),           // Zone 1: Meadow
     (90, 14, 13, 3, 2, 1),         // Zone 2: Dark Forest
     (160, 22, 22, 4, 6, 2),        // Zone 3: Mountain Pass

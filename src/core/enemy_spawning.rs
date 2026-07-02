@@ -282,8 +282,8 @@ mod tests {
         for _ in 0..samples {
             let regular = generate_dungeon_enemy(zone_id);
             let elite = generate_dungeon_elite(zone_id);
-            elite_hp += elite.max_hp as u64;
-            regular_hp += regular.max_hp as u64;
+            elite_hp += elite.max_hp;
+            regular_hp += regular.max_hp;
         }
 
         assert!(
@@ -302,8 +302,8 @@ mod tests {
         for _ in 0..samples {
             let elite = generate_dungeon_elite(zone_id);
             let boss = generate_dungeon_boss(zone_id);
-            boss_hp += boss.max_hp as u64;
-            elite_hp += elite.max_hp as u64;
+            boss_hp += boss.max_hp;
+            elite_hp += elite.max_hp;
         }
 
         assert!(
@@ -352,8 +352,8 @@ mod tests {
             .expect("Should have spawned enemy");
 
         let (base_hp, _, base_dmg, _, _, _) = ZONE_ENEMY_STATS[4];
-        let hp_lo = (base_hp as f64 * 0.85) as u32;
-        let hp_hi = (base_hp as f64 * 1.15) as u32;
+        let hp_lo = (base_hp as f64 * 0.85) as u64;
+        let hp_hi = (base_hp as f64 * 1.15) as u64;
         assert!(
             enemy.max_hp >= hp_lo && enemy.max_hp <= hp_hi,
             "Dungeon enemy HP {} should be near zone 5 base HP {} (range {}-{})",
@@ -362,8 +362,8 @@ mod tests {
             hp_lo,
             hp_hi
         );
-        let dmg_lo = (base_dmg as f64 * 0.85) as u32;
-        let dmg_hi = (base_dmg as f64 * 1.15) as u32;
+        let dmg_lo = (base_dmg as f64 * 0.85) as u64;
+        let dmg_hi = (base_dmg as f64 * 1.15) as u64;
         assert!(
             enemy.damage >= dmg_lo && enemy.damage <= dmg_hi,
             "Dungeon enemy damage {} should be near zone 5 base damage {} (range {}-{})",
@@ -442,7 +442,7 @@ mod tests {
         let enemy = state.combat_state.current_enemy.as_ref().unwrap();
         let (base_hp, _, _, _, _, _) = ZONE_ENEMY_STATS[9];
         assert!(
-            enemy.max_hp >= (base_hp as f64 * 0.85) as u32,
+            enemy.max_hp >= (base_hp as f64 * 0.85) as u64,
             "Zone 10 enemy HP {} should be near base {}",
             enemy.max_hp,
             base_hp
@@ -461,7 +461,7 @@ mod tests {
         let enemy = state.combat_state.current_enemy.as_ref().unwrap();
         let (base_hp, _, _, _, _, _) = ZONE_ENEMY_STATS[10];
         assert!(
-            enemy.max_hp >= (base_hp as f64 * 0.85) as u32,
+            enemy.max_hp >= (base_hp as f64 * 0.85) as u64,
             "Zone 11 enemy HP {} should be near base {}",
             enemy.max_hp,
             base_hp

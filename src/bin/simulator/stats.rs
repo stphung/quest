@@ -15,6 +15,11 @@ pub struct SimStats {
     pub zone_entry_tick: HashMap<(u32, u32), u64>,
     pub zone_boss_defeated_tick: HashMap<(u32, u32), u64>,
     pub deaths_per_zone: HashMap<(u32, u32), u64>,
+    pub combat_retreats: u64,
+    pub retreats_per_zone: HashMap<(u32, u32), u64>,
+    pub boss_enrages: u64,
+    pub enrages_per_zone: HashMap<(u32, u32), u64>,
+    pub frontier_backoffs: u64,
     pub items_by_rarity: [u64; 5],
     pub items_equipped: u64,
     pub boss_items_dropped: u64,
@@ -30,6 +35,7 @@ pub struct SimStats {
     pub haven_final_tiers: Vec<(String, u8)>,
     pub pr_earned: u64,
     pub pr_spent: u64,
+    pub prestiges_performed: u32,
     pub ascension_level: u32,
     pub challenges_won: u64,
     pub stormglass_balance: u64,
@@ -59,6 +65,11 @@ impl Default for SimStats {
             zone_entry_tick: HashMap::new(),
             zone_boss_defeated_tick: HashMap::new(),
             deaths_per_zone: HashMap::new(),
+            combat_retreats: 0,
+            retreats_per_zone: HashMap::new(),
+            boss_enrages: 0,
+            enrages_per_zone: HashMap::new(),
+            frontier_backoffs: 0,
             items_by_rarity: [0; 5],
             items_equipped: 0,
             boss_items_dropped: 0,
@@ -74,6 +85,7 @@ impl Default for SimStats {
             haven_final_tiers: Vec::new(),
             pr_earned: 0,
             pr_spent: 0,
+            prestiges_performed: 0,
             ascension_level: 0,
             challenges_won: 0,
             stormglass_balance: 0,
@@ -156,17 +168,29 @@ impl SimStats {
                 TickEvent::PlayerDiedInDungeon => {
                     self.total_deaths += 1;
                 }
-                TickEvent::SubzoneBossDefeated { xp_gained, .. } => {
+                TickEvent::SubzoneBossDefeated { xp_gained, result } => {
                     self.total_boss_kills += 1;
                     self.total_xp_gained += xp_gained;
                     self.zone_boss_defeated_tick
                         .entry(current_zone)
                         .or_insert(tick);
-                }
-                TickEvent::PlayerAttack { was_crit, .. } => {
-                    if *was_crit {
-                        self.total_crits += 1;
+                    if matches!(
+                        result,
+                        quest::zones::BossDefeatResult::FrontierBackoff { .. }
+                    ) {
+                        self.frontier_backoffs += 1;
                     }
+                }
+                TickEvent::CombatRetreat { .. } => {
+                    self.combat_retreats += 1;
+                    *self.retreats_per_zone.entry(current_zone).or_insert(0) += 1;
+                }
+                TickEvent::BossEnrage { .. } => {
+                    self.boss_enrages += 1;
+                    *self.enrages_per_zone.entry(current_zone).or_insert(0) += 1;
+                }
+                TickEvent::PlayerAttack { was_crit, .. } if *was_crit => {
+                    self.total_crits += 1;
                 }
                 TickEvent::ItemDropped {
                     rarity,

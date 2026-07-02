@@ -316,19 +316,19 @@ The curve has three phases:
 ```rust
 /// Combat bonuses from prestige rank (independent of attributes/Haven)
 pub struct PrestigeCombatBonuses {
-    pub flat_damage: u32,       // Added after Haven % multiplier, before crit
-    pub flat_defense: u32,      // Added to DEX-based defense
+    pub flat_damage: u64,       // Added after Haven % multiplier, before crit
+    pub flat_defense: u64,      // Added to DEX-based defense
     pub crit_chance: f64,       // Percentage points added to crit chance
-    pub flat_hp: u32,           // Added to combat HP, NOT to DerivedStats.max_hp
+    pub flat_hp: u64,           // Added to combat HP, NOT to DerivedStats.max_hp
 }
 
 impl PrestigeCombatBonuses {
     pub fn from_rank(rank: u32) -> Self {
         Self {
-            flat_damage: (2.0 * (rank as f64).powf(0.6)).floor() as u32,
-            flat_defense: (1.0 * (rank as f64).powf(0.55)).floor() as u32,
+            flat_damage: (2.0 * (rank as f64).powf(0.6)).floor() as u64,
+            flat_defense: (1.0 * (rank as f64).powf(0.55)).floor() as u64,
             crit_chance: (rank as f64 * 0.5).min(10.0),
-            flat_hp: (5.0 * (rank as f64).powf(0.5)).floor() as u32,
+            flat_hp: (5.0 * (rank as f64).powf(0.5)).floor() as u64,
         }
     }
 }

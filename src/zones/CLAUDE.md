@@ -50,11 +50,12 @@ Each subzone has a named boss. The final subzone's boss has `is_zone_boss: true`
 ### `ZoneProgression` (`progression.rs`)
 Serializable state tracking the player's position and progress:
 - `current_zone_id` / `current_subzone_id` -- current location
-- `defeated_bosses: Vec<(u32, u32)>` -- (zone_id, subzone_id) pairs
-- `unlocked_zones: Vec<u32>` -- zones the player can enter
+- `defeated_bosses: BTreeSet<(u32, u32)>` -- (zone_id, subzone_id) pairs
+- `unlocked_zones: BTreeSet<u32>` -- zones the player can enter
 - `kills_in_subzone: u32` -- kill counter toward boss spawn (resets on boss defeat or death)
 - `fighting_boss: bool` -- whether a boss fight is active
 - `has_stormbreaker: bool` -- legacy flag (achievement-based check preferred)
+- `death_retreat_zone: Option<u32>` / `death_retreat_count: u32` / `frontier_cooldown_cycles: u32` -- transient (`serde(skip)`) frontier backoff state; set by `record_death_retreat()` when a death-triggered combat retreat fires (stalemate/timeout retreats don't record), cleared by any boss defeat in the recorded zone or prestige reset
 
 ### `BossDefeatResult` (`boss_defeat.rs`)
 Enum returned by `on_boss_defeated()` / `on_boss_defeated_with_cap()`:
@@ -66,6 +67,7 @@ Enum returned by `on_boss_defeated()` / `on_boss_defeated_with_cap()`:
 - **ExpanseCycle** -- completed Zone 11 cycle, loops back to subzone 1
 - **FractureCycle { zone_id }** -- completed a fracture cap zone cycle, loops back to subzone 1
 - **LoomZoneCycle { zone_id }** -- completed a Loom cap zone cycle, loops back to subzone 1
+- **FrontierBackoff { zone_id, blocked_zone_id }** -- zone completed, but the next zone recently caused a death-loop retreat; cycles the current zone until the frontier cooldown is consumed (max `FRONTIER_BACKOFF_MAX_CYCLES` cycles, growing with repeated retreats)
 
 ### `FractureRegion` (`fracture.rs`)
 Named fracture chapters, each containing 3-4 zones:
@@ -76,7 +78,7 @@ Named fracture chapters, each containing 3-4 zones:
 - `WailingReach` (Zones 24-26, unlocked by P200 + Deep Layer 25)
 - `OriginWound` (Zones 27-30, unlocked by P300 + Deep Layer 30)
 
-Methods: `start_zone_id()`, `end_zone_id()`, `unlock_layer()`, `from_layer()`, `unlock_headline()`, `unlock_atmospheric()`, `power_core_narrative()`, `unlock_mechanical()`, `unlock_log_line()`, `unlock_ticker_text()`
+Methods: `start_zone_id()`, `end_zone_id()`, `unlock_layer()`, `from_layer()`, `unlock_headline()`, `unlock_atmospheric()`, `power_core_narrative()`, `unlock_mechanical()`, `unlock_log_line()`, `unlock_ticker_text()`, `ascension_narrative()` -- narrative bridge text tying the fracture to Ascension, `ascension_level_unlocked()` -- the Ascension level (I-VI) that becomes newly available at this region's unlock
 
 ## Zone Tiers and Prestige Requirements
 
@@ -162,7 +164,7 @@ Nineteen zones across six chapters, unlocked by Deep layer breakthroughs. Enemy 
 - Zone 30 becomes the permanent fracture loop cap
 - Fracture zones have prestige requirements: P50 (Z12-14), P75 (Z15-17), P100 (Z18-20), P150 (Z21-23), P200 (Z24-26), P300 (Z27-30) — enforced alongside Deep layer gates by `sync_account_zone_unlocks()`
 
-**Boss defeat with cap awareness:** `on_boss_defeated_with_cap(prestige_rank, achievements, fracture_zone_cap)` extends the original `on_boss_defeated()` to handle fracture cycling logic.
+**Boss defeat with cap awareness:** `on_boss_defeated_with_cap(prestige_rank, achievements, fracture_zone_cap, loom_zone_cap)` extends the original `on_boss_defeated()` to handle fracture cycling logic.
 
 ## Loom Zones 31-50
 
@@ -186,9 +188,9 @@ Twenty zones across five chapters, triple-gated by pattern completion, ascension
 
 ## Zone Access Sync (`access.rs`)
 
-`sync_account_zone_unlocks(prog, storms_end_unlocked, fracture_zone_cap, prestige_rank, loom_zone_cap)`:
+`sync_account_zone_unlocks(prog, storms_end_unlocked, fracture_zone_cap, prestige_rank, loom_zone_cap, ascension_level)`:
 - Called at: character load, prestige reset, StormsEnd, fracture region unlock, pattern completion
-- If `storms_end_unlocked`, unlocks Zone 11
+- If `storms_end_unlocked` and prestige rank >= P25, unlocks Zone 11
 - Unlocks every zone in `12..=fracture_zone_cap`
 - Unlocks every Loom zone in `31..=loom_zone_cap` if prestige requirement met
 - Never unlocks above cap, never removes earlier unlocks

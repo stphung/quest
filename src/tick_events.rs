@@ -270,6 +270,17 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                             zone_name, xp_gained
                         )
                     }
+                    BossDefeatResult::FrontierBackoff {
+                        blocked_zone_id, ..
+                    } => {
+                        let blocked_name = crate::zones::get_zone(*blocked_zone_id)
+                            .map(|z| z.name)
+                            .unwrap_or("Unknown");
+                        format!(
+                            "\u{1f451} Boss defeated! +{} XP \u{2014} {} has bested you before; holding position to regroup...",
+                            xp_gained, blocked_name
+                        )
+                    }
                 };
                 game_state.combat_state.add_log_entry(message, false, true);
                 // Push zone advancement to ticker
@@ -326,6 +337,20 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
                             icon: "\u{1F5FA}",
                             text: "Expanse Cycles!".to_string(),
                             color: Color::Cyan,
+                            bold: false,
+                            segments: None,
+                        });
+                    }
+                    BossDefeatResult::FrontierBackoff {
+                        blocked_zone_id, ..
+                    } => {
+                        let blocked_name = crate::zones::get_zone(*blocked_zone_id)
+                            .map(|z| z.name)
+                            .unwrap_or("Unknown");
+                        game_state.ticker.push(TickerEntry {
+                            icon: "\u{1F6E1}",
+                            text: format!("Regrouping before {}!", blocked_name),
+                            color: Color::DarkGray,
                             bold: false,
                             segments: None,
                         });

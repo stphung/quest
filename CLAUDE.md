@@ -25,7 +25,7 @@ This runs all PR quality checks:
 1. Format checking (`cargo fmt --check`)
 2. Clippy linting (`cargo clippy --all-targets -- -D warnings`)
 3. All tests (`cargo test`)
-4. Build verification (`cargo build --all-targets`)
+4. Progression check (`cargo run --release --bin simulator -- --check-progression`)
 5. Security audit (`cargo audit --deny yanked`)
 
 **Auto-fix formatting:**
@@ -33,19 +33,37 @@ This runs all PR quality checks:
 make fmt               # Applies rustfmt to all code
 ```
 
+### How to Verify Your Change
+
+`make check` is the final gate before every push. But run the *targeted* verification for what you touched first — it is faster and catches what the generic gate can't. Pick the row(s) matching your change:
+
+| You changed… | Verify with |
+|--------------|-------------|
+| `src/ui/` rendering | `cargo test snapshot` — review the diff; re-bless intentional changes with `INSTA_UPDATE=always cargo test snapshot` and commit the `.snap` diffs. For visual changes, also screenshot the real game with the `drive-game` skill |
+| A full-screen overlay (Haven/Deep/Loom/Soulforge/Stormglass/Time Vault) | `cargo test overlay_snapshot` — same re-bless workflow; scenes render via their entry points in `src/ui/overlay_snapshot_tests.rs` |
+| Combat, zones, XP, or balance constants (`core/constants.rs`, `ZONE_ENEMY_STATS`, multipliers) | `cargo test` + `cargo run --release --bin simulator -- --check-progression`. For balance questions beyond the CI gate ("can players still reach Z50?"), run the `balance-sim` skill |
+| Core tick loop (`src/core/tick*.rs`) | `cargo test --test game_tick_tests` + progression check. Keep the loop seeded-RNG clean — `game_tick_with_context()` takes `rng: &mut R` for a reason |
+| The Deep (`src/deep/`) | `cargo test --test deep_tests` + `cargo run --bin deep_simulator -- --hours 24 --seed 1 --strategy balanced` |
+| Loom (`src/loom/`) | `cargo test --test loom_tests` + `cargo test overlay_snapshot` (graph renderer) + progression check (Loom unlocks are asserted in the endgame scenario) |
+| Items, drops, generation (`src/items/`) | `cargo test --test item_tests` + `cargo test snapshot` (equipment panel renders names/tiers/colors). Keep `generate_item_with_rng` the single RNG entry point — fixtures depend on seeded generation |
+| `GameState` fields / serde / persistence | `cargo test --test save_compat_tests` — loads the committed save corpus (`tests/fixtures/saves/`) through the real load paths; a failure means existing player saves break (account loaders silently wipe progress on parse failure, so this is the only red flag you get). Fix with `serde(default)`/`alias`/migration, never by editing the corpus. Also `cargo test --test character_tests --test history_tests` |
+| A challenge minigame (`src/challenges/`) | That game's unit tests + `cargo test snapshot_all_minigames`. New minigame? Use the `add-challenge` skill — it covers all 15 integration points |
+| Keyboard input (`src/input/`) | No automated coverage — drive the real game with the `drive-game` skill and exercise the key path you changed |
+| Fixtures or the UI clock (`src/fixtures.rs`, `src/ui/clock.rs`) | Full `cargo test` — nearly every snapshot depends on them. If `snapshot_rendering_is_deterministic` fails, you introduced a wall-clock/RNG/ordering leak; fix that, never re-bless around it |
+| Dependencies (`Cargo.toml`) | `cargo audit --deny yanked` (CI runs it even where local sandboxes can't) + the `dependency-audit` skill for a deeper pass |
+| Docs / wiki | `doc-audit` / `wiki-audit` skills check for stale constants and broken links |
+
+Two habits that make verification meaningful:
+- **Verify the behavior, not just the build.** A green `cargo check` proves nothing about a gameplay change — run the row above that actually exercises it.
+- **Snapshot diffs are the review, not noise.** When a `.snap` file changes, read the diff before re-blessing; an unexpected changed frame is the test working.
+
 ## CI/CD Pipeline
 
-**On every PR:**
-- Runs `scripts/ci-checks.sh` (format, lint, test, build, audit)
-- Must pass to merge
+**On every PR** (`.github/workflows/ci.yml`): six independent jobs — `fmt`, `clippy`, `test`, `balance` (progression check), `audit`, `coverage` — each running its check inline (not by invoking `scripts/ci-checks.sh`). A `ci-pass` gate job requires all six to succeed before merge.
 
-**On push to main:**
-- Runs all checks
-- Builds release binaries for 3 platforms (Linux, macOS x86/ARM)
-- Signs macOS binaries with ad-hoc signature (prevents Gatekeeper blocking)
-- Creates GitHub release with downloadable binaries
+**On push to main:** Builds release binaries for 3 platforms (Linux, macOS x86/ARM), signs macOS binaries with an ad-hoc signature (prevents Gatekeeper blocking), and creates a GitHub release with downloadable binaries. This runs independently of the PR check jobs.
 
-**Key insight:** Local `make check` runs the **exact same script** as CI, ensuring consistency.
+**Key insight:** `scripts/ci-checks.sh` (run locally via `make check`) mirrors the PR jobs' commands but is not itself invoked by CI — the two are maintained in parallel, so keep them in sync when changing either. One known drift: the `coverage` job's `--ignore-filename-regex` in `ci.yml` excludes `utils/debug_menu`, `loom/graph`, `loom/layout`, and `loom/milestones` in addition to what `scripts/ci-checks.sh`'s local coverage step excludes.
 
 ## Skills (`.claude/skills/`)
 
@@ -59,7 +77,11 @@ Agent-invocable skills — ask in natural language to trigger them.
 | `doc-audit` | "audit the docs", "update documentation" | Multi-agent docs audit: finds stale constants, missing files, outdated types across CLAUDE.md and docs/ |
 | `wiki-audit` | "audit the wiki", "wiki is stale" | Multi-agent wiki audit: finds stale numbers, missing systems, broken links in quest.wiki/ |
 | `dependency-audit` | "audit dependencies", "update deps" | Multi-agent dependency audit: outdated versions, unused deps, security advisories, feature hygiene |
+| `add-challenge` | "add a challenge", "new minigame" | Checklist-driven agent for adding a new challenge minigame across all 15 integration points |
+| `balance-sim` | "run the simulator", "check balance" | Multi-agent balance simulator: runs headless simulator across strategies/seeds, produces prioritized balance report |
+| `clean-workspace` | "clean up workspace", "reset workspace" | Resets the repo to a fresh-clone-like state: removes stale branches and uncommitted files |
 | `ship` | "ship it", `/ship` | Push branch, create PR with automerge, watch CI until merged, fix failures |
+| `drive-game` | "drive the game", "screenshot the game" | Runs the real game in tmux against `mkstate` fixtures (isolated via `QUEST_DIR`), sends keystrokes, captures PNG screenshots for PR review |
 
 ## Architecture
 
@@ -96,9 +118,17 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 
 ### Simulators
 
-**Game Simulator** (`src/bin/simulator/`): Headless game balance simulator calling `game_tick_with_context()` with no UI/delay. Supports `--ticks`, `--seed`, `--prestige`, `--runs`, `--strategy <profile>` (casual/optimal/speedrun), `--stormbreaker`, `--assertions`. Strategy profiles inject challenge wins, enhancement, sigils, ascension, and auto-prestige.
+**Game Simulator** (`src/bin/simulator/`): Headless game balance simulator calling `game_tick_with_context()` with no UI/delay. Supports `--ticks`, `--seed`, `--prestige`, `--runs`, `--strategy <profile>` (casual/optimal/speedrun), `--stormbreaker`, `--assertions`, `--check-progression`. Strategy profiles inject challenge wins, enhancement, sigils, ascension, and auto-prestige.
 
-**Deep Simulator** (`src/bin/deep_simulator.rs`): Headless Deep expedition simulator. Supports `--hours`, `--seed`, `--strategy` (rush/balanced/infrastructure), `--guild-rank`.
+**Progression check** (`simulator --check-progression`): CI gate asserting the game still progresses. Runs 3 scenarios across multiple seeds — early-game (2h at P0), prestige-economy (6h, optimal strategy), endgame-systems (30h at P200 speedrun) — and asserts coarse progression facts (zone/level pacing, PR economy, Deep/Loom/Ascension unlocks). Scenarios and thresholds live in `src/bin/simulator/scenarios.rs`; thresholds carry ~2x headroom because the tick loop is not perfectly deterministic. Runs as the `Balance` job on every PR and as step 4 of `make check`.
+
+**Deep Simulator** (`src/bin/deep_simulator.rs`): Headless Deep expedition simulator. Supports `--hours`, `--seed`, `--strategy` (rush/farm/balanced/infrastructure), `--guild-rank`.
+
+**Fixture Generator** (`src/bin/mkstate.rs`): Writes character save fixtures for named scenarios (`fresh`, `midgame`, `endgame`, `boss`). Pair with the `QUEST_DIR` env var (honored by `core::paths::get_quest_dir()`) to run the game against an isolated save directory. Used by the `drive-game` skill for UI verification; `scripts/screenshot.sh` captures a tmux pane as a color PNG. The scenario builders live in `src/fixtures.rs` (`quest::fixtures`), shared with the UI snapshot tests — mkstate feeds them the wall clock and thread RNG, tests feed a fixed timestamp and a seeded RNG.
+
+### UI Snapshot Tests (`src/ui/snapshot_tests.rs`)
+
+Deterministic full-frame TUI snapshot tests (insta + ratatui `TestBackend`) covering each responsive size tier across fixture scenarios, plus the full-screen overlays (Haven, Deep, Loom, Soulforge, Stormglass, Time Vault) in `src/ui/overlay_snapshot_tests.rs`; committed snapshots live in `src/ui/snapshots/`. Part of `cargo test`, so they gate CI. After an intentional UI change: review the diff, re-bless with `INSTA_UPDATE=always cargo test snapshot`, and commit the `.snap` changes. This is the first line of verification for any `src/ui/` change — use the `drive-game` skill for visual/e2e confirmation. Determinism rules (freezable `ui/clock.rs`, no direct wall-clock reads in render code) are documented in [src/ui/CLAUDE.md](src/ui/CLAUDE.md).
 
 ### Library Crate (`src/lib.rs`)
 
@@ -167,4 +197,4 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 
 ## Dependencies
 
-Ratatui 0.30, Serde (JSON), serde_json 1.0, Rand 0.10, Rand_chacha 0.10 (seeded RNG for simulator), Chrono, dirs 6.0, Chess-engine 0.1, ureq 3.3, flate2 1.1, zip 8.5, unicode-width 0.2, git2 0.20 (vendored-openssl), tar 0.4, uuid 1.23, petgraph 0.8 (Loom DAG), tempfile 3 (dev), criterion 0.8 (dev/bench)
+Ratatui 0.30, Serde (JSON), serde_json 1.0, Rand 0.10, Rand_chacha 0.10 (seeded RNG for simulator), Chrono, dirs 6.0, Chess-engine 0.1, ureq 3.3, flate2 1.1, zip 8.5, unicode-width 0.2, git2 0.20 (vendored-openssl), tar 0.4, uuid 1.23, petgraph 0.8 (Loom DAG), tempfile 3 (dev), criterion 0.8 (dev/bench), insta 1 (dev, UI snapshot tests)

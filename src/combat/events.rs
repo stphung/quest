@@ -15,7 +15,7 @@ pub struct CombatBonuses {
     /// +% damage, applied after early_damage_percent (e.g. Haven Armory)
     pub damage_percent: f64,
     /// Flat damage added after % multipliers, before enemy defense (prestige)
-    pub flat_damage: u32,
+    pub flat_damage: u64,
     /// +% crit chance (e.g. Haven Watchtower + prestige crit)
     pub crit_chance_percent: f64,
     /// +% chance to strike twice (e.g. Haven War Room)
@@ -25,7 +25,7 @@ pub struct CombatBonuses {
 
     // --- Defense pipeline (enemy_attack.rs) ---
     /// Flat defense added to derived defense (prestige)
-    pub flat_defense: u32,
+    pub flat_defense: u64,
     /// Damage reduction % applied after defense subtraction (e.g. Divine Bulwark 30%)
     pub damage_reduction_percent: f64,
 
@@ -69,7 +69,7 @@ impl Default for CombatBonuses {
 
 pub enum CombatEvent {
     PlayerAttack {
-        damage: u32,
+        damage: u64,
         was_crit: bool,
     },
     /// Player's attack was blocked because boss requires a weapon
@@ -77,11 +77,11 @@ pub enum CombatEvent {
         weapon_needed: String,
     },
     EnemyAttack {
-        damage: u32,
+        damage: u64,
     },
     /// Damage reflected back to the enemy when they hit the player
     DamageReflected {
-        damage: u32,
+        damage: u64,
     },
     PlayerDied,
     /// Player died while in a dungeon (no prestige loss)
@@ -99,7 +99,7 @@ pub enum CombatEvent {
     },
     /// HP regen completed after a kill
     RegenComplete {
-        healed: u32,
+        healed: u64,
     },
     /// Boss enraged after fight timer expired — instant kill.
     /// If weapon_blocked, player retreats to subzone 1 of the current zone.
@@ -116,4 +116,7 @@ pub enum CombatEvent {
     CombatRetreat {
         zone_name: String,
     },
+    /// Player was overwhelmed inside a dungeon and abandoned it
+    /// (safe exit, no prestige loss). Followed by a CombatRetreat.
+    DungeonRetreat,
 }

@@ -1100,11 +1100,7 @@ pub fn draw_footer(
     };
 
     let update_status_text = if let Some(info) = update_info {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let millis = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis();
+        let millis = super::clock::now_millis();
         // Sine-wave pulse between dim (60,50,0) and bright yellow (255,215,0)
         // Full cycle ~3.2 seconds for a breathing fade in/out
         let phase = (millis % 3200) as f64 / 3200.0 * std::f64::consts::TAU;

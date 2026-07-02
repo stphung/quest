@@ -20,19 +20,19 @@ use crate::zones::BossDefeatResult;
 pub enum TickEvent {
     // ── Combat ──────────────────────────────────────────────────
     /// Player attacked an enemy.
-    PlayerAttack { damage: u32, was_crit: bool },
+    PlayerAttack { damage: u64, was_crit: bool },
 
     /// Player's attack was blocked because the boss requires a specific weapon.
     PlayerAttackBlocked { weapon_needed: String },
 
     /// Enemy attacked the player.
-    EnemyAttack { damage: u32, enemy_name: String },
+    EnemyAttack { damage: u64, enemy_name: String },
 
     /// Damage reflected back to the enemy.
-    DamageReflected { damage: u32 },
+    DamageReflected { damage: u64 },
 
     /// HP regen completed after a kill.
-    RegenComplete { healed: u32 },
+    RegenComplete { healed: u64 },
 
     /// Normal enemy or dungeon combat-room enemy was defeated.
     EnemyDefeated { xp_gained: u64, enemy_name: String },

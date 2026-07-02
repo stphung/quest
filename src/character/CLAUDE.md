@@ -45,7 +45,7 @@ Combat stats calculated from attributes and enhancement levels. Recalculated whe
 - `calculate_derived_stats(attrs, equipment, enhancement_levels: &[u8; 7])` takes per-slot enhancement levels
 - Enhancement multipliers scale equipment attribute bonuses and affix values per slot
 - Max HP, damage (physical + magic), defense, crit chance, crit multiplier
-- XP multiplier (from WIS), prestige multiplier (from CHA)
+- XP multiplier (from WIS). CHA's prestige multiplier bonus is not a `DerivedStats` field — it's computed separately via `core::xp::prestige_multiplier(rank, cha_modifier)`
 
 ### `PrestigeTier` (`prestige.rs`)
 Named tiers from Bronze through Eternal with diminishing-returns XP multipliers.
@@ -63,7 +63,7 @@ Characters are saved as individual JSON files in `~/.quest/`:
 `manager.rs` defines the `CharacterManager` struct, `CharacterSaveData`, and `CharacterInfo` types. `persistence.rs` implements the file I/O methods on `CharacterManager`.
 
 ### Character CRUD Operations
-- `create_character(name)` — Creates new character with base attributes, validates name uniqueness
+- Character creation flows through `creation.rs::process_creation_input()` → `GameState::new()` → `persistence.rs::save_character()` (no standalone `create_character()` function)
 - `load_character(name)` — Loads from JSON file (`persistence.rs`)
 - `save_character(state)` — Serializes GameState to JSON (`persistence.rs`)
 - `delete_character(name)` — Removes JSON file (`persistence.rs`)
@@ -83,9 +83,10 @@ XP curve: `100 * level^1.5` (XP needed for next level)
 
 1. Player must meet level threshold (`can_prestige()` in `prestige_actions.rs`)
 2. Confirmation dialog shown (`ui/prestige_confirm.rs`)
-3. `perform_prestige()` resets: level → 1, XP → 0, zone → first, attributes → base
-4. Preserves: prestige_rank (incremented), equipment, achievements, haven
-5. New attribute cap = 20 + (5 * new_prestige_rank)
+3. `perform_prestige()` resets: level → 1, XP → 0, zone → first, attributes → base, **equipment → complete wipe**
+4. Preserves: prestige_rank (incremented), achievements, haven, fishing progression
+5. `perform_prestige_with_vault(state, preserved_slots)` is a separate entry point that keeps specific equipment slots (gated by Vault tier elsewhere) instead of wiping them
+6. New attribute cap = 20 + (5 * new_prestige_rank)
 
 ## Input Handling (`input.rs`, `creation.rs`, `delete.rs`, `rename.rs`, `select.rs`)
 
@@ -116,10 +117,10 @@ Flat combat bonuses computed from prestige rank, applied during combat each tick
 ```rust
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PrestigeCombatBonuses {
-    pub flat_damage: u32,    // Added after Haven % bonus, before enemy defense
-    pub flat_defense: u32,   // Added to DEX-based defense
+    pub flat_damage: u64,    // Added after Haven % bonus, before enemy defense
+    pub flat_defense: u64,   // Added to DEX-based defense
     pub crit_chance: f64,    // Added to DEX-based crit (capped at 15%)
-    pub flat_hp: u32,        // Added to combat max HP (not DerivedStats)
+    pub flat_hp: u64,        // Added to combat max HP (not DerivedStats)
 }
 ```
 

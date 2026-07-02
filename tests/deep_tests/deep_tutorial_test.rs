@@ -316,7 +316,7 @@ fn test_mercenary_availability() {
 
     let injured = Mercenary {
         status: MercStatus::Injured {
-            missions_remaining: 2,
+            recover_at: chrono::Utc::now() + chrono::Duration::hours(6),
         },
         ..base.clone()
     };
@@ -679,7 +679,7 @@ fn test_prestige_available_merc_count() {
         Mercenary {
             id: 3,
             status: MercStatus::Injured {
-                missions_remaining: 1,
+                recover_at: chrono::Utc::now() + chrono::Duration::hours(6),
             },
             ..base.clone()
         },
@@ -847,6 +847,7 @@ fn test_deep_state_serde_roundtrip() {
 /// Mercenary struct should survive JSON roundtrip.
 #[test]
 fn test_mercenary_serde_roundtrip() {
+    let recover_at = chrono::Utc::now() + chrono::Duration::hours(6);
     let merc = Mercenary {
         id: 42,
         name: "Rodgar".to_string(),
@@ -857,9 +858,7 @@ fn test_mercenary_serde_roundtrip() {
         expertise: 4,
         level: 3,
         missions_completed: 7,
-        status: MercStatus::Injured {
-            missions_remaining: 1,
-        },
+        status: MercStatus::Injured { recover_at },
     };
 
     let json = serde_json::to_string(&merc).unwrap();
@@ -870,12 +869,7 @@ fn test_mercenary_serde_roundtrip() {
     assert_eq!(loaded.archetype, MercArchetype::Vanguard);
     assert_eq!(loaded.level, 3);
     assert_eq!(loaded.missions_completed, 7);
-    assert!(matches!(
-        loaded.status,
-        MercStatus::Injured {
-            missions_remaining: 1
-        }
-    ));
+    assert_eq!(loaded.status, MercStatus::Injured { recover_at });
 }
 
 // =============================================================================
@@ -1065,6 +1059,7 @@ fn test_supply_runs_are_always_safe() {
             &mut mission,
             &mut deep.prestige,
             &mut deep.persistent,
+            chrono::Utc::now(),
             &mut rng,
         );
 

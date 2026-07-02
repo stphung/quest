@@ -6,7 +6,6 @@ use crate::deep::{
     DeepUiState, LayerTier, MercArchetype, MercQuality, MercStatus, Mission, MissionStatus,
     MissionType,
 };
-use chrono::Utc;
 use ratatui::style::Color;
 
 use super::deep_shared::{draw_deep_card, truncate_text};
@@ -415,12 +414,12 @@ fn render_hub_roster(
             let (q_glyph, q_color) = super::deep_roster::quality_glyph(merc);
             let class_name = merc.archetype.display_name();
             let (status_label, status_color) = match &merc.status {
-                MercStatus::Available => ("Ready", Color::Green),
-                MercStatus::OnMission(_) => ("On Mission", Color::Cyan),
-                MercStatus::Injured {
-                    missions_remaining, ..
-                } => super::deep_roster::injury_severity_display(*missions_remaining),
-                MercStatus::Lost => ("Lost", Color::Red),
+                MercStatus::Available => ("Ready".to_string(), Color::Green),
+                MercStatus::OnMission(_) => ("On Mission".to_string(), Color::Cyan),
+                MercStatus::Injured { recover_at } => {
+                    super::deep_roster::injury_status_display(*recover_at, super::clock::now_utc())
+                }
+                MercStatus::Lost => ("Lost".to_string(), Color::Red),
             };
 
             if is_selected {
@@ -465,7 +464,7 @@ fn render_hub_roster(
                 &format!("{:3}", merc.effective_resilience()),
                 Color::White,
             );
-            put_text(buffer, row, col_status, status_label, status_color);
+            put_text(buffer, row, col_status, &status_label, status_color);
             row += 1;
         }
     }
@@ -817,7 +816,7 @@ fn render_active_missions_content(
     deep: &DeepState,
     ui: &DeepUiState,
 ) {
-    let now = Utc::now();
+    let now = super::clock::now_utc();
     let millis = current_millis();
     let active = &deep.prestige.active_missions;
     let completed = &deep.prestige.pending_results;
@@ -837,8 +836,7 @@ fn render_active_missions_content(
         let log = &deep.prestige.warband_log;
         if !log.is_empty() && mid + 3 < content_bottom {
             render_section_rule(buffer, mid + 2, width, "WARBAND LOG", None);
-            let mut lr = mid + 3;
-            for entry in log.iter().rev().take(5) {
+            for (lr, entry) in (mid + 3..).zip(log.iter().rev().take(5)) {
                 if lr >= content_bottom {
                     break;
                 }
@@ -852,7 +850,6 @@ fn render_active_missions_content(
                     icon, entry.layer, entry.mission_name, entry.marks_earned
                 );
                 put_text(buffer, lr, 1, &line, color);
-                lr += 1;
             }
         }
         return;
@@ -1361,11 +1358,7 @@ fn render_new_mission_compact(
                 } else {
                     Color::LightRed
                 };
-                let ratio_pct = if min == 0 {
-                    999
-                } else {
-                    squad_power * 100 / min
-                };
+                let ratio_pct = (squad_power * 100).checked_div(min).unwrap_or(999);
 
                 // Archetype check line
                 let mut arch_info = String::new();
@@ -1682,8 +1675,12 @@ fn render_squad_assembly_left(
             }
             let avail_str = match &merc.status {
                 MercStatus::OnMission(_) => "(on mission)".to_string(),
-                MercStatus::Injured { missions_remaining } => {
-                    format!("(injured: {})", missions_remaining)
+                MercStatus::Injured { recover_at } => {
+                    let (label, _) = super::deep_roster::injury_status_display(
+                        *recover_at,
+                        super::clock::now_utc(),
+                    );
+                    format!("({})", label.to_lowercase())
                 }
                 MercStatus::Lost => "(lost)".to_string(),
                 _ => String::new(),
@@ -2176,11 +2173,7 @@ fn render_squad_summary_panel(
     } else {
         squad_power as f64 / min as f64
     };
-    let ratio_pct = if min == 0 {
-        999u32
-    } else {
-        squad_power * 100 / min
-    };
+    let ratio_pct = (squad_power * 100).checked_div(min).unwrap_or(999u32);
 
     let (bar_color, forecast_label, forecast_color) = if ui.staged_squad.is_empty() {
         (

@@ -46,7 +46,8 @@ Git-based save versioning system. Every meaningful game event creates a git comm
 Uses `ureq` for GitHub API calls and `git2` for remote operations. Cloud operations run in background threads with results delivered via `mpsc` channels (managed in `main.rs`).
 
 **Key operations**:
-- `validate_token()` -- validates a GitHub PAT, returns username and repo list
+- `github_get_username(token)` -- validates a GitHub PAT, returns the authenticated username
+- `github_list_repos(token)` -- lists the authenticated user's repos
 - `link_github()` -- validates PAT, ensures remote repo exists (creates if needed), adds git remote, fetches, saves config
 - `push_all_branches()` -- pushes all local branches to the cloud remote
 - `fetch_all()` / `fast_forward_all()` -- fetches from remote and fast-forwards local branches

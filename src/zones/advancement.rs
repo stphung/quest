@@ -61,6 +61,7 @@ impl ZoneProgression {
         // Reset kill tracking
         self.kills_in_subzone = 0;
         self.fighting_boss = false;
+        self.clear_death_retreat();
 
         // Clear defeated bosses
         self.defeated_bosses.clear();
@@ -109,6 +110,18 @@ mod tests {
         assert!(prog.advance_to_next_zone(0));
         assert_eq!(prog.current_zone_id, 2);
         assert_eq!(prog.current_subzone_id, 1);
+    }
+
+    #[test]
+    fn test_reset_for_prestige_clears_death_retreat() {
+        let mut prog = ZoneProgression::new();
+        prog.current_zone_id = 2;
+        prog.record_death_retreat();
+        assert!(prog.frontier_backoff_blocks(2));
+
+        prog.reset_for_prestige(5);
+        assert_eq!(prog.death_retreat_zone, None);
+        assert_eq!(prog.frontier_cooldown_cycles, 0);
     }
 
     #[test]

@@ -23,7 +23,7 @@ src/achievements/
 
 ### `AchievementId` (`types.rs`)
 
-Enum with 232 variants covering all trackable milestones. Organized by domain:
+Enum with 240 variants covering all trackable milestones. Organized by domain:
 
 - **Combat**: `SlayerI`..`SlayerXV` (100 to 1B kills), `BossHunterI`..`BossHunterXV` (1 to 10M bosses)
 - **Level**: `Level10`..`Level100000` (18 milestones)
@@ -45,7 +45,7 @@ Nine categories for browsing: `Combat`, `Level`, `Prestige`, `Progression`, `Cha
 
 ### `AchievementDef` (`data.rs`)
 
-Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 232 achievements total.
+Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 240 achievements total. Note: `VaultWardenJourneyman` is currently set to 15 points (`data.rs`), which doesn't match any tier — the other three Vault Warden achievements follow Trivial/Easy/Medium (5/10/25), so this looks like a data entry slip rather than an intentional off-tier value; left as-is pending a balance decision.
 
 Achievement score is computed at runtime by summing the point values of all unlocked achievements. Score is displayed in four locations: browser title bar, achievement unlock modal, achievement detail panel, and stats view.
 
@@ -85,7 +85,14 @@ Event handlers: `on_enemy_killed`, `on_level_up`, `on_prestige`, `on_zone_fully_
 
 ### Retroactive Sync
 
-When loading a character, `sync_from_game_state()` retroactively unlocks achievements for milestones already passed (e.g., loading a level 120 character unlocks Level10 through Level100). Similarly, `sync_from_haven()` syncs Haven tier achievements. Note: kill/boss/dungeon counters cannot be synced retroactively since they are stored in the achievements file, not character saves.
+When loading a character, `sync_from_game_state()` retroactively unlocks achievements for milestones already passed (e.g., loading a level 120 character unlocks Level10 through Level100, and re-checks prestige and zone completion). Four companion syncs cover the systems `sync_from_game_state()` doesn't reach:
+
+- `sync_from_ascension()` -- unlocks `AscensionI`..`AscensionX` for every level up to the character's current ascension level
+- `sync_from_deep()` -- unlocks Deep discovery and guild rank milestones based on discovery flag, guild rank, and deepest layer reached
+- `sync_from_haven()` -- syncs Haven discovery and per-room tier achievements
+- `sync_from_loom()` -- unlocks Loom discovery and pattern-completion milestones based on discovery flag and completed pattern count
+
+Note: kill/boss/dungeon counters cannot be synced retroactively since they are stored in the achievements file, not character saves.
 
 ## Modal Notification System
 
@@ -112,7 +119,7 @@ Additionally, `newly_unlocked` is drained each tick by `collect_achievement_even
 
 ## Integration Points
 
-- **tick.rs** (`core/tick.rs`): Calls `on_*` handlers during combat, fishing, dungeon, and discovery processing. Collects `TickEvent::AchievementUnlocked` events. Checks modal readiness.
+- **tick.rs** (`core/tick.rs`): Calls `on_*` handlers during combat, fishing, dungeon, discovery, and prestige (passive PR gains) processing. Collects `TickEvent::AchievementUnlocked` events. Checks modal readiness.
 - **main.rs**: Loads/saves achievements. Syncs on character load. Handles prestige and minigame win achievements. Routes `TickEvent::AchievementUnlocked` to combat log. Displays modal overlay from `achievement_modal_ready`.
 - **game_logic.rs** (`core/game_logic.rs`): `update_combat()` takes `&mut Achievements` and calls `on_enemy_killed` on kills.
 - **haven** (`haven/logic.rs`): Haven upgrades trigger `on_haven_all_t1/t2/architect` checks.

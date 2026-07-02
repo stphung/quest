@@ -10,6 +10,7 @@ pub mod character_delete;
 pub mod character_rename;
 pub mod character_select;
 pub mod chess_scene;
+mod clock;
 mod combat_3d;
 pub mod combat_effects;
 pub(crate) mod combat_scene;
@@ -40,6 +41,8 @@ pub mod loom_scene;
 pub mod minesweeper_scene;
 pub mod morris_scene;
 pub mod overlay_layout;
+#[cfg(test)]
+mod overlay_snapshot_tests;
 pub mod prestige_confirm;
 pub mod responsive;
 pub mod rune_scene;
@@ -48,6 +51,8 @@ pub mod runic_shift_scene;
 mod scene_fx;
 pub mod shard_fusion_scene;
 pub mod snake_scene;
+#[cfg(test)]
+mod snapshot_tests;
 mod soulforge_effects;
 pub mod soulforge_scene;
 mod soulforge_slots;
@@ -951,9 +956,9 @@ fn draw_status_strip_dungeon(frame: &mut Frame, row0: Rect, row1: Rect, game_sta
 
 /// Formats an HP label like "HP:340/500" or "Goblin:12.4K/25K" using short
 /// number formatting for values >= 10,000.
-fn format_hp_label(name: &str, current: u32, max: u32) -> String {
-    let cur_s = game_common::format_number_short(current as u64);
-    let max_s = game_common::format_number_short(max as u64);
+fn format_hp_label(name: &str, current: u64, max: u64) -> String {
+    let cur_s = game_common::format_number_short(current);
+    let max_s = game_common::format_number_short(max);
     format!("{}:{}/{}", name, cur_s, max_s)
 }
 
@@ -1079,6 +1084,8 @@ fn draw_status_strip_combat(frame: &mut Frame, row0: Rect, row1: Rect, game_stat
 }
 
 /// Renders a damage flash right-aligned in the given area.
+/// Resets the background so the text stays readable when drawn over a
+/// filled gauge (which paints cell backgrounds with its fill color).
 fn render_flash(frame: &mut Frame, area: Rect, flash: Option<&crate::combat::types::DamageFlash>) {
     if let Some(flash) = flash {
         let progress = 1.0 - (flash.remaining / crate::combat::types::DAMAGE_FLASH_DURATION);
@@ -1093,7 +1100,7 @@ fn render_flash(frame: &mut Frame, area: Rect, flash: Option<&crate::combat::typ
             }
             s
         };
-        let text = Paragraph::new(Span::styled(&flash.text, style))
+        let text = Paragraph::new(Span::styled(&flash.text, style.bg(Color::Reset)))
             .alignment(ratatui::layout::Alignment::Right);
         frame.render_widget(text, area);
     }
@@ -1413,8 +1420,6 @@ fn draw_dungeon_view(
     _achievements: &crate::achievements::Achievements,
     _ctx: &LayoutContext,
 ) {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -1428,10 +1433,7 @@ fn draw_dungeon_view(
     frame.render_widget(status_widget, chunks[0]);
 
     // Calculate blink phase (0.5 second cycle)
-    let millis = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
+    let millis = clock::now_millis();
     let blink_phase = (millis % 500) as f64 / 500.0;
 
     // Dungeon map backdrop + map overlay

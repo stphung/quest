@@ -15,6 +15,7 @@ pub mod deep;
 pub mod dungeon;
 pub mod enhancement;
 pub mod fishing;
+pub mod fixtures;
 pub mod god_items;
 pub mod haven;
 pub mod history;

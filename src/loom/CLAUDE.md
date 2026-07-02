@@ -11,7 +11,7 @@ src/loom/
 ├── logic.rs        — Node upgrades, base production, stall detection, reactions, shuttle building/demolishing, direct-pull tick
 ├── recipes.rs      — Recipe registry, lookup_recipe(a, b, nature), recipes_by_nature()
 ├── patterns.rs     — Woven Pattern sustain timer and completion tracking
-├── discovery.rs    — 28 woven patterns defined in create_pattern_sequence()
+├── discovery.rs    — 28 completable + 1 eternal pattern (29 total) defined in create_pattern_sequence()
 ├── milestones.rs   — Pattern milestone types and helpers for key pattern completion modals
 ├── graph.rs        — petgraph DAG construction, rebuild logic, rate updates
 ├── layout.rs       — Sugiyama layout engine: layer assignment, crossing minimization, coordinate assignment
@@ -116,6 +116,8 @@ Woven Patterns use sustained production rates rather than accumulated totals:
 - Rate measurement uses a 20-second rolling window (`RateTracker` struct, 200 ticks at 100ms/tick, transient, not serialized)
 - Simple pause model: progress never decays, only pauses when any rate drops below threshold
 
+**Eternal Pattern**: `create_pattern_sequence()` defines a 29th pattern (index 28, `eternal_pattern()`) flagged `eternal: true`. It never completes and is excluded from `completed_pattern_count()` — an intentional endgame sink that keeps sustained production meaningful after all 28 standard patterns are done.
+
 ## Production Chain Flow
 
 ```
@@ -186,7 +188,7 @@ Shuttles can be upgraded to increase their intake cap. Each level adds 0.5x to t
 
 When an Extractor is upgraded, it enters a lockout period:
 
-- **Buffer drain**: 50% of the extractor's current buffer is consumed on upgrade start.
+- **Buffer drain**: 50% of the extractor's buffer *capacity* is consumed on upgrade start; the upgrade is blocked unless the current buffer holds at least that amount.
 - **Lockout duration**: `level * 2h` (e.g., upgrading to level 2 = 2h lockout, level 3 = 4h, etc.)
 - **Zero production**: The extractor produces nothing during the lockout period.
 - **Rate tracker cleared**: The `RateTracker` for that extractor is reset when the upgrade begins, so rolling-window rates reflect only post-upgrade production.
@@ -230,4 +232,4 @@ Starts ~1:1 at low rates, scales superlinearly as WR increases:
 - **Discovery**: Triggered by pattern completion milestones
 - **Ascension** (`ascension/types.rs`): `ascension_pattern_gate()` checks pattern count for VII-X eligibility; `max_shuttle_level()` gates shuttle upgrades by Ascension tier
 - **Zones** (`zones/`): `loom_zone_cap_for_patterns()` unlocks Loom Zones 31-50 based on completed pattern count
-- **petgraph 0.7**: DAG construction and traversal in `graph.rs`; layout computed in `layout.rs`
+- **petgraph 0.8**: DAG construction and traversal in `graph.rs`; layout computed in `layout.rs`
