@@ -33,6 +33,30 @@ This runs all PR quality checks:
 make fmt               # Applies rustfmt to all code
 ```
 
+### How to Verify Your Change
+
+`make check` is the final gate before every push. But run the *targeted* verification for what you touched first — it is faster and catches what the generic gate can't. Pick the row(s) matching your change:
+
+| You changed… | Verify with |
+|--------------|-------------|
+| `src/ui/` rendering | `cargo test snapshot` — review the diff; re-bless intentional changes with `INSTA_UPDATE=always cargo test snapshot` and commit the `.snap` diffs. For visual changes, also screenshot the real game with the `drive-game` skill |
+| A full-screen overlay (Haven/Deep/Loom/Soulforge/Stormglass/Time Vault) | `cargo test overlay_snapshot` — same re-bless workflow; scenes render via their entry points in `src/ui/overlay_snapshot_tests.rs` |
+| Combat, zones, XP, or balance constants (`core/constants.rs`, `ZONE_ENEMY_STATS`, multipliers) | `cargo test` + `cargo run --release --bin simulator -- --check-progression`. For balance questions beyond the CI gate ("can players still reach Z50?"), run the `balance-sim` skill |
+| Core tick loop (`src/core/tick*.rs`) | `cargo test --test game_tick_tests` + progression check. Keep the loop seeded-RNG clean — `game_tick_with_context()` takes `rng: &mut R` for a reason |
+| The Deep (`src/deep/`) | `cargo test --test deep_tests` + `cargo run --bin deep_simulator -- --hours 24 --seed 1 --strategy balanced` |
+| Loom (`src/loom/`) | `cargo test --test loom_tests` + `cargo test overlay_snapshot` (graph renderer) + progression check (Loom unlocks are asserted in the endgame scenario) |
+| Items, drops, generation (`src/items/`) | `cargo test --test item_tests` + `cargo test snapshot` (equipment panel renders names/tiers/colors). Keep `generate_item_with_rng` the single RNG entry point — fixtures depend on seeded generation |
+| `GameState` fields / serde / persistence | `cargo test --test character_tests --test history_tests` + the mkstate round-trip tests (`cargo test --bin mkstate`). There is no old-save fixture corpus yet — if you rename/remove a serialized field, manually confirm a pre-change save still loads |
+| A challenge minigame (`src/challenges/`) | That game's unit tests + `cargo test snapshot_all_minigames`. New minigame? Use the `add-challenge` skill — it covers all 15 integration points |
+| Keyboard input (`src/input/`) | No automated coverage — drive the real game with the `drive-game` skill and exercise the key path you changed |
+| Fixtures or the UI clock (`src/fixtures.rs`, `src/ui/clock.rs`) | Full `cargo test` — nearly every snapshot depends on them. If `snapshot_rendering_is_deterministic` fails, you introduced a wall-clock/RNG/ordering leak; fix that, never re-bless around it |
+| Dependencies (`Cargo.toml`) | `cargo audit --deny yanked` (CI runs it even where local sandboxes can't) + the `dependency-audit` skill for a deeper pass |
+| Docs / wiki | `doc-audit` / `wiki-audit` skills check for stale constants and broken links |
+
+Two habits that make verification meaningful:
+- **Verify the behavior, not just the build.** A green `cargo check` proves nothing about a gameplay change — run the row above that actually exercises it.
+- **Snapshot diffs are the review, not noise.** When a `.snap` file changes, read the diff before re-blessing; an unexpected changed frame is the test working.
+
 ## CI/CD Pipeline
 
 **On every PR:**
