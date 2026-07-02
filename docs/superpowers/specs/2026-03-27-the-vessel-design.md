@@ -73,7 +73,7 @@ The Vessel carries a small, tight-knit crew. Every member matters — losing one
 
 ### Ship Rooms (~20 total)
 
-Room slots unlock at distance milestones (~1 every 500 ly). What you build in each slot is your choice.
+Room slots unlock at geometrically spaced distance milestones — roughly one every 1-2 weeks of wall-clock under the speed curve (see rooms spec). What you build in each slot is your choice.
 
 **Room upgrade system:** Two axes of improvement:
 1. **Levels (1-10)** — spend salvage/materials to level up a room. Each level increases its base stat contribution. Straightforward resource investment.
@@ -145,18 +145,26 @@ Choices depend on ship capabilities (Sensors reveal hidden options, Shuttle Bay 
 
 **Destination:** 10,000 light-years.
 
-**Speed curve:**
-- Starting speed: ~0.1 ly/day (engines level 1)
-- Mid-game: ~1-3 ly/day (upgraded engines, Reactor supporting more rooms)
-- Late-game: ~10+ ly/day (maxed engines, optimized ship)
+**Duration target: ~8 months of engaged idle play** (240 ± 60 days). Active optimizers land closer to 5-6 months; fully passive play drifts toward 12. This is the master pacing constant — the speed curve, milestone spacing, and enemy scaling all derive from it, and the vessel simulator (planned alongside sub-project 4) validates changes against it.
 
-**Distance milestones** unlock:
-- New room slots (~1 every 500 ly, reaching ~20 total by 10,000 ly)
+**Speed** is derived from the ship's final Engines stat (formula and anchors in the rooms spec): `speed_ly_per_day = Engines² / 1,000`, capped at 100 ly/day. Intended trajectory:
+
+| Phase | Speed | Wall-clock |
+|-------|-------|-----------|
+| Launch | 0.1 ly/day (Engines 10) | day 0 |
+| Early voyage | ~1 ly/day (Engines ~32) | ~month 2 |
+| Mid voyage | ~10-20 ly/day (Engines ~100-140) | ~month 4 |
+| Cruise plateau | 60-100 ly/day (Engines 250-316) | final ~3 months |
+
+Speed roughly doubles every ~2 weeks through the ramp, then plateaus. The design principle: **distance is exponential, wall-clock is linear.**
+
+**Distance milestones are spaced geometrically** (~×1.5-1.6 apart), so under the exponential speed curve each unlock arrives roughly every 1-2 weeks of wall-clock regardless of raw distance:
+- New room slots (16 unlocks from 10 ly to 9,000 ly — see rooms spec)
 - New encounter types and enemy tiers
 - Story beats and narrative revelations about the destination
 - New room types available to build
 
-**Scaling:** Enemies, resource scarcity, and event complexity all scale with distance. The void gets harder the further you go.
+**Scaling:** Enemies, resource scarcity, and event complexity scale with distance on sublinear power curves (distance spans three orders of magnitude — linear scaling would explode). The void gets harder the further you go.
 
 ## Supply Line from Home
 

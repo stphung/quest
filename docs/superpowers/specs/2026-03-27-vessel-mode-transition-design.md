@@ -124,7 +124,7 @@ Same structure as Act 1 (stats left, activity right, ticker bottom) but with new
 │ (none yet)                 │
 │                            │
 │ ── ROOMS ──                │
-│ 2/20 slots                 │
+│ 4/20 slots                 │
 │ Reactor     Lv 1           │
 │ Engines     Lv 1           │
 │                            │
@@ -178,19 +178,33 @@ These hotkeys are stubs in sub-project 2 — they'll be wired in later sub-proje
 
 The voyage runs on the same 100ms tick as Act 1. Per tick:
 
-1. **Distance increment:** `distance += speed_ly_per_day / (10 * 86400)` (10 ticks/sec, 86400 sec/day)
-2. **Fuel drain:** `fuel -= fuel_drain_per_tick` (proportional to speed)
-3. **Supply drain:** `supplies -= supply_drain_per_tick` (proportional to crew count; 0 crew = 0 drain)
-4. **Drift check:** if fuel <= 0 or hull <= 0, enter drift state
+1. **Distance increment:** `distance += speed_ly_per_day / (10 * 86400)` (10 ticks/sec, 86400 sec/day). Speed derives from the final Engines stat (`Engines² / 1,000`, see rooms spec); in this sub-project (no rooms system yet) it is the constant 0.1 ly/day.
+2. **Fuel drain:** `fuel_drain_per_day = 2 + 0.8 × speed`, applied per tick. Faster travel costs more per day but *less per light-year* — economies of scale reward engine investment.
+3. **Harvesting:** `void_matter_per_day = 2 + 0.2 × Sensors(final)`, applied per tick (see Void Matter Harvesting below).
+4. **Supply drain:** `supplies -= supply_drain_per_tick` (proportional to crew count; 0 crew = 0 drain)
+5. **Drift check:** if fuel <= 0 or hull <= 0, enter drift state
 
 Starting values:
 - Distance: 0.0 ly
-- Speed: 0.1 ly/day
-- Fuel: 100% (1,000 units; drain rate ~1/day at base speed = ~1,000 day supply)
+- Speed: 0.1 ly/day (Engines 10)
+- Fuel: 100% (1,000 units, drain ~2.1/day at launch speed — a ~480-day tank, deliberately generous before the Refinery unlocks at 40 ly)
 - Hull: 100% (100 HP; no drain without combat)
 - Supplies: 100% (500 units; no drain without crew)
+- Void matter: 0 (capacity 200)
 
-These numbers are placeholders — later sub-projects will tune them with combat and resource harvesting in the loop.
+These numbers are first-pass — the vessel simulator validates them with combat and harvesting in the loop.
+
+## Void Matter Harvesting
+
+The third resource pillar, alongside combat scavenging and production rooms. The ship's collectors passively sweep void matter as it travels — no player action required, fitting the idle design.
+
+- **Harvest rate:** `void_matter_per_day = 2 + 0.2 × Sensors(final)`. At launch (Sensors 10): 4 VM/day. Late voyage (Sensors ~200+): 40+ VM/day. This gives Sensors a continuous economic role on top of crits and event reveals.
+- **Storage:** void matter has its own cap (200 base, +10% per Cargo Hold level).
+- **Uses:** (1) the **Fuel Refinery** converts it to fuel at 2 VM → 1 fuel, throughput 5 VM/day per Refinery level; (2) the **Forge** consumes it as a crafting input for components; (3) some decision events ask for it ("feed the anomaly").
+- **Without a Refinery** (unlocks at 40 ly), void matter accumulates but cannot become fuel — the early game runs on the launch tank and combat scavenge.
+- **Density pockets:** decision events and Sensors discoveries can grant burst harvests ("+50 VM from a nebula pocket").
+
+**Fuel economy design intent:** combat scavenging covers roughly 60-120% of drain through the early and mid voyage; at the cruise plateau scavenging alone runs a deficit and harvesting + Refinery closes the gap, with event caches as the buffer. If the simulator shows the late-game deficit is structural, the designed relief valve is an **engine throttle** (run below max speed to cut drain) rather than more income.
 
 ## Drift State
 
@@ -221,6 +235,8 @@ pub struct VesselState {
     pub hull_max: f64,           // Max hull
     pub supplies: f64,           // 0.0 - 500.0
     pub supplies_capacity: f64,  // Max supplies
+    pub void_matter: f64,        // 0.0 - void_matter_capacity
+    pub void_matter_capacity: f64, // Max void matter (200 base)
     pub drifting: bool,          // In drift state
     pub ship_level: u32,         // XP-based level
     pub ship_xp: u64,            // Accumulated XP
@@ -232,13 +248,20 @@ Persisted to `~/.quest/vessel.json` (separate file, like Deep and Loom).
 
 ## Offline Progression
 
-When the game is closed and reopened, calculate elapsed real time and simulate:
-- Distance gained (speed × elapsed days, capped by fuel)
-- Fuel consumed
-- Supply consumed
-- Drift if resources ran out mid-offline
+Same wiring pattern as offline XP and Deep mission resolution (`resolve_deep_offline` in `src/main_helpers/offline.rs` is the template). One design principle governs all of it: **the voyage continues while you're away, but nothing irreversible happens to people.** Capped at 7 days (same as Act 1); beyond the cap the ship holds station.
 
-Same pattern as existing offline XP and Deep mission resolution.
+| System | Offline behavior |
+|--------|-----------------|
+| Travel, fuel/supply drain, harvesting | 100% rate — these are wall-clock systems already |
+| Workshop repair, Garden production | 100% rate |
+| Crew skill growth | 100% rate (spec'd as wall-clock ~3 days/level; pausing it would contradict the crew spec) |
+| Combat | Resolved statistically at **50% encounter rate** using expected-value outcomes (no crit/variance rolls): ship XP, salvage, and scavenged fuel/supplies granted in aggregate; hull takes expected net damage (incoming minus repair) |
+| Crew injuries | Possible offline at reduced rate, but **never permanent loss** — the drift crew-loss roll is skipped offline |
+| Bosses | **Never auto-fought.** The ship halts at the boss milestone; ambient encounters continue banking salvage (see combat spec); the boss waits for the player |
+| Drift | If expected hull or fuel hits 0 mid-offline, combat stops at that timestamp and the remaining offline time applies drift recovery instead |
+| Decision events | Don't fire on their wall-clock schedule; up to **3 queue** as "signals logged by the Sensors array," presented one at a time on return. Events beyond the queue cap auto-resolve via the safe path (no resource loss, rewards missed). Recruitment (pity-timer) events always queue and never expire |
+
+Rationale: full-rate travel preserves the idle fantasy ("my ship sailed while I slept"). Half-rate combat means an offline player arrives at distance-gated content slightly underleveled — which self-corrects, because a too-weak ship loses hull and drift halts travel. And permanent crew loss must always trace to a decision the player was present for; losing a named crew member while asleep is rage-quit material.
 
 ## Files
 
@@ -263,6 +286,10 @@ Same pattern as existing offline XP and Deep mission resolution.
 - Unit test: drift triggers when fuel hits 0
 - Unit test: drift triggers when hull hits 0
 - Unit test: offline progression calculates correct distance/fuel
+- Unit test: offline combat resolves at 50% encounter rate with expected-value outcomes
+- Unit test: offline drift mid-window stops combat and applies recovery for remaining time
+- Unit test: offline event queue caps at 3, overflow auto-resolves safe
+- Unit test: harvesting rate scales with Sensors; void matter respects capacity
 - Unit test: transition beat state machine advances correctly
 - Unit test: serde round-trip for VesselState
 - Snapshot tests: voyage shell layout and each transition beat (full-frame TUI snapshot infra from #623/#624)

@@ -117,7 +117,7 @@ Crew are found during the voyage through narrative moments, not recruited from a
 
 ### Frequency
 
-Random with pity timer: recruitment events appear organically but with a guarantee of at least one opportunity every 1,500 ly. First opportunity appears within ~200 ly or the first few hours. Total available across the full 10,000 ly voyage: ~8-10 opportunities, so the player can be somewhat selective.
+Random with pity timer, measured in **wall-clock time** (distance is exponential across the voyage, so a distance-based pity would bunch all recruitment into the final months): recruitment events appear organically with a guarantee of at least one opportunity every ~3 weeks. The first opportunity appears within the first day of the voyage. Total across the ~8-month voyage: ~8-12 opportunities, so the player can be somewhat selective.
 
 ### Information Reveal
 
@@ -162,6 +162,8 @@ Crew can be permanently lost from:
 
 Lost crew are gone forever. This is the primary emotional stakes of the voyage.
 
+**Offline protection:** permanent loss never happens offline — the drift crew-loss roll is skipped during offline resolution (see mode-transition spec, Offline Progression). Losing a named crew member must always trace to a decision the player was present for.
+
 ### Injury Protection
 
 - Medbay prevents severe injuries from becoming permanent loss (same pattern as Deep Medic archetype)
@@ -185,7 +187,7 @@ When supplies hit 0:
 At launch:
 - 0 crew aboard
 - Crew capacity: 2 (no Life Support built yet)
-- First crew member is offered during the first decision event (~500 ly or first few hours)
+- First crew member is offered during the first decision event (within the first day of the voyage)
 
 ## UI: Crew Management
 

@@ -77,6 +77,28 @@ Per level, base stats increase:
 - Engines: +1 (speed is powerful, grows slowly)
 - Sensors: +1
 
+## Speed Formula (Engines → ly/day)
+
+Speed is derived from the **final** Engines stat (after all four layers):
+
+```
+speed_ly_per_day = Engines² / 1,000     (capped at 100 ly/day)
+```
+
+| Engines (final) | Speed |
+|-----------------|-------|
+| 10 (launch) | 0.1 ly/day |
+| 25 | 0.63 ly/day |
+| 40 | 1.6 ly/day |
+| 80 | 6.4 ly/day |
+| 150 | 22.5 ly/day |
+| 250 | 62.5 ly/day |
+| 316+ | 100 ly/day (cap) |
+
+The mapping is quadratic on purpose: the four stat layers each grow roughly linearly, and squaring turns steady investment into the exponential speed ramp the ~8-month duration target requires (see parent spec, Distance and Progression). The cap keeps the final approach from trivializing and bounds encounter frequency.
+
+Sanity check on reachability: late-voyage base Engines ≈ 10 + ship level (~70-80), × room 2.0 (Engines room Lv 10) × crew ~1.5 (primary specialist Lv 10) × components ~1.3 ≈ 270-310 — the plateau is reachable but requires investment in all four layers.
+
 ## Reactor Power Budget
 
 The Reactor is a room that produces power points. All other rooms consume power.
@@ -122,29 +144,32 @@ Note: The Reactor itself costs 0 power (it produces, doesn't consume).
 
 ### Slot Unlocks
 
-~20 slots unlock at distance milestones, roughly 1 per 500 ly:
+The ship launches with **4 slots** (2 filled — Reactor, Engines — plus 2 empty, so the starting salvage has somewhere to go). 16 more unlock at geometrically spaced distances (~×1.6 apart). Under the exponential speed curve this means **a new slot roughly every 1-2 weeks of wall-clock** across the whole voyage:
 
-| Distance | Slots Available | Cumulative |
-|----------|----------------|------------|
-| 0 ly (launch) | 2 | 2 |
-| 500 ly | 1 | 3 |
-| 1,000 ly | 1 | 4 |
-| 1,500 ly | 1 | 5 |
-| ... | 1 per 500 ly | ... |
-| 9,000 ly | 1 | 20 |
+| Slot # | Distance | Slot # | Distance |
+|--------|----------|--------|----------|
+| 1-4 | 0 ly (launch) | 13 | 400 ly |
+| 5 | 10 ly | 14 | 640 ly |
+| 6 | 16 ly | 15 | 1,000 ly |
+| 7 | 25 ly | 16 | 1,600 ly |
+| 8 | 40 ly | 17 | 2,500 ly |
+| 9 | 64 ly | 18 | 4,000 ly |
+| 10 | 100 ly | 19 | 6,400 ly |
+| 11 | 160 ly | 20 | 9,000 ly |
+| 12 | 250 ly | | |
 
 ### Room Type Unlocks
 
-Room types unlock at distance milestones. Not all types available from the start.
+Room types unlock at distance milestones (aligned with slot-ladder rungs). Not all types available from the start.
 
 | Distance | Room Types Unlocked |
 |----------|-------------------|
 | 0 ly | Reactor, Engines, Hull Plating, Weapons Bay, Cargo Hold, Quarters |
-| 1,000 ly | Fuel Refinery, Life Support, Sensors Array |
-| 2,500 ly | Workshop, Garden, Medbay |
-| 4,000 ly | Forge, Shuttle Bay, Shrine |
-| 6,000 ly | Cartography Deck, Rune Array |
-| 8,000 ly | Void Lens, Fate Loom |
+| 40 ly | Fuel Refinery, Life Support, Sensors Array |
+| 250 ly | Workshop, Garden, Medbay |
+| 1,000 ly | Forge, Shuttle Bay, Shrine |
+| 2,500 ly | Cartography Deck, Rune Array |
+| 6,400 ly | Void Lens, Fate Loom |
 
 ### Building a Room
 
@@ -192,7 +217,7 @@ Each room contributes a multiplier bonus to one or more stats. Base contribution
 | Hull Plating | Hull | +0.10 | — |
 | Engines | Engines | +0.10 | — |
 | Sensors Array | Sensors | +0.10 | — |
-| Fuel Refinery | — | — | Reduces fuel drain by 5%/level |
+| Fuel Refinery | — | — | Converts void matter → fuel: 5 VM/day throughput per level at 2 VM : 1 fuel (see mode-transition spec, Void Matter Harvesting) |
 | Cargo Hold | — | — | +10% resource capacity/level |
 | Life Support | — | — | +1 crew capacity/level (ship base capacity is 2 with none built) |
 | Quarters | — | — | +5% crew effectiveness/level |
@@ -212,8 +237,8 @@ A level 5 Weapons Bay contributes: `5 × 0.10 = 0.50` to the Firepower room mult
 ## Starting State (at launch)
 
 The Vessel starts with:
-- 2 room slots filled: **Reactor** (Lv 1) and **Engines** (Lv 1)
-- Ship level 1 (base stats: Firepower 10, Hull 10, Engines 10, Sensors 10)
+- 4 room slots: **Reactor** (Lv 1) and **Engines** (Lv 1) built, 2 empty
+- Ship level 1 (base stats: Firepower 10, Hull 10, Engines 10, Sensors 10 → speed 0.1 ly/day)
 - 0 crew
 - Some starting salvage (enough for 2-3 room builds)
 - Room types available: Reactor, Engines, Hull Plating, Weapons Bay, Cargo Hold, Quarters
@@ -255,7 +280,8 @@ Accessed via `[R]` hotkey from the voyage screen. Shows a grid/list of all slots
 
 ## Testing
 
-- Unit test: stat formula (base × room × crew) produces correct values
+- Unit test: stat formula (base × room × crew × component) produces correct values
+- Unit test: speed formula anchors (Engines 10 → 0.1 ly/day, 100 ly/day cap at 316+)
 - Unit test: Reactor power production at each level
 - Unit test: room power cost scales with base + level
 - Unit test: over-budget penalty applies 50% to all rooms

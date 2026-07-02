@@ -53,73 +53,93 @@ Enemy damage to ship:
 ### Kill Rewards
 
 On enemy defeat:
-- **Ship XP** — for base stat leveling
+- **Ship XP** — `xp = 50 × (1 + distance/50)^0.5` × type modifier (common 1x, elite 2.5x, boss 10x). At the plateau (~48 kills/day at 9,000 ly ≈ 670 XP each) the ship gains a level every ~2-3 days against the `500 × level^1.3` curve.
 - **Salvage** — primary upgrade currency (for room builds/levels)
 - **Components** — rare drops, chance scales with enemy tier
 - **Fuel/Supplies** — small amounts from scavenging the wreck
 
 ## Encounter Frequency
 
-Encounters are **distance-based**. Faster ship = more fights per day.
+Two components: an **ambient wall-clock rate** (the void is never fully empty) plus a **speed-driven rate** (faster ship = more fights per day):
 
 ```
-encounters_per_ly = base_rate × distance_modifier
+encounters_per_day = 3 + 1.5 × speed_ly_per_day     (capped at 48/day — one per 30 min)
 ```
 
-- **base_rate:** 2 encounters per ly traveled
-- **distance_modifier:** `1.0 + (distance / 5000) × 0.5` — density increases slightly deeper into the void
-- At 0.1 ly/day (early): ~0.2 encounters/day (one every ~5 days — sparse, lonely)
-- At 1 ly/day (mid): ~2-3 encounters/day
-- At 10 ly/day (late): ~25+ encounters/day (constant combat)
+- At launch (0.1 ly/day): ~3/day — a fight every ~8 hours. Sparse and lonely, but alive, and enough salvage income to bootstrap the first room builds.
+- Mid voyage (10 ly/day): ~18/day.
+- Cruise plateau (60-100 ly/day): capped at 48/day — constant combat.
+
+**The ambient component continues while the ship is halted** — blocked at a boss milestone or recovering in drift, the void comes to you. This guarantees salvage income even when progress is stopped, so a too-weak ship grinds up to a boss rather than soft-locking.
 
 Between encounters, the void view shows the peaceful star field.
 
 ## Enemy Scaling
 
-### Normal Enemies (formula-based, smooth curve)
+### Normal Enemies (formula-based, smooth power curves)
+
+Distance spans three orders of magnitude, so scaling is **sublinear** — linear scaling would produce four-digit attack values no ship stat budget can match. First-pass formulas (simulator-validated before implementation):
 
 ```
-enemy_hp     = 20 + distance × 2.0
-enemy_attack = 5 + distance × 0.8
-enemy_defense = 3 + distance × 0.5
-enemy_accuracy = 10 + distance × 0.3
+scale = 1 + distance / 50
+
+enemy_hp       = 20 × scale^0.90
+enemy_attack   =  5 × scale^0.70
+enemy_defense  =  3 × scale^0.65
+enemy_accuracy = 10 × scale^0.50
+enemy_stealth  = 10 × scale^0.50
 ```
+
+Anchors (common enemies, before type modifiers):
+
+| Distance | HP | Attack | Defense | Accuracy |
+|----------|-----|--------|---------|----------|
+| 0 ly | 20 | 5 | 3 | 10 |
+| 100 ly | 54 | 11 | 6 | 17 |
+| 1,000 ly | 310 | 42 | 22 | 46 |
+| 9,000 ly | 2,150 | 190 | 88 | 135 |
+
+The exponents are tuned so late-voyage ship stats (final stats in the hundreds after all four layers) stay in the same magnitude band as enemy stats — fights get harder but the subtractive damage pipeline never degenerates into always-min-1 or one-shots.
 
 Stats have ±15% random variance per encounter.
 
 ### Enemy Types
 
+Type thresholds sit on the same geometric ladder as room slots, so new enemies appear at a steady wall-clock cadence.
+
 **Common — Void Creatures** (70% of encounters):
 | Type | Distance | Modifier | Flavor |
 |------|----------|----------|--------|
 | Void Wisp | 0+ ly | 0.5x stats | Faint, barely hostile |
-| Branch Parasite | 200+ ly | 0.8x stats | Feeds on wood-matter |
-| Root Worm | 500+ ly | 1.0x stats | Burrowing void dweller |
-| Cosmic Stalker | 1,500+ ly | 1.2x stats | Hunts between branches |
-| Void Leviathan | 3,000+ ly | 1.5x stats | Massive, slow, devastating |
-| Abyss Tendril | 5,000+ ly | 1.8x stats | Reaches from the deep void |
-| Entropy Shade | 7,000+ ly | 2.0x stats | Reality itself dissolving |
+| Branch Parasite | 25+ ly | 0.8x stats | Feeds on wood-matter |
+| Root Worm | 100+ ly | 1.0x stats | Burrowing void dweller |
+| Cosmic Stalker | 400+ ly | 1.2x stats | Hunts between branches |
+| Void Leviathan | 1,600+ ly | 1.5x stats | Massive, slow, devastating |
+| Abyss Tendril | 4,000+ ly | 1.8x stats | Reaches from the deep void |
+| Entropy Shade | 6,400+ ly | 2.0x stats | Reality itself dissolving |
 
 The highest-tier type available for the current distance is used, with a weighted random roll favoring newer types.
 
 **Elite — Lost Vessels** (20% of encounters):
 | Type | Distance | Modifier | Special |
 |------|----------|----------|---------|
-| Drifting Hulk | 500+ ly | 1.5x stats | Slow attacks, high HP |
-| Ghost Frigate | 2,000+ ly | 1.8x stats | Fast attacks, evasive |
-| Corrupted Warship | 4,000+ ly | 2.2x stats | Heavy damage, heavy defense |
-| Abyssal Dreadnought | 7,000+ ly | 2.8x stats | End-tier elite |
+| Drifting Hulk | 100+ ly | 1.5x stats | Slow attacks, high HP |
+| Ghost Frigate | 640+ ly | 1.8x stats | Fast attacks, evasive |
+| Corrupted Warship | 2,500+ ly | 2.2x stats | Heavy damage, heavy defense |
+| Abyssal Dreadnought | 6,400+ ly | 2.8x stats | End-tier elite |
 
 Elites always drop salvage. Higher component drop rate (20% vs 5% for common).
 
 **Bosses — Norse Mythological** (at distance milestones):
 | Boss | Distance | Modifier | Drop |
 |------|----------|----------|------|
-| Níðhöggr's Fang | 1,000 ly | 3x stats | Guaranteed component + room unlock |
-| Hræsvelgr's Wake | 2,500 ly | 4x stats | Guaranteed component |
-| Jörmungandr Fragment | 5,000 ly | 5x stats | Guaranteed rare component |
-| Fenrir's Shadow | 7,500 ly | 7x stats | Guaranteed rare component |
-| Surtr's Ember | 9,500 ly | 10x stats | Guaranteed legendary component |
+| Níðhöggr's Fang | 50 ly | 3x stats | Guaranteed component + room unlock |
+| Hræsvelgr's Wake | 400 ly | 4x stats | Guaranteed component |
+| Jörmungandr Fragment | 1,600 ly | 5x stats | Guaranteed rare component |
+| Fenrir's Shadow | 4,500 ly | 7x stats | Guaranteed rare component |
+| Surtr's Ember | 9,200 ly | 10x stats | Guaranteed legendary component |
+
+Under the intended speed trajectory these land roughly at months ~2.5, 4, 5, 6, and 7.5 of the voyage — one boss per phase of the ship's growth.
 
 Bosses are one-time encounters. They block passage — you must defeat them to continue past their distance milestone. Attack interval: 1.2s. After defeat, a narrative moment plays.
 
@@ -175,11 +195,13 @@ Boss encounters that reduce hull to 0: boss resets to full HP. Player must recov
 
 ### Salvage
 
-Primary currency. Dropped by all enemies:
+Primary currency. Dropped by all enemies (sublinear, same rationale as enemy scaling — room costs are static, so linear salvage would trivialize late-game upgrades):
 
 ```
-salvage_base = 5 + distance × 0.3
+salvage_base = 5 × (1 + distance/50)^0.6
 ```
+
+Anchors: ~5 at launch, ~31 at 1,000 ly, ~113 at 9,000 ly.
 
 - Common enemies: 1.0x salvage
 - Elite enemies: 2.5x salvage
@@ -200,9 +222,11 @@ Component quality tiers (like item rarity): Common, Uncommon, Rare, Legendary. H
 ### Fuel & Supplies
 
 Small amounts scavenged from defeated enemies:
-- Common: 1-3 fuel, 0-1 supplies
-- Elite: 5-10 fuel, 2-5 supplies
+- Common: 0-1 fuel, 0-1 supplies
+- Elite: 2-4 fuel, 1-2 supplies
 - Boss: 25 fuel, 15 supplies
+
+Deliberately lean: scavenging covers most fuel drain through the mid voyage but runs a deficit at the cruise plateau, where harvesting + Refinery take over (see mode-transition spec, Fuel economy design intent).
 
 ## Files
 
