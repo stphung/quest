@@ -11,7 +11,6 @@ use ratatui::{
     widgets::{Block, Borders, Gauge, Paragraph},
     Frame,
 };
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Returns the icon of the highest unlocked prestige achievement, if any.
 pub(super) fn highest_prestige_badge(
@@ -186,10 +185,7 @@ pub(super) fn format_eta(seconds: u64) -> String {
 }
 
 fn current_millis() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis()
+    super::clock::now_millis()
 }
 
 pub(super) fn prestige_ready_gauge_style() -> Style {
@@ -292,7 +288,7 @@ pub(super) fn draw_deep_panel(
         deep.persistent.deepest_layer_reached,
     );
     let events = pending_event_count(&deep.prestige);
-    let now_chrono = chrono::Utc::now();
+    let now_chrono = super::clock::now_utc();
     let nearest_mission = deep
         .prestige
         .active_missions
@@ -558,7 +554,7 @@ pub(super) fn draw_deep_panel(
 
 /// Returns seconds until the next active mission completes, or None if no active missions.
 fn next_mission_eta_secs(prestige: &crate::deep::DeepPrestige) -> Option<i64> {
-    let now = chrono::Utc::now();
+    let now = super::clock::now_utc();
     prestige
         .active_missions
         .iter()
@@ -617,10 +613,7 @@ fn core_summary(
     achievements: &crate::achievements::Achievements,
     deep: &crate::deep::DeepState,
 ) -> CoreSummary {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64;
+    let now = super::clock::now_secs();
 
     let mut summary = CoreSummary {
         ready_count: 0,

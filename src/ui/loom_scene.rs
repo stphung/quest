@@ -1370,7 +1370,7 @@ fn render_bottom_panel_eternal(
     let multiplier = crate::loom::wr_pr_multiplier(wr_rate);
 
     // Compute gauge progress: fraction of time until next PR grant.
-    let now = chrono::Utc::now().timestamp();
+    let now = super::clock::now_utc().timestamp();
     let last = loom.persistent.wr_pr_last_granted_at;
     let fill_secs = if pr_per_hour > 0 {
         (3600i64 / pr_per_hour as i64).max(1)

@@ -2,11 +2,25 @@
 
 Terminal UI rendering using Ratatui + Crossterm. All rendering is separated from game logic — UI files only read state and draw frames.
 
+## Snapshot Tests (`snapshot_tests.rs`)
+
+Full-frame snapshot tests render `draw_ui_with_update()` into a ratatui `TestBackend` and assert the buffer (characters + style runs, so color changes fail too) against committed [insta](https://insta.rs) snapshots in `snapshots/`. They run as part of `cargo test` — this is the primary way to verify UI changes without eyeballing screenshots.
+
+- **Determinism**: the UI clock is frozen via `clock::freeze_at_millis()`, fixtures come from `crate::fixtures` with a fixed timestamp and seeded RNG, and `BUILD_COMMIT` in the footer is masked by an insta filter. `snapshot_rendering_is_deterministic` guards against regressions — if it fails, a wall-clock read, thread RNG, or unordered iteration leaked into the render path; fix that, never re-bless around it.
+- **After an intentional UI change**: run `cargo test snapshot`, review the diff insta prints, then re-bless with `INSTA_UPDATE=always cargo test snapshot` (or `cargo insta review`) and commit the updated `.snap` files. For visual changes, also screenshot the real game with the `drive-game` skill.
+- **Adding coverage**: build a state with `crate::fixtures` (or extend it), then call `assert_frame_snapshot("name", &state, w, h)`. One representative size per tier is enough.
+
+### UI Clock (`clock.rs`)
+
+All wall-clock reads in rendering code go through `ui::clock` (`now_millis()`, `now_secs()`, `now_utc()`) so tests can freeze time. **Never call `SystemTime::now()`, `Utc::now()`, or `Instant::now()` directly from UI code** — it breaks snapshot determinism. Spinners/pulses should derive from `clock::now_millis()` (or `scene_fx::current_millis()`, which delegates to it).
+
 ## Module Structure
 
 ```
 src/ui/
 ├── mod.rs                      # Main draw_ui_with_update(), layout coordinator
+├── clock.rs                    # Freezable UI animation clock — sole source of wall-clock time for rendering
+├── snapshot_tests.rs           # Full-frame insta snapshot tests (with committed snapshots/ dir)
 ├── responsive.rs               # Responsive layout: SizeTier enum, LayoutContext, size thresholds
 ├── game_common.rs              # Shared minigame layout components (IMPORTANT)
 ├── stats_panel.rs              # Left panel: layout orchestration (delegates to helpers below)

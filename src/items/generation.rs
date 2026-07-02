@@ -1,4 +1,4 @@
-use super::names::generate_display_name;
+use super::names::generate_display_name_with_rng;
 use super::types::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
 use crate::core::constants::{
     ILVL_SCALING_BASE, ILVL_SCALING_DIVISOR, TIER_MULTIPLIERS, TIER_THRESHOLDS,
@@ -8,14 +8,24 @@ use rand::{Rng, RngExt};
 /// Generate an item with the given slot, rarity, and item level.
 /// ilvl determines stat scaling: ilvl 10 (zone 1) to ilvl 100 (zone 10).
 pub fn generate_item(slot: EquipmentSlot, rarity: Rarity, ilvl: u32) -> Item {
-    let mut rng = rand::rng();
-    let tier = roll_tier(&mut rng);
+    generate_item_with_rng(slot, rarity, ilvl, &mut rand::rng())
+}
+
+/// Like [`generate_item`], but rolls against a caller-provided RNG so
+/// fixtures and tests can generate reproducible items from a seed.
+pub fn generate_item_with_rng(
+    slot: EquipmentSlot,
+    rarity: Rarity,
+    ilvl: u32,
+    rng: &mut impl Rng,
+) -> Item {
+    let tier = roll_tier(rng);
 
     // Generate attribute bonuses based on rarity, ilvl, and tier
-    let attributes = generate_attributes(rarity, ilvl, tier, &mut rng);
+    let attributes = generate_attributes(rarity, ilvl, tier, rng);
 
     // Generate affixes based on rarity, ilvl, and tier
-    let affixes = generate_affixes(rarity, ilvl, tier, &mut rng);
+    let affixes = generate_affixes(rarity, ilvl, tier, rng);
 
     let mut item = Item {
         slot,
@@ -29,7 +39,7 @@ pub fn generate_item(slot: EquipmentSlot, rarity: Rarity, ilvl: u32) -> Item {
         god_item_id: None,
     };
 
-    item.display_name = generate_display_name(&item);
+    item.display_name = generate_display_name_with_rng(&item, rng);
     item.base_name = item.display_name.clone();
 
     item

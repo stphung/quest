@@ -10,6 +10,7 @@ pub mod character_delete;
 pub mod character_rename;
 pub mod character_select;
 pub mod chess_scene;
+mod clock;
 mod combat_3d;
 pub mod combat_effects;
 pub(crate) mod combat_scene;
@@ -48,6 +49,8 @@ pub mod runic_shift_scene;
 mod scene_fx;
 pub mod shard_fusion_scene;
 pub mod snake_scene;
+#[cfg(test)]
+mod snapshot_tests;
 mod soulforge_effects;
 pub mod soulforge_scene;
 mod soulforge_slots;
@@ -1415,8 +1418,6 @@ fn draw_dungeon_view(
     _achievements: &crate::achievements::Achievements,
     _ctx: &LayoutContext,
 ) {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -1430,10 +1431,7 @@ fn draw_dungeon_view(
     frame.render_widget(status_widget, chunks[0]);
 
     // Calculate blink phase (0.5 second cycle)
-    let millis = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
+    let millis = clock::now_millis();
     let blink_phase = (millis % 500) as f64 / 500.0;
 
     // Dungeon map backdrop + map overlay

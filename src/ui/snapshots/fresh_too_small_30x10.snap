@@ -1,0 +1,28 @@
+---
+source: src/ui/snapshot_tests.rs
+expression: frame
+---
+Buffer {
+    area: Rect { x: 0, y: 0, width: 30, height: 10 },
+    content: [
+        "                              ",
+        "      Terminal too small      ",
+        "                              ",
+        "   Need: 40x16   Have: 30x10  ",
+        "                              ",
+        " Please resize your terminal. ",
+        "                              ",
+        "                              ",
+        "                              ",
+        "                              ",
+    ],
+    styles: [
+        x: 0, y: 0, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+        x: 6, y: 1, fg: Yellow, bg: Reset, underline: Reset, modifier: BOLD,
+        x: 24, y: 1, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+        x: 3, y: 3, fg: DarkGray, bg: Reset, underline: Reset, modifier: NONE,
+        x: 28, y: 3, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+        x: 1, y: 5, fg: White, bg: Reset, underline: Reset, modifier: NONE,
+        x: 29, y: 5, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+    ]
+}

@@ -115,7 +115,7 @@ pub(super) fn render_recruit(
     let marks = deep.prestige.warband_marks;
 
     // ── Summary header ──
-    let now = Utc::now();
+    let now = super::clock::now_utc();
     let refresh_secs = (pool.refreshed_at + chrono::Duration::hours(24) - now)
         .num_seconds()
         .max(0);
