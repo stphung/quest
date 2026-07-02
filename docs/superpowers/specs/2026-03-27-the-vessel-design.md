@@ -27,14 +27,15 @@ All four must be met:
 | Zone 50 conquered | The Origin Thread reveals the dying branch |
 | 100,000 PR spent | Fuel for the transformation |
 
-Fuel-phase duration depends heavily on Loom investment. WR→PR is `PR/hr = WR × (1 + WR/100)` (`src/loom/logic.rs`), plus Power Cores at up to 48 PR/day:
+The 100,000 is **spent from prestige rank** (1 PR : 1 fuel, player-initiated transfers — see the launch-gate spec). Rank never freezes; PR income keeps flowing normally and the player chooses when and how deep to burn. Fuel-phase duration therefore depends on the player's PR bank and Loom investment. WR→PR is `PR/hr = WR × (1 + WR/100)` (`src/loom/logic.rs`), plus Power Cores at up to 48 PR/day:
 
-| Loom state | WR rate | PR/day | Days to 100,000 |
-|-----------|---------|--------|-----------------|
-| Typical at pattern-28 completion | 50 WR/hr | ~1,850 | ~54 |
-| Maxed (all 6 extractors L20 → 131 WR/hr) | 131 WR/hr | ~7,320 | ~14 |
+| Situation | PR/day income | Time to bank 100,000 |
+|-----------|--------------|----------------------|
+| Veteran with 100k+ rank to spare | — | Immediate — burn the bank and launch |
+| At the gate near P50k, typical Loom (50 WR/hr) | ~1,850 | ~54 days |
+| At the gate near P50k, maxed Loom (131 WR/hr) | ~7,320 | ~14 days |
 
-So the construction watch runs **two weeks to two months** — upgrading extractors during the fuel phase is the player's main lever, which conveniently gives the phase something to do. (Challenge wins grant only 1-2 PR each — negligible at these rates.)
+So the construction watch runs **zero days to two months**, and it's active: burn rank below P50,000 to launch sooner at temporarily weakened prestige bonuses (zone unlocks never re-lock), or cruise while the Loom refills the bank. Upgrading extractors toward L20 remains the big income lever during the wait. (Challenge wins grant only 1-2 PR each — negligible at these rates.)
 
 ## Mode Shift
 
