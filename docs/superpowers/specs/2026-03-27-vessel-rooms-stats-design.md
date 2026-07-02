@@ -194,7 +194,7 @@ Each room contributes a multiplier bonus to one or more stats. Base contribution
 | Sensors Array | Sensors | +0.10 | — |
 | Fuel Refinery | — | — | Reduces fuel drain by 5%/level |
 | Cargo Hold | — | — | +10% resource capacity/level |
-| Life Support | — | — | +1 crew capacity/level (base 2) |
+| Life Support | — | — | +1 crew capacity/level (ship base capacity is 2 with none built) |
 | Quarters | — | — | +5% crew effectiveness/level |
 | Medbay | — | — | Crew injury recovery speed +10%/level |
 | Shrine | All stats | +0.02 | — |

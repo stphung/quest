@@ -56,7 +56,7 @@ Each specialty has primary rooms (high multiplier) and secondary rooms (moderate
 
 ## Crew Multiplier
 
-The crew multiplier is the third layer in the ship stat formula: `final_stat = base × room_multiplier × crew_multiplier`.
+The crew multiplier is the third of four layers in the ship stat formula: `final_stat = base × room_multiplier × crew_multiplier × component_multiplier` (see `vessel-rooms-stats-design.md`).
 
 Crew multiplier for a stat = product of all crew contributions to that stat. Most crew only contribute to the stat their assigned room affects.
 
@@ -92,7 +92,7 @@ Reassigning a crew member to a different room resets nothing — skill level is 
 
 ## Crew Capacity
 
-Base crew capacity: 2. Increased by Life Support room (+1 per level, base level gives +2 capacity for total of 4). Max capacity: 8 (Life Support level 6+).
+Base crew capacity: 2. Increased by Life Support room (+1 per level). Max capacity: 8 (Life Support level 6+).
 
 | Life Support Level | Crew Capacity |
 |-------------------|---------------|

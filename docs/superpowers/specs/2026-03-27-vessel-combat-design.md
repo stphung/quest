@@ -10,7 +10,7 @@ Ship combat uses the same tick-based auto-attack engine as Act 1 hero combat, re
 
 ## Combat Engine
 
-Reuses the existing combat pipeline with ship stats mapped to hero stats:
+Reuses the existing combat pipeline with ship stats mapped to hero stats. Note: the Act 1 combat stat pipeline was migrated from `u32` to `u64` (#619) — vessel combat stats should be `u64` from the start.
 
 | Ship Stat | Maps To | Role |
 |-----------|---------|------|

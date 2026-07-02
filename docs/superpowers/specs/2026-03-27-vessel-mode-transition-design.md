@@ -265,3 +265,4 @@ Same pattern as existing offline XP and Deep mission resolution.
 - Unit test: offline progression calculates correct distance/fuel
 - Unit test: transition beat state machine advances correctly
 - Unit test: serde round-trip for VesselState
+- Snapshot tests: voyage shell layout and each transition beat (full-frame TUI snapshot infra from #623/#624)
