@@ -80,6 +80,13 @@ pub struct GameState {
     pub storm_sigils: StormSigils,
     /// Ascension level — per-character combat power multiplier (0 = no ascension)
     pub ascension_level: u32,
+    /// True after the Zone 50 final boss first falls — enables Vessel ticker
+    /// whispers and the [V] overlay (persistent, survives prestige)
+    pub vessel_signal_discovered: bool,
+    /// True after the player confirms the Vessel launch and burns 100,000 PR
+    pub vessel_launched: bool,
+    /// Play-time seconds when the last Vessel whisper was pushed (transient)
+    pub vessel_last_whisper_at: u64,
     /// Active challenge minigame (transient, not saved)
     pub active_minigame: Option<ActiveMinigame>,
     /// Session kill count (transient, not saved)
@@ -158,6 +165,9 @@ impl GameState {
             stormglass_discovered: false,
             storm_sigils: StormSigils::new(),
             ascension_level: 0,
+            vessel_signal_discovered: false,
+            vessel_launched: false,
+            vessel_last_whisper_at: 0,
             active_minigame: None,
             session_kills: 0,
             consecutive_deaths: 0,

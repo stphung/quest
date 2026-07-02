@@ -35,6 +35,10 @@ pub(super) struct CharacterSaveData {
     pub(super) storm_sigils: crate::stormglass::sigils::StormSigils,
     #[serde(default)]
     pub(super) ascension_level: u32,
+    #[serde(default)]
+    pub(super) vessel_signal_discovered: bool,
+    #[serde(default)]
+    pub(super) vessel_launched: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -150,6 +154,9 @@ mod tests {
             stormglass_discovered: false,
             storm_sigils: crate::stormglass::sigils::StormSigils::new(),
             ascension_level: 0,
+            vessel_signal_discovered: false,
+            vessel_launched: false,
+            vessel_last_whisper_at: 0,
             chrono_surge_active: false,
             debug_force_overcharge: false,
         }
@@ -902,6 +909,44 @@ mod tests {
             loaded.ascension_level, 3,
             "ascension_level=3 should persist through save→load"
         );
+    }
+
+    #[test]
+    fn test_vessel_flags_roundtrip() {
+        let (manager, _dir) = temp_manager();
+        let mut state = make_test_state("VesselRt");
+        state.vessel_signal_discovered = true;
+        state.vessel_launched = true;
+
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager
+            .load_character("vesselrt.json")
+            .expect("load failed");
+
+        assert!(
+            loaded.vessel_signal_discovered,
+            "vessel_signal_discovered should persist through save→load"
+        );
+        assert!(
+            loaded.vessel_launched,
+            "vessel_launched should persist through save→load"
+        );
+        assert_eq!(
+            loaded.vessel_last_whisper_at, 0,
+            "vessel_last_whisper_at is transient and resets on load"
+        );
+    }
+
+    #[test]
+    fn test_vessel_flags_default_false_on_old_saves() {
+        let (manager, _dir) = temp_manager();
+        let state = make_test_state("VesselDefault");
+        manager.save_character(&state).expect("save failed");
+        let loaded = manager
+            .load_character("vesseldefault.json")
+            .expect("load failed");
+        assert!(!loaded.vessel_signal_discovered);
+        assert!(!loaded.vessel_launched);
     }
 
     #[test]

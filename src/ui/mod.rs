@@ -67,6 +67,7 @@ pub mod ticker;
 pub mod time_vault_scene;
 pub mod title_browser_scene;
 pub mod vault_warden_scene;
+pub mod vessel_scene;
 mod zone_bg;
 
 use crate::challenges::ActiveMinigame;

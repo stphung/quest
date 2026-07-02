@@ -228,6 +228,7 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
             | GameOverlay::StormglassDiscovery
             | GameOverlay::DeepDiscovery
             | GameOverlay::LoomDiscovery
+            | GameOverlay::VesselDiscovery
             | GameOverlay::FractureRegionUnlock { .. }
             | GameOverlay::PatternMilestoneUnlock { .. }
     ) {
@@ -267,6 +268,11 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
     // 2.9. The Loom of Worlds overlay
     if loom_ui.open {
         return loom_input::handle_loom(key, loom_state, loom_ui);
+    }
+
+    // 2.95. The Vessel overlay
+    if matches!(overlay, GameOverlay::Vessel { .. }) {
+        return handle_vessel_overlay(key, state, loom_state, overlay);
     }
 
     // 3. Vault item selection
@@ -373,6 +379,52 @@ fn handle_dismiss_overlay(key: KeyEvent, overlay: &mut GameOverlay) -> InputResu
         *overlay = GameOverlay::None;
     }
     InputResult::Continue
+}
+
+/// The Vessel construction overlay: Enter opens/answers the all-or-nothing
+/// launch confirmation; Esc backs out (of the confirm first, then the overlay).
+fn handle_vessel_overlay(
+    key: KeyEvent,
+    state: &mut GameState,
+    loom_state: &crate::loom::LoomState,
+    overlay: &mut GameOverlay,
+) -> InputResult {
+    let GameOverlay::Vessel { confirm_pending } = overlay else {
+        return InputResult::Continue;
+    };
+    match key.code {
+        KeyCode::Esc => {
+            if *confirm_pending {
+                *confirm_pending = false;
+            } else {
+                *overlay = GameOverlay::None;
+            }
+            InputResult::Continue
+        }
+        KeyCode::Enter => {
+            if state.vessel_launched {
+                *overlay = GameOverlay::None;
+                return InputResult::Continue;
+            }
+            let completed_patterns = loom_state.persistent.completed_pattern_count();
+            if *confirm_pending {
+                *confirm_pending = false;
+                if crate::vessel::perform_launch(state, completed_patterns) {
+                    state.combat_state.add_log_entry(
+                        "\u{2726} 100,000 Prestige Ranks burn. The Loom becomes a hull."
+                            .to_string(),
+                        false,
+                        true,
+                    );
+                    return InputResult::NeedsSave;
+                }
+            } else if crate::vessel::can_launch(state, completed_patterns) {
+                *confirm_pending = true;
+            }
+            InputResult::Continue
+        }
+        _ => InputResult::Continue,
+    }
 }
 
 fn handle_ascension_confirm(
@@ -655,6 +707,14 @@ fn handle_base_game(
                         .is_none_or(|gate| deep_state.persistent.deepest_layer_reached >= gate))
             {
                 *overlay = GameOverlay::AscensionConfirm;
+            }
+            InputResult::Continue
+        }
+        KeyCode::Char('v') | KeyCode::Char('V') => {
+            if state.vessel_signal_discovered {
+                *overlay = GameOverlay::Vessel {
+                    confirm_pending: false,
+                };
             }
             InputResult::Continue
         }

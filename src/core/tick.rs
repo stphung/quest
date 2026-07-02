@@ -200,6 +200,9 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
     // increase here to keep prestige achievement progress current (#597).
     tick_stages::track_passive_prestige_gain(ctx.state, ctx.achievements, prestige_before);
 
+    // ── 12c. Vessel whispers ───────────────────────────────────────
+    tick_stages::tick_vessel_whispers(ctx.state, &mut result);
+
     // ── 12. Achievement modal accumulation ────────────────────────
     if ctx.achievements.is_modal_ready() {
         result.achievement_modal_ready = ctx.achievements.take_modal_queue();

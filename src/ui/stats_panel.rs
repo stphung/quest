@@ -297,6 +297,26 @@ fn draw_hero_panel(
         ]));
     }
 
+    // Prestige row 2b (optional): Vessel signal
+    if game_state.vessel_signal_discovered {
+        let violet = Color::Rgb(150, 120, 200);
+        let hint_bright = super::clock::now_millis() % 1600 < 800;
+        let hint_style = if hint_bright {
+            Style::default().fg(violet).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Rgb(100, 75, 135))
+        };
+        let label = if game_state.vessel_launched {
+            "\u{2726} The Vessel awaits "
+        } else {
+            "\u{2726} The branch withers... "
+        };
+        prestige_lines.push(Line::from(vec![
+            Span::styled(label, Style::default().fg(violet)),
+            Span::styled("[V] Vessel", hint_style),
+        ]));
+    }
+
     // Prestige row 3: XP multiplier
     let mut xp_spans = vec![
         Span::styled("⚡ XP: ", Style::default().add_modifier(Modifier::BOLD)),

@@ -79,6 +79,9 @@ struct Overrides {
     stormglass: Option<u64>,
     stormbreaker: bool,
     boss_ready: bool,
+    vessel_signal: bool,
+    vessel_launched: bool,
+    loom_patterns: Option<usize>,
 }
 
 fn usage() -> ! {
@@ -101,6 +104,9 @@ fn usage() -> ! {
          \x20 --stormglass <n>     Stormglass balance (also marks it discovered)\n\
          \x20 --stormbreaker       Grant Stormbreaker (Zone 10 boss gate)\n\
          \x20 --boss-ready         Subzone boss spawns on the first tick\n\
+         \x20 --vessel-signal      Vessel signal discovered (Z50 boss fallen)\n\
+         \x20 --vessel-launched    Vessel already launched (100k PR burned)\n\
+         \x20 --loom-patterns <n>  Write loom.json with n completed patterns\n\
          \nSet QUEST_DIR to write into an isolated directory."
     );
     std::process::exit(1);
@@ -137,6 +143,9 @@ fn parse_overrides(args: &[String]) -> Overrides {
             "--stormglass" => o.stormglass = Some(num(args, &mut i, "--stormglass")),
             "--stormbreaker" => o.stormbreaker = true,
             "--boss-ready" => o.boss_ready = true,
+            "--vessel-signal" => o.vessel_signal = true,
+            "--vessel-launched" => o.vessel_launched = true,
+            "--loom-patterns" => o.loom_patterns = Some(num(args, &mut i, "--loom-patterns")),
             "--gear" => {
                 o.gear = Some(match value(args, &mut i, "--gear") {
                     "common" => Rarity::Common,
@@ -206,6 +215,31 @@ fn apply_overrides(state: &mut GameState, o: &Overrides) {
     if o.boss_ready {
         state.zone_progression.kills_in_subzone = KILLS_FOR_BOSS;
     }
+    if o.vessel_signal {
+        state.vessel_signal_discovered = true;
+    }
+    if o.vessel_launched {
+        state.vessel_signal_discovered = true;
+        state.vessel_launched = true;
+    }
+}
+
+/// Writes loom.json with the Loom discovered and `completed` patterns marked
+/// complete (0-28). Needed for Vessel launch-gate states.
+fn write_loom_state(completed: usize) {
+    use quest::loom;
+    let mut loom_state = loom::LoomState::new();
+    loom::initialize_loom(&mut loom_state);
+    loom::complete_discovery(&mut loom_state);
+    for p in loom_state.persistent.patterns.iter_mut().take(completed) {
+        p.completed = true;
+    }
+    loom::save_loom(&loom_state).expect("failed to write loom.json");
+    println!(
+        "Wrote loom.json ({} / {} patterns complete)",
+        completed.min(loom_state.persistent.patterns.len()),
+        loom_state.persistent.patterns.len()
+    );
 }
 
 fn main() {
@@ -234,6 +268,10 @@ fn main() {
     manager
         .save_character(&state)
         .expect("failed to write save file");
+
+    if let Some(patterns) = overrides.loom_patterns {
+        write_loom_state(patterns);
+    }
 
     let dir = quest::core::paths::get_quest_dir().expect("failed to resolve quest dir");
     println!(

@@ -490,6 +490,11 @@ pub fn process_combat_events<R: Rng>(
                 // Deep discovery: first Endless kill at P15+
                 // Check before moving defeat_result into the event
                 let is_expanse_cycle = matches!(defeat_result, BossDefeatResult::ExpanseCycle);
+                // Vessel signal: first Zone 50 final boss kill (cap-zone cycle)
+                let is_z50_cycle = matches!(
+                    defeat_result,
+                    BossDefeatResult::LoomZoneCycle { zone_id: 50 }
+                );
 
                 result.events.push(TickEvent::SubzoneBossDefeated {
                     xp_gained,
@@ -507,6 +512,11 @@ pub fn process_combat_events<R: Rng>(
                     if !debug_mode {
                         result.achievements_changed = true;
                     }
+                }
+
+                if is_z50_cycle && !state.vessel_signal_discovered {
+                    state.vessel_signal_discovered = true;
+                    result.events.push(TickEvent::VesselSignalDiscovered);
                 }
             }
             CombatEvent::CombatRetreat { zone_name } => {
@@ -680,6 +690,25 @@ pub(super) fn track_passive_prestige_gain(
 ) {
     if state.prestige_rank > prestige_before {
         achievements.on_prestige(state.prestige_rank, Some(&state.character_name));
+    }
+}
+
+/// Emit an atmospheric Vessel whisper roughly every 60 seconds of play time
+/// once the signal is discovered, until the Vessel launches. Rotates through
+/// the whisper list deterministically (no RNG).
+pub fn tick_vessel_whispers(state: &mut GameState, result: &mut TickResult) {
+    if !state.vessel_signal_discovered || state.vessel_launched {
+        return;
+    }
+    let elapsed = state
+        .play_time_seconds
+        .saturating_sub(state.vessel_last_whisper_at);
+    if elapsed >= crate::vessel::WHISPER_INTERVAL_SECONDS {
+        state.vessel_last_whisper_at = state.play_time_seconds;
+        let index = state.play_time_seconds / crate::vessel::WHISPER_INTERVAL_SECONDS;
+        result.events.push(TickEvent::VesselWhisper {
+            message: crate::vessel::whisper_message(index),
+        });
     }
 }
 

@@ -157,6 +157,13 @@ pub enum TickEvent {
     /// The Deep was discovered (first Endless kill at P15+).
     DeepDiscovered,
 
+    /// The Vessel signal was discovered (first Zone 50 final boss kill).
+    VesselSignalDiscovered,
+
+    /// Atmospheric Vessel whisper for the ticker (fires ~every 60s of play
+    /// time once the signal is discovered, until launch).
+    VesselWhisper { message: &'static str },
+
     // ── The Deep ──────────────────────────────────────────────────
     /// A Deep mission was completed.
     DeepMissionComplete { message: String },
