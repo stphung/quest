@@ -27,7 +27,7 @@ Overlay with four spending options:
 1. **Invoke Challenge** (3,000 SG): Presents 3 random challenge types to choose from, bypassing normal discovery
 2. **Chrono Surge** (500-16,000 SG): Fast-forwards game ticks with animated summary (15 min to 8 hours of gameplay)
 3. **Storm Sigils**: Unlock slots, etch sigils, and reroll for persistent bonuses
-4. **Storm Lure** (50,000 SG): Consumable that guarantees Storm Leviathan encounters on legendary fish catches at rank 40. Requires fishing rank 40 and no active lure
+4. **Storm Lure** (50,000 SG): Consumable that guarantees Storm Leviathan encounters on legendary fish catches at rank 40. Requires fishing rank 40, no active lure, and the Leviathan not yet caught
 
 ### Storm Sigils
 Up to 5 sigil slots that provide permanent percentage-based bonuses. Character-level, persists through prestige.
@@ -71,7 +71,7 @@ UI state machine for the Exchange overlay: `Menu`, `InvokeTrialConfirm`, `Invoke
 Overlay state with `open`, `selected_item`, `phase`, trial options, surge selection, and sigil UI state (selected slot, choices, pick selection, result, animation).
 
 ### `ChronoSurgeState` (`types.rs`)
-Tracks an active surge: `ticks_remaining`, `ticks_total`, `batch_size` (computed for 10-second animation), `kills`, `levels_gained`, `items_equipped`.
+Tracks an active surge: `ticks_remaining`, `ticks_total`, `batch_size` (computed for 10-second animation), `kills`, `levels_gained`, `items_equipped`, `missions_completed`, `overcharged` (whether boosted by a Sigil of Overcharge), `created_at_ms` (creation timestamp for flash timing).
 
 ### `StormSigils` (`sigils.rs`)
 Character-level storage: `slots_unlocked` (0-5) and `sigils: Vec<Option<Sigil>>` (5 slots). Serialized via serde for persistence.
@@ -103,4 +103,4 @@ A single etched sigil: `effect: SigilEffectType`, `value: f64`, `grade: SigilGra
 - **ui/stormglass_scene.rs**: Exchange overlay rendering (menu, trial selection, surge animation, sigils list, pick-1-of-3)
 - **input/stormglass_input.rs**: Exchange overlay input handling
 - **fishing/types.rs**: `FishingState.storm_lure_active` flag, consumed on Leviathan encounter
-- **spending.rs**: `can_purchase_storm_lure()` checks balance, active status, and fishing rank
+- **spending.rs**: `can_purchase_storm_lure()` checks balance, active status, Leviathan not yet caught, and fishing rank

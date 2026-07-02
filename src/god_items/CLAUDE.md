@@ -15,6 +15,7 @@ Three Norse mythology-themed endgame items with unique combat passives and non-c
 - **`GodItemPassive`**: Combat passive abilities -- `DivineBulwark { damage_reduction_percent }`, `Windborne { attack_speed_percent }`, `GiantsMight { damage_percent }`.
 - **`GodItemBonus`**: Non-combat bonuses -- `Swiftstrider { regen_reduction_percent }`, `Swiftfoot { dungeon_speed_percent }`, `NimbleHands { fishing_reduction_percent }`.
 - **`GodItemDefinition`**: Static definition containing `id`, `name`, `title`, `slot`, `attributes`, `affixes`, `passive`, and `bonuses`. Has a `to_item()` method that creates a Rarity::Mythic Item with ilvl 100, tier 9.
+- **`CachedGodItemBonuses`**: Aggregated bonus values (DR%, attack speed%, damage%, regen/dungeon/fishing reductions) computed once via `compute(equipment)` in a single pass over equipped items, avoiding per-tick equipment scans.
 
 ## Item Definitions
 

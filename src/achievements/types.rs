@@ -1090,6 +1090,27 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_on_prestige_progress_uses_high_water_mark() {
+        let mut achievements = Achievements::default();
+
+        // Reach P4724, then spend PR down to P200 (Ascension/Haven costs).
+        achievements.on_prestige(4724, Some("Hero"));
+        achievements.on_prestige(200, Some("Hero"));
+
+        // Progress toward Omega Rank must not regress below the high-water mark.
+        let progress = achievements
+            .get_progress(AchievementId::Prestige10000)
+            .expect("Prestige10000 should have tracked progress");
+        assert_eq!(progress.current, 4724);
+        assert_eq!(progress.target, 10000);
+
+        // Milestones already passed stay unlocked and new ones use the max.
+        assert!(achievements.is_unlocked(AchievementId::Prestige1000));
+        achievements.on_prestige(10000, Some("Hero"));
+        assert!(achievements.is_unlocked(AchievementId::Prestige10000));
+    }
+
     // =========================================================================
     // Storms End Achievement Test
     // =========================================================================

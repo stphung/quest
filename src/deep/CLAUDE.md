@@ -262,8 +262,8 @@ pub enum DeepView { Hub, NewMission, Roster, Infrastructure, EventResponse, Recr
 - `mission_power_threshold(layer, mission_type) -> u32` — Convenience wrapper selecting the right threshold for a mission type
 
 **Durations:**
-- `mission_duration_secs(tier, mission_type) -> u64` — Final duration before modifiers (1h Supply Run to 40h Breakthrough)
-- `apply_duration_modifiers(base_secs, mods) -> u64` — Full pipeline: Outpost (-25%) * Familiarity (-10/-20/-30%) * Saboteur (-10/-15%) * Overpower (-10%), clamped to 30min floor
+- `mission_duration_secs(tier, mission_type) -> u64` — Base duration before modifiers (1h Supply Run to 40h Breakthrough)
+- `effective_duration_secs(tier, mission_type, layer, persistent) -> u64` (in `missions.rs`) — Full pipeline: base * Familiarity (-15/-30/-45%) * Outpost (-25%) * Bridge (-2% per bridged layer below, capped at -30%). Gateway Expeditions skip all reductions (fixed 3 days)
 
 **Familiarity:**
 - `familiarity_gain(mission_type) -> u8` — Per-mission gain (Supply Run: 2, Recon: 5, Expedition: 15, Breakthrough: 15, Construction: 5)
@@ -328,16 +328,16 @@ The game tick does **not** simulate mission progress. It only checks for pending
 | `VOID_START_LAYER` | 26 |
 
 ### Power Thresholds (Breakthrough)
-Layers 1-25 use a lookup table. Void (26+) scales linearly at +80/layer. Sample values:
+Layers 1-25 use a lookup table. Void (26+) scales linearly at +60/layer (Breakthrough). Sample values:
 
 | Layer | Breakthrough | Expedition | Recon | Supply Run |
 |-------|-------------|-----------|-------|-----------|
 | 1 | 25 | 20 | 15 | 10 |
 | 7 | 130 | 100 | 75 | 50 |
 | 13 | 295 | 220 | 165 | 110 |
-| 19 | 545 | 410 | 310 | 205 |
-| 25 | 930 | 700 | 525 | 350 |
-| 26+ | 930+80n | 700+60n | 525+45n | 350+30n |
+| 19 | 410 | 310 | 230 | 155 |
+| 25 | 700 | 525 | 395 | 265 |
+| 26+ | 700+60n | 525+45n | 395+35n | 265+25n |
 
 ### Mission Durations (Base, Before Modifiers)
 | Tier | Supply Run | Recon | Expedition | Breakthrough | Construction |
@@ -349,18 +349,16 @@ Layers 1-25 use a lookup table. Void (26+) scales linearly at +80/layer. Sample 
 | Abyss | 5h | 8h | 24h | 32h | 16h |
 | Void | 6h | 10h | 30h | 40h | 20h |
 
-Minimum duration floor: 30 minutes (`MIN_MISSION_DURATION_SECS = 1800`).
-
 ### Duration Modifiers (Multiplicative)
 | Source | Reduction |
 |--------|-----------|
-| Outpost | -25% |
-| Familiarity: Mapped | -10% |
-| Familiarity: Familiar | -20% |
-| Familiarity: Mastered | -30% |
-| Saboteur (base) | -10% |
-| Saboteur (Lv10+) | -15% |
-| Overpowered squad (>150%) | -10% |
+| Outpost (on this layer) | -25% |
+| Familiarity: Mapped | -15% |
+| Familiarity: Familiar | -30% |
+| Familiarity: Mastered | -45% |
+| Bridge (per bridged layer below) | -2%, capped at -30% |
+
+Gateway Expeditions are always exactly 3 days — no infrastructure or familiarity reductions apply.
 
 ### Mercenary Stats
 | Archetype | Growth/Level (P/R/E) | Level 10 Stats (from base) |

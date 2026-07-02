@@ -670,6 +670,19 @@ pub(super) fn process_zone_achievements(
     }
 }
 
+/// Track prestige rank gained passively during this tick (Power Cores,
+/// WR→PR conversion). Manual prestige and challenge rewards are input-driven
+/// and tracked by `main_helpers::achievements::track_input_achievements`.
+pub(super) fn track_passive_prestige_gain(
+    state: &GameState,
+    achievements: &mut Achievements,
+    prestige_before: u32,
+) {
+    if state.prestige_rank > prestige_before {
+        achievements.on_prestige(state.prestige_rank, Some(&state.character_name));
+    }
+}
+
 /// Collect newly unlocked achievements into TickResult events.
 pub(super) fn collect_achievement_events(achievements: &mut Achievements, result: &mut TickResult) {
     for id in achievements.take_newly_unlocked() {
