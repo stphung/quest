@@ -593,9 +593,9 @@ Progressive 10-encounter hunt, only available at rank 40 on legendary fish catch
 | +9 | 20% | 4 PR | -1 level | 20 PR |
 | +10 | 10% | 5 PR | -2 levels | 50 PR |
 
-**Soul Tithe**: Levels +5/+6/+7 offer an alternative guaranteed-success option at higher PR cost (4/6/8 PR respectively) for 100% success rate. This provides a deterministic path for risk-averse players.
+**Soul Tithe**: Levels +5 through +10 offer an alternative guaranteed-success option at higher PR cost (4/6/8 PR for +5/+6/+7, 25/85/750 PR for +8/+9/+10) for 100% success rate. This provides a deterministic path for risk-averse players. High-tier prices are ~0.75x the expected PR cost of gambling that step once failure penalties and re-climbing are accounted for.
 
-**Key insight**: Levels +1 through +4 are safe (100% success, no penalty). The risk/reward curve steepens dramatically above +7. Reaching +10 on a single slot requires significant prestige investment due to the 10% success rate and -2 penalty on failure.
+**Key insight**: Levels +1 through +4 are safe (100% success, no penalty). The risk/reward curve steepens dramatically above +7. Reaching +10 on a single slot requires significant prestige investment: gamble at 10% success with a -2 penalty on failure, or pay the 750 PR Soul Tithe for a guaranteed finish.
 
 ### Cumulative Bonus Curve
 

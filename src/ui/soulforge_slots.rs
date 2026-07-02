@@ -219,7 +219,7 @@ pub(super) fn render_menu_content(
             );
         }
 
-        // Detail line 3: Soul Tithe hint (only for +5/+6/+7)
+        // Detail line 3: Soul Tithe hint (when available for the target level)
         if let Some(oc_cost) = soul_tithe_cost(target) {
             let oc_label = "Soul Tithe: ";
             put_text(buffer, detail_start_row + 2, 0, oc_label, Color::DarkGray);
@@ -320,7 +320,7 @@ pub(super) fn render_confirming_content(
         Color::Rgb(title_rgb.0, title_rgb.1, title_rgb.2),
     );
 
-    // Mode selector row (only for +5/+6/+7)
+    // Mode selector row (when soul tithe is available for the target level)
     let detail_row_offset = if has_mode_selector {
         // Render mode selector at top+3
         let row = (top + 3) as i32;

@@ -63,6 +63,9 @@ pub const ENHANCEMENT_COSTS: [u32; 10] = [
     5, // +10: 5 PR
 ];
 
+// Soul Tithe prices for +8-+10 are ~0.75x the expected PR cost of gambling
+// that step (attempt fees plus re-buying levels lost to failures via the
+// tithes below), the same discount ratio the +5-+7 prices imply.
 pub const ENHANCEMENT_SOUL_TITHE_COSTS: [Option<u32>; 10] = [
     None,
     None,
@@ -71,9 +74,9 @@ pub const ENHANCEMENT_SOUL_TITHE_COSTS: [Option<u32>; 10] = [
     Some(4),
     Some(6),
     Some(8), // +5-7: soul tithe for guaranteed 100%
-    None,
-    None,
-    None, // +8-10: no soul tithe available
+    Some(25),
+    Some(85),
+    Some(750), // +8-10: guaranteed, priced against the failure cascade
 ];
 
 pub const ENHANCEMENT_FAIL_PENALTY: [u8; 10] = [
@@ -250,7 +253,7 @@ mod tests {
         assert_eq!(enhancement_cost(10), 5);
 
         assert_eq!(soul_tithe_cost(0), None);
-        assert_eq!(soul_tithe_cost(8), None);
+        assert_eq!(soul_tithe_cost(8), Some(25));
         assert_eq!(soul_tithe_cost(6), Some(6));
 
         assert_eq!(fail_penalty(0), 0);

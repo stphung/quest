@@ -523,7 +523,7 @@ Enhancement operates on the 7 equipment slots (Weapon, Armor, Helmet, Gloves, Bo
 | +9 | 20% | 4 PR | -1 level |
 | +10 | 10% | 5 PR | -2 levels |
 
-**Soul Tithe**: Levels +5/+6/+7 offer an alternative guaranteed-success option at higher PR cost (4/6/8 PR respectively) for 100% success rate.
+**Soul Tithe**: Levels +5 through +10 offer an alternative guaranteed-success option at higher PR cost (4/6/8 PR for +5/+6/+7, 25/85/750 PR for +8/+9/+10) for 100% success rate.
 
 ### Cumulative Bonus Multiplier
 

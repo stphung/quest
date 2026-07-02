@@ -48,12 +48,14 @@ Display struct: `slot_index`, `success`, `old_level`, `new_level`, `cost`.
 | +5 | 2 PR / 70% | 4 PR / 100% | -1 |
 | +6 | 3 PR / 55% | 6 PR / 100% | -1 |
 | +7 | 3 PR / 40% | 8 PR / 100% | -1 |
-| +8 | 4 PR / 30% | -- | -1 |
-| +9 | 4 PR / 20% | -- | -1 |
-| +10 | 5 PR / 10% | -- | -2 |
+| +8 | 4 PR / 30% | 25 PR / 100% | -1 |
+| +9 | 4 PR / 20% | 85 PR / 100% | -1 |
+| +10 | 5 PR / 10% | 750 PR / 100% | -2 |
 
 ### Soul Tithe Mechanic
-For +5/+6/+7, players can choose "Soul Tithe" mode on the confirmation screen (Left/Right arrows to toggle). Soul Tithe pays a higher PR cost for guaranteed 100% success. Not available for +1-+4 (already 100%) or +8-+10 (too risky for guarantees).
+For +5 through +10, players can choose "Soul Tithe" mode on the confirmation screen (Left/Right arrows to toggle). Soul Tithe pays a higher PR cost for guaranteed 100% success. Not available for +1-+4 (already 100%).
+
+Prices for +8-+10 are ~0.75x the expected PR cost of gambling that step -- attempt fees plus re-buying levels lost to failures via the tithes below -- matching the discount ratio the +5-+7 prices imply. A test (`test_soul_tithe_high_tier_prices_track_expected_gamble_cost`) asserts this relationship holds, so retuning rates/penalties requires repricing the tithes.
 
 ### Stat Multiplier Curve
 Enhancement multiplier = `1.0 + cumulative_bonus / 100.0`:
@@ -100,7 +102,7 @@ Blocked when dungeon, fishing, or minigame is active. Once discovered, `enhancem
 ### types.rs (helper functions)
 - `success_rate(target_level) -> f64` -- Lookup success rate for target level
 - `enhancement_cost(target_level) -> u32` -- Lookup standard PR cost for target level
-- `soul_tithe_cost(target_level) -> Option<u32>` -- Lookup soul tithe PR cost (Some for +5/+6/+7, None otherwise)
+- `soul_tithe_cost(target_level) -> Option<u32>` -- Lookup soul tithe PR cost (Some for +5 through +10, None otherwise)
 - `fail_penalty(target_level) -> u8` -- Lookup failure penalty for target level
 - `enhancement_multiplier(level) -> f64` -- Calculate stat multiplier for current level
 - `enhancement_prefix(level) -> String` -- Format display prefix (e.g., "+5 " or "")
@@ -133,6 +135,6 @@ Blocked when dungeon, fishing, or minigame is active. Once discovered, `enhancem
 | `SOULFORGE_DISCOVERY_RANK_BONUS` | 0.000007 | Per rank above 15 |
 | `ENHANCEMENT_SUCCESS_RATES` | [1.0, 1.0, 1.0, 1.0, 0.7, 0.55, 0.4, 0.3, 0.2, 0.1] | Indexed by target level - 1 |
 | `ENHANCEMENT_COSTS` | [1, 1, 1, 1, 2, 3, 3, 4, 4, 5] | Standard PR cost per target level |
-| `ENHANCEMENT_SOUL_TITHE_COSTS` | [None×4, Some(4), Some(6), Some(8), None×3] | Soul Tithe PR cost (100% success) |
+| `ENHANCEMENT_SOUL_TITHE_COSTS` | [None×4, Some(4), Some(6), Some(8), Some(25), Some(85), Some(750)] | Soul Tithe PR cost (100% success) |
 | `ENHANCEMENT_FAIL_PENALTY` | [0, 0, 0, 0, 1, 1, 1, 1, 1, 2] | Level loss on failure |
 | `ENHANCEMENT_CUMULATIVE_BONUS` | [0, 5, 10, 15, 20, 30, 40, 55, 75, 100, 150] | % bonus at each level |
