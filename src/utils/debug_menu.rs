@@ -467,6 +467,7 @@ impl DebugAction {
                 for node in &mut loom.persistent.nodes {
                     node.unlocked = true;
                 }
+                loom.graph_dirty = true;
                 "All nodes unlocked."
             }
             Self::LoomGrantResources => {
