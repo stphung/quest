@@ -232,9 +232,18 @@ pub fn render_graph_canvas(
                         resource_emoji(seg.resource),
                         seg.current_rate
                     );
+                    let label_cols = display_width(&label);
                     let lbl = Line::from(Span::styled(label, Style::default().fg(label_color)));
                     // Offset slightly above the edge midpoint so it doesn't sit on the line.
-                    ctx.print(seg.label_pos.0, seg.label_pos.1 + 3.0, lbl);
+                    print_clamped(
+                        ctx,
+                        seg.label_pos.0,
+                        seg.label_pos.1 + 3.0,
+                        lbl,
+                        label_cols,
+                        canvas_width,
+                        canvas_height,
+                    );
                 }
             }
 
@@ -283,6 +292,8 @@ pub fn render_graph_canvas(
                     has_selection,
                     frame_count,
                     effective_color,
+                    canvas_width,
+                    canvas_height,
                 );
 
                 // 5. Draw pattern requirement lines below the node dot.
@@ -292,10 +303,19 @@ pub fn render_graph_canvas(
                     let req_start_y = dot_y - 2.0 * row_h;
                     for (i, (text, color)) in info.req_lines.iter().enumerate() {
                         let req_y = req_start_y - (i as f64) * row_h;
-                        let half_w = text.len() as f64 * char_w / 2.0;
+                        let req_cols = display_width(text);
+                        let half_w = req_cols as f64 * char_w / 2.0;
                         let line =
                             Line::from(Span::styled(text.clone(), Style::default().fg(*color)));
-                        ctx.print(info.cx - half_w, req_y, line);
+                        print_clamped(
+                            ctx,
+                            info.cx - half_w,
+                            req_y,
+                            line,
+                            req_cols,
+                            canvas_width,
+                            canvas_height,
+                        );
                     }
                 }
             }
@@ -353,6 +373,28 @@ fn display_width(s: &str) -> usize {
 /// Gauge bar characters.
 const GAUGE_FULL: char = '▰';
 const GAUGE_EMPTY: char = '▱';
+
+/// Print a line on the canvas, clamping its anchor so the label stays inside
+/// the canvas bounds. Ratatui's Canvas *drops* any label whose anchor point
+/// falls outside the x/y bounds (it filters, it does not clip), so a centered
+/// label near the left edge — whose anchor goes negative at narrow terminal
+/// widths — would silently vanish. Clamping shifts the label inward instead.
+///
+/// `label_cols` is the label's display width in terminal columns; the anchor
+/// is kept at or below `canvas_width - label_cols * 2` so the whole label
+/// stays visible (1 column = 2 braille x-dots).
+fn print_clamped(
+    ctx: &mut ratatui::widgets::canvas::Context<'_>,
+    x: f64,
+    y: f64,
+    line: Line<'static>,
+    label_cols: usize,
+    canvas_width: f64,
+    canvas_height: f64,
+) {
+    let max_x = (canvas_width - label_cols as f64 * 2.0).max(0.0);
+    ctx.print(x.clamp(0.0, max_x), y.clamp(0.0, canvas_height), line);
+}
 
 #[allow(clippy::too_many_arguments)]
 fn build_node_render_info(
@@ -595,6 +637,7 @@ fn build_node_render_info(
 ///
 /// `effective_color` overrides the node's base color (used in build mode for
 /// highlighting/dimming). When `is_selected`, label is always white.
+#[allow(clippy::too_many_arguments)]
 fn render_gauge_node(
     ctx: &mut ratatui::widgets::canvas::Context<'_>,
     info: &NodeRenderInfo,
@@ -602,6 +645,8 @@ fn render_gauge_node(
     _has_selection: bool,
     frame_count: u32,
     effective_color: Color,
+    canvas_width: f64,
+    canvas_height: f64,
 ) {
     let filled = (info.fill * info.gauge_width as f64).round() as usize;
     let empty = info.gauge_width.saturating_sub(filled);
@@ -669,8 +714,23 @@ fn render_gauge_node(
     let label_display_w = info.label_display_width + 1 + info.gauge_width + prefix_extra;
     let half_w_px = label_display_w as f64 * char_w / 2.0;
 
+    // Clamp the centered anchor into the canvas so edge nodes keep their
+    // labels (see print_clamped); line 2 aligns to the clamped position.
+    let label_x = (info.cx - half_w_px).clamp(
+        0.0,
+        (canvas_width - label_display_w as f64 * char_w).max(0.0),
+    );
+
     let line1 = Line::from(spans);
-    ctx.print(info.cx - half_w_px, info.cy + row_h, line1);
+    print_clamped(
+        ctx,
+        label_x,
+        info.cy + row_h,
+        line1,
+        label_display_w,
+        canvas_width,
+        canvas_height,
+    );
 
     // Line 2: rate text right-aligned under the gauge portion of line 1.
     if !info.rate_text.is_empty() {
@@ -678,9 +738,17 @@ fn render_gauge_node(
             info.rate_text.clone(),
             Style::default().fg(rate_color),
         ));
-        let right_edge = info.cx + half_w_px;
-        let rate_w_px = info.rate_text.len() as f64 * char_w;
-        ctx.print(right_edge - rate_w_px, info.cy, line2);
+        let rate_cols = display_width(&info.rate_text);
+        let right_edge = label_x + label_display_w as f64 * char_w;
+        print_clamped(
+            ctx,
+            right_edge - rate_cols as f64 * char_w,
+            info.cy,
+            line2,
+            rate_cols,
+            canvas_width,
+            canvas_height,
+        );
     }
 }
 
