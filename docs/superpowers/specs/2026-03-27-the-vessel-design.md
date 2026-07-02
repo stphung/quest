@@ -40,8 +40,7 @@ accumulates while you're away is not numbers. It is *arrival*.
    multipliers. The emotional payoff of the act is the manifest read at
    arrival: *who made it*.
 6. **Small numbers, big moments.** No ship XP, no power budgets, no tier
-   ladders. A hull has 100 integrity, a crew has 7 souls, a route has 24
-   stops. Every number fits in a sentence.
+   ladders. Two gauges, 7 berths, a route of ~24 stops. Every number fits in a sentence.
 
 **Anti-goals** (deliberately absent, because Act 1 owns them): ship
 levels/XP; a room-grid engine to optimize; an enemy-tier ladder; drop tables
@@ -121,9 +120,9 @@ player chooses. The chart is the main screen of Act 2.
   where it is strategy rather than a dice roll.
 
 What a waypoint delivers is determined by three things the player already
-controls: **the road chosen** (a hungry road takes supplies; a lucky one
-gives), **the hull carried** (refits recolor hazards into non-events or
-worse), and **the souls aboard** (Runa aboard means the Drowned Choir is
+controls: **the road chosen** (a hungry road costs provisions; a lucky one
+gives them), **the refits carried** (they recolor hazards into non-events
+or worse), and **the souls aboard** (Runa aboard means the Drowned Choir is
 answered — automatically, as a scene, not as a button). Scene *shapes* —
 way-station, wreck, haven, shrine, shipyard — are content templates for
 writing, not decision templates. Named threats — Níðhöggr's Fang and its
@@ -145,8 +144,8 @@ force real choices. Each soul has:
 
 - **A face and a voice** — one line of personality that colors ambient log
   moments and arrival scenes.
-- **A station** (helm, tender, watch, keel) — souls at stations ease gauge
-  drains and recolor what roads yield ("with Torvald at the helm, the Teeth
+- **A station** (helm, tender, watch, keel) — souls at stations recolor
+  what roads yield ("with Torvald at the helm, the Teeth
   are a passage, not a toll"). Assignment matters; arithmetic stays out of
   sight.
 - **An arc** — one personal thread that unfolds at particular places along
@@ -159,42 +158,63 @@ force real choices. Each soul has:
   covenant from the old spec set stands: **no soul is ever lost while the
   player is away.**)
 
-**Hope** is the fourth gauge, beside fuel, hull, and supplies — moved by
-choices, losses, rest, and small ambient kindnesses. Low hope darkens
-vignette options and slows the ship; high hope is wind. Hope is the caravan
-answer to Act 1's power curve: the number that measures *how the people are
-doing*.
+**Hope** is the second of the game's two gauges (see Resource Model) —
+moved by losses, arcs, letters kept, and small kindnesses. It cannot be
+spent and cannot be bought. It has one mechanical effect: high hope is
+wind — legs run faster; low hope drags days onto every crossing, and at
+bottom the ship falls into the Long Silence (arcs pause, legs crawl) until
+a rest stop breaks it. Hope is the caravan answer to Act 1's power curve:
+the number that measures *how the people are doing*.
 
 ### The Vessel Underway
 
-Three material gauges + hope. **Fuel** burns per leg; **hull** takes what
-the void deals; **supplies** feed the souls. Gauges are refilled by waypoint
-choices, letters from home, and the rare kindness of the void — not by a
-production engine.
+### Resource Model — two gauges, nothing else
 
-- **Drift** stands: any gauge at zero stops the ship mid-leg into a recovery
-  scene — a setback with a story, never a death.
-- **Refits** replace the room system: at **~4 shipyard waypoints**, the
-  player makes an exclusive hull choice — *Void Lens or Long Hold; Storm
-  Sail or Quiet Keel* — that changes how legs play (see hazards sooner vs
-  carry more; ride currents faster vs shed hull damage). Sixteen possible
-  hulls by arrival; no respec.
-- **Leg ambience** replaces auto-combat: the void tests the ship in small
-  auto-resolved moments that tax gauges and generate log lines. The player's
-  defenses are route choice, refit choice, and stationed souls — not DPS.
+**Provisions** is the whole material economy in one bar. Every road has one
+cost, stated on its junction card (*"~9 days · 40 provisions"*) — long roads
+cost more, dangerous roads cost more, holding station sips a little. Places
+refill it (harbors, rest stops) and letters from home top it up until the
+Going-Dark. At zero, the ship drifts mid-leg into a recovery scene — a
+setback with a story, never a death.
+
+**Hope** is the people gauge, defined with the Souls above: unspendable,
+one effect (the wind), and the lens the finale reads through.
+
+Everything else the player holds is deliberately **not** a resource:
+
+- **Rumors** are annotations on the chart, not a currency — held forever,
+  acquisition priced into scenes and way-stations.
+- **Keepsakes** have no mechanics: mementos that appear in the manifest,
+  and occasionally the only tender a stranger will accept — flavor, not
+  economy.
+- **Berths** are a slot limit (seven), not an upkeep cost. Souls eat
+  nothing; the berth question is always *who*, never *how many can we
+  feed*.
+- **Refits**: ~3 one-time A/B choices at shipyards that permanently
+  re-price roads (*Storm Sail:* legs faster, dangerous roads cost more ·
+  *Long Hold:* +provisions cap · *Quiet Keel:* named threats cost less).
+  Configuration, not consumables.
+
+No conversions, no crafting, no production trickle: sources are places and
+letters, sinks are roads. Every resource problem has the same answer the
+game wants you to reach — *look at the chart and pick a road*.
+
+**Leg ambience** replaces auto-combat: the void's moments write log lines
+and color the scene at the next arrival; the player's defenses are route
+choice, refits, and stationed souls — not DPS.
 
 ### Letters From Home — and the Going-Dark
 
 The old world does not trickle PR to the ship. It **writes**.
 
-- At each arrival in Chapters I–II, a **care package** waits: supplies,
-  fuel, a keepsake — contents scaled by what the Loom produced during the
+- At each arrival in Chapters I–II, a **care package** waits: provisions
+  and a keepsake — contents scaled by what the Loom produced during the
   leg — wrapped in a short letter that references the player's own Act 1
   history (the Haven they built, the leviathan they caught).
 - **The Going-Dark:** at the threshold of Chapter III (~60% of the route),
   the dying branch finally dies. One last letter — a goodbye — and then
-  silence. No more packages. The ship is truly alone, and every gauge from
-  here is earned from the void itself. This is the act's midpoint twist,
+  silence. No more packages. The ship is truly alone, and every provision
+  from here is earned from the void itself. This is the act's midpoint twist,
   the moment the journey's stakes become real, and the clean mechanical end
   of the supply line (no taper math, no transmission-rate balancing).
 
@@ -222,14 +242,14 @@ fleet — the stop this road was known for. The scene plays: Eir searches the
 wreck and finds medicine; because Runa stands the watch, she hears what
 nests inside before it hears the ship, and it stays sleeping. A rumor
 learned, a rune fragment nobody can read yet. A care package from home
-waits below: fuel cells and a letter that mentions your Haven by name.
+waits below: provisions and a letter that mentions your Haven by name.
 Then the junction — the only decision of the day: the short road is hungry
 (a rumor from two stops back), the long road has a shipyard. You take the
 long road. Six minutes. Done. The footer says ~2 days.
 
 **A check-in, month three (the Going-Dark, Chapter III).** The last letter
-arrived two stops ago; you've reread it twice. Supplies are thinner than
-you'd like — you took the hermit's road knowing it tithes grain, because
+arrived two stops ago; you've reread it twice. Provisions are thinner than
+you'd like — you took the hermit's road knowing it tithes, because
 hope rises where he keeps his lanterns, and high hope has made the legs
 faster. Runa's arc came to a head last arrival; she stood the watch and
 something in the dark *answered her song* — a rumor no trader could have
@@ -266,8 +286,8 @@ Never: grind, optimize, reset.
 | 1 | Launch Gate | gates, burn, kill-switch | **Shipped** |
 | 2 | The Route & the Waypoints | chart structure, leg/arrival state machine, junction choice rules, road character & pricing, fog & rumors, tree-on-horizon render | **Next to write** |
 | 3 | The Souls | roster, stations, arcs, hope, loss & memorial, offline covenant | Not started |
-| 4 | Arrival Scenes | scene delivery system, road/hull/soul recoloring, scene shapes, writing pipeline | Not started |
-| 5 | The Vessel Underway | gauges, drift, refits, leg ambience & named threats | Not started |
+| 4 | Arrival Scenes | scene delivery system, road/refit/soul recoloring, scene shapes, writing pipeline | Not started |
+| 5 | The Vessel Underway | provisions & hope, drift, refits, leg ambience & named threats | Not started |
 | 6 | Letters From Home & the Going-Dark | care packages, letter templates, the midpoint event | Not started |
 | 7 | The Arrival | final approach, manifest, keepsake chart, Act 3 gate | Not started |
 
