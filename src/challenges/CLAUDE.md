@@ -89,6 +89,7 @@ All 14 challenge types use the `impl_apply_game_result!` macro in `mod.rs` to ge
 
 ```rust
 impl_apply_game_result! {
+    fn apply_newgame_result;
     variant: NewGame;
     result_body: |result, state, reward| {
         use newgame::types::NewGameResult;
@@ -98,13 +99,13 @@ impl_apply_game_result! {
         };
         (won, loss_message)
     }
-    game_type: "newgame";
+    game_type: crate::achievements::MinigameType::NewGame;
     icon: "\u{265F}";           // Unicode icon for combat log
     win_message: "Victory!";
 }
 ```
 
-The macro generates `apply_newgame_result(state) -> Option<MinigameWinInfo>` which extracts the game result, applies rewards via `apply_challenge_rewards()`, and emits `MinigameWinInfo` for achievement tracking.
+The macro generates `apply_newgame_result(state) -> Option<MinigameWinInfo>` which extracts the game result, applies rewards via `apply_challenge_rewards()`, and emits `MinigameWinInfo` for achievement tracking. Omitting the `fn apply_newgame_result;` line generates the default name `apply_game_result`.
 
 ### 4. Integrate with Menu System (`menu.rs`)
 
@@ -272,19 +273,19 @@ Challenges are discovered randomly (~2hr average). The `CHALLENGE_TABLE` in `men
 
 | Challenge | Weight | ~Probability | Rationale |
 |-----------|--------|--------------|-----------|
-| Rune | 30 | ~13% | Fastest (~2 min) |
-| Minesweeper | 28 | ~12% | Fast puzzle |
-| Snake | 22 | ~10% | Quick action |
-| Flappy Bird | 20 | ~9% | Moderate action |
-| Sigil Surge | 20 | ~9% | Moderate action-puzzle |
-| Shard Fusion | 20 | ~9% | Moderate puzzle (2048-style) |
-| Runic Lights | 20 | ~9% | Moderate puzzle |
-| JezzBall | 18 | ~8% | Moderate action |
-| Sudoku | 18 | ~8% | Moderate puzzle |
-| Vault Warden | 18 | ~8% | Moderate puzzle |
-| Gomoku | 15 | ~7% | Medium-length strategy |
+| Rune | 30 | ~12% | Fastest (~2 min) |
+| Minesweeper | 28 | ~11% | Fast puzzle |
+| Snake | 22 | ~9% | Quick action |
+| Flappy Bird | 20 | ~8% | Moderate action |
+| Sigil Surge | 20 | ~8% | Moderate action-puzzle |
+| Shard Fusion | 20 | ~8% | Moderate puzzle (2048-style) |
+| Runic Lights | 20 | ~8% | Moderate puzzle |
+| JezzBall | 18 | ~7% | Moderate action |
+| Sudoku | 18 | ~7% | Moderate puzzle |
+| Vault Warden | 18 | ~7% | Moderate puzzle |
+| Gomoku | 15 | ~6% | Medium-length strategy |
 | Morris | 12 | ~5% | Longer strategy |
-| Chess | 8 | ~4% | Long commitment |
+| Chess | 8 | ~3% | Long commitment |
 | Go | 7 | ~3% | Longest game |
 
 When adding a new challenge, add it to `CHALLENGE_TABLE` with an appropriate weight.
@@ -310,6 +311,6 @@ Winning a minigame emits a `MinigameWinInfo` (defined in `mod.rs`) with `game_ty
 | JezzBall (Containment Breach) | 34×22 grid | N/A (action) | Real-time ~60 FPS, ball physics, wall-building to capture area, 3 lives, 2-5 balls (Novice→Master), target 60-84%, 4 difficulties, requires P1+ |
 | Sigil Surge (Runic Shift) | 6×12 grid | N/A (action-puzzle) | Real-time ~60 FPS, panel-matching with 5 rune colors, 3 lives, rising blocks (7000-3000ms interval), chain combos, 4 difficulties, requires P1+ |
 | Sudoku (Sigil Matrix) | 9×9 grid | N/A (puzzle) | Classic Sudoku with 4 difficulties, pencil marks, cursor navigation, requires P1+ |
-| Shard Fusion | 4×4 grid | N/A (puzzle) | 2048-style tile merging, target values (512-4096 by difficulty), slide animations, 4 difficulties, requires P1+ |
+| Shard Fusion | 4×4 grid | N/A (puzzle) | 2048-style tile merging, target values (256-2048 by difficulty), slide animations, 4 difficulties, requires P1+ |
 | Runic Lights | Variable | N/A (puzzle) | Light-pattern matching puzzle, 4 difficulties, requires P1+ |
 | Vault Warden | Variable | N/A (puzzle) | Vault security puzzle, 4 difficulties, requires P1+ |

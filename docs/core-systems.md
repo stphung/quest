@@ -392,7 +392,7 @@ Individual JSON files per character stored in `~/.quest/`. Maximum 3 characters.
 
 ## Tick Architecture
 
-The game runs a 100ms tick loop. Each tick calls `game_tick()` in `src/core/tick.rs`, which orchestrates all game systems and returns a `TickResult`.
+The game runs a 100ms tick loop. Each tick calls `game_tick_with_context()` in `src/core/tick.rs`, which orchestrates all game systems and returns a `TickResult`.
 
 The tick implementation is split across several files:
 - `tick.rs` -- Orchestrator: calls each stage in order, returns `TickResult`
@@ -405,22 +405,13 @@ The tick implementation is split across several files:
 - `recent_drops.rs` -- RecentDrop struct and deque management
 - `ticker.rs` -- Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
 
-### game_tick() Signature
+### game_tick_with_context() Signature
 
 ```rust
-pub fn game_tick<R: Rng>(
-    state: &mut GameState,
-    tick_counter: &mut u32,
-    haven: &mut Haven,
-    enhancement: &mut EnhancementProgress,
-    achievements: &mut Achievements,
-    deep: &mut DeepState,
-    debug_mode: bool,
-    rng: &mut R,
-) -> TickResult
+pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> TickResult
 ```
 
-Generic `<R: Rng>` allows seeded RNG in tests (`ChaCha8Rng`) and `thread_rng()` in production.
+`TickContext` (`src/core/tick_context.rs`) bundles the mutable state: `state`, `tick_counter`, `haven`, `enhancement`, `deep`, `achievements`, `loom`, and `debug_mode`. Generic `<R: Rng>` allows seeded RNG in tests (`ChaCha8Rng`) and `thread_rng()` in production. The older `game_tick()` free-parameter wrapper is `#[deprecated]`.
 
 ### TickEvent and TickResult
 
@@ -572,7 +563,7 @@ Enhancement state (`EnhancementProgress`) is saved to `~/.quest/enhancement.json
 | Attack interval | 1.5s (base) |
 | HP regen after kill | 2.5s (base) |
 | Autosave | 30s |
-| Update check interval | 30 min |
+| Update check interval | 15 min |
 | Offline XP multiplier | 0.25 (25%) |
 | Max offline time | 7 days (604,800s) |
 | Base drop rate | 15% |
@@ -597,7 +588,8 @@ Enhancement state (`EnhancementProgress`) is saved to `~/.quest/enhancement.json
 | Prestige mult formula | `1.0 + 0.5 * rank^0.7` |
 | Base max fishing rank | 30 (40 with Fishing Dock T4) |
 | Fracture zone stat multiplier | `FRACTURE_ZONE_STAT_MULTIPLIER = 1.6` (per zone from Z11 base) |
-| Max ascension level (I-VI table) | `MAX_ASCENSION_LEVEL = 6` |
+| Max ascension level | `MAX_ASCENSION_LEVEL = 10` |
 | Ascension PR costs (I-VI) | [35, 65, 120, 200, 325, 500] (total 1,245 PR) |
+| Ascension PR costs (VII-X) | [1500, 4000, 8000, 15000] (pattern-gated: 8/16/22/28 patterns) |
 | Ascension deep gates (I-VI) | [3, 7, 12, 18, 25, 30] layers |
 | Ascension multiplier | `2^level` for I-VI (2x-64x); `64 * 1.5^(level-6)` for VII+ |

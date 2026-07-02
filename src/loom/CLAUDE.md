@@ -186,7 +186,7 @@ Shuttles can be upgraded to increase their intake cap. Each level adds 0.5x to t
 
 When an Extractor is upgraded, it enters a lockout period:
 
-- **Buffer drain**: 50% of the extractor's current buffer is consumed on upgrade start.
+- **Buffer drain**: 50% of the extractor's buffer *capacity* is consumed on upgrade start; the upgrade is blocked unless the current buffer holds at least that amount.
 - **Lockout duration**: `level * 2h` (e.g., upgrading to level 2 = 2h lockout, level 3 = 4h, etc.)
 - **Zero production**: The extractor produces nothing during the lockout period.
 - **Rate tracker cleared**: The `RateTracker` for that extractor is reset when the upgrade begins, so rolling-window rates reflect only post-upgrade production.

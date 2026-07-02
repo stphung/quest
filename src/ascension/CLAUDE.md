@@ -27,7 +27,7 @@ Returned by `ascend()`:
 
 - `ascension_cost(level) -> u32` -- PR cost to reach the given level
 - `ascension_deep_gate(level) -> Option<u32>` -- Deep layer requirement (None for levels 7+)
-- `ascension_pattern_gate(level) -> Option<u32>` -- Woven Pattern requirement for levels 7-10 (None for levels 1-6)
+- `ascension_pattern_gate(level) -> Option<usize>` -- Woven Pattern requirement for levels 7-10 (None for levels 1-6)
 - `ascension_combat_multiplier(level) -> f64` -- Combat stat multiplier at given level
 - `max_shuttle_level(ascension_level) -> u32` -- Max Loom Shuttle upgrade level for given Ascension tier (1 for 0-VI, 3/5/7/10 for VII-X)
 

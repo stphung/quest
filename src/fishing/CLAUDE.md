@@ -1,6 +1,6 @@
 # Fishing System
 
-Separate progression track where players discover fishing spots, catch fish for XP, find item drops, rank up through 40 tiers, and hunt the Storm Leviathan.
+Separate progression track where players discover fishing spots, catch fish for XP, find item drops, rank up through 40 ranks across 8 tiers, and hunt the Storm Leviathan.
 
 ## Module Structure
 
@@ -67,10 +67,10 @@ pub struct HavenFishingBonuses {
 ```
 
 ### `LeviathanResult` (`generation.rs`)
-Result of Storm Leviathan roll: `None`, `Escaped { encounter_number }`, or `Caught`.
+Result of Storm Leviathan roll: `None`, `Escaped { encounter_number }`, `CatchMiss` (appeared in catch phase but wasn't caught), or `Caught`.
 
 ### `FishingTickResult` (`logic.rs`)
-Return value from tick processing with messages, `caught_storm_leviathan` flag, and optional `leviathan_encounter` number.
+Return value from tick processing with messages, `caught_storm_leviathan` flag, optional `leviathan_encounter` number, `leviathan_catch_miss` flag, and `lure_consumed` flag.
 
 ## Rank System
 
@@ -137,13 +137,13 @@ Progressive 10-encounter hunt, only available at rank 40 on legendary fish catch
 ### generation.rs
 - `roll_fish_rarity(rank, rng) -> FishRarity` -- Rank-adjusted rarity roll
 - `generate_fish(rarity, rng) -> CaughtFish` -- Random fish name + XP for rarity
-- `generate_fish_with_rank(rarity, rank, leviathan_encounters, rng) -> (CaughtFish, LeviathanResult)` -- Fish generation with Leviathan hunt logic
+- `generate_fish_with_rank(rarity, rank, leviathan_encounters, lure_encounter_bonus, lure_catch_bonus, rng) -> (CaughtFish, LeviathanResult)` -- Fish generation with Leviathan hunt logic
 - `is_storm_leviathan(fish) -> bool` -- Check if catch is the Storm Leviathan
 - `generate_fishing_session(rng) -> FishingSession` -- New session (random spot, 3-8 fish, Casting phase)
 - `roll_casting_ticks(rng)`, `roll_waiting_ticks(rng)`, `roll_reeling_ticks(rng)` -- Phase duration rolls
 
 ### logic.rs
-- `tick_fishing_with_haven_result(state, rng, haven) -> FishingTickResult` -- Main tick processor (preferred)
+- `tick_fishing_with_haven_result(state, rng, haven, god_item_fishing_reduction_percent) -> FishingTickResult` -- Main tick processor (preferred)
 - `tick_fishing_with_haven(state, rng, haven) -> Vec<String>` -- Returns messages only
 - `tick_fishing(state, rng) -> Vec<String>` -- Legacy wrapper (no Haven bonuses)
 
