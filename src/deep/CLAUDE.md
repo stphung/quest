@@ -360,7 +360,7 @@ Gateway Expeditions are always exactly 3 days — no infrastructure or familiari
 ### Mercenary Stats
 | Archetype | Growth/Level (P/R/E) | Level 10 Stats (from base) |
 |-----------|---------------------|---------------------------|
-| Vanguard | 4.0 / 3.5 / 2.0 | ~48 / ~46 / ~26 |
+| Vanguard | 4.0 / 3.5 / 2.0 | ~50 / ~44 / ~22 |
 | Scout | 3.0 / 3.0 / 3.5 | ~35 / ~37 / ~44 |
 | Arcanist | 3.5 / 2.0 / 4.0 | ~42 / ~24 / ~50 |
 | Medic | 2.0 / 3.5 / 3.0 | ~24 / ~46 / ~37 |

@@ -83,6 +83,10 @@ pub fn tick_game(game: &mut NewGameGame) {
 }
 ```
 
+### `facade.rs`
+
+Defines `tick_challenge_ai_facade()`, a decoupled entry point for ticking active-game AI thinking (mirrors `fishing/facade.rs`'s `tick_fishing_facade()`). Not currently called in production — `tick_stages.rs` Stage 1 duplicates the chess/morris/gomoku/go dispatch logic inline instead of calling the facade.
+
 ### `impl_apply_game_result!` Macro (`mod.rs`)
 
 All 14 challenge types use the `impl_apply_game_result!` macro in `mod.rs` to generate their `apply_game_result()` function. Instead of manually implementing reward logic, invoke the macro:
@@ -304,7 +308,7 @@ Winning a minigame emits a `MinigameWinInfo` (defined in `mod.rs`) with `game_ty
 | Morris | 24 points | Minimax (`ai.rs`) | Mill detection, 3 phases |
 | Gomoku | 15x15 | Minimax depth 2-5 (`ai.rs`) | Win line detection |
 | Minesweeper | Variable | N/A (puzzle) | Flood fill reveal, flags |
-| Rune | 4-6 slots | N/A (puzzle) | Mastermind-style feedback |
+| Rune | 3-5 slots | N/A (puzzle) | Mastermind-style feedback |
 | Go | 9x9 | MCTS | Captures, ko rule, territory scoring |
 | Snake (Serpent's Path) | 26×26 grid | N/A (action) | Real-time ~60 FPS, direction-based movement, 4 difficulties (Novice 10 food/200ms, Master 25 food/90ms), requires P1+ |
 | Flappy Bird (Skyward Gauntlet) | 50×18 area | N/A (action) | Real-time ~60 FPS, gravity/flap physics, pipe obstacles with gap sizes (7→4 rows), 3 lives, 4 difficulties, requires P1+ |

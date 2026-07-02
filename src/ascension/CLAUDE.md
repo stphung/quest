@@ -20,6 +20,7 @@ Returned by `ascend()`:
 - `InsufficientPR { needed, have }` -- not enough prestige ranks
 - `DeepGateNotMet { needed_layer, current_layer }` -- Deep layer requirement not reached (levels I-VI)
 - `PatternGateNotMet { needed_patterns, current_patterns }` -- Woven Pattern requirement not reached (levels VII-X)
+- `MaxLevelReached` -- already at `MAX_ASCENSION_LEVEL` (10)
 
 ## Key Functions
 
@@ -33,8 +34,8 @@ Returned by `ascend()`:
 
 ### `logic.rs`
 
-- `can_ascend(ascension_level, prestige_rank, deepest_layer) -> bool` -- Check eligibility for next level
-- `ascend(state, deepest_layer) -> AscendResult` -- Execute Ascension: validate, deduct PR, increment level
+- `can_ascend(ascension_level, prestige_rank, deepest_layer, completed_patterns) -> bool` -- Check eligibility for next level
+- `ascend(state, deepest_layer, completed_patterns) -> AscendResult` -- Execute Ascension: validate, deduct PR, increment level
 
 ## Ascension Table
 
@@ -74,6 +75,6 @@ Total PR for I-VI: 1,245 PR.
 - **Core** (`core/tick_types.rs`): `TickEvent::Ascended { level, message }` variant
 - **Core** (`core/game_state.rs`): `ascension_level` field on `GameState`
 - **Deep** (`deep/types.rs`): Deep layer milestones gate Ascension availability (account-level check)
-- **Achievements** (`achievements/handlers.rs`): `on_ascended(level)` unlocks `AscensionI` through `AscensionVI` (one achievement per level)
+- **Achievements** (`achievements/handlers.rs`): `on_ascended(level)` unlocks `AscensionI` through `AscensionX` (one achievement per level, I-X)
 - **UI** (`ui/stats_prestige.rs`): Shows "Asc N (Mx)" alongside prestige info when level > 0
 - **Loom** (`loom/`): `completed_pattern_count()` provides pattern gate checks for VII-X; `max_shuttle_level(ascension_level)` gates shuttle upgrade caps

@@ -49,18 +49,18 @@ pub struct GameState {
     pub active_dungeon: Option<Dungeon>,
     pub fishing: FishingState,
     pub zone_progression: ZoneProgression,
-    pub chess_stats: ChessStats,
     pub stormglass: u64,                   // Stormglass currency balance
     pub stormglass_discovered: bool,
     pub storm_sigils: StormSigils,
-    pub consecutive_deaths: u32,           // Death loop tracking
     pub ascension_level: u32,              // Ascension level (0 = no ascension, persists through prestige)
 
     // Transient (serde(skip), reset on load)
     pub active_fishing: Option<FishingSession>,
     pub challenge_menu: ChallengeMenu,
+    pub chess_stats: ChessStats,           // Reset to default() every load, not part of FlatGameState
     pub active_minigame: Option<ActiveMinigame>,
     pub session_kills: u64,
+    pub consecutive_deaths: u32,           // Death loop tracking; reset to 0 every load
     pub recent_drops: VecDeque<RecentDrop>,  // Capped at 10
     pub last_minigame_win: Option<MinigameWinInfo>,
     pub xp_rate_samples: VecDeque<u64>,    // Rolling 15-min XP/sec window
@@ -78,6 +78,7 @@ pub struct GameState {
     pub cached_haven_bonuses: HavenBonuses,   // Cached merged Haven bonuses (recomputed when bonuses_dirty)
     pub cached_sigil_bonuses: SigilBonuses,   // Cached merged Sigil bonuses (recomputed when bonuses_dirty)
     pub bonuses_dirty: bool,                  // Set when Haven rooms, Storm Sigils, or prestige rank change
+    pub cached_god_item_bonuses: CachedGodItemBonuses, // Cached god item bonuses (recomputed when derived_stats_dirty)
     pub debug_force_overcharge: bool,         // Debug: force next Chrono Surge to be overcharged
 }
 ```
@@ -193,6 +194,7 @@ The old `game_tick()` function with individual parameters is `#[deprecated]` —
 | 2. Challenge discovery | Rolls for new challenge discovery (P1+ required, Haven bonus applied, skipped during Chrono Surge) |
 | 3. Sync player HP | Recalculates `DerivedStats` (with `enhancement.levels`), builds unified `CombatBonuses` (prestige, Haven, god items, sigils, ascension multiplier), applies `flat_hp` and ascension multiplier to `combat_state.player_max_hp` |
 | 4. Dungeon exploration | Calls `update_dungeon()`, processes room entry, treasure, keys, boss unlock, completion/failure |
+| 4b. Loom of Worlds | `tick_stages::tick_loom(...)` — checks Loom discovery (fires when Deep's Gateway at Layer 30 opens), then if discovered ticks shuttle construction/pull, base production, neighbor unlocking, pattern sustain, and WR→PR conversion. Runs on wall-clock time, regardless of whether fishing or combat runs this tick |
 | 5. Fishing | If fishing active: ticks session, handles catches/items/rank-ups/Leviathan, updates play time, **returns early** (skips combat) |
 | 6. Combat | Calls `run_combat()`, maps `CombatEvent` to `TickEvent`, applies XP, handles kills/deaths, processes item drops and discoveries |
 | 6b. HUD decay | Decays combat HUD flash timers |
@@ -204,13 +206,12 @@ The old `game_tick()` function with individual parameters is `#[deprecated]` —
 | 11b. Deep discovery | No per-tick roll; discovery is triggered during Stage 6 combat processing on first Expanse cycle boss kill at P15+ |
 | 11c. Deep mission tick | Ticks Deep missions (check-ins, completions, breakthroughs triggering fracture region unlocks) |
 | 11d. Fracture region unlock | Consumes `pending_fracture_region_unlock`, calls `sync_account_zone_unlocks`, emits `FractureRegionUnlocked` |
-| 11e. Loom discovery | Checks Loom of Worlds discovery and pattern milestone consumption |
 | 11f. Pattern milestones | Consumes pending pattern milestones, syncs zone unlocks, emits `PatternMilestoneReached` |
 | 12a. Power Cores | Ticks Power Cores for passive PR generation |
-| 12b. Passive prestige tracking | Reports passive PR gains this tick (Power Cores, WR→PR) to the achievement system; also runs before the fishing early-return |
+| 12b. Passive prestige tracking | Reports passive PR gains this tick (Power Cores, WR→PR) to the achievement system |
 | 12. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display |
 
-**Important**: Stage 5 (fishing) returns early, skipping stages 6-7. Fishing and combat are mutually exclusive.
+**Important**: Stage 5 (fishing) returns early when fishing is active, skipping stages 6 through 12 (combat, HUD decay, enemy spawn, play time, Haven/Soulforge discovery, Deep missions, fracture/pattern unlock consumption, Power Cores). The stage-8 play-time increment and HUD decay are instead handled inline inside `process_fishing_tick()` itself. Stage 9 (`collect_achievement_events`) and stage 12b (`track_passive_prestige_gain`) are specially re-invoked right before the early return — they are not skipped, just run out of their normal position — since Stage 4b (Loom) may have granted PR via WR→PR conversion even on a fishing tick. Fishing and combat remain mutually exclusive within a tick.
 
 ### Stage Functions (`tick_stages.rs`)
 
@@ -231,16 +232,16 @@ The old `game_tick()` function with individual parameters is `#[deprecated]` —
 | `xp_for_next_level` | `(level: u32) -> u64` | XP curve: `100 * level^1.5` |
 | `prestige_multiplier` | `(rank: u32, cha_modifier: i32) -> f64` | Base from prestige tier + CHA bonus (0.1 per modifier point) |
 | `xp_gain_per_tick` | `(prestige_rank, wis_mod, cha_mod) -> f64` | `1.0 * prestige_mult * (1 + wis_mod * 0.05)` |
-| `apply_tick_xp` | `(state, xp: f64) -> (levelups, attrs)` | Applies XP, processes level-ups in a loop, distributes +3 attribute points per level |
-| `distribute_level_up_points` | `(state) -> Vec<AttributeType>` | Randomly distributes 3 points among non-capped attributes |
-| `combat_kill_xp` | `(passive_rate, haven_bonus) -> u64` | Random 200-400 ticks of XP per kill, with Haven Training Yard bonus |
+| `apply_tick_xp` | `(rng: &mut R, state, xp: f64) -> (levelups, attrs)` | Applies XP, processes level-ups in a loop, distributes +3 attribute points per level |
+| `distribute_level_up_points` | `(rng: &mut R, state) -> Vec<AttributeType>` | Randomly distributes 3 points among non-capped attributes |
+| `combat_kill_xp` | `(rng: &mut R, passive_rate, haven_bonus) -> u64` | Random 200-400 ticks of XP per kill, with Haven Training Yard bonus |
 
 ### Offline Progression (`offline.rs`)
 
 | Function | Signature | Purpose |
 |----------|-----------|---------|
 | `calculate_offline_xp` | `(elapsed, rank, wis, cha, haven_bonus) -> f64` | Simulates kills at 25% rate, capped at 7 days |
-| `process_offline_progression` | `(state, haven_bonus) -> OfflineReport` | Full offline XP processing, updates `last_save_time` |
+| `process_offline_progression` | `(rng: &mut R, state, haven_bonus) -> OfflineReport` | Full offline XP processing, updates `last_save_time` |
 
 Offline XP formula: `(elapsed_seconds / 5.0) * 0.25 * xp_per_kill * (1 + haven_bonus/100)`
 
@@ -255,7 +256,7 @@ Offline XP formula: `(elapsed_seconds / 5.0) * 0.25 * xp_per_kill * (1 + haven_b
 
 | Function | Signature | Purpose |
 |----------|-----------|---------|
-| `try_discover_dungeon` | `(state) -> bool` | 1% chance per call, generates dungeon via `generate_dungeon(level, prestige_rank, zone_id)` |
+| `try_discover_dungeon` | `(rng: &mut R, state) -> bool` | 1% chance per call, generates dungeon via `generate_dungeon(level, prestige_rank, zone_id)` |
 
 ### Re-export Wrapper (`game_logic.rs`)
 

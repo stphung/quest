@@ -212,7 +212,7 @@ When active, a `[DEBUG]` indicator shows in the UI corner.
 
 ### Menu Options
 
-The debug menu uses a tabbed category structure with 8 tabs. Left/Right arrows switch tabs, Up/Down navigate within a tab, Enter triggers.
+The debug menu uses a tabbed category structure with 10 tabs. Left/Right arrows switch tabs, Up/Down navigate within a tab, Enter triggers.
 
 **Challenges tab:**
 - Trigger Chess, Morris, Gomoku, Minesweeper, Rune, Go, Flappy Bird, JezzBall, Snake, Sigil Surge, Sudoku, Shard Fusion, Runic Lights, Vault Warden challenges
@@ -234,6 +234,12 @@ The debug menu uses a tabbed category structure with 8 tabs. Left/Right arrows s
 
 **Character tab:**
 - Character-level debug options
+
+**Soulforge tab:**
+- Set enhancement level (0-10) for the equipped weapon
+
+**Loom tab:**
+- Trigger Loom discovery, time warp, select archetype (BurnBright/ReachWide/RunDeep), unlock all nodes, grant resources, complete pattern, advance to a specific pattern
 
 **Borders tab:**
 - Border style options for visual customization

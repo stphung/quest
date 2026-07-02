@@ -80,7 +80,7 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 | Crate | Purpose |
 |-------|---------|
 | ratatui 0.30 | Terminal UI framework |
-| crossterm 0.27 | Terminal backend |
+| crossterm (transitive, ~0.29) | Terminal backend (pulled in via ratatui, not a direct dependency) |
 | serde / serde_json | JSON serialization |
 | rand | RNG for procedural systems |
 | rand_chacha | Deterministic RNG for simulator and tests |
@@ -93,7 +93,7 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 
 ## Core Game Loop
 
-The game runs at **10 ticks per second** (100ms intervals). Each tick is processed by `game_tick_with_context()` in `src/core/tick.rs`, which orchestrates all game systems through a 14-stage pipeline.
+The game runs at **10 ticks per second** (100ms intervals). Each tick is processed by `game_tick_with_context()` in `src/core/tick.rs`, which orchestrates all game systems through a 21-stage pipeline.
 
 ```
                     GAME TICK PIPELINE (core/tick.rs)
@@ -103,23 +103,30 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
     │           → Render                                      │
     └──────────────────────────┬──────────────────────────────┘
                                │
-          game_tick_with_context() 14-stage pipeline:
+          game_tick_with_context() pipeline:
                                │
     ┌──────────────────────────┴──────────────────────────────┐
-    │  1. Challenge AI        Tick AI thinking for active game │
-    │  2. Challenge Discovery Roll for new challenge (P1+)    │
-    │  3. Sync Player HP      Recalculate DerivedStats        │
-    │  4. Dungeon Exploration Process rooms, keys, boss       │
-    │  5. Fishing             Tick session (EARLY RETURN)     │
-    │  6. Combat              Attack cycle, kills, deaths     │
-    │  7. Enemy Spawn         Spawn if idle + not regen       │
-    │  8. Play Time           Increment tick/second counters  │
-    │  9. Achievement Collect Drain newly unlocked into events│
-    │ 10. Haven Discovery     Roll for Haven (P10+)           │
-    │ 11. Soulforge Discovery Roll for Soulforge (P15+)      │
-    │ 12. Deep Discovery      Trigger hook (no per-tick roll) │
-    │ 13. Deep Missions       Tick active missions, events    │
-    │ 14. Achievement Modal   Check 500ms accumulation window │
+    │  0.  Merged Bonuses     Compute merged Haven+Sigil bonuses│
+    │  1.  Challenge AI        Tick AI thinking for active game│
+    │  2.  Challenge Discovery Roll for new challenge (P1+)    │
+    │  3.  Sync Player HP      Recalculate DerivedStats        │
+    │  4.  Dungeon Exploration Process rooms, keys, boss       │
+    │  4b. Loom of Worlds     Discovery + shuttle/production tick│
+    │  5.  Fishing             Tick session (EARLY RETURN)     │
+    │  6.  Combat              Attack cycle, kills, deaths     │
+    │  6b. HUD Decay           Decay combat HUD flash timers   │
+    │  7.  Enemy Spawn         Spawn if idle + not regen       │
+    │  8.  Play Time           Increment tick/second counters  │
+    │  9.  Achievement Collect Drain newly unlocked into events│
+    │ 10.  Haven Discovery     Roll for Haven (P10+)           │
+    │ 11.  Soulforge Discovery Roll for Soulforge (P15+)      │
+    │ 11b. Deep Discovery      Trigger hook (no per-tick roll) │
+    │ 11c. Deep Mission Tick   Tick active missions, events    │
+    │ 11d. Fracture Unlock     Consume pending region unlock   │
+    │ 11f. Pattern Milestones  Consume pending pattern milestone│
+    │ 12a. Power Cores         Tick Power Cores passive PR gain│
+    │ 12b. Passive PR Tracking Report Power Core/WR→PR gains   │
+    │ 12.  Achievement Modal   Check 500ms accumulation window │
     └─────────────────────────────────────────────────────────┘
                                │
                                ▼
@@ -130,6 +137,7 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
                     │      changed: bool,  │
                     │    haven_changed,    │
                     │    deep_changed,     │
+                    │    loom_changed,     │
                     │    leviathan_        │
                     │      encounter,      │
                     │    achievement_      │
@@ -177,7 +185,7 @@ pub struct TickResult {
     pub enhancement_changed: bool,
     pub god_items_changed: bool,
     pub deep_changed: bool,
-    pub power_cores_changed: bool,
+    pub loom_changed: bool,
     pub achievement_modal_ready: Vec<AchievementId>,
 }
 ```
