@@ -101,7 +101,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 
 **Progression check** (`simulator --check-progression`): CI gate asserting the game still progresses. Runs 3 scenarios across multiple seeds — early-game (2h at P0), prestige-economy (6h, optimal strategy), endgame-systems (30h at P200 speedrun) — and asserts coarse progression facts (zone/level pacing, PR economy, Deep/Loom/Ascension unlocks). Scenarios and thresholds live in `src/bin/simulator/scenarios.rs`; thresholds carry ~2x headroom because the tick loop is not perfectly deterministic. Runs as the `Balance` job on every PR and as step 4 of `make check`.
 
-**Deep Simulator** (`src/bin/deep_simulator.rs`): Headless Deep expedition simulator. Supports `--hours`, `--seed`, `--strategy` (rush/balanced/infrastructure), `--guild-rank`.
+**Deep Simulator** (`src/bin/deep_simulator.rs`): Headless Deep expedition simulator. Supports `--hours`, `--seed`, `--strategy` (rush/farm/balanced/infrastructure), `--guild-rank`.
 
 **Fixture Generator** (`src/bin/mkstate.rs`): Writes character save fixtures for named scenarios (`fresh`, `midgame`, `endgame`, `boss`). Pair with the `QUEST_DIR` env var (honored by `core::paths::get_quest_dir()`) to run the game against an isolated save directory. Used by the `drive-game` skill for UI verification; `scripts/screenshot.sh` captures a tmux pane as a color PNG.
 

@@ -407,17 +407,20 @@ After completing Zone 10, the player unlocks The Expanse (Zone 11), an infinite 
 
 ### Ascension System
 
-Per-character combat power multiplier purchased with prestige ranks, gated by Deep layer breakthroughs. Ascension level **survives prestige**, making it the strongest permanent investment available.
+Per-character combat power multiplier purchased with prestige ranks, gated by Deep layer breakthroughs (I-VI) or Loom Woven Pattern counts (VII-X). Ascension level **survives prestige**, making it the strongest permanent investment available.
 
-| Level | Deep Gate | PR Cost | Multiplier |
-|-------|-----------|---------|------------|
+| Level | Gate | PR Cost | Multiplier |
+|-------|------|---------|------------|
 | I | Layer 3 | 35 | 2x |
 | II | Layer 7 | 65 | 4x |
 | III | Layer 12 | 120 | 8x |
 | IV | Layer 18 | 200 | 16x |
 | V | Layer 25 | 325 | 32x |
 | VI | Layer 30 | 500 | 64x |
-| VII+ | None | 500+75*(n-6) | 64 × 1.5^(n-6) |
+| VII | 8 Patterns | 1,500 | 96x |
+| VIII | 16 Patterns | 4,000 | 144x |
+| IX | 22 Patterns | 8,000 | 216x |
+| X | 28 Patterns | 15,000 | 324x |
 
 Total PR for I-VI: 1,245 PR. Multiplier applies multiplicatively to damage, defense, and max HP. Required to farm fracture zones (Z12+) where enemy stats scale 1.6x per zone from Zone 11.
 
@@ -757,23 +760,25 @@ Exactly one Elite and one Boss room per dungeon.
 
 ## Challenge Minigames
 
-All challenges require P1+ to discover. Discovery is random (~2hr average per challenge). 12 challenge types with 4 difficulty levels each.
+All challenges require P1+ to discover. Discovery is random (~2hr average per challenge). 14 challenge types with 4 difficulty levels each.
 
 ### Discovery Weights
 
 | Challenge | Weight | ~Probability |
 |-----------|--------|--------------|
-| Rune (Rune Deciphering) | 30 | ~14% |
-| Minesweeper (Trap Detection) | 28 | ~13% |
-| Snake (Serpent's Path) | 22 | ~10% |
-| Flappy Bird (Skyward Gauntlet) | 20 | ~9% |
-| Sigil Surge (Runic Shift) | 20 | ~9% |
-| Shard Fusion | 20 | ~9% |
-| JezzBall (Containment Breach) | 18 | ~8% |
-| Sudoku (Sigil Matrix) | 18 | ~8% |
-| Gomoku (Five in a Row) | 15 | ~7% |
-| Morris (Nine Men's Morris) | 12 | ~6% |
-| Chess | 8 | ~4% |
+| Rune (Rune Deciphering) | 30 | ~12% |
+| Minesweeper (Trap Detection) | 28 | ~11% |
+| Snake (Serpent's Path) | 22 | ~9% |
+| Flappy Bird (Skyward Gauntlet) | 20 | ~8% |
+| Sigil Surge (Runic Shift) | 20 | ~8% |
+| Shard Fusion | 20 | ~8% |
+| Runic Lights | 20 | ~8% |
+| JezzBall (Containment Breach) | 18 | ~7% |
+| Sudoku (Sigil Matrix) | 18 | ~7% |
+| Vault Warden | 18 | ~7% |
+| Gomoku (Five in a Row) | 15 | ~6% |
+| Morris (Nine Men's Morris) | 12 | ~5% |
+| Chess | 8 | ~3% |
 | Go (Territory Control) | 7 | ~3% |
 
 ### Challenge Rewards
@@ -885,6 +890,24 @@ All challenges require P1+ to discover. Discovery is random (~2hr average per ch
 | Apprentice | 1,024 | 2,000 SG |
 | Journeyman | 2,048 | +1 Prestige Rank, 4,000 SG |
 | Master | 4,096 | +2 Prestige Ranks, 10,000 SG |
+
+**Runic Lights** (Lights Out puzzle, move limit = 3x par):
+
+| Difficulty | Grid | Par | Reward |
+|------------|------|-----|--------|
+| Novice | 3x3 | 5 | 400 SG |
+| Apprentice | 4x4 | 8 | 1,200 SG |
+| Journeyman | 5x5 | 12 | +1 Prestige Rank, 3,000 SG |
+| Master | 6x6 | 16 | +2 Prestige Ranks, 6,000 SG |
+
+**Vault Warden** (Sokoban, curated Microban levels, 5 restart attempts):
+
+| Difficulty | Level Pool | Reward |
+|------------|-----------|--------|
+| Novice | 38 levels | 400 SG |
+| Apprentice | 38 levels | 1,200 SG |
+| Journeyman | 38 levels | +1 Prestige Rank, 3,000 SG |
+| Master | 41 levels | +2 Prestige Ranks, 6,000 SG |
 
 ---
 

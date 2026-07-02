@@ -155,7 +155,7 @@ Not all challenges are equally discoverable:
 
 ## Headless Game Simulator for Balance Testing
 
-**Decision**: Add a `src/bin/simulator.rs` binary that runs the game tick loop headlessly, collecting metrics for game balance analysis.
+**Decision**: Add a `src/bin/simulator/` binary that runs the game tick loop headlessly, collecting metrics for game balance analysis.
 
 **Rationale**: Balance testing previously required playing the game manually or writing one-off test harnesses. The simulator reuses the exact same `game_tick()` function, ensuring perfect fidelity with the real game. It supports:
 - Configurable tick count, RNG seed, starting prestige
@@ -242,7 +242,7 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 **Decision**: Introduce `impl_apply_game_result!` macro and extract remaining AI submodules.
 
 **What changed**:
-- Added `impl_apply_game_result!` macro in `src/challenges/mod.rs` to standardize reward application across all 12 challenge minigames
+- Added `impl_apply_game_result!` macro in `src/challenges/mod.rs` to standardize reward application across all challenge minigames (12 at the time, now 14)
 - Extracted `morris/ai.rs` and `gomoku/ai.rs` as separate AI submodules
 - Extracted `combat/enemy_generation.rs` for zone/dungeon enemy generators
 
