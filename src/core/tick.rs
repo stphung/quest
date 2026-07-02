@@ -42,6 +42,9 @@ use rand::Rng;
 pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> TickResult {
     let mut result = TickResult::default();
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
+    // Snapshot prestige rank so passive gains this tick (Power Cores, WR→PR)
+    // can be reported to the achievement system at the end of the tick.
+    let prestige_before = ctx.state.prestige_rank;
 
     // ── 0. Compute merged Haven + Sigil bonuses ─────────────────
     let (haven_bonuses, sigil_bonuses) = tick_stages::compute_merged_bonuses(ctx.haven, ctx.state);
@@ -72,7 +75,9 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
         &mut result,
         rng,
     ) {
-        // Fishing was active — skip combat, collect achievements and return
+        // Fishing was active — skip combat, collect achievements and return.
+        // The Loom stage (4b) may have granted PR via WR→PR conversion.
+        tick_stages::track_passive_prestige_gain(ctx.state, ctx.achievements, prestige_before);
         tick_stages::collect_achievement_events(ctx.achievements, &mut result);
         return result;
     }
@@ -188,6 +193,12 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
 
     // ── 12a. Power Cores tick ─────────────────────────────────────
     crate::power_cores::tick::tick_power_cores(ctx.state, ctx.deep, ctx.achievements, &mut result);
+
+    // ── 12b. Track passive prestige rank gains ────────────────────
+    // Power Cores (12a) and WR→PR conversion (4b) raise prestige_rank
+    // without going through the manual prestige input path, so report the
+    // increase here to keep prestige achievement progress current (#597).
+    tick_stages::track_passive_prestige_gain(ctx.state, ctx.achievements, prestige_before);
 
     // ── 12. Achievement modal accumulation ────────────────────────
     if ctx.achievements.is_modal_ready() {
@@ -388,6 +399,49 @@ mod tests {
         let result2 = game_tick_with_context(&mut ctx, &mut rng2);
 
         assert_eq!(result1.events.len(), result2.events.len());
+    }
+
+    #[test]
+    fn test_passive_power_core_pr_updates_prestige_achievements() {
+        use crate::achievements::AchievementId;
+        use crate::core::tick_context::TickContext;
+        use crate::power_cores::fill_duration_secs;
+
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.prestige_rank = 9999;
+        let mut tick_counter = 0u32;
+        let mut haven = Haven::default();
+        let mut enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
+        let mut loom = crate::loom::LoomState::new();
+        let mut achievements = Achievements::default();
+
+        // Activate one Power Core with a completed fill cycle so this tick
+        // grants +1 PR, crossing the P10,000 milestone.
+        achievements.unlock(AchievementId::PowerCoreI, None);
+        achievements.take_newly_unlocked();
+        let fill = fill_duration_secs(2);
+        deep.persistent.power_core_last_granted.insert(
+            AchievementId::PowerCoreI,
+            chrono::Utc::now().timestamp() - fill - 1,
+        );
+
+        let mut ctx = TickContext {
+            state: &mut state,
+            tick_counter: &mut tick_counter,
+            haven: &mut haven,
+            enhancement: &mut enhancement,
+            deep: &mut deep,
+            achievements: &mut achievements,
+            loom: &mut loom,
+            debug_mode: false,
+        };
+        let mut rng = test_rng();
+        game_tick_with_context(&mut ctx, &mut rng);
+
+        assert_eq!(state.prestige_rank, 10000);
+        assert_eq!(achievements.highest_prestige_rank, 10000);
+        assert!(achievements.is_unlocked(AchievementId::Prestige10000));
     }
 
     #[test]
