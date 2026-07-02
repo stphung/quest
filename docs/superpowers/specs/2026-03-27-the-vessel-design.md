@@ -135,6 +135,37 @@ junction-shaped (exclusive, permanent, strategic — never gambles):
 **berths** (a soul asks to board; seven berths; at capacity someone must be
 declined) and **refits** (a shipyard offers A or B, once).
 
+### No Right Path
+
+There is deliberately no optimal route, and no equal ones either — choices
+matter through **difference, memory, and irreversibility**, never
+optimality. The authoring rules that guarantee it:
+
+1. **Roads differ in kind, never in amount.** Branches at a junction trade
+   incommensurables — time vs a place vs a person vs a refit. If two
+   branches can be compared on one axis, the junction is broken. This is
+   what defeats optimization; symmetric balance would not.
+2. **The game remembers.** Grayed roads keep their names all the way to the
+   Tree; losses stay carved; the manifest recounts the causal chains. A
+   choice never referenced again didn't matter, whatever it cost.
+3. **Never reveal what an untaken road held.** Names, not contents — the
+   player's imagination of the road not taken must stay bigger than
+   anything we could write. Itemizing missed content converts difference
+   into regret and reintroduces "the right path" as the one you skipped.
+4. **You cannot lose the crossing — only have a different one.** Every
+   route reaches the Tree; drift floors every failure. Locally worse
+   outcomes exist (the Teeth), but they are priced, chosen, and become
+   story — never "restart" (there is no restart; one crossing per save).
+5. **Content parity, not content equality.** Every route family passes
+   enough soul-candidates and at least one shipyard that no route locks
+   the player out of a full voyage — different souls, not fewer.
+6. **No grades.** The manifest's numbers are memory, never score: no
+   ranks, no "true ending," no epilogue variant that outranks another.
+
+Side effect worth noting: this makes the act spoiler-proof — a wiki that
+maps every road is just free rumors, and the game already sells rumors.
+A fully-informed player still faces the same incommensurable trades.
+
 ### The Souls
 
 **Three board at launch** — faces from the systems the player mastered
