@@ -145,12 +145,105 @@ pub fn engage_enemy(state: &mut GameState) {
     state.combat_state.is_regenerating = false;
 }
 
-/// Starts a chess challenge (deterministic: fresh board, no RNG) so the
-/// right panel renders the minigame scene instead of combat.
-pub fn start_chess_challenge(state: &mut GameState) {
-    state.active_minigame = Some(ActiveMinigame::Chess(Box::new(ChessGame::new(
-        ChessDifficulty::Journeyman,
-    ))));
+/// One freshly started instance of every challenge minigame, keyed by a
+/// short snake_case name. Games whose setup rolls randomness (mine layouts,
+/// puzzles, spawn positions) draw from the caller's RNG, so a seeded RNG
+/// yields identical boards every time. Construction order is fixed —
+/// reordering entries changes every game after the reordered one.
+pub fn all_challenges(rng: &mut impl Rng) -> Vec<(&'static str, ActiveMinigame)> {
+    use crate::challenges::{
+        flappy, go, gomoku, jezzball, minesweeper, morris, rune, runic_lights, runic_shift,
+        shard_fusion, snake, sudoku, vault_warden,
+    };
+
+    let mut rune_game = rune::RuneGame::new(rune::types::RuneDifficulty::Journeyman);
+    rune::generate_code(&mut rune_game, rng);
+
+    let mut shift_game =
+        runic_shift::RunicShiftGame::new(runic_shift::RunicShiftDifficulty::Journeyman);
+    // The constructor fills the board from a thread RNG; re-roll it from
+    // the caller's RNG so the starting grid is reproducible.
+    shift_game.fill_starting_rows(rng);
+    shift_game.next_row = shift_game.roll_next_row(rng);
+
+    vec![
+        (
+            "chess",
+            ActiveMinigame::Chess(Box::new(ChessGame::new(ChessDifficulty::Journeyman))),
+        ),
+        (
+            "flappy",
+            ActiveMinigame::FlappyBird(flappy::FlappyBirdGame::new(
+                flappy::FlappyBirdDifficulty::Journeyman,
+            )),
+        ),
+        (
+            "morris",
+            ActiveMinigame::Morris(morris::MorrisGame::new(
+                morris::MorrisDifficulty::Journeyman,
+            )),
+        ),
+        (
+            "gomoku",
+            ActiveMinigame::Gomoku(gomoku::GomokuGame::new(
+                gomoku::GomokuDifficulty::Journeyman,
+            )),
+        ),
+        (
+            "minesweeper",
+            ActiveMinigame::Minesweeper(minesweeper::MinesweeperGame::new(
+                minesweeper::MinesweeperDifficulty::Journeyman,
+            )),
+        ),
+        ("rune", ActiveMinigame::Rune(rune_game)),
+        (
+            "runic_lights",
+            runic_lights::start_runic_lights_game(
+                runic_lights::RunicLightsDifficulty::Journeyman,
+                rng,
+            ),
+        ),
+        ("runic_shift", ActiveMinigame::RunicShift(shift_game)),
+        (
+            "shard_fusion",
+            shard_fusion::start_shard_fusion_game(
+                shard_fusion::ShardFusionDifficulty::Journeyman,
+                rng,
+            ),
+        ),
+        (
+            "go",
+            ActiveMinigame::Go(go::GoGame::new(go::GoDifficulty::Journeyman)),
+        ),
+        (
+            "jezzball",
+            ActiveMinigame::Jezzball(jezzball::JezzballGame::new(
+                jezzball::JezzballDifficulty::Journeyman,
+                rng,
+            )),
+        ),
+        (
+            "snake",
+            ActiveMinigame::Snake(snake::SnakeGame::new(
+                snake::SnakeDifficulty::Journeyman,
+                rng,
+            )),
+        ),
+        (
+            "sudoku",
+            ActiveMinigame::Sudoku(sudoku::generate_puzzle(
+                sudoku::SudokuDifficulty::Journeyman,
+                rng,
+            )),
+        ),
+        (
+            "vault_warden",
+            vault_warden::start_vault_warden_game(
+                vault_warden::VaultWardenDifficulty::Journeyman,
+                rng,
+            ),
+        ),
+    ]
 }
 
 /// A discovered Deep with mid-game progress and one running expedition.

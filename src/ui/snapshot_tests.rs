@@ -176,13 +176,16 @@ fn snapshot_systems_discovered() {
     assert_scene_snapshot("systems_discovered_l_80x30", &scene, 80, 30);
 }
 
-/// Minigame overlay: an active chess challenge (deterministic initial
-/// board) replaces the combat panel.
+/// Minigame overlays: one freshly started instance of every challenge
+/// replaces the combat panel. Games with random setup draw from a seeded
+/// RNG, so boards are reproducible.
 #[test]
-fn snapshot_minigame_chess() {
+fn snapshot_all_minigames() {
     let mut state = fixtures::midgame("Chess", CREATED_AT, &mut gear_rng());
-    fixtures::start_chess_challenge(&mut state);
-    assert_frame_snapshot("minigame_chess_xl_160x45", &state, 160, 45);
+    for (key, game) in fixtures::all_challenges(&mut ChaCha8Rng::seed_from_u64(GEAR_SEED)) {
+        state.active_minigame = Some(game);
+        assert_frame_snapshot(&format!("minigame_{key}_xl_160x45"), &state, 160, 45);
+    }
 }
 
 /// Two renders of the same state must be byte-identical. If this fails, a
