@@ -25,15 +25,21 @@ accumulates while you're away is not numbers. It is *arrival*.
    constellation chart between named waypoints, with the destination visibly
    growing on the horizon. Never a percentage.
 2. **Check-ins are appointments.** The core idle unit is a multi-day *leg*;
-   the core active unit is an *arrival* — a 5–15 minute scene at a place with
-   a name, a choice, and a consequence. The game tells you when you'll arrive.
-3. **Doors close.** Routes not taken stay untaken. Choices at waypoints
-   resolve once. Souls lost stay lost. This is the first part of the game
-   where the player can't eventually have everything — that is the point.
-4. **People over parts.** The ship's crew are named souls with arcs, not stat
+   the core active unit is an *arrival* — a short scene at a place with a
+   name, where what the road promised is paid. The game tells you when
+   you'll arrive.
+3. **All choice lives on the map.** The junction is the game's one decision
+   surface: you choose *roads*, informed by rumors, and then the road
+   happens to you. Arrivals are never tests — no option menus, no
+   risk/reward gambles at the dock. The risk was priced when you picked
+   the road.
+4. **Doors close.** Routes not taken stay untaken. Souls lost stay lost.
+   This is the first part of the game where the player can't eventually
+   have everything — that is the point.
+5. **People over parts.** The ship's crew are named souls with arcs, not stat
    multipliers. The emotional payoff of the act is the manifest read at
    arrival: *who made it*.
-5. **Small numbers, big moments.** No ship XP, no power budgets, no tier
+6. **Small numbers, big moments.** No ship XP, no power budgets, no tier
    ladders. A hull has 100 integrity, a crew has 7 souls, a route has 24
    stops. Every number fits in a sentence.
 
@@ -102,20 +108,33 @@ player chooses. The chart is the main screen of Act 2.
   silence that frays hope. Ambient moments tick by in the log ("the watch
   changes; Runa hums an old net-song"). The footer always reads:
   *Arriving at ⟨place⟩ in ~⟨time⟩.*
-- **An arrival** is the active unit: a vignette at a named place —
-  narrative scene → a real choice → consequences applied → depart when
-  ready. Arrivals **wait for the player**: the Vessel holds station at the
-  waypoint until you play the scene. The appointment keeps.
-- **A junction** is the strategy unit: 2–3 onward branches with visible
-  character (long/safe, short/hungry, unknown/rumored) and whatever rumors
-  you hold. Chosen once. No takebacks.
+- **An arrival** is the active unit: a scene at a named place that **pays
+  off the road you chose** — the shipyard the rumor promised, the survivor
+  the wreck held, the toll the hungry road took. You read it, you collect
+  it, you depart. **No option menus.** Arrivals still wait for the player:
+  the Vessel holds station until you play the scene. The appointment keeps.
+- **A junction** is the choice unit — the game's only one: 2–3 onward roads,
+  each a package of stops with visible character (this road has a shipyard;
+  that one is hungry but fast; the third, no one has word of) annotated by
+  whatever rumors you hold. Chosen once. No takebacks. Everything a
+  risk/reward menu would have asked at a waypoint is asked here instead,
+  where it is strategy rather than a dice roll.
 
-Waypoint scenes are built from five mechanical templates under unique
-writing: **trade** (spend/gain across gauges and cargo), **hazard** (a
-risk choice with stakes), **recruit** (a soul may join), **mystery**
-(rumors, rune fragments, strangeness), **rest** (heal souls, mend hull,
-raise hope). Named threats — Níðhöggr's Fang and its kin — live at specific
-waypoints as *entities you deal with in the scene*, not stat walls.
+What a waypoint delivers is determined by three things the player already
+controls: **the road chosen** (a hungry road takes supplies; a lucky one
+gives), **the hull carried** (refits recolor hazards into non-events or
+worse), and **the souls aboard** (Runa aboard means the Drowned Choir is
+answered — automatically, as a scene, not as a button). Scene *shapes* —
+way-station, wreck, haven, shrine, shipyard — are content templates for
+writing, not decision templates. Named threats — Níðhöggr's Fang and its
+kin — live on specific roads; whether their scene is a toll, a terror, or
+a passage depends on what you brought, all of it knowable at the junction
+if your rumors were good.
+
+Two decisions do survive outside junctions, because they are
+junction-shaped (exclusive, permanent, strategic — never gambles):
+**berths** (a soul asks to board; seven berths; at capacity someone must be
+declined) and **refits** (a shipyard offers A or B, once).
 
 ### The Souls
 
@@ -125,14 +144,16 @@ can be found along the route; the hull berths **seven**, so late recruits
 force real choices. Each soul has:
 
 - **A face and a voice** — one line of personality that colors ambient log
-  moments and vignette options.
+  moments and arrival scenes.
 - **A station** (helm, tender, watch, keel) — souls at stations ease gauge
-  drains and unlock vignette options ("Torvald can force the airlock").
-  Assignment matters; arithmetic stays out of sight.
-- **An arc** — one personal thread that unfolds across 3–4 waypoint scenes
-  and resolves before arrival. Arcs pay out in hope, in options, and in the
-  arrival manifest.
-- **Mortality.** Souls can be lost — to hazards chosen badly, to the deep
+  drains and recolor what roads yield ("with Torvald at the helm, the Teeth
+  are a passage, not a toll"). Assignment matters; arithmetic stays out of
+  sight.
+- **An arc** — one personal thread that unfolds at particular places along
+  particular roads (part of what a road is *worth* at the junction) and
+  resolves before arrival. Arcs pay out in hope, in rumors, and in the
+  manifest.
+- **Mortality.** Souls can be lost — to roads chosen badly, to the deep
   void, to their own arcs. Loss is permanent. Each loss carves a name into
   the hull, visible in the ship art for the rest of the game. (The offline
   covenant from the old spec set stands: **no soul is ever lost while the
@@ -197,22 +218,24 @@ Lanterns in ~26h.* You close the game. Nothing needs you. That's new.
 
 **A check-in, week two (Chapter I).** You open the game at lunch. The leg
 finished overnight: the Vessel holds station at a wreck of the first pilgrim
-fleet. The vignette: Eir wants to search the wreck for medicine; the hull
-groans near it; a rumor says something nests inside. Three options, one
-choice — you risk it. Medicine found, hull scraped, and a rune fragment
-nobody can read yet. A care package from home waits below: fuel cells and a
-letter that mentions your Haven by name. You pick the next leg at the
-junction — the long way, because a rumor bought two stops ago says the short
-way is hungry. Eight minutes. Done. The footer says ~2 days.
+fleet — the stop this road was known for. The scene plays: Eir searches the
+wreck and finds medicine; because Runa stands the watch, she hears what
+nests inside before it hears the ship, and it stays sleeping. A rumor
+learned, a rune fragment nobody can read yet. A care package from home
+waits below: fuel cells and a letter that mentions your Haven by name.
+Then the junction — the only decision of the day: the short road is hungry
+(a rumor from two stops back), the long road has a shipyard. You take the
+long road. Six minutes. Done. The footer says ~2 days.
 
 **A check-in, month three (the Going-Dark, Chapter III).** The last letter
 arrived two stops ago; you've reread it twice. Supplies are thinner than
-you'd like because you gave grain to the hermit-station — hope's been high
-since, and high hope has made the legs faster. Runa's arc came to a head
-last arrival; she stood the watch alone and something in the dark *answered
-her song* — a rumor no trader could have sold you. Torvald and the warden
-disagree about the next junction. You side with Torvald. You're wrong about
-that, but you won't know for two more stops.
+you'd like — you took the hermit's road knowing it tithes grain, because
+hope rises where he keeps his lanterns, and high hope has made the legs
+faster. Runa's arc came to a head last arrival; she stood the watch and
+something in the dark *answered her song* — a rumor no trader could have
+sold you. At the junction, Torvald reads one road and the warden reads the
+other, and their counsel disagrees. You side with Torvald. You're wrong
+about that, but you won't know for two more stops.
 
 **A check-in, month six (Chapter IV).** The tree owns half the horizon.
 One name is carved into the hull; you still route around hazards you'd have
@@ -229,20 +252,21 @@ Never: grind, optimize, reset.
 - ~24 waypoints × 1–3-day legs (+ hold-station time at arrivals) ≈
   **5–8 months** — matching the established Act 2 duration target while
   making its texture episodic instead of continuous.
-- ~7 junction choices, ~4 refit choices, 6–8 soul arcs, ~30 authored
-  vignettes (24 waypoints + branch variants), 1 midpoint set-piece
-  (Going-Dark), 1 finale (Arrival).
-- Active time: 5–15 minutes per arrival, every 1–3 days — a fraction of
-  Act 1's engagement but far denser in consequence.
+- ~7 junction choices, ~4 refit choices, a handful of berth decisions,
+  6–8 soul arcs, ~30 authored arrival scenes (24 waypoints + branch
+  variants), 1 midpoint set-piece (Going-Dark), 1 finale (Arrival).
+- Active time: 3–10 minutes per arrival (read the scene, collect, choose
+  the road when there is one), every 1–3 days — a fraction of Act 1's
+  engagement but far denser in consequence.
 
 ## Spec Queue (rewritten)
 
 | # | Spec | Scope | Status |
 |---|------|-------|--------|
 | 1 | Launch Gate | gates, burn, kill-switch | **Shipped** |
-| 2 | The Route & the Waypoints | chart structure, leg/arrival state machine, junctions, fog & rumors, tree-on-horizon render | **Next to write** |
+| 2 | The Route & the Waypoints | chart structure, leg/arrival state machine, junction choice rules, road character & pricing, fog & rumors, tree-on-horizon render | **Next to write** |
 | 3 | The Souls | roster, stations, arcs, hope, loss & memorial, offline covenant | Not started |
-| 4 | Arrivals & Vignettes | scene system, five templates, choice/consequence encoding, writing pipeline | Not started |
+| 4 | Arrival Scenes | scene delivery system, road/hull/soul recoloring, scene shapes, writing pipeline | Not started |
 | 5 | The Vessel Underway | gauges, drift, refits, leg ambience & named threats | Not started |
 | 6 | Letters From Home & the Going-Dark | care packages, letter templates, the midpoint event | Not started |
 | 7 | The Arrival | final approach, manifest, keepsake chart, Act 3 gate | Not started |
@@ -260,5 +284,8 @@ capacity bones).
   ticks gently down after ~3 days of holding station (proposed: the latter,
   softly — the souls are eager).
 - How rumor acquisition is priced (supplies? keepsakes? a soul's time?).
+- How much variance a road carries beyond its known character — proposed:
+  little; a road should mostly keep its promises, so junctions stay
+  strategy rather than gambling at one remove.
 - Whether the rune-fragment shortcut meta-puzzle (Deadreckoning garnish)
   ships in v1 or as a post-arrival content update.
