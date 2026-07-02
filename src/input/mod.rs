@@ -411,7 +411,7 @@ fn handle_vessel_overlay(
                 *confirm_pending = false;
                 if crate::vessel::perform_launch(state, completed_patterns) {
                     state.combat_state.add_log_entry(
-                        "\u{2726} 100,000 Prestige Ranks burn. The Loom becomes a hull."
+                        "\u{2726} 250,000 Prestige Ranks burn. The Loom becomes a hull."
                             .to_string(),
                         false,
                         true,

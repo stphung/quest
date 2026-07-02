@@ -4,7 +4,7 @@
 
 ## Overview
 
-After completing all 28 Woven Patterns, reaching Ascension X, conquering Zone 50, and spending 100,000 PR, the player discovers that their branch of Yggdrasil is dying. A beacon on a distant living branch calls to them. The Loom's woven reality becomes the hull of a ship — the Vessel — and the player launches into the void between worlds. This begins Act 2: the game shifts from zone-based combat to a voyage through cosmic space, with the ship as the new "character."
+After completing all 28 Woven Patterns, reaching Ascension X, conquering Zone 50, and spending 250,000 PR, the player discovers that their branch of Yggdrasil is dying. A beacon on a distant living branch calls to them. The Loom's woven reality becomes the hull of a ship — the Vessel — and the player launches into the void between worlds. This begins Act 2: the game shifts from zone-based combat to a voyage through cosmic space, with the ship as the new "character."
 
 ## Narrative Foundation
 
@@ -12,7 +12,7 @@ After completing all 28 Woven Patterns, reaching Ascension X, conquering Zone 50
 
 **The beacon.** After Z50 falls, a signal appears from impossibly far away — another branch, still alive. The Loom resonates with it. The 28 Woven Patterns weren't just sustaining reality locally; they were unconsciously answering a call.
 
-**The ship IS the Loom.** The Loom's woven fate becomes the literal hull of the Vessel. The Deep's Gateway was digging toward the roots. The patterns were the blueprint. Everything the player built was preparation for this moment. 100,000 PR fuels the transformation — reality itself is burned as fuel to reshape the Loom into something that can travel between branches.
+**The ship IS the Loom.** The Loom's woven fate becomes the literal hull of the Vessel. The Deep's Gateway was digging toward the roots. The patterns were the blueprint. Everything the player built was preparation for this moment. 250,000 PR fuels the transformation — reality itself is burned as fuel to reshape the Loom into something that can travel between branches.
 
 **The destination.** A living branch of Yggdrasil, 10,000 light-years away. Visible on sensors from launch. The gate to Act 3 (colony/settlement — future content).
 
@@ -25,23 +25,23 @@ All four must be met:
 | 28 Woven Patterns complete | The Loom is fully built — becomes the hull |
 | Ascension X | Maximum power — the character is ready |
 | Zone 50 conquered | The Origin Thread reveals the dying branch |
-| 100,000 PR spent | Fuel for the transformation |
+| 250,000 PR spent | Fuel for the transformation |
 
-The 100,000 is **spent from prestige rank in a single all-or-nothing burn at launch confirmation** (see the launch-gate spec). Rank never freezes and there is no partial banking — the gate is simply holding 100,000 PR at once, and the hero fights at full prestige bonuses for the entire wait. WR→PR is `PR/hr = WR × (1 + WR/100)` (`src/loom/logic.rs`), plus Power Cores at up to 48 PR/day:
+The 250,000 is **spent from prestige rank in a single all-or-nothing burn at launch confirmation** (see the launch-gate spec). Rank never freezes and there is no partial banking — the gate is simply holding 250,000 PR at once, and the hero fights at full prestige bonuses for the entire wait. WR→PR is `PR/hr = WR × (1 + WR/100)` (`src/loom/logic.rs`), plus Power Cores at up to 48 PR/day:
 
-| Situation | PR/day income | Time until P100,000 |
+| Situation | PR/day income | Time until P250,000 |
 |-----------|--------------|---------------------|
-| Veteran already holding 100k+ | — | Immediate — launch the moment the signal appears |
-| At the gate near P50k, typical Loom (50 WR/hr) | ~1,850 | ~27 days |
-| At the gate near P50k, maxed Loom (131 WR/hr) | ~7,320 | ~7 days |
+| Veteran already holding 250k+ | — | Immediate — launch the moment the signal appears |
+| At the gate near P50k, typical Loom (50 WR/hr) | ~1,850 | ~108 days (~3.6 months) |
+| At the gate near P50k, maxed Loom (131 WR/hr) | ~7,320 | ~27 days |
 
-So the construction watch runs **zero days to about a month**. Upgrading extractors toward L20 is the big income lever during the wait. (Challenge wins grant only 1-2 PR each — negligible at these rates.)
+So the construction watch runs **zero days to ~3.6 months**. At this price, maxing the extractors to L20 (which quadruples income) is effectively part of the launch grind, not an optional optimization. (Challenge wins grant only 1-2 PR each — negligible at these rates.)
 
 ## Mode Shift
 
 Launching the Vessel is an **alternate game mode**. The player is no longer fighting in zones. The entire UI shifts to the voyage. The old world runs in the background as a supply line but is not directly playable.
 
-**Act 1 carryover:** Clean break. Only PR transmissions carry over. The 100,000 PR IS the carryover — everything the player built was consumed to create the ship. No God Items, Haven bonuses, or Ascension multipliers transfer. The Vessel is a fresh start.
+**Act 1 carryover:** Clean break. Only PR transmissions carry over. The 250,000 PR IS the carryover — everything the player built was consumed to create the ship. No God Items, Haven bonuses, or Ascension multipliers transfer. The Vessel is a fresh start.
 
 ## The Vessel as Character
 

@@ -5,7 +5,7 @@
 
 ## Overview
 
-After conquering Zone 50, the player begins seeing hints about the dying branch of Yggdrasil. A new `[V]` hotkey opens the Vessel overlay showing progress toward launch. Prestige rank keeps ticking up as normal; the fuel gate is simply **holding 100,000 PR at once**. Launch is a single all-or-nothing burn — confirming deducts the full 100,000 in one action. There is no partial banking and no fuel accumulator. This sub-project covers everything up to the launch confirmation — no Act 2 gameplay yet.
+After conquering Zone 50, the player begins seeing hints about the dying branch of Yggdrasil. A new `[V]` hotkey opens the Vessel overlay showing progress toward launch. Prestige rank keeps ticking up as normal; the fuel gate is simply **holding 250,000 PR at once**. Launch is a single all-or-nothing burn — confirming deducts the full 250,000 in one action. There is no partial banking and no fuel accumulator. This sub-project covers everything up to the launch confirmation — no Act 2 gameplay yet.
 
 ## Phases
 
@@ -40,49 +40,49 @@ The `[V] Vessel` hint pulses between dim and bright (using the existing tick mil
 
 A full-screen overlay (like Haven, Deep, Soulforge) opened via `[V]`. Contains:
 
-**Construction screen** showing the four requirements with check/cross indicators, a rank-progress bar toward the 100,000 burn, and a generation rate estimate.
+**Construction screen** showing the four requirements with check/cross indicators, a rank-progress bar toward the 250,000 burn, and a generation rate estimate.
 
 The overlay renders into the scene buffer (same pattern as Deep overlay — `render_vessel_scene()` paints to a buffer, then the buffer is flushed to frame).
 
-### Phase 4: The 100,000 PR Gate
+### Phase 4: The 250,000 PR Gate
 
-**Prestige rank never freezes and PR grants are never diverted.** PR keeps ticking up from all sources exactly as before (WR→PR, Power Cores, challenges, prestige actions — none of that code is touched). The fuel gate is simply: **the player must hold 100,000 PR at the moment of launch.** There is no partial banking, no transfer controls, no `vessel_fuel` accumulator — the burn happens once, in full, when launch is confirmed.
+**Prestige rank never freezes and PR grants are never diverted.** PR keeps ticking up from all sources exactly as before (WR→PR, Power Cores, challenges, prestige actions — none of that code is touched). The fuel gate is simply: **the player must hold 250,000 PR at the moment of launch.** There is no partial banking, no transfer controls, no `vessel_fuel` accumulator — the burn happens once, in full, when launch is confirmed.
 
 The overlay shows current rank against the threshold:
 
 ```
-Prestige: P61,420 / 100,000        ██████░░░░  61%
-Income: ~7,320 PR/day — ready in ~6 days
+Prestige: P152,840 / 250,000       ██████░░░░  61%
+Income: ~7,320 PR/day — ready in ~13 days
 ```
 
 **Consequences of this model:**
 - The hero fights at full strength for the entire wait — rank (and its bonuses) stays intact until the single burn at launch.
-- A veteran already holding 100k+ can launch the moment the signal appears. They earned it.
-- A player arriving at the gate near P50,000 climbs to 100,000: ~27 days at typical pattern-28 rates (75 PR/hr), ~7 days at a maxed Loom (303 PR/hr).
-- The burn leaves `rank - 100,000` behind (usually a small remainder). Post-launch rank only matters to the background supply line (sub-project 7), and zone unlocks cannot re-lock (`sync_account_zone_unlocks` in `src/zones/access.rs` never removes an unlock), so there is no reason to over-save beyond the threshold.
+- A veteran already holding 250k+ can launch the moment the signal appears. They earned it.
+- A player arriving at the gate near P50,000 climbs to 250,000: ~108 days (~3.6 months) at typical pattern-28 rates (75 PR/hr), ~27 days at a maxed Loom (303 PR/hr). Maxing the extractors is effectively part of the launch grind at this price.
+- The burn leaves `rank - 250,000` behind (usually a small remainder). Post-launch rank only matters to the background supply line (sub-project 7), and zone unlocks cannot re-lock (`sync_account_zone_unlocks` in `src/zones/access.rs` never removes an unlock), so there is no reason to over-save beyond the threshold.
 - One dramatic moment instead of many small ones: the player watches everything they accumulated vanish in a single confirmed action. That IS the launch.
 
 The overlay shows:
-- Current prestige rank against the 100,000 threshold, with a progress bar (live — rank keeps ticking up during the watch)
+- Current prestige rank against the 250,000 threshold, with a progress bar (live — rank keeps ticking up during the watch)
 - Estimated PR/day generation rate and days until the threshold is reached
 - The other three requirements with ✓/✗
 
 ### Phase 5: Launch Ready
 
-When `prestige_rank >= 100,000` and the other gates are met (28 patterns, Ascension X, signal discovered), the overlay changes to show a "Launch" option. The requirements section shows all green checkmarks. A `[Enter] Launch into the Void` prompt appears.
+When `prestige_rank >= 250,000` and the other gates are met (28 patterns, Ascension X, signal discovered), the overlay changes to show a "Launch" option. The requirements section shows all green checkmarks. A `[Enter] Launch into the Void` prompt appears.
 
 ### Phase 6: Launch Confirmation
 
 Pressing Enter on the ready screen shows a confirmation modal:
-- The burn, stated plainly: `P161,420  →  P61,420` (before → after)
-- Lists what will happen (100,000 PR consumed in one burn, the Loom transforms, the voyage begins)
+- The burn, stated plainly: `P253,218  →  P3,218` (before → after)
+- Lists what will happen (250,000 PR consumed in one burn, the Loom transforms, the voyage begins)
 - "There is no return."
 - `[Enter] Confirm  [Esc] Cancel`
 
 On confirm, in one action:
 
 ```
-state.prestige_rank -= 100_000;
+state.prestige_rank -= 250_000;
 state.recalculate_prestige_bonuses();
 state.derived_stats_dirty = true;
 state.vessel_launched = true;
@@ -113,7 +113,7 @@ fn can_launch(state: &GameState, loom: &LoomState) -> bool {
         && !state.vessel_launched
         && state.ascension_level >= 10
         && crate::loom::all_patterns_complete(&loom.persistent)
-        && state.prestige_rank >= 100_000
+        && state.prestige_rank >= 250_000
 }
 ```
 
@@ -155,8 +155,8 @@ Layout:
 ```
 Row 0-8:   Ship ASCII art + narrative text
 Row 9:     Separator
-Row 10-13: Four requirement lines with ✓/✗ (PR line shows rank / 100,000)
-Row 14-15: Rank progress bar toward 100,000
+Row 10-13: Four requirement lines with ✓/✗ (PR line shows rank / 250,000)
+Row 14-15: Rank progress bar toward 250,000
 Row 16:    Generation rate + days-until-ready estimate
 Row 17:    Footer ([Enter] Launch / [Esc] Close)
 ```
@@ -194,9 +194,9 @@ Sub-project 1 can merge to main **dark**: `vessel::ACT2_ENABLED = false` keeps t
 
 ## Testing
 
-- Unit test: `can_launch` requires all four gates (signal, Ascension X, 28 patterns, 100,000 PR)
-- Unit test: launch deducts exactly 100,000, recalculates prestige bonuses, sets `vessel_launched`
-- Unit test: launch refused below 100,000 PR and after already launched
+- Unit test: `can_launch` requires all four gates (signal, Ascension X, 28 patterns, 250,000 PR)
+- Unit test: launch deducts exactly 250,000, recalculates prestige bonuses, sets `vessel_launched`
+- Unit test: launch refused below 250,000 PR and after already launched
 - Unit test: PR grants (WR→PR, Power Cores, challenges) are untouched during the wait — rank keeps rising
 - Unit test: `vessel_signal_discovered` set on Z50 boss kill
 - Unit test: serde round-trip for new GameState fields (backwards compat)

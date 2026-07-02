@@ -189,7 +189,11 @@ fn render_construction_lines(
     lines.push(requirement_line(
         state.prestige_rank >= vessel::LAUNCH_PR_COST,
         "Fuel for the transformation",
-        &format!("P{} / 100,000", format_thousands(state.prestige_rank)),
+        &format!(
+            "P{} / {}",
+            format_thousands(state.prestige_rank),
+            format_thousands(vessel::LAUNCH_PR_COST)
+        ),
     ));
     lines.push(Line::from(""));
 
@@ -223,7 +227,10 @@ fn render_construction_lines(
 
 fn render_launched_lines(lines: &mut Vec<Line<'_>>, state: &GameState) {
     lines.push(Line::from(Span::styled(
-        "The burn is complete. 100,000 Prestige Ranks became a hull.",
+        format!(
+            "The burn is complete. {} Prestige Ranks became a hull.",
+            format_thousands(vessel::LAUNCH_PR_COST)
+        ),
         Style::default().fg(GOLD),
     )));
     lines.push(Line::from(""));
@@ -291,7 +298,10 @@ fn render_launch_confirm_modal(frame: &mut Frame, area: Rect, state: &GameState)
         ]),
         Line::from(""),
         Line::from(Span::styled(
-            "100,000 Prestige Ranks are burned in one breath.",
+            format!(
+                "{} Prestige Ranks are burned in one breath.",
+                format_thousands(vessel::LAUNCH_PR_COST)
+            ),
             Style::default().fg(Color::Gray),
         )),
         Line::from(Span::styled(

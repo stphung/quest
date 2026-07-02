@@ -2,7 +2,7 @@
 //!
 //! After the player clears Zone 50, a signal from a living branch of
 //! Yggdrasil is discovered. Launching the Vessel requires holding
-//! 100,000 Prestige Ranks and burning them in a single all-or-nothing
+//! 250,000 Prestige Ranks and burning them in a single all-or-nothing
 //! action. See `docs/superpowers/specs/2026-03-27-vessel-launch-gate-design.md`.
 
 use crate::core::game_state::GameState;
@@ -27,7 +27,7 @@ pub fn act2_enabled() -> bool {
 }
 
 /// Prestige rank cost of launching the Vessel, burned in one action.
-pub const LAUNCH_PR_COST: u32 = 100_000;
+pub const LAUNCH_PR_COST: u32 = 250_000;
 
 /// Woven Patterns required to launch (the complete Loom becomes the hull).
 pub const LAUNCH_REQUIRED_PATTERNS: usize = 28;
@@ -63,7 +63,7 @@ pub fn can_launch(state: &GameState, completed_patterns: usize) -> bool {
         && state.prestige_rank >= LAUNCH_PR_COST
 }
 
-/// Burns 100,000 PR in a single action and marks the Vessel launched.
+/// Burns `LAUNCH_PR_COST` PR in a single action and marks the Vessel launched.
 /// Returns false (and changes nothing) if any gate is unmet.
 pub fn perform_launch(state: &mut GameState, completed_patterns: usize) -> bool {
     if !can_launch(state, completed_patterns) {
@@ -84,7 +84,7 @@ mod tests {
         let mut state = GameState::new("Voyager".to_string(), 0);
         state.vessel_signal_discovered = true;
         state.ascension_level = 10;
-        state.prestige_rank = 100_000;
+        state.prestige_rank = 250_000;
         state
     }
 
@@ -117,14 +117,14 @@ mod tests {
         assert!(!can_launch(&gated_state(), 27));
 
         let mut s = gated_state();
-        s.prestige_rank = 99_999;
+        s.prestige_rank = 249_999;
         assert!(!can_launch(&s, 28));
     }
 
     #[test]
     fn launch_burns_exactly_the_cost_and_sets_flag() {
         let mut state = gated_state();
-        state.prestige_rank = 103_218;
+        state.prestige_rank = 253_218;
         assert!(perform_launch(&mut state, 28));
         assert_eq!(state.prestige_rank, 3_218);
         assert!(state.vessel_launched);
