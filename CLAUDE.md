@@ -59,17 +59,11 @@ Two habits that make verification meaningful:
 
 ## CI/CD Pipeline
 
-**On every PR:**
-- Runs `scripts/ci-checks.sh` (format, lint, test, build, audit)
-- Must pass to merge
+**On every PR** (`.github/workflows/ci.yml`): six independent jobs — `fmt`, `clippy`, `test`, `balance` (progression check), `audit`, `coverage` — each running its check inline (not by invoking `scripts/ci-checks.sh`). A `ci-pass` gate job requires all six to succeed before merge.
 
-**On push to main:**
-- Runs all checks
-- Builds release binaries for 3 platforms (Linux, macOS x86/ARM)
-- Signs macOS binaries with ad-hoc signature (prevents Gatekeeper blocking)
-- Creates GitHub release with downloadable binaries
+**On push to main:** Builds release binaries for 3 platforms (Linux, macOS x86/ARM), signs macOS binaries with an ad-hoc signature (prevents Gatekeeper blocking), and creates a GitHub release with downloadable binaries. This runs independently of the PR check jobs.
 
-**Key insight:** Local `make check` runs the **exact same script** as CI, ensuring consistency.
+**Key insight:** `scripts/ci-checks.sh` (run locally via `make check`) mirrors the PR jobs' commands but is not itself invoked by CI — the two are maintained in parallel, so keep them in sync when changing either. One known drift: the `coverage` job's `--ignore-filename-regex` in `ci.yml` excludes `utils/debug_menu`, `loom/graph`, `loom/layout`, and `loom/milestones` in addition to what `scripts/ci-checks.sh`'s local coverage step excludes.
 
 ## Skills (`.claude/skills/`)
 
