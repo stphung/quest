@@ -17,3 +17,7 @@ Thumbs.db
 .worktrees/
 .worktrees/
 .superpowers/
+
+# insta pending snapshots (accepted snapshots in src/**/snapshots/ ARE committed)
+*.snap.new
+*.pending-snap

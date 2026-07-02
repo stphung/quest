@@ -22,12 +22,12 @@
 //! (haven.json, deep.json, loom, enhancement) is not generated yet — the game
 //! treats those systems as undiscovered, which is a valid state.
 
-use quest::character::{AttributeType, Attributes, CharacterManager};
-use quest::combat::CombatState;
+use quest::character::CharacterManager;
 use quest::core::GameState;
 use quest::core::KILLS_FOR_BOSS;
-use quest::items::{generate_item, EquipmentSlot, Rarity};
-use quest::zones::{get_zone, ZoneProgression};
+use quest::fixtures;
+use quest::items::Rarity;
+use quest::zones::get_zone;
 
 use chrono::Utc;
 
@@ -168,13 +168,13 @@ fn apply_overrides(state: &mut GameState, o: &Overrides) {
     }
     if let Some(level) = o.level {
         state.character_level = level;
-        sync_hp(state);
+        fixtures::sync_hp(state);
     }
     if let Some(asc) = o.ascension {
         state.ascension_level = asc;
     }
     if let Some(attrs) = o.attrs {
-        set_attributes(state, attrs.min(state.get_attribute_cap()));
+        fixtures::set_attributes(state, attrs.min(state.get_attribute_cap()));
     }
     if o.zone.is_some() || o.subzone.is_some() {
         let zone = o.zone.unwrap_or(state.zone_progression.current_zone_id);
@@ -188,13 +188,13 @@ fn apply_overrides(state: &mut GameState, o: &Overrides) {
                  mkstate does not generate; the game may not honor this placement"
             );
         }
-        advance_to_zone(state, zone, o.subzone.unwrap_or(1));
+        fixtures::advance_to_zone(state, zone, o.subzone.unwrap_or(1));
     }
     if let Some(rarity) = o.gear {
         let ilvl = o
             .ilvl
             .unwrap_or(state.zone_progression.current_zone_id * 10);
-        equip_all(state, rarity, rarity, ilvl);
+        fixtures::equip_all(state, rarity, rarity, ilvl, &mut rand::rng());
     }
     if let Some(sg) = o.stormglass {
         state.stormglass = sg;
@@ -254,107 +254,28 @@ fn default_name(scenario: &str) -> String {
     }
 }
 
+// Scenario builders live in quest::fixtures (shared with the UI snapshot
+// tests); these wrappers just supply the wall clock and thread RNG.
 fn build_fresh(name: String) -> GameState {
-    GameState::new(name, Utc::now().timestamp())
+    fixtures::fresh(&name, Utc::now().timestamp())
 }
 
 fn build_midgame(name: String) -> GameState {
-    let mut state = GameState::new(name, Utc::now().timestamp());
-    state.character_level = 45;
-    state.prestige_rank = 5;
-    state.total_prestige_count = 5;
-    state.play_time_seconds = 60 * 60 * 30;
-    set_attributes(&mut state, 40); // cap at P5 is 45
-    advance_to_zone(&mut state, 8, 2);
-    equip_all(&mut state, Rarity::Rare, Rarity::Epic, 80);
-    state.stormglass_discovered = true;
-    state.stormglass = 750;
-    sync_hp(&mut state);
-    state
+    fixtures::midgame(&name, Utc::now().timestamp(), &mut rand::rng())
 }
 
 fn build_endgame(name: String) -> GameState {
-    let mut state = GameState::new(name, Utc::now().timestamp());
-    state.character_level = 80;
-    state.prestige_rank = 25;
-    state.total_prestige_count = 32;
-    state.ascension_level = 3;
-    state.play_time_seconds = 60 * 60 * 400;
-    set_attributes(&mut state, 100); // cap at P25 is 145
-    advance_to_zone(&mut state, 11, 1);
-    equip_all(&mut state, Rarity::Epic, Rarity::Legendary, 110);
-    state.zone_progression.has_stormbreaker = true;
-    state.stormglass_discovered = true;
-    state.stormglass = 25_000;
-    sync_hp(&mut state);
-    state
+    fixtures::endgame(&name, Utc::now().timestamp(), &mut rand::rng())
 }
 
 fn build_boss(name: String) -> GameState {
-    let mut state = build_midgame(name);
-    // should_spawn_boss() becomes true, so the first tick spawns the boss.
-    state.zone_progression.kills_in_subzone = KILLS_FOR_BOSS;
-    state
-}
-
-fn set_attributes(state: &mut GameState, value: u32) {
-    let mut attrs = Attributes::new();
-    for attr in AttributeType::all() {
-        attrs.set(attr, value);
-    }
-    state.attributes = attrs;
-}
-
-/// Unlocks zones 1..=target, marks every subzone boss below the target
-/// position as defeated, and places the character at (target, subzone).
-fn advance_to_zone(state: &mut GameState, zone_id: u32, subzone_id: u32) {
-    let mut prog = ZoneProgression::new();
-    for z in 1..=zone_id {
-        prog.unlock_zone(z);
-        let Some(zone) = get_zone(z) else { continue };
-        for sub in &zone.subzones {
-            if z < zone_id || sub.id < subzone_id {
-                prog.defeat_boss(z, sub.id);
-            }
-        }
-    }
-    prog.current_zone_id = zone_id;
-    prog.current_subzone_id = subzone_id;
-    state.zone_progression = prog;
-}
-
-fn equip_all(state: &mut GameState, base: Rarity, weapon_rarity: Rarity, ilvl: u32) {
-    let slots = [
-        EquipmentSlot::Weapon,
-        EquipmentSlot::Armor,
-        EquipmentSlot::Helmet,
-        EquipmentSlot::Gloves,
-        EquipmentSlot::Boots,
-        EquipmentSlot::Amulet,
-        EquipmentSlot::Ring,
-    ];
-    for slot in slots {
-        let rarity = if slot == EquipmentSlot::Weapon {
-            weapon_rarity
-        } else {
-            base
-        };
-        state
-            .equipment
-            .set(slot, Some(generate_item(slot, rarity, ilvl)));
-    }
-}
-
-/// Gives the fixture a sane starting HP pool. The real max HP (with
-/// prestige/ascension bonuses) is recalculated by the first game tick.
-fn sync_hp(state: &mut GameState) {
-    let hp = 50 + state.character_level as u64 * 10;
-    state.combat_state = CombatState::new(hp);
+    fixtures::boss(&name, Utc::now().timestamp(), &mut rand::rng())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use quest::character::AttributeType;
 
     fn args(list: &[&str]) -> Vec<String> {
         list.iter().map(|s| s.to_string()).collect()
@@ -455,7 +376,7 @@ mod tests {
     #[test]
     fn test_advance_to_zone_defeats_prior_bosses() {
         let mut state = build_fresh("T".into());
-        advance_to_zone(&mut state, 3, 2);
+        fixtures::advance_to_zone(&mut state, 3, 2);
         // Every subzone boss in zones 1-2 and subzone 1 of zone 3 is defeated.
         for z in 1..=2 {
             for sub in &get_zone(z).unwrap().subzones {

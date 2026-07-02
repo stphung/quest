@@ -1,5 +1,5 @@
 use super::types::{AffixType, EquipmentSlot, Item, Rarity};
-use rand::RngExt;
+use rand::{Rng, RngExt};
 
 pub fn get_base_name(slot: EquipmentSlot) -> &'static [&'static str] {
     match slot {
@@ -51,8 +51,10 @@ pub fn get_affix_suffix(affix_type: AffixType) -> &'static str {
     }
 }
 
-pub fn generate_display_name(item: &Item) -> String {
-    let mut rng = rand::rng();
+/// Rolls a display name against a caller-provided RNG so fixtures and
+/// tests can generate reproducible names from a seed. Pass `rand::rng()`
+/// for gameplay drops.
+pub fn generate_display_name_with_rng(item: &Item, rng: &mut impl Rng) -> String {
     let base_names = get_base_name(item.slot);
     let base = base_names[rng.random_range(0..base_names.len())];
 
@@ -98,7 +100,7 @@ mod tests {
             affixes: vec![],
             god_item_id: None,
         };
-        let name = generate_display_name(&item);
+        let name = generate_display_name_with_rng(&item, &mut rand::rng());
         // Should be just base name
         assert!(!name.is_empty());
         assert!(!name.contains("Fine"));
@@ -117,7 +119,7 @@ mod tests {
             affixes: vec![],
             god_item_id: None,
         };
-        let name = generate_display_name(&item);
+        let name = generate_display_name_with_rng(&item, &mut rand::rng());
         assert!(name.starts_with("Fine"));
     }
 
@@ -137,7 +139,7 @@ mod tests {
             }],
             god_item_id: None,
         };
-        let name = generate_display_name(&item);
+        let name = generate_display_name_with_rng(&item, &mut rand::rng());
         // Should contain either "Cruel" or "of Power"
         assert!(name.contains("Cruel") || name.contains("of Power"));
     }
@@ -226,7 +228,7 @@ mod tests {
             }],
             god_item_id: None,
         };
-        let name = generate_display_name(&item);
+        let name = generate_display_name_with_rng(&item, &mut rand::rng());
         // Should use affix prefix "Sturdy" or suffix "of Vitality"
         assert!(
             name.contains("Sturdy") || name.contains("of Vitality"),
@@ -251,7 +253,7 @@ mod tests {
             }],
             god_item_id: None,
         };
-        let name = generate_display_name(&item);
+        let name = generate_display_name_with_rng(&item, &mut rand::rng());
         assert!(
             name.contains("Deadly") || name.contains("of Precision"),
             "Legendary item name '{}' should reference CritChance affix",
@@ -272,7 +274,7 @@ mod tests {
             affixes: vec![],
             god_item_id: None,
         };
-        let name = generate_display_name(&item);
+        let name = generate_display_name_with_rng(&item, &mut rand::rng());
         // Should be a plain base name since there are no affixes
         let ring_names = get_base_name(EquipmentSlot::Ring);
         assert!(
@@ -297,7 +299,7 @@ mod tests {
                 affixes: vec![],
                 god_item_id: None,
             };
-            let name = generate_display_name(&item);
+            let name = generate_display_name_with_rng(&item, &mut rand::rng());
             let base_names = get_base_name(EquipmentSlot::Boots);
             assert!(
                 base_names.iter().any(|&n| name == n),
@@ -362,7 +364,7 @@ mod tests {
                         god_item_id: None,
                     };
 
-                    let name = generate_display_name(&item);
+                    let name = generate_display_name_with_rng(&item, &mut rand::rng());
                     assert!(
                         !name.is_empty(),
                         "Generated name should never be empty for {:?} {:?}",
@@ -403,7 +405,7 @@ mod tests {
                     god_item_id: None,
                 };
 
-                let name = generate_display_name(&item);
+                let name = generate_display_name_with_rng(&item, &mut rand::rng());
                 assert!(
                     !name.contains("  "),
                     "Name '{}' should not have double spaces",

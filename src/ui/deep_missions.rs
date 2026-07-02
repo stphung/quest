@@ -6,7 +6,6 @@ use crate::deep::{
     DeepUiState, LayerTier, MercArchetype, MercQuality, MercStatus, Mission, MissionStatus,
     MissionType,
 };
-use chrono::Utc;
 use ratatui::style::Color;
 
 use super::deep_shared::{draw_deep_card, truncate_text};
@@ -418,7 +417,7 @@ fn render_hub_roster(
                 MercStatus::Available => ("Ready".to_string(), Color::Green),
                 MercStatus::OnMission(_) => ("On Mission".to_string(), Color::Cyan),
                 MercStatus::Injured { recover_at } => {
-                    super::deep_roster::injury_status_display(*recover_at, chrono::Utc::now())
+                    super::deep_roster::injury_status_display(*recover_at, super::clock::now_utc())
                 }
                 MercStatus::Lost => ("Lost".to_string(), Color::Red),
             };
@@ -817,7 +816,7 @@ fn render_active_missions_content(
     deep: &DeepState,
     ui: &DeepUiState,
 ) {
-    let now = Utc::now();
+    let now = super::clock::now_utc();
     let millis = current_millis();
     let active = &deep.prestige.active_missions;
     let completed = &deep.prestige.pending_results;
@@ -1677,8 +1676,10 @@ fn render_squad_assembly_left(
             let avail_str = match &merc.status {
                 MercStatus::OnMission(_) => "(on mission)".to_string(),
                 MercStatus::Injured { recover_at } => {
-                    let (label, _) =
-                        super::deep_roster::injury_status_display(*recover_at, chrono::Utc::now());
+                    let (label, _) = super::deep_roster::injury_status_display(
+                        *recover_at,
+                        super::clock::now_utc(),
+                    );
                     format!("({})", label.to_lowercase())
                 }
                 MercStatus::Lost => "(lost)".to_string(),

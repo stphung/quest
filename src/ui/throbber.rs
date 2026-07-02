@@ -1,7 +1,5 @@
 //! Shared throbber/spinner utilities for UI animations.
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
 /// Braille spinner characters for animated loading indicators.
 const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
@@ -109,12 +107,9 @@ const WAITING_MESSAGES: [&str; 100] = [
     "The final test approaches...",
 ];
 
-/// Returns the current time in milliseconds since UNIX epoch.
+/// Returns the current time in milliseconds since UNIX epoch (freezable in tests).
 fn current_millis() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis()
+    super::clock::now_millis()
 }
 
 /// Returns the current spinner character based on system time.

@@ -9,6 +9,9 @@ mod deep;
 mod dungeon;
 mod enhancement;
 mod fishing;
+// Only exercised by the UI snapshot tests in this crate; the game itself
+// builds state through normal play. Shared with the lib for mkstate.
+mod fixtures;
 #[allow(dead_code)]
 mod god_items;
 mod haven;

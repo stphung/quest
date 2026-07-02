@@ -266,7 +266,6 @@ fn render_status_summary(
     deep: &DeepState,
     millis: u128,
 ) {
-    use chrono::Utc;
     let rank = deep.persistent.guild_rank;
     let marks = deep.prestige.warband_marks;
     let active = deep.prestige.active_mission_count() as u32;
@@ -354,7 +353,7 @@ fn render_status_summary(
     }
 
     // Next completion time (right-aligned)
-    let now = Utc::now();
+    let now = super::clock::now_utc();
     let (next_str, next_color) = if active == 0 {
         ("\u{25f7} idle".to_string(), Color::Rgb(90, 108, 130))
     } else {

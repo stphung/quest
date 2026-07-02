@@ -106,7 +106,11 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 
 **Deep Simulator** (`src/bin/deep_simulator.rs`): Headless Deep expedition simulator. Supports `--hours`, `--seed`, `--strategy` (rush/farm/balanced/infrastructure), `--guild-rank`.
 
-**Fixture Generator** (`src/bin/mkstate.rs`): Writes character save fixtures for named scenarios (`fresh`, `midgame`, `endgame`, `boss`). Pair with the `QUEST_DIR` env var (honored by `core::paths::get_quest_dir()`) to run the game against an isolated save directory. Used by the `drive-game` skill for UI verification; `scripts/screenshot.sh` captures a tmux pane as a color PNG.
+**Fixture Generator** (`src/bin/mkstate.rs`): Writes character save fixtures for named scenarios (`fresh`, `midgame`, `endgame`, `boss`). Pair with the `QUEST_DIR` env var (honored by `core::paths::get_quest_dir()`) to run the game against an isolated save directory. Used by the `drive-game` skill for UI verification; `scripts/screenshot.sh` captures a tmux pane as a color PNG. The scenario builders live in `src/fixtures.rs` (`quest::fixtures`), shared with the UI snapshot tests — mkstate feeds them the wall clock and thread RNG, tests feed a fixed timestamp and a seeded RNG.
+
+### UI Snapshot Tests (`src/ui/snapshot_tests.rs`)
+
+Deterministic full-frame TUI snapshot tests (insta + ratatui `TestBackend`) covering each responsive size tier across fixture scenarios; committed snapshots live in `src/ui/snapshots/`. Part of `cargo test`, so they gate CI. After an intentional UI change: review the diff, re-bless with `INSTA_UPDATE=always cargo test snapshot`, and commit the `.snap` changes. This is the first line of verification for any `src/ui/` change — use the `drive-game` skill for visual/e2e confirmation. Determinism rules (freezable `ui/clock.rs`, no direct wall-clock reads in render code) are documented in [src/ui/CLAUDE.md](src/ui/CLAUDE.md).
 
 ### Library Crate (`src/lib.rs`)
 
@@ -175,4 +179,4 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 
 ## Dependencies
 
-Ratatui 0.30, Serde (JSON), serde_json 1.0, Rand 0.10, Rand_chacha 0.10 (seeded RNG for simulator), Chrono, dirs 6.0, Chess-engine 0.1, ureq 3.3, flate2 1.1, zip 8.5, unicode-width 0.2, git2 0.20 (vendored-openssl), tar 0.4, uuid 1.23, petgraph 0.8 (Loom DAG), tempfile 3 (dev), criterion 0.8 (dev/bench)
+Ratatui 0.30, Serde (JSON), serde_json 1.0, Rand 0.10, Rand_chacha 0.10 (seeded RNG for simulator), Chrono, dirs 6.0, Chess-engine 0.1, ureq 3.3, flate2 1.1, zip 8.5, unicode-width 0.2, git2 0.20 (vendored-openssl), tar 0.4, uuid 1.23, petgraph 0.8 (Loom DAG), tempfile 3 (dev), criterion 0.8 (dev/bench), insta 1 (dev, UI snapshot tests)

@@ -146,13 +146,8 @@ pub fn render_status_bar(
 ///
 /// Uses a braille spinner animation (100ms per frame).
 pub fn render_thinking_status_bar(frame: &mut Frame, area: Rect, message: &str) {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
     const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-    let millis = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
+    let millis = super::clock::now_millis();
     let frame_idx = ((millis / 100) % 10) as usize;
     let spinner = SPINNER[frame_idx];
 

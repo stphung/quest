@@ -2030,7 +2030,7 @@ fn render_sigils_list(
         }
 
         // Countdown to next rotation (midnight UTC)
-        let now = chrono::Utc::now();
+        let now = super::clock::now_utc();
         let tomorrow = (now.date_naive() + chrono::Duration::days(1))
             .and_hms_opt(0, 0, 0)
             .unwrap();

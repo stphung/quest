@@ -8,7 +8,6 @@ use ratatui::{
     Frame,
 };
 use std::cell::RefCell;
-use std::time::{SystemTime, UNIX_EPOCH};
 use unicode_width::UnicodeWidthChar;
 
 /// Cell in a scene render buffer.
@@ -45,12 +44,9 @@ impl Default for SceneCell {
     }
 }
 
-/// Current time in milliseconds since UNIX epoch.
+/// Current time in milliseconds since UNIX epoch (freezable in tests).
 pub fn current_millis() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis()
+    super::clock::now_millis()
 }
 
 /// 2D deterministic hash useful for star/noise placement.
