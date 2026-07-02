@@ -10,11 +10,16 @@
 //! item (tier, attributes, affixes, name) is reproducible.
 #![allow(dead_code)]
 
+use crate::achievements::{Achievements, UnlockedAchievement};
+use crate::challenges::{ActiveMinigame, ChessDifficulty, ChessGame};
 use crate::character::{AttributeType, Attributes};
-use crate::combat::CombatState;
+use crate::combat::{CombatState, Enemy};
 use crate::core::GameState;
+use crate::deep::{DeepState, Mission, MissionStatus, MissionType};
 use crate::items::{generate_item_with_rng, EquipmentSlot, Rarity};
+use crate::power_cores::ALL_POWER_CORES;
 use crate::zones::{get_zone, ZoneProgression};
+use chrono::{DateTime, Duration, Utc};
 use rand::Rng;
 
 /// Level 1 character at Zone 1, nothing discovered.
@@ -126,4 +131,69 @@ pub fn equip_all(
 pub fn sync_hp(state: &mut GameState) {
     let hp = 50 + state.character_level as u64 * 10;
     state.combat_state = CombatState::new(hp);
+}
+
+/// Puts a deterministic mid-fight enemy into the combat state: a Zone 8
+/// mob at partial HP, with the player also below full HP so both HP bars
+/// render partially filled. Stats are fixed (the real spawner rolls
+/// variance from a thread RNG).
+pub fn engage_enemy(state: &mut GameState) {
+    let mut enemy = Enemy::new_with_defense("Tidal Kraken".to_string(), 820, 96, 48);
+    enemy.current_hp = 512;
+    state.combat_state.current_enemy = Some(enemy);
+    state.combat_state.player_current_hp = (state.combat_state.player_max_hp * 2) / 3;
+    state.combat_state.is_regenerating = false;
+}
+
+/// Starts a chess challenge (deterministic: fresh board, no RNG) so the
+/// right panel renders the minigame scene instead of combat.
+pub fn start_chess_challenge(state: &mut GameState) {
+    state.active_minigame = Some(ActiveMinigame::Chess(Box::new(ChessGame::new(
+        ChessDifficulty::Journeyman,
+    ))));
+}
+
+/// A discovered Deep with mid-game progress and one running expedition.
+/// `now` must be the frozen UI-clock instant in tests so the mission ETA
+/// and progress gauge render deterministically.
+pub fn deep_state_active(now: DateTime<Utc>) -> DeepState {
+    let mut deep = DeepState::new();
+    deep.persistent.discovered = true;
+    deep.persistent.deepest_layer_reached = 12;
+    // Power Core I half-filled (2 PR/day = 12h fill), Core II left at 0 so
+    // it renders as ready — one gauge of each kind.
+    deep.persistent.power_core_last_granted.insert(
+        crate::achievements::AchievementId::PowerCoreI,
+        now.timestamp() - 6 * 3600,
+    );
+    deep.prestige.warband_marks = 45;
+    deep.prestige.active_missions.push(Mission {
+        id: 1,
+        mission_type: MissionType::Expedition,
+        layer: 12,
+        squad: Vec::new(),
+        started_at: now - Duration::hours(3),
+        ends_at: now + Duration::hours(2),
+        events: Vec::new(),
+        pending_event_index: 0,
+        status: MissionStatus::Active,
+        result: None,
+        is_first_orders: false,
+    });
+    deep
+}
+
+/// Unlocks the first `count` Power Cores directly (bypassing the unlock
+/// queue so no pending-notification state leaks into the fixture), with a
+/// fixed unlock timestamp.
+pub fn unlock_power_cores(achievements: &mut Achievements, count: usize, unlocked_at: i64) {
+    for core in ALL_POWER_CORES.iter().take(count) {
+        achievements.unlocked.insert(
+            core.achievement_id,
+            UnlockedAchievement {
+                unlocked_at,
+                character_name: None,
+            },
+        );
+    }
 }

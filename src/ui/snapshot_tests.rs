@@ -32,37 +32,76 @@ fn gear_rng() -> ChaCha8Rng {
     ChaCha8Rng::seed_from_u64(GEAR_SEED)
 }
 
+/// The frozen instant as a chrono timestamp, for deriving fixture
+/// timestamps (mission ETAs, core fill times) that must be time-relative.
+fn frozen_utc() -> chrono::DateTime<chrono::Utc> {
+    chrono::DateTime::from_timestamp_millis(FROZEN_MILLIS as i64).unwrap()
+}
+
+/// Everything `draw_ui_with_update()` reads besides the character state.
+/// `Scene::new()` gives the bare setup (nothing discovered); tests flip
+/// fields to exercise discovered-system rendering.
+struct Scene<'a> {
+    state: &'a GameState,
+    deep: DeepState,
+    achievements: Achievements,
+    enhancement_levels: [u8; 7],
+    haven_discovered: bool,
+    soulforge_discovered: bool,
+    loom_discovered: bool,
+}
+
+impl<'a> Scene<'a> {
+    fn new(state: &'a GameState) -> Self {
+        Self {
+            state,
+            deep: DeepState::new(),
+            achievements: Achievements::default(),
+            enhancement_levels: [0; 7],
+            haven_discovered: false,
+            soulforge_discovered: false,
+            loom_discovered: false,
+        }
+    }
+}
+
 /// Renders one frame of the main game UI at the given terminal size and
 /// returns the buffer's debug view.
-fn render_main(state: &GameState, width: u16, height: u16) -> String {
+fn render_scene(scene: &Scene, width: u16, height: u16) -> String {
     let _clock = clock::freeze_at_millis(FROZEN_MILLIS);
-    let deep = DeepState::new();
-    let achievements = Achievements::default();
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
     terminal
         .draw(|frame| {
             draw_ui_with_update(
                 frame,
-                state,
+                scene.state,
                 None,  // update_info
                 false, // update_check_completed
                 false, // update_check_failed
-                false, // haven_discovered
-                false, // soulforge_discovered
-                state.stormglass_discovered,
-                &deep,
-                false, // loom_discovered
-                &achievements,
-                &[0; 7], // enhancement_levels
-                &deep,
+                scene.haven_discovered,
+                scene.soulforge_discovered,
+                scene.state.stormglass_discovered,
+                &scene.deep,
+                scene.loom_discovered,
+                &scene.achievements,
+                &scene.enhancement_levels,
+                &scene.deep,
             );
         })
         .unwrap();
     format!("{:?}", terminal.backend().buffer())
 }
 
+fn render_main(state: &GameState, width: u16, height: u16) -> String {
+    render_scene(&Scene::new(state), width, height)
+}
+
 fn assert_frame_snapshot(name: &str, state: &GameState, width: u16, height: u16) {
-    let frame = render_main(state, width, height);
+    assert_scene_snapshot(name, &Scene::new(state), width, height);
+}
+
+fn assert_scene_snapshot(name: &str, scene: &Scene, width: u16, height: u16) {
+    let frame = render_scene(scene, width, height);
     let mut settings = insta::Settings::clone_current();
     // Same snapshot files are asserted from both the lib and bin test
     // targets; a bare name keeps them shared and the directory readable.
@@ -108,6 +147,42 @@ fn snapshot_endgame() {
 fn snapshot_boss_ready() {
     let state = fixtures::boss("Boss", CREATED_AT, &mut gear_rng());
     assert_frame_snapshot("boss_ready_xl_160x45", &state, 160, 45);
+}
+
+/// Mid-fight combat: enemy sprite and both HP bars partially filled —
+/// the state the combat panel spends most of its life in.
+#[test]
+fn snapshot_combat_active() {
+    let mut state = fixtures::midgame("Combat", CREATED_AT, &mut gear_rng());
+    fixtures::engage_enemy(&mut state);
+    assert_frame_snapshot("combat_xl_160x45", &state, 160, 45);
+    assert_frame_snapshot("combat_m_60x24", &state, 60, 24);
+}
+
+/// All account-level systems visible at once: discovered Deep with a
+/// running expedition, two Power Cores (one ready, one filling), Haven /
+/// Soulforge / Loom discovery indicators, and enhanced gear.
+#[test]
+fn snapshot_systems_discovered() {
+    let state = fixtures::endgame("Systems", CREATED_AT, &mut gear_rng());
+    let mut scene = Scene::new(&state);
+    scene.deep = fixtures::deep_state_active(frozen_utc());
+    fixtures::unlock_power_cores(&mut scene.achievements, 2, frozen_utc().timestamp());
+    scene.enhancement_levels = [7, 5, 4, 3, 3, 2, 1];
+    scene.haven_discovered = true;
+    scene.soulforge_discovered = true;
+    scene.loom_discovered = true;
+    assert_scene_snapshot("systems_discovered_xl_160x45", &scene, 160, 45);
+    assert_scene_snapshot("systems_discovered_l_80x30", &scene, 80, 30);
+}
+
+/// Minigame overlay: an active chess challenge (deterministic initial
+/// board) replaces the combat panel.
+#[test]
+fn snapshot_minigame_chess() {
+    let mut state = fixtures::midgame("Chess", CREATED_AT, &mut gear_rng());
+    fixtures::start_chess_challenge(&mut state);
+    assert_frame_snapshot("minigame_chess_xl_160x45", &state, 160, 45);
 }
 
 /// Two renders of the same state must be byte-identical. If this fails, a
