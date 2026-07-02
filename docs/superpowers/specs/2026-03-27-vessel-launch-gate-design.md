@@ -5,7 +5,7 @@
 
 ## Overview
 
-After conquering Zone 50, the player begins seeing hints about the dying branch of Yggdrasil. A new `[V]` hotkey opens the Vessel overlay showing construction progress toward launch. Prestige rank keeps ticking up as normal, and the player **spends** rank into "Vessel Fuel" (1:1, irreversible) until 100,000 is banked, then they can launch. This sub-project covers everything up to the launch confirmation — no Act 2 gameplay yet.
+After conquering Zone 50, the player begins seeing hints about the dying branch of Yggdrasil. A new `[V]` hotkey opens the Vessel overlay showing progress toward launch. Prestige rank keeps ticking up as normal; the fuel gate is simply **holding 100,000 PR at once**. Launch is a single all-or-nothing burn — confirming deducts the full 100,000 in one action. There is no partial banking and no fuel accumulator. This sub-project covers everything up to the launch confirmation — no Act 2 gameplay yet.
 
 ## Phases
 
@@ -40,51 +40,55 @@ The `[V] Vessel` hint pulses between dim and bright (using the existing tick mil
 
 A full-screen overlay (like Haven, Deep, Soulforge) opened via `[V]`. Contains:
 
-**Construction screen** showing the four requirements with check/cross indicators, a fuel gauge, and generation rate estimate.
+**Construction screen** showing the four requirements with check/cross indicators, a rank-progress bar toward the 100,000 burn, and a generation rate estimate.
 
 The overlay renders into the scene buffer (same pattern as Deep overlay — `render_vessel_scene()` paints to a buffer, then the buffer is flushed to frame).
 
-### Phase 4: PR Fuel Transfer
+### Phase 4: The 100,000 PR Gate
 
-`vessel_fuel: u32` is a new persistent field on `GameState`.
+**Prestige rank never freezes and PR grants are never diverted.** PR keeps ticking up from all sources exactly as before (WR→PR, Power Cores, challenges, prestige actions — none of that code is touched). The fuel gate is simply: **the player must hold 100,000 PR at the moment of launch.** There is no partial banking, no transfer controls, no `vessel_fuel` accumulator — the burn happens once, in full, when launch is confirmed.
 
-**Prestige rank never freezes and PR grants are never diverted.** PR keeps ticking up from all sources exactly as before (WR→PR, Power Cores, challenges, prestige actions — none of that code is touched). Instead, the player **spends prestige rank as fuel**, 1 PR : 1 fuel, from within the Vessel overlay. Burning your accumulated rank into the ship is the mechanic — reality itself is the fuel, which is the parent spec's fiction made literal.
-
-Transfer controls in the overlay:
+The overlay shows current rank against the threshold:
 
 ```
-Prestige: P61,420          Fuel: 38,500 / 100,000
-[1] Transfer 1,000   [2] Transfer 10,000   [3] Transfer Max
+Prestige: P61,420 / 100,000        ██████░░░░  61%
+Income: ~7,320 PR/day — ready in ~6 days
 ```
-
-- Transfers clamp to available rank and to the 100,000 cap. Irreversible — fuel cannot be refunded to rank.
-- Each transfer calls `recalculate_prestige_bonuses()` and sets `derived_stats_dirty` — spending rank genuinely weakens the hero's prestige bonuses until income regrows it. A real sacrifice, but a temporary one at endgame generation rates.
-- Spending below P50,000 shows a warning line ("The Loom's furthest threads will slacken") but is allowed. Zone unlocks are safe: `sync_account_zone_unlocks` (`src/zones/access.rs`) never removes an unlock once granted, so dropping below a zone's prestige requirement cannot re-lock it.
-- Transfers are available as soon as `vessel_signal_discovered` is set — the other launch gates (patterns, Ascension X) are independent checkmarks, not prerequisites for banking fuel.
 
 **Consequences of this model:**
-- A veteran sitting on a large PR bank (say P150k+) can fund the entire 100,000 immediately and launch the moment the signal appears. They earned it.
-- A player arriving at the gate near P50,000 who wants to keep their rank generates fresh PR: ~14 days at a maxed Loom (303 PR/hr), ~54 days at typical pattern-28 rates (75 PR/hr).
-- The choice of *when* and *how deep* to burn is the construction-watch gameplay: dip below P50k and launch sooner at weaker bonuses, or cruise while the Loom refills the bank.
+- The hero fights at full strength for the entire wait — rank (and its bonuses) stays intact until the single burn at launch.
+- A veteran already holding 100k+ can launch the moment the signal appears. They earned it.
+- A player arriving at the gate near P50,000 climbs to 100,000: ~27 days at typical pattern-28 rates (75 PR/hr), ~7 days at a maxed Loom (303 PR/hr).
+- The burn leaves `rank - 100,000` behind (usually a small remainder). Post-launch rank only matters to the background supply line (sub-project 7), and zone unlocks cannot re-lock (`sync_account_zone_unlocks` in `src/zones/access.rs` never removes an unlock), so there is no reason to over-save beyond the threshold.
+- One dramatic moment instead of many small ones: the player watches everything they accumulated vanish in a single confirmed action. That IS the launch.
 
 The overlay shows:
-- Current prestige rank (live — it keeps ticking up during the watch)
-- Current fuel / 100,000 with a progress bar
-- Transfer controls (`[1]` 1,000 / `[2]` 10,000 / `[3]` Max)
-- Estimated PR/day generation rate and days-to-full if the player banked everything as it arrives
+- Current prestige rank against the 100,000 threshold, with a progress bar (live — rank keeps ticking up during the watch)
+- Estimated PR/day generation rate and days until the threshold is reached
+- The other three requirements with ✓/✗
 
 ### Phase 5: Launch Ready
 
-When `vessel_fuel >= 100,000`, the overlay changes to show a "Launch" option. The requirements section shows all green checkmarks. A `[Enter] Launch into the Void` prompt appears.
+When `prestige_rank >= 100,000` and the other gates are met (28 patterns, Ascension X, signal discovered), the overlay changes to show a "Launch" option. The requirements section shows all green checkmarks. A `[Enter] Launch into the Void` prompt appears.
 
 ### Phase 6: Launch Confirmation
 
 Pressing Enter on the ready screen shows a confirmation modal:
-- Lists what will happen (consume 100k PR worth of fuel, transform the Loom, begin voyage)
+- The burn, stated plainly: `P161,420  →  P61,420` (before → after)
+- Lists what will happen (100,000 PR consumed in one burn, the Loom transforms, the voyage begins)
 - "There is no return."
 - `[Enter] Confirm  [Esc] Cancel`
 
-On confirm: sets `vessel_launched: bool = true` on game state. The actual mode transition to Act 2 is handled by a future sub-project — for now, launch just sets the flag and shows a "Coming soon" message or similar placeholder.
+On confirm, in one action:
+
+```
+state.prestige_rank -= 100_000;
+state.recalculate_prestige_bonuses();
+state.derived_stats_dirty = true;
+state.vessel_launched = true;
+```
+
+The actual mode transition to Act 2 is handled by a future sub-project — for now, launch performs the burn, sets the flag, and shows a "Coming soon" message or similar placeholder.
 
 ## State Model
 
@@ -93,38 +97,29 @@ New fields on `GameState` (with `#[serde(default)]`):
 ```rust
 /// True after Z50 final boss first kill — enables ticker hints and [V] hotkey
 pub vessel_signal_discovered: bool,
-/// Accumulated PR fuel for Vessel construction (0-100,000)
-pub vessel_fuel: u32,
 /// True after player confirms launch — triggers Act 2 mode shift (future sub-project)
 pub vessel_launched: bool,
 ```
 
-No separate module needed yet. These three fields on `GameState` are sufficient for sub-project 1.
+No separate module and no fuel accumulator needed. These two fields on `GameState` are sufficient for sub-project 1 — the fuel gate reads `prestige_rank` directly.
 
-## Fuel Transfer Logic
+## Launch Burn Logic
 
-A single action handler in the Vessel overlay input path — no changes to any PR grant site:
+A single gate check and a single deduction in the launch confirmation handler — no changes to any PR grant site:
 
 ```
-fn transfer_fuel(state: &mut GameState, requested: u32) {
-    if !state.vessel_signal_discovered || state.vessel_launched {
-        return;
-    }
-    let room = 100_000u32.saturating_sub(state.vessel_fuel);
-    let amount = requested.min(state.prestige_rank).min(room);
-    if amount == 0 {
-        return;
-    }
-    state.prestige_rank -= amount;
-    state.vessel_fuel += amount;
-    state.recalculate_prestige_bonuses();
-    state.derived_stats_dirty = true;
+fn can_launch(state: &GameState, loom: &LoomState) -> bool {
+    state.vessel_signal_discovered
+        && !state.vessel_launched
+        && state.ascension_level >= 10
+        && crate::loom::all_patterns_complete(&loom.persistent)
+        && state.prestige_rank >= 100_000
 }
 ```
 
-(`vessel_signal_discovered` already implies Z50 was cleared — no separate `z50_cleared` flag is needed. The other launch gates are checked at launch time, not at transfer time.)
+(`vessel_signal_discovered` already implies Z50 was cleared — no separate `z50_cleared` flag is needed.)
 
-Note this is far simpler than intercepting PR income: grants remain untouched at all five sites (prestige action, WR→PR, Power Cores online/offline, challenge rewards), and achievement passive-PR tracking (#612) keeps working unmodified because rank genuinely goes up before the player chooses to spend it.
+The deduction happens exactly once, at confirmation (see Phase 6). This is the simplest possible model: PR grants remain untouched at all five sites (prestige action, WR→PR, Power Cores online/offline, challenge rewards), achievement passive-PR tracking (#612) keeps working unmodified, there is no partial state to persist, and the hero fights at full prestige bonuses for the entire wait.
 
 ## Z50 Detection
 
@@ -150,7 +145,7 @@ The codebase has two overlay mechanisms: the `GameOverlay` enum (`src/input/type
 - **Discovery modal:** `GameOverlay::VesselDiscovery` unit variant — the one-time reveal celebration when the signal is discovered (same as `DeepDiscovery`)
 - **Construction overlay:** a new `VesselUiState` struct with a `showing: bool` (the Deep/Loom pattern), dispatched from Step 2 of the input priority chain via a new `src/input/vessel_input.rs`
 - **Hotkey:** `[V]` in the base-hotkey block (Step 9 of the priority chain in `src/input/mod.rs`), gated by `vessel_signal_discovered`
-- **Within overlay:** `[Esc]` closes. `[1]`/`[2]`/`[3]` transfer 1,000 / 10,000 / Max PR to fuel. `[Enter]` triggers launch when ready. Arrow keys unused for now.
+- **Within overlay:** `[Esc]` closes. `[Enter]` triggers launch when ready. Arrow keys unused for now.
 
 ## UI Rendering
 
@@ -160,10 +155,9 @@ Layout:
 ```
 Row 0-8:   Ship ASCII art + narrative text
 Row 9:     Separator
-Row 10-13: Four requirement lines with ✓/✗
-Row 14:    Prestige balance + fuel gauge with progress bar
-Row 15:    Transfer controls ([1] 1,000  [2] 10,000  [3] Max)
-Row 16:    Generation rate + estimate (+ P50k warning line when relevant)
+Row 10-13: Four requirement lines with ✓/✗ (PR line shows rank / 100,000)
+Row 14-15: Rank progress bar toward 100,000
+Row 16:    Generation rate + days-until-ready estimate
 Row 17:    Footer ([Enter] Launch / [Esc] Close)
 ```
 
@@ -171,7 +165,7 @@ Row 17:    Footer ([Enter] Launch / [Esc] Close)
 
 | File | Change |
 |------|--------|
-| `src/core/game_state.rs` | Add `vessel_signal_discovered`, `vessel_fuel`, `vessel_launched` fields |
+| `src/core/game_state.rs` | Add `vessel_signal_discovered`, `vessel_launched` fields |
 | `src/core/tick_types.rs` | Add `VesselSignalDiscovered` tick event variant |
 | `src/core/tick_stages.rs` | Detect Z50 boss kill, emit event |
 | `src/tick_events.rs` | Handle `VesselSignalDiscovered` flag, add ticker messages |
@@ -184,10 +178,10 @@ Row 17:    Footer ([Enter] Launch / [Esc] Close)
 
 ## Testing
 
-- Unit test: transfer moves PR to fuel 1:1 and recalculates prestige bonuses
-- Unit test: transfer clamps to available rank and to the 100,000 cap
-- Unit test: transfer refused before signal discovery and after launch
-- Unit test: PR grants (WR→PR, Power Cores, challenges) are untouched during the fuel phase — rank keeps rising
+- Unit test: `can_launch` requires all four gates (signal, Ascension X, 28 patterns, 100,000 PR)
+- Unit test: launch deducts exactly 100,000, recalculates prestige bonuses, sets `vessel_launched`
+- Unit test: launch refused below 100,000 PR and after already launched
+- Unit test: PR grants (WR→PR, Power Cores, challenges) are untouched during the wait — rank keeps rising
 - Unit test: `vessel_signal_discovered` set on Z50 boss kill
 - Unit test: serde round-trip for new GameState fields (backwards compat)
 - Add save-format compatibility fixtures for the new fields (fixture corpus from #626)
