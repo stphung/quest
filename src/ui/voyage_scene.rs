@@ -132,7 +132,11 @@ fn render_chart_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
     let tree_height = tree_art.lines().count() as u16 + 1;
     let rows = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(tree_height), Constraint::Min(4)])
+        .constraints([
+            Constraint::Length(tree_height),
+            Constraint::Min(4),
+            Constraint::Length(1),
+        ])
         .split(inner);
 
     let mut tree_lines: Vec<Line> = tree_art
@@ -150,6 +154,51 @@ fn render_chart_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
 
     let lines = chart_lines(voyage, rows[1].width, rows[1].height);
     frame.render_widget(Paragraph::new(lines), rows[1]);
+
+    frame.render_widget(
+        Paragraph::new(legend_line(rows[2].width)).alignment(Alignment::Center),
+        rows[2],
+    );
+}
+
+/// One-line chart legend. The journey reads bottom-to-top, so the legend
+/// also anchors the direction of travel. Compact wording under narrow
+/// panels (the L tier gives the chart ~38 columns).
+fn legend_line(width: u16) -> Line<'static> {
+    let entries: &[(&str, Color, &str)] = if width >= 70 {
+        &[
+            ("\u{25c6}", GOLD, " you"),
+            ("\u{25c9}", VESSEL_VIOLET, " visited"),
+            ("\u{25cb}", Color::Gray, " known ahead"),
+            ("\u{25cc}", SEA_DIM, " unknown"),
+            ("\u{2715}", Color::DarkGray, " passed by"),
+        ]
+    } else {
+        &[
+            ("\u{25c6}", GOLD, " you"),
+            ("\u{25c9}", VESSEL_VIOLET, " past"),
+            ("\u{25cb}", Color::Gray, " ahead"),
+            ("\u{2715}", Color::DarkGray, " shut"),
+        ]
+    };
+    let mut spans = Vec::new();
+    for (i, (glyph, color, label)) in entries.iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::styled(
+                "  \u{00b7}  ",
+                Style::default().fg(Color::DarkGray),
+            ));
+        }
+        spans.push(Span::styled(*glyph, Style::default().fg(*color)));
+        spans.push(Span::styled(*label, Style::default().fg(Color::DarkGray)));
+    }
+    if width >= 100 {
+        spans.push(Span::styled(
+            "  \u{00b7}  the Tree lies north",
+            Style::default().fg(Color::DarkGray),
+        ));
+    }
+    Line::from(spans)
 }
 
 /// Pure chart rendering: the viewport around the Vessel as styled lines.
