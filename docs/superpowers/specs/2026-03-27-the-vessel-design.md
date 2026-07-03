@@ -102,11 +102,14 @@ player chooses. The chart is the main screen of Act 2.
 
 ### The Rhythm: Legs and Arrivals
 
-- **A leg** (waypoint → waypoint) is the idle unit: **1–3 real days**, each
-  leg flavored — a favoring current, a debris field that taxes the hull, a
-  silence that frays hope. Ambient moments tick by in the log ("the watch
-  changes; Runa hums an old net-song"). The footer always reads:
-  *Arriving at ⟨place⟩ in ~⟨time⟩.*
+- **A leg** (waypoint → waypoint) is the idle unit: **1–3 real days** — and
+  not dead time. The void has **weather** (currents, silence-banks, squalls
+  that move on the chart in real time), the ship has **trim** (one posture
+  dial priced against today's weather), and the night has **watches**
+  (typed nights, scheduled souls, a log the nights write themselves).
+  Other pilgrims' lights cross the chart on their own roads. See
+  [2026-07-03-vessel-underway-design.md](2026-07-03-vessel-underway-design.md).
+  The footer always reads: *Arriving at ⟨place⟩ in ~⟨time⟩.*
 - **An arrival** is the active unit: a scene at a named place that **pays
   off the road you chose** — the shipyard the rumor promised, the survivor
   the wreck held, the toll the hungry road took. You read it, you collect
@@ -230,9 +233,11 @@ No conversions, no crafting, no production trickle: sources are places and
 letters, sinks are roads. Every resource problem has the same answer the
 game wants you to reach — *look at the chart and pick a road*.
 
-**Leg ambience** replaces auto-combat: the void's moments write log lines
-and color the scene at the next arrival; the player's defenses are route
-choice, refits, and stationed souls — not DPS.
+**The travel layer** replaces auto-combat (see the Underway spec): weather
+prices time, hope, and provisions; trim and the watch rotation are the
+standing choices between junctions; the log is the voice of the crossing.
+The player's defenses are route choice, refits, trim, and the watch —
+not DPS.
 
 ### Letters From Home — and the Going-Dark
 
@@ -318,7 +323,7 @@ Never: grind, optimize, reset.
 | 2 | The Route & the Waypoints | chart structure, leg/arrival state machine, junction choice rules, road character & pricing, fog & rumors, tree-on-horizon render | **Next to write** |
 | 3 | The Souls | roster, stations, arcs, hope, loss & memorial, offline covenant | Not started |
 | 4 | Arrival Scenes | scene delivery system, road/refit/soul recoloring, scene shapes, writing pipeline | Not started |
-| 5 | The Vessel Underway | provisions & hope, drift, refits, leg ambience & named threats | Not started |
+| 5 | Underway — Weather, Trim & the Watch | void weather, trim postures, night types & watch rotation, the log, pilgrim ships, drift, refits | **Spec written** — [2026-07-03-vessel-underway-design.md](2026-07-03-vessel-underway-design.md) |
 | 6 | Letters From Home & the Going-Dark | care packages, letter templates, the midpoint event | Not started |
 | 7 | The Arrival | final approach, manifest, keepsake chart, Act 3 gate | Not started |
 
