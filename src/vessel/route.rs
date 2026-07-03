@@ -185,6 +185,11 @@ pub const ROUTE_START: WaypointId = WaypointId(0);
 /// The only sink: the Tree.
 pub const ROUTE_SINK: WaypointId = WaypointId(37);
 
+/// The chart canvas dimensions — every `chart_pos` lives inside this box
+/// (the renderer's viewport and the keepsake chart's pan both clamp to it).
+pub const CHART_CANVAS_W: u16 = 120;
+pub const CHART_CANVAS_H: u16 = 90;
+
 /// The v1 route: 38 authored waypoints (~24 seen on any taken path).
 pub const WAYPOINTS: [Waypoint; 38] = [
     // ── Chapter I: The Shallows ─────────────────────────────────────────────

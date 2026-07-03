@@ -616,8 +616,23 @@ fn main() -> io::Result<()> {
                                 });
                             }
                             if let Some(playback) = v.take_finale_playback() {
+                                // The crossing is over: Act 3's gate opens
+                                // the moment the finale surfaces.
+                                state.vessel_arrived = true;
                                 voyage_ui.scene_play =
                                     Some(vessel::ScenePlay { playback, index: 0 });
+                                if !debug_mode {
+                                    let _ = vessel::persistence::save_voyage(v);
+                                    save_files(
+                                        &character_manager,
+                                        &state,
+                                        &global_achievements,
+                                        &haven,
+                                        &enhancement,
+                                        &deep_state,
+                                        &loom_state,
+                                    );
+                                }
                             }
 
                             terminal.draw(|frame| {

@@ -39,6 +39,8 @@ pub(super) struct CharacterSaveData {
     pub(super) vessel_signal_discovered: bool,
     #[serde(default)]
     pub(super) vessel_launched: bool,
+    #[serde(default)]
+    pub(super) vessel_arrived: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -156,6 +158,7 @@ mod tests {
             ascension_level: 0,
             vessel_signal_discovered: false,
             vessel_launched: false,
+            vessel_arrived: false,
             vessel_last_whisper_at: 0,
             chrono_surge_active: false,
             debug_force_overcharge: false,

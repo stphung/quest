@@ -39,6 +39,8 @@ pub(crate) struct FlatGameState {
     pub vessel_signal_discovered: bool,
     #[serde(default)]
     pub vessel_launched: bool,
+    #[serde(default)]
+    pub vessel_arrived: bool,
 }
 
 impl From<&crate::core::game_state::GameState> for FlatGameState {
@@ -64,6 +66,7 @@ impl From<&crate::core::game_state::GameState> for FlatGameState {
             ascension_level: state.ascension_level,
             vessel_signal_discovered: state.vessel_signal_discovered,
             vessel_launched: state.vessel_launched,
+            vessel_arrived: state.vessel_arrived,
         }
     }
 }
@@ -100,6 +103,7 @@ impl FlatGameState {
             ascension_level: self.ascension_level,
             vessel_signal_discovered: self.vessel_signal_discovered,
             vessel_launched: self.vessel_launched,
+            vessel_arrived: self.vessel_arrived,
             // Transient fields — defaults
             vessel_last_whisper_at: 0,
             active_fishing: None,

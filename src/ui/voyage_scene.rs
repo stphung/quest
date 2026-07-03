@@ -43,9 +43,15 @@ pub fn render_voyage(
         return;
     }
 
-    match ctx.tier {
-        SizeTier::XL | SizeTier::L => render_full(frame, area, voyage, ui),
-        _ => render_strip(frame, area, voyage, ui),
+    // The harbor's rooms (arrived only) take the whole frame at any tier.
+    match ui.view {
+        VoyageView::Manifest { scroll } => render_manifest(frame, area, voyage, scroll),
+        VoyageView::Keepsake { x, y } => render_keepsake_chart(frame, area, voyage, x, y),
+        VoyageView::Record { scroll } => render_record(frame, area, voyage, scroll),
+        _ => match ctx.tier {
+            SizeTier::XL | SizeTier::L => render_full(frame, area, voyage, ui),
+            _ => render_strip(frame, area, voyage, ui),
+        },
     }
 
     let scene_waiting = matches!(
@@ -249,6 +255,10 @@ fn render_full(frame: &mut Frame, area: Rect, voyage: &VoyageState, ui: &VoyageU
             render_farewell_panel(frame, cols[1], voyage, selected)
         }
         VoyageView::Chart => render_vessel_panel(frame, cols[1], voyage),
+        // Full-frame rooms are intercepted in `render_voyage`.
+        VoyageView::Manifest { .. } | VoyageView::Keepsake { .. } | VoyageView::Record { .. } => {
+            render_vessel_panel(frame, cols[1], voyage)
+        }
     }
 }
 
@@ -343,15 +353,33 @@ fn legend_line(width: u16) -> Line<'static> {
     Line::from(spans)
 }
 
+/// The route canvas dimensions (chart coordinates live in this space).
+pub const CANVAS_W: i32 = 120;
+pub const CANVAS_H: i32 = 90;
+
 /// Pure chart rendering: the viewport around the Vessel as styled lines.
 /// Exposed for snapshot tests.
 pub fn chart_lines(voyage: &VoyageState, width: u16, height: u16) -> Vec<Line<'static>> {
     let (ship_x, ship_y) = ship_position(voyage);
+    chart_lines_centered(voyage, width, height, ship_x, ship_y)
+}
+
+/// The chart viewport centered on an arbitrary canvas point (the keepsake
+/// chart pans this). Fog rules are identical everywhere: visited bright,
+/// untaken crossed out, unvisited nameless — panning reveals nothing.
+pub fn chart_lines_centered(
+    voyage: &VoyageState,
+    width: u16,
+    height: u16,
+    center_x: u16,
+    center_y: u16,
+) -> Vec<Line<'static>> {
+    let (ship_x, ship_y) = ship_position(voyage);
     let w = width.max(10) as i32;
     let h = height.max(4) as i32;
-    // Viewport top-left in canvas space, centered on the ship, clamped.
-    let vx = (ship_x as i32 - w / 2).clamp(0, (120 - w).max(0));
-    let vy = (ship_y as i32 - h / 2).clamp(0, (90 - h).max(0));
+    // Viewport top-left in canvas space, clamped.
+    let vx = (center_x as i32 - w / 2).clamp(0, (CANVAS_W - w).max(0));
+    let vy = (center_y as i32 - h / 2).clamp(0, (CANVAS_H - h).max(0));
 
     let sea = if voyage.gone_dark {
         Color::Rgb(45, 52, 74) // after the Going-Dark, even the water dims
@@ -423,9 +451,23 @@ pub fn chart_lines(voyage: &VoyageState, width: u16, height: u16) -> Vec<Line<'s
         }
     }
 
+    // The harbor is calm: no weather, no roaming lights — only the Sister
+    // Verity's lamp, moored beside the Tree for whatever comes after.
+    let arrived = matches!(voyage.phase, VoyagePhase::Arrived { .. });
+    if arrived {
+        let (sx, sy) = route::waypoint(route::ROUTE_SINK).chart_pos;
+        put(
+            sx as i32 - 2,
+            sy as i32,
+            '\u{2600}', // ☀ — her glyph on the chart all crossing long
+            Color::LightYellow,
+            &mut grid,
+        );
+    }
+
     // The void's weather, on road midpoints (spec 5): currents cyan,
     // silence a cold gray, squalls a stormy blue.
-    for wx in voyage.weather_visible() {
+    for wx in voyage.weather_visible().into_iter().filter(|_| !arrived) {
         let r = route::road(wx.road);
         let a = route::waypoint(r.from).chart_pos;
         let b = route::waypoint(r.to).chart_pos;
@@ -441,7 +483,7 @@ pub fn chart_lines(voyage: &VoyageState, width: u16, height: u16) -> Vec<Line<'s
     }
 
     // Other pilgrims: moving lights on their roads.
-    for (ship, road) in voyage.pilgrims_today() {
+    for (ship, road) in voyage.pilgrims_today().into_iter().filter(|_| !arrived) {
         let r = route::road(road);
         let a = route::waypoint(r.from).chart_pos;
         let b = route::waypoint(r.to).chart_pos;
@@ -556,6 +598,13 @@ fn line_points(from: (u16, u16), to: (u16, u16)) -> Vec<(i32, i32)> {
 // ── The Vessel panel (right column, chart view) ─────────────────────────────
 
 fn render_vessel_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
+    // Moored at the Tree, the panel becomes the harbor: the gauges retire
+    // (they were the crossing), and the rooms open.
+    if matches!(voyage.phase, VoyagePhase::Arrived { .. }) {
+        render_harbor_panel(frame, area, voyage);
+        return;
+    }
+
     let block = Block::default()
         .title(" \u{25c6} The Vessel ")
         .borders(Borders::ALL)
@@ -778,19 +827,26 @@ fn phase_lines(voyage: &VoyageState) -> Vec<Line<'static>> {
                 Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
             )),
             Line::from(Span::styled(
-                format!("The crossing took {} days.", at_min / MINUTES_PER_DAY),
+                format!(
+                    "Moored in the root-harbor \u{2014} the crossing took {} days.",
+                    at_min / MINUTES_PER_DAY
+                ),
                 Style::default().fg(Color::Gray),
             )),
             Line::from(Span::styled(
-                "(The finale arrives with a later update.)",
-                Style::default().fg(Color::DarkGray),
+                "The Sister Verity lies alongside.",
+                Style::default().fg(Color::Gray),
             )),
         ],
     }
 }
 
 fn footer_keys(voyage: &VoyageState) -> Vec<Line<'static>> {
-    let mut keys = vec!["[S] Souls", "[W] Watch", "[T] Trim", "[R] Log"];
+    let mut keys = if matches!(voyage.phase, VoyagePhase::Arrived { .. }) {
+        vec!["[M] Manifest", "[K] Chart", "[R] Record"]
+    } else {
+        vec!["[S] Souls", "[W] Watch", "[T] Trim", "[R] Log"]
+    };
     if matches!(
         voyage.phase,
         VoyagePhase::HoldingStation {
@@ -1414,6 +1470,343 @@ fn render_scene_modal(frame: &mut Frame, area: Rect, modal: &SceneModal) {
         Paragraph::new(lines)
             .alignment(Alignment::Center)
             .wrap(Wrap { trim: false }),
+        inner,
+    );
+}
+
+// ── The harbor (spec 7: the Arrived state's home) ───────────────────────────
+
+fn render_harbor_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
+    let block = Block::default()
+        .title(" \u{2693} The Root-Harbor ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GOLD));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let mut lines: Vec<Line> = vec![Line::from("")];
+    lines.extend(phase_lines(voyage));
+    lines.push(Line::from(""));
+    let ashore = voyage.aboard_count();
+    lines.push(Line::from(Span::styled(
+        format!(
+            "{ashore} soul{} came ashore.",
+            if ashore == 1 { "" } else { "s" }
+        ),
+        Style::default().fg(Color::White),
+    )));
+    let carved = voyage.carved_names();
+    if !carved.is_empty() {
+        lines.push(Line::from(Span::styled(
+            format!("Carved into the hull: {}", carved.join(", ")),
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "Nothing ticks here. The rooms keep.",
+        Style::default().fg(Color::DarkGray),
+    )));
+    lines.push(Line::from(""));
+    for key_line in footer_keys(voyage) {
+        lines.push(key_line);
+    }
+    frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+}
+
+/// The manifest: a ship's document, not a report card. Facts a captain
+/// would know; no totals, no ranks, no score.
+fn render_manifest(frame: &mut Frame, area: Rect, voyage: &VoyageState, scroll: u16) {
+    use crate::vessel::refits::REFIT_PAIRS;
+    use crate::vessel::souls;
+    use crate::vessel::voyage::SoulStatus;
+
+    frame.render_widget(Clear, area);
+    let block = Block::default()
+        .title(" \u{2693} The Manifest ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GOLD));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let header = |text: &str| {
+        Line::from(Span::styled(
+            text.to_string(),
+            Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+        ))
+    };
+    let entry = |text: String| {
+        Line::from(Span::styled(
+            format!("  {text}"),
+            Style::default().fg(Color::White),
+        ))
+    };
+    let note = |text: String| {
+        Line::from(Span::styled(
+            format!("    {text}"),
+            Style::default().fg(Color::Gray),
+        ))
+    };
+
+    let mut lines: Vec<Line> = vec![Line::from("")];
+
+    // The crossing.
+    lines.push(header("The crossing"));
+    let days = match voyage.phase {
+        VoyagePhase::Arrived { at_min } => at_min / MINUTES_PER_DAY,
+        _ => voyage.day_index(),
+    };
+    lines.push(entry(format!(
+        "The Vessel \u{2014} out of {} for {}",
+        route::waypoint(route::ROUTE_START).name,
+        route::waypoint(route::ROUTE_SINK).name
+    )));
+    lines.push(note(format!(
+        "{days} days at sea \u{00b7} {} ports of call",
+        voyage.visited.len()
+    )));
+    lines.push(Line::from(""));
+
+    // The souls, grouped by how their stories ended. Souls never met are
+    // not listed: the manifest records the crossing that happened.
+    lines.push(header("The souls"));
+    let aboard: Vec<_> = voyage
+        .souls
+        .iter()
+        .filter(|s| s.status == SoulStatus::Aboard)
+        .collect();
+    if !aboard.is_empty() {
+        lines.push(note("Came ashore".to_string()));
+        for s in aboard {
+            let def = souls::soul(s.soul);
+            let post = match s.station {
+                Some(p) => format!("last stood the {}", p.display_name().to_lowercase()),
+                None => "rested the last leg".to_string(),
+            };
+            let resolution = def
+                .arc
+                .last()
+                .map(|b| format!(" \u{00b7} \u{201c}{}\u{201d}", b.title))
+                .unwrap_or_default();
+            lines.push(entry(format!("{} \u{2014} {post}{resolution}", def.name)));
+        }
+    }
+    let away: Vec<_> = voyage
+        .souls
+        .iter()
+        .filter(|s| matches!(s.status, SoulStatus::Ashore | SoulStatus::Declined))
+        .collect();
+    if !away.is_empty() {
+        lines.push(note("Went their own way".to_string()));
+        for s in away {
+            let def = souls::soul(s.soul);
+            let where_ = s
+                .left_at
+                .map(|w| route::waypoint(w).name)
+                .unwrap_or("along the road");
+            let verb = if s.status == SoulStatus::Ashore {
+                "stepped ashore at"
+            } else {
+                "stayed behind at"
+            };
+            lines.push(entry(format!("{} \u{2014} {verb} {where_}", def.name)));
+        }
+    }
+    let carved = voyage.carved_names();
+    if !carved.is_empty() {
+        lines.push(note("Carved into the hull".to_string()));
+        for name in carved {
+            lines.push(entry(format!(
+                "{name} \u{2014} the hull carries the name the rest of the way"
+            )));
+        }
+    }
+    lines.push(Line::from(""));
+
+    // The hold.
+    lines.push(header("The hold"));
+    if voyage.keepsakes.is_empty() {
+        lines.push(note(
+            "No keepsakes. The crossing itself will have to do.".to_string(),
+        ));
+    }
+    for keepsake in &voyage.keepsakes {
+        lines.push(entry(keepsake.clone()));
+    }
+    let mut senders: Vec<&'static str> = Vec::new();
+    for l in crate::vessel::letters::LETTERS
+        .iter()
+        .take(voyage.letters_received.min(12) as usize)
+    {
+        if !senders.contains(&l.sender) {
+            senders.push(l.sender);
+        }
+    }
+    let has_last_letter = voyage
+        .visited
+        .contains(&crate::vessel::route::WaypointId(23));
+    let letters_kept = voyage.letters_received.min(12) as usize + usize::from(has_last_letter);
+    if letters_kept > 0 {
+        if has_last_letter {
+            senders.push(crate::vessel::letters::LAST_LETTER.sender);
+        }
+        lines.push(entry(format!("Letters kept: {letters_kept}")));
+        lines.push(note(format!("from {}", senders.join(", "))));
+    }
+    lines.push(Line::from(""));
+
+    // The wake.
+    lines.push(header("The wake"));
+    lines.push(entry(format!("Rumors heard: {}", voyage.rumors.len())));
+    for refit in &voyage.refits {
+        // The one place the manifest admits a road not taken: the refit
+        // door the player closed, chosen looking at both.
+        let closed = REFIT_PAIRS
+            .iter()
+            .find_map(|p| {
+                if p.a == *refit {
+                    Some(p.b)
+                } else if p.b == *refit {
+                    Some(p.a)
+                } else {
+                    None
+                }
+            })
+            .map(|other| format!(" \u{2014} the {} stayed on the shelf", other.display_name()))
+            .unwrap_or_default();
+        lines.push(entry(format!("Refit: {}{closed}", refit.display_name())));
+    }
+    if voyage.gone_dark {
+        lines.push(note(
+            "The mail stopped past the Last Lantern. It did not resume.".to_string(),
+        ));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "\u{2191}\u{2193} scroll  \u{00b7}  [Esc] the harbor",
+        Style::default().fg(Color::DarkGray),
+    )));
+    frame.render_widget(
+        Paragraph::new(lines)
+            .wrap(Wrap { trim: false })
+            .scroll((scroll, 0)),
+        inner,
+    );
+}
+
+/// The keepsake chart: the whole canvas, pannable. Untaken roads keep
+/// their cross, unvisited waypoints keep their fog and their namelessness
+/// — this is a map of *your crossing*, never of the world.
+fn render_keepsake_chart(frame: &mut Frame, area: Rect, voyage: &VoyageState, x: u16, y: u16) {
+    frame.render_widget(Clear, area);
+    let block = Block::default()
+        .title(" \u{2726} The Keepsake Chart ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GOLD));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(4), Constraint::Length(1)])
+        .split(inner);
+
+    let lines = chart_lines_centered(voyage, rows[0].width, rows[0].height, x, y);
+    frame.render_widget(Paragraph::new(lines), rows[0]);
+
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            "\u{2190}\u{2191}\u{2193}\u{2192} pan  \u{00b7}  \u{2715} roads not taken \
+             \u{00b7}  \u{25cc} what the fog kept  \u{00b7}  [Esc] the harbor",
+            Style::default().fg(Color::DarkGray),
+        )))
+        .alignment(Alignment::Center),
+        rows[1],
+    );
+}
+
+/// The record: the complete Log, oldest first, with the letters bound in
+/// at full length. The act's paper trail, kept.
+fn render_record(frame: &mut Frame, area: Rect, voyage: &VoyageState, scroll: u16) {
+    use crate::vessel::letters::{LAST_LETTER, LETTERS, MAIL_FAILS_LOG};
+    use crate::vessel::voyage::SoulStatus;
+
+    frame.render_widget(Clear, area);
+    let block = Block::default()
+        .title(" \u{2042} The Record ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GOLD));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let mut lines: Vec<Line> = vec![Line::from("")];
+    lines.push(Line::from(Span::styled(
+        "The crossing, in order",
+        Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+    )));
+    for entry in &voyage.log {
+        lines.push(Line::from(Span::styled(
+            format!("  \u{00b7} {entry}"),
+            Style::default().fg(Color::Gray),
+        )));
+    }
+
+    let kept = voyage.letters_received.min(12) as usize;
+    let has_last_letter = voyage
+        .visited
+        .contains(&crate::vessel::route::WaypointId(23));
+    if kept > 0 || has_last_letter {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "The letters, kept",
+            Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+        )));
+        let mut letters: Vec<&crate::vessel::letters::LetterDef> =
+            LETTERS.iter().take(kept).collect();
+        if has_last_letter {
+            letters.push(&LAST_LETTER);
+        }
+        for letter in letters {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                format!("From {}:", letter.sender),
+                Style::default().fg(Color::White),
+            )));
+            lines.push(Line::from(Span::styled(
+                format!("  {}", letter.text),
+                Style::default().fg(Color::Gray),
+            )));
+            if let Some((soul, ps)) = letter.postscript {
+                let aboard = voyage
+                    .soul_state(soul)
+                    .is_some_and(|s| s.status == SoulStatus::Aboard);
+                if aboard {
+                    lines.push(Line::from(Span::styled(
+                        format!("  {ps}"),
+                        Style::default().fg(VESSEL_VIOLET),
+                    )));
+                }
+            }
+        }
+        if voyage.gone_dark {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                MAIL_FAILS_LOG.to_string(),
+                Style::default().fg(Color::DarkGray),
+            )));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "\u{2191}\u{2193} scroll  \u{00b7}  [Esc] the harbor",
+        Style::default().fg(Color::DarkGray),
+    )));
+    frame.render_widget(
+        Paragraph::new(lines)
+            .wrap(Wrap { trim: false })
+            .scroll((scroll, 0)),
         inner,
     );
 }

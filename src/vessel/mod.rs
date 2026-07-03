@@ -66,6 +66,21 @@ pub enum VoyageView {
     Farewell {
         selected: usize,
     },
+    /// The manifest — the harbor's first room (spec 7, arrived only).
+    Manifest {
+        scroll: u16,
+    },
+    /// The keepsake chart, pannable; `(x, y)` is the canvas point the
+    /// viewport centers on (spec 7, arrived only).
+    Keepsake {
+        x: u16,
+        y: u16,
+    },
+    /// The record — the complete Log with the letters bound in
+    /// (spec 7, arrived only).
+    Record {
+        scroll: u16,
+    },
 }
 
 /// A scene being read: title line + body text.

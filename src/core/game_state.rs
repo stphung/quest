@@ -85,6 +85,10 @@ pub struct GameState {
     pub vessel_signal_discovered: bool,
     /// True after the player confirms the Vessel launch and burns 100,000 PR
     pub vessel_launched: bool,
+    /// True once the Vessel reaches the Tree — the crossing is over and
+    /// Act 3, whenever it exists, keys off this the way Act 2 keyed off
+    /// `vessel_launched` (persistent, survives everything)
+    pub vessel_arrived: bool,
     /// Play-time seconds when the last Vessel whisper was pushed (transient)
     pub vessel_last_whisper_at: u64,
     /// Active challenge minigame (transient, not saved)
@@ -167,6 +171,7 @@ impl GameState {
             ascension_level: 0,
             vessel_signal_discovered: false,
             vessel_launched: false,
+            vessel_arrived: false,
             vessel_last_whisper_at: 0,
             active_minigame: None,
             session_kills: 0,

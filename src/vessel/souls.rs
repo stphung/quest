@@ -136,6 +136,9 @@ pub struct SoulDef {
     /// The one-line personality that colors log moments and scenes.
     pub voice: &'static str,
     pub origin: &'static str,
+    /// One paragraph at the rail, in their voice, read at the finale
+    /// if they are aboard when the Vessel reaches the Tree (spec 7).
+    pub rail_line: &'static str,
     /// One aptitude axis: strengthens the matching station AND is what
     /// nights read (spec 5). `None` means their value is counsel and arc.
     pub affinity: Option<Station>,
@@ -169,6 +172,10 @@ pub const SOULS: [SoulDef; 8] = [
         name: "Torvald",
         voice: "I've been lower than dark. It blinks first.",
         origin: "captain of the Deep's guild",
+        rail_line: "Torvald stands at the rail with both hands open, holding \
+                    nothing, on purpose. \"Thirty layers down I learned the \
+                    dark blinks first,\" he says. \"Nobody told me what comes \
+                    after it blinks. This. This comes after.\"",
         affinity: Some(Station::Helm),
         sites: &[],
         arc: &[
@@ -222,6 +229,11 @@ pub const SOULS: [SoulDef; 8] = [
         name: "Eir",
         voice: "A ship is a house that argues with the sea.",
         origin: "warden of the Haven",
+        rail_line: "Eir counts the crew at the rail the way she counted \
+                    bunks in the Haven, and for once the number comes out \
+                    right. \"There are rooms in those roots,\" she says, \
+                    already planning. \"Somebody will need to argue with \
+                    them about drafts.\"",
         affinity: Some(Station::Tender),
         sites: &[],
         arc: &[
@@ -278,6 +290,10 @@ pub const SOULS: [SoulDef; 8] = [
         name: "Runa",
         voice: "Everything worth catching sings first.",
         origin: "the fisher",
+        rail_line: "Runa leans out over the water and listens before she \
+                    looks, the way she always has. \"It's singing,\" she \
+                    says. \"The whole harbor. I told you — everything worth \
+                    catching sings first, and we caught it.\"",
         affinity: Some(Station::Watch),
         sites: &[],
         arc: &[
@@ -330,6 +346,10 @@ pub const SOULS: [SoulDef; 8] = [
         name: "Maren",
         voice: "A light is a promise somebody has to keep.",
         origin: "the last lightship keeper",
+        rail_line: "Maren watches the lit windows in the root-walls and does \
+                    not blink, cataloguing every lamp like a keeper taking \
+                    inventory of a coastline. \"Somebody kept the promise,\" \
+                    she says quietly. \"All this way out, somebody kept it.\"",
         affinity: Some(Station::Watch),
         sites: &[WaypointId(1)],
         arc: &[
@@ -382,6 +402,10 @@ pub const SOULS: [SoulDef; 8] = [
         name: "Sefa",
         voice: "The dead don't need the song. The living do.",
         origin: "the last cantor of the drowned parishes",
+        rail_line: "Sefa sings one verse at the rail — not the office for \
+                    the drowned, a different one, older, that nobody aboard \
+                    has heard her use. \"Arrival hymn,\" she explains, \
+                    embarrassed. \"I kept it dry the whole way. In case.\"",
         affinity: None,
         sites: &[WaypointId(3), WaypointId(5)],
         arc: &[
@@ -434,6 +458,10 @@ pub const SOULS: [SoulDef; 8] = [
         name: "Ysolt",
         voice: "Hulls and hearts. Same joinery, mostly.",
         origin: "a mender from Saint Elm's",
+        rail_line: "Ysolt runs a palm along the rail, reading the crossing \
+                    out of the wood grain — every strain, every mend, every \
+                    league. \"She held,\" is the verdict, delivered like a \
+                    diagnosis. \"Hulls and hearts. Both held.\"",
         affinity: Some(Station::Tender),
         sites: &[WaypointId(14), WaypointId(16), WaypointId(18)],
         arc: &[
@@ -486,6 +514,11 @@ pub const SOULS: [SoulDef; 8] = [
         name: "Cormac",
         voice: "Charts end. Roads don't.",
         origin: "a pilot of the uncharted lanes",
+        rail_line: "Cormac looks at the root-harbor the way other men look \
+                    at a finished map, which is to say with suspicion. \
+                    \"Charts end,\" he says, and then, grudging, granting \
+                    it: \"Roads don't. There'll be roads out of here too. \
+                    Someday somebody should walk one.\"",
         affinity: Some(Station::Helm),
         sites: &[WaypointId(20), WaypointId(21)],
         arc: &[
@@ -538,6 +571,11 @@ pub const SOULS: [SoulDef; 8] = [
         name: "Brother Wren",
         voice: "I slept in the deep. It dreams, you know.",
         origin: "woken from the Sleepers' Trench",
+        rail_line: "Brother Wren does not look at the Tree. He looks back, \
+                    once, the only soul aboard who does, and then turns \
+                    around smiling like a man waking on purpose for the \
+                    first time. \"The deep dreams,\" he says. \"It dreamed \
+                    this. I remember now.\"",
         affinity: None,
         sites: &[WaypointId(26), WaypointId(28)],
         arc: &[

@@ -630,6 +630,35 @@ pub const SCENES: [SceneDef; 38] = [
     },
 ];
 
+// ── The finale's closing beats (spec 7) ─────────────────────────────────────
+// Appended to W37's authored beats by `take_finale_playback`: the rail
+// lines come from the souls aboard, then (if names were carved) the
+// memorial, then these two — the harbor, and the lamp.
+
+/// The carved-names beat, present only on crossings that carried a loss.
+pub fn finale_carved_beat(names: &[&str]) -> String {
+    format!(
+        "Before anyone goes ashore, the crew gathers at the rail where the \
+         names are carved \u{2014} {} \u{2014} and reads them within sight \
+         of the Tree. They crossed. The hull carried them the whole way.",
+        names.join(", ")
+    )
+}
+
+/// The Sister Verity, moored in the root-harbor. The act's one outward hook.
+pub const FINALE_HARBOR: &str =
+    "The Sister Verity lies alongside the root-quay, lamps banked, hull \
+     scarred by her own crossing. Her mate waves the Vessel in to the berth \
+     beside her as if it had been held. \u{201c}The rest of you made it,\u{201d} \
+     she calls across the water. \u{201c}Good. She said you would.\u{201d}";
+
+/// The closing beat: a door in the root-wall, closed, with a lamp beside it.
+pub const FINALE_LAMP: &str =
+    "Up the quay, past the galley fires and the bell, there is a door in \
+     the root-wall. It is closed. Beside it, a lamp is lit. Nobody says \
+     anything about the door. The harbor has rooms; the rooms have doors; \
+     one of them, later, is yours.";
+
 #[cfg(test)]
 mod tests {
     use super::*;
