@@ -122,7 +122,7 @@ Blocked when dungeon, fishing, or minigame is active. Once discovered, `enhancem
 - **core/tick.rs**: Stage 3 passes `enhancement.levels` to `calculate_derived_stats()`. Stage 11 rolls for Soulforge discovery (`try_discover_soulforge()`), emits `TickEvent::SoulforgeDiscovered`, and sets `enhancement_changed` flag
 - **core/tick.rs**: `game_tick()` takes `enhancement: &mut EnhancementProgress` as a parameter
 - **main.rs**: Loads/saves enhancement state. Handles Soulforge input routing and overlay management via `SoulforgeUiState`
-- **achievements/types.rs**: `on_soulforge_discovered()` and `on_enhancement_upgraded()` track Soulforge-related milestones
+- **achievements/handlers.rs**: `on_soulforge_discovered()` and `on_enhancement_upgraded()` track Soulforge-related milestones
 - **ui/soulforge_scene.rs**: Soulforge overlay rendering (slot list, enhancement animation, result display)
 
 ## Constants (`types.rs`)

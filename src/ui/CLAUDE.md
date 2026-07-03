@@ -83,6 +83,8 @@ src/ui/
 ├── ascension_scene.rs          # Ascension overlay UI (level display, cost/gate info, ascend confirmation)
 ├── stormglass_scene.rs         # Stormglass Exchange overlay with animations (Invoke Trial rolling, Chrono Surge speed ramp/fast-forward, Storm Sigils daily rotation, Storm Lure)
 ├── time_vault_scene.rs         # Time Vault overlay (branch/commit browser, restore, fork, GitHub cloud sync)
+├── vessel_scene.rs             # Vessel discovery modal and construction/launch-confirmation overlay (Act 2 kill-switch gated)
+├── voyage_scene.rs             # Act 2 "Crossing" main screen (chart/junction/trim/souls/watch/farewell views); imports vessel_scene::VESSEL_VIOLET
 ├── scene_fx.rs                 # Shared utilities for layered ASCII scene rendering (wide char support, SceneCell::new(), put_text_centered(), display_width())
 ├── overlay_layout.rs            # Shared overlay layout helpers for consistent overlay rendering
 ├── zone_bg.rs                  # Stylized zone background scenes (6-layer compositing, unique backgrounds for all 30 zones)

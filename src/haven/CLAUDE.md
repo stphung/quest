@@ -87,11 +87,12 @@ Haven bonuses are consumed by other systems via parameter passing:
 
 - **Items** (`items/drops.rs`): `try_drop_from_mob(state, zone_id, drop_bonus, rarity_bonus)` — Trophy Hall and Workshop bonuses (mob drops only, not boss drops)
 - **Challenges** (`challenges/menu.rs`): Library discovery rate boost
-- **Combat/XP** (`core/game_logic.rs`): Training Yard XP multiplier, Armory damage, Watchtower crit, War Room double strike
+- **Combat** (`core/tick_stages.rs`): Builds the unified `CombatBonuses` struct each tick, carrying Armory damage%, Watchtower crit%, and War Room double strike% from Haven bonuses; **Combat math** (`core/power_rating.rs`): applies the damage/crit/double-strike calculations
+- **XP** (`core/xp.rs`): `combat_kill_xp()` applies the Training Yard XP multiplier
 - **Fishing** (`fishing/logic.rs`): `HavenFishingBonuses` struct with Garden timer reduction, Fishing Dock double fish chance, max rank bonus
-- **Offline** (`core/game_logic.rs`): Hearthstone offline XP bonus
+- **Offline** (`core/offline.rs`): `calculate_offline_xp()` applies the Hearthstone offline XP bonus
 - **UI** (`ui/haven_scene.rs`): Haven overlay for building/upgrading
-- **Input** (`input.rs`): `HavenUiState` manages the overlay
+- **Input** (`input/types.rs`, `input/haven_input.rs`): `HavenUiState` is defined in `input/types.rs` and consumed by the overlay input handler in `input/haven_input.rs`
 
 ## Haven UI
 

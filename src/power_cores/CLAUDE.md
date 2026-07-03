@@ -66,4 +66,6 @@ Power Cores state is persisted as part of the Deep system. `DeepState.persistent
 - **Core** (`core/tick_types.rs`): `TickEvent::PowerCoreGranted { core_name }` variant; `TickResult::deep_changed` flag
 - **Achievements** (`achievements/types.rs`): `PowerCoreI` through `PowerCoreVI` achievement IDs unlock each core
 - **Deep** (`deep/`): Deep layer breakthroughs unlock the corresponding Power Core achievements
-- **Main** (`main.rs`): Calls `tick_power_cores()` each tick, `apply_offline_power_cores()` on character load, saves state on change
+- **Core** (`core/tick.rs`): Calls `tick_power_cores()` each tick inside `game_tick_with_context()`
+- **Main Helpers** (`main_helpers/update.rs`): Calls `apply_offline_power_cores()` on character load
+- **Main** (`main.rs`): Saves state on change

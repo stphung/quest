@@ -219,7 +219,7 @@ The `gateway_opened` field on `DeepPersistent` tracks whether the Gateway beneat
 Not serialized — pure runtime UI state. Manages which `DeepView` is shown and selection indices.
 
 ```rust
-pub enum DeepView { Hub, NewMission, Roster, Infrastructure, EventResponse, Recruit }
+pub enum DeepView { Active, NewMission, Roster, Infrastructure, EventResponse, Recruit }
 ```
 
 ## Key Functions
@@ -291,7 +291,7 @@ The game tick does **not** simulate mission progress. It only checks for pending
 
 ## Integration Points
 
-- **`core/tick.rs`**: `game_tick()` takes `deep: &mut DeepState`. Stage 11c ticks Deep missions and checks for pending check-in events.
+- **`core/tick.rs`**: `game_tick()` takes `deep: &mut DeepState`. Stage 11c ticks Deep missions and checks for pending check-in events. Note: `game_tick()` is `#[deprecated(note = "Use game_tick_with_context instead")]` — it is not the live call path. Production code (`main.rs`, chrono surge) calls `game_tick_with_context()`, which threads `deep` through the `TickContext` struct instead.
 - **`core/tick_stages.rs`**: `process_combat_events()` triggers Deep discovery on `BossDefeatResult::ExpanseCycle` when `!discovered && prestige_rank >= DEEP_MIN_PRESTIGE_RANK`. Emits `TickEvent::DeepDiscovered`, sets `deep_changed` flag.
 - **`core/tick_types.rs`**: `TickEvent::DeepDiscovered` variant, `TickResult::deep_changed` flag
 - **`tick_events.rs`**: `TickFlags::deep_discovered` field, combat log message on discovery
@@ -302,10 +302,9 @@ The game tick does **not** simulate mission progress. It only checks for pending
 - **`main.rs`**: Loads/saves Deep state alongside Haven and Enhancement. Passes `&mut deep` to `game_tick()` and `save_all()`
 - **`main_helpers/persistence.rs`**: `save_all()` includes `deep` parameter, calls `save_deep()` when discovered
 - **`main_helpers/offline.rs`**: `resolve_deep_offline()` completes missions that finished while game was closed
-- **`ui/deep_scene.rs`**: Deep overlay rendering (Hub, NewMission, Roster, Infrastructure, EventResponse, Recruit views)
+- **`ui/deep_scene.rs`**: Deep overlay rendering (Active, NewMission, Roster, Infrastructure, EventResponse, Recruit views)
 - **`ui/stats_panel.rs`**: Pending event indicator when `deep.prestige.has_any_pending_event()`
 - **`achievements/`**: Deep-related achievements (discovery, layer milestones, guild ranks)
-- **`items/types.rs`**: Abyssal affix types (`AbyssalMissionSpeed`, `AbyssalSupplyYield`, `AbyssalResilience`)
 
 ## Constants and Balance Reference
 
