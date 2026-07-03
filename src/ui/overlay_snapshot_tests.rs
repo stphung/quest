@@ -232,3 +232,84 @@ fn snapshot_time_vault_overlay() {
         })
     });
 }
+
+/// Renders one overlay frame at an arbitrary size under a frozen clock
+/// (the Act 2 strip layout needs a small tier).
+fn render_overlay_sized(width: u16, height: u16, draw: impl FnOnce(&mut Frame)) -> String {
+    let _clock = clock::freeze_at_millis(FROZEN_MILLIS);
+    let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+    terminal.draw(draw).unwrap();
+    format!("{:?}", terminal.backend().buffer())
+}
+
+#[test]
+fn snapshot_voyage_junction_cards() {
+    assert_overlay_snapshot("voyage_junction_xl_160x45", || {
+        let voyage = fixtures::voyage_at_first_junction(frozen_utc());
+        let ui = crate::vessel::VoyageUiState {
+            view: crate::vessel::VoyageView::Junction { selected: 0 },
+            scene_modal: None,
+        };
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+        })
+    });
+}
+
+#[test]
+fn snapshot_voyage_chart_mid_leg() {
+    assert_overlay_snapshot("voyage_chart_mid_leg_xl_160x45", || {
+        let voyage = fixtures::voyage_mid_leg(frozen_utc());
+        let ui = crate::vessel::VoyageUiState::default();
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+        })
+    });
+}
+
+#[test]
+fn snapshot_voyage_trim_panel_mid_leg() {
+    assert_overlay_snapshot("voyage_trim_xl_160x45", || {
+        let voyage = fixtures::voyage_mid_leg(frozen_utc());
+        let ui = crate::vessel::VoyageUiState {
+            view: crate::vessel::VoyageView::Trim { selected: 2 },
+            scene_modal: None,
+        };
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+        })
+    });
+}
+
+#[test]
+fn snapshot_voyage_strip_small_tier() {
+    assert_overlay_snapshot("voyage_strip_m_60x24", || {
+        let voyage = fixtures::voyage_mid_leg(frozen_utc());
+        let ui = crate::vessel::VoyageUiState::default();
+        render_overlay_sized(60, 24, |f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+        })
+    });
+}
+
+#[test]
+fn snapshot_voyage_intro() {
+    assert_overlay_snapshot("voyage_intro_xl_160x45", || {
+        let mut voyage = fixtures::voyage_at_first_junction(frozen_utc());
+        voyage.intro_pending = true;
+        let ui = crate::vessel::VoyageUiState::default();
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+        })
+    });
+}

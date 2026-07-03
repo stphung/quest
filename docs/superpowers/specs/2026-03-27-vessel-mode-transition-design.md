@@ -1,5 +1,10 @@
 # Vessel Mode Transition & Basic Voyage Shell
 
+> **⚠ SUPERSEDED (2026-07-02).** Act 2's direction changed to *The Pilgrimage
+> of Souls* — see the rewritten parent spec and
+> [2026-07-02-act2-voyage-experience-exploration.md](2026-07-02-act2-voyage-experience-exploration.md).
+> The 5-beat launch transition, gauge/drift model, and offline rules survive into the new spec queue; the continuous-distance shell does not. Kept for salvage, not for implementation.
+
 **Parent spec:** `docs/superpowers/specs/2026-03-27-the-vessel-design.md`
 **Sub-project:** 2 of 7
 **Depends on:** Sub-project 1 (Launch Gate)

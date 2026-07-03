@@ -5,7 +5,44 @@
 //! 250,000 Prestige Ranks and burning them in a single all-or-nothing
 //! action. See `docs/superpowers/specs/2026-03-27-vessel-launch-gate-design.md`.
 
+pub mod junction;
+pub mod persistence;
+pub mod route;
+pub mod voyage;
+
 use crate::core::game_state::GameState;
+
+/// Transient voyage UI state (not serialized) — which surface of the
+/// Crossing screen is open. Lives here (like `DeepUiState`) so input and
+/// rendering share one struct.
+#[derive(Debug, Default)]
+pub struct VoyageUiState {
+    pub view: VoyageView,
+    /// A scene modal being read (arrival/recovery placeholder until spec 4).
+    pub scene_modal: Option<SceneModal>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum VoyageView {
+    #[default]
+    Chart,
+    /// Choosing a road at a junction; `selected` indexes the card list.
+    Junction {
+        selected: usize,
+    },
+    /// The trim panel; `selected` indexes `voyage::Trim::ALL`.
+    Trim {
+        selected: usize,
+    },
+    Rumors,
+}
+
+/// A scene being read: title line + body text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SceneModal {
+    pub title: String,
+    pub body: String,
+}
 
 /// Release kill-switch for Act 2. While `false`, the Vessel is fully
 /// invisible: no discovery modal, no ticker whispers, no stats-panel row,
