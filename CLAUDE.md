@@ -76,7 +76,7 @@ Agent-invocable skills — ask in natural language to trigger them.
 | `audit` | "full audit", "audit everything" | Runs all 5 audit skills in parallel on isolated worktrees (perf, test, doc, wiki, dependency) |
 | `perf-audit` | "audit performance", "optimize hot paths" | Multi-agent perf audit: finds bottlenecks, auto-fixes, adds benchmarks |
 | `test-audit` | "audit the tests", "fix flaky tests" | Multi-agent test audit: finds flakiness + perf issues by area, auto-fixes, 10x verification |
-| `doc-audit` | "audit the docs", "update documentation" | Multi-agent docs audit: finds stale constants, missing files, outdated types across CLAUDE.md and docs/ |
+| `doc-audit` | "audit the docs", "update documentation" | Multi-agent docs audit: finds stale constants, missing files, outdated types across CLAUDE.md, README.md, and docs/ |
 | `wiki-audit` | "audit the wiki", "wiki is stale" | Multi-agent wiki audit: finds stale numbers, missing systems, broken links in quest.wiki/ |
 | `dependency-audit` | "audit dependencies", "update deps" | Multi-agent dependency audit: outdated versions, unused deps, security advisories, feature hygiene |
 | `add-challenge` | "add a challenge", "new minigame" | Checklist-driven agent for adding a new challenge minigame across all 15 integration points |
