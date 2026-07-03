@@ -880,13 +880,16 @@ fn test_game_tick_challenge_discovery_requires_prestige() {
     let mut achievements = Achievements::default();
     let mut rng = test_rng();
 
+    // Prestige gate is checked before any RNG roll, so a smaller tick count
+    // is enough to prove P0 never discovers a challenge -- no need to burn
+    // cycles on thousands of ticks.
     let events = run_ticks(
         &mut state,
         &mut tick_counter,
         &mut haven,
         &mut achievements,
         &mut rng,
-        1000,
+        100,
     );
 
     let challenge_events: Vec<_> = events
