@@ -353,7 +353,12 @@ pub fn chart_lines(voyage: &VoyageState, width: u16, height: u16) -> Vec<Line<'s
     let vx = (ship_x as i32 - w / 2).clamp(0, (120 - w).max(0));
     let vy = (ship_y as i32 - h / 2).clamp(0, (90 - h).max(0));
 
-    let mut grid: Vec<Vec<(char, Color)>> = vec![vec![(' ', SEA_DIM); w as usize]; h as usize];
+    let sea = if voyage.gone_dark {
+        Color::Rgb(45, 52, 74) // after the Going-Dark, even the water dims
+    } else {
+        SEA_DIM
+    };
+    let mut grid: Vec<Vec<(char, Color)>> = vec![vec![(' ', sea); w as usize]; h as usize];
     let put = |x: i32, y: i32, c: char, color: Color, grid: &mut Vec<Vec<(char, Color)>>| {
         let (gx, gy) = (x - vx, y - vy);
         if gx >= 0 && gx < w && gy >= 0 && gy < h {
@@ -1010,6 +1015,24 @@ fn render_rumor_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
 
     let mut lines: Vec<Line> = vec![Line::from("")];
 
+    let letters_kept = voyage.letter_events.len().max(
+        voyage
+            .log
+            .iter()
+            .filter(|l| l.starts_with("A letter from"))
+            .count(),
+    );
+    if letters_kept > 0 || voyage.gone_dark {
+        lines.push(Line::from(Span::styled(
+            if voyage.gone_dark {
+                format!("Letters kept: {letters_kept} \u{00b7} the mail has stopped")
+            } else {
+                format!("Letters kept: {letters_kept}")
+            },
+            Style::default().fg(Color::Gray),
+        )));
+        lines.push(Line::from(""));
+    }
     // The story so far: the most recent scene titles, oldest first.
     if !voyage.log.is_empty() {
         lines.push(Line::from(Span::styled(

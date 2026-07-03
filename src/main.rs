@@ -574,6 +574,34 @@ fn main() -> io::Result<()> {
                                     });
                                 }
                             }
+                            // Letters from home (possibly delivered offline)
+                            // queue as readable moments.
+                            for event in v.take_letter_events() {
+                                if event == vessel::letters::MAIL_FAILS_EVENT {
+                                    voyage_ui.moments.push_back(vessel::SceneModal {
+                                        title: "Mail-hour".to_string(),
+                                        body: "The crew gathers on deck out of habit.                                                Nothing comes. The world behind has gone                                                out; from here to the Tree, the only                                                lights are the ones aboard."
+                                            .to_string(),
+                                    });
+                                    continue;
+                                }
+                                if let Some(def) = vessel::letters::letter_by_event(event) {
+                                    let mut body = def.text.to_string();
+                                    if let Some((soul, ps)) = def.postscript {
+                                        let aboard = v.soul_state(soul).is_some_and(|s| {
+                                            s.status == vessel::voyage::SoulStatus::Aboard
+                                        });
+                                        if aboard {
+                                            body.push_str("\n\n");
+                                            body.push_str(ps);
+                                        }
+                                    }
+                                    voyage_ui.moments.push_back(vessel::SceneModal {
+                                        title: format!("A letter from {}", def.sender),
+                                        body,
+                                    });
+                                }
+                            }
                             if v.take_pending_recovery_scene() {
                                 // Chapter-authored recovery scene (spec 4).
                                 let chapter = v
