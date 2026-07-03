@@ -67,6 +67,10 @@ fn simulate(strategy: Strategy, seed: u64, checkin_hours: i64) -> RunResult {
             v.phase
         );
         v.play_arrival_scene();
+        // Boarding asks block departure: say yes while a berth is free.
+        if v.pending_ask.is_some() && !v.accept_ask() {
+            v.decline_ask();
+        }
         let cards = current_junction_cards(&v);
         if !cards.is_empty() && !v.arrived() {
             let selectable: Vec<_> = cards.iter().filter(|c| c.selectable).collect();

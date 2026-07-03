@@ -249,6 +249,7 @@ fn snapshot_voyage_junction_cards() {
         let ui = crate::vessel::VoyageUiState {
             view: crate::vessel::VoyageView::Junction { selected: 0 },
             scene_modal: None,
+            moments: Default::default(),
         };
         render_overlay(|f| {
             let area = f.area();
@@ -278,6 +279,7 @@ fn snapshot_voyage_trim_panel_mid_leg() {
         let ui = crate::vessel::VoyageUiState {
             view: crate::vessel::VoyageView::Trim { selected: 2 },
             scene_modal: None,
+            moments: Default::default(),
         };
         render_overlay(|f| {
             let area = f.area();
@@ -305,6 +307,44 @@ fn snapshot_voyage_intro() {
     assert_overlay_snapshot("voyage_intro_xl_160x45", || {
         let mut voyage = fixtures::voyage_at_first_junction(frozen_utc());
         voyage.intro_pending = true;
+        let ui = crate::vessel::VoyageUiState::default();
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+        })
+    });
+}
+
+#[test]
+fn snapshot_voyage_souls_panel() {
+    assert_overlay_snapshot("voyage_souls_xl_160x45", || {
+        let mut voyage = fixtures::voyage_at_first_junction(frozen_utc());
+        // Torvald at the helm so the panel shows a post, a paused arc, and
+        // resting souls side by side.
+        voyage.set_station(
+            crate::vessel::souls::SoulId(0),
+            Some(crate::vessel::souls::Station::Helm),
+        );
+        let ui = crate::vessel::VoyageUiState {
+            view: crate::vessel::VoyageView::Souls { selected: 1 },
+            scene_modal: None,
+            moments: Default::default(),
+        };
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+        })
+    });
+}
+
+#[test]
+fn snapshot_voyage_boarding_ask() {
+    assert_overlay_snapshot("voyage_ask_xl_160x45", || {
+        let mut voyage = fixtures::voyage_at_first_junction(frozen_utc());
+        // Stage Sefa's ask so the modal renders over the chart.
+        voyage.pending_ask = Some(crate::vessel::souls::SoulId(4));
         let ui = crate::vessel::VoyageUiState::default();
         render_overlay(|f| {
             let area = f.area();

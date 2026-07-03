@@ -35,17 +35,30 @@ pub fn handle_voyage_input(
     }
 
     // A scene being read swallows everything except its close keys.
+    // Closing it surfaces the next queued log moment, if any.
     if ui.scene_modal.is_some() {
         if matches!(key.code, KeyCode::Esc | KeyCode::Enter | KeyCode::Char(' ')) {
-            ui.scene_modal = None;
+            ui.scene_modal = ui.moments.pop_front();
         }
         return VoyageInputResult::Handled;
+    }
+    if let Some(moment) = ui.moments.pop_front() {
+        ui.scene_modal = Some(moment);
+        return VoyageInputResult::Handled;
+    }
+
+    // A boarding ask is a door: it must be answered before anything else
+    // (except choosing who steps ashore when the berths are full).
+    if voyage.pending_ask.is_some() && !matches!(ui.view, VoyageView::Farewell { .. }) {
+        return handle_ask_keys(key, voyage, ui);
     }
 
     match ui.view {
         VoyageView::Chart => handle_chart_keys(key, voyage, ui),
         VoyageView::Junction { selected } => handle_junction_keys(key, voyage, ui, selected),
         VoyageView::Trim { selected } => handle_trim_keys(key, voyage, ui, selected),
+        VoyageView::Souls { selected } => handle_souls_keys(key, voyage, ui, selected),
+        VoyageView::Farewell { selected } => handle_farewell_keys(key, voyage, ui, selected),
         VoyageView::Rumors => {
             if matches!(
                 key.code,
@@ -55,6 +68,139 @@ pub fn handle_voyage_input(
             }
             VoyageInputResult::Handled
         }
+    }
+}
+
+fn handle_ask_keys(
+    key: KeyEvent,
+    voyage: &mut VoyageState,
+    ui: &mut VoyageUiState,
+) -> VoyageInputResult {
+    let Some(asking) = voyage.pending_ask else {
+        return VoyageInputResult::Handled;
+    };
+    match key.code {
+        KeyCode::Char('a') | KeyCode::Char('A') | KeyCode::Enter => {
+            if voyage.accept_ask() {
+                let def = crate::vessel::souls::soul(asking);
+                ui.scene_modal = Some(SceneModal {
+                    title: format!("{} comes aboard", def.name),
+                    body: format!("\u{201c}{}\u{201d}", def.voice),
+                });
+                VoyageInputResult::HandledNeedsSave
+            } else {
+                // Berths full: someone must step ashore first.
+                ui.view = VoyageView::Farewell { selected: 0 };
+                VoyageInputResult::Handled
+            }
+        }
+        KeyCode::Char('d') | KeyCode::Char('D') => {
+            if let Some(declined) = voyage.decline_ask() {
+                let def = crate::vessel::souls::soul(declined);
+                ui.scene_modal = Some(SceneModal {
+                    title: format!("{} stays behind", def.name),
+                    body: "The door closes. The name stays on the chart.".to_string(),
+                });
+            }
+            VoyageInputResult::HandledNeedsSave
+        }
+        _ => VoyageInputResult::Handled,
+    }
+}
+
+fn handle_souls_keys(
+    key: KeyEvent,
+    voyage: &mut VoyageState,
+    ui: &mut VoyageUiState,
+    selected: usize,
+) -> VoyageInputResult {
+    let count = voyage.souls.len();
+    if count == 0 {
+        ui.view = VoyageView::Chart;
+        return VoyageInputResult::Handled;
+    }
+    let selected = selected.min(count - 1);
+    match key.code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            ui.view = VoyageView::Souls {
+                selected: selected.saturating_sub(1),
+            };
+            VoyageInputResult::Handled
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            ui.view = VoyageView::Souls {
+                selected: (selected + 1).min(count - 1),
+            };
+            VoyageInputResult::Handled
+        }
+        // Enter cycles the selected soul's post: rest -> Helm -> Tender ->
+        // Watch -> rest. Only aboard souls take a post.
+        KeyCode::Enter => {
+            use crate::vessel::souls::Station;
+            let s = voyage.souls[selected];
+            let next = match s.station {
+                None => Some(Station::Helm),
+                Some(Station::Helm) => Some(Station::Tender),
+                Some(Station::Tender) => Some(Station::Watch),
+                Some(Station::Watch) => None,
+            };
+            if voyage.set_station(s.soul, next) {
+                VoyageInputResult::HandledNeedsSave
+            } else {
+                VoyageInputResult::Handled
+            }
+        }
+        KeyCode::Esc | KeyCode::Char('s') | KeyCode::Char('S') => {
+            ui.view = VoyageView::Chart;
+            VoyageInputResult::Handled
+        }
+        _ => VoyageInputResult::Ignored,
+    }
+}
+
+fn handle_farewell_keys(
+    key: KeyEvent,
+    voyage: &mut VoyageState,
+    ui: &mut VoyageUiState,
+    selected: usize,
+) -> VoyageInputResult {
+    let aboard: Vec<_> = voyage.aboard().map(|s| s.soul).collect();
+    if aboard.is_empty() {
+        ui.view = VoyageView::Chart;
+        return VoyageInputResult::Handled;
+    }
+    let selected = selected.min(aboard.len() - 1);
+    match key.code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            ui.view = VoyageView::Farewell {
+                selected: selected.saturating_sub(1),
+            };
+            VoyageInputResult::Handled
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            ui.view = VoyageView::Farewell {
+                selected: (selected + 1).min(aboard.len() - 1),
+            };
+            VoyageInputResult::Handled
+        }
+        KeyCode::Enter => {
+            let ashore = aboard[selected];
+            if voyage.farewell(ashore) && voyage.accept_ask() {
+                let ashore_def = crate::vessel::souls::soul(ashore);
+                ui.scene_modal = Some(SceneModal {
+                    title: format!("{} steps ashore", ashore_def.name),
+                    body: "A full ship is a chosen ship. The manifest remembers.".to_string(),
+                });
+            }
+            ui.view = VoyageView::Chart;
+            VoyageInputResult::HandledNeedsSave
+        }
+        KeyCode::Esc => {
+            // The ask is still pending; back to answering it.
+            ui.view = VoyageView::Chart;
+            VoyageInputResult::Handled
+        }
+        _ => VoyageInputResult::Ignored,
     }
 }
 
@@ -97,6 +243,10 @@ fn handle_chart_keys(
         }
         KeyCode::Char('r') | KeyCode::Char('R') => {
             ui.view = VoyageView::Rumors;
+            VoyageInputResult::Handled
+        }
+        KeyCode::Char('s') | KeyCode::Char('S') => {
+            ui.view = VoyageView::Souls { selected: 0 };
             VoyageInputResult::Handled
         }
         KeyCode::Char('b') | KeyCode::Char('B') => {

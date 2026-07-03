@@ -8,6 +8,7 @@
 pub mod junction;
 pub mod persistence;
 pub mod route;
+pub mod souls;
 pub mod voyage;
 
 use crate::core::game_state::GameState;
@@ -20,6 +21,9 @@ pub struct VoyageUiState {
     pub view: VoyageView,
     /// A scene modal being read (arrival/recovery placeholder until spec 4).
     pub scene_modal: Option<SceneModal>,
+    /// Queued log moments (arc beats, boardings) shown one at a time after
+    /// the current modal closes.
+    pub moments: std::collections::VecDeque<SceneModal>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -35,6 +39,15 @@ pub enum VoyageView {
         selected: usize,
     },
     Rumors,
+    /// The Souls panel; `selected` indexes the met-soul list.
+    Souls {
+        selected: usize,
+    },
+    /// Choosing who steps ashore so a pending ask can be accepted;
+    /// `selected` indexes the aboard list.
+    Farewell {
+        selected: usize,
+    },
 }
 
 /// A scene being read: title line + body text.

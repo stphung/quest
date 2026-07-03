@@ -346,6 +346,8 @@ pub fn voyage_at_first_junction(now: DateTime<Utc>) -> crate::vessel::voyage::Vo
         .unwrap();
     v.tick(launched + Duration::days(2));
     v.play_arrival_scene();
+    // Maren asks to board at the Lightship Vigil; the fixture takes her.
+    assert!(v.accept_ask(), "Maren's ask expected at W1");
     v.depart(roads_from(WaypointId(1)).next().unwrap().id)
         .unwrap();
     v.tick(launched + Duration::days(4));

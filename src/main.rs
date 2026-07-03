@@ -563,6 +563,17 @@ fn main() -> io::Result<()> {
                             }
                             let v = voyage.as_mut().expect("voyage initialized above");
                             v.tick(Utc::now());
+                            // Arc beats (possibly fired offline) queue as log
+                            // moments, shown one at a time.
+                            for event in v.take_soul_events() {
+                                let def = vessel::souls::soul(event.soul);
+                                if let Some(beat) = def.arc.get(event.beat as usize) {
+                                    voyage_ui.moments.push_back(vessel::SceneModal {
+                                        title: beat.title.to_string(),
+                                        body: beat.text.to_string(),
+                                    });
+                                }
+                            }
                             if v.take_pending_recovery_scene() && voyage_ui.scene_modal.is_none() {
                                 voyage_ui.scene_modal = Some(vessel::SceneModal {
                                     title: "Underway again".to_string(),
