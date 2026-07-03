@@ -48,13 +48,146 @@ pub fn render_voyage(
         _ => render_strip(frame, area, voyage, ui),
     }
 
-    if let Some(modal) = &ui.scene_modal {
+    let scene_waiting = matches!(
+        voyage.phase,
+        VoyagePhase::HoldingStation {
+            scene_state: SceneState::Waiting,
+            ..
+        }
+    );
+    if let Some(play) = &ui.scene_play {
+        render_scene_play(frame, area, play);
+    } else if let Some(modal) = &ui.scene_modal {
         render_scene_modal(frame, area, modal);
-    } else if !matches!(ui.view, VoyageView::Farewell { .. }) {
+    } else if !scene_waiting && !matches!(ui.view, VoyageView::Farewell { .. }) {
+        // Doors wait their turn: the arrival scene reads first.
         if let Some(asking) = voyage.pending_ask {
             render_ask_modal(frame, area, voyage, asking);
+        } else if let Some(pair) = voyage.pending_refit_pair() {
+            render_refit_modal(frame, area, pair);
         }
     }
+}
+
+// ── Scene playback (spec 4: beats, one page at a time) ─────────────────────
+
+fn render_scene_play(frame: &mut Frame, area: Rect, play: &crate::vessel::ScenePlay) {
+    let width = area.width.clamp(40, 76);
+    let height = area.height.clamp(10, 16).min(area.height);
+    let x = area.x + (area.width.saturating_sub(width)) / 2;
+    let y = area.y + (area.height.saturating_sub(height)) / 2;
+    let rect = Rect::new(x, y, width, height);
+    frame.render_widget(Clear, rect);
+
+    let block = Block::default()
+        .title(format!(" {} ", play.playback.title))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GOLD));
+    let inner = block.inner(rect);
+    frame.render_widget(block, rect);
+
+    let total = play.playback.paragraphs.len();
+    let index = play.index.min(total.saturating_sub(1));
+    let last_page = index + 1 >= total;
+
+    let mut lines = vec![Line::from("")];
+    lines.push(Line::from(Span::styled(
+        play.playback.paragraphs[index].clone(),
+        Style::default().fg(Color::White),
+    )));
+    lines.push(Line::from(""));
+    if last_page && !play.playback.payout_note.is_empty() {
+        lines.push(Line::from(Span::styled(
+            play.playback.payout_note.clone(),
+            Style::default().fg(VIOLET_DIM),
+        )));
+        lines.push(Line::from(""));
+    }
+    let progress: String = (0..total)
+        .map(|i| if i == index { '\u{25cf}' } else { '\u{00b7}' })
+        .collect();
+    lines.push(Line::from(Span::styled(
+        format!(
+            "{progress}   {}",
+            if last_page {
+                "[Enter] Close"
+            } else {
+                "[Enter] More"
+            }
+        ),
+        Style::default().fg(Color::DarkGray),
+    )));
+    frame.render_widget(
+        Paragraph::new(lines)
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: false }),
+        inner,
+    );
+}
+
+// ── The yard's refit door ───────────────────────────────────────────────────
+
+fn render_refit_modal(frame: &mut Frame, area: Rect, pair: crate::vessel::refits::RefitPair) {
+    let width = area.width.clamp(40, 66);
+    let height = 12u16.min(area.height);
+    let x = area.x + (area.width.saturating_sub(width)) / 2;
+    let y = area.y + (area.height.saturating_sub(height)) / 2;
+    let rect = Rect::new(x, y, width, height);
+    frame.render_widget(Clear, rect);
+
+    let block = Block::default()
+        .title(" \u{2692} The yard makes an offer ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GOLD));
+    let inner = block.inner(rect);
+    frame.render_widget(block, rect);
+
+    let lines = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "One refit, while she's in the slip. The other never fits her.",
+            Style::default().fg(Color::Gray),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("[A] ", Style::default().fg(GOLD)),
+            Span::styled(
+                pair.a.display_name().to_string(),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!(" \u{2014} {}", pair.a.blurb()),
+                Style::default().fg(Color::Gray),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("[B] ", Style::default().fg(GOLD)),
+            Span::styled(
+                pair.b.display_name().to_string(),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!(" \u{2014} {}", pair.b.blurb()),
+                Style::default().fg(Color::Gray),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Permanent. The doors close behind the choice.",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
+    frame.render_widget(
+        Paragraph::new(lines)
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: false }),
+        inner,
+    );
 }
 
 // ── Intro (placeholder for the 5-beat transition, spec 4) ──────────────────
@@ -587,7 +720,7 @@ fn phase_lines(voyage: &VoyageState) -> Vec<Line<'static>> {
 }
 
 fn footer_keys(voyage: &VoyageState) -> Vec<Line<'static>> {
-    let mut keys = vec!["[S] Souls", "[T] Trim", "[R] Rumors"];
+    let mut keys = vec!["[S] Souls", "[T] Trim", "[R] Log"];
     if matches!(
         voyage.phase,
         VoyagePhase::HoldingStation {
@@ -804,13 +937,37 @@ fn trim_effect_line(voyage: &VoyageState, trim: Trim) -> String {
 
 fn render_rumor_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
     let block = Block::default()
-        .title(" \u{2042} Rumors ")
+        .title(" \u{2042} The Log ")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(VESSEL_VIOLET));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
     let mut lines: Vec<Line> = vec![Line::from("")];
+
+    // The story so far: the most recent scene titles, oldest first.
+    if !voyage.log.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "The story so far",
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::BOLD),
+        )));
+        let recent = voyage.log.len().saturating_sub(8);
+        for title in &voyage.log[recent..] {
+            lines.push(Line::from(Span::styled(
+                format!("  \u{00b7} {title}"),
+                Style::default().fg(Color::Gray),
+            )));
+        }
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Rumors held",
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::BOLD),
+        )));
+    }
     if voyage.rumors.is_empty() {
         lines.push(Line::from(Span::styled(
             "Nothing heard yet. Way-stations sell what they hear.",

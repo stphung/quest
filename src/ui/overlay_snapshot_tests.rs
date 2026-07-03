@@ -248,6 +248,7 @@ fn snapshot_voyage_junction_cards() {
         let voyage = fixtures::voyage_at_first_junction(frozen_utc());
         let ui = crate::vessel::VoyageUiState {
             view: crate::vessel::VoyageView::Junction { selected: 0 },
+            scene_play: None,
             scene_modal: None,
             moments: Default::default(),
         };
@@ -278,6 +279,7 @@ fn snapshot_voyage_trim_panel_mid_leg() {
         let voyage = fixtures::voyage_mid_leg(frozen_utc());
         let ui = crate::vessel::VoyageUiState {
             view: crate::vessel::VoyageView::Trim { selected: 2 },
+            scene_play: None,
             scene_modal: None,
             moments: Default::default(),
         };
@@ -328,6 +330,7 @@ fn snapshot_voyage_souls_panel() {
         );
         let ui = crate::vessel::VoyageUiState {
             view: crate::vessel::VoyageView::Souls { selected: 1 },
+            scene_play: None,
             scene_modal: None,
             moments: Default::default(),
         };
@@ -345,6 +348,46 @@ fn snapshot_voyage_boarding_ask() {
         let mut voyage = fixtures::voyage_at_first_junction(frozen_utc());
         // Stage Sefa's ask so the modal renders over the chart.
         voyage.pending_ask = Some(crate::vessel::souls::SoulId(4));
+        let ui = crate::vessel::VoyageUiState::default();
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+        })
+    });
+}
+
+#[test]
+fn snapshot_voyage_scene_playback() {
+    assert_overlay_snapshot("voyage_scene_playback_xl_160x45", || {
+        let mut voyage = fixtures::voyage_at_first_junction(frozen_utc());
+        // Re-stage the Markets arrival unplayed and read its scene.
+        voyage.phase = crate::vessel::voyage::VoyagePhase::HoldingStation {
+            waypoint: crate::vessel::route::WaypointId(2),
+            arrived_at_min: voyage.processed_minutes,
+            scene_state: crate::vessel::voyage::SceneState::Waiting,
+            arrived_by: Some(crate::vessel::route::RoadId(1)),
+        };
+        let playback = voyage.play_arrival_scene().expect("scene plays");
+        let ui = crate::vessel::VoyageUiState {
+            view: crate::vessel::VoyageView::Chart,
+            scene_play: Some(crate::vessel::ScenePlay { playback, index: 0 }),
+            scene_modal: None,
+            moments: Default::default(),
+        };
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+        })
+    });
+}
+
+#[test]
+fn snapshot_voyage_refit_door() {
+    assert_overlay_snapshot("voyage_refit_xl_160x45", || {
+        let mut voyage = fixtures::voyage_at_first_junction(frozen_utc());
+        voyage.pending_refit = Some(0);
         let ui = crate::vessel::VoyageUiState::default();
         render_overlay(|f| {
             let area = f.area();

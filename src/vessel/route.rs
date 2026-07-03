@@ -122,6 +122,10 @@ pub struct Waypoint {
     pub chapter: Chapter,
     /// Authored position on the virtual chart canvas (~120x90 cells).
     pub chart_pos: (u16, u16),
+    /// Stable content id + one-line fallback. Full scenes live in
+    /// `scenes.rs`, indexed by waypoint id; this stays as the registry the
+    /// scene-id test walks.
+    #[allow(dead_code)]
     pub scene: SceneRef,
     pub features: &'static [Feature],
 }

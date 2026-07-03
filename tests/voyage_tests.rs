@@ -28,6 +28,9 @@ fn cross(mut pick: impl FnMut(&VoyageState) -> usize, trim: Trim) -> (VoyageStat
             v.phase
         );
         if v.play_arrival_scene().is_some() || v.current_waypoint().is_some() {
+            if v.pending_refit.is_some() {
+                v.choose_refit(true);
+            }
             // Answer any boarding ask: yes while a berth is free, no after
             // (asks block departure until answered).
             if v.pending_ask.is_some() && !v.accept_ask() {

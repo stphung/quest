@@ -4,7 +4,7 @@
 use chrono::{DateTime, Duration, Utc};
 use quest::vessel::route::{self, roads_from, WaypointId, ROUTE_START};
 use quest::vessel::souls::{self, SoulId, Station, ARC_BEAT_REST_DAYS, BERTHS, SOULS};
-use quest::vessel::voyage::{SoulStatus, VoyagePhase, VoyageState};
+use quest::vessel::voyage::{SoulStatus, Trim, VoyagePhase, VoyageState};
 
 fn t0() -> DateTime<Utc> {
     "2026-07-03T12:00:00Z".parse().unwrap()
@@ -308,4 +308,137 @@ fn old_voyage_saves_load_with_the_launch_trio() {
     assert!(!loaded.long_silence);
     let names: Vec<_> = loaded.aboard().map(|s| souls::soul(s.soul).name).collect();
     assert_eq!(names, vec!["Torvald", "Eir", "Runa"]);
+}
+
+#[test]
+fn threat_ledgers_are_functions_of_prior_choices() {
+    use quest::vessel::route::RoadId;
+    use quest::vessel::voyage::VoyagePhase;
+
+    // Stage an arrival over the Ossuary Reef (R9) three ways.
+    let stage = |via: RoadId, at: quest::vessel::route::WaypointId| {
+        let mut v = started();
+        v.phase = VoyagePhase::HoldingStation {
+            waypoint: at,
+            arrived_at_min: v.processed_minutes,
+            scene_state: quest::vessel::voyage::SceneState::Waiting,
+            arrived_by: Some(via),
+        };
+        v
+    };
+    let reef = quest::vessel::route::WaypointId(9);
+
+    // Hurried and unsung: the Warden takes provisions AND hope.
+    let mut v = stage(RoadId(9), reef);
+    v.set_trim(Trim::Run);
+    let (p0, h0) = (v.provisions, v.hope);
+    v.play_arrival_scene().unwrap();
+    assert!(v.provisions < p0 && v.hope < h0);
+
+    // Slow and respectful: provisions only.
+    let mut v = stage(RoadId(9), reef);
+    v.set_trim(Trim::Quiet);
+    let h0 = v.hope;
+    v.play_arrival_scene().unwrap();
+    assert_eq!(v.hope, h0, "respectful passage spares hope");
+
+    // Sefa aboard: safe, and a keepsake.
+    let mut v = stage(RoadId(9), reef);
+    v.pending_ask = Some(SoulId(4));
+    assert!(v.accept_ask());
+    let p0 = v.provisions;
+    v.play_arrival_scene().unwrap();
+    assert_eq!(v.provisions, p0, "the office buys passage");
+    assert!(v.keepsakes.iter().any(|k| k.contains("Warden")));
+}
+
+#[test]
+fn the_thorns_take_a_stationed_soul_and_only_a_stationed_soul() {
+    use quest::vessel::route::{RoadId, WaypointId};
+    use quest::vessel::voyage::{SceneState, VoyagePhase};
+
+    let thorn_run = WaypointId(36);
+    let stage = || {
+        let mut v = started();
+        v.phase = VoyagePhase::HoldingStation {
+            waypoint: thorn_run,
+            arrived_at_min: v.processed_minutes,
+            scene_state: SceneState::Waiting,
+            arrived_by: Some(RoadId(42)),
+        };
+        v
+    };
+
+    // A stationed soul is exposed: helm first.
+    let mut v = stage();
+    v.set_station(SoulId(0), Some(Station::Helm));
+    v.set_station(SoulId(1), Some(Station::Tender));
+    v.play_arrival_scene().unwrap();
+    assert_eq!(
+        v.carved_names(),
+        vec!["Torvald"],
+        "the helm was the exposure"
+    );
+    assert_eq!(
+        v.soul_state(SoulId(1)).unwrap().status,
+        SoulStatus::Aboard,
+        "one loss, not a massacre"
+    );
+
+    // Everyone below: the ship pays instead; nobody is taken.
+    let mut v = stage();
+    let p0 = v.provisions;
+    v.play_arrival_scene().unwrap();
+    assert!(v.carved_names().is_empty());
+    assert!(v.provisions < p0);
+
+    // Cormac at the helm: one clean line, keepsake, no loss.
+    let mut v = stage();
+    v.pending_ask = Some(SoulId(6));
+    assert!(v.accept_ask());
+    v.set_station(SoulId(6), Some(Station::Helm));
+    v.play_arrival_scene().unwrap();
+    assert!(v.carved_names().is_empty());
+    assert!(v.keepsakes.iter().any(|k| k.contains("thorn spar")));
+
+    // The Quiet Keel refit: the hull pays, nobody is taken.
+    let mut v = stage();
+    v.set_station(SoulId(0), Some(Station::Helm));
+    v.refits.push(quest::vessel::refits::RefitId::QuietKeel);
+    v.play_arrival_scene().unwrap();
+    assert!(v.carved_names().is_empty(), "the keel held");
+}
+
+#[test]
+fn refit_doors_open_at_the_first_three_shipyards_and_close_behind() {
+    use quest::vessel::refits::RefitId;
+
+    let mut v = started();
+    assert!(v.pending_refit.is_none());
+    // Stage three yard visits.
+    for (i, pick_a) in [(0u8, true), (1, false), (2, true)] {
+        v.pending_refit = Some(i);
+        let pair = v.pending_refit_pair().unwrap();
+        let chosen = v.choose_refit(pick_a).unwrap();
+        assert_eq!(chosen, if pick_a { pair.a } else { pair.b });
+        assert!(v.pending_refit.is_none());
+    }
+    assert_eq!(v.refits.len(), 3);
+    assert_eq!(v.refit_doors_seen, 3);
+    assert!(v.has_refit(RefitId::StormSail));
+    assert!(v.has_refit(RefitId::DeepLarder));
+    assert!(v.has_refit(RefitId::LanternMast));
+    // Long Hold not taken: cap unchanged. Deep Larder taken instead.
+    assert_eq!(v.provisions_cap, 100.0);
+    // Storm Sail composes into leg time.
+    assert!(v.time_mult() < 1.0);
+}
+
+#[test]
+fn scene_payouts_apply_exactly_once() {
+    let mut v = started(); // W0 scene played by started()
+    let p_after_first = v.provisions;
+    assert!(v.play_arrival_scene().is_none(), "scenes play once");
+    assert_eq!(v.provisions, p_after_first);
+    assert_eq!(v.log.len(), 1, "one log line per scene");
 }
