@@ -602,6 +602,48 @@ fn main() -> io::Result<()> {
                                     });
                                 }
                             }
+                            // The prices paid (spec 8): strain, scars,
+                            // and mendings, each with its cause named.
+                            for event in v.take_passage_events() {
+                                use vessel::voyage::PassageEvent;
+                                let (title, body) = match event {
+                                    PassageEvent::Strained { soul, level, cause } => {
+                                        let name = vessel::souls::soul(soul).name;
+                                        (
+                                            if level >= 2 {
+                                                format!("{name} is worn")
+                                            } else {
+                                                format!("{name} is strained")
+                                            },
+                                            format!(
+                                                "{} \u{2014} {}.",
+                                                cause.text(),
+                                                if level >= 2 {
+                                                    "they cannot hold a post until rested"
+                                                } else {
+                                                    "their kind hands falter until they rest"
+                                                }
+                                            ),
+                                        )
+                                    }
+                                    PassageEvent::HealedAtRest { soul } => {
+                                        let name = vessel::souls::soul(soul).name;
+                                        (
+                                            format!("{name} mends"),
+                                            "A rest stop's fire, a meal eaten sitting \
+                                             down, and sleep with no post to stand."
+                                                .to_string(),
+                                        )
+                                    }
+                                    PassageEvent::Scarred { wear, cause } => (
+                                        format!("The hull takes a scar (\u{00d7}{wear})"),
+                                        format!("{}.", cause.text()),
+                                    ),
+                                };
+                                voyage_ui
+                                    .moments
+                                    .push_back(vessel::SceneModal { title, body });
+                            }
                             if v.take_pending_recovery_scene() {
                                 // Chapter-authored recovery scene (spec 4).
                                 let chapter = v

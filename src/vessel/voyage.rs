@@ -47,6 +47,17 @@ pub const RUMOR_PRICE: f64 = 6.0;
 pub const HOPE_MAX: u8 = 10;
 /// Hold-station decay never drags hope below "steady" — the eager-souls rule.
 pub const HOPE_FLOOR_STEADY: u8 = 5;
+/// Below this, hope cannot be *spent* (spec 8): you can be worn down
+/// into the Long Silence, never buy your way in.
+pub const HOPE_SPEND_FLOOR: u8 = 3;
+/// Press the Helm: the price and what it buys.
+pub const PRESS_HOPE_COST: u8 = 2;
+pub const PRESS_TIME_SAVED: f64 = 0.15;
+/// Hard rations: the hold stretches, the people pay.
+pub const HARD_RATIONS_BURN_MULT: f64 = 0.75;
+/// Scars on the hull: cap, and what each one eats.
+pub const HULL_WEAR_MAX: u8 = 6;
+pub const WEAR_BURN_PER_SCAR: f64 = 0.05;
 pub const LAUNCH_HOPE: u8 = 7;
 
 /// Dev/test wall-clock multiplier (`QUEST_VOYAGE_TIME_SCALE`, default 1.0).
@@ -103,11 +114,14 @@ impl Trim {
     }
 
     pub fn display_name(&self) -> &'static str {
+        // The player-facing Pace ladder (spec 10), in Oregon Trail's
+        // register — named for the toll, not the speed. The internal
+        // variant names stay (Run/Cruise/Quiet/Mourn) as engine terms.
         match self {
-            Trim::Run => "Run",
-            Trim::Cruise => "Cruise",
-            Trim::Quiet => "Quiet",
-            Trim::Mourn => "Mourn",
+            Trim::Run => "Grueling",
+            Trim::Cruise => "Steady",
+            Trim::Quiet => "Easy",
+            Trim::Mourn => "Restful",
         }
     }
 
@@ -187,6 +201,14 @@ pub struct SoulState {
     /// older than spec 7.
     #[serde(default)]
     pub left_at: Option<WaypointId>,
+    /// The crossing's price on this soul (spec 8): 0 sound, 1 strained
+    /// (affinity stops counting, rest at half pace), 2 worn (cannot hold
+    /// a post). Healed one level per RestStop arrival, off-post only.
+    #[serde(default)]
+    pub strain: u8,
+    /// Nights stood in a row; the third strains. Any night off resets it.
+    #[serde(default)]
+    pub consecutive_watches: u8,
 }
 
 /// An arc beat fired (possibly offline) — queued for the UI to show as a
@@ -203,6 +225,69 @@ pub struct SoulEvent {
 pub struct LogEntry {
     pub day: u64,
     pub text: String,
+}
+
+/// Why a soul strained (spec 8). Every entry names its cause — a price
+/// is only fair if the buyer can read the receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StrainCause {
+    ThirdWatch,
+    SquallAtRun,
+    SilenceHelm,
+    PressedHard,
+}
+
+impl StrainCause {
+    pub fn text(&self) -> &'static str {
+        match self {
+            StrainCause::ThirdWatch => "three nights on watch, back to back",
+            StrainCause::SquallAtRun => "a squall crossed at Run, on deck the whole way",
+            StrainCause::SilenceHelm => "the helm held through the silence, alone with it",
+            StrainCause::PressedHard => "the ship pressed hard twice, and the wheel remembers",
+        }
+    }
+}
+
+/// Why the hull took a scar (spec 8).
+// Wear comes only from choices — Run through squalls, hungry roads,
+// pressing a scarred hull — never from drifting. Drift is the covenant's
+// gentle failure; letting it scar would compound the very state it
+// rescues (probe-verified death-spiral, 2026-07-03).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum WearCause {
+    RunHard,
+    SquallAtRun,
+    ThreatRoad,
+    PressedWorn,
+}
+
+impl WearCause {
+    pub fn text(&self) -> &'static str {
+        match self {
+            WearCause::RunHard => "a whole leg driven at Run, start to finish",
+            WearCause::SquallAtRun => "a squall taken at Run",
+            WearCause::ThreatRoad => "the road took its price from her skin",
+            WearCause::PressedWorn => "pressed hard on a hull already carrying scars",
+        }
+    }
+}
+
+/// A price paid on the crossing (spec 8), queued for the UI like arc
+/// beats: acquired at deterministic sim-time events, surfaced at the next
+/// check-in with the cause named. Serialized so costs taken offline greet
+/// the return.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PassageEvent {
+    /// A soul strained (level 1) or worn (level 2), and why.
+    Strained {
+        soul: SoulId,
+        level: u8,
+        cause: StrainCause,
+    },
+    /// A soul mended one level at a rest stop.
+    HealedAtRest { soul: SoulId },
+    /// The hull took a scar (its new count), and why.
+    Scarred { wear: u8, cause: WearCause },
 }
 
 /// A resolved scene, ready to read: title, paragraphs (beats + matching
@@ -223,6 +308,8 @@ fn default_roster() -> Vec<SoulState> {
             arc_beat: 0,
             rest_minutes: 0,
             left_at: None,
+            strain: 0,
+            consecutive_watches: 0,
         })
         .collect()
 }
@@ -339,6 +426,32 @@ pub struct VoyageState {
     /// view's log moments.
     #[serde(default)]
     pub soul_events: Vec<SoulEvent>,
+    /// Scars on the hull (0..=HULL_WEAR_MAX): each adds 5% provisions
+    /// burn. Mended only at shipyards, in place of a refit (spec 8).
+    #[serde(default)]
+    pub hull_wear: u8,
+    /// Hard rations: burn ×0.75, hope −1 per full day underway while on.
+    #[serde(default)]
+    pub hard_rations: bool,
+    /// Whole minutes underway on hard rations since the last hope toll.
+    #[serde(default)]
+    pub rations_minutes: u64,
+    /// The helm was already pressed on this leg.
+    #[serde(default)]
+    pub pressed_this_leg: bool,
+    /// Presses this chapter — the second strains the helm soul.
+    #[serde(default)]
+    pub presses_this_chapter: u8,
+    /// Squalls that already took their price at Run (strain + scar), by id.
+    #[serde(default)]
+    pub priced_squalls: Vec<u32>,
+    /// Silence banks that already strained the helm, by id.
+    #[serde(default)]
+    pub strained_banks: Vec<u32>,
+    /// Prices paid, waiting to be read (drained by the UI like soul
+    /// events; serialized so costs taken offline greet the return).
+    #[serde(default)]
+    pub passage_events: Vec<PassageEvent>,
 }
 
 fn default_provisions_cap() -> f64 {
@@ -408,11 +521,132 @@ impl VoyageState {
             letters_received: 0,
             gone_dark: false,
             letter_events: Vec::new(),
+            hull_wear: 0,
+            hard_rations: false,
+            rations_minutes: 0,
+            pressed_this_leg: false,
+            presses_this_chapter: 0,
+            priced_squalls: Vec::new(),
+            strained_banks: Vec::new(),
+            passage_events: Vec::new(),
         }
     }
 
     pub fn has_refit(&self, refit: RefitId) -> bool {
         self.refits.contains(&refit)
+    }
+
+    // ── The price of passage (spec 8) ───────────────────────────────────────
+
+    /// A soul takes a level of strain, with the cause on the receipt.
+    /// Becoming worn clears their post — a worn soul cannot hold one.
+    fn strain_soul(&mut self, id: SoulId, cause: StrainCause) {
+        let Some(s) = self
+            .souls
+            .iter_mut()
+            .find(|s| s.soul == id && s.status == SoulStatus::Aboard)
+        else {
+            return;
+        };
+        if s.strain >= 2 {
+            return;
+        }
+        s.strain += 1;
+        let level = s.strain;
+        if level == 2 {
+            s.station = None;
+        }
+        self.passage_events.push(PassageEvent::Strained {
+            soul: id,
+            level,
+            cause,
+        });
+    }
+
+    /// The hull takes a scar (capped): each one makes her eat 5% more.
+    fn scar_hull(&mut self, cause: WearCause) {
+        if self.hull_wear >= HULL_WEAR_MAX {
+            return;
+        }
+        self.hull_wear += 1;
+        self.passage_events.push(PassageEvent::Scarred {
+            wear: self.hull_wear,
+            cause,
+        });
+    }
+
+    /// Drain the prices paid since last read (possibly offline).
+    pub fn take_passage_events(&mut self) -> Vec<PassageEvent> {
+        std::mem::take(&mut self.passage_events)
+    }
+
+    /// Whether the helm can be pressed right now (the UI's hint gate).
+    pub fn can_press(&self) -> bool {
+        matches!(self.phase, VoyagePhase::Traveling { .. })
+            && !self.pressed_this_leg
+            && self.hope >= HOPE_SPEND_FLOOR
+    }
+
+    /// Spend hope to drive the ship: the leg's remaining time shrinks by
+    /// 15%, once per leg. The second press in a chapter strains the helm
+    /// soul; pressing a hull already at 4+ scars costs her another.
+    pub fn press_helm(&mut self) -> bool {
+        if !self.can_press() {
+            return false;
+        }
+        let VoyagePhase::Traveling {
+            road,
+            departed_at_min,
+            progress_days,
+        } = self.phase
+        else {
+            return false;
+        };
+        let base_days = f64::from(route::road(road).base_days);
+        let remaining = (base_days - progress_days).max(0.0);
+        self.phase = VoyagePhase::Traveling {
+            road,
+            departed_at_min,
+            progress_days: progress_days + remaining * PRESS_TIME_SAVED,
+        };
+        self.lower_hope(PRESS_HOPE_COST);
+        self.pressed_this_leg = true;
+        self.presses_this_chapter = self.presses_this_chapter.saturating_add(1);
+        if self.presses_this_chapter >= 2 {
+            if let Some(helm) = self.station_soul(Station::Helm) {
+                self.strain_soul(helm, StrainCause::PressedHard);
+            }
+        }
+        if self.hull_wear >= 4 {
+            self.scar_hull(WearCause::PressedWorn);
+        }
+        self.push_log("The helm pressed, and the ship answered.".to_string());
+        true
+    }
+
+    /// Turn hard rations on (requires hope to spend) or off (always free).
+    pub fn set_hard_rations(&mut self, on: bool) -> bool {
+        if on && self.hope < HOPE_SPEND_FLOOR {
+            return false;
+        }
+        if self.hard_rations != on {
+            self.hard_rations = on;
+            self.rations_minutes = 0;
+        }
+        true
+    }
+
+    /// The yard's third door: mend the hull instead of refitting. Zeroes
+    /// the scars; that yard's refit pair closes forever, unchosen.
+    pub fn choose_mend(&mut self) -> bool {
+        if self.pending_refit.is_none() {
+            return false;
+        }
+        self.hull_wear = 0;
+        self.refit_doors_seen += 1;
+        self.pending_refit = None;
+        self.push_log("Mended at the yard. The scars planed away.".to_string());
+        true
     }
 
     // ── Multiplier composition ──────────────────────────────────────────────
@@ -433,9 +667,17 @@ impl VoyageState {
             * wind_time_mult(self.hope, self.long_silence)
             * helm_time_mult(
                 helm.is_some(),
-                helm.is_some_and(|id| souls::soul(id).affinity == Some(Station::Helm)),
+                // A strained hand loses the affine edge (spec 8).
+                helm.is_some_and(|id| {
+                    souls::soul(id).affinity == Some(Station::Helm) && self.soul_sound(id)
+                }),
             )
             * storm_sail
+    }
+
+    /// True when the soul carries no strain (spec 8's affinity gate).
+    fn soul_sound(&self, id: SoulId) -> bool {
+        self.soul_state(id).is_some_and(|s| s.strain == 0)
     }
 
     /// Leg-provisions multiplier at a hypothetical trim.
@@ -447,11 +689,22 @@ impl VoyageState {
         } else {
             trim.provisions_mult()
         };
+        // Spec 8: hard rations stretch the hold; scars make her eat.
+        let rations = if self.hard_rations {
+            HARD_RATIONS_BURN_MULT
+        } else {
+            1.00
+        };
+        let wear = 1.0 + WEAR_BURN_PER_SCAR * f64::from(self.hull_wear);
         trim_mult
             * tender_provisions_mult(
                 tender.is_some(),
-                tender.is_some_and(|id| souls::soul(id).affinity == Some(Station::Tender)),
+                tender.is_some_and(|id| {
+                    souls::soul(id).affinity == Some(Station::Tender) && self.soul_sound(id)
+                }),
             )
+            * rations
+            * wear
     }
 
     pub fn time_mult(&self) -> f64 {
@@ -528,6 +781,14 @@ impl VoyageState {
                                     self.silence_minutes -= MINUTES_PER_DAY;
                                     self.lower_hope(1);
                                 }
+                                // The helm holds it alone (spec 8): once
+                                // per bank, the wheel-hand strains.
+                                if !self.strained_banks.contains(&wx.id) {
+                                    if let Some(helm) = self.station_soul(Station::Helm) {
+                                        self.strained_banks.push(wx.id);
+                                        self.strain_soul(helm, StrainCause::SilenceHelm);
+                                    }
+                                }
                             }
                         }
                         WeatherKind::Squall => {
@@ -537,6 +798,19 @@ impl VoyageState {
                                 Trim::Cruise => 2.0,
                             };
                             burn += per_day / MINUTES_PER_DAY as f64;
+                            // Run takes a squall on deck and on the skin
+                            // (spec 8): once per squall, the first posted
+                            // soul strains and the hull scars.
+                            if self.trim == Trim::Run && !self.priced_squalls.contains(&wx.id) {
+                                self.priced_squalls.push(wx.id);
+                                self.scar_hull(WearCause::SquallAtRun);
+                                let posted = [Station::Helm, Station::Tender, Station::Watch]
+                                    .into_iter()
+                                    .find_map(|p| self.station_soul(p));
+                                if let Some(soul) = posted {
+                                    self.strain_soul(soul, StrainCause::SquallAtRun);
+                                }
+                            }
                         }
                     }
                 }
@@ -559,6 +833,15 @@ impl VoyageState {
                     if self.mourn_minutes >= MINUTES_PER_DAY {
                         self.mourn_minutes -= MINUTES_PER_DAY;
                         self.hope = (self.hope + 1).min(HOPE_MAX);
+                    }
+                }
+                // Hard rations: the hold stretches, the people pay a
+                // point of hope per full day underway (spec 8).
+                if self.hard_rations {
+                    self.rations_minutes += 1;
+                    if self.rations_minutes >= MINUTES_PER_DAY {
+                        self.rations_minutes -= MINUTES_PER_DAY;
+                        self.lower_hope(1);
                     }
                 }
 
@@ -613,6 +896,16 @@ impl VoyageState {
     }
 
     fn arrive_at(&mut self, waypoint: WaypointId, arrived_by: Option<RoadId>) {
+        // A leg made good at Run leaves a mark (spec 8): driving her hard
+        // is the choice that wears her. Squalls and threat roads add more.
+        if arrived_by.is_some() && self.trim == Trim::Run {
+            self.scar_hull(WearCause::RunHard);
+        }
+        // A new chapter forgives the chapter's presses (spec 8).
+        let prev_chapter = self.visited.last().map(|w| route::waypoint(*w).chapter);
+        if prev_chapter != Some(route::waypoint(waypoint).chapter) {
+            self.presses_this_chapter = 0;
+        }
         self.visited.push(waypoint);
         self.rumor_bought_this_visit = false;
         self.hold_decay_applied = 0;
@@ -622,6 +915,22 @@ impl VoyageState {
         if self.long_silence && route::waypoint(waypoint).has_feature(Feature::RestStop) {
             self.long_silence = false;
             self.hope = self.hope.max(3);
+        }
+
+        // Rest stops mend the off-post by one level (spec 8) — posts are
+        // not rest; relieving someone is the decision.
+        if route::waypoint(waypoint).has_feature(Feature::RestStop) {
+            let mut healed = Vec::new();
+            for s in &mut self.souls {
+                if s.status == SoulStatus::Aboard && s.station.is_none() && s.strain > 0 {
+                    s.strain -= 1;
+                    healed.push(s.soul);
+                }
+            }
+            for soul in healed {
+                self.passage_events
+                    .push(PassageEvent::HealedAtRest { soul });
+            }
         }
 
         // The mail. Letters catch up to the Vessel at ports while home
@@ -710,6 +1019,14 @@ impl VoyageState {
         for i in 0..self.souls.len() {
             let s = self.souls[i];
             if s.status != SoulStatus::Aboard || s.station.is_some() {
+                continue;
+            }
+            // Spec 8: a worn soul's story pauses; a strained soul rests
+            // at half pace (a hurt person heals before they tell tales).
+            if s.strain >= 2 {
+                continue;
+            }
+            if s.strain == 1 && !self.processed_minutes.is_multiple_of(2) {
                 continue;
             }
             let def = souls::soul(s.soul);
@@ -893,6 +1210,7 @@ impl VoyageState {
                 } else {
                     self.provisions = (self.provisions - 15.0).max(0.0);
                     self.lower_hope(2);
+                    self.scar_hull(WearCause::ThreatRoad);
                     (
                         vec!["You hurry the reef, and the Warden hurries with you. It \
                              takes its toll from the hold and something less \
@@ -943,6 +1261,7 @@ impl VoyageState {
                     )
                 } else if quiet_keel {
                     self.provisions = (self.provisions - 10.0).max(0.0);
+                    self.scar_hull(WearCause::ThreatRoad);
                     (
                         vec!["The thorns close on the hull and the quiet keel holds — \
                              barely, loudly, expensively. The crew spends the last \
@@ -951,11 +1270,13 @@ impl VoyageState {
                         vec!["the thorns take 10".to_string()],
                     )
                 } else {
-                    // The exposure is the post: helm first, then tender,
-                    // then watch. Resting souls are below, and safe.
-                    let exposed = [Station::Helm, Station::Tender, Station::Watch]
+                    // The exposure is the post, weakest first (spec 8):
+                    // the most strained stationed soul, ties broken helm,
+                    // tender, watch. Resting souls are below, and safe.
+                    let exposed = [Station::Watch, Station::Tender, Station::Helm]
                         .into_iter()
-                        .find_map(|post| self.station_soul(post));
+                        .filter_map(|post| self.station_soul(post))
+                        .max_by_key(|id| self.soul_state(*id).map(|s| s.strain).unwrap_or(0));
                     if let Some(lost) = exposed {
                         let name = souls::soul(lost).name;
                         self.mark_lost(lost);
@@ -971,6 +1292,7 @@ impl VoyageState {
                     } else {
                         self.provisions = (self.provisions - 20.0).max(0.0);
                         self.lower_hope(2);
+                        self.scar_hull(WearCause::ThreatRoad);
                         (
                             vec!["With every soul below, the ship takes the thorns on \
                                  her own skin. She holds. It costs the hold and the \
@@ -1099,9 +1421,10 @@ impl VoyageState {
                 self.untaken.push(sibling.id);
             }
         }
-        // A new leg: the strange-night cap resets, stale watch overrides
-        // (nights already past) are pruned.
+        // A new leg: the strange-night cap resets, the press is spent,
+        // stale watch overrides (nights already past) are pruned.
         self.strange_seen_this_leg = false;
+        self.pressed_this_leg = false;
         let today = self.processed_minutes / MINUTES_PER_DAY;
         self.night_assignments.retain(|(d, _)| *d >= today);
         self.phase = VoyagePhase::Traveling {
@@ -1216,6 +1539,10 @@ impl VoyageState {
             self.strange_seen_this_leg = true;
         }
         if !kind.needs_watch() {
+            // A night that asks nothing is a night off: fatigue resets.
+            for s in &mut self.souls {
+                s.consecutive_watches = 0;
+            }
             return; // quiet nights ask nothing and write nothing
         }
 
@@ -1231,7 +1558,7 @@ impl VoyageState {
                     s.rest_minutes = s.rest_minutes.saturating_sub(MINUTES_PER_DAY);
                 }
             }
-            if def.affinity == Some(Station::Watch) {
+            if def.affinity == Some(Station::Watch) && self.soul_sound(soul_id) {
                 (NightOutcome::StoodAffine, Some(def.name))
             } else {
                 (NightOutcome::Stood, Some(def.name))
@@ -1243,6 +1570,30 @@ impl VoyageState {
         } else {
             (NightOutcome::Unstood, None)
         };
+
+        // Watch fatigue (spec 8): the stander's count rises, everyone
+        // else's night off resets theirs; the third night in a row strains.
+        for s in &mut self.souls {
+            if s.status != SoulStatus::Aboard {
+                continue;
+            }
+            if Some(s.soul) == stander {
+                s.consecutive_watches = s.consecutive_watches.saturating_add(1);
+            } else {
+                s.consecutive_watches = 0;
+            }
+        }
+        if let Some(id) = stander {
+            if self
+                .soul_state(id)
+                .is_some_and(|s| s.consecutive_watches >= 3)
+            {
+                if let Some(s) = self.souls.iter_mut().find(|s| s.soul == id) {
+                    s.consecutive_watches = 0;
+                }
+                self.strain_soul(id, StrainCause::ThirdWatch);
+            }
+        }
 
         let effect = nights::night_effect(kind, outcome);
         if effect.provisions < 0.0 {
@@ -1349,6 +1700,10 @@ impl VoyageState {
         {
             return false;
         }
+        // A worn soul cannot hold a post (spec 8).
+        if station.is_some() && self.soul_state(id).is_some_and(|s| s.strain >= 2) {
+            return false;
+        }
         if let Some(post) = station {
             for s in &mut self.souls {
                 if s.station == Some(post) {
@@ -1381,6 +1736,8 @@ impl VoyageState {
             arc_beat: 0,
             rest_minutes: 0,
             left_at: None,
+            strain: 0,
+            consecutive_watches: 0,
         });
         true
     }
@@ -1396,6 +1753,8 @@ impl VoyageState {
             arc_beat: 0,
             rest_minutes: 0,
             left_at: here,
+            strain: 0,
+            consecutive_watches: 0,
         });
         Some(id)
     }

@@ -219,6 +219,20 @@ fn handle_refit_keys(
     let Some(pair) = voyage.pending_refit_pair() else {
         return VoyageInputResult::Handled;
     };
+    if matches!(key.code, KeyCode::Char('m') | KeyCode::Char('M')) && voyage.hull_wear > 0 {
+        let scars = voyage.hull_wear;
+        if voyage.choose_mend() {
+            ui.scene_modal = Some(SceneModal {
+                title: "Mended at the yard".to_string(),
+                body: format!(
+                    "The shipwrights plane away {scars} scar{}. The refits stay \
+                     on the shelf, and the shelf closes.",
+                    if scars == 1 { "" } else { "s" }
+                ),
+            });
+        }
+        return VoyageInputResult::HandledNeedsSave;
+    }
     let pick_a = match key.code {
         KeyCode::Char('a') | KeyCode::Char('A') => true,
         KeyCode::Char('b') | KeyCode::Char('B') => false,
@@ -411,6 +425,7 @@ fn handle_chart_keys(
             }
             _ => VoyageInputResult::Handled,
         },
+        // [T] opens the Pace panel (the internal view is still `Trim`).
         KeyCode::Char('t') | KeyCode::Char('T') => {
             let current = Trim::ALL
                 .iter()
@@ -463,6 +478,19 @@ fn handle_chart_keys(
                 ui.scene_modal = Some(SceneModal {
                     title: "A rumor, bought".to_string(),
                     body: route::rumor(bought).text.to_string(),
+                });
+                VoyageInputResult::HandledNeedsSave
+            } else {
+                VoyageInputResult::Handled
+            }
+        }
+        KeyCode::Char('p') | KeyCode::Char('P') => {
+            if voyage.press_helm() {
+                ui.scene_modal = Some(SceneModal {
+                    title: "The helm, pressed".to_string(),
+                    body: "Two points of hope, spent on purpose. The ship answers \
+                           and the leg shortens."
+                        .to_string(),
                 });
                 VoyageInputResult::HandledNeedsSave
             } else {
@@ -522,7 +550,8 @@ fn handle_trim_keys(
     ui: &mut VoyageUiState,
     selected: usize,
 ) -> VoyageInputResult {
-    let selected = selected.min(Trim::ALL.len() - 1);
+    // Rows: the four trims, then hard rations (spec 8).
+    let selected = selected.min(Trim::ALL.len());
     match key.code {
         KeyCode::Up | KeyCode::Char('k') => {
             ui.view = VoyageView::Trim {
@@ -532,11 +561,16 @@ fn handle_trim_keys(
         }
         KeyCode::Down | KeyCode::Char('j') => {
             ui.view = VoyageView::Trim {
-                selected: (selected + 1).min(Trim::ALL.len() - 1),
+                selected: (selected + 1).min(Trim::ALL.len()),
             };
             VoyageInputResult::Handled
         }
         KeyCode::Enter => {
+            if selected == Trim::ALL.len() {
+                let on = !voyage.hard_rations;
+                voyage.set_hard_rations(on);
+                return VoyageInputResult::HandledNeedsSave;
+            }
             voyage.set_trim(Trim::ALL[selected]);
             ui.view = VoyageView::Chart;
             VoyageInputResult::HandledNeedsSave

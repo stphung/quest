@@ -70,7 +70,7 @@ pub fn render_voyage(
         if let Some(asking) = voyage.pending_ask {
             render_ask_modal(frame, area, voyage, asking);
         } else if let Some(pair) = voyage.pending_refit_pair() {
-            render_refit_modal(frame, area, pair);
+            render_refit_modal(frame, area, pair, voyage.hull_wear);
         }
     }
 }
@@ -133,7 +133,12 @@ fn render_scene_play(frame: &mut Frame, area: Rect, play: &crate::vessel::SceneP
 
 // ── The yard's refit door ───────────────────────────────────────────────────
 
-fn render_refit_modal(frame: &mut Frame, area: Rect, pair: crate::vessel::refits::RefitPair) {
+fn render_refit_modal(
+    frame: &mut Frame,
+    area: Rect,
+    pair: crate::vessel::refits::RefitPair,
+    wear: u8,
+) {
     let width = area.width.clamp(40, 66);
     let height = 12u16.min(area.height);
     let x = area.x + (area.width.saturating_sub(width)) / 2;
@@ -148,7 +153,7 @@ fn render_refit_modal(frame: &mut Frame, area: Rect, pair: crate::vessel::refits
     let inner = block.inner(rect);
     frame.render_widget(block, rect);
 
-    let lines = vec![
+    let mut lines = vec![
         Line::from(""),
         Line::from(Span::styled(
             "One refit, while she's in the slip. The other never fits her.",
@@ -188,6 +193,30 @@ fn render_refit_modal(frame: &mut Frame, area: Rect, pair: crate::vessel::refits
             Style::default().fg(Color::DarkGray),
         )),
     ];
+    // The third door (spec 8): a scarred hull can be mended instead —
+    // and that yard's refits go unbuilt forever.
+    if wear > 0 {
+        lines.insert(lines.len() - 2, Line::from(""));
+        lines.insert(
+            lines.len() - 2,
+            Line::from(vec![
+                Span::styled("[M] ", Style::default().fg(GOLD)),
+                Span::styled(
+                    "Mend her",
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!(
+                        " \u{2014} plane away {wear} scar{}; both refits stay on the shelf",
+                        if wear == 1 { "" } else { "s" }
+                    ),
+                    Style::default().fg(Color::Gray),
+                ),
+            ]),
+        );
+    }
     frame.render_widget(
         Paragraph::new(lines)
             .alignment(Alignment::Center)
@@ -615,8 +644,31 @@ fn render_vessel_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
     let mut lines: Vec<Line> = Vec::new();
     lines.push(Line::from(""));
     lines.extend(gauge_lines(voyage, inner.width));
+    // The hull and the table (spec 8): scars eat, rations stretch.
+    if voyage.hull_wear > 0 {
+        lines.push(Line::from(Span::styled(
+            format!(
+                "Hull       scarred \u{00d7}{} \u{2014} the hold pays {}% more",
+                voyage.hull_wear,
+                voyage.hull_wear as u32 * 5
+            ),
+            Style::default().fg(Color::LightRed),
+        )));
+    }
+    if voyage.hard_rations {
+        lines.push(Line::from(Span::styled(
+            "Rations    Bare Bones \u{2014} the hold stretches, hope pays daily",
+            Style::default().fg(Color::Yellow),
+        )));
+    }
     lines.push(Line::from(""));
     lines.extend(phase_lines(voyage));
+    if voyage.can_press() {
+        lines.push(Line::from(Span::styled(
+            "[P] Press the helm \u{2014} \u{2212}2 hope, the leg shortens",
+            Style::default().fg(GOLD),
+        )));
+    }
     // The sky over this leg, and the night ahead (spec 5).
     for wx in voyage.weather_on_leg() {
         lines.push(Line::from(Span::styled(
@@ -726,7 +778,7 @@ fn gauge_lines(voyage: &VoyageState, width: u16) -> Vec<Line<'static>> {
             ),
         ]),
         Line::from(vec![
-            Span::styled("Trim       ", Style::default().fg(Color::Gray)),
+            Span::styled("Pace       ", Style::default().fg(Color::Gray)),
             Span::styled(
                 voyage.trim.display_name().to_string(),
                 Style::default().fg(Color::White),
@@ -845,7 +897,7 @@ fn footer_keys(voyage: &VoyageState) -> Vec<Line<'static>> {
     let mut keys = if matches!(voyage.phase, VoyagePhase::Arrived { .. }) {
         vec!["[M] Manifest", "[K] Chart", "[R] Record"]
     } else {
-        vec!["[S] Souls", "[W] Watch", "[T] Trim", "[R] Log"]
+        vec!["[S] Souls", "[W] Watch", "[T] Pace", "[R] Log"]
     };
     if matches!(
         voyage.phase,
@@ -983,15 +1035,16 @@ fn card_lines(card: &RoadCard, selected: bool) -> Vec<Line<'static>> {
 
 fn render_trim_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, selected: usize) {
     let block = Block::default()
-        .title(" \u{2261} Trim ")
+        .title(" \u{2261} Pace ")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(VESSEL_VIOLET));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
     let mut lines: Vec<Line> = vec![Line::from("")];
+    let selected = selected.min(Trim::ALL.len()); // last row: hard rations
     for (i, trim) in Trim::ALL.iter().enumerate() {
-        let is_selected = i == selected.min(Trim::ALL.len() - 1);
+        let is_selected = i == selected;
         let is_current = *trim == voyage.trim;
         let marker = if is_selected { "\u{25b8} " } else { "  " };
         let name_style = if is_current {
@@ -1016,6 +1069,45 @@ fn render_trim_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, select
         )));
         lines.push(Line::from(""));
     }
+    // Rations — Oregon Trail's other dial (spec 10): Filling by default,
+    // Bare Bones stretches the hold and the people pay in hope.
+    {
+        let is_selected = selected == Trim::ALL.len();
+        let marker = if is_selected { "\u{25b8} " } else { "  " };
+        let name_style = if voyage.hard_rations {
+            Style::default().fg(GOLD).add_modifier(Modifier::BOLD)
+        } else if is_selected {
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::White)
+        };
+        lines.push(Line::from(vec![
+            Span::styled(format!("{marker}Rations \u{2014} "), name_style),
+            Span::styled(
+                if voyage.hard_rations {
+                    "Bare Bones"
+                } else {
+                    "Filling"
+                }
+                .to_string(),
+                name_style,
+            ),
+        ]));
+        lines.push(Line::from(Span::styled(
+            if voyage.hard_rations {
+                "    the hold burns a quarter slower \u{00b7} hope \u{2212}1 each day".to_string()
+            } else if voyage.hope < crate::vessel::voyage::HOPE_SPEND_FLOOR {
+                "    Bare Bones would ask hope you don't have to spare".to_string()
+            } else {
+                "    the crew eats their fill \u{2014} Bare Bones stretches it, at a cost"
+                    .to_string()
+            },
+            Style::default().fg(Color::Gray),
+        )));
+        lines.push(Line::from(""));
+    }
     lines.push(Line::from(Span::styled(
         "\u{2191}\u{2193} choose  \u{00b7}  [Enter] set  \u{00b7}  [Esc] back",
         Style::default().fg(Color::DarkGray),
@@ -1024,7 +1116,7 @@ fn render_trim_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, select
 }
 
 /// Final computed prices, never multipliers (Underway's rule): what this
-/// trim does to the rest of the current leg, or its standing character.
+/// pace does to the rest of the current leg, or its standing character.
 fn trim_effect_line(voyage: &VoyageState, trim: Trim) -> String {
     if let VoyagePhase::Traveling {
         road,
@@ -1041,9 +1133,10 @@ fn trim_effect_line(voyage: &VoyageState, trim: Trim) -> String {
             * voyage.provisions_mult_with(trim))
         .round() as u64;
         let extra = match trim {
-            Trim::Mourn => " · hope rises daily",
-            Trim::Quiet => " · hears more",
-            _ => "",
+            Trim::Mourn => " \u{00b7} hope rises daily",
+            Trim::Quiet => " \u{00b7} hears the dark",
+            Trim::Run => " \u{00b7} scars the hull",
+            Trim::Cruise => "",
         };
         format!(
             "arrives in {} \u{00b7} {provisions} provisions{extra}",
@@ -1051,10 +1144,10 @@ fn trim_effect_line(voyage: &VoyageState, trim: Trim) -> String {
         )
     } else {
         match trim {
-            Trim::Run => "faster legs, a hungrier hold".to_string(),
-            Trim::Cruise => "the default; never wrong, never best".to_string(),
-            Trim::Quiet => "slower, thriftier, hears more".to_string(),
-            Trim::Mourn => "slowest; the only trim that raises hope at sea".to_string(),
+            Trim::Run => "fastest \u{2014} the hold empties and she scars".to_string(),
+            Trim::Cruise => "the honest middle; never wrong, never best".to_string(),
+            Trim::Quiet => "slower, sparing \u{2014} quiet enough to hear the dark".to_string(),
+            Trim::Mourn => "slowest \u{2014} the crew mends and hope climbs".to_string(),
         }
     }
 }
@@ -1160,10 +1253,17 @@ fn render_souls_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, selec
         let is_selected = i == selected;
         let marker = if is_selected { "\u{25b8} " } else { "  " };
         let (status_note, name_color) = match s.status {
-            SoulStatus::Aboard => match s.station {
-                Some(post) => (format!("at the {}", post.display_name()), Color::White),
-                None => ("resting".to_string(), Color::White),
-            },
+            SoulStatus::Aboard => {
+                let base = match s.station {
+                    Some(post) => format!("at the {}", post.display_name()),
+                    None => "resting".to_string(),
+                };
+                match s.strain {
+                    2 => (format!("{base} \u{00b7} worn"), Color::LightRed),
+                    1 => (format!("{base} \u{00b7} strained"), Color::Yellow),
+                    _ => (base, Color::White),
+                }
+            }
             SoulStatus::Declined => ("stayed behind".to_string(), Color::DarkGray),
             SoulStatus::Ashore => ("ashore".to_string(), Color::DarkGray),
             SoulStatus::Lost => ("carved into the hull".to_string(), Color::LightRed),
@@ -1379,11 +1479,19 @@ fn render_watch_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, selec
             "needs no watch".to_string()
         } else if let Some(id) = stander {
             let def = souls::soul(*id);
-            let affine = def.affinity == Some(souls::Station::Watch);
+            let state = voyage.soul_state(*id);
+            let affine =
+                def.affinity == Some(souls::Station::Watch) && state.is_none_or(|s| s.strain == 0);
+            let fatigue = state.map(|s| s.consecutive_watches).unwrap_or(0);
             format!(
-                "stood by {}{}",
+                "stood by {}{}{}",
                 def.name,
-                if affine { " (kind hands)" } else { "" }
+                if affine { " (kind hands)" } else { "" },
+                if fatigue >= 2 {
+                    " \u{2014} a third night running will wear on them"
+                } else {
+                    ""
+                }
             )
         } else {
             "unstood \u{2014} it will cost what it costs".to_string()

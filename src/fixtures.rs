@@ -469,6 +469,8 @@ pub fn voyage_arrived(
         arc_beat: 4,
         rest_minutes: 0,
         left_at,
+        strain: 0,
+        consecutive_watches: 0,
     };
     v.souls = vec![
         met(SoulId(0), SoulStatus::Aboard, Some(Station::Helm), None),
