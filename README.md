@@ -4,7 +4,7 @@
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-blue.svg)](https://github.com/stphung/quest/releases/latest)
 
-A terminal-based idle RPG game written in Rust. Watch your hero grow stronger automatically as they battle through 10 zones, explore procedural dungeons, and fish for legendary catches!
+A terminal-based idle RPG game written in Rust. Watch your hero grow stronger automatically as they battle through 50 zones, explore procedural dungeons, fish for legendary catches, and dive into layered endgame systems — prestige, Ascension, the Deep, and the Loom of Worlds!
 
 > **Why "quest"?** Because that's exactly what it is. Simple, memorable, and to the point.
 
@@ -22,15 +22,15 @@ Then run `quest` to start your adventure!
 ## Features
 
 - **Automatic Combat** - Your character fights enemies automatically with turn-based combat
-- **10 Zones** - Progress through 10 unique zones from Meadow to Storm Citadel, each with 3-4 subzones and bosses
+- **50 Zones** - 10 base zones from Meadow to Storm Citadel, Fracture zones (11-30) unlocked through the Deep, and Loom zones (31-50) gated by Woven Patterns, Ascension, and prestige
 - **6 Attributes** - STR, DEX, CON, INT, WIS, CHA form the foundation of your character
 - **Prestige System** - Reset for permanent XP multipliers (1.5× per rank) and unlock higher zones
 - **Procedural Dungeons** - Explore grid-based dungeons with fog of war, treasure rooms, elite guardians, and bosses
-- **Fishing** - Separate progression track with 30 ranks and 5 fish rarities
+- **Fishing** - Separate progression track with 40 ranks and 5 fish rarities
 - **Diablo-style Items** - 7 equipment slots, 6 rarity tiers (including God items with unique passives), procedural names, and smart auto-equip
 - **Multi-Character** - Create and manage multiple characters with JSON saves
-- **Offline Progress** - Continue gaining XP even when closed (50% rate, max 7 days)
-- **Challenge Minigames** - Discover and play Chess, Go, Nine Men's Morris, Gomoku, Minesweeper, and Rune Deciphering (requires P1+)
+- **Offline Progress** - Continue gaining XP even when closed (25% rate, max 7 days)
+- **Challenge Minigames** - Discover and play 14 minigames: Chess, Go, Nine Men's Morris, Gomoku, Minesweeper, Rune Deciphering, Runic Lights, Runic Shift, Shard Fusion, Sudoku, Snake, Jezzball, Flappy Bird, and Vault Warden (requires P1+)
 - **Haven Base Building** - Account-level base with upgradeable rooms providing permanent bonuses
 - **Achievements** - Track milestones across combat, zones, fishing, challenges, and prestige
 - **3D ASCII Combat** - First-person dungeon view with visual effects
@@ -97,7 +97,7 @@ cargo run --release
 
 ### Zones & Progression
 
-Progress through 10 zones, each with 3-4 subzones and unique bosses:
+Progress through 50 zones. The first 10 base zones each have 3-4 subzones and unique bosses:
 
 | Tier | Zones | Prestige Required | Levels |
 |------|-------|-------------------|--------|
@@ -110,6 +110,7 @@ Progress through 10 zones, each with 3-4 subzones and unique bosses:
 - Defeat 10 enemies in a subzone to spawn the boss
 - Defeat subzone bosses to advance
 - Zone 10's final boss requires forging **Stormbreaker**
+- Beyond Zone 10: Fracture zones (11-30) unlock by clearing layers of the Deep, and Loom zones (31-50) unlock through Woven Patterns, Ascension tiers, and prestige milestones
 
 ### Attributes & Combat
 
@@ -133,7 +134,7 @@ Prestige resets your level for permanent benefits:
 - **XP Multiplier**: 1.5× per prestige rank (compounding)
 - **Attribute Caps**: Base 10 + (5 × prestige rank)
 - **Zone Unlocks**: Higher zones require prestige ranks
-- **Better Item Drops**: +5% drop rate per prestige rank
+- **Better Item Drops**: +1% drop rate per prestige rank (capped at 25% total)
 
 Example progression: Bronze (1.5×) → Silver (2.25×) → Gold (3.375×) → Platinum → Diamond → Celestial...
 
@@ -148,8 +149,8 @@ Procedural grid-based exploration:
 
 ### Fishing
 
-Separate progression track with 30 ranks across 6 tiers:
-- Novice → Apprentice → Journeyman → Expert → Master → Grandmaster
+Separate progression track with 40 ranks across 8 tiers:
+- Novice → Apprentice → Journeyman → Expert → Master → Grandmaster → Mythic → Transcendent
 - Fish rarities: Common, Uncommon, Rare, Epic, Legendary
 - Higher ranks improve catch quality
 
@@ -163,6 +164,7 @@ Discover challenge minigames while adventuring (requires Prestige 1+):
 - **Gomoku** - Five-in-a-row on a 15×15 board with minimax AI (4 difficulty levels)
 - **Minesweeper (Trap Detection)** - Clear minefields across 4 difficulty levels (9×9 to 20×16)
 - **Rune Deciphering** - Mastermind-style deduction game with symbol sequences
+- **...and more** - Runic Lights, Runic Shift, Shard Fusion, Sudoku, Snake, Jezzball, Flappy Bird, and Vault Warden (14 total)
 - Challenges appear randomly (~2 hour average discovery time)
 - Accept or decline from the challenge menu
 - Winning rewards prestige points based on difficulty
@@ -197,14 +199,14 @@ Track your progress across all characters:
 
 - Procedural name generation with prefixes/suffixes
 - Smart auto-equip based on weighted scoring
-- Drop rate: 30% base + 5% per prestige rank
+- Drop rate: 15% base + 1% per prestige rank (capped at 25%)
 
 ## Save System
 
 - **Location**: `~/.quest/` directory (JSON format)
 - **Multi-character**: Each character saved separately
 - **Auto-save**: Every 30 seconds
-- **Offline Progress**: Simulates kills at 50% rate (max 7 days)
+- **Offline Progress**: Simulates kills at 25% rate (max 7 days)
 
 ## Technical Details
 
@@ -220,17 +222,26 @@ Track your progress across all characters:
 ```
 src/
 ├── main.rs            # Entry point, game loop
-├── input.rs           # Keyboard input routing
-├── core/              # Game state, logic, constants
+├── input/             # Keyboard input routing
+├── core/              # Game state, tick engine, constants
 ├── character/         # Attributes, prestige, save system
 ├── combat/            # Enemy generation, combat logic
-├── zones/             # Zone data and progression
+├── zones/             # Zone data and progression (base, Fracture, Loom)
 ├── dungeon/           # Procedural dungeon system
 ├── fishing/           # Fishing minigame
 ├── items/             # Equipment and drop system
-├── challenges/        # Chess, Go, Morris, Gomoku, Minesweeper, Rune
+├── enhancement/       # Soulforge equipment enhancement
+├── ascension/         # Combat power multiplier system
+├── deep/              # Mercenary expedition system
+├── loom/              # Resource production chains
+├── stormglass/        # Currency and Storm Sigils
+├── power_cores/       # Passive PR generation
+├── god_items/         # Norse mythology endgame items
+├── challenges/        # 14 challenge minigames
 ├── haven/             # Account-level base building
 ├── achievements/      # Achievement tracking system
+├── history/           # Git-based save versioning (Time Vault)
+├── vessel/            # Act 2 Vessel/Voyage (dark behind kill-switch)
 ├── utils/             # Build info, updater, debug menu
 └── ui/                # Terminal UI components
 ```
