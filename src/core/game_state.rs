@@ -89,6 +89,10 @@ pub struct GameState {
     /// Act 3, whenever it exists, keys off this the way Act 2 keyed off
     /// `vessel_launched` (persistent, survives everything)
     pub vessel_arrived: bool,
+    /// True once the ferryman era ends — the last souls carried out of
+    /// the dark (spec 9). Act 3's real gate; `vessel_arrived` remains the
+    /// record of the first arrival (persistent, survives everything)
+    pub last_crossing_complete: bool,
     /// Play-time seconds when the last Vessel whisper was pushed (transient)
     pub vessel_last_whisper_at: u64,
     /// Active challenge minigame (transient, not saved)
@@ -172,6 +176,7 @@ impl GameState {
             vessel_signal_discovered: false,
             vessel_launched: false,
             vessel_arrived: false,
+            last_crossing_complete: false,
             vessel_last_whisper_at: 0,
             active_minigame: None,
             session_kills: 0,

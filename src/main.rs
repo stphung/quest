@@ -539,6 +539,7 @@ fn main() -> io::Result<()> {
                     // launched (kill-switch gated). Loaded lazily on the
                     // first Act 2 frame so the launch burn boots it too.
                     let mut voyage: Option<vessel::voyage::VoyageState> = None;
+                    let mut colony: Option<vessel::colony::ColonyState> = None;
                     let mut voyage_ui = vessel::VoyageUiState::default();
 
                     'game_loop: loop {
@@ -559,6 +560,10 @@ fn main() -> io::Result<()> {
                                             )
                                         }),
                                 );
+                                // The colony (spec 9) persists across
+                                // crossings — founded on the first arrival,
+                                // loaded here for every ferry run after.
+                                colony = vessel::persistence::load_colony(&state.character_id);
                                 terminal.clear()?;
                             }
                             let v = voyage.as_mut().expect("voyage initialized above");
@@ -658,13 +663,51 @@ fn main() -> io::Result<()> {
                                 });
                             }
                             if let Some(playback) = v.take_finale_playback() {
-                                // The crossing is over: Act 3's gate opens
-                                // the moment the finale surfaces.
+                                // The first arrival is the record; every
+                                // arrival folds into the colony (spec 9).
                                 state.vessel_arrived = true;
+                                let col = colony.get_or_insert_with(|| {
+                                    vessel::colony::ColonyState::found(state.character_id.clone())
+                                });
+                                let days = v.day_index();
+                                let delivered = if v.crossing_number == 1 {
+                                    v.aboard_count() as u32
+                                } else {
+                                    v.passengers
+                                };
+                                let new_districts =
+                                    col.deliver_crossing(delivered, days, days * 10, days);
+                                voyage_ui.moments.push_back(vessel::SceneModal {
+                                    title: "Landfall".to_string(),
+                                    body: format!(
+                                        "{delivered} souls step onto the living branch. \
+                                         The colony stands at {}. {} still wait in the \
+                                         dark behind you.",
+                                        col.souls_delivered, col.souls_remaining
+                                    ),
+                                });
+                                for d in new_districts {
+                                    voyage_ui.moments.push_back(vessel::SceneModal {
+                                        title: format!("The colony raises {}", d.name()),
+                                        body: format!("From here on, {}.", d.bonus()),
+                                    });
+                                }
+                                if col.era_over() {
+                                    state.last_crossing_complete = true;
+                                    voyage_ui.moments.push_back(vessel::SceneModal {
+                                        title: "The last crossing".to_string(),
+                                        body: "The old world is empty. Every soul that \
+                                               could be carried has been carried. Sister \
+                                               Verity waits by the door in the root-wall, \
+                                               and the door, at last, is ajar."
+                                            .to_string(),
+                                    });
+                                }
                                 voyage_ui.scene_play =
                                     Some(vessel::ScenePlay { playback, index: 0 });
                                 if !debug_mode {
                                     let _ = vessel::persistence::save_voyage(v);
+                                    let _ = vessel::persistence::save_colony(col);
                                     save_files(
                                         &character_manager,
                                         &state,
@@ -685,6 +728,7 @@ fn main() -> io::Result<()> {
                                     v,
                                     &voyage_ui,
                                     &ctx,
+                                    colony.as_ref(),
                                 );
                             })?;
 
@@ -716,6 +760,33 @@ fn main() -> io::Result<()> {
                                             VoyageInputResult::HandledNeedsSave => {
                                                 if !debug_mode {
                                                     let _ = vessel::persistence::save_voyage(v);
+                                                }
+                                            }
+                                            VoyageInputResult::SailAgain => {
+                                                // The next ferry run: carry the
+                                                // crew and the colony's bonuses
+                                                // into a fresh crossing (spec 9).
+                                                if let Some(col) = &colony {
+                                                    if !col.era_over() {
+                                                        let crew = v.souls.clone();
+                                                        let seed = col.era_seed
+                                                            ^ (col.crossings_completed as u64 + 1)
+                                                                .wrapping_mul(0x9E3779B9);
+                                                        *v = vessel::voyage::VoyageState::begin_ferry(
+                                                            state.character_id.clone(),
+                                                            seed,
+                                                            Utc::now(),
+                                                            col,
+                                                            crew,
+                                                        );
+                                                        voyage_ui =
+                                                            vessel::VoyageUiState::default();
+                                                        if !debug_mode {
+                                                            let _ =
+                                                                vessel::persistence::save_voyage(v);
+                                                        }
+                                                        terminal.clear()?;
+                                                    }
                                                 }
                                             }
                                             VoyageInputResult::Handled
