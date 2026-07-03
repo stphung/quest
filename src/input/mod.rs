@@ -11,6 +11,7 @@ mod soulforge_input;
 mod stormglass_input;
 pub mod time_vault_input;
 pub mod types;
+pub mod voyage_input;
 
 // Re-export all types for backward compatibility
 pub use types::*;

@@ -535,7 +535,104 @@ fn main() -> io::Result<()> {
                     let mut update_check_handle: Option<std::thread::JoinHandle<UpdateInfoStatus>> =
                         Some(std::thread::spawn(utils::updater::check_update_info));
 
+                    // Act 2: the voyage owns the loop once the Vessel has
+                    // launched (kill-switch gated). Loaded lazily on the
+                    // first Act 2 frame so the launch burn boots it too.
+                    let mut voyage: Option<vessel::voyage::VoyageState> = None;
+                    let mut voyage_ui = vessel::VoyageUiState::default();
+
                     'game_loop: loop {
+                        // ── Act 2: The Crossing ─────────────────────────────
+                        // After the launch burn, the loop belongs to the
+                        // voyage: chart, holds, junctions. Act 1 systems idle
+                        // untouched beneath it; spec 6 (the Going-Dark) owns
+                        // their eventual wind-down.
+                        if state.vessel_launched && vessel::act2_enabled() {
+                            if voyage.is_none() {
+                                voyage = Some(
+                                    vessel::persistence::load_voyage(&state.character_id)
+                                        .unwrap_or_else(|| {
+                                            vessel::voyage::VoyageState::begin(
+                                                state.character_id.clone(),
+                                                Utc::now().timestamp_millis() as u64,
+                                                Utc::now(),
+                                            )
+                                        }),
+                                );
+                                terminal.clear()?;
+                            }
+                            let v = voyage.as_mut().expect("voyage initialized above");
+                            v.tick(Utc::now());
+                            if v.take_pending_recovery_scene() && voyage_ui.scene_modal.is_none() {
+                                voyage_ui.scene_modal = Some(vessel::SceneModal {
+                                    title: "Underway again".to_string(),
+                                    body: "Something small was caught, mended, and shared. \
+                                           The hold holds a little again, and the road is \
+                                           still there."
+                                        .to_string(),
+                                });
+                            }
+
+                            terminal.draw(|frame| {
+                                let ctx = ui::responsive::LayoutContext::from_frame(frame);
+                                ui::voyage_scene::render_voyage(
+                                    frame,
+                                    frame.area(),
+                                    v,
+                                    &voyage_ui,
+                                    &ctx,
+                                );
+                            })?;
+
+                            if event::poll(Duration::from_millis(100))? {
+                                match event::read()? {
+                                    Event::Resize(_, _) => terminal.clear()?,
+                                    Event::Key(key_event)
+                                        if key_event.kind == KeyEventKind::Press =>
+                                    {
+                                        use input::voyage_input::{
+                                            handle_voyage_input, VoyageInputResult,
+                                        };
+                                        match handle_voyage_input(key_event, v, &mut voyage_ui) {
+                                            VoyageInputResult::Quit => {
+                                                if !debug_mode {
+                                                    let _ = vessel::persistence::save_voyage(v);
+                                                    save_files(
+                                                        &character_manager,
+                                                        &state,
+                                                        &global_achievements,
+                                                        &haven,
+                                                        &enhancement,
+                                                        &deep_state,
+                                                        &loom_state,
+                                                    );
+                                                }
+                                                break 'game_loop;
+                                            }
+                                            VoyageInputResult::HandledNeedsSave => {
+                                                if !debug_mode {
+                                                    let _ = vessel::persistence::save_voyage(v);
+                                                }
+                                            }
+                                            VoyageInputResult::Handled
+                                            | VoyageInputResult::Ignored => {}
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+
+                            if last_autosave.elapsed()
+                                >= Duration::from_secs(AUTOSAVE_INTERVAL_SECONDS)
+                            {
+                                last_autosave = Instant::now();
+                                if !debug_mode {
+                                    let _ = vessel::persistence::save_voyage(v);
+                                }
+                            }
+                            continue;
+                        }
+
                         // Check if background update check completed
                         if let Some(handle) = update_check_handle.take() {
                             if handle.is_finished() {

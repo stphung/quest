@@ -82,6 +82,9 @@ struct Overrides {
     vessel_signal: bool,
     vessel_launched: bool,
     loom_patterns: Option<usize>,
+    voyage: Option<u16>,
+    voyage_day: Option<u64>,
+    voyage_provisions: Option<f64>,
 }
 
 fn usage() -> ! {
@@ -107,6 +110,10 @@ fn usage() -> ! {
          \x20 --vessel-signal      Vessel signal discovered (Z50 boss fallen)\n\
          \x20 --vessel-launched    Vessel already launched (100k PR burned)\n\
          \x20 --loom-patterns <n>  Write loom.json with n completed patterns\n\
+         \x20 --voyage <waypoint>  Write voyage.json holding at waypoint 0-37\n\
+         \x20                      (implies --vessel-launched; needs QUEST_ACT2=1 to see)\n\
+         \x20 --voyage-day <n>     Days since launch (default 2x path length)\n\
+         \x20 --voyage-provisions <n>  Provisions in the hold (default 80)\n\
          \nSet QUEST_DIR to write into an isolated directory."
     );
     std::process::exit(1);
@@ -146,6 +153,11 @@ fn parse_overrides(args: &[String]) -> Overrides {
             "--vessel-signal" => o.vessel_signal = true,
             "--vessel-launched" => o.vessel_launched = true,
             "--loom-patterns" => o.loom_patterns = Some(num(args, &mut i, "--loom-patterns")),
+            "--voyage" => o.voyage = Some(num(args, &mut i, "--voyage")),
+            "--voyage-day" => o.voyage_day = Some(num(args, &mut i, "--voyage-day")),
+            "--voyage-provisions" => {
+                o.voyage_provisions = Some(num(args, &mut i, "--voyage-provisions"))
+            }
             "--gear" => {
                 o.gear = Some(match value(args, &mut i, "--gear") {
                     "common" => Rarity::Common,
@@ -218,10 +230,39 @@ fn apply_overrides(state: &mut GameState, o: &Overrides) {
     if o.vessel_signal {
         state.vessel_signal_discovered = true;
     }
-    if o.vessel_launched {
+    if o.vessel_launched || o.voyage.is_some() {
         state.vessel_signal_discovered = true;
         state.vessel_launched = true;
     }
+}
+
+/// Writes voyage.json holding station at the given waypoint.
+fn write_voyage_state(state: &GameState, o: &Overrides) {
+    let waypoint = o.voyage.expect("checked by caller");
+    if waypoint as usize >= quest::vessel::route::WAYPOINTS.len() {
+        eprintln!(
+            "error: waypoint {waypoint} does not exist (0-{})",
+            quest::vessel::route::WAYPOINTS.len() - 1
+        );
+        std::process::exit(1);
+    }
+    let waypoint = quest::vessel::route::WaypointId(waypoint);
+    // A loose default: roughly two days per waypoint passed.
+    let day = o.voyage_day.unwrap_or(2 * waypoint.0 as u64 + 2);
+    let voyage = fixtures::voyage_holding_at(
+        state.character_id.clone(),
+        waypoint,
+        day,
+        o.voyage_provisions.unwrap_or(80.0),
+        Utc::now(),
+    );
+    quest::vessel::persistence::save_voyage(&voyage).expect("failed to write voyage.json");
+    println!(
+        "Wrote voyage.json (holding at {}, day {}, {} provisions)",
+        quest::vessel::route::waypoint(waypoint).name,
+        day,
+        voyage.provisions_display()
+    );
 }
 
 /// Writes loom.json with the Loom discovered and `completed` patterns marked
@@ -271,6 +312,10 @@ fn main() {
 
     if let Some(patterns) = overrides.loom_patterns {
         write_loom_state(patterns);
+    }
+
+    if overrides.voyage.is_some() {
+        write_voyage_state(&state, &overrides);
     }
 
     let dir = quest::core::paths::get_quest_dir().expect("failed to resolve quest dir");

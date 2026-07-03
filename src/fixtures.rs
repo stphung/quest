@@ -331,3 +331,95 @@ pub fn unlock_power_cores(achievements: &mut Achievements, count: usize, unlocke
         );
     }
 }
+
+/// A voyage six days in, holding station at the Shoal Markets (the first
+/// junction), scene played, ready to chart a course. Launch time is
+/// `now - 6 days` so wall-clock ticks are deterministic for tests.
+pub fn voyage_at_first_junction(now: DateTime<Utc>) -> crate::vessel::voyage::VoyageState {
+    use crate::vessel::route::{roads_from, WaypointId, ROUTE_START};
+    let launched = now - Duration::days(6);
+    let mut v =
+        crate::vessel::voyage::VoyageState::begin("fixture-voyager".to_string(), 42, launched);
+    v.intro_pending = false;
+    v.play_arrival_scene();
+    v.depart(roads_from(ROUTE_START).next().unwrap().id)
+        .unwrap();
+    v.tick(launched + Duration::days(2));
+    v.play_arrival_scene();
+    v.depart(roads_from(WaypointId(1)).next().unwrap().id)
+        .unwrap();
+    v.tick(launched + Duration::days(4));
+    v.play_arrival_scene();
+    v.tick(now);
+    // A rumor aboard so the junction card shows an annotation and a
+    // rumor-revealed stop.
+    v.rumors.push(crate::vessel::voyage::LearnedRumor {
+        rumor: crate::vessel::route::RumorId(1),
+        learned_at: WaypointId(1),
+    });
+    v
+}
+
+/// A voyage mid-leg on the Drowned Choir road (out of the first junction),
+/// roughly half way along, at Quiet trim.
+pub fn voyage_mid_leg(now: DateTime<Utc>) -> crate::vessel::voyage::VoyageState {
+    use crate::vessel::route::roads_from;
+    let mut v = voyage_at_first_junction(now - Duration::hours(22));
+    v.set_trim(crate::vessel::voyage::Trim::Quiet);
+    let junction = v.current_waypoint().unwrap();
+    v.depart(roads_from(junction).next().unwrap().id).unwrap();
+    v.tick(now);
+    v
+}
+
+/// A voyage holding station at an arbitrary waypoint (scene not yet played),
+/// with a plausible visited spine behind it and siblings of every taken road
+/// marked untaken — exactly as real play would leave them. Used by
+/// `mkstate --voyage` for drive-game sessions.
+pub fn voyage_holding_at(
+    character_id: String,
+    waypoint: crate::vessel::route::WaypointId,
+    day: u64,
+    provisions: f64,
+    now: DateTime<Utc>,
+) -> crate::vessel::voyage::VoyageState {
+    use crate::vessel::route::{roads_from, ROUTE_START};
+    use crate::vessel::voyage::{SceneState, VoyagePhase, VoyageState, MINUTES_PER_DAY};
+
+    // BFS for a real path from the start to the target waypoint.
+    let mut queue = std::collections::VecDeque::from([vec![ROUTE_START]]);
+    let path = loop {
+        let Some(path) = queue.pop_front() else {
+            panic!("waypoint {waypoint:?} is not reachable from the start");
+        };
+        let last = *path.last().unwrap();
+        if last == waypoint {
+            break path;
+        }
+        for road in roads_from(last) {
+            let mut next = path.clone();
+            next.push(road.to);
+            queue.push_back(next);
+        }
+    };
+
+    let launched = now - Duration::days(day as i64);
+    let mut v = VoyageState::begin(character_id, 42, launched);
+    v.intro_pending = false;
+    v.processed_minutes = day * MINUTES_PER_DAY;
+    v.provisions = provisions.clamp(0.0, v.provisions_cap);
+    for pair in path.windows(2) {
+        for sibling in roads_from(pair[0]) {
+            if sibling.to != pair[1] {
+                v.untaken.push(sibling.id);
+            }
+        }
+    }
+    v.visited = path;
+    v.phase = VoyagePhase::HoldingStation {
+        waypoint,
+        arrived_at_min: v.processed_minutes,
+        scene_state: SceneState::Waiting,
+    };
+    v
+}
