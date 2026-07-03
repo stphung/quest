@@ -6,6 +6,7 @@
 //! action. See `docs/superpowers/specs/2026-03-27-vessel-launch-gate-design.md`.
 
 pub mod junction;
+pub mod letters;
 pub mod nights;
 pub mod persistence;
 pub mod pilgrims;

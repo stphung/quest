@@ -8,6 +8,9 @@
 //!
 //! See `docs/superpowers/specs/2026-07-03-vessel-route-waypoints-design.md`.
 
+use super::letters::{
+    self, LAST_LETTER_EVENT, LETTER_PARCEL_PROVISIONS, MAIL_FAILS_EVENT, MAIL_FAILS_HOPE_COST,
+};
 use super::nights::{self, NightKind, NightOutcome};
 use super::pilgrims::{self, PilgrimShip};
 use super::refits::{RefitId, REFIT_PAIRS};
@@ -297,6 +300,16 @@ pub struct VoyageState {
     /// Pilgrim ships already hailed (once per ship).
     #[serde(default)]
     pub hailed: Vec<u8>,
+    /// Letters from home delivered so far (index into the sequence).
+    #[serde(default)]
+    pub letters_received: u8,
+    /// The mail has stopped. Permanent; set by the Going-Dark's last beat.
+    #[serde(default)]
+    pub gone_dark: bool,
+    /// Delivered letters waiting to be read (drained by the UI; serialized
+    /// so mail that arrived offline greets the return).
+    #[serde(default)]
+    pub letter_events: Vec<u8>,
     /// Every soul met so far (unmet = absent). Older saves default to the
     /// launch trio.
     #[serde(default = "default_roster")]
@@ -378,6 +391,9 @@ impl VoyageState {
             silence_minutes: 0,
             heard_banks: Vec::new(),
             hailed: Vec::new(),
+            letters_received: 0,
+            gone_dark: false,
+            letter_events: Vec::new(),
         }
     }
 
@@ -592,6 +608,31 @@ impl VoyageState {
         if self.long_silence && route::waypoint(waypoint).has_feature(Feature::RestStop) {
             self.long_silence = false;
             self.hope = self.hope.max(3);
+        }
+
+        // The mail. Letters catch up to the Vessel at ports while home
+        // still writes; the Threshold hands over the last one; and the
+        // first arrival past the Last Lantern is the night the mail does
+        // not come. Location-triggered, never timed (the covenant).
+        let chapter = route::waypoint(waypoint).chapter;
+        if !self.gone_dark {
+            if waypoint == WaypointId(23) {
+                self.deliver_letter(LAST_LETTER_EVENT);
+            } else if chapter <= Chapter::DriftRoads {
+                let index = self.letters_received;
+                if letters::letter_by_event(index).is_some() {
+                    self.deliver_letter(index);
+                }
+                // Past twelve, the mail simply thins: arrivals get nothing,
+                // which is its own foreshadowing.
+                self.letters_received = self.letters_received.saturating_add(1);
+            } else if self.visited.contains(&WaypointId(24)) && waypoint != WaypointId(24) {
+                // The crew gathers at mail-hour, and nothing comes.
+                self.gone_dark = true;
+                self.lower_hope(MAIL_FAILS_HOPE_COST);
+                self.log.push(letters::MAIL_FAILS_LOG.to_string());
+                self.letter_events.push(MAIL_FAILS_EVENT);
+            }
         }
 
         // A soul may be waiting here. The ask blocks departure until
@@ -1070,6 +1111,24 @@ impl VoyageState {
         std::mem::take(&mut self.pending_recovery_scene)
     }
 
+    /// Deliver one letter: the parcel, the hope, the log, the queue.
+    fn deliver_letter(&mut self, event: u8) {
+        let Some(def) = letters::letter_by_event(event) else {
+            return;
+        };
+        self.provisions = (self.provisions + LETTER_PARCEL_PROVISIONS).min(self.provisions_cap);
+        if def.hope > 0 {
+            self.hope = (self.hope + def.hope).min(HOPE_MAX);
+        }
+        self.log.push(format!("A letter from {}", def.sender));
+        self.letter_events.push(event);
+    }
+
+    /// Drain letters waiting to be read (possibly delivered offline).
+    pub fn take_letter_events(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.letter_events)
+    }
+
     // ── Nights and the watch ────────────────────────────────────────────────
 
     /// The night's type on `day`, with the per-leg strange cap applied.
@@ -1507,8 +1566,10 @@ mod tests {
                 ..
             }
         ));
-        // The leg burned about its base price.
-        let burned = LAUNCH_PROVISIONS - v.provisions;
+        // The leg burned about its base price (net of the letter parcel
+        // that was waiting at the arrival — spec 6).
+        let burned =
+            LAUNCH_PROVISIONS - v.provisions + crate::vessel::letters::LETTER_PARCEL_PROVISIONS;
         assert!(
             (burned - f64::from(road.base_provisions)).abs() < 1.0,
             "burned {burned}, expected ~{}",
@@ -1531,7 +1592,8 @@ mod tests {
         run.tick(at);
         assert!(matches!(cruise.phase, VoyagePhase::Traveling { .. }));
         assert!(matches!(run.phase, VoyagePhase::HoldingStation { .. }));
-        let run_burn = LAUNCH_PROVISIONS - run.provisions;
+        let run_burn =
+            LAUNCH_PROVISIONS - run.provisions + crate::vessel::letters::LETTER_PARCEL_PROVISIONS;
         assert!(
             (run_burn - f64::from(road.base_provisions) * 1.30).abs() < 1.0,
             "run should burn ~130%, burned {run_burn}"
