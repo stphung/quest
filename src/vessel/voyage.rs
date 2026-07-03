@@ -114,11 +114,14 @@ impl Trim {
     }
 
     pub fn display_name(&self) -> &'static str {
+        // The player-facing Pace ladder (spec 10), in Oregon Trail's
+        // register — named for the toll, not the speed. The internal
+        // variant names stay (Run/Cruise/Quiet/Mourn) as engine terms.
         match self {
-            Trim::Run => "Run",
-            Trim::Cruise => "Cruise",
-            Trim::Quiet => "Quiet",
-            Trim::Mourn => "Mourn",
+            Trim::Run => "Grueling",
+            Trim::Cruise => "Steady",
+            Trim::Quiet => "Easy",
+            Trim::Mourn => "Restful",
         }
     }
 

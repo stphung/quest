@@ -657,7 +657,7 @@ fn render_vessel_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
     }
     if voyage.hard_rations {
         lines.push(Line::from(Span::styled(
-            "Rations    hard \u{2014} the hold stretches, hope pays daily",
+            "Rations    Bare Bones \u{2014} the hold stretches, hope pays daily",
             Style::default().fg(Color::Yellow),
         )));
     }
@@ -778,7 +778,7 @@ fn gauge_lines(voyage: &VoyageState, width: u16) -> Vec<Line<'static>> {
             ),
         ]),
         Line::from(vec![
-            Span::styled("Trim       ", Style::default().fg(Color::Gray)),
+            Span::styled("Pace       ", Style::default().fg(Color::Gray)),
             Span::styled(
                 voyage.trim.display_name().to_string(),
                 Style::default().fg(Color::White),
@@ -897,7 +897,7 @@ fn footer_keys(voyage: &VoyageState) -> Vec<Line<'static>> {
     let mut keys = if matches!(voyage.phase, VoyagePhase::Arrived { .. }) {
         vec!["[M] Manifest", "[K] Chart", "[R] Record"]
     } else {
-        vec!["[S] Souls", "[W] Watch", "[T] Trim", "[R] Log"]
+        vec!["[S] Souls", "[W] Watch", "[T] Pace", "[R] Log"]
     };
     if matches!(
         voyage.phase,
@@ -1035,7 +1035,7 @@ fn card_lines(card: &RoadCard, selected: bool) -> Vec<Line<'static>> {
 
 fn render_trim_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, selected: usize) {
     let block = Block::default()
-        .title(" \u{2261} Trim ")
+        .title(" \u{2261} Pace ")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(VESSEL_VIOLET));
     let inner = block.inner(area);
@@ -1069,7 +1069,8 @@ fn render_trim_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, select
         )));
         lines.push(Line::from(""));
     }
-    // The table's own dial (spec 8): hard rations, priced like a trim.
+    // Rations — Oregon Trail's other dial (spec 10): Filling by default,
+    // Bare Bones stretches the hold and the people pay in hope.
     {
         let is_selected = selected == Trim::ALL.len();
         let marker = if is_selected { "\u{25b8} " } else { "  " };
@@ -1083,19 +1084,24 @@ fn render_trim_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, select
             Style::default().fg(Color::White)
         };
         lines.push(Line::from(vec![
-            Span::styled(format!("{marker}Hard rations"), name_style),
+            Span::styled(format!("{marker}Rations \u{2014} "), name_style),
             Span::styled(
-                if voyage.hard_rations { "  (on)" } else { "" }.to_string(),
-                Style::default().fg(Color::Gray),
+                if voyage.hard_rations {
+                    "Bare Bones"
+                } else {
+                    "Filling"
+                }
+                .to_string(),
+                name_style,
             ),
         ]));
         lines.push(Line::from(Span::styled(
             if voyage.hard_rations {
                 "    the hold burns a quarter slower \u{00b7} hope \u{2212}1 each day".to_string()
             } else if voyage.hope < crate::vessel::voyage::HOPE_SPEND_FLOOR {
-                "    too little hope left to ask it of them".to_string()
+                "    Bare Bones would ask hope you don't have to spare".to_string()
             } else {
-                "    burn \u{00d7}0.75 \u{00b7} hope \u{2212}1 per day \u{2014} the people pay"
+                "    the crew eats their fill \u{2014} Bare Bones stretches it, at a cost"
                     .to_string()
             },
             Style::default().fg(Color::Gray),
@@ -1110,7 +1116,7 @@ fn render_trim_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, select
 }
 
 /// Final computed prices, never multipliers (Underway's rule): what this
-/// trim does to the rest of the current leg, or its standing character.
+/// pace does to the rest of the current leg, or its standing character.
 fn trim_effect_line(voyage: &VoyageState, trim: Trim) -> String {
     if let VoyagePhase::Traveling {
         road,
@@ -1127,9 +1133,10 @@ fn trim_effect_line(voyage: &VoyageState, trim: Trim) -> String {
             * voyage.provisions_mult_with(trim))
         .round() as u64;
         let extra = match trim {
-            Trim::Mourn => " · hope rises daily",
-            Trim::Quiet => " · hears more",
-            _ => "",
+            Trim::Mourn => " \u{00b7} hope rises daily",
+            Trim::Quiet => " \u{00b7} hears the dark",
+            Trim::Run => " \u{00b7} scars the hull",
+            Trim::Cruise => "",
         };
         format!(
             "arrives in {} \u{00b7} {provisions} provisions{extra}",
@@ -1137,10 +1144,10 @@ fn trim_effect_line(voyage: &VoyageState, trim: Trim) -> String {
         )
     } else {
         match trim {
-            Trim::Run => "faster legs, a hungrier hold".to_string(),
-            Trim::Cruise => "the default; never wrong, never best".to_string(),
-            Trim::Quiet => "slower, thriftier, hears more".to_string(),
-            Trim::Mourn => "slowest; the only trim that raises hope at sea".to_string(),
+            Trim::Run => "fastest \u{2014} the hold empties and she scars".to_string(),
+            Trim::Cruise => "the honest middle; never wrong, never best".to_string(),
+            Trim::Quiet => "slower, sparing \u{2014} quiet enough to hear the dark".to_string(),
+            Trim::Mourn => "slowest \u{2014} the crew mends and hope climbs".to_string(),
         }
     }
 }

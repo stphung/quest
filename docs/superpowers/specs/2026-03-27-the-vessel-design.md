@@ -328,6 +328,7 @@ Never: grind, optimize, reset.
 | 7 | The Arrival | final approach, manifest, keepsake chart, Act 3 gate | **Shipped** — [2026-07-03-vessel-arrival-design.md](2026-07-03-vessel-arrival-design.md) |
 | 8 | The Price of Passage | scarcity pass, hope sinks, strain ledger, hull wear & mend-vs-refit | **Spec written** — [2026-07-03-vessel-price-of-passage-design.md](2026-07-03-vessel-price-of-passage-design.md) |
 | 9 | The Ferryman | the crossing loop, souls delivered & the dimming race, Resonance, the Colony, the Reckoning pane, Act 3 gate moves to the Last Crossing | **Spec written** — [2026-07-03-vessel-ferryman-design.md](2026-07-03-vessel-ferryman-design.md) |
+| 10 | Pace & Rations naming | rename Trim→Pace (Grueling/Steady/Easy/Restful) and the rations toggle (Filling/Bare Bones), Oregon Trail register; strings only | **Shipped** — [2026-07-03-vessel-pace-rations-naming.md](2026-07-03-vessel-pace-rations-naming.md) |
 
 The old sub-specs 2–5 (mode transition, rooms & stats, auto-combat, crew)
 are **superseded** by this direction; salvage from them what still fits

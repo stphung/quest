@@ -425,6 +425,7 @@ fn handle_chart_keys(
             }
             _ => VoyageInputResult::Handled,
         },
+        // [T] opens the Pace panel (the internal view is still `Trim`).
         KeyCode::Char('t') | KeyCode::Char('T') => {
             let current = Trim::ALL
                 .iter()
