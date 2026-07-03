@@ -322,7 +322,7 @@ Never: grind, optimize, reset.
 | 1 | Launch Gate | gates, burn, kill-switch | **Shipped** |
 | 2 | The Route & the Waypoints | route graph data model, voyage state machine, junction cards & pricing, fog & rumors, chart renderer, mode routing | **Spec written** — [2026-07-03-vessel-route-waypoints-design.md](2026-07-03-vessel-route-waypoints-design.md) |
 | 3 | The Souls | roster, stations, arcs, hope, loss & memorial, offline covenant | **Spec written** — [2026-07-03-vessel-souls-design.md](2026-07-03-vessel-souls-design.md) |
-| 4 | Arrival Scenes | scene delivery system, road/refit/soul recoloring, scene shapes, writing pipeline | Not started |
+| 4 | Arrival Scenes | scene delivery system, road/refit/soul recoloring, scene shapes, writing pipeline | **Spec written** — [2026-07-03-vessel-arrival-scenes-design.md](2026-07-03-vessel-arrival-scenes-design.md) |
 | 5 | Underway — Weather, Trim & the Watch | void weather, trim postures, night types & watch rotation, the log, pilgrim ships, drift, refits | **Spec written** — [2026-07-03-vessel-underway-design.md](2026-07-03-vessel-underway-design.md) |
 | 6 | Letters From Home & the Going-Dark | care packages, letter templates, the midpoint event | Not started |
 | 7 | The Arrival | final approach, manifest, keepsake chart, Act 3 gate | Not started |
