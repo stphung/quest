@@ -8,6 +8,8 @@
 //!
 //! See `docs/superpowers/specs/2026-07-03-vessel-route-waypoints-design.md`.
 
+use super::nights::{self, NightKind, NightOutcome};
+use super::pilgrims::{self, PilgrimShip};
 use super::refits::{RefitId, REFIT_PAIRS};
 use super::route::{
     self, Chapter, Feature, Road, RoadId, RumorId, WaypointId, ROUTE_SINK, ROUTE_START,
@@ -17,6 +19,7 @@ use super::souls::{
     self, helm_time_mult, tender_provisions_mult, wind_time_mult, ArcTrigger, SoulId, Station,
     ARC_BEAT_REST_DAYS, BERTHS, FAREWELL_HOPE_COST, LOSS_HOPE_COST,
 };
+use super::weather::{self, WeatherKind, WeatherObj};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -277,6 +280,23 @@ pub struct VoyageState {
     /// The finale playback has been surfaced once (spec 7 owns the rest).
     #[serde(default)]
     pub finale_shown: bool,
+    /// Per-night watch overrides: (day index, soul). Editable until the
+    /// night begins; persists offline.
+    #[serde(default)]
+    pub night_assignments: Vec<(u64, SoulId)>,
+    /// A strange night already visited this leg (max one per leg).
+    #[serde(default)]
+    pub strange_seen_this_leg: bool,
+    /// Whole minutes spent inside silence-banks un-Quiet since the last
+    /// hope toll (integer so day boundaries are exact).
+    #[serde(default)]
+    pub silence_minutes: u64,
+    /// Silence-banks already listened into at Quiet (one rumor per bank).
+    #[serde(default)]
+    pub heard_banks: Vec<u32>,
+    /// Pilgrim ships already hailed (once per ship).
+    #[serde(default)]
+    pub hailed: Vec<u8>,
     /// Every soul met so far (unmet = absent). Older saves default to the
     /// launch trio.
     #[serde(default = "default_roster")]
@@ -353,6 +373,11 @@ impl VoyageState {
             log: Vec::new(),
             drifted_this_leg: false,
             finale_shown: false,
+            night_assignments: Vec::new(),
+            strange_seen_this_leg: false,
+            silence_minutes: 0,
+            heard_banks: Vec::new(),
+            hailed: Vec::new(),
         }
     }
 
@@ -431,10 +456,60 @@ impl VoyageState {
                 progress_days,
             } => {
                 let road = route::road(road_id);
-                let dp = (1.0 / MINUTES_PER_DAY as f64) / self.time_mult();
-                let burn = dp
+                let mut dp = (1.0 / MINUTES_PER_DAY as f64) / self.time_mult();
+                let mut burn = dp
                     * (f64::from(road.base_provisions) / f64::from(road.base_days))
                     * self.provisions_mult();
+
+                // The void's weather on this road, this hour. Derived, not
+                // stored — offline sees the same sky by construction.
+                let hour = self.processed_minutes / 60;
+                for wx in weather::weather_on_road(self.voyage_seed, hour, road_id) {
+                    match wx.kind {
+                        WeatherKind::Current => {
+                            if self.trim == Trim::Run {
+                                if wx.with_bearing {
+                                    // Riding it: big time gain, no extra burn.
+                                    dp /= 0.85;
+                                } else {
+                                    // Running against it costs stores.
+                                    burn *= 1.15;
+                                }
+                            }
+                        }
+                        WeatherKind::SilenceBank => {
+                            if self.trim == Trim::Quiet {
+                                // Quiet hears what the silence hides —
+                                // once per bank.
+                                if !self.heard_banks.contains(&wx.id) {
+                                    self.heard_banks.push(wx.id);
+                                    if self.grant_next_rumor(road.from) {
+                                        self.log.push(format!(
+                                            "In {}, running Quiet, the crew heard \
+                                             what the silence was hiding.",
+                                            wx.name
+                                        ));
+                                    }
+                                }
+                            } else {
+                                // Hope frays inside, one point per full day.
+                                self.silence_minutes += 1;
+                                if self.silence_minutes >= MINUTES_PER_DAY {
+                                    self.silence_minutes -= MINUTES_PER_DAY;
+                                    self.lower_hope(1);
+                                }
+                            }
+                        }
+                        WeatherKind::Squall => {
+                            let per_day = match self.trim {
+                                Trim::Run => 4.0,
+                                Trim::Quiet | Trim::Mourn => 1.0,
+                                Trim::Cruise => 2.0,
+                            };
+                            burn += per_day / MINUTES_PER_DAY as f64;
+                        }
+                    }
+                }
 
                 if self.provisions < burn {
                     // The hold runs dry mid-road: drift where we stand.
@@ -466,6 +541,10 @@ impl VoyageState {
                         departed_at_min,
                         progress_days: new_progress,
                     };
+                    // Midnight at sea: the day's night resolves.
+                    if (self.processed_minutes + 1).is_multiple_of(MINUTES_PER_DAY) {
+                        self.resolve_night(self.processed_minutes / MINUTES_PER_DAY, road_id);
+                    }
                 }
             }
             VoyagePhase::Drifting {
@@ -945,6 +1024,11 @@ impl VoyageState {
                 self.untaken.push(sibling.id);
             }
         }
+        // A new leg: the strange-night cap resets, stale watch overrides
+        // (nights already past) are pruned.
+        self.strange_seen_this_leg = false;
+        let today = self.processed_minutes / MINUTES_PER_DAY;
+        self.night_assignments.retain(|(d, _)| *d >= today);
         self.phase = VoyagePhase::Traveling {
             road: road_id,
             departed_at_min: self.processed_minutes,
@@ -984,6 +1068,159 @@ impl VoyageState {
     /// Consume the pending drift-recovery scene flag (UI shows it once).
     pub fn take_pending_recovery_scene(&mut self) -> bool {
         std::mem::take(&mut self.pending_recovery_scene)
+    }
+
+    // ── Nights and the watch ────────────────────────────────────────────────
+
+    /// The night's type on `day`, with the per-leg strange cap applied.
+    pub fn night_kind(&self, day: u64) -> NightKind {
+        let raw = nights::raw_night_kind(self.voyage_seed, day);
+        if raw == NightKind::Strange && self.strange_seen_this_leg {
+            NightKind::Quiet
+        } else {
+            raw
+        }
+    }
+
+    /// Who stands `day`'s night if nothing changes: the per-night override,
+    /// else the Watch-station soul.
+    pub fn night_stander(&self, day: u64) -> Option<SoulId> {
+        self.night_assignments
+            .iter()
+            .find(|(d, _)| *d == day)
+            .map(|(_, s)| *s)
+            .or_else(|| self.station_soul(Station::Watch))
+    }
+
+    /// Assign (or clear) a soul to a coming night. Editable until the
+    /// night begins; standing it costs a resting soul a rest day.
+    pub fn assign_night(&mut self, day: u64, soul: Option<SoulId>) {
+        self.night_assignments.retain(|(d, _)| *d != day);
+        if let Some(soul) = soul {
+            if self
+                .soul_state(soul)
+                .is_some_and(|s| s.status == SoulStatus::Aboard)
+            {
+                self.night_assignments.push((day, soul));
+            }
+        }
+    }
+
+    /// The three-night forecast: (day, kind, who stands it).
+    pub fn night_forecast(&self) -> Vec<(u64, NightKind, Option<SoulId>)> {
+        let today = self.processed_minutes / MINUTES_PER_DAY;
+        (0..3)
+            .map(|i| {
+                let day = today + i;
+                (day, self.night_kind(day), self.night_stander(day))
+            })
+            .collect()
+    }
+
+    fn resolve_night(&mut self, day: u64, road: RoadId) {
+        let kind = self.night_kind(day);
+        if kind == NightKind::Strange {
+            self.strange_seen_this_leg = true;
+        }
+        if !kind.needs_watch() {
+            return; // quiet nights ask nothing and write nothing
+        }
+
+        // Who stands it: the assignment/watch soul; else a matched-course
+        // pilgrim crew (their roads coincide and you aren't Running); else
+        // nobody.
+        let stander = self.night_stander(day);
+        let (outcome, name) = if let Some(soul_id) = stander {
+            let def = souls::soul(soul_id);
+            // A resting soul standing a night is not resting that night.
+            if let Some(s) = self.souls.iter_mut().find(|s| s.soul == soul_id) {
+                if s.station.is_none() {
+                    s.rest_minutes = s.rest_minutes.saturating_sub(MINUTES_PER_DAY);
+                }
+            }
+            if def.affinity == Some(Station::Watch) {
+                (NightOutcome::StoodAffine, Some(def.name))
+            } else {
+                (NightOutcome::Stood, Some(def.name))
+            }
+        } else if self.trim != Trim::Run
+            && pilgrims::pilgrims_on(day).iter().any(|(_, r)| *r == road)
+        {
+            (NightOutcome::StoodByPilgrim, None)
+        } else {
+            (NightOutcome::Unstood, None)
+        };
+
+        let effect = nights::night_effect(kind, outcome);
+        if effect.provisions < 0.0 {
+            self.provisions = (self.provisions + effect.provisions).max(0.0);
+        }
+        if effect.hope < 0 {
+            self.lower_hope(effect.hope.unsigned_abs());
+        }
+        if effect.rumor && !self.grant_next_rumor(route::road(road).from) {
+            // Nothing left to learn: the night pays in spirits instead.
+            self.hope = (self.hope + 1).min(HOPE_MAX);
+        }
+        self.log.push(nights::log_line(kind, outcome, name));
+    }
+
+    /// Learn the next authored rumor not yet held (weather, nights, and
+    /// pilgrims all pay through here). Returns false when all are known.
+    fn grant_next_rumor(&mut self, learned_at: WaypointId) -> bool {
+        let next = route::RUMORS.iter().find(|r| !self.knows_rumor(r.id));
+        if let Some(def) = next {
+            self.rumors.push(LearnedRumor {
+                rumor: def.id,
+                learned_at,
+            });
+            true
+        } else {
+            false
+        }
+    }
+
+    // ── Weather and pilgrims (read model + hail) ────────────────────────────
+
+    /// Weather visible on the chart right now.
+    pub fn weather_visible(&self) -> Vec<WeatherObj> {
+        weather::weather_at(self.voyage_seed, self.processed_minutes / 60)
+    }
+
+    /// Weather on the road underway, if traveling.
+    pub fn weather_on_leg(&self) -> Vec<WeatherObj> {
+        match self.phase {
+            VoyagePhase::Traveling { road, .. } | VoyagePhase::Drifting { road, .. } => {
+                weather::weather_on_road(self.voyage_seed, self.processed_minutes / 60, road)
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    /// Pilgrim ships abroad today, with their roads.
+    pub fn pilgrims_today(&self) -> Vec<(&'static PilgrimShip, RoadId)> {
+        pilgrims::pilgrims_on(self.processed_minutes / MINUTES_PER_DAY)
+    }
+
+    /// A ship in hailing range: sharing your road, not yet hailed.
+    pub fn hailable(&self) -> Option<&'static PilgrimShip> {
+        let road = self.current_road()?.id;
+        self.pilgrims_today()
+            .into_iter()
+            .find(|(s, r)| *r == road && !self.hailed.contains(&s.id))
+            .map(|(s, _)| s)
+    }
+
+    /// Hail her. Once per ship for the whole crossing: an exchange of
+    /// news, and their rumor becomes your chart annotation.
+    pub fn hail(&mut self) -> Option<&'static PilgrimShip> {
+        let ship = self.hailable()?;
+        self.hailed.push(ship.id);
+        let at = self.current_road().map(|r| r.from).unwrap_or(ROUTE_START);
+        self.grant_next_rumor(at);
+        self.log
+            .push(format!("Hailed {}. {}", ship.name, ship.hail));
+        Some(ship)
     }
 
     // ── The roster ──────────────────────────────────────────────────────────
@@ -1306,6 +1543,9 @@ mod tests {
         let mut v = started();
         v.hope = 5;
         v.set_trim(Trim::Mourn);
+        // Runa stands the nights (Watch-affine) so night prices don't
+        // muddy the Mourn measurement.
+        v.set_station(SoulId(2), Some(Station::Watch));
         // Road 12 is the longest early road; use a long leg instead:
         // sail road 0 (1 day base = 1.4 days at Mourn).
         let road = route::roads_from(ROUTE_START).next().unwrap();
@@ -1334,10 +1574,11 @@ mod tests {
         assert!(progress_days > 0.3 && progress_days < 0.5);
         assert_eq!(v.provisions, 0.0);
 
-        // 36 hours later: recovered, resumed at the same progress, +25.
+        // 36 hours later: recovered, resumed at the same progress, +25 —
+        // minus whatever the nights and weather priced in the interim.
         v.tick(t0() + Duration::hours(12 + 36 + 1));
         assert!(matches!(v.phase, VoyagePhase::Traveling { .. }));
-        assert!(v.provisions > 20.0 && v.provisions <= 25.0);
+        assert!(v.provisions > 10.0 && v.provisions <= 25.0);
         assert!(v.take_pending_recovery_scene());
         assert!(!v.take_pending_recovery_scene(), "shown once");
 

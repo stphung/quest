@@ -6,12 +6,15 @@
 //! action. See `docs/superpowers/specs/2026-03-27-vessel-launch-gate-design.md`.
 
 pub mod junction;
+pub mod nights;
 pub mod persistence;
+pub mod pilgrims;
 pub mod refits;
 pub mod route;
 pub mod scenes;
 pub mod souls;
 pub mod voyage;
+pub mod weather;
 
 use crate::core::game_state::GameState;
 
@@ -51,6 +54,10 @@ pub enum VoyageView {
     Rumors,
     /// The Souls panel; `selected` indexes the met-soul list.
     Souls {
+        selected: usize,
+    },
+    /// The watch forecast; `selected` indexes the next three nights.
+    Watch {
         selected: usize,
     },
     /// Choosing who steps ashore so a pending ask can be accepted;
