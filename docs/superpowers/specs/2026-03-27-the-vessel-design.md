@@ -320,7 +320,7 @@ Never: grind, optimize, reset.
 | # | Spec | Scope | Status |
 |---|------|-------|--------|
 | 1 | Launch Gate | gates, burn, kill-switch | **Shipped** |
-| 2 | The Route & the Waypoints | chart structure, leg/arrival state machine, junction choice rules, road character & pricing, fog & rumors, tree-on-horizon render | **Next to write** |
+| 2 | The Route & the Waypoints | route graph data model, voyage state machine, junction cards & pricing, fog & rumors, chart renderer, mode routing | **Spec written** — [2026-07-03-vessel-route-waypoints-design.md](2026-07-03-vessel-route-waypoints-design.md) |
 | 3 | The Souls | roster, stations, arcs, hope, loss & memorial, offline covenant | Not started |
 | 4 | Arrival Scenes | scene delivery system, road/refit/soul recoloring, scene shapes, writing pipeline | Not started |
 | 5 | Underway — Weather, Trim & the Watch | void weather, trim postures, night types & watch rotation, the log, pilgrim ships, drift, refits | **Spec written** — [2026-07-03-vessel-underway-design.md](2026-07-03-vessel-underway-design.md) |
