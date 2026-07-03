@@ -159,7 +159,9 @@ fn test_storm_leviathan_achievement_via_game_tick() {
 
 #[test]
 fn test_challenge_discovery_blocked_during_fishing_via_game_tick() {
-    for seed in 0..100u64 {
+    // Fishing gate is checked before any RNG roll, so a handful of seeds
+    // is enough to prove it -- no need to burn cycles on hundreds.
+    for seed in 0..5u64 {
         let mut state = fresh();
         state.prestige_rank = 1;
         state.active_fishing = Some(fishing_session(FishingPhase::Waiting, 100, 5));
@@ -181,7 +183,9 @@ fn test_challenge_discovery_blocked_during_fishing_via_game_tick() {
 
 #[test]
 fn test_challenge_discovery_blocked_during_dungeon_via_game_tick() {
-    for seed in 0..100u64 {
+    // Dungeon gate is checked before any RNG roll, so a handful of seeds
+    // is enough to prove it -- no need to burn cycles on hundreds.
+    for seed in 0..5u64 {
         let mut state = fresh();
         state.prestige_rank = 1;
         state.active_dungeon = Some(generate_dungeon(10, 0, 1));
@@ -203,7 +207,9 @@ fn test_challenge_discovery_blocked_during_dungeon_via_game_tick() {
 
 #[test]
 fn test_challenge_discovery_blocked_during_active_minigame_via_game_tick() {
-    for seed in 0..100u64 {
+    // Active-minigame gate is checked before any RNG roll, so a handful of
+    // seeds is enough to prove it -- no need to burn cycles on hundreds.
+    for seed in 0..5u64 {
         let mut state = fresh();
         state.prestige_rank = 1;
         state.active_minigame = Some(ActiveMinigame::Chess(Box::new(ChessGame::new(

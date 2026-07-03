@@ -1359,7 +1359,9 @@ fn test_haven_discovery_via_game_tick_at_p10() {
 #[test]
 fn test_haven_discovery_via_game_tick_blocked_at_p9() {
     // Verify game_tick does NOT produce HavenDiscovered at P9 (structurally blocked)
-    for seed in 0..100u64 {
+    // Chance is 0.0 by code structure below the prestige gate, so a handful of
+    // seeds is enough to prove it -- no need to burn cycles on hundreds.
+    for seed in 0..5u64 {
         let mut state = fresh_state();
         state.prestige_rank = 9;
         let mut tc = 0u32;
@@ -1384,7 +1386,9 @@ fn test_haven_discovery_via_game_tick_blocked_at_p9() {
 #[test]
 fn test_haven_discovery_via_game_tick_blocked_during_fishing() {
     // Verify game_tick does NOT produce HavenDiscovered during fishing (structurally blocked)
-    for seed in 0..100u64 {
+    // This is a code-gate check prior to any RNG roll, so a handful of
+    // seeds is enough to prove it -- no need to burn cycles on hundreds.
+    for seed in 0..5u64 {
         let mut state = fresh_state();
         state.prestige_rank = 15;
         state.active_fishing = Some(make_fishing_session(FishingPhase::Waiting, 100, 5));
@@ -1411,7 +1415,9 @@ fn test_haven_discovery_via_game_tick_blocked_during_dungeon() {
     // Verify game_tick does NOT produce HavenDiscovered during dungeon
     use quest::dungeon::generation::generate_dungeon;
 
-    for seed in 0..100u64 {
+    // This is a code-gate check prior to any RNG roll, so a handful of
+    // seeds is enough to prove it -- no need to burn cycles on hundreds.
+    for seed in 0..5u64 {
         let mut state = fresh_state();
         state.prestige_rank = 15;
         state.active_dungeon = Some(generate_dungeon(10, 0, 1));

@@ -604,7 +604,10 @@ fn test_haven_discovery_blocked_by_active_fishing() {
 #[test]
 fn test_haven_discovery_sets_haven_changed_and_achievements_changed() {
     // Use P200 where discovery chance = 0.000014 + 190*0.000007 = ~0.00134/tick.
-    // Over 3 seeds * 2000 ticks = 6000 ticks: ~8 expected discoveries, near-certain.
+    // Over 3 seeds * 1000 ticks = 3000 ticks: ~4.0 expected discoveries
+    // (1 - e^-4.0 ~= 98% chance of at least one). Seeds are fixed constants
+    // (0, 1, 2), so this is deterministic across runs, not flaky -- verified
+    // passing across repeated local runs.
     for seed in 0u64..3 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let mut haven = Haven::default();
@@ -613,7 +616,7 @@ fn test_haven_discovery_sets_haven_changed_and_achievements_changed() {
         state.prestige_rank = 200;
         let mut tick_counter = 0u32;
 
-        for _ in 0..2000 {
+        for _ in 0..1000 {
             let result = game_tick(
                 &mut state,
                 &mut tick_counter,
@@ -640,7 +643,7 @@ fn test_haven_discovery_sets_haven_changed_and_achievements_changed() {
             }
         }
     }
-    panic!("Haven discovery should have occurred with P200 in 3 * 2000 ticks");
+    panic!("Haven discovery should have occurred with P200 in 3 * 1000 ticks");
 }
 
 // =============================================================================

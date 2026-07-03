@@ -295,19 +295,15 @@ fn test_dungeon_size_scaling() {
         dungeon_p0.size
     );
 
-    // Prestige 5 at level 10: base 0 + 5/2 = tier 2 (Large), ±1 = Medium/Large/Epic
-    // Actually generated several dungeons to verify scaling
-    let mut found_larger = false;
-    for _ in 0..10 {
-        let dungeon = generate_dungeon(10, 5, 1);
-        if dungeon.size != DungeonSize::Small {
-            found_larger = true;
-            break;
-        }
-    }
-    assert!(
-        found_larger,
-        "Prestige 5 should sometimes get larger dungeons than Small"
+    // Prestige 5 at level 10: base_tier = 0 + 5/2 = 2 (Large), and variation is
+    // bounded to {-1, 0, +1}, so final_tier = max(0, 2 + variation) >= 1 always.
+    // DungeonSize::Small (tier 0) is mathematically impossible for these
+    // inputs regardless of RNG, so no retry loop is needed.
+    let dungeon = generate_dungeon(10, 5, 1);
+    assert_ne!(
+        dungeon.size,
+        DungeonSize::Small,
+        "Prestige 5 at level 10 should never roll Small (base tier 2, variation ±1)"
     );
 }
 

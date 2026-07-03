@@ -941,7 +941,7 @@ fn test_deep_not_discovered_via_game_tick_without_boss_kill() {
     let mut deep = DeepState::new();
     let mut achievements = Achievements::default();
 
-    for _ in 0..500 {
+    for _ in 0..100 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,

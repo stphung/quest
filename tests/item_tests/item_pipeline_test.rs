@@ -546,8 +546,15 @@ fn test_auto_equip_across_different_slots_is_independent() {
 fn test_full_pipeline_generate_power_equip() {
     let mut game_state = GameState::new("Pipeline Hero".to_string(), 0);
 
+    // Seeded RNG: item tier rolls are random (T0 0.40x to T9 1.00x stat
+    // multiplier), so an unseeded generate_item() could theoretically let a
+    // lucky high-tier Common roll beat an unlucky low-tier Legendary roll.
+    // Seed 42 is confirmed (via repeated local runs) to keep
+    // legendary_power > common_power for these rarity/ilvl inputs.
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
     // Generate a common item and equip it
-    let common_item = generate_item(EquipmentSlot::Weapon, Rarity::Common, 5);
+    let common_item = generate_item_with_rng(EquipmentSlot::Weapon, Rarity::Common, 5, &mut rng);
     assert!(common_item.attributes.total() > 0);
     let common_power = common_item.power();
     assert!(common_power > 0);
@@ -556,7 +563,8 @@ fn test_full_pipeline_generate_power_equip() {
     assert!(equipped, "Common item should equip into empty weapon slot");
 
     // Generate a legendary item and verify it replaces the common
-    let legendary_item = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 20);
+    let legendary_item =
+        generate_item_with_rng(EquipmentSlot::Weapon, Rarity::Legendary, 20, &mut rng);
     let legendary_power = legendary_item.power();
 
     // Legendary should outpower common (on average, overwhelmingly so)

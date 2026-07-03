@@ -561,7 +561,10 @@ fn test_is_modal_ready_before_500ms_returns_false() {
     // Unlock triggers modal queue and starts accumulation timer
     achievements.unlock(AchievementId::SlayerI, Some("Hero".to_string()));
 
-    // Immediately after unlock, 500ms hasn't passed yet
+    // Manually set the accumulation_start to "now" so the elapsed time is
+    // deterministically under 500ms, avoiding a wall-clock race with unlock().
+    achievements.accumulation_start = Some(std::time::Instant::now());
+
     assert!(!achievements.is_modal_ready());
 }
 
