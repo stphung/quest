@@ -198,30 +198,11 @@ pub struct SoulEvent {
     pub beat: u8,
 }
 
-/// One line of the ship's log, stamped with the voyage day it was
-/// written. Untagged so pre-spec-7 saves — bare strings — still load;
-/// their day is simply unknown.
+/// One line of the ship's log, stamped with the voyage day it was written.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum LogEntry {
-    Dated { day: u64, text: String },
-    Undated(String),
-}
-
-impl LogEntry {
-    pub fn text(&self) -> &str {
-        match self {
-            LogEntry::Dated { text, .. } => text,
-            LogEntry::Undated(text) => text,
-        }
-    }
-
-    pub fn day(&self) -> Option<u64> {
-        match self {
-            LogEntry::Dated { day, .. } => Some(*day),
-            LogEntry::Undated(_) => None,
-        }
-    }
+pub struct LogEntry {
+    pub day: u64,
+    pub text: String,
 }
 
 /// A resolved scene, ready to read: title, paragraphs (beats + matching
@@ -1506,7 +1487,7 @@ impl VoyageState {
     /// Write a line into the ship's log, stamped with today.
     fn push_log(&mut self, text: String) {
         let day = self.day_index();
-        self.log.push(LogEntry::Dated { day, text });
+        self.log.push(LogEntry { day, text });
     }
 
     /// Game minutes until arrival at the current trim, if traveling.

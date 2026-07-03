@@ -508,7 +508,7 @@ pub fn voyage_arrived(
         .visited
         .iter()
         .enumerate()
-        .map(|(i, w)| LogEntry::Dated {
+        .map(|(i, w)| LogEntry {
             day: i as u64 * 60 / ports,
             text: waypoint(*w).name.to_string(),
         })
@@ -520,11 +520,11 @@ pub fn voyage_arrived(
         let at = v
             .log
             .iter()
-            .position(|e| e.day().is_some_and(|d| d > day))
+            .position(|e| e.day > day)
             .unwrap_or(v.log.len());
         v.log.insert(
             at,
-            LogEntry::Dated {
+            LogEntry {
                 day,
                 text: text.to_string(),
             },

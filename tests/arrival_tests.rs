@@ -190,37 +190,19 @@ fn the_act_three_gate_defaults_closed_and_persists() {
 #[test]
 fn the_log_keeps_time() {
     let v = cross();
-    // Every line a real crossing writes knows its day, and the days
-    // never run backwards.
-    let mut last_day = 0;
+    // Every line the crossing writes knows its day, and the days never
+    // run backwards.
     assert!(!v.log.is_empty());
+    let mut last_day = 0;
     for entry in &v.log {
-        let day = entry.day().expect("new entries are dated");
-        assert!(day >= last_day, "the log reads in order");
-        last_day = day;
+        assert!(entry.day >= last_day, "the log reads in order");
+        last_day = entry.day;
     }
-    assert_eq!(v.log.first().unwrap().day(), Some(0), "the pier is day 0");
+    assert_eq!(v.log.first().unwrap().day, 0, "the pier is day 0");
     assert!(last_day >= 20, "the crossing took real time");
-}
-
-#[test]
-fn old_logs_load_undated_and_still_read() {
-    let v = VoyageState::begin("old-log".to_string(), 1, t0());
-    let mut json: serde_json::Value = serde_json::to_value(&v).unwrap();
-    json["log"] = serde_json::json!(["The Last Harbor", "A letter from home"]);
-    let loaded: VoyageState = serde_json::from_value(json).unwrap();
-    assert_eq!(loaded.log.len(), 2);
-    assert_eq!(loaded.log[0].text(), "The Last Harbor");
-    assert_eq!(loaded.log[0].day(), None, "old lines don't invent a day");
-    // And a mixed log — old lines plus new — round-trips intact.
-    let mut mixed = loaded;
-    mixed.log.push(quest::vessel::voyage::LogEntry::Dated {
-        day: 12,
-        text: "The Threshold".to_string(),
-    });
-    let reloaded: VoyageState =
-        serde_json::from_value(serde_json::to_value(&mixed).unwrap()).unwrap();
-    assert_eq!(reloaded.log, mixed.log);
+    // And the days survive save/load.
+    let loaded: VoyageState = serde_json::from_str(&serde_json::to_string(&v).unwrap()).unwrap();
+    assert_eq!(loaded.log, v.log);
 }
 
 #[test]

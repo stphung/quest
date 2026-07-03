@@ -1075,7 +1075,7 @@ fn render_rumor_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
         voyage
             .log
             .iter()
-            .filter(|l| l.text().starts_with("A letter from"))
+            .filter(|l| l.text.starts_with("A letter from"))
             .count(),
     );
     if letters_kept > 0 || voyage.gone_dark {
@@ -1854,13 +1854,10 @@ fn last_position(voyage: &VoyageState) -> WaypointId {
     voyage.visited.last().copied().unwrap_or(route::ROUTE_START)
 }
 
-/// A log line with its day, when the entry knows one (pre-spec-7 saves
-/// carry undated lines).
+/// A log line as the record shows it, day first (1-based, matching the
+/// vessel panel's day counter).
 fn log_entry_line(entry: &crate::vessel::voyage::LogEntry) -> String {
-    match entry.day() {
-        Some(day) => format!("Day {} \u{2014} {}", day + 1, entry.text()),
-        None => entry.text().to_string(),
-    }
+    format!("Day {} \u{2014} {}", entry.day + 1, entry.text)
 }
 
 fn format_minutes(minutes: u64) -> String {
