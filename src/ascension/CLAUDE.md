@@ -72,9 +72,9 @@ Total PR for I-VI: 1,245 PR.
 
 - **Combat** (`combat/events.rs`): `CombatBonuses::ascension_multiplier` field applied to player damage, defense, and HP in the combat pipeline
 - **Core** (`core/tick_stages.rs`): Builds `ascension_multiplier` from `ascension_combat_multiplier(state.ascension_level)` and injects into `CombatBonuses`; applies ascension multiplier to player max HP
-- **Core** (`core/tick_types.rs`): `TickEvent::Ascended { level, message }` variant
+- **Core** (`core/tick_types.rs`): `TickEvent::Ascended { level: u32 }` variant
 - **Core** (`core/game_state.rs`): `ascension_level` field on `GameState`
 - **Deep** (`deep/types.rs`): Deep layer milestones gate Ascension availability (account-level check)
 - **Achievements** (`achievements/handlers.rs`): `on_ascended(level)` unlocks `AscensionI` through `AscensionX` (one achievement per level, I-X)
-- **UI** (`ui/stats_prestige.rs`): Shows "Asc N (Mx)" alongside prestige info when level > 0
+- **UI** (`ui/stats_panel.rs`): Shows "✦ Ascension {roman} — ×{mult} power" alongside prestige info when level > 0 (`stats_prestige.rs` only supplies the `to_roman()` helper used in the format string)
 - **Loom** (`loom/`): `completed_pattern_count()` provides pattern gate checks for VII-X; `max_shuttle_level(ascension_level)` gates shuttle upgrade caps

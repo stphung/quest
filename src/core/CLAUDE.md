@@ -16,7 +16,7 @@ src/core/
 ├── recent_drops.rs  # RecentDrop struct, recent drops deque management
 ├── tick.rs          # game_tick_with_context() orchestration — coordinates all stages; game_tick() is deprecated
 ├── tick_stages.rs   # Tick processing stages 4-6 and helper functions
-├── tick_types.rs    # TickEvent enum (48 variants) and TickResult struct
+├── tick_types.rs    # TickEvent enum (50 variants) and TickResult struct
 ├── ticker.rs        # Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
 ├── xp.rs            # XP curves, leveling, combat kill XP, distribute_level_up_points
 ├── power_rating.rs  # Character power rating (sqrt of DPS x eHP)
@@ -53,6 +53,9 @@ pub struct GameState {
     pub stormglass_discovered: bool,
     pub storm_sigils: StormSigils,
     pub ascension_level: u32,              // Ascension level (0 = no ascension, persists through prestige)
+    pub vessel_signal_discovered: bool,    // Act 2: true after Zone 50 final boss first falls
+    pub vessel_launched: bool,             // Act 2: true after player confirms launch and burns 250,000 PR
+    pub vessel_arrived: bool,              // Act 2: true once the Vessel reaches the Tree (crossing complete)
 
     // Transient (serde(skip), reset on load)
     pub active_fishing: Option<FishingSession>,
@@ -80,6 +83,7 @@ pub struct GameState {
     pub bonuses_dirty: bool,                  // Set when Haven rooms, Storm Sigils, or prestige rank change
     pub cached_god_item_bonuses: CachedGodItemBonuses, // Cached god item bonuses (recomputed when derived_stats_dirty)
     pub debug_force_overcharge: bool,         // Debug: force next Chrono Surge to be overcharged
+    pub vessel_last_whisper_at: u64,          // Act 2: play-time seconds when the last Vessel whisper was pushed
 }
 ```
 
@@ -124,7 +128,7 @@ pub struct OfflineReport {
 
 ### `TickEvent` (`tick_types.rs`)
 
-Enum with 48 variants describing everything that can happen in a single tick. The presentation layer (main.rs) maps these to combat log entries and visual effects. Game logic never touches UI types.
+Enum with 50 variants describing everything that can happen in a single tick. The presentation layer (main.rs) maps these to combat log entries and visual effects. Game logic never touches UI types.
 
 **Categories:**
 - **Combat**: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `EnemyDefeated`, `PlayerDied`, `PlayerDiedInDungeon`, `DamageReflected`, `RegenComplete`, `BossEnrage`, `CombatRetreat`
@@ -132,7 +136,7 @@ Enum with 48 variants describing everything that can happen in a single tick. Th
 - **Zone Progression**: `SubzoneBossDefeated` (with `BossDefeatResult`)
 - **Dungeon**: `DungeonRoomEntered`, `DungeonTreasureFound`, `DungeonKeyFound`, `DungeonBossUnlocked`, `DungeonBossDefeated`, `DungeonEliteDefeated`, `DungeonFailed`, `DungeonCompleted`
 - **Fishing**: `FishingMessage`, `FishCaught`, `FishingItemFound`, `FishingRankUp`, `StormLeviathanCaught`
-- **Discovery**: `ChallengeDiscovered`, `DungeonDiscovered`, `FishingSpotDiscovered`, `HavenDiscovered`, `SoulforgeDiscovered`, `DeepDiscovered`, `StormglassDiscovered`
+- **Discovery**: `ChallengeDiscovered`, `DungeonDiscovered`, `FishingSpotDiscovered`, `HavenDiscovered`, `SoulforgeDiscovered`, `DeepDiscovered`, `StormglassDiscovered`, `VesselSignalDiscovered`, `VesselWhisper`
 - **The Deep**: `DeepMissionComplete`, `DeepEventPending`, `DeepMercInjured`, `DeepMercLost`, `DeepBreakthrough`, `DeepGuildRankUp`
 - **Stormglass**: `StormglassSalvaged`, `StormglassDungeonCache`
 - **Fracture Zones**: `FractureRegionUnlocked` (with `FractureRegion`)
@@ -196,7 +200,7 @@ The old `game_tick()` function with individual parameters is `#[deprecated]` —
 | 4. Dungeon exploration | Calls `update_dungeon()`, processes room entry, treasure, keys, boss unlock, completion/failure |
 | 4b. Loom of Worlds | `tick_stages::tick_loom(...)` — checks Loom discovery (fires when Deep's Gateway at Layer 30 opens), then if discovered ticks shuttle construction/pull, base production, neighbor unlocking, pattern sustain, and WR→PR conversion. Runs on wall-clock time, regardless of whether fishing or combat runs this tick |
 | 5. Fishing | If fishing active: ticks session, handles catches/items/rank-ups/Leviathan, updates play time, **returns early** (skips combat) |
-| 6. Combat | Calls `run_combat()`, maps `CombatEvent` to `TickEvent`, applies XP, handles kills/deaths, processes item drops and discoveries |
+| 6. Combat | Calls `run_combat()`, maps `CombatEvent` to `TickEvent`, applies XP, handles kills/deaths, processes item drops and discoveries. Also triggers Deep discovery (first Expanse cycle boss kill at P15+) and Vessel signal discovery (first Zone 50 final boss kill) inline in `process_combat_events` |
 | 6b. HUD decay | Decays combat HUD flash timers |
 | 7. Enemy spawn | Calls `spawn_enemy_if_needed()` if no enemy and not regenerating |
 | 8. Play time | Increments tick counter; at 10 ticks, increments `play_time_seconds` |
@@ -209,6 +213,7 @@ The old `game_tick()` function with individual parameters is `#[deprecated]` —
 | 11f. Pattern milestones | Consumes pending pattern milestones, syncs zone unlocks, emits `PatternMilestoneReached` |
 | 12a. Power Cores | Ticks Power Cores for passive PR generation |
 | 12b. Passive prestige tracking | Reports passive PR gains this tick (Power Cores, WR→PR) to the achievement system |
+| 12c. Vessel whispers | Gated by `crate::vessel::act2_enabled()` (the Act 2 kill-switch). Calls `tick_stages::tick_vessel_whispers()`, which emits an atmospheric `TickEvent::VesselWhisper` roughly every 60s of play time once the signal is discovered, until the Vessel launches |
 | 12. Achievement modal | Checks if 500ms accumulation window has elapsed for modal display |
 
 **Important**: Stage 5 (fishing) returns early when fishing is active, skipping stages 6 through 12 (combat, HUD decay, enemy spawn, play time, Haven/Soulforge discovery, Deep missions, fracture/pattern unlock consumption, Power Cores). The stage-8 play-time increment and HUD decay are instead handled inline inside `process_fishing_tick()` itself. Stage 9 (`collect_achievement_events`) and stage 12b (`track_passive_prestige_gain`) are specially re-invoked right before the early return — they are not skipped, just run out of their normal position — since Stage 4b (Loom) may have granted PR via WR→PR conversion even on a fishing tick. Fishing and combat remain mutually exclusive within a tick.
@@ -313,6 +318,7 @@ All functions above are re-exported through `game_logic.rs` for backward compati
 | `SOULFORGE_DISCOVERY_RANK_BONUS` | 0.000007 | Per rank above 15 |
 | `SOULFORGE_MIN_PRESTIGE_RANK` | 15 | |
 | `DEEP_MIN_PRESTIGE_RANK` | 15 | |
+| `STORMGLASS_MIN_PRESTIGE_RANK` | 15 | Gates Stormglass salvage (same rank as Soulforge/Deep) |
 
 ### Zone Enemy Stats
 | Constant | Value | Notes |
@@ -373,11 +379,22 @@ Zone 11 (The Expanse) is an endgame wall: `(5000, 400, 500, 80, 250, 30)` — ro
 - **items** (`items::drops`): `try_drop_from_mob()`, `try_drop_from_boss()`; (`items::scoring`): `auto_equip_if_better()`
 - **zones** (`zones`): `BossDefeatResult`, `get_zone()`, `get_all_zones()`
 
-### game_logic.rs depends on
-- **character**: `Attributes`, `AttributeType`, `DerivedStats`, `prestige::get_prestige_tier()`
-- **combat**: `generate_enemy_for_current_zone()`, `generate_boss_for_current_zone()`, `generate_dungeon_enemy()`, `generate_dungeon_elite()`, `generate_dungeon_boss()`
-- **dungeon**: `generate_dungeon(level, prestige_rank, zone_id)`, `RoomType`
+### enemy_spawning.rs depends on
+- **combat** (`combat::enemy_generation`): `generate_enemy_for_current_zone()`, `generate_boss_for_current_zone()`, `generate_dungeon_enemy()`, `generate_dungeon_elite()`, `generate_dungeon_boss()`
+- **dungeon** (`dungeon::types`): `RoomType`
+
+### discoveries.rs depends on
+- **dungeon** (`dungeon::generation`): `generate_dungeon(level, prestige_rank, zone_id)`
+
+### game_state.rs depends on
+- **character**: `Attributes`, `DerivedStats`, `prestige::PrestigeCombatBonuses`
 - **zones**: `ZoneProgression`
+
+### xp.rs depends on
+- **character**: `attributes::AttributeType`, `prestige::get_prestige_tier()`
+
+### game_logic.rs
+Re-exports the above (plus offline.rs) for backward compatibility; carries no direct external dependencies of its own.
 
 ### Other modules depend on core
 - **main.rs**: Calls `game_tick_with_context()`, processes `TickResult`, handles IO (save, visual effects, log entries)

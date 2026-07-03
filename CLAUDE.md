@@ -116,7 +116,7 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 | UI | `src/ui/` | [CLAUDE.md](src/ui/CLAUDE.md) | Terminal UI components (Ratatui) |
 | Utils | `src/utils/` | [CLAUDE.md](src/utils/CLAUDE.md) | Build info, updater, debug menu |
 | Loom | `src/loom/` | [CLAUDE.md](src/loom/CLAUDE.md) | Resource production chains, direct-pull refineries |
-| Vessel | `src/vessel/` | — | Act 2: Vessel launch gate + Voyage engine, dark behind the `ACT2_ENABLED` kill-switch (`QUEST_ACT2=1` to preview) |
+| Vessel | `src/vessel/` | [CLAUDE.md](src/vessel/CLAUDE.md) | Act 2: Vessel launch gate + Voyage engine, dark behind the `ACT2_ENABLED` kill-switch (`QUEST_ACT2=1` to preview) |
 | Main Helpers | `src/main_helpers/` | [CLAUDE.md](src/main_helpers/CLAUDE.md) | Orchestration between main.rs and domain modules |
 
 ### Simulators
