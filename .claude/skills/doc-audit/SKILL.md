@@ -1,11 +1,11 @@
 ---
 name: doc-audit
-description: Multi-agent developer documentation audit — finds stale constants, missing files, and outdated types across CLAUDE.md files and docs/. Use when docs are stale, after adding features, or before releases.
+description: Multi-agent developer documentation audit — finds stale constants, missing files, and outdated types across CLAUDE.md files, README.md, and docs/. Use when docs are stale, after adding features, or before releases.
 ---
 
 # Audit Developer Documentation
 
-Multi-agent audit of developer documentation. Finds stale content, missing files, and outdated types across CLAUDE.md files and docs/, then auto-fixes safe patterns.
+Multi-agent audit of developer documentation. Finds stale content, missing files, and outdated types across CLAUDE.md files, README.md, and docs/, then auto-fixes safe patterns.
 
 ## When to Use
 
@@ -15,11 +15,11 @@ Multi-agent audit of developer documentation. Finds stale content, missing files
 - New modules exist without CLAUDE.md files
 - When asked to audit or update docs
 
-**For player-facing wiki:** Use the `wiki-audit` skill instead.
+**For the player-facing wiki (`quest.wiki/`):** Use the `wiki-audit` skill instead. The repo `README.md` is covered *here* (Agent 6), not by wiki-audit.
 
-## Phase 1: Parallel Audit (5 Agents, Read-Only)
+## Phase 1: Parallel Audit (6 Agents, Read-Only)
 
-Spawn 5 Explore agents simultaneously. Each agent cross-references documentation against actual source code to find discrepancies.
+Spawn 6 Explore agents simultaneously. Each agent cross-references documentation against actual source code to find discrepancies.
 
 **Agent 1 — Root & Architecture**
 
@@ -43,6 +43,12 @@ Scope: `src/haven/CLAUDE.md`, `src/enhancement/CLAUDE.md`, `src/ascension/CLAUDE
 
 Scope: `src/ui/CLAUDE.md`, `src/input/CLAUDE.md`, `src/utils/CLAUDE.md`, `src/main_helpers/CLAUDE.md`, `src/achievements/CLAUDE.md`, `src/history/CLAUDE.md`
 
+**Agent 6 — README (player-facing)**
+
+Scope: `README.md`
+
+Check every player-facing claim against source, not against other docs: the intro tagline and Features list (zone count, rank counts, rates, system roster — new shipped systems must appear), gameplay numbers (drop rates, offline rate, prestige formula, attribute caps, enhancement odds), key bindings in Controls (verify against `src/input/` and `src/main_helpers/update.rs` handlers, not memory), minigame details (board sizes, ELO, rewards), the Game Systems sections, install/update/platform claims, and the project-structure tree. Two README-specific rules: (1) do NOT advertise dark-shipped / kill-switched features (e.g. anything gated behind `vessel::ACT2_ENABLED`) — players can't see them yet; (2) prefer removing a precise-but-wrong number over inventing a new unverified one.
+
 ### Anti-Patterns
 
 Each agent searches for:
@@ -55,6 +61,10 @@ Each agent searches for:
 | Listed file doesn't exist | MEDIUM | CLAUDE.md lists `bar.rs` but it was deleted/renamed | Remove or rename |
 | Stale type/enum variant | MEDIUM | New enum variant not documented | Add to types table |
 | Stale dependency version | LOW | `Cargo.toml` says 0.30 but docs say 0.28 | Update version |
+| Stale README gameplay claim | HIGH | README says "10 zones" / "30 ranks" but code has 50 / 40 | Update to match source |
+| Wrong key binding in README | MEDIUM | README says "Q: Quit" but handler binds Esc | Update to actual handler |
+| Shipped system missing from README | MEDIUM | Feature landed but Features list / Game Systems silent | Add a bullet or section |
+| Dark-shipped feature advertised in README | HIGH | Kill-switched content described as playable | Remove from README (keep in CLAUDE.md) |
 
 Each agent produces a ranked report: file, pattern, severity (HIGH/MEDIUM/LOW), current value vs correct value, whether auto-fixable.
 
@@ -81,7 +91,8 @@ Spawn fix agents based on audit findings.
 1. `make check` must pass
 2. Every `src/*/` directory has a CLAUDE.md (except `bin/`)
 3. Every file listed in any CLAUDE.md exists on disk
-4. Report summary of: findings, auto-fixes applied, items flagged for review
+4. README.md contains no dark-shipped features and every number in it was verified against source this run
+5. Report summary of: findings, auto-fixes applied, items flagged for review
 
 ## Module CLAUDE.md Template
 
