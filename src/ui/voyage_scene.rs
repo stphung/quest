@@ -244,6 +244,7 @@ fn render_full(frame: &mut Frame, area: Rect, voyage: &VoyageState, ui: &VoyageU
         VoyageView::Trim { selected } => render_trim_panel(frame, cols[1], voyage, selected),
         VoyageView::Rumors => render_rumor_panel(frame, cols[1], voyage),
         VoyageView::Souls { selected } => render_souls_panel(frame, cols[1], voyage, selected),
+        VoyageView::Watch { selected } => render_watch_panel(frame, cols[1], voyage, selected),
         VoyageView::Farewell { selected } => {
             render_farewell_panel(frame, cols[1], voyage, selected)
         }
@@ -417,6 +418,35 @@ pub fn chart_lines(voyage: &VoyageState, width: u16, height: u16) -> Vec<Line<'s
         }
     }
 
+    // The void's weather, on road midpoints (spec 5): currents cyan,
+    // silence a cold gray, squalls a stormy blue.
+    for wx in voyage.weather_visible() {
+        let r = route::road(wx.road);
+        let a = route::waypoint(r.from).chart_pos;
+        let b = route::waypoint(r.to).chart_pos;
+        let (mx, my) = ((a.0 as i32 + b.0 as i32) / 2, (a.1 as i32 + b.1 as i32) / 2);
+        let color = match wx.kind {
+            crate::vessel::weather::WeatherKind::Current => Color::Cyan,
+            crate::vessel::weather::WeatherKind::SilenceBank => Color::Rgb(110, 110, 125),
+            crate::vessel::weather::WeatherKind::Squall => Color::Rgb(90, 130, 190),
+        };
+        for dx in -1..=1 {
+            put(mx + dx, my, wx.kind.glyph(), color, &mut grid);
+        }
+    }
+
+    // Other pilgrims: moving lights on their roads.
+    for (ship, road) in voyage.pilgrims_today() {
+        let r = route::road(road);
+        let a = route::waypoint(r.from).chart_pos;
+        let b = route::waypoint(r.to).chart_pos;
+        let (mx, my) = (
+            (a.0 as i32 + b.0 as i32) / 2,
+            (a.1 as i32 + b.1 as i32) / 2 + 1,
+        );
+        put(mx, my, ship.glyph, Color::LightYellow, &mut grid);
+    }
+
     // The Vessel, pulsing.
     let pulse = (super::clock::now_millis() / 600).is_multiple_of(2);
     let ship_glyph = if pulse { '\u{25c6}' } else { '\u{25c7}' }; // ◆ / ◇
@@ -533,6 +563,41 @@ fn render_vessel_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
     lines.extend(gauge_lines(voyage, inner.width));
     lines.push(Line::from(""));
     lines.extend(phase_lines(voyage));
+    // The sky over this leg, and the night ahead (spec 5).
+    for wx in voyage.weather_on_leg() {
+        lines.push(Line::from(Span::styled(
+            format!(
+                "{} {} ({}) \u{2014} {}",
+                wx.kind.glyph(),
+                wx.name,
+                wx.kind.display_name(),
+                weather_hint(&wx, voyage)
+            ),
+            Style::default().fg(Color::Cyan),
+        )));
+    }
+    if matches!(voyage.phase, VoyagePhase::Traveling { .. }) {
+        if let Some((day, kind, stander)) = voyage.night_forecast().into_iter().next() {
+            let _ = day;
+            let who = stander
+                .map(|id| crate::vessel::souls::soul(id).name)
+                .unwrap_or("no one");
+            lines.push(Line::from(Span::styled(
+                if kind.needs_watch() {
+                    format!("Tonight: {} \u{00b7} watch: {}", kind.display_name(), who)
+                } else {
+                    "Tonight: quiet".to_string()
+                },
+                Style::default().fg(Color::Gray),
+            )));
+        }
+        if let Some(ship) = voyage.hailable() {
+            lines.push(Line::from(Span::styled(
+                format!("[H] Hail {}", ship.name),
+                Style::default().fg(GOLD),
+            )));
+        }
+    }
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         format!(
@@ -720,7 +785,7 @@ fn phase_lines(voyage: &VoyageState) -> Vec<Line<'static>> {
 }
 
 fn footer_keys(voyage: &VoyageState) -> Vec<Line<'static>> {
-    let mut keys = vec!["[S] Souls", "[T] Trim", "[R] Log"];
+    let mut keys = vec!["[S] Souls", "[W] Watch", "[T] Trim", "[R] Log"];
     if matches!(
         voyage.phase,
         VoyagePhase::HoldingStation {
@@ -1198,6 +1263,99 @@ fn render_ask_modal(
             .wrap(Wrap { trim: false }),
         inner,
     );
+}
+
+// ── The watch forecast ──────────────────────────────────────────────────────
+
+fn render_watch_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, selected: usize) {
+    use crate::vessel::souls;
+
+    let block = Block::default()
+        .title(" \u{263e} The Watch ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(VESSEL_VIOLET));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let forecast = voyage.night_forecast();
+    let selected = selected.min(forecast.len().saturating_sub(1));
+    let mut lines: Vec<Line> = vec![Line::from("")];
+    let labels = ["Tonight", "Tomorrow", "The night after"];
+    for (i, (_day, kind, stander)) in forecast.iter().enumerate() {
+        let marker = if i == selected { "\u{25b8} " } else { "  " };
+        let style = if i == selected {
+            Style::default().fg(GOLD).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::White)
+        };
+        lines.push(Line::from(Span::styled(
+            format!(
+                "{marker}{} \u{2014} a {} night",
+                labels[i],
+                kind.display_name()
+            ),
+            style,
+        )));
+        let note = if !kind.needs_watch() {
+            "needs no watch".to_string()
+        } else if let Some(id) = stander {
+            let def = souls::soul(*id);
+            let affine = def.affinity == Some(souls::Station::Watch);
+            format!(
+                "stood by {}{}",
+                def.name,
+                if affine { " (kind hands)" } else { "" }
+            )
+        } else {
+            "unstood \u{2014} it will cost what it costs".to_string()
+        };
+        lines.push(Line::from(Span::styled(
+            format!("      {note}"),
+            Style::default().fg(Color::Gray),
+        )));
+    }
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "A soul standing a night is not resting that night.",
+        Style::default().fg(Color::DarkGray),
+    )));
+    lines.push(Line::from(Span::styled(
+        "\u{2191}\u{2193} choose night  \u{00b7}  [Enter] cycle stander  \u{00b7}  [Esc] back",
+        Style::default().fg(Color::DarkGray),
+    )));
+    frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+}
+
+/// One line of standing advice for a weather object, phrased as prices.
+fn weather_hint(wx: &crate::vessel::weather::WeatherObj, voyage: &VoyageState) -> String {
+    use crate::vessel::weather::WeatherKind;
+    match wx.kind {
+        WeatherKind::Current => {
+            if voyage.trim == Trim::Run {
+                if wx.with_bearing {
+                    "riding it; the miles come cheap".to_string()
+                } else {
+                    "running against it; the hold pays".to_string()
+                }
+            } else if wx.with_bearing {
+                "a following set \u{2014} Run would ride it".to_string()
+            } else {
+                "set against the road".to_string()
+            }
+        }
+        WeatherKind::SilenceBank => {
+            if voyage.trim == Trim::Quiet {
+                "running Quiet through it; listening".to_string()
+            } else {
+                "hope frays inside \u{2014} Quiet nullifies it".to_string()
+            }
+        }
+        WeatherKind::Squall => match voyage.trim {
+            Trim::Run => "running it doubles the tax".to_string(),
+            Trim::Quiet | Trim::Mourn => "sheltered through; half tax".to_string(),
+            Trim::Cruise => "taxing the hold \u{2014} shelter at Quiet/Mourn".to_string(),
+        },
+    }
 }
 
 // ── Scene modal (placeholder arrival text until spec 4) ─────────────────────

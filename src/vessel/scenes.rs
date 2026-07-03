@@ -232,7 +232,7 @@ pub const SCENES: [SceneDef; 38] = [
                  strait faster than hulls do.",
             ),
         ],
-        payout: pay(15),
+        payout: pay(18),
     },
     // W8 — The Salt Orchard
     SceneDef {
@@ -275,7 +275,7 @@ pub const SCENES: [SceneDef; 38] = [
             "Nobody says 'we could still turn around.' The not-saying takes \
              most of the evening.",
         )],
-        payout: pay_hope(14, 1),
+        payout: pay_hope(16, 1),
     },
     // W11 — First Drift
     SceneDef {
@@ -320,7 +320,7 @@ pub const SCENES: [SceneDef; 38] = [
             "In the doubled starlight, the names you sail for feel briefly \
              present, standing just behind each shoulder, approving.",
         )],
-        payout: pay(16),
+        payout: pay(18),
     },
     // W14 — Saint Elm's Rest
     SceneDef {
@@ -356,7 +356,7 @@ pub const SCENES: [SceneDef; 38] = [
             "Maren logs its bearing without comment. Whatever keeps that \
              lamp, she intends it to know somebody noticed.",
         )],
-        payout: pay(16),
+        payout: pay(18),
     },
     // W17 — The Long Meander
     SceneDef {
@@ -364,7 +364,7 @@ pub const SCENES: [SceneDef; 38] = [
              than rope. The current hums them through the hull at night, \
              4/4, patient, the tempo of oars long gone."],
         colors: &[],
-        payout: pay(18),
+        payout: pay(20),
     },
     // W18 — The Pilgrims' Buoy
     SceneDef {
@@ -388,7 +388,7 @@ pub const SCENES: [SceneDef; 38] = [
              keeper says everyone looks. The keeper says nobody looks \
              twice."],
         colors: &[],
-        payout: pay(16),
+        payout: pay(18),
     },
     // W20 — The Whale Roads
     SceneDef {
@@ -444,7 +444,7 @@ pub const SCENES: [SceneDef; 38] = [
              the ones addressed to people who will never read them. The \
              postmaster stamps those too, without being asked.",
         )],
-        payout: pay(20),
+        payout: pay(22),
     },
     // W24 — The Last Lantern
     SceneDef {
@@ -467,7 +467,7 @@ pub const SCENES: [SceneDef; 38] = [
              hostile. It is grading you on comportment.",
         ],
         colors: &[],
-        payout: pay(12),
+        payout: pay(14),
     },
     // W26 — The Choir of Bones
     SceneDef {
@@ -482,7 +482,7 @@ pub const SCENES: [SceneDef; 38] = [
             "Sefa listens for a long time and then says, wet-eyed, 'That's \
              ours. That's the office. How does it know the office?'",
         )],
-        payout: pay(15),
+        payout: pay(18),
     },
     // W27 — The Cold Shelf
     SceneDef {
@@ -491,7 +491,7 @@ pub const SCENES: [SceneDef; 38] = [
              hold. Conversation frosts too — the cold gets into sentences \
              and shortens them."],
         colors: &[],
-        payout: pay(12),
+        payout: pay(15),
     },
     // W28 — The Sleepers' Trench
     SceneDef {
@@ -503,7 +503,7 @@ pub const SCENES: [SceneDef; 38] = [
             "One bunk is warm and freshly empty.",
         ],
         colors: &[],
-        payout: pay(15),
+        payout: pay(18),
     },
     // W29 — The Ember Hold
     SceneDef {
@@ -543,7 +543,7 @@ pub const SCENES: [SceneDef; 38] = [
             "Torvald stands the dark watches like a man keeping an old \
              appointment. 'Told you,' he says to it, quietly. 'Blinked.'",
         )],
-        payout: pay(12),
+        payout: pay(15),
     },
     // W31 — The Gloaming Shallows
     SceneDef {
@@ -563,7 +563,7 @@ pub const SCENES: [SceneDef; 38] = [
              you go with something that might be a bow.",
         ],
         colors: &[],
-        payout: pay_hope(16, 1),
+        payout: pay_hope(18, 1),
     },
     // W33 — First Light
     SceneDef {

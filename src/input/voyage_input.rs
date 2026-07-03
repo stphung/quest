@@ -86,6 +86,7 @@ pub fn handle_voyage_input(
         VoyageView::Junction { selected } => handle_junction_keys(key, voyage, ui, selected),
         VoyageView::Trim { selected } => handle_trim_keys(key, voyage, ui, selected),
         VoyageView::Souls { selected } => handle_souls_keys(key, voyage, ui, selected),
+        VoyageView::Watch { selected } => handle_watch_keys(key, voyage, ui, selected),
         VoyageView::Farewell { selected } => handle_farewell_keys(key, voyage, ui, selected),
         VoyageView::Rumors => {
             if matches!(
@@ -214,6 +215,57 @@ fn handle_souls_keys(
     }
 }
 
+fn handle_watch_keys(
+    key: KeyEvent,
+    voyage: &mut VoyageState,
+    ui: &mut VoyageUiState,
+    selected: usize,
+) -> VoyageInputResult {
+    let selected = selected.min(2);
+    match key.code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            ui.view = VoyageView::Watch {
+                selected: selected.saturating_sub(1),
+            };
+            VoyageInputResult::Handled
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            ui.view = VoyageView::Watch {
+                selected: (selected + 1).min(2),
+            };
+            VoyageInputResult::Handled
+        }
+        // Enter cycles the night's stander: default -> each aboard soul ->
+        // explicitly nobody -> default.
+        KeyCode::Enter => {
+            let forecast = voyage.night_forecast();
+            let Some((day, _, _)) = forecast.get(selected).copied() else {
+                return VoyageInputResult::Handled;
+            };
+            let aboard: Vec<_> = voyage.aboard().map(|s| s.soul).collect();
+            let current = voyage
+                .night_assignments
+                .iter()
+                .find(|(d, _)| *d == day)
+                .map(|(_, s)| *s);
+            let next = match current {
+                None => aboard.first().copied(),
+                Some(cur) => {
+                    let idx = aboard.iter().position(|s| *s == cur);
+                    idx.and_then(|i| aboard.get(i + 1).copied())
+                }
+            };
+            voyage.assign_night(day, next);
+            VoyageInputResult::HandledNeedsSave
+        }
+        KeyCode::Esc | KeyCode::Char('w') | KeyCode::Char('W') => {
+            ui.view = VoyageView::Chart;
+            VoyageInputResult::Handled
+        }
+        _ => VoyageInputResult::Ignored,
+    }
+}
+
 fn handle_farewell_keys(
     key: KeyEvent,
     voyage: &mut VoyageState,
@@ -300,6 +352,21 @@ fn handle_chart_keys(
         KeyCode::Char('s') | KeyCode::Char('S') => {
             ui.view = VoyageView::Souls { selected: 0 };
             VoyageInputResult::Handled
+        }
+        KeyCode::Char('w') | KeyCode::Char('W') => {
+            ui.view = VoyageView::Watch { selected: 0 };
+            VoyageInputResult::Handled
+        }
+        KeyCode::Char('h') | KeyCode::Char('H') => {
+            if let Some(ship) = voyage.hail() {
+                ui.scene_modal = Some(SceneModal {
+                    title: format!("Hailing {}", ship.name),
+                    body: format!("{} {}", ship.line, ship.hail),
+                });
+                VoyageInputResult::HandledNeedsSave
+            } else {
+                VoyageInputResult::Handled
+            }
         }
         KeyCode::Char('b') | KeyCode::Char('B') => {
             if let Some(bought) = voyage.buy_rumor() {

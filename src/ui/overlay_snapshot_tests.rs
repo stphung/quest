@@ -396,3 +396,25 @@ fn snapshot_voyage_refit_door() {
         })
     });
 }
+
+#[test]
+fn snapshot_voyage_watch_panel() {
+    assert_overlay_snapshot("voyage_watch_xl_160x45", || {
+        let mut voyage = fixtures::voyage_mid_leg(frozen_utc());
+        voyage.set_station(
+            crate::vessel::souls::SoulId(2),
+            Some(crate::vessel::souls::Station::Watch),
+        );
+        let ui = crate::vessel::VoyageUiState {
+            view: crate::vessel::VoyageView::Watch { selected: 1 },
+            scene_play: None,
+            scene_modal: None,
+            moments: Default::default(),
+        };
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+        })
+    });
+}

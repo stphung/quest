@@ -63,6 +63,10 @@ fn simulate(strategy: Strategy, seed: u64, checkin_hours: i64) -> RunResult {
         quest::vessel::souls::SoulId(1),
         Some(quest::vessel::souls::Station::Tender),
     );
+    v.set_station(
+        quest::vessel::souls::SoulId(2),
+        Some(quest::vessel::souls::Station::Watch),
+    );
 
     let mut now = t0;
     let mut drifts = 0u32;
