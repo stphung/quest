@@ -119,7 +119,7 @@ fn letters_pay_their_parcel_and_hope_exactly_once() {
     let events = v.take_letter_events();
     assert_eq!(events, vec![0]);
     assert!(v.take_letter_events().is_empty(), "drained once");
-    assert!(v.log.iter().any(|l| l.contains("A letter from")));
+    assert!(v.log.iter().any(|l| l.text().contains("A letter from")));
 }
 
 #[test]

@@ -164,7 +164,7 @@ fn hailing_a_pilgrim_happens_once_and_pays_in_rumors() {
     assert!(v.rumors.len() > rumors_before);
     assert!(v.hailable().is_none(), "once per ship");
     assert!(v.hail().is_none());
-    assert!(v.log.iter().any(|l| l.contains("Sister Verity")));
+    assert!(v.log.iter().any(|l| l.text().contains("Sister Verity")));
 }
 
 #[test]

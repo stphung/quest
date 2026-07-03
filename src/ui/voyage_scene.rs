@@ -1075,7 +1075,7 @@ fn render_rumor_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
         voyage
             .log
             .iter()
-            .filter(|l| l.starts_with("A letter from"))
+            .filter(|l| l.text().starts_with("A letter from"))
             .count(),
     );
     if letters_kept > 0 || voyage.gone_dark {
@@ -1098,9 +1098,9 @@ fn render_rumor_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
                 .add_modifier(Modifier::BOLD),
         )));
         let recent = voyage.log.len().saturating_sub(8);
-        for title in &voyage.log[recent..] {
+        for entry in &voyage.log[recent..] {
             lines.push(Line::from(Span::styled(
-                format!("  \u{00b7} {title}"),
+                format!("  \u{00b7} {}", log_entry_line(entry)),
                 Style::default().fg(Color::Gray),
             )));
         }
@@ -1747,7 +1747,7 @@ fn render_record(frame: &mut Frame, area: Rect, voyage: &VoyageState, scroll: u1
     )));
     for entry in &voyage.log {
         lines.push(Line::from(Span::styled(
-            format!("  \u{00b7} {entry}"),
+            format!("  \u{00b7} {}", log_entry_line(entry)),
             Style::default().fg(Color::Gray),
         )));
     }
@@ -1852,6 +1852,15 @@ fn current_chapter(voyage: &VoyageState) -> route::Chapter {
 /// The most recently reached waypoint (for chapter/tree-stage display).
 fn last_position(voyage: &VoyageState) -> WaypointId {
     voyage.visited.last().copied().unwrap_or(route::ROUTE_START)
+}
+
+/// A log line with its day, when the entry knows one (pre-spec-7 saves
+/// carry undated lines).
+fn log_entry_line(entry: &crate::vessel::voyage::LogEntry) -> String {
+    match entry.day() {
+        Some(day) => format!("Day {} \u{2014} {}", day + 1, entry.text()),
+        None => entry.text().to_string(),
+    }
 }
 
 fn format_minutes(minutes: u64) -> String {

@@ -449,7 +449,7 @@ pub fn voyage_arrived(
     use crate::vessel::route::{waypoint, RumorId, ROUTE_SINK};
     use crate::vessel::souls::{SoulId, Station};
     use crate::vessel::voyage::{
-        LearnedRumor, SoulState, SoulStatus, VoyagePhase, MINUTES_PER_DAY,
+        LearnedRumor, LogEntry, SoulState, SoulStatus, VoyagePhase, MINUTES_PER_DAY,
     };
 
     let mut v = voyage_holding_at(character_id, ROUTE_SINK, 60, 40.0, now);
@@ -502,13 +502,33 @@ pub fn voyage_arrived(
         rumor: RumorId(1),
         learned_at: v.visited.get(1).copied().unwrap_or(ROUTE_SINK),
     }];
+    // ~60 days over the visited spine, a little over two days per port.
+    let ports = v.visited.len().max(1) as u64;
     v.log = v
         .visited
         .iter()
-        .map(|w| waypoint(*w).name.to_string())
+        .enumerate()
+        .map(|(i, w)| LogEntry::Dated {
+            day: i as u64 * 60 / ports,
+            text: waypoint(*w).name.to_string(),
+        })
         .collect();
-    v.log.push("Refit: Storm Sail".to_string());
-    v.log
-        .push("No letters. There will be no more letters.".to_string());
+    for (day, text) in [
+        (18, "Refit: Storm Sail"),
+        (42, "No letters. There will be no more letters."),
+    ] {
+        let at = v
+            .log
+            .iter()
+            .position(|e| e.day().is_some_and(|d| d > day))
+            .unwrap_or(v.log.len());
+        v.log.insert(
+            at,
+            LogEntry::Dated {
+                day,
+                text: text.to_string(),
+            },
+        );
+    }
     v
 }

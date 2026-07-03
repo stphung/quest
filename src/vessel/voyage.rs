@@ -198,6 +198,32 @@ pub struct SoulEvent {
     pub beat: u8,
 }
 
+/// One line of the ship's log, stamped with the voyage day it was
+/// written. Untagged so pre-spec-7 saves — bare strings — still load;
+/// their day is simply unknown.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum LogEntry {
+    Dated { day: u64, text: String },
+    Undated(String),
+}
+
+impl LogEntry {
+    pub fn text(&self) -> &str {
+        match self {
+            LogEntry::Dated { text, .. } => text,
+            LogEntry::Undated(text) => text,
+        }
+    }
+
+    pub fn day(&self) -> Option<u64> {
+        match self {
+            LogEntry::Dated { day, .. } => Some(*day),
+            LogEntry::Undated(_) => None,
+        }
+    }
+}
+
 /// A resolved scene, ready to read: title, paragraphs (beats + matching
 /// color lines + ledger lines), and the payout in small print.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -280,9 +306,10 @@ pub struct VoyageState {
     /// Mementos. No mechanics; the manifest remembers (spec 7).
     #[serde(default)]
     pub keepsakes: Vec<String>,
-    /// The crossing's story so far: one title per scene and beat.
+    /// The crossing's story so far: one line per scene and beat, each
+    /// stamped with the voyage day it was written.
     #[serde(default)]
-    pub log: Vec<String>,
+    pub log: Vec<LogEntry>,
     /// The leg that is underway (or just ended) included a drift.
     #[serde(default)]
     pub drifted_this_leg: bool,
@@ -506,7 +533,7 @@ impl VoyageState {
                                 if !self.heard_banks.contains(&wx.id) {
                                     self.heard_banks.push(wx.id);
                                     if self.grant_next_rumor(road.from) {
-                                        self.log.push(format!(
+                                        self.push_log(format!(
                                             "In {}, running Quiet, the crew heard \
                                              what the silence was hiding.",
                                             wx.name
@@ -636,7 +663,7 @@ impl VoyageState {
                 // The crew gathers at mail-hour, and nothing comes.
                 self.gone_dark = true;
                 self.lower_hope(MAIL_FAILS_HOPE_COST);
-                self.log.push(letters::MAIL_FAILS_LOG.to_string());
+                self.push_log(letters::MAIL_FAILS_LOG.to_string());
                 self.letter_events.push(MAIL_FAILS_EVENT);
             }
         }
@@ -828,7 +855,7 @@ impl VoyageState {
         }
 
         let title = route::waypoint(waypoint).name.to_string();
-        self.log.push(title.clone());
+        self.push_log(title.clone());
         self.drifted_this_leg = false;
 
         Some(ScenePlayback {
@@ -993,7 +1020,7 @@ impl VoyageState {
         }
         self.refit_doors_seen += 1;
         self.pending_refit = None;
-        self.log.push(format!("Refit: {}", chosen.display_name()));
+        self.push_log(format!("Refit: {}", chosen.display_name()));
         Some(chosen)
     }
 
@@ -1010,7 +1037,7 @@ impl VoyageState {
         let def = scenes::scene_def(ROUTE_SINK);
         self.hope = (self.hope + def.payout.hope.max(0) as u8).min(HOPE_MAX);
         let title = route::waypoint(ROUTE_SINK).name.to_string();
-        self.log.push(title.clone());
+        self.push_log(title.clone());
 
         let mut paragraphs: Vec<String> = def.beats.iter().map(|b| b.to_string()).collect();
         // The rail: souls who stepped ashore earlier said their goodbyes
@@ -1146,7 +1173,7 @@ impl VoyageState {
         if def.hope > 0 {
             self.hope = (self.hope + def.hope).min(HOPE_MAX);
         }
-        self.log.push(format!("A letter from {}", def.sender));
+        self.push_log(format!("A letter from {}", def.sender));
         self.letter_events.push(event);
     }
 
@@ -1247,7 +1274,7 @@ impl VoyageState {
             // Nothing left to learn: the night pays in spirits instead.
             self.hope = (self.hope + 1).min(HOPE_MAX);
         }
-        self.log.push(nights::log_line(kind, outcome, name));
+        self.push_log(nights::log_line(kind, outcome, name));
     }
 
     /// Learn the next authored rumor not yet held (weather, nights, and
@@ -1303,8 +1330,7 @@ impl VoyageState {
         self.hailed.push(ship.id);
         let at = self.current_road().map(|r| r.from).unwrap_or(ROUTE_START);
         self.grant_next_rumor(at);
-        self.log
-            .push(format!("Hailed {}. {}", ship.name, ship.hail));
+        self.push_log(format!("Hailed {}. {}", ship.name, ship.hail));
         Some(ship)
     }
 
@@ -1475,6 +1501,12 @@ impl VoyageState {
     /// Days since launch (the seed input for Underway determinism).
     pub fn day_index(&self) -> u64 {
         self.processed_minutes / MINUTES_PER_DAY
+    }
+
+    /// Write a line into the ship's log, stamped with today.
+    fn push_log(&mut self, text: String) {
+        let day = self.day_index();
+        self.log.push(LogEntry::Dated { day, text });
     }
 
     /// Game minutes until arrival at the current trim, if traveling.
