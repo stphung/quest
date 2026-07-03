@@ -98,17 +98,24 @@ better (or deliberately worse) than the promise.
 
 Every leg-night has a type, forecast **3 nights ahead** on the chart panel:
 
-| Type | Frequency | Stood well | Stood poorly / unstood |
-|------|-----------|------------|------------------------|
+| Type | Frequency | Stood (any soul) | Unstood |
+|------|-----------|------------------|---------|
 | **Quiet night** | ~40% | a log line; nothing asked | — (quiet nights need no watch) |
-| **Cold night** | ~15% | careful souls spend less (provisions −2 instead of −5) | provisions −5 |
-| **Hungry night** | ~15% | tender-suited souls halve it | provisions −6 |
-| **Singing night** | ~15% | the *right* soul earns a rumor or arc beat | a log line of something missed |
-| **Strange night** | ~15%, **max 1 per leg** | lore/arc payoff; sometimes a unique rumor | hope −2, and "the night keeps whatever it was going to say" |
+| **Cold night** | ~15% | provisions −2 instead of −5 | provisions −5 |
+| **Hungry night** | ~15% | provisions −3 instead of −6 | provisions −6 |
+| **Singing night** | ~15% | a log line of the song | a log line of something missed |
+| **Strange night** | ~15%, **max 1 per leg** | lore log line; nothing taken | hope −2, and "the night keeps whatever it was going to say" |
 
-Night suitability is a property of the **soul** (Runa answers singing
-nights; Eir is careful in the cold; Torvald is steady on strange nights but
-learns nothing), written in their dossier — no hidden stats.
+A **Watch-affine** soul (spec 3) standing any typed night resolves it one
+grade kinder: cold/hungry costs drop to −1/−2, singing nights yield the
+rumor or arc beat, strange nights pay out their lore/unique rumor.
+
+Night suitability is not a separate table: nights read the soul's single
+**affinity** axis (spec 3 — the same property that strengthens their
+matching station). A Watch-affine soul (Runa, Maren) stands any typed
+night one grade kinder; every other soul stands it at the base outcome.
+No hidden stats, one axis per soul. The Watch-stationed soul covers typed
+nights by default; the forecast panel edits per night.
 
 ### Scheduling rules
 
@@ -180,7 +187,7 @@ windows, where her road coincides with plausible player routes).
 | Chart (main screen) | weather objects on edges, pilgrim lights, wake lanterns, trim + tonight's watch in the Vessel panel, weather summary block |
 | Return view | unread log entries (auto-opens after >12h away), then to chart |
 | Trim panel (`[T]`) | four postures with final computed prices against live weather |
-| Watch panel (`[W]`) | 3-night forecast, suitability notes per soul, rest/arc status |
+| Watch panel (`[W]`) | 3-night forecast, affinity notes per soul, rest/arc status |
 | Hail (`[H]`) | pilgrim exchange when one is in range |
 
 ## What This Spec Does NOT Add

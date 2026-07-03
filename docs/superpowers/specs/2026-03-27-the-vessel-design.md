@@ -178,7 +178,7 @@ force real choices. Each soul has:
 
 - **A face and a voice** — one line of personality that colors ambient log
   moments and arrival scenes.
-- **A station** (helm, tender, watch, keel) — souls at stations recolor
+- **A station** (helm, tender, watch) — souls at stations recolor
   what roads yield ("with Torvald at the helm, the Teeth
   are a passage, not a toll"). Assignment matters; arithmetic stays out of
   sight.

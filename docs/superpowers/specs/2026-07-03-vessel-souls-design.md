@@ -4,7 +4,8 @@
 **Sub-project:** 3 of 7
 **Depends on:** spec 2 (shipped — route graph, voyage state machine, junction
 cards). **Feeds:** spec 4 (arrival scenes are where souls board, speak, and
-are lost), spec 5 (night suitability, watch-vs-rest), spec 7 (the manifest).
+are lost), spec 5 (the watch reads affinity; watch-vs-rest), spec 7 (the
+manifest).
 
 ## Overview
 
@@ -26,11 +27,17 @@ while the player is away.
 Faces from the systems the player mastered. Their dossiers are the tutorial
 for every soul mechanic.
 
-| Soul | Origin | Voice (one line) | Station affinity | Night suitability |
-|------|--------|------------------|------------------|-------------------|
-| **Torvald** | the Deep's guild captain | "I've been lower than dark. It blinks first." | Helm | steady on strange nights (nothing bad, learns nothing) |
-| **Eir** | the Haven's warden | "A ship is a house that argues with the sea." | Tender | careful in the cold (cold nights cost less) |
-| **Runa** | the fisher | "Everything worth catching sings first." | Watch | answers singing nights (earns the rumor/beat) |
+| Soul | Origin | Voice (one line) | Affinity |
+|------|--------|------------------|----------|
+| **Torvald** | the Deep's guild captain | "I've been lower than dark. It blinks first." | Helm |
+| **Eir** | the Haven's warden | "A ship is a house that argues with the sea." | Tender |
+| **Runa** | the fisher | "Everything worth catching sings first." | Watch |
+
+A soul has exactly **one aptitude axis: affinity** (Helm, Tender, Watch, or
+none). It does double duty — it strengthens the matching station's effect
+*and* it is what the night system reads (spec 5): there is no separate
+per-soul night-suitability table. Runa at Watch answers singing nights
+because Watch-affinity is what answering nights *is*.
 
 ### Five found along the route
 
@@ -42,13 +49,18 @@ fewer souls). Sites use the existing `Feature::SoulCandidate` waypoints.
 | Soul | Met at (any one of) | Who they are | Affinity |
 |------|---------------------|--------------|----------|
 | **Maren** | the Lightship Vigil (W1, spine) | the last lightship keeper; asks to see one more lit lantern | Watch |
-| **Sefa** | the Drowned Choir (W3) · the Kelp Meadows (W5) | the last cantor of the drowned parishes | — (sings; singing nights) |
+| **Sefa** | the Drowned Choir (W3) · the Kelp Meadows (W5) | the last cantor of the drowned parishes | — |
 | **Ysolt** | Saint Elm's Rest (W14) · the Beacon Graveyard (W16) · the Pilgrims' Buoy (W18) | a mender of hulls and of the other kind of damage | Tender |
 | **Cormac** | the Whale Roads (W20) · the Smugglers' Slip (W21) | a pilot who knows the roads nobody charts | Helm |
-| **Brother Wren** | the Choir of Bones (W26) · the Sleepers' Trench (W28) | woken from a years-long sleep; remembers the deep from inside | Keel |
+| **Brother Wren** | the Choir of Bones (W26) · the Sleepers' Trench (W28) | woken from a years-long sleep; remembers the deep from inside | — |
 
 The remaining soul-candidate waypoints (W9 the Ossuary Reef, W12 the
 Wandering Fair) host **arc beats**, not recruitments.
+
+Each station has exactly two affine souls (whose route determines which
+you meet first), and two souls — Sefa and Brother Wren — have none: their
+whole value is counsel and their arcs. A no-affinity soul is the spec's
+proof that stations are not the only reason to want someone aboard.
 
 ### Berths: seven
 
@@ -65,19 +77,23 @@ Lost (authored only) | Arrived`.
 
 ## Stations
 
-Four standing posts, assigned from the Souls panel (`[S]`), persistent
-until changed (including offline). One soul per station; unassigned
-stations simply lack the effect. **A soul at a station is not resting** —
-the same coverage-vs-story trade as the night watch (spec 5), and the core
-reason a 7-berth roster matters: four posts, and arcs only move for the
-souls you let rest.
+**Three standing posts** — one per system the ship actually runs on: time
+(Helm), provisions (Tender), nights (Watch). Assigned from the Souls panel
+(`[S]`), persistent until changed (including offline). One soul per
+station; an unassigned station simply lacks the effect. **A soul at a
+station is not resting** — the standing coverage-vs-story trade, and the
+core reason a 7-berth roster matters: three posts, and arcs only move for
+the souls you let rest.
 
 | Station | Standing effect (any soul) | With affinity soul |
 |---------|---------------------------|--------------------|
 | **Helm** | legs 4% faster | 8% faster |
-| **Tender** | leg provisions −5% | −10%, and cold/hungry nights resolve one grade kinder |
-| **Watch** | default assignee for typed nights (spec 5) | singing/strange nights resolve one grade kinder |
-| **Keel** | dark-tagged roads don't fray hope | named-threat roads re-price one step kinder (hook consumed by spec 4 scenes) |
+| **Tender** | leg provisions −5% | −10% |
+| **Watch** | stands every typed night by default (editable per night from spec 5's forecast panel) | typed nights resolve one grade kinder |
+
+(There is deliberately no fourth post. An earlier draft had a "Keel"
+station for threat/dark-road protection; it was cut — threat pricing
+belongs to the road card and spec 4's scenes, not to a passive slot.)
 
 Rules that keep the arithmetic invisible on screen:
 
@@ -179,8 +195,7 @@ pub struct SoulDef {            // authored table, like route.rs
     name: &'static str,
     voice: &'static str,        // the one-line personality
     origin: &'static str,
-    affinity: Option<Station>,
-    night_note: &'static str,   // dossier text; spec 5 consumes the typed form
+    affinity: Option<Station>,  // one axis: station bonus AND night behavior
     sites: &'static [WaypointId],  // empty = boards at launch
     arc: &'static [ArcBeat],    // trigger + payout per beat
     counsel: &'static [(RoadId, &'static str)],
@@ -202,7 +217,10 @@ station multipliers above, `LOSS_HOPE_COST = 3`, `FAREWELL_HOPE_COST = 1`.
 
 No soul stats, levels, or equipment. No morale-per-soul (hope is one
 shared gauge). No procedural souls — eight authored people, full stop. No
-soul death outside authored scenes. No upkeep.
+soul death outside authored scenes. No upkeep. No fourth station, and no
+per-soul night tables — affinity is the single aptitude axis, read by
+stations and nights alike. The load-bearing triangle is
+**stations ↔ arcs ↔ wind**; everything else on a soul is voice.
 
 ## Testing
 
@@ -222,9 +240,6 @@ soul death outside authored scenes. No upkeep.
 
 ## Open Questions
 
-- Should the Watch station soul auto-cover *all* typed nights, or only
-  when the forecast panel is untouched (lean: default assignee, editable
-  per night — keeps spec 5's panel meaningful)?
 - Farewell timing: immediate at the current waypoint vs "at the next
   harbor" (lean: next waypoint with a scene, so it lands as story).
 - Whether counsel lines should ever disagree with the card's own tags
