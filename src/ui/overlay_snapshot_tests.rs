@@ -255,7 +255,7 @@ fn snapshot_voyage_junction_cards() {
         render_overlay(|f| {
             let area = f.area();
             let ctx = LayoutContext::from_frame(f);
-            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, None);
         })
     });
 }
@@ -268,7 +268,7 @@ fn snapshot_voyage_chart_mid_leg() {
         render_overlay(|f| {
             let area = f.area();
             let ctx = LayoutContext::from_frame(f);
-            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, None);
         })
     });
 }
@@ -286,7 +286,7 @@ fn snapshot_voyage_trim_panel_mid_leg() {
         render_overlay(|f| {
             let area = f.area();
             let ctx = LayoutContext::from_frame(f);
-            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, None);
         })
     });
 }
@@ -299,7 +299,7 @@ fn snapshot_voyage_strip_small_tier() {
         render_overlay_sized(60, 24, |f| {
             let area = f.area();
             let ctx = LayoutContext::from_frame(f);
-            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, None);
         })
     });
 }
@@ -313,7 +313,7 @@ fn snapshot_voyage_intro() {
         render_overlay(|f| {
             let area = f.area();
             let ctx = LayoutContext::from_frame(f);
-            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, None);
         })
     });
 }
@@ -337,7 +337,7 @@ fn snapshot_voyage_souls_panel() {
         render_overlay(|f| {
             let area = f.area();
             let ctx = LayoutContext::from_frame(f);
-            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, None);
         })
     });
 }
@@ -352,7 +352,7 @@ fn snapshot_voyage_boarding_ask() {
         render_overlay(|f| {
             let area = f.area();
             let ctx = LayoutContext::from_frame(f);
-            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, None);
         })
     });
 }
@@ -378,7 +378,7 @@ fn snapshot_voyage_scene_playback() {
         render_overlay(|f| {
             let area = f.area();
             let ctx = LayoutContext::from_frame(f);
-            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, None);
         })
     });
 }
@@ -392,7 +392,7 @@ fn snapshot_voyage_refit_door() {
         render_overlay(|f| {
             let area = f.area();
             let ctx = LayoutContext::from_frame(f);
-            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, None);
         })
     });
 }
@@ -411,7 +411,7 @@ fn snapshot_voyage_harbor() {
         render_overlay(|f| {
             let area = f.area();
             let ctx = LayoutContext::from_frame(f);
-            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, None);
         })
     });
 }
@@ -424,7 +424,26 @@ fn snapshot_voyage_harbor_strip() {
         render_overlay_sized(60, 24, |f| {
             let area = f.area();
             let ctx = LayoutContext::from_frame(f);
-            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, None);
+        })
+    });
+}
+
+#[test]
+fn snapshot_voyage_reckoning() {
+    assert_overlay_snapshot("voyage_reckoning_xl_160x45", || {
+        let voyage = fixtures::voyage_mid_leg(frozen_utc());
+        let colony = fixtures::colony_midera();
+        let ui = crate::vessel::VoyageUiState {
+            view: crate::vessel::VoyageView::Reckoning,
+            scene_play: None,
+            scene_modal: None,
+            moments: Default::default(),
+        };
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, Some(&colony));
         })
     });
 }
@@ -442,7 +461,7 @@ fn snapshot_voyage_manifest() {
         render_overlay(|f| {
             let area = f.area();
             let ctx = LayoutContext::from_frame(f);
-            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, None);
         })
     });
 }
@@ -461,7 +480,7 @@ fn snapshot_voyage_keepsake_chart() {
         render_overlay(|f| {
             let area = f.area();
             let ctx = LayoutContext::from_frame(f);
-            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, None);
         })
     });
 }
@@ -479,7 +498,7 @@ fn snapshot_voyage_record() {
         render_overlay(|f| {
             let area = f.area();
             let ctx = LayoutContext::from_frame(f);
-            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, None);
         })
     });
 }
@@ -532,7 +551,7 @@ fn snapshot_voyage_watch_panel() {
         render_overlay(|f| {
             let area = f.area();
             let ctx = LayoutContext::from_frame(f);
-            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, None);
         })
     });
 }

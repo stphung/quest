@@ -86,6 +86,7 @@ struct Overrides {
     voyage_day: Option<u64>,
     voyage_provisions: Option<f64>,
     voyage_arrived: bool,
+    colony: bool,
 }
 
 fn usage() -> ! {
@@ -117,6 +118,7 @@ fn usage() -> ! {
          \x20 --voyage-provisions <n>  Provisions in the hold (default 80)\n\
          \x20 --voyage-arrived     Write voyage.json moored at the Tree (spec 7\n\
          \x20                      harbor: manifest, keepsake chart, record)\n\
+         \x20 --colony             Write colony.json mid-era (spec 9 Reckoning [L])\n\
          \nSet QUEST_DIR to write into an isolated directory."
     );
     std::process::exit(1);
@@ -158,6 +160,7 @@ fn parse_overrides(args: &[String]) -> Overrides {
             "--loom-patterns" => o.loom_patterns = Some(num(args, &mut i, "--loom-patterns")),
             "--voyage" => o.voyage = Some(num(args, &mut i, "--voyage")),
             "--voyage-arrived" => o.voyage_arrived = true,
+            "--colony" => o.colony = true,
             "--voyage-day" => o.voyage_day = Some(num(args, &mut i, "--voyage-day")),
             "--voyage-provisions" => {
                 o.voyage_provisions = Some(num(args, &mut i, "--voyage-provisions"))
@@ -234,7 +237,7 @@ fn apply_overrides(state: &mut GameState, o: &Overrides) {
     if o.vessel_signal {
         state.vessel_signal_discovered = true;
     }
-    if o.vessel_launched || o.voyage.is_some() || o.voyage_arrived {
+    if o.vessel_launched || o.voyage.is_some() || o.voyage_arrived || o.colony {
         state.vessel_signal_discovered = true;
         state.vessel_launched = true;
     }
@@ -318,6 +321,15 @@ fn main() {
         write_loom_state(patterns);
     }
 
+    if overrides.colony {
+        let mut colony = fixtures::colony_midera();
+        colony.character_id = state.character_id.clone();
+        quest::vessel::persistence::save_colony(&colony).expect("failed to write colony.json");
+        println!(
+            "Wrote colony.json ({} souls delivered)",
+            colony.souls_delivered
+        );
+    }
     if overrides.voyage_arrived {
         let voyage = fixtures::voyage_arrived(state.character_id.clone(), Utc::now());
         quest::vessel::persistence::save_voyage(&voyage).expect("failed to write voyage.json");

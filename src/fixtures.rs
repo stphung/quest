@@ -437,6 +437,24 @@ pub fn voyage_holding_at(
     v
 }
 
+/// A colony mid-era for the Reckoning pane: a good headline number,
+/// several districts founded, resonance compounding. Deterministic.
+pub fn colony_midera() -> crate::vessel::colony::ColonyState {
+    use crate::vessel::colony::{ColonyState, CrossingRecords};
+    let mut c = ColonyState::found("fixture-voyager".to_string());
+    c.souls_delivered = 1_247;
+    c.souls_remaining = 1_038;
+    c.resonance = 1_247;
+    c.crossings_completed = 22;
+    c.records = CrossingRecords {
+        fastest_days: 21,
+        most_carried: 60,
+        total_leagues: 8_640,
+        total_nights: 214,
+    };
+    c
+}
+
 /// A finished crossing, moored at the Tree with the finale already read:
 /// the harbor screen's home state. The roster carries one of everything
 /// the manifest can show — souls ashore, a decline, a farewell, and a

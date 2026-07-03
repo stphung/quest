@@ -35,6 +35,7 @@ pub fn render_voyage(
     voyage: &VoyageState,
     ui: &VoyageUiState,
     ctx: &LayoutContext,
+    colony: Option<&crate::vessel::colony::ColonyState>,
 ) {
     frame.render_widget(Clear, area);
 
@@ -48,6 +49,7 @@ pub fn render_voyage(
         VoyageView::Manifest { scroll } => render_manifest(frame, area, voyage, scroll),
         VoyageView::Keepsake { x, y } => render_keepsake_chart(frame, area, voyage, x, y),
         VoyageView::Record { scroll } => render_record(frame, area, voyage, scroll),
+        VoyageView::Reckoning => render_reckoning(frame, area, colony),
         _ => match ctx.tier {
             SizeTier::XL | SizeTier::L => render_full(frame, area, voyage, ui),
             _ => render_strip(frame, area, voyage, ui),
@@ -285,9 +287,10 @@ fn render_full(frame: &mut Frame, area: Rect, voyage: &VoyageState, ui: &VoyageU
         }
         VoyageView::Chart => render_vessel_panel(frame, cols[1], voyage),
         // Full-frame rooms are intercepted in `render_voyage`.
-        VoyageView::Manifest { .. } | VoyageView::Keepsake { .. } | VoyageView::Record { .. } => {
-            render_vessel_panel(frame, cols[1], voyage)
-        }
+        VoyageView::Manifest { .. }
+        | VoyageView::Keepsake { .. }
+        | VoyageView::Record { .. }
+        | VoyageView::Reckoning => render_vessel_panel(frame, cols[1], voyage),
     }
 }
 
@@ -895,9 +898,15 @@ fn phase_lines(voyage: &VoyageState) -> Vec<Line<'static>> {
 
 fn footer_keys(voyage: &VoyageState) -> Vec<Line<'static>> {
     let mut keys = if matches!(voyage.phase, VoyagePhase::Arrived { .. }) {
-        vec!["[M] Manifest", "[K] Chart", "[R] Record"]
+        vec!["[N] Sail again", "[M] Manifest", "[K] Chart", "[R] Record"]
     } else {
-        vec!["[S] Souls", "[W] Watch", "[T] Pace", "[R] Log"]
+        vec![
+            "[S] Souls",
+            "[W] Watch",
+            "[T] Pace",
+            "[R] Log",
+            "[L] Reckoning",
+        ]
     };
     if matches!(
         voyage.phase,
@@ -1917,6 +1926,178 @@ fn render_record(frame: &mut Frame, area: Rect, voyage: &VoyageState, scroll: u1
             .scroll((scroll, 0)),
         inner,
     );
+}
+
+// ── The Reckoning (spec 9: the numbers pane) ────────────────────────────────
+
+fn render_reckoning(
+    frame: &mut Frame,
+    area: Rect,
+    colony: Option<&crate::vessel::colony::ColonyState>,
+) {
+    use crate::vessel::colony::District;
+    frame.render_widget(Clear, area);
+    let block = Block::default()
+        .title(" \u{263c} The Reckoning ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GOLD));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let Some(c) = colony else {
+        // Before the first arrival, there is nothing yet to reckon.
+        let lines = vec![
+            Line::from(""),
+            Line::from(Span::styled(
+                "The colony is not yet founded.",
+                Style::default().fg(Color::White),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "Carry your first souls to the Tree, and the count begins.",
+                Style::default().fg(Color::Gray),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "[L] / [Esc] back",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ];
+        frame.render_widget(
+            Paragraph::new(lines)
+                .alignment(Alignment::Center)
+                .wrap(Wrap { trim: false }),
+            inner,
+        );
+        return;
+    };
+
+    let mut lines: Vec<Line> = vec![Line::from("")];
+    // The headline number, big and gold.
+    lines.push(Line::from(Span::styled(
+        "SOULS CARRIED OUT OF THE DARK",
+        Style::default()
+            .fg(Color::Gray)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(Span::styled(
+        spaced_number(c.souls_delivered),
+        Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(Span::styled(
+        format!(
+            "{} still wait in the old world",
+            with_commas(c.souls_remaining)
+        ),
+        Style::default().fg(Color::DarkGray),
+    )));
+    lines.push(Line::from(""));
+
+    // The engine.
+    lines.push(Line::from(vec![
+        Span::styled(
+            format!("Resonance {}", with_commas(c.resonance)),
+            Style::default()
+                .fg(VESSEL_VIOLET)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!(
+                "   \u{00b7}   the Vessel sails {:.2}\u{00d7} her old self",
+                c.resonance_speed_factor()
+            ),
+            Style::default().fg(Color::Gray),
+        ),
+    ]));
+    lines.push(Line::from(Span::styled(
+        format!(
+            "{} crossings made \u{00b7} {} carried at most in one",
+            c.crossings_completed, c.records.most_carried
+        ),
+        Style::default().fg(Color::Gray),
+    )));
+    lines.push(Line::from(""));
+
+    // The colony.
+    lines.push(Line::from(Span::styled(
+        format!("THE COLONY \u{2014} pop. {}", with_commas(c.population())),
+        Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD),
+    )));
+    for d in District::ALL {
+        let founded = c.has_district(d);
+        let (mark, style) = if founded {
+            ("\u{2713} ", Style::default().fg(Color::Green))
+        } else {
+            ("\u{25cc} ", Style::default().fg(Color::DarkGray))
+        };
+        let detail = if founded {
+            format!("{} \u{2014} {}", d.name(), d.bonus())
+        } else {
+            format!("{} at pop. {}", d.name(), with_commas(d.threshold()))
+        };
+        lines.push(Line::from(vec![
+            Span::styled(format!("  {mark}"), style),
+            Span::styled(
+                detail,
+                if founded {
+                    Style::default().fg(Color::White)
+                } else {
+                    Style::default().fg(Color::DarkGray)
+                },
+            ),
+        ]));
+    }
+    lines.push(Line::from(""));
+
+    // The trophy shelf.
+    lines.push(Line::from(Span::styled(
+        "RECORDS",
+        Style::default()
+            .fg(Color::Gray)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(Span::styled(
+        format!(
+            "  fastest crossing {}d \u{00b7} {} leagues sailed \u{00b7} {} nights stood",
+            c.records.fastest_days,
+            with_commas(c.records.total_leagues),
+            with_commas(c.records.total_nights)
+        ),
+        Style::default().fg(Color::Gray),
+    )));
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "[L] / [Esc] back",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+}
+
+/// A big headline number spaced out for weight: 1 , 2 4 7.
+fn spaced_number(n: u64) -> String {
+    with_commas(n)
+        .chars()
+        .flat_map(|ch| [ch, ' '])
+        .collect::<String>()
+        .trim_end()
+        .to_string()
+}
+
+/// Thousands-separated, the incremental idiom.
+fn with_commas(n: u64) -> String {
+    let s = n.to_string();
+    let bytes = s.as_bytes();
+    let mut out = String::new();
+    for (i, b) in bytes.iter().enumerate() {
+        if i > 0 && (bytes.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(*b as char);
+    }
+    out
 }
 
 // ── Strip layout (S/M) ──────────────────────────────────────────────────────

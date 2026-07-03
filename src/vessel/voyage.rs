@@ -58,6 +58,9 @@ pub const HARD_RATIONS_BURN_MULT: f64 = 0.75;
 /// Scars on the hull: cap, and what each one eats.
 pub const HULL_WEAR_MAX: u8 = 6;
 pub const WEAR_BURN_PER_SCAR: f64 = 0.05;
+/// Each passenger aboard a ferry run adds this much to the daily burn
+/// (spec 9): a full hold of 40 eats ~40% more than an empty one.
+pub const PASSENGER_BURN_PER_SOUL: f64 = 0.004;
 pub const LAUNCH_HOPE: u8 = 7;
 
 /// Dev/test wall-clock multiplier (`QUEST_VOYAGE_TIME_SCALE`, default 1.0).
@@ -452,10 +455,30 @@ pub struct VoyageState {
     /// events; serialized so costs taken offline greet the return).
     #[serde(default)]
     pub passage_events: Vec<PassageEvent>,
+    /// Which crossing of the era this is (spec 9). 1 = the authored
+    /// pilgrimage; 2+ are ferry runs carrying passengers by the count.
+    #[serde(default = "default_crossing_number")]
+    pub crossing_number: u32,
+    /// Passengers embarked this crossing (ferry runs only; 0 on the
+    /// first). Cargo that eats: the hold burns faster the fuller she is.
+    #[serde(default)]
+    pub passengers: u32,
+    /// The Resonance speed multiplier baked in at launch (≤ 1.0). Held
+    /// constant for the crossing so offline == live stays bitwise.
+    #[serde(default = "default_one")]
+    pub resonance_time_mult: f64,
 }
 
 fn default_provisions_cap() -> f64 {
     PROVISIONS_CAP
+}
+
+fn default_crossing_number() -> u32 {
+    1
+}
+
+fn default_one() -> f64 {
+    1.0
 }
 
 /// Why a departure was refused.
@@ -529,7 +552,53 @@ impl VoyageState {
             priced_squalls: Vec::new(),
             strained_banks: Vec::new(),
             passage_events: Vec::new(),
+            crossing_number: 1,
+            passengers: 0,
+            resonance_time_mult: 1.0,
         }
+    }
+
+    /// A ferry run (crossing 2+, spec 9): the surviving crew sail again,
+    /// rested; the hold carries passengers by the count; Resonance and the
+    /// Colony's districts fold their bonuses into a fresh crossing. The
+    /// intro and the authored recruit asks are behind us — passengers, not
+    /// pilgrims, ride now.
+    pub fn begin_ferry(
+        character_id: String,
+        voyage_seed: u64,
+        now: DateTime<Utc>,
+        colony: &crate::vessel::colony::ColonyState,
+        crew: Vec<SoulState>,
+    ) -> Self {
+        use crate::vessel::colony::District;
+        let mut v = VoyageState::begin(character_id, voyage_seed, now);
+        v.intro_pending = false;
+        v.crossing_number = colony.crossings_completed + 2;
+        v.passengers = colony.next_passengers();
+        v.resonance_time_mult = colony.resonance_time_mult();
+
+        // Coming home was rest: the crew sail sound, their stations kept
+        // where they can be, arcs already told.
+        v.souls = crew
+            .into_iter()
+            .filter(|s| s.status == SoulStatus::Aboard)
+            .map(|mut s| {
+                s.strain = 0;
+                s.consecutive_watches = 0;
+                s.rest_minutes = 0;
+                s
+            })
+            .collect();
+
+        // The colony's standing bonuses (districts derive from population).
+        if colony.has_district(District::Granary) {
+            v.provisions_cap = PROVISIONS_CAP + 25.0;
+            v.provisions = v.provisions_cap;
+        }
+        if colony.has_district(District::Hearth) {
+            v.hope = (LAUNCH_HOPE + 1).min(HOPE_MAX);
+        }
+        v
     }
 
     pub fn has_refit(&self, refit: RefitId) -> bool {
@@ -663,7 +732,10 @@ impl VoyageState {
         } else {
             1.00
         };
-        trim.time_mult()
+        // Resonance (spec 9) sails her faster the more of the old world
+        // she has carried — a constant baked in at launch.
+        self.resonance_time_mult
+            * trim.time_mult()
             * wind_time_mult(self.hope, self.long_silence)
             * helm_time_mult(
                 helm.is_some(),
@@ -696,7 +768,10 @@ impl VoyageState {
             1.00
         };
         let wear = 1.0 + WEAR_BURN_PER_SCAR * f64::from(self.hull_wear);
-        trim_mult
+        // Passengers are cargo that eats (spec 9): every full berth adds
+        // a little to the daily burn, so scarcity becomes load management.
+        let load = 1.0 + PASSENGER_BURN_PER_SOUL * f64::from(self.passengers);
+        load * trim_mult
             * tender_provisions_mult(
                 tender.is_some(),
                 tender.is_some_and(|id| {
@@ -938,7 +1013,10 @@ impl VoyageState {
         // first arrival past the Last Lantern is the night the mail does
         // not come. Location-triggered, never timed (the covenant).
         let chapter = route::waypoint(waypoint).chapter;
-        if !self.gone_dark {
+        // Only the first crossing hears from home — the old world went
+        // dark, permanently (spec 6). Ferry runs get colony letters
+        // instead, driven from the loop (spec 9).
+        if self.crossing_number == 1 && !self.gone_dark {
             if waypoint == WaypointId(23) {
                 self.deliver_letter(LAST_LETTER_EVENT);
             } else if chapter <= Chapter::DriftRoads {
@@ -958,11 +1036,14 @@ impl VoyageState {
             }
         }
 
-        // A soul may be waiting here. The ask blocks departure until
-        // answered — doors are answered, never slipped past.
-        if let Some(def) = souls::recruit_at(waypoint) {
-            if !self.met(def.id) {
-                self.pending_ask = Some(def.id);
+        // A soul may be waiting here — but only the authored pilgrimage
+        // recruits (crossing 1). Ferry runs embark passengers by the
+        // count at launch, not named souls at ports.
+        if self.crossing_number == 1 {
+            if let Some(def) = souls::recruit_at(waypoint) {
+                if !self.met(def.id) {
+                    self.pending_ask = Some(def.id);
+                }
             }
         }
 

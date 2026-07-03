@@ -17,6 +17,10 @@ pub enum VoyageInputResult {
     HandledNeedsSave,
     /// Save and leave the game.
     Quit,
+    /// At the harbor: begin the next ferry crossing (spec 9). The loop
+    /// in main.rs rebuilds the voyage carrying the crew and the colony's
+    /// bonuses; ignored when the era is over.
+    SailAgain,
     Ignored,
 }
 
@@ -149,6 +153,15 @@ pub fn handle_voyage_input(
                     ui.view = VoyageView::Chart;
                 }
                 _ => {}
+            }
+            VoyageInputResult::Handled
+        }
+        VoyageView::Reckoning => {
+            if matches!(
+                key.code,
+                KeyCode::Esc | KeyCode::Char('l') | KeyCode::Char('L')
+            ) {
+                ui.view = VoyageView::Chart;
             }
             VoyageInputResult::Handled
         }
@@ -434,6 +447,10 @@ fn handle_chart_keys(
             ui.view = VoyageView::Trim { selected: current };
             VoyageInputResult::Handled
         }
+        KeyCode::Char('l') | KeyCode::Char('L') => {
+            ui.view = VoyageView::Reckoning;
+            VoyageInputResult::Handled
+        }
         KeyCode::Char('r') | KeyCode::Char('R') => {
             // At the harbor the Log becomes the record — complete, with
             // the letters bound in.
@@ -448,6 +465,7 @@ fn handle_chart_keys(
             ui.view = VoyageView::Manifest { scroll: 0 };
             VoyageInputResult::Handled
         }
+        KeyCode::Char('n') | KeyCode::Char('N') if voyage.arrived() => VoyageInputResult::SailAgain,
         KeyCode::Char('k') | KeyCode::Char('K') if voyage.arrived() => {
             // Open centered on the Tree; the crossing pans out from there.
             let (x, y) = route::waypoint(route::ROUTE_SINK).chart_pos;

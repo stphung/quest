@@ -39,6 +39,42 @@ pub fn save_voyage_to_path(voyage: &VoyageState, path: &Path) -> io::Result<()> 
     fs::write(path, json)
 }
 
+// ── The Colony (spec 9) — persists across crossings, keyed like the voyage.
+
+use super::colony::ColonyState;
+
+pub fn colony_save_path() -> io::Result<PathBuf> {
+    Ok(crate::core::paths::get_quest_dir()?.join("colony.json"))
+}
+
+/// Load the colony for `character_id`. A missing file, unreadable JSON,
+/// or another character's colony all return `None` — the caller founds a
+/// fresh one when the first crossing arrives.
+pub fn load_colony(character_id: &str) -> Option<ColonyState> {
+    let path = colony_save_path().ok()?;
+    load_colony_from_path(&path, character_id)
+}
+
+pub fn load_colony_from_path(path: &Path, character_id: &str) -> Option<ColonyState> {
+    let json = fs::read_to_string(path).ok()?;
+    let state: ColonyState = serde_json::from_str(&json).ok()?;
+    (state.character_id == character_id).then_some(state)
+}
+
+pub fn save_colony(colony: &ColonyState) -> io::Result<()> {
+    let path = colony_save_path()?;
+    save_colony_to_path(colony, &path)
+}
+
+pub fn save_colony_to_path(colony: &ColonyState, path: &Path) -> io::Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let json = serde_json::to_string_pretty(colony)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    fs::write(path, json)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

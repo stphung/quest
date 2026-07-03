@@ -5,6 +5,7 @@
 //! 250,000 Prestige Ranks and burning them in a single all-or-nothing
 //! action. See `docs/superpowers/specs/2026-03-27-vessel-launch-gate-design.md`.
 
+pub mod colony;
 pub mod junction;
 pub mod letters;
 pub mod nights;
@@ -81,6 +82,8 @@ pub enum VoyageView {
     Record {
         scroll: u16,
     },
+    /// The Reckoning — the colony's numbers pane (spec 9).
+    Reckoning,
 }
 
 /// A scene being read: title line + body text.
