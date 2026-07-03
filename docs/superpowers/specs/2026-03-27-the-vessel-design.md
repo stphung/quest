@@ -325,7 +325,7 @@ Never: grind, optimize, reset.
 | 4 | Arrival Scenes | scene delivery system, road/refit/soul recoloring, scene shapes, writing pipeline | **Shipped** — [2026-07-03-vessel-arrival-scenes-design.md](2026-07-03-vessel-arrival-scenes-design.md) |
 | 5 | Underway — Weather, Trim & the Watch | void weather, trim postures, night types & watch rotation, the log, pilgrim ships, drift, refits | **Shipped** — [2026-07-03-vessel-underway-design.md](2026-07-03-vessel-underway-design.md) |
 | 6 | Letters From Home & the Going-Dark | care packages, letter templates, the midpoint event | **Shipped** — [2026-07-03-vessel-letters-going-dark-design.md](2026-07-03-vessel-letters-going-dark-design.md) |
-| 7 | The Arrival | final approach, manifest, keepsake chart, Act 3 gate | **Spec written** — [2026-07-03-vessel-arrival-design.md](2026-07-03-vessel-arrival-design.md) |
+| 7 | The Arrival | final approach, manifest, keepsake chart, Act 3 gate | **Shipped** — [2026-07-03-vessel-arrival-design.md](2026-07-03-vessel-arrival-design.md) |
 
 The old sub-specs 2–5 (mode transition, rooms & stats, auto-combat, crew)
 are **superseded** by this direction; salvage from them what still fits
