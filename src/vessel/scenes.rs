@@ -154,7 +154,7 @@ pub const SCENES: [SceneDef; 38] = [
             "Word of your pace precedes you; a fishwife charges you the \
              hurry tax and does not pretend otherwise.",
         )],
-        payout: pay(28),
+        payout: pay(25),
     },
     // W3 — The Drowned Choir
     SceneDef {
@@ -194,7 +194,7 @@ pub const SCENES: [SceneDef; 38] = [
             "After the empty days, the meadows read as a promise kept: the \
              world still has pantries.",
         )],
-        payout: pay(20),
+        payout: pay(18),
     },
     // W6 — The Tollgate
     SceneDef {
@@ -244,7 +244,7 @@ pub const SCENES: [SceneDef; 38] = [
         ],
         colors: &[],
         payout: ScenePayout {
-            provisions: 20,
+            provisions: 18,
             hope: 0,
             rumor: None,
             keepsake: Some("a jar of salt-orchard preserve"),
@@ -284,7 +284,7 @@ pub const SCENES: [SceneDef; 38] = [
              learns the Drift Roads' first law: you don't sail them, you \
              are walked by them."],
         colors: &[],
-        payout: pay(18),
+        payout: pay(16),
     },
     // W12 — The Wandering Fair
     SceneDef {
@@ -302,7 +302,7 @@ pub const SCENES: [SceneDef; 38] = [
              the prize shelf and joins them for a drink instead.",
         )],
         payout: ScenePayout {
-            provisions: 28,
+            provisions: 25,
             hope: 0,
             rumor: None,
             keepsake: Some("a fair ribbon, unfaded"),
@@ -330,7 +330,7 @@ pub const SCENES: [SceneDef; 38] = [
              mends your seams; the kitchen mends the rest.",
         ],
         colors: &[],
-        payout: pay_hope(20, 1),
+        payout: pay_hope(18, 1),
     },
     // W15 — The Hungry Narrows
     SceneDef {
@@ -379,7 +379,7 @@ pub const SCENES: [SceneDef; 38] = [
             "One letter, water-stained, says only: 'It is further than they \
              told us and it is worth it.' It gets passed around all night.",
         )],
-        payout: pay_hope(25, 1),
+        payout: pay_hope(22, 1),
     },
     // W19 — The Crossroads Light
     SceneDef {
@@ -456,7 +456,7 @@ pub const SCENES: [SceneDef; 38] = [
              dark. She does not sell the answer to 'why do you stay.'",
         ],
         colors: &[],
-        payout: pay(28),
+        payout: pay(25),
     },
     // W25 — The Silence
     SceneDef {
@@ -525,7 +525,7 @@ pub const SCENES: [SceneDef; 38] = [
             ),
         ],
         payout: ScenePayout {
-            provisions: 25,
+            provisions: 22,
             hope: 1,
             rumor: None,
             keepsake: Some("an ember-hold coal that never quite cools"),
@@ -552,7 +552,7 @@ pub const SCENES: [SceneDef; 38] = [
              slow congregations. The deep, being gentle — once, on \
              purpose, for you."],
         colors: &[],
-        payout: pay_hope(20, 1),
+        payout: pay_hope(18, 1),
     },
     // W32 — Deepgate
     SceneDef {
@@ -587,7 +587,7 @@ pub const SCENES: [SceneDef; 38] = [
              are. You are close. The water tastes faintly of orchards.",
         ],
         colors: &[],
-        payout: pay(20),
+        payout: pay(18),
     },
     // W35 — The Bloom Fields
     SceneDef {
@@ -681,7 +681,7 @@ mod tests {
             let payout = scene_def(w.id).payout;
             if w.has_feature(Feature::WayStation) {
                 assert!(
-                    payout.provisions >= 25,
+                    payout.provisions >= 22,
                     "{} is a way-station and should provision well",
                     w.name
                 );
