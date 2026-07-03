@@ -48,9 +48,146 @@ pub fn render_voyage(
         _ => render_strip(frame, area, voyage, ui),
     }
 
-    if let Some(modal) = &ui.scene_modal {
+    let scene_waiting = matches!(
+        voyage.phase,
+        VoyagePhase::HoldingStation {
+            scene_state: SceneState::Waiting,
+            ..
+        }
+    );
+    if let Some(play) = &ui.scene_play {
+        render_scene_play(frame, area, play);
+    } else if let Some(modal) = &ui.scene_modal {
         render_scene_modal(frame, area, modal);
+    } else if !scene_waiting && !matches!(ui.view, VoyageView::Farewell { .. }) {
+        // Doors wait their turn: the arrival scene reads first.
+        if let Some(asking) = voyage.pending_ask {
+            render_ask_modal(frame, area, voyage, asking);
+        } else if let Some(pair) = voyage.pending_refit_pair() {
+            render_refit_modal(frame, area, pair);
+        }
     }
+}
+
+// ── Scene playback (spec 4: beats, one page at a time) ─────────────────────
+
+fn render_scene_play(frame: &mut Frame, area: Rect, play: &crate::vessel::ScenePlay) {
+    let width = area.width.clamp(40, 76);
+    let height = area.height.clamp(10, 16).min(area.height);
+    let x = area.x + (area.width.saturating_sub(width)) / 2;
+    let y = area.y + (area.height.saturating_sub(height)) / 2;
+    let rect = Rect::new(x, y, width, height);
+    frame.render_widget(Clear, rect);
+
+    let block = Block::default()
+        .title(format!(" {} ", play.playback.title))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GOLD));
+    let inner = block.inner(rect);
+    frame.render_widget(block, rect);
+
+    let total = play.playback.paragraphs.len();
+    let index = play.index.min(total.saturating_sub(1));
+    let last_page = index + 1 >= total;
+
+    let mut lines = vec![Line::from("")];
+    lines.push(Line::from(Span::styled(
+        play.playback.paragraphs[index].clone(),
+        Style::default().fg(Color::White),
+    )));
+    lines.push(Line::from(""));
+    if last_page && !play.playback.payout_note.is_empty() {
+        lines.push(Line::from(Span::styled(
+            play.playback.payout_note.clone(),
+            Style::default().fg(VIOLET_DIM),
+        )));
+        lines.push(Line::from(""));
+    }
+    let progress: String = (0..total)
+        .map(|i| if i == index { '\u{25cf}' } else { '\u{00b7}' })
+        .collect();
+    lines.push(Line::from(Span::styled(
+        format!(
+            "{progress}   {}",
+            if last_page {
+                "[Enter] Close"
+            } else {
+                "[Enter] More"
+            }
+        ),
+        Style::default().fg(Color::DarkGray),
+    )));
+    frame.render_widget(
+        Paragraph::new(lines)
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: false }),
+        inner,
+    );
+}
+
+// ── The yard's refit door ───────────────────────────────────────────────────
+
+fn render_refit_modal(frame: &mut Frame, area: Rect, pair: crate::vessel::refits::RefitPair) {
+    let width = area.width.clamp(40, 66);
+    let height = 12u16.min(area.height);
+    let x = area.x + (area.width.saturating_sub(width)) / 2;
+    let y = area.y + (area.height.saturating_sub(height)) / 2;
+    let rect = Rect::new(x, y, width, height);
+    frame.render_widget(Clear, rect);
+
+    let block = Block::default()
+        .title(" \u{2692} The yard makes an offer ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GOLD));
+    let inner = block.inner(rect);
+    frame.render_widget(block, rect);
+
+    let lines = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "One refit, while she's in the slip. The other never fits her.",
+            Style::default().fg(Color::Gray),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("[A] ", Style::default().fg(GOLD)),
+            Span::styled(
+                pair.a.display_name().to_string(),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!(" \u{2014} {}", pair.a.blurb()),
+                Style::default().fg(Color::Gray),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("[B] ", Style::default().fg(GOLD)),
+            Span::styled(
+                pair.b.display_name().to_string(),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!(" \u{2014} {}", pair.b.blurb()),
+                Style::default().fg(Color::Gray),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Permanent. The doors close behind the choice.",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
+    frame.render_widget(
+        Paragraph::new(lines)
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: false }),
+        inner,
+    );
 }
 
 // ── Intro (placeholder for the 5-beat transition, spec 4) ──────────────────
@@ -106,6 +243,10 @@ fn render_full(frame: &mut Frame, area: Rect, voyage: &VoyageState, ui: &VoyageU
         }
         VoyageView::Trim { selected } => render_trim_panel(frame, cols[1], voyage, selected),
         VoyageView::Rumors => render_rumor_panel(frame, cols[1], voyage),
+        VoyageView::Souls { selected } => render_souls_panel(frame, cols[1], voyage, selected),
+        VoyageView::Farewell { selected } => {
+            render_farewell_panel(frame, cols[1], voyage, selected)
+        }
         VoyageView::Chart => render_vessel_panel(frame, cols[1], voyage),
     }
 }
@@ -394,6 +535,21 @@ fn render_vessel_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
     lines.extend(phase_lines(voyage));
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
+        format!(
+            "Souls aboard: {} of {}",
+            voyage.aboard_count(),
+            crate::vessel::souls::BERTHS
+        ),
+        Style::default().fg(Color::Gray),
+    )));
+    let carved = voyage.carved_names();
+    if !carved.is_empty() {
+        lines.push(Line::from(Span::styled(
+            format!("Carved into the hull: {}", carved.join(", ")),
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
+    lines.push(Line::from(Span::styled(
         format!("Rumors held: {}", voyage.rumors.len()),
         Style::default().fg(Color::Gray),
     )));
@@ -433,6 +589,21 @@ fn gauge_lines(voyage: &VoyageState, width: u16) -> Vec<Line<'static>> {
                 Style::default()
                     .fg(VESSEL_VIOLET)
                     .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                {
+                    let arrow = crate::vessel::souls::wind_arrow(voyage.hope, voyage.long_silence);
+                    if arrow.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" {arrow}")
+                    }
+                },
+                Style::default().fg(if voyage.hope >= 8 {
+                    Color::Green
+                } else {
+                    Color::LightRed
+                }),
             ),
         ]),
         Line::from(vec![
@@ -549,7 +720,7 @@ fn phase_lines(voyage: &VoyageState) -> Vec<Line<'static>> {
 }
 
 fn footer_keys(voyage: &VoyageState) -> Vec<Line<'static>> {
-    let mut keys = vec!["[T] Trim", "[R] Rumors"];
+    let mut keys = vec!["[S] Souls", "[T] Trim", "[R] Log"];
     if matches!(
         voyage.phase,
         VoyagePhase::HoldingStation {
@@ -670,6 +841,15 @@ fn card_lines(card: &RoadCard, selected: bool) -> Vec<Line<'static>> {
             Style::default().fg(VESSEL_VIOLET),
         )));
     }
+    for (name, line) in &card.counsel {
+        lines.push(Line::from(vec![
+            Span::styled(format!("    {name}: "), Style::default().fg(GOLD)),
+            Span::styled(
+                format!("\u{201c}{line}\u{201d}"),
+                Style::default().fg(Color::Gray),
+            ),
+        ]));
+    }
     lines
 }
 
@@ -728,9 +908,11 @@ fn trim_effect_line(voyage: &VoyageState, trim: Trim) -> String {
     {
         let r = route::road(road);
         let remaining = (f64::from(r.base_days) - progress_days).max(0.0);
-        let hours = (remaining * trim.time_mult() * 24.0).round() as u64;
+        // Wind and stations compose in — the panel shows what would
+        // actually happen, not the trim's raw dial.
+        let hours = (remaining * voyage.time_mult_with(trim) * 24.0).round() as u64;
         let provisions = (remaining * f64::from(r.base_provisions) / f64::from(r.base_days)
-            * trim.provisions_mult())
+            * voyage.provisions_mult_with(trim))
         .round() as u64;
         let extra = match trim {
             Trim::Mourn => " · hope rises daily",
@@ -755,13 +937,37 @@ fn trim_effect_line(voyage: &VoyageState, trim: Trim) -> String {
 
 fn render_rumor_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
     let block = Block::default()
-        .title(" \u{2042} Rumors ")
+        .title(" \u{2042} The Log ")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(VESSEL_VIOLET));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
     let mut lines: Vec<Line> = vec![Line::from("")];
+
+    // The story so far: the most recent scene titles, oldest first.
+    if !voyage.log.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "The story so far",
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::BOLD),
+        )));
+        let recent = voyage.log.len().saturating_sub(8);
+        for title in &voyage.log[recent..] {
+            lines.push(Line::from(Span::styled(
+                format!("  \u{00b7} {title}"),
+                Style::default().fg(Color::Gray),
+            )));
+        }
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Rumors held",
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::BOLD),
+        )));
+    }
     if voyage.rumors.is_empty() {
         lines.push(Line::from(Span::styled(
             "Nothing heard yet. Way-stations sell what they hear.",
@@ -788,6 +994,210 @@ fn render_rumor_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
         Style::default().fg(Color::DarkGray),
     )));
     frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+}
+
+// ── The Souls panel ─────────────────────────────────────────────────────────
+
+fn render_souls_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, selected: usize) {
+    use crate::vessel::souls::{self, ARC_BEAT_REST_DAYS};
+    use crate::vessel::voyage::{SoulStatus, MINUTES_PER_DAY};
+
+    let block = Block::default()
+        .title(" \u{263c} The Souls ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(VESSEL_VIOLET));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let selected = selected.min(voyage.souls.len().saturating_sub(1));
+    let mut lines: Vec<Line> = vec![Line::from("")];
+    for (i, s) in voyage.souls.iter().enumerate() {
+        let def = souls::soul(s.soul);
+        let is_selected = i == selected;
+        let marker = if is_selected { "\u{25b8} " } else { "  " };
+        let (status_note, name_color) = match s.status {
+            SoulStatus::Aboard => match s.station {
+                Some(post) => (format!("at the {}", post.display_name()), Color::White),
+                None => ("resting".to_string(), Color::White),
+            },
+            SoulStatus::Declined => ("stayed behind".to_string(), Color::DarkGray),
+            SoulStatus::Ashore => ("ashore".to_string(), Color::DarkGray),
+            SoulStatus::Lost => ("carved into the hull".to_string(), Color::LightRed),
+        };
+        let name_style = if is_selected {
+            Style::default().fg(GOLD).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(name_color)
+        };
+        let mut spans = vec![
+            Span::styled(format!("{marker}{}", def.name), name_style),
+            Span::styled(
+                format!("  \u{00b7}  {status_note}"),
+                Style::default().fg(Color::Gray),
+            ),
+        ];
+        if let Some(affinity) = def.affinity {
+            spans.push(Span::styled(
+                format!("  ({})", affinity.display_name().to_lowercase()),
+                Style::default().fg(VIOLET_DIM),
+            ));
+        }
+        lines.push(Line::from(spans));
+
+        // Arc status: the price of coverage is always visible.
+        if s.status == SoulStatus::Aboard {
+            let arc_line = if (s.arc_beat as usize) >= def.arc.len() {
+                "story told".to_string()
+            } else if s.station.is_some() {
+                "arc paused (on post)".to_string()
+            } else if voyage.long_silence {
+                "arc paused (the Long Silence)".to_string()
+            } else {
+                let need = ARC_BEAT_REST_DAYS * MINUTES_PER_DAY;
+                let done_days = s.rest_minutes as f64 / MINUTES_PER_DAY as f64;
+                format!(
+                    "next beat: rested {:.0} of {} days",
+                    done_days.floor(),
+                    need / MINUTES_PER_DAY
+                )
+            };
+            lines.push(Line::from(Span::styled(
+                format!("      {arc_line}"),
+                Style::default().fg(Color::DarkGray),
+            )));
+        }
+    }
+
+    // Dossier for the selected soul.
+    if let Some(s) = voyage.souls.get(selected) {
+        let def = souls::soul(s.soul);
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            format!("\u{201c}{}\u{201d}", def.voice),
+            Style::default().fg(VESSEL_VIOLET),
+        )));
+        lines.push(Line::from(Span::styled(
+            format!("\u{2014} {}, {}", def.name, def.origin),
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "\u{2191}\u{2193} choose  \u{00b7}  [Enter] cycle post  \u{00b7}  [Esc] back",
+        Style::default().fg(Color::DarkGray),
+    )));
+    lines.push(Line::from(Span::styled(
+        "A soul on post is not resting; arcs move on rest days.",
+        Style::default().fg(Color::DarkGray),
+    )));
+    frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+}
+
+// ── Farewell (a full ship is a chosen ship) ─────────────────────────────────
+
+fn render_farewell_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, selected: usize) {
+    use crate::vessel::souls;
+
+    let block = Block::default()
+        .title(" \u{2693} Who steps ashore? ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::LightRed));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let aboard: Vec<_> = voyage.aboard().collect();
+    let selected = selected.min(aboard.len().saturating_sub(1));
+    let mut lines: Vec<Line> = vec![Line::from("")];
+    if let Some(asking) = voyage.pending_ask {
+        lines.push(Line::from(Span::styled(
+            format!(
+                "The berths are full, and {} is asking.",
+                souls::soul(asking).name
+            ),
+            Style::default().fg(Color::White),
+        )));
+        lines.push(Line::from(""));
+    }
+    for (i, s) in aboard.iter().enumerate() {
+        let def = souls::soul(s.soul);
+        let marker = if i == selected { "\u{25b8} " } else { "  " };
+        let style = if i == selected {
+            Style::default().fg(GOLD).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::White)
+        };
+        lines.push(Line::from(Span::styled(
+            format!("{marker}{}", def.name),
+            style,
+        )));
+    }
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "\u{2191}\u{2193} choose  \u{00b7}  [Enter] farewell  \u{00b7}  [Esc] back to the ask",
+        Style::default().fg(Color::DarkGray),
+    )));
+    lines.push(Line::from(Span::styled(
+        "A farewell is permanent. The manifest remembers.",
+        Style::default().fg(Color::DarkGray),
+    )));
+    frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+}
+
+// ── Boarding ask modal ──────────────────────────────────────────────────────
+
+fn render_ask_modal(
+    frame: &mut Frame,
+    area: Rect,
+    voyage: &VoyageState,
+    asking: crate::vessel::souls::SoulId,
+) {
+    use crate::vessel::souls::{self, BERTHS};
+
+    let def = souls::soul(asking);
+    let width = area.width.clamp(30, 64);
+    let height = 11u16.min(area.height);
+    let x = area.x + (area.width.saturating_sub(width)) / 2;
+    let y = area.y + (area.height.saturating_sub(height)) / 2;
+    let rect = Rect::new(x, y, width, height);
+    frame.render_widget(Clear, rect);
+
+    let block = Block::default()
+        .title(format!(" {} asks to board ", def.name))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GOLD));
+    let inner = block.inner(rect);
+    frame.render_widget(block, rect);
+
+    let full = voyage.aboard_count() >= BERTHS;
+    let mut lines = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            format!("\u{201c}{}\u{201d}", def.voice),
+            Style::default().fg(Color::White),
+        )),
+        Line::from(Span::styled(
+            format!("\u{2014} {}", def.origin),
+            Style::default().fg(Color::Gray),
+        )),
+        Line::from(""),
+    ];
+    if full {
+        lines.push(Line::from(Span::styled(
+            "The berths are full. Taking them aboard means a farewell.",
+            Style::default().fg(Color::LightRed),
+        )));
+    }
+    lines.push(Line::from(Span::styled(
+        "[A] Take aboard    [D] Decline",
+        Style::default().fg(GOLD),
+    )));
+    frame.render_widget(
+        Paragraph::new(lines)
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: false }),
+        inner,
+    );
 }
 
 // ── Scene modal (placeholder arrival text until spec 4) ─────────────────────

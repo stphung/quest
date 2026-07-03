@@ -34,18 +34,59 @@ pub fn handle_voyage_input(
         return VoyageInputResult::Handled;
     }
 
-    // A scene being read swallows everything except its close keys.
-    if ui.scene_modal.is_some() {
-        if matches!(key.code, KeyCode::Esc | KeyCode::Enter | KeyCode::Char(' ')) {
-            ui.scene_modal = None;
+    // A scene being read swallows everything: Enter turns the page, Esc
+    // skips to the end. Closing surfaces whatever waits next.
+    if let Some(play) = &mut ui.scene_play {
+        match key.code {
+            KeyCode::Enter | KeyCode::Char(' ') => {
+                if play.index + 1 < play.playback.paragraphs.len() {
+                    play.index += 1;
+                } else {
+                    ui.scene_play = None;
+                }
+            }
+            KeyCode::Esc => ui.scene_play = None,
+            _ => {}
         }
         return VoyageInputResult::Handled;
+    }
+    // A one-line moment being read; closing surfaces the next queued one.
+    if ui.scene_modal.is_some() {
+        if matches!(key.code, KeyCode::Esc | KeyCode::Enter | KeyCode::Char(' ')) {
+            ui.scene_modal = ui.moments.pop_front();
+        }
+        return VoyageInputResult::Handled;
+    }
+    if let Some(moment) = ui.moments.pop_front() {
+        ui.scene_modal = Some(moment);
+        return VoyageInputResult::Handled;
+    }
+
+    // Doors, in order: a boarding ask, then the yard's refit offer. They
+    // engage only after the arrival scene has been read (the scene comes
+    // first, always), and each must be answered before departure.
+    let scene_waiting = matches!(
+        voyage.phase,
+        VoyagePhase::HoldingStation {
+            scene_state: SceneState::Waiting,
+            ..
+        }
+    );
+    if !scene_waiting && !matches!(ui.view, VoyageView::Farewell { .. }) {
+        if voyage.pending_ask.is_some() {
+            return handle_ask_keys(key, voyage, ui);
+        }
+        if voyage.pending_refit.is_some() {
+            return handle_refit_keys(key, voyage, ui);
+        }
     }
 
     match ui.view {
         VoyageView::Chart => handle_chart_keys(key, voyage, ui),
         VoyageView::Junction { selected } => handle_junction_keys(key, voyage, ui, selected),
         VoyageView::Trim { selected } => handle_trim_keys(key, voyage, ui, selected),
+        VoyageView::Souls { selected } => handle_souls_keys(key, voyage, ui, selected),
+        VoyageView::Farewell { selected } => handle_farewell_keys(key, voyage, ui, selected),
         VoyageView::Rumors => {
             if matches!(
                 key.code,
@@ -58,6 +99,167 @@ pub fn handle_voyage_input(
     }
 }
 
+fn handle_ask_keys(
+    key: KeyEvent,
+    voyage: &mut VoyageState,
+    ui: &mut VoyageUiState,
+) -> VoyageInputResult {
+    let Some(asking) = voyage.pending_ask else {
+        return VoyageInputResult::Handled;
+    };
+    match key.code {
+        KeyCode::Char('a') | KeyCode::Char('A') | KeyCode::Enter => {
+            if voyage.accept_ask() {
+                let def = crate::vessel::souls::soul(asking);
+                ui.scene_modal = Some(SceneModal {
+                    title: format!("{} comes aboard", def.name),
+                    body: format!("\u{201c}{}\u{201d}", def.voice),
+                });
+                VoyageInputResult::HandledNeedsSave
+            } else {
+                // Berths full: someone must step ashore first.
+                ui.view = VoyageView::Farewell { selected: 0 };
+                VoyageInputResult::Handled
+            }
+        }
+        KeyCode::Char('d') | KeyCode::Char('D') => {
+            if let Some(declined) = voyage.decline_ask() {
+                let def = crate::vessel::souls::soul(declined);
+                ui.scene_modal = Some(SceneModal {
+                    title: format!("{} stays behind", def.name),
+                    body: "The door closes. The name stays on the chart.".to_string(),
+                });
+            }
+            VoyageInputResult::HandledNeedsSave
+        }
+        _ => VoyageInputResult::Handled,
+    }
+}
+
+fn handle_refit_keys(
+    key: KeyEvent,
+    voyage: &mut VoyageState,
+    ui: &mut VoyageUiState,
+) -> VoyageInputResult {
+    let Some(pair) = voyage.pending_refit_pair() else {
+        return VoyageInputResult::Handled;
+    };
+    let pick_a = match key.code {
+        KeyCode::Char('a') | KeyCode::Char('A') => true,
+        KeyCode::Char('b') | KeyCode::Char('B') => false,
+        _ => return VoyageInputResult::Handled,
+    };
+    if let Some(chosen) = voyage.choose_refit(pick_a) {
+        let closed = if pick_a { pair.b } else { pair.a };
+        ui.scene_modal = Some(SceneModal {
+            title: format!("Refit: {}", chosen.display_name()),
+            body: format!(
+                "The yard fits her out. From here on, {}. The {} stays on \
+                 the shelf, and the shelf closes.",
+                chosen.blurb(),
+                closed.display_name()
+            ),
+        });
+    }
+    VoyageInputResult::HandledNeedsSave
+}
+
+fn handle_souls_keys(
+    key: KeyEvent,
+    voyage: &mut VoyageState,
+    ui: &mut VoyageUiState,
+    selected: usize,
+) -> VoyageInputResult {
+    let count = voyage.souls.len();
+    if count == 0 {
+        ui.view = VoyageView::Chart;
+        return VoyageInputResult::Handled;
+    }
+    let selected = selected.min(count - 1);
+    match key.code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            ui.view = VoyageView::Souls {
+                selected: selected.saturating_sub(1),
+            };
+            VoyageInputResult::Handled
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            ui.view = VoyageView::Souls {
+                selected: (selected + 1).min(count - 1),
+            };
+            VoyageInputResult::Handled
+        }
+        // Enter cycles the selected soul's post: rest -> Helm -> Tender ->
+        // Watch -> rest. Only aboard souls take a post.
+        KeyCode::Enter => {
+            use crate::vessel::souls::Station;
+            let s = voyage.souls[selected];
+            let next = match s.station {
+                None => Some(Station::Helm),
+                Some(Station::Helm) => Some(Station::Tender),
+                Some(Station::Tender) => Some(Station::Watch),
+                Some(Station::Watch) => None,
+            };
+            if voyage.set_station(s.soul, next) {
+                VoyageInputResult::HandledNeedsSave
+            } else {
+                VoyageInputResult::Handled
+            }
+        }
+        KeyCode::Esc | KeyCode::Char('s') | KeyCode::Char('S') => {
+            ui.view = VoyageView::Chart;
+            VoyageInputResult::Handled
+        }
+        _ => VoyageInputResult::Ignored,
+    }
+}
+
+fn handle_farewell_keys(
+    key: KeyEvent,
+    voyage: &mut VoyageState,
+    ui: &mut VoyageUiState,
+    selected: usize,
+) -> VoyageInputResult {
+    let aboard: Vec<_> = voyage.aboard().map(|s| s.soul).collect();
+    if aboard.is_empty() {
+        ui.view = VoyageView::Chart;
+        return VoyageInputResult::Handled;
+    }
+    let selected = selected.min(aboard.len() - 1);
+    match key.code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            ui.view = VoyageView::Farewell {
+                selected: selected.saturating_sub(1),
+            };
+            VoyageInputResult::Handled
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            ui.view = VoyageView::Farewell {
+                selected: (selected + 1).min(aboard.len() - 1),
+            };
+            VoyageInputResult::Handled
+        }
+        KeyCode::Enter => {
+            let ashore = aboard[selected];
+            if voyage.farewell(ashore) && voyage.accept_ask() {
+                let ashore_def = crate::vessel::souls::soul(ashore);
+                ui.scene_modal = Some(SceneModal {
+                    title: format!("{} steps ashore", ashore_def.name),
+                    body: "A full ship is a chosen ship. The manifest remembers.".to_string(),
+                });
+            }
+            ui.view = VoyageView::Chart;
+            VoyageInputResult::HandledNeedsSave
+        }
+        KeyCode::Esc => {
+            // The ask is still pending; back to answering it.
+            ui.view = VoyageView::Chart;
+            VoyageInputResult::Handled
+        }
+        _ => VoyageInputResult::Ignored,
+    }
+}
+
 fn handle_chart_keys(
     key: KeyEvent,
     voyage: &mut VoyageState,
@@ -66,15 +268,11 @@ fn handle_chart_keys(
     match key.code {
         KeyCode::Enter => match voyage.phase {
             VoyagePhase::HoldingStation {
-                waypoint,
                 scene_state: SceneState::Waiting,
                 ..
             } => {
-                if let Some(scene) = voyage.play_arrival_scene() {
-                    ui.scene_modal = Some(SceneModal {
-                        title: route::waypoint(waypoint).name.to_string(),
-                        body: scene.placeholder.to_string(),
-                    });
+                if let Some(playback) = voyage.play_arrival_scene() {
+                    ui.scene_play = Some(crate::vessel::ScenePlay { playback, index: 0 });
                 }
                 VoyageInputResult::HandledNeedsSave
             }
@@ -97,6 +295,10 @@ fn handle_chart_keys(
         }
         KeyCode::Char('r') | KeyCode::Char('R') => {
             ui.view = VoyageView::Rumors;
+            VoyageInputResult::Handled
+        }
+        KeyCode::Char('s') | KeyCode::Char('S') => {
+            ui.view = VoyageView::Souls { selected: 0 };
             VoyageInputResult::Handled
         }
         KeyCode::Char('b') | KeyCode::Char('B') => {
@@ -215,14 +417,24 @@ mod tests {
     #[test]
     fn enter_plays_the_arrival_scene_then_opens_the_junction() {
         let (mut v, mut ui) = fresh();
-        // First Enter: go ashore — scene modal opens, scene marked played.
+        // First Enter: go ashore — the scene playback opens (spec 4 pager),
+        // scene marked played.
         let r = handle_voyage_input(key(KeyCode::Enter), &mut v, &mut ui);
         assert_eq!(r, VoyageInputResult::HandledNeedsSave);
-        assert!(ui.scene_modal.is_some());
-        // Close the modal.
-        handle_voyage_input(key(KeyCode::Esc), &mut v, &mut ui);
-        assert!(ui.scene_modal.is_none());
-        // Second Enter: chart a course.
+        let pages = ui
+            .scene_play
+            .as_ref()
+            .expect("scene playback open")
+            .playback
+            .paragraphs
+            .len();
+        assert!(pages >= 2, "the Last Harbor scene has beats");
+        // Page through to the end; the pager closes.
+        for _ in 0..pages {
+            handle_voyage_input(key(KeyCode::Enter), &mut v, &mut ui);
+        }
+        assert!(ui.scene_play.is_none());
+        // Next Enter: chart a course.
         handle_voyage_input(key(KeyCode::Enter), &mut v, &mut ui);
         assert_eq!(ui.view, VoyageView::Junction { selected: 0 });
         // Commit: the Last Harbor's one road out.

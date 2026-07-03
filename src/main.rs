@@ -563,14 +563,33 @@ fn main() -> io::Result<()> {
                             }
                             let v = voyage.as_mut().expect("voyage initialized above");
                             v.tick(Utc::now());
-                            if v.take_pending_recovery_scene() && voyage_ui.scene_modal.is_none() {
-                                voyage_ui.scene_modal = Some(vessel::SceneModal {
-                                    title: "Underway again".to_string(),
-                                    body: "Something small was caught, mended, and shared. \
-                                           The hold holds a little again, and the road is \
-                                           still there."
-                                        .to_string(),
+                            // Arc beats (possibly fired offline) queue as log
+                            // moments, shown one at a time.
+                            for event in v.take_soul_events() {
+                                let def = vessel::souls::soul(event.soul);
+                                if let Some(beat) = def.arc.get(event.beat as usize) {
+                                    voyage_ui.moments.push_back(vessel::SceneModal {
+                                        title: beat.title.to_string(),
+                                        body: beat.text.to_string(),
+                                    });
+                                }
+                            }
+                            if v.take_pending_recovery_scene() {
+                                // Chapter-authored recovery scene (spec 4).
+                                let chapter = v
+                                    .visited
+                                    .last()
+                                    .map(|w| vessel::route::waypoint(*w).chapter)
+                                    .unwrap_or(vessel::route::Chapter::Shallows);
+                                let (title, body) = vessel::scenes::recovery_scene(chapter);
+                                voyage_ui.moments.push_back(vessel::SceneModal {
+                                    title: title.to_string(),
+                                    body: body.to_string(),
                                 });
+                            }
+                            if let Some(playback) = v.take_finale_playback() {
+                                voyage_ui.scene_play =
+                                    Some(vessel::ScenePlay { playback, index: 0 });
                             }
 
                             terminal.draw(|frame| {

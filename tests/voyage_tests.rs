@@ -28,6 +28,14 @@ fn cross(mut pick: impl FnMut(&VoyageState) -> usize, trim: Trim) -> (VoyageStat
             v.phase
         );
         if v.play_arrival_scene().is_some() || v.current_waypoint().is_some() {
+            if v.pending_refit.is_some() {
+                v.choose_refit(true);
+            }
+            // Answer any boarding ask: yes while a berth is free, no after
+            // (asks block departure until answered).
+            if v.pending_ask.is_some() && !v.accept_ask() {
+                v.decline_ask();
+            }
             let cards = current_junction_cards(&v);
             if !cards.is_empty() && !v.arrived() {
                 let selectable: Vec<_> = cards.iter().filter(|c| c.selectable).collect();
@@ -87,9 +95,13 @@ fn priciest_road_crossing_survives_by_drifting() {
         (20..=160).contains(&days),
         "run-hard crossing took {days} days"
     );
-    // Travel itself never touches hope — drift included. An attended
-    // crossing (scenes played, prompt departures) lands with launch hope.
-    assert_eq!(v.hope, 7, "travel/drift must not harm hope");
+    // Travel itself never harms hope — drift included. Arc beats can only
+    // raise it, so an attended crossing lands at launch hope or better.
+    assert!(
+        v.hope >= 7,
+        "travel/drift must not harm hope (got {})",
+        v.hope
+    );
 }
 
 #[test]

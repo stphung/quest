@@ -43,7 +43,7 @@ impl Strategy {
 
 struct RunResult {
     days: u64,
-    drifts: bool,
+    drifts: u32,
     hope: u8,
     waypoints: usize,
 }
@@ -54,9 +54,19 @@ fn simulate(strategy: Strategy, seed: u64, checkin_hours: i64) -> RunResult {
     let mut v = VoyageState::begin(format!("sim-{seed}"), seed, t0);
     v.intro_pending = false;
     v.set_trim(strategy.trim());
+    // A played ship staffs its posts: Torvald at the helm, Eir tending.
+    v.set_station(
+        quest::vessel::souls::SoulId(0),
+        Some(quest::vessel::souls::Station::Helm),
+    );
+    v.set_station(
+        quest::vessel::souls::SoulId(1),
+        Some(quest::vessel::souls::Station::Tender),
+    );
 
     let mut now = t0;
-    let mut drifted = false;
+    let mut drifts = 0u32;
+    let mut was_drifting = false;
     let mut checkins = 0u32;
     while !v.arrived() {
         checkins += 1;
@@ -67,6 +77,15 @@ fn simulate(strategy: Strategy, seed: u64, checkin_hours: i64) -> RunResult {
             v.phase
         );
         v.play_arrival_scene();
+        // Boarding asks block departure: say yes while a berth is free.
+        if v.pending_ask.is_some() && !v.accept_ask() {
+            v.decline_ask();
+        }
+        // Yard offers: alternate A/B across the crossing.
+        if v.pending_refit.is_some() {
+            let pick_a = v.refits.len().is_multiple_of(2);
+            v.choose_refit(pick_a);
+        }
         let cards = current_junction_cards(&v);
         if !cards.is_empty() && !v.arrived() {
             let selectable: Vec<_> = cards.iter().filter(|c| c.selectable).collect();
@@ -88,13 +107,15 @@ fn simulate(strategy: Strategy, seed: u64, checkin_hours: i64) -> RunResult {
         }
         now += Duration::hours(checkin_hours);
         v.tick(now);
-        if matches!(v.phase, quest::vessel::voyage::VoyagePhase::Drifting { .. }) {
-            drifted = true;
+        let drifting = matches!(v.phase, quest::vessel::voyage::VoyagePhase::Drifting { .. });
+        if drifting && !was_drifting {
+            drifts += 1;
         }
+        was_drifting = drifting;
     }
     RunResult {
         days: v.day_index(),
-        drifts: drifted,
+        drifts,
         hope: v.hope,
         waypoints: v.visited.len(),
     }
@@ -157,6 +178,24 @@ fn main() {
             // Attended-crossing envelope: legs are 1-3 days, ~24 waypoints,
             // plus hold/drift slack. Real calendars stretch with player
             // cadence; this bounds the authored road data itself.
+            // The economy gate (spec 4): a Cruise crossing leans on drift
+            // at most once; Mourn never. Priciest runs hard at Run trim on
+            // the dearest roads on purpose — it is the no-lose stress test,
+            // not an economy subject.
+            let max_drifts = match strategy {
+                Strategy::Mourn => Some(0),
+                Strategy::Cheapest | Strategy::Random => Some(1),
+                Strategy::Priciest => None,
+            };
+            if let Some(max_drifts) = max_drifts {
+                assert!(
+                    result.drifts <= max_drifts,
+                    "[{}/seed {}] {} drifts exceeds the economy gate ({max_drifts})",
+                    strategy.name(),
+                    seed + run,
+                    result.drifts
+                );
+            }
             assert!(
                 (20..=200).contains(&result.days),
                 "[{}/seed {}] {} days is outside the envelope",
@@ -171,10 +210,10 @@ fn main() {
                 result.days,
                 result.waypoints,
                 result.hope,
-                if result.drifts {
-                    " \u{00b7} drifted"
+                if result.drifts > 0 {
+                    format!(" \u{00b7} drifted x{}", result.drifts)
                 } else {
-                    ""
+                    String::new()
                 }
             );
         }

@@ -8,8 +8,14 @@
 //!
 //! See `docs/superpowers/specs/2026-07-03-vessel-route-waypoints-design.md`.
 
+use super::refits::{RefitId, REFIT_PAIRS};
 use super::route::{
-    self, Feature, Road, RoadId, RumorId, SceneRef, WaypointId, ROUTE_SINK, ROUTE_START,
+    self, Chapter, Feature, Road, RoadId, RumorId, WaypointId, ROUTE_SINK, ROUTE_START,
+};
+use super::scenes::{self, ColorKey};
+use super::souls::{
+    self, helm_time_mult, tender_provisions_mult, wind_time_mult, ArcTrigger, SoulId, Station,
+    ARC_BEAT_REST_DAYS, BERTHS, FAREWELL_HOPE_COST, LOSS_HOPE_COST,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -31,11 +37,6 @@ pub const DRIFT_RECOVERY_HOURS: u64 = 36;
 pub const HOLD_STATION_GRACE_DAYS: u64 = 3;
 /// Buying a rumor at a way-station (one per visit).
 pub const RUMOR_PRICE: f64 = 6.0;
-/// Interim economy: playing an arrival scene provisions the ship. Spec 4's
-/// authored scenes replace this uniform gift with real payoffs (markets,
-/// gifts, catches); the number is tuned so a Cruise crossing runs the hold
-/// close to dry without leaning on drift.
-pub const ARRIVAL_PROVISIONS_GIFT: f64 = 20.0;
 /// Hope is a small number with a name, never a percentage.
 pub const HOPE_MAX: u8 = 10;
 /// Hold-station decay never drags hope below "steady" — the eager-souls rule.
@@ -134,6 +135,10 @@ pub enum VoyagePhase {
         waypoint: WaypointId,
         arrived_at_min: u64,
         scene_state: SceneState,
+        /// The road that brought us (colors the arrival scene and runs its
+        /// threat ledger). Absent in pre-spec-4 saves.
+        #[serde(default)]
+        arrived_by: Option<RoadId>,
     },
     Arrived {
         at_min: u64,
@@ -145,6 +150,62 @@ pub enum VoyagePhase {
 pub struct LearnedRumor {
     pub rumor: RumorId,
     pub learned_at: WaypointId,
+}
+
+/// Where a met soul stands with the Vessel. Unmet souls are simply absent
+/// from the roster vec. Every non-`Aboard` state is permanent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SoulStatus {
+    Aboard,
+    /// The ask was refused. The door closed.
+    Declined,
+    /// Stepped ashore in a farewell (to free a berth). Remembered, not lost.
+    Ashore,
+    /// Lost — authored scenes only (spec 4). Carved into the hull.
+    Lost,
+}
+
+/// One met soul's state in the crossing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SoulState {
+    pub soul: SoulId,
+    pub status: SoulStatus,
+    /// Standing post. A stationed soul is not resting.
+    pub station: Option<Station>,
+    /// Beats fired so far (arc has 3 beats + a resolution = 4).
+    pub arc_beat: u8,
+    /// Rest minutes accumulated toward the next *ready* beat.
+    pub rest_minutes: u64,
+}
+
+/// An arc beat fired (possibly offline) — queued for the UI to show as a
+/// log moment. Serialized so beats that land while away greet the return.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SoulEvent {
+    pub soul: SoulId,
+    /// Index into the soul's arc (0..=3).
+    pub beat: u8,
+}
+
+/// A resolved scene, ready to read: title, paragraphs (beats + matching
+/// color lines + ledger lines), and the payout in small print.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScenePlayback {
+    pub title: String,
+    pub paragraphs: Vec<String>,
+    pub payout_note: String,
+}
+
+fn default_roster() -> Vec<SoulState> {
+    souls::launch_souls()
+        .map(|def| SoulState {
+            soul: def.id,
+            status: SoulStatus::Aboard,
+            station: None,
+            arc_beat: 0,
+            rest_minutes: 0,
+        })
+        .collect()
 }
 
 fn default_true() -> bool {
@@ -195,6 +256,42 @@ pub struct VoyageState {
     /// Set false after the first-boot 5-beat transition has played.
     #[serde(default = "default_true")]
     pub intro_pending: bool,
+    /// Refits chosen (permanent A/B doors at shipyards).
+    #[serde(default)]
+    pub refits: Vec<RefitId>,
+    /// How many refit doors have been offered (the sequence cursor).
+    #[serde(default)]
+    pub refit_doors_seen: u8,
+    /// A yard's offer waiting to be answered; blocks departure like an ask.
+    #[serde(default)]
+    pub pending_refit: Option<u8>,
+    /// Mementos. No mechanics; the manifest remembers (spec 7).
+    #[serde(default)]
+    pub keepsakes: Vec<String>,
+    /// The crossing's story so far: one title per scene and beat.
+    #[serde(default)]
+    pub log: Vec<String>,
+    /// The leg that is underway (or just ended) included a drift.
+    #[serde(default)]
+    pub drifted_this_leg: bool,
+    /// The finale playback has been surfaced once (spec 7 owns the rest).
+    #[serde(default)]
+    pub finale_shown: bool,
+    /// Every soul met so far (unmet = absent). Older saves default to the
+    /// launch trio.
+    #[serde(default = "default_roster")]
+    pub souls: Vec<SoulState>,
+    /// A boarding ask waiting for an answer. Blocks departure — the ask is
+    /// a door, and doors are answered, never slipped past.
+    #[serde(default)]
+    pub pending_ask: Option<SoulId>,
+    /// Hope hit ashen: legs crawl and arcs pause until a rest stop.
+    #[serde(default)]
+    pub long_silence: bool,
+    /// Arc beats fired since last read (possibly offline) — the return
+    /// view's log moments.
+    #[serde(default)]
+    pub soul_events: Vec<SoulEvent>,
 }
 
 fn default_provisions_cap() -> f64 {
@@ -212,6 +309,10 @@ pub enum DepartError {
     NoSuchRoad,
     /// Locked: not affordable and not the cheapest road out.
     Locked,
+    /// A soul is asking to board; answer before the ship leaves.
+    AskPending,
+    /// The yard's refit offer waits; answer before the ship leaves.
+    RefitPending,
 }
 
 impl VoyageState {
@@ -227,6 +328,7 @@ impl VoyageState {
                 waypoint: ROUTE_START,
                 arrived_at_min: 0,
                 scene_state: SceneState::Waiting,
+                arrived_by: None,
             },
             trim: Trim::Cruise,
             provisions: LAUNCH_PROVISIONS,
@@ -240,7 +342,69 @@ impl VoyageState {
             mourn_minutes: 0,
             hold_decay_applied: 0,
             intro_pending: true,
+            souls: default_roster(),
+            pending_ask: None,
+            long_silence: false,
+            soul_events: Vec::new(),
+            refits: Vec::new(),
+            refit_doors_seen: 0,
+            pending_refit: None,
+            keepsakes: Vec::new(),
+            log: Vec::new(),
+            drifted_this_leg: false,
+            finale_shown: false,
         }
+    }
+
+    pub fn has_refit(&self, refit: RefitId) -> bool {
+        self.refits.contains(&refit)
+    }
+
+    // ── Multiplier composition ──────────────────────────────────────────────
+    // Fixed order, documented once: time = base × trim × wind × helm;
+    // provisions = base × trim × tender. The UI only ever shows the composed
+    // integers these produce.
+
+    /// Leg-time multiplier at a hypothetical trim (the trim panel previews
+    /// all four). Wind and helm ride along.
+    pub fn time_mult_with(&self, trim: Trim) -> f64 {
+        let helm = self.station_soul(Station::Helm);
+        let storm_sail = if self.has_refit(RefitId::StormSail) {
+            0.90
+        } else {
+            1.00
+        };
+        trim.time_mult()
+            * wind_time_mult(self.hope, self.long_silence)
+            * helm_time_mult(
+                helm.is_some(),
+                helm.is_some_and(|id| souls::soul(id).affinity == Some(Station::Helm)),
+            )
+            * storm_sail
+    }
+
+    /// Leg-provisions multiplier at a hypothetical trim.
+    pub fn provisions_mult_with(&self, trim: Trim) -> f64 {
+        let tender = self.station_soul(Station::Tender);
+        // Mourning Colors deepens Mourn's thrift (0.80 instead of 0.90).
+        let trim_mult = if trim == Trim::Mourn && self.has_refit(RefitId::MourningColors) {
+            0.80
+        } else {
+            trim.provisions_mult()
+        };
+        trim_mult
+            * tender_provisions_mult(
+                tender.is_some(),
+                tender.is_some_and(|id| souls::soul(id).affinity == Some(Station::Tender)),
+            )
+    }
+
+    pub fn time_mult(&self) -> f64 {
+        self.time_mult_with(self.trim)
+    }
+
+    pub fn provisions_mult(&self) -> f64 {
+        self.provisions_mult_with(self.trim)
     }
 
     // ── Lazy tick ───────────────────────────────────────────────────────────
@@ -259,6 +423,7 @@ impl VoyageState {
 
     /// One game minute of world. Small, total, and allocation-free.
     fn step_minute(&mut self) {
+        self.step_arcs_minute();
         match self.phase {
             VoyagePhase::Traveling {
                 road: road_id,
@@ -266,14 +431,15 @@ impl VoyageState {
                 progress_days,
             } => {
                 let road = route::road(road_id);
-                let dp = (1.0 / MINUTES_PER_DAY as f64) / self.trim.time_mult();
+                let dp = (1.0 / MINUTES_PER_DAY as f64) / self.time_mult();
                 let burn = dp
                     * (f64::from(road.base_provisions) / f64::from(road.base_days))
-                    * self.trim.provisions_mult();
+                    * self.provisions_mult();
 
                 if self.provisions < burn {
                     // The hold runs dry mid-road: drift where we stand.
                     self.provisions = 0.0;
+                    self.drifted_this_leg = true;
                     self.phase = VoyagePhase::Drifting {
                         road: road_id,
                         progress_days,
@@ -293,7 +459,7 @@ impl VoyageState {
 
                 let new_progress = progress_days + dp;
                 if new_progress >= f64::from(road.base_days) {
-                    self.arrive_at(road.to);
+                    self.arrive_at(road.to, Some(road_id));
                 } else {
                     self.phase = VoyagePhase::Traveling {
                         road: road_id,
@@ -310,7 +476,11 @@ impl VoyageState {
                 if self.processed_minutes - since_min >= DRIFT_RECOVERY_HOURS * 60 {
                     // Something small is caught, mended, shared. The covenant:
                     // drift prices time and pride, never souls.
-                    self.provisions = f64::from(DRIFT_RECOVERY_PROVISIONS);
+                    self.provisions = if self.has_refit(RefitId::DeepLarder) {
+                        40.0
+                    } else {
+                        f64::from(DRIFT_RECOVERY_PROVISIONS)
+                    };
                     self.pending_recovery_scene = true;
                     self.phase = VoyagePhase::Traveling {
                         road,
@@ -333,11 +503,54 @@ impl VoyageState {
         }
     }
 
-    fn arrive_at(&mut self, waypoint: WaypointId) {
+    fn arrive_at(&mut self, waypoint: WaypointId, arrived_by: Option<RoadId>) {
         self.visited.push(waypoint);
         self.rumor_bought_this_visit = false;
         self.hold_decay_applied = 0;
+
+        // A hearth breaks the Long Silence: the fire is relit, hope
+        // returns to "low", and the ship can breathe again.
+        if self.long_silence && route::waypoint(waypoint).has_feature(Feature::RestStop) {
+            self.long_silence = false;
+            self.hope = self.hope.max(3);
+        }
+
+        // A soul may be waiting here. The ask blocks departure until
+        // answered — doors are answered, never slipped past.
+        if let Some(def) = souls::recruit_at(waypoint) {
+            if !self.met(def.id) {
+                self.pending_ask = Some(def.id);
+            }
+        }
+
+        // The first three distinct shipyards each open one refit door.
+        if route::waypoint(waypoint).has_feature(Feature::Shipyard)
+            && (self.refit_doors_seen as usize) < REFIT_PAIRS.len()
+            && self.pending_refit.is_none()
+        {
+            self.pending_refit = Some(self.refit_doors_seen);
+        }
+
+        // Entering Chapter IV: unresolved arcs skip straight to their
+        // resolution beat (skipped beats pay nothing) — nobody's story is
+        // left dangling at the finale.
+        if route::waypoint(waypoint).chapter == Chapter::RootsOfLight {
+            for i in 0..self.souls.len() {
+                if self.souls[i].status == SoulStatus::Aboard && self.souls[i].arc_beat < 3 {
+                    self.souls[i].arc_beat = 3;
+                    self.souls[i].rest_minutes = 0;
+                }
+            }
+        }
+
         if waypoint == ROUTE_SINK {
+            // The crossing ends with every aboard story resolved: any
+            // resolution still unfired fires now, rest debt forgiven.
+            for i in 0..self.souls.len() {
+                if self.souls[i].status == SoulStatus::Aboard && self.souls[i].arc_beat < 4 {
+                    self.fire_beat(i);
+                }
+            }
             self.phase = VoyagePhase::Arrived {
                 at_min: self.processed_minutes,
             };
@@ -346,28 +559,333 @@ impl VoyageState {
                 waypoint,
                 arrived_at_min: self.processed_minutes,
                 scene_state: SceneState::Waiting,
+                arrived_by,
             };
         }
     }
 
+    // ── Arcs ────────────────────────────────────────────────────────────────
+
+    /// One minute of arc time: souls aboard and off-station rest; a soul
+    /// whose next beat is ready converts rest into story. The Long Silence
+    /// pauses all of it.
+    fn step_arcs_minute(&mut self) {
+        if self.long_silence {
+            return;
+        }
+        for i in 0..self.souls.len() {
+            let s = self.souls[i];
+            if s.status != SoulStatus::Aboard || s.station.is_some() {
+                continue;
+            }
+            let def = souls::soul(s.soul);
+            let Some(beat) = def.arc.get(s.arc_beat as usize) else {
+                continue; // arc complete
+            };
+            if !self.trigger_met(beat.trigger) {
+                continue;
+            }
+            self.souls[i].rest_minutes += 1;
+            if self.souls[i].rest_minutes >= ARC_BEAT_REST_DAYS * MINUTES_PER_DAY {
+                self.fire_beat(i);
+            }
+        }
+    }
+
+    fn trigger_met(&self, trigger: ArcTrigger) -> bool {
+        match trigger {
+            ArcTrigger::Aboard => true,
+            ArcTrigger::ReachChapter(chapter) => self
+                .visited
+                .last()
+                .is_some_and(|w| route::waypoint(*w).chapter >= chapter),
+            ArcTrigger::VisitFeature(feature) => self
+                .visited
+                .iter()
+                .any(|w| route::waypoint(*w).has_feature(feature)),
+            ArcTrigger::VisitWaypoint(waypoint) => self.visited.contains(&waypoint),
+        }
+    }
+
+    /// Fire the roster[i] soul's next beat: payout lands, the moment is
+    /// queued for the log, the rest counter resets.
+    fn fire_beat(&mut self, i: usize) {
+        let s = self.souls[i];
+        let def = souls::soul(s.soul);
+        let Some(beat) = def.arc.get(s.arc_beat as usize) else {
+            return;
+        };
+        self.hope = (self.hope + beat.payout.hope).min(HOPE_MAX);
+        if let Some(rumor) = beat.payout.rumor {
+            if !self.knows_rumor(rumor) {
+                let learned_at = self.visited.last().copied().unwrap_or(ROUTE_START);
+                self.rumors.push(LearnedRumor { rumor, learned_at });
+            }
+        }
+        self.soul_events.push(SoulEvent {
+            soul: s.soul,
+            beat: s.arc_beat,
+        });
+        self.souls[i].arc_beat += 1;
+        self.souls[i].rest_minutes = 0;
+    }
+
     // ── Player actions ──────────────────────────────────────────────────────
 
-    /// Play the arrival scene at the held waypoint. Returns the scene slot
-    /// (spec 4 content) — `None` if there is nothing waiting to play.
-    pub fn play_arrival_scene(&mut self) -> Option<&'static SceneRef> {
-        if let VoyagePhase::HoldingStation {
+    /// Play the arrival scene at the held waypoint: resolve its beats and
+    /// color lines, run the road's threat ledger, apply the payout — all
+    /// exactly once. Returns the playback for the UI, `None` if nothing
+    /// waits to play.
+    pub fn play_arrival_scene(&mut self) -> Option<ScenePlayback> {
+        let VoyagePhase::HoldingStation {
             waypoint,
             scene_state: scene_state @ SceneState::Waiting,
+            arrived_by,
             ..
         } = &mut self.phase
-        {
-            *scene_state = SceneState::Played;
-            let waypoint = *waypoint;
-            self.provisions = (self.provisions + ARRIVAL_PROVISIONS_GIFT).min(self.provisions_cap);
-            Some(&route::waypoint(waypoint).scene)
-        } else {
-            None
+        else {
+            return None;
+        };
+        *scene_state = SceneState::Played;
+        let waypoint = *waypoint;
+        let arrived_by = *arrived_by;
+
+        let def = scenes::scene_def(waypoint);
+        let mut paragraphs: Vec<String> = def.beats.iter().map(|b| b.to_string()).collect();
+        for (key, line) in def.colors {
+            if self.color_matches(*key, arrived_by) {
+                paragraphs.push(line.to_string());
+            }
         }
+
+        // The road's threat, if it carried one, speaks now — a ledger of
+        // prior choices, never a roll.
+        let mut payout_notes: Vec<String> = Vec::new();
+        if let Some(road_id) = arrived_by {
+            if route::road(road_id).threat.is_some() {
+                let (lines, notes) = self.threat_ledger(road_id);
+                paragraphs.extend(lines);
+                payout_notes.extend(notes);
+            }
+        }
+
+        // The authored payout, applied once.
+        let payout = def.payout;
+        if payout.provisions > 0 {
+            self.provisions =
+                (self.provisions + f64::from(payout.provisions)).min(self.provisions_cap);
+            payout_notes.push(format!("the hold gains {}", payout.provisions));
+        }
+        match payout.hope.cmp(&0) {
+            std::cmp::Ordering::Greater => {
+                self.hope = (self.hope + payout.hope as u8).min(HOPE_MAX);
+                payout_notes.push("hope rises".to_string());
+            }
+            std::cmp::Ordering::Less => {
+                self.lower_hope(payout.hope.unsigned_abs());
+                payout_notes.push("hope dims".to_string());
+            }
+            std::cmp::Ordering::Equal => {}
+        }
+        if let Some(rumor) = payout.rumor {
+            if !self.knows_rumor(rumor) {
+                self.rumors.push(LearnedRumor {
+                    rumor,
+                    learned_at: waypoint,
+                });
+                payout_notes.push("a rumor learned".to_string());
+            }
+        }
+        if let Some(keepsake) = payout.keepsake {
+            self.keepsakes.push(keepsake.to_string());
+            payout_notes.push(format!("kept: {keepsake}"));
+        }
+
+        let title = route::waypoint(waypoint).name.to_string();
+        self.log.push(title.clone());
+        self.drifted_this_leg = false;
+
+        Some(ScenePlayback {
+            title,
+            paragraphs,
+            payout_note: payout_notes.join(" \u{00b7} "),
+        })
+    }
+
+    fn color_matches(&self, key: ColorKey, arrived_by: Option<RoadId>) -> bool {
+        match key {
+            ColorKey::SoulAboard(id) => self
+                .soul_state(id)
+                .is_some_and(|s| s.status == SoulStatus::Aboard),
+            ColorKey::ArrivedBy(road) => arrived_by == Some(road),
+            ColorKey::TrimIs(trim) => self.trim == trim,
+            ColorKey::KnowsRumor(rumor) => self.knows_rumor(rumor),
+            ColorKey::HopeAtLeast(n) => self.hope >= n,
+            ColorKey::HopeBelow(n) => self.hope < n,
+            ColorKey::Drifted => self.drifted_this_leg,
+        }
+    }
+
+    /// The threat ledgers: outcome rows checked in order, every row a
+    /// consequence of choices the junction card priced. Returns the scene
+    /// lines and the payout notes.
+    fn threat_ledger(&mut self, road_id: RoadId) -> (Vec<String>, Vec<String>) {
+        let quiet_keel = self.has_refit(RefitId::QuietKeel);
+        match road_id.0 {
+            // The Ossuary Warden, over the reef.
+            9 => {
+                let sefa_aboard = self
+                    .soul_state(SoulId(4))
+                    .is_some_and(|s| s.status == SoulStatus::Aboard);
+                if sefa_aboard {
+                    self.keepsakes
+                        .push("the Warden's token, white and warm".to_string());
+                    (
+                        vec!["The Warden rises to count you — and Sefa sings the office \
+                             for the unburied. The white water goes still, and \
+                             something like a tithe-mark is pressed into the rail."
+                            .to_string()],
+                        vec!["kept: the Warden's token".to_string()],
+                    )
+                } else if quiet_keel || self.trim == Trim::Quiet || self.trim == Trim::Mourn {
+                    self.provisions = (self.provisions - 15.0).max(0.0);
+                    (
+                        vec!["The Warden takes its toll from the hold, slowly, while \
+                             the crew stands silent and lets it. Slow and respectful \
+                             buys passage. It does not buy exemption."
+                            .to_string()],
+                        vec!["the Warden takes 15".to_string()],
+                    )
+                } else {
+                    self.provisions = (self.provisions - 15.0).max(0.0);
+                    self.lower_hope(2);
+                    (
+                        vec!["You hurry the reef, and the Warden hurries with you. It \
+                             takes its toll from the hold and something less \
+                             replaceable from the crew's sleep."
+                            .to_string()],
+                        vec!["the Warden takes 15 \u{00b7} hope dims".to_string()],
+                    )
+                }
+            }
+            // The Silence itself, on the silent road.
+            29 => {
+                let anchored = self.aboard().any(|s| s.station.is_none());
+                if anchored || quiet_keel {
+                    (
+                        vec!["The Silence leans on the ship for three days. The souls \
+                             at rest hold the crew's voice for them — a hand on a \
+                             shoulder, a note passed, a meal made loudly. It passes."
+                            .to_string()],
+                        vec![],
+                    )
+                } else {
+                    self.lower_hope(2);
+                    (
+                        vec!["Every soul stood a post and nobody held the middle of \
+                             the ship. The Silence sat there instead, and the leg's \
+                             log is three blank pages."
+                            .to_string()],
+                        vec!["hope dims".to_string()],
+                    )
+                }
+            }
+            // The Thorns — the game's only loss.
+            42 => {
+                let cormac_at_helm = self
+                    .soul_state(SoulId(6))
+                    .is_some_and(|s| s.status == SoulStatus::Aboard)
+                    && self.station_soul(Station::Helm) == Some(SoulId(6));
+                if cormac_at_helm {
+                    self.keepsakes
+                        .push("a thorn spar, cut clean at the tip".to_string());
+                    (
+                        vec!["Cormac takes the run in one line, reading the thorns \
+                             like a sentence he wrote. The hull never touches. At \
+                             the far end he hands back the wheel and says, 'Now it's \
+                             a road.'"
+                            .to_string()],
+                        vec!["kept: a thorn spar".to_string()],
+                    )
+                } else if quiet_keel {
+                    self.provisions = (self.provisions - 10.0).max(0.0);
+                    (
+                        vec!["The thorns close on the hull and the quiet keel holds — \
+                             barely, loudly, expensively. The crew spends the last \
+                             mile listening to the wood argue and win."
+                            .to_string()],
+                        vec!["the thorns take 10".to_string()],
+                    )
+                } else {
+                    // The exposure is the post: helm first, then tender,
+                    // then watch. Resting souls are below, and safe.
+                    let exposed = [Station::Helm, Station::Tender, Station::Watch]
+                        .into_iter()
+                        .find_map(|post| self.station_soul(post));
+                    if let Some(lost) = exposed {
+                        let name = souls::soul(lost).name;
+                        self.mark_lost(lost);
+                        (
+                            vec![format!(
+                                "The thorns take the ship the way weather takes \
+                                     a coastline. When the run opens out and the \
+                                     count is called, {name} does not answer it. The \
+                                     post stands empty. The hull carries a new name."
+                            )],
+                            vec![format!("{name} is lost \u{00b7} hope falls")],
+                        )
+                    } else {
+                        self.provisions = (self.provisions - 20.0).max(0.0);
+                        self.lower_hope(2);
+                        (
+                            vec!["With every soul below, the ship takes the thorns on \
+                                 her own skin. She holds. It costs the hold and the \
+                                 crew's certainty, and the scars stay."
+                                .to_string()],
+                            vec!["the thorns take 20 \u{00b7} hope dims".to_string()],
+                        )
+                    }
+                }
+            }
+            _ => (Vec::new(), Vec::new()),
+        }
+    }
+
+    /// The refit door being offered, if any.
+    pub fn pending_refit_pair(&self) -> Option<crate::vessel::refits::RefitPair> {
+        self.pending_refit
+            .map(|i| REFIT_PAIRS[(i as usize).min(REFIT_PAIRS.len() - 1)])
+    }
+
+    /// Answer the yard: take A or B. The other closes forever.
+    pub fn choose_refit(&mut self, pick_a: bool) -> Option<RefitId> {
+        let pair = self.pending_refit_pair()?;
+        let chosen = if pick_a { pair.a } else { pair.b };
+        self.refits.push(chosen);
+        if chosen == RefitId::LongHold {
+            self.provisions_cap = LONG_HOLD_PROVISIONS_CAP;
+        }
+        self.refit_doors_seen += 1;
+        self.pending_refit = None;
+        self.log.push(format!("Refit: {}", chosen.display_name()));
+        Some(chosen)
+    }
+
+    /// The finale scene at the Tree, surfaced once (spec 7 owns the rest).
+    pub fn take_finale_playback(&mut self) -> Option<ScenePlayback> {
+        if !self.arrived() || self.finale_shown {
+            return None;
+        }
+        self.finale_shown = true;
+        let def = scenes::scene_def(ROUTE_SINK);
+        self.hope = (self.hope + def.payout.hope.max(0) as u8).min(HOPE_MAX);
+        let title = route::waypoint(ROUTE_SINK).name.to_string();
+        self.log.push(title.clone());
+        Some(ScenePlayback {
+            title,
+            paragraphs: def.beats.iter().map(|b| b.to_string()).collect(),
+            payout_note: "the crossing is over".to_string(),
+        })
     }
 
     /// Set the ship's posture. Takes effect from the next unprocessed minute.
@@ -387,9 +905,9 @@ impl VoyageState {
             || route::cheapest_road_from(road.from).is_some_and(|c| c.id == road.id)
     }
 
-    /// Whole-leg price at the current trim, as the card shows it.
+    /// Whole-leg price as the card shows it: trim and tender composed.
     pub fn road_price(&self, road: &Road) -> u32 {
-        (f64::from(road.base_provisions) * self.trim.provisions_mult()).round() as u32
+        (f64::from(road.base_provisions) * self.provisions_mult()).round() as u32
     }
 
     pub fn road_affordable(&self, road: &Road) -> bool {
@@ -409,6 +927,12 @@ impl VoyageState {
         };
         if scene_state == SceneState::Waiting {
             return Err(DepartError::SceneWaiting);
+        }
+        if self.pending_ask.is_some() {
+            return Err(DepartError::AskPending);
+        }
+        if self.pending_refit.is_some() {
+            return Err(DepartError::RefitPending);
         }
         let road = route::roads_from(waypoint)
             .find(|r| r.id == road_id)
@@ -462,6 +986,144 @@ impl VoyageState {
         std::mem::take(&mut self.pending_recovery_scene)
     }
 
+    // ── The roster ──────────────────────────────────────────────────────────
+
+    pub fn met(&self, id: SoulId) -> bool {
+        self.souls.iter().any(|s| s.soul == id)
+    }
+
+    pub fn soul_state(&self, id: SoulId) -> Option<&SoulState> {
+        self.souls.iter().find(|s| s.soul == id)
+    }
+
+    pub fn aboard(&self) -> impl Iterator<Item = &SoulState> {
+        self.souls.iter().filter(|s| s.status == SoulStatus::Aboard)
+    }
+
+    pub fn aboard_count(&self) -> usize {
+        self.aboard().count()
+    }
+
+    /// Who holds a post, if anyone.
+    pub fn station_soul(&self, station: Station) -> Option<SoulId> {
+        self.aboard()
+            .find(|s| s.station == Some(station))
+            .map(|s| s.soul)
+    }
+
+    /// Assign a soul to a post (bumping whoever held it) or relieve them
+    /// (`None`) so their arc can move again.
+    pub fn set_station(&mut self, id: SoulId, station: Option<Station>) -> bool {
+        if !self
+            .soul_state(id)
+            .is_some_and(|s| s.status == SoulStatus::Aboard)
+        {
+            return false;
+        }
+        if let Some(post) = station {
+            for s in &mut self.souls {
+                if s.station == Some(post) {
+                    s.station = None;
+                }
+            }
+        }
+        for s in &mut self.souls {
+            if s.soul == id {
+                s.station = station;
+            }
+        }
+        true
+    }
+
+    /// Say yes to the pending ask. Fails (returning `false`) when the
+    /// berths are full — free one with [`Self::farewell`] first, or decline.
+    pub fn accept_ask(&mut self) -> bool {
+        let Some(id) = self.pending_ask else {
+            return false;
+        };
+        if self.aboard_count() >= BERTHS {
+            return false;
+        }
+        self.pending_ask = None;
+        self.souls.push(SoulState {
+            soul: id,
+            status: SoulStatus::Aboard,
+            station: None,
+            arc_beat: 0,
+            rest_minutes: 0,
+        });
+        true
+    }
+
+    /// Say no. Permanent: the door closes, the name stays on the chart.
+    pub fn decline_ask(&mut self) -> Option<SoulId> {
+        let id = self.pending_ask.take()?;
+        self.souls.push(SoulState {
+            soul: id,
+            status: SoulStatus::Declined,
+            station: None,
+            arc_beat: 0,
+            rest_minutes: 0,
+        });
+        Some(id)
+    }
+
+    /// A soul steps ashore to free a berth. Remembered in the manifest,
+    /// never carved into the hull. Costs a little hope.
+    pub fn farewell(&mut self, id: SoulId) -> bool {
+        let Some(s) = self
+            .souls
+            .iter_mut()
+            .find(|s| s.soul == id && s.status == SoulStatus::Aboard)
+        else {
+            return false;
+        };
+        s.status = SoulStatus::Ashore;
+        s.station = None;
+        self.lower_hope(FAREWELL_HOPE_COST);
+        true
+    }
+
+    /// A soul is lost. Reachable ONLY from authored scenes (spec 4) — no
+    /// tick-driven path calls this, which is the covenant in one sentence.
+    /// The name is carved into the hull for the rest of the game.
+    #[allow(dead_code)] // Spec 4's loss API; covenant-tested today.
+    pub fn mark_lost(&mut self, id: SoulId) -> bool {
+        let Some(s) = self
+            .souls
+            .iter_mut()
+            .find(|s| s.soul == id && s.status == SoulStatus::Aboard)
+        else {
+            return false;
+        };
+        s.status = SoulStatus::Lost;
+        s.station = None;
+        self.lower_hope(LOSS_HOPE_COST);
+        true
+    }
+
+    /// Names carved into the hull, in the order they were lost.
+    pub fn carved_names(&self) -> Vec<&'static str> {
+        self.souls
+            .iter()
+            .filter(|s| s.status == SoulStatus::Lost)
+            .map(|s| souls::soul(s.soul).name)
+            .collect()
+    }
+
+    /// Drain arc moments queued for the log (possibly fired offline).
+    pub fn take_soul_events(&mut self) -> Vec<SoulEvent> {
+        std::mem::take(&mut self.soul_events)
+    }
+
+    /// Lower hope, entering the Long Silence at ashen.
+    fn lower_hope(&mut self, by: u8) {
+        self.hope = self.hope.saturating_sub(by);
+        if self.hope == 0 {
+            self.long_silence = true;
+        }
+    }
+
     // ── Read model ──────────────────────────────────────────────────────────
 
     /// The waypoint the ship is at, if holding station.
@@ -497,7 +1159,7 @@ impl VoyageState {
         } = self.phase
         {
             let base_days = f64::from(route::road(road).base_days);
-            let remaining = (base_days - progress_days).max(0.0) * self.trim.time_mult();
+            let remaining = (base_days - progress_days).max(0.0) * self.time_mult();
             Some((remaining * MINUTES_PER_DAY as f64).ceil() as u64)
         } else {
             None
@@ -557,6 +1219,9 @@ mod tests {
         let mut now = t0() + Duration::days(2);
         v.tick(now);
         v.play_arrival_scene().expect("arrived at W1");
+        // W1 is Maren's recruit site; the ask blocks departure until
+        // answered. Take her aboard.
+        assert!(v.accept_ask(), "Maren's ask should be pending at W1");
         v.depart(route::roads_from(WaypointId(1)).next().unwrap().id)
             .unwrap();
         now += Duration::days(2);

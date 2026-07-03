@@ -32,6 +32,9 @@ pub struct RoadCard {
     pub provisions_price: u32,
     /// Rumor lines that attach to this road.
     pub annotations: Vec<&'static str>,
+    /// Counsel from souls aboard: (name, line in their voice). Information,
+    /// never arithmetic — and occasionally, deliberately, wrong.
+    pub counsel: Vec<(&'static str, &'static str)>,
     /// A named threat is always on the card — roads keep no secrets they
     /// were authored to tell.
     pub threat: Option<&'static str>,
@@ -91,6 +94,16 @@ fn road_card(voyage: &VoyageState, road: &'static Road) -> RoadCard {
         }
     }
 
+    let mut counsel = Vec::new();
+    for aboard in voyage.aboard() {
+        let def = crate::vessel::souls::soul(aboard.soul);
+        for (counsel_road, line) in def.counsel {
+            if *counsel_road == road.id {
+                counsel.push((def.name, *line));
+            }
+        }
+    }
+
     RoadCard {
         road,
         title: format!("Toward {}", route::waypoint(road.to).name),
@@ -100,6 +113,7 @@ fn road_card(voyage: &VoyageState, road: &'static Road) -> RoadCard {
         days_label: days_label(road, voyage),
         provisions_price: voyage.road_price(road),
         annotations,
+        counsel,
         threat: road.threat.map(|t| t.name),
         affordable: voyage.road_affordable(road),
         selectable: voyage.road_selectable(road),
@@ -109,7 +123,7 @@ fn road_card(voyage: &VoyageState, road: &'static Road) -> RoadCard {
 /// Small integers on screen: the estimate is rounded to half-days and shown
 /// as either "about N days" or a "N–M days" range.
 fn days_label(road: &Road, voyage: &VoyageState) -> String {
-    let est_days = f64::from(road.base_days) * voyage.trim.time_mult();
+    let est_days = f64::from(road.base_days) * voyage.time_mult();
     let est_minutes = est_days * MINUTES_PER_DAY as f64;
     if est_minutes < MINUTES_PER_DAY as f64 * 0.75 {
         return "under a day".to_string();

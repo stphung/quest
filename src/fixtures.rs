@@ -346,6 +346,8 @@ pub fn voyage_at_first_junction(now: DateTime<Utc>) -> crate::vessel::voyage::Vo
         .unwrap();
     v.tick(launched + Duration::days(2));
     v.play_arrival_scene();
+    // Maren asks to board at the Lightship Vigil; the fixture takes her.
+    assert!(v.accept_ask(), "Maren's ask expected at W1");
     v.depart(roads_from(WaypointId(1)).next().unwrap().id)
         .unwrap();
     v.tick(launched + Duration::days(4));
@@ -420,6 +422,17 @@ pub fn voyage_holding_at(
         waypoint,
         arrived_at_min: v.processed_minutes,
         scene_state: SceneState::Waiting,
+        arrived_by: None,
     };
+    // The doors a real arrival would have opened.
+    if let Some(def) = crate::vessel::souls::recruit_at(waypoint) {
+        if !v.met(def.id) {
+            v.pending_ask = Some(def.id);
+        }
+    }
+    if crate::vessel::route::waypoint(waypoint).has_feature(crate::vessel::route::Feature::Shipyard)
+    {
+        v.pending_refit = Some(0);
+    }
     v
 }
