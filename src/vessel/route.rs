@@ -1266,7 +1266,7 @@ pub fn tree_stage_index(at: WaypointId) -> usize {
     let sink_y = waypoint(ROUTE_SINK).chart_pos.1 as f32;
     let here_y = waypoint(at).chart_pos.1 as f32;
     let progress = ((start_y - here_y) / (start_y - sink_y)).clamp(0.0, 1.0);
-    (((progress * TREE_STAGES.len() as f32) as usize).min(TREE_STAGES.len() - 1)).max(0)
+    ((progress * TREE_STAGES.len() as f32) as usize).min(TREE_STAGES.len() - 1)
 }
 
 #[cfg(test)]
