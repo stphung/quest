@@ -22,7 +22,7 @@ Then run `quest` to start your adventure!
 ## Features
 
 - **Automatic Combat** - Your character fights enemies automatically with turn-based combat
-- **50 Zones** - 10 base zones from Meadow to Storm Citadel, Fracture zones (11-30) unlocked through the Deep, and Loom zones (31-50) gated by Woven Patterns, Ascension, and prestige
+- **50 Zones** - 10 base zones from Meadow to Storm Citadel, Fracture zones (12-30) unlocked through the Deep, and Loom zones (31-50) gated by Woven Patterns, Ascension, and prestige
 - **6 Attributes** - STR, DEX, CON, INT, WIS, CHA form the foundation of your character
 - **Prestige System** - Reset for a permanent XP multiplier that grows with rank (diminishing returns) and unlock higher zones
 - **Procedural Dungeons** - Explore grid-based dungeons with fog of war, treasure rooms, elite guardians, and bosses
@@ -30,13 +30,13 @@ Then run `quest` to start your adventure!
 - **Diablo-style Items** - 7 equipment slots, 6 rarity tiers (including God items with unique passives), procedural names, and smart auto-equip
 - **Multi-Character** - Create and manage multiple characters with JSON saves
 - **Offline Progress** - Continue gaining XP even when closed (25% rate, max 7 days)
-- **Challenge Minigames** - Discover and play 14 minigames: Chess, Go, Nine Men's Morris, Gomoku, Minesweeper, Rune Deciphering, Runic Lights, Runic Shift, Shard Fusion, Sudoku, Snake, Jezzball, Flappy Bird, and Vault Warden (requires P1+)
+- **Challenge Minigames** - Discover and play 14 minigames: Chess, Go, Nine Men's Morris, Gomoku, Minesweeper, Rune Deciphering, Runic Lights, Runic Shift, Shard Fusion, Sudoku, Snake, Jezzball, Flappy Bird, and Vault Warden
 - **Haven Base Building** - Account-level base with upgradeable rooms providing permanent bonuses
 - **Soulforge Enhancement** - Account-wide per-slot equipment enhancement (+1 to +10) with escalating risk
 - **Ascension** - Multiplicative combat power system (2× up to 324×) gated by Deep milestones and Woven Patterns
 - **The Deep** - Recruit a mercenary company and send real-time expeditions into an endless underground structure
 - **Loom of Worlds** - Resource production chains weaving Patterns that unlock the final 20 zones
-- **Stormglass Exchange** - Currency earned from challenges, spent on Storm Sigils and combat boosts
+- **Stormglass Exchange** - Currency earned through gameplay (item salvage, dungeon caches, enhancement consolation), spent on Storm Sigils and combat boosts
 - **Power Cores** - Passive prestige rank generation unlocked by Deep layer breakthroughs
 - **Time Vault** - Git-based save versioning: browse, restore, and fork your save history
 - **Achievements** - Track milestones across combat, zones, fishing, challenges, and prestige
@@ -97,6 +97,7 @@ cargo run --release
 - **A**: Achievements browser
 - **T**: Time Vault
 - **W**: Open the wiki
+- **!**: Bug report
 - **Esc**: Quit
 
 ### Gameplay
@@ -261,7 +262,9 @@ src/
 ├── achievements/      # Achievement tracking system
 ├── history/           # Git-based save versioning (Time Vault)
 ├── vessel/            # Act 2 Vessel/Voyage (dark behind kill-switch)
+├── main_helpers/      # Orchestration between main.rs and domain modules
 ├── utils/             # Build info, updater, debug menu
+├── bin/               # Simulator and fixture-generator binaries
 └── ui/                # Terminal UI components
 ```
 

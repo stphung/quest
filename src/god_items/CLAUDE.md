@@ -45,9 +45,9 @@ God items are created via the debug menu (discovery/forging system not yet desig
 
 - **Combat pipeline** (`combat/player_attack.rs`): Giant's Might damage bonus applied early in damage calculation
 - **Combat pipeline** (`combat/enemy_attack.rs`): Divine Bulwark DR applied after defense
-- **Attack speed** (`combat/attacks.rs`): Windborne halves effective attack interval
+- **Attack speed** (`combat/orchestration.rs`, `core/power_rating.rs`): Player's `attack_speed_percent` (carrying Windborne) reduces the effective attack interval; `combat/attacks.rs` only computes the enemy-side `effective_enemy_attack_interval()`
 - **Derived stats** (`character/derived_stats.rs`): XP gain affix contributes to XP multiplier
-- **HP regen** (`core/tick.rs`): Swiftstrider reduces regen delay between encounters
+- **HP regen** (`combat/regen.rs`): Swiftstrider reduces regen delay between encounters via `bonuses.regen_reduction_percent`
 - **Dungeon movement** (`dungeon/logic.rs`): Swiftfoot reduces room movement timers
 - **Fishing timers** (`fishing/logic.rs`): NimbleHands reduces fishing phase durations
 - **Debug menu** (`utils/debug_menu.rs`): Forge actions create and equip god items

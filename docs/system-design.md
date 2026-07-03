@@ -156,7 +156,7 @@ The game runs at **10 ticks per second** (100ms intervals). Each tick is process
 
 ### Key Types
 
-**`**`TickEvent`** (48 variants):
+**`**`TickEvent`** (50 variants):
 - Combat: `PlayerAttack`, `PlayerAttackBlocked`, `EnemyAttack`, `DamageReflected`, `RegenComplete`, `EnemyDefeated`, `BossEnrage`, `PlayerDied`, `PlayerDiedInDungeon`, `CombatRetreat`
 - Items: `ItemDropped`
 - Zones: `SubzoneBossDefeated`
@@ -1025,7 +1025,7 @@ quest/
 │   │   ├── game_logic.rs    # Thin re-export wrapper for submodules
 │   │   ├── game_state.rs    # Main GameState struct
 │   │   ├── tick.rs          # game_tick_with_context() orchestrator
-│   │   ├── tick_types.rs    # TickEvent enum (48 variants), TickResult struct
+│   │   ├── tick_types.rs    # TickEvent enum (50 variants), TickResult struct
 │   │   ├── tick_stages.rs   # Tick processing stages 4-6 + helpers
 │   │   ├── xp.rs            # XP calculation, leveling, combat kill XP
 │   │   ├── discoveries.rs   # Discovery rolls (dungeon, fishing, Haven, Soulforge)
@@ -1063,7 +1063,7 @@ quest/
 │   │   ├── events.rs        # CombatEvent, CombatBonuses (unified struct)
 │   │   └── regen.rs         # HP regeneration after combat
 │   ├── zones/               # Zone system
-│   │   ├── data.rs          # Zone definitions (30 zones)
+│   │   ├── data.rs          # Zone definitions (50 zones)
 │   │   ├── progression.rs   # Zone progression
 │   │   ├── advancement.rs   # Zone/subzone advancement and travel
 │   │   ├── boss_defeat.rs   # Boss defeat handling
@@ -1139,16 +1139,32 @@ quest/
 │   ├── god_items/           # God Items system (Asprika, Sleipnir, Megingjord)
 │   │   └── types.rs         # God item definitions, passives, bonuses, query helpers
 │   ├── achievements/        # Achievement system
-│   │   ├── types.rs         # AchievementId (213 variants), Achievements state
+│   │   ├── types.rs         # AchievementId (240 variants), Achievements state
 │   │   ├── data.rs          # Achievement database
 │   │   ├── handlers.rs      # Event handlers (on_kill, on_boss_kill, etc.)
 │   │   ├── milestones.rs    # Milestone definitions and thresholds
 │   │   ├── modal.rs         # Modal notification queue (500ms accumulation window)
 │   │   ├── notifications.rs # Notification state management
 │   │   ├── stats.rs         # Achievement statistics and progress tracking
-│   │   ├── titles.rs        # Title definitions (63 titles), selection, validation
+│   │   ├── titles.rs        # Title definitions (64 titles), selection, validation
 │   │   ├── unlock.rs        # Core unlock machinery (is_unlocked, unlock, check_milestones)
 │   │   └── persistence.rs   # Save/load
+│   ├── loom/                # Loom of Worlds — resource production chains, direct-pull refineries
+│   │   ├── mod.rs           # Public re-exports
+│   │   ├── types.rs         # NodeId, LoomNode, Shuttle, Resource, WovenPattern, LoomState, graph/layout types
+│   │   ├── logic.rs         # Extractor/shuttle production ticks, source validation, tier intake helpers
+│   │   ├── recipes.rs       # Combinatorial recipe registry (input_a, input_b, nature) -> output
+│   │   ├── patterns.rs      # Woven Pattern requirement tracking and completion
+│   │   ├── discovery.rs     # Loom discovery roll and completion
+│   │   ├── milestones.rs    # Key pattern completion milestone types and helpers
+│   │   ├── graph.rs         # DAG representation of the production network (petgraph)
+│   │   ├── layout.rs        # Sugiyama-style layered DAG layout engine for GraphView
+│   │   └── persistence.rs   # Save/load from ~/.quest/loom.json
+│   ├── history/             # Time Vault — git-based save versioning
+│   │   ├── mod.rs           # Public re-exports: HistoryRepo, HistoryError, SaveEvent, CommitInfo, TimelineInfo
+│   │   ├── types.rs         # SaveEvent enum (21 variants), CommitInfo, TimelineInfo, commit message formatting
+│   │   ├── git.rs           # HistoryRepo wrapping git2::Repository; local commit/branch/restore/fork operations
+│   │   └── cloud.rs         # GitHub cloud sync: CloudConfig, CloudStatus, CloudOpResult
 │   ├── utils/               # Utilities
 │   │   ├── build_info.rs    # Build metadata
 │   │   ├── updater.rs       # Self-update
@@ -1200,7 +1216,7 @@ quest/
 │       ├── throbber.rs      # Spinner animations
 │       └── character_select.rs, character_creation.rs,
 │           character_delete.rs, character_rename.rs
-├── tests/                   # 79 integration test files
+├── tests/                   # 22 integration test files
 ├── .github/workflows/       # CI/CD pipeline
 ├── scripts/                 # Quality checks (ci-checks.sh)
 ├── docs/                    # Design documents
@@ -1234,6 +1250,14 @@ Each major module has its own `CLAUDE.md` with implementation patterns, integrat
 - `src/ascension/CLAUDE.md` -- Ascension combat power multiplier system
 - `src/deep/CLAUDE.md` -- The Deep mercenary expedition system
 - `src/ui/CLAUDE.md` -- Shared layout components, color conventions
+- `src/input/CLAUDE.md` -- Keyboard input routing, overlay/minigame dispatch
+- `src/utils/CLAUDE.md` -- Build info, self-update, debug menu
+- `src/stormglass/CLAUDE.md` -- Stormglass currency, Storm Sigils, daily rotation
+- `src/power_cores/CLAUDE.md` -- Passive PR generation from Deep layer milestones
+- `src/god_items/CLAUDE.md` -- Norse mythology endgame items and passives
+- `src/history/CLAUDE.md` -- Time Vault git-based save versioning
+- `src/loom/CLAUDE.md` -- Resource production chains, direct-pull refineries
+- `src/main_helpers/CLAUDE.md` -- Orchestration helpers extracted from main.rs
 
 ---
 

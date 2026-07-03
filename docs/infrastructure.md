@@ -27,18 +27,11 @@ If `cargo-llvm-cov` is installed (always in CI, optional locally), a coverage ch
 
 ### CI Workflows
 
-**On every PR:**
-- Runs `scripts/ci-checks.sh`
-- Must pass to merge
+**On every PR** (`.github/workflows/ci.yml`): six independent jobs -- `fmt`, `clippy`, `test`, `balance` (progression check), `audit`, `coverage` -- each running its check inline (not by invoking `scripts/ci-checks.sh`). A `ci-pass` gate job requires all six to succeed before merge.
 
-**On push to main:**
-- Runs all checks
-- Builds release binaries for 3 platforms:
-  - Linux x86_64
-  - macOS x86_64
-  - macOS ARM64 (aarch64)
-- Signs macOS binaries with ad-hoc signature (prevents Gatekeeper blocking)
-- Creates GitHub release with downloadable binaries
+**On push to main:** Builds release binaries for 3 platforms (Linux x86_64, macOS x86_64, macOS ARM64), signs macOS binaries with an ad-hoc signature (prevents Gatekeeper blocking), and creates a GitHub release with downloadable binaries. This runs independently of the PR check jobs.
+
+**Key insight:** `scripts/ci-checks.sh` (run locally via `make check`) mirrors the PR jobs' commands but is not itself invoked by CI -- the two are maintained in parallel, so keep them in sync when changing either. One known drift: the `coverage` job's `--ignore-filename-regex` in `ci.yml` excludes `utils/debug_menu`, `loom/graph`, `loom/layout`, and `loom/milestones` in addition to what `scripts/ci-checks.sh`'s local coverage step excludes.
 
 ## Auto-Update System
 
@@ -193,7 +186,7 @@ With `--runs N`, the simulator runs N simulations with incrementing seeds and pr
 
 ### CSV Output
 
-The `--csv` option writes a time-series with columns: tick, game_time_s, level, xp, zone_id, subzone_id, prestige_rank, total_kills, total_deaths, fishing_rank, items_found. Useful for graphing progression curves.
+The `--csv` option writes a time-series with columns: tick, game_time_s, level, xp, zone_id, subzone_id, prestige_rank, total_kills, total_deaths, fishing_rank, items_found, haven_rooms_built, haven_prestige_spent, ascension_level, enhancement_avg, stormglass_balance, challenges_won, pr_earned, pr_spent. Useful for graphing progression curves.
 
 ## Debug Menu
 
@@ -224,10 +217,10 @@ The debug menu uses a tabbed category structure with 10 tabs. Left/Right arrows 
 - Grant 1000 Stormglass, Discover Stormglass, Grant 100k Stormglass, Etch Random Sigils (All Slots), Etch S+ Sigil (Slot 1), Force Next Surge Overcharged
 
 **Items tab:**
-- Forge Asprika, Forge Sleipnir, Forge Megingjord (God Items)
+- Forge Stormbreaker, Forge Asprika, Forge Sleipnir, Forge Megingjord (God Items)
 
 **Deep tab:**
-- Discover The Deep, Grant 10000 Warband Marks, Refresh Mission Pool, Refresh Recruit Pool, Clear Current Frontier Layer, Complete Active Missions
+- Discover The Deep, Grant 10000 Warband Marks, Refresh Mission Pool, Refresh Recruit Pool, Clear Current Frontier Layer, Complete Active Missions, Unlock Deep Layer 3, Unlock Deep Layer 7, Unlock Deep Layer 12, Unlock Deep Layer 18, Unlock Deep Layer 25, Unlock Deep Layer 30
 
 **Zones tab:**
 - Zone/fracture zone travel options

@@ -349,7 +349,7 @@ For detailed implementation documentation, see `src/ascension/CLAUDE.md`.
 
 Account-level achievement system that persists across all characters. Stored in `~/.quest/achievements.json`. Achievement tracking is driven by `on_*` event handlers (in `achievements/handlers.rs`) called from `tick.rs` during game processing. Milestone definitions and thresholds are in `achievements/milestones.rs`. Newly unlocked achievements are emitted as `TickEvent::AchievementUnlocked` events and collected by `collect_achievement_events()`. The `achievements_changed` flag in `TickResult` signals when the file needs to be saved.
 
-### Categories (8)
+### Categories (9)
 
 **Combat:**
 - Slayer I-XV: 100, 500, 1K, 5K, 10K, 50K, 100K, 500K, 1M, 2.5M, 10M, 50M, 100M, 500M, 1B kills. Unique icon progression per tier displayed as badges in the combat panel title
@@ -379,6 +379,9 @@ Account-level achievement system that persists across all characters. Stored in 
 
 **Deep:**
 - DeepDiscovered, Layer5/10/15/20/25Cleared, DeepGuildRank2/3/4/5, DeepMerc10/25/50/100Missions, DeepVoidExplorer, DeepInfraBuilder (various infrastructure and progression milestones)
+
+**Loom:**
+- LoomDiscovered, LoomPattern1/4/8/16/22/28 (Woven Pattern completion milestones)
 
 **Stats:**
 - Tracks cumulative gameplay statistics (kills, deaths, fish caught, dungeons cleared, etc.)

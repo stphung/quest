@@ -396,7 +396,7 @@ The game runs a 100ms tick loop. Each tick calls `game_tick_with_context()` in `
 
 The tick implementation is split across several files:
 - `tick.rs` -- Orchestrator: calls each stage in order, returns `TickResult`
-- `tick_types.rs` -- `TickEvent` enum (48 variants) and `TickResult` struct
+- `tick_types.rs` -- `TickEvent` enum (50 variants) and `TickResult` struct
 - `tick_stages.rs` -- Processing stages 4-6 and helper functions (`process_item_drop`, `process_discoveries`, etc.)
 - `xp.rs` -- XP calculation, leveling logic, combat kill XP
 - `discoveries.rs` -- Discovery rolls for dungeons, fishing spots, Haven, Soulforge
@@ -415,7 +415,7 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
 
 ### TickEvent and TickResult
 
-`TickEvent` is an enum with 48 variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types. Defined in `tick_types.rs`.
+`TickEvent` is an enum with 50 variants describing everything that can happen in a single tick. The presentation layer (`main.rs` via `tick_events.rs`) maps these to combat log entries and visual effects. Game logic never touches UI types. Defined in `tick_types.rs`.
 
 ```rust
 pub struct TickResult {
@@ -589,7 +589,7 @@ Enhancement state (`EnhancementProgress`) is saved to `~/.quest/enhancement.json
 | Deep discovery gate | `DEEP_MIN_PRESTIGE_RANK = 15` |
 | Deep discovery trigger | First `BossDefeatResult::ExpanseCycle` kill (The Endless) |
 | Stormglass prestige gate | `STORMGLASS_MIN_PRESTIGE_RANK = 15` |
-| Death loop threshold | `DEATH_LOOP_THRESHOLD = 3` (consecutive boss deaths trigger retreat) |
+| Death loop threshold | `DEATH_LOOP_THRESHOLD = 3` (consecutive mob deaths trigger retreat) |
 | Mob fight timeout | `MOB_FIGHT_TIMEOUT_SECONDS = 30.0` (stalemate prevention) |
 | Frontier backoff cap | `FRONTIER_BACKOFF_MAX_CYCLES = 8` (max safe-zone cycles before retrying a death-loop zone) |
 | Prestige mult formula | `1.0 + 0.5 * rank^0.7` |

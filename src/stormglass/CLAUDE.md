@@ -95,11 +95,11 @@ A single etched sigil: `effect: SigilEffectType`, `value: f64`, `grade: SigilGra
 
 ## Integration Points
 
-- **core/tick.rs**: Emits `StormglassDiscovered`, `StormglassSalvaged`, `StormglassDungeonCache` tick events during salvage and dungeon processing
-- **core/tick.rs**: Sigil bonuses are computed via `SigilBonuses::compute()` and injected into the unified `CombatBonuses` struct each tick
+- **core/tick_stages.rs**: Emits `StormglassDiscovered`, `StormglassSalvaged`, `StormglassDungeonCache` tick events during salvage and dungeon processing
+- **core/tick_stages.rs**: Sigil bonuses are computed via `SigilBonuses::compute()` and injected into the unified `CombatBonuses` struct each tick
 - **combat/events.rs**: `CombatBonuses` includes sigil damage%, crit%, attack speed%, DR%, double strike%, and regen fields
 - **challenges/menu.rs**: `ChallengeReward` struct includes `stormglass` field; all challenges award Stormglass
-- **enhancement/logic.rs**: Failed enhancements award Stormglass consolation via `soulforge_consolation()`
+- **stormglass/earning.rs**: `soulforge_consolation()` is defined here and called directly from `main.rs` when a failed enhancement occurs — `enhancement/logic.rs` has no Stormglass references
 - **ui/stormglass_scene.rs**: Exchange overlay rendering (menu, trial selection, surge animation, sigils list, pick-1-of-3)
 - **input/stormglass_input.rs**: Exchange overlay input handling
 - **fishing/types.rs**: `FishingState.storm_lure_active` flag, consumed on Leviathan encounter

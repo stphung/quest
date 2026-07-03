@@ -121,9 +121,9 @@ Additionally, `newly_unlocked` is drained each tick by `collect_achievement_even
 
 - **tick.rs** (`core/tick.rs`): Calls `on_*` handlers during combat, fishing, dungeon, discovery, and prestige (passive PR gains) processing. Collects `TickEvent::AchievementUnlocked` events. Checks modal readiness.
 - **main.rs**: Loads/saves achievements. Syncs on character load. Handles prestige and minigame win achievements. Routes `TickEvent::AchievementUnlocked` to combat log. Displays modal overlay from `achievement_modal_ready`.
-- **game_logic.rs** (`core/game_logic.rs`): `update_combat()` takes `&mut Achievements` and calls `on_enemy_killed` on kills.
-- **haven** (`haven/logic.rs`): Haven upgrades trigger `on_haven_all_t1/t2/architect` checks.
-- **zones** (`zones/data.rs`): `sync_zone_completions()` uses zone definitions to check which zones are fully cleared.
+- **combat** (`combat/orchestration.rs`, `combat/damage.rs`): `update_combat()` (in `orchestration.rs`) takes `&mut Achievements`; `on_enemy_killed` is called from `combat/damage.rs` on kills.
+- **haven** (`achievements/handlers.rs`): `on_haven_all_t1/t2/architect` aren't called directly from `haven/logic.rs` -- they're checked inside `sync_from_haven()`, which `src/input/haven_input.rs` calls live immediately after a successful `haven::try_build_room()`, and which is also called retroactively on character load (see "Retroactive Sync" above).
+- **zones** (`achievements/handlers.rs` consuming `zones/data.rs`): `sync_zone_completions()` (private fn in `handlers.rs`) calls `zones::get_all_zones()` (defined in `zones/data.rs`) to check which zones are fully cleared.
 - **deep** (`deep/`): Deep milestones trigger `on_deep_discovered`, `on_deep_breakthrough`, `on_deep_guild_rank_up`, `on_deep_mission_complete`, `on_deep_merc_lost`, `on_deep_gateway_opened`.
 - **UI** (`ui/achievement_browser_scene.rs`): Achievement browser overlay and unlock modal rendering.
 
