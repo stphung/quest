@@ -39,6 +39,7 @@ impl CharacterManager {
             ascension_level: state.ascension_level,
             vessel_signal_discovered: state.vessel_signal_discovered,
             vessel_launched: state.vessel_launched,
+            vessel_arrived: state.vessel_arrived,
         };
 
         let json = serde_json::to_string_pretty(&save_data)
@@ -102,6 +103,7 @@ impl CharacterManager {
             ascension_level: save_data.ascension_level,
             vessel_signal_discovered: save_data.vessel_signal_discovered,
             vessel_launched: save_data.vessel_launched,
+            vessel_arrived: save_data.vessel_arrived,
             vessel_last_whisper_at: 0,
             chrono_surge_active: false,
             debug_force_overcharge: false,

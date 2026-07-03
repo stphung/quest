@@ -397,6 +397,124 @@ fn snapshot_voyage_refit_door() {
     });
 }
 
+// ── The harbor (spec 7) ─────────────────────────────────────────────────────
+
+fn arrived_voyage() -> crate::vessel::voyage::VoyageState {
+    fixtures::voyage_arrived("fixture-voyager".to_string(), frozen_utc())
+}
+
+#[test]
+fn snapshot_voyage_harbor() {
+    assert_overlay_snapshot("voyage_harbor_xl_160x45", || {
+        let voyage = arrived_voyage();
+        let ui = crate::vessel::VoyageUiState::default();
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+        })
+    });
+}
+
+#[test]
+fn snapshot_voyage_harbor_strip() {
+    assert_overlay_snapshot("voyage_harbor_strip_m_60x24", || {
+        let voyage = arrived_voyage();
+        let ui = crate::vessel::VoyageUiState::default();
+        render_overlay_sized(60, 24, |f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+        })
+    });
+}
+
+#[test]
+fn snapshot_voyage_manifest() {
+    assert_overlay_snapshot("voyage_manifest_xl_160x45", || {
+        let voyage = arrived_voyage();
+        let ui = crate::vessel::VoyageUiState {
+            view: crate::vessel::VoyageView::Manifest { scroll: 0 },
+            scene_play: None,
+            scene_modal: None,
+            moments: Default::default(),
+        };
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+        })
+    });
+}
+
+#[test]
+fn snapshot_voyage_keepsake_chart() {
+    assert_overlay_snapshot("voyage_keepsake_xl_160x45", || {
+        let voyage = arrived_voyage();
+        let (x, y) = crate::vessel::route::waypoint(crate::vessel::route::ROUTE_SINK).chart_pos;
+        let ui = crate::vessel::VoyageUiState {
+            view: crate::vessel::VoyageView::Keepsake { x, y },
+            scene_play: None,
+            scene_modal: None,
+            moments: Default::default(),
+        };
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+        })
+    });
+}
+
+#[test]
+fn snapshot_voyage_record() {
+    assert_overlay_snapshot("voyage_record_xl_160x45", || {
+        let voyage = arrived_voyage();
+        let ui = crate::vessel::VoyageUiState {
+            view: crate::vessel::VoyageView::Record { scroll: 0 },
+            scene_play: None,
+            scene_modal: None,
+            moments: Default::default(),
+        };
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx);
+        })
+    });
+}
+
+/// No Right Path, rule 3, as a test: pan the keepsake chart across the
+/// whole canvas and assert no unvisited, un-crossed-out waypoint's name
+/// ever reaches the frame. The fog outlives the crossing.
+#[test]
+fn keepsake_chart_never_reveals_the_fog() {
+    use crate::vessel::route;
+    let _clock = clock::freeze_at_millis(FROZEN_MILLIS);
+    let voyage = arrived_voyage();
+    let visited: std::collections::HashSet<_> = voyage.visited.iter().copied().collect();
+    let untaken_dests: std::collections::HashSet<_> =
+        voyage.untaken.iter().map(|r| route::road(*r).to).collect();
+
+    for (cx, cy) in [(0u16, 0u16), (30, 22), (60, 45), (90, 67), (119, 89)] {
+        let lines = super::voyage_scene::chart_lines_centered(&voyage, 100, 44, cx, cy);
+        let text: String = lines
+            .iter()
+            .flat_map(|l| l.spans.iter().map(|s| s.content.clone()))
+            .collect();
+        for wp in &route::WAYPOINTS {
+            if !visited.contains(&wp.id) && !untaken_dests.contains(&wp.id) {
+                assert!(
+                    !text.contains(wp.name),
+                    "the fog broke at ({cx},{cy}): {} was never seen and \
+                     must never be named",
+                    wp.name
+                );
+            }
+        }
+    }
+}
+
 #[test]
 fn snapshot_voyage_watch_panel() {
     assert_overlay_snapshot("voyage_watch_xl_160x45", || {

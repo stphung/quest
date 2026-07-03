@@ -97,6 +97,80 @@ pub fn handle_voyage_input(
             }
             VoyageInputResult::Handled
         }
+        VoyageView::Manifest { scroll } => {
+            match key.code {
+                KeyCode::Up | KeyCode::Char('k') => {
+                    ui.view = VoyageView::Manifest {
+                        scroll: scroll.saturating_sub(1),
+                    };
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    ui.view = VoyageView::Manifest {
+                        scroll: (scroll + 1).min(200),
+                    };
+                }
+                KeyCode::Esc | KeyCode::Char('m') | KeyCode::Char('M') => {
+                    ui.view = VoyageView::Chart;
+                }
+                _ => {}
+            }
+            VoyageInputResult::Handled
+        }
+        VoyageView::Keepsake { x, y } => {
+            // Pan the viewport center across the canvas; the renderer
+            // clamps the viewport itself, so the edges simply stop.
+            use crate::vessel::route::{CHART_CANVAS_H, CHART_CANVAS_W};
+            match key.code {
+                KeyCode::Left => {
+                    ui.view = VoyageView::Keepsake {
+                        x: x.saturating_sub(4),
+                        y,
+                    };
+                }
+                KeyCode::Right => {
+                    ui.view = VoyageView::Keepsake {
+                        x: (x + 4).min(CHART_CANVAS_W),
+                        y,
+                    };
+                }
+                KeyCode::Up => {
+                    ui.view = VoyageView::Keepsake {
+                        x,
+                        y: y.saturating_sub(2),
+                    };
+                }
+                KeyCode::Down => {
+                    ui.view = VoyageView::Keepsake {
+                        x,
+                        y: (y + 2).min(CHART_CANVAS_H),
+                    };
+                }
+                KeyCode::Esc | KeyCode::Char('k') | KeyCode::Char('K') => {
+                    ui.view = VoyageView::Chart;
+                }
+                _ => {}
+            }
+            VoyageInputResult::Handled
+        }
+        VoyageView::Record { scroll } => {
+            match key.code {
+                KeyCode::Up | KeyCode::Char('k') => {
+                    ui.view = VoyageView::Record {
+                        scroll: scroll.saturating_sub(1),
+                    };
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    ui.view = VoyageView::Record {
+                        scroll: (scroll + 1).min(500),
+                    };
+                }
+                KeyCode::Esc | KeyCode::Char('r') | KeyCode::Char('R') => {
+                    ui.view = VoyageView::Chart;
+                }
+                _ => {}
+            }
+            VoyageInputResult::Handled
+        }
     }
 }
 
@@ -346,7 +420,23 @@ fn handle_chart_keys(
             VoyageInputResult::Handled
         }
         KeyCode::Char('r') | KeyCode::Char('R') => {
-            ui.view = VoyageView::Rumors;
+            // At the harbor the Log becomes the record — complete, with
+            // the letters bound in.
+            ui.view = if voyage.arrived() {
+                VoyageView::Record { scroll: 0 }
+            } else {
+                VoyageView::Rumors
+            };
+            VoyageInputResult::Handled
+        }
+        KeyCode::Char('m') | KeyCode::Char('M') if voyage.arrived() => {
+            ui.view = VoyageView::Manifest { scroll: 0 };
+            VoyageInputResult::Handled
+        }
+        KeyCode::Char('k') | KeyCode::Char('K') if voyage.arrived() => {
+            // Open centered on the Tree; the crossing pans out from there.
+            let (x, y) = route::waypoint(route::ROUTE_SINK).chart_pos;
+            ui.view = VoyageView::Keepsake { x, y };
             VoyageInputResult::Handled
         }
         KeyCode::Char('s') | KeyCode::Char('S') => {
@@ -538,6 +628,67 @@ mod tests {
         let r = handle_voyage_input(key(KeyCode::Enter), &mut v, &mut ui);
         assert_eq!(r, VoyageInputResult::HandledNeedsSave);
         assert_eq!(v.trim, Trim::Quiet);
+        assert_eq!(ui.view, VoyageView::Chart);
+    }
+
+    #[test]
+    fn the_harbor_rooms_gate_on_arrival() {
+        let (mut v, mut ui) = fresh();
+        // Underway, the rooms do not open — [M]/[K] fall through, [R] is
+        // still the Log.
+        handle_voyage_input(key(KeyCode::Char('m')), &mut v, &mut ui);
+        assert_eq!(ui.view, VoyageView::Chart);
+        handle_voyage_input(key(KeyCode::Char('K')), &mut v, &mut ui);
+        assert_eq!(ui.view, VoyageView::Chart);
+        handle_voyage_input(key(KeyCode::Char('r')), &mut v, &mut ui);
+        assert_eq!(ui.view, VoyageView::Rumors);
+        handle_voyage_input(key(KeyCode::Esc), &mut v, &mut ui);
+
+        // Moored at the Tree, they open — and Esc walks back to the harbor.
+        v.phase = VoyagePhase::Arrived { at_min: 0 };
+        handle_voyage_input(key(KeyCode::Char('m')), &mut v, &mut ui);
+        assert_eq!(ui.view, VoyageView::Manifest { scroll: 0 });
+        handle_voyage_input(key(KeyCode::Down), &mut v, &mut ui);
+        assert_eq!(ui.view, VoyageView::Manifest { scroll: 1 });
+        handle_voyage_input(key(KeyCode::Esc), &mut v, &mut ui);
+        assert_eq!(ui.view, VoyageView::Chart);
+
+        handle_voyage_input(key(KeyCode::Char('r')), &mut v, &mut ui);
+        assert_eq!(ui.view, VoyageView::Record { scroll: 0 });
+        handle_voyage_input(key(KeyCode::Esc), &mut v, &mut ui);
+        assert_eq!(ui.view, VoyageView::Chart);
+    }
+
+    #[test]
+    fn the_keepsake_chart_pans_and_clamps() {
+        use crate::vessel::route::{waypoint, CHART_CANVAS_H, CHART_CANVAS_W, ROUTE_SINK};
+        let (mut v, mut ui) = fresh();
+        v.phase = VoyagePhase::Arrived { at_min: 0 };
+        handle_voyage_input(key(KeyCode::Char('k')), &mut v, &mut ui);
+        let (tx, ty) = waypoint(ROUTE_SINK).chart_pos;
+        assert_eq!(
+            ui.view,
+            VoyageView::Keepsake { x: tx, y: ty },
+            "opens centered on the Tree"
+        );
+        // Pan hard toward every edge: the center clamps to the canvas.
+        for _ in 0..100 {
+            handle_voyage_input(key(KeyCode::Left), &mut v, &mut ui);
+            handle_voyage_input(key(KeyCode::Up), &mut v, &mut ui);
+        }
+        assert_eq!(ui.view, VoyageView::Keepsake { x: 0, y: 0 });
+        for _ in 0..100 {
+            handle_voyage_input(key(KeyCode::Right), &mut v, &mut ui);
+            handle_voyage_input(key(KeyCode::Down), &mut v, &mut ui);
+        }
+        assert_eq!(
+            ui.view,
+            VoyageView::Keepsake {
+                x: CHART_CANVAS_W,
+                y: CHART_CANVAS_H
+            }
+        );
+        handle_voyage_input(key(KeyCode::Esc), &mut v, &mut ui);
         assert_eq!(ui.view, VoyageView::Chart);
     }
 

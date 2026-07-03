@@ -182,6 +182,11 @@ pub struct SoulState {
     pub arc_beat: u8,
     /// Rest minutes accumulated toward the next *ready* beat.
     pub rest_minutes: u64,
+    /// Where a declined or farewelled soul left the story (the manifest
+    /// remembers the place). `None` for souls aboard, lost, or from saves
+    /// older than spec 7.
+    #[serde(default)]
+    pub left_at: Option<WaypointId>,
 }
 
 /// An arc beat fired (possibly offline) — queued for the UI to show as a
@@ -191,6 +196,13 @@ pub struct SoulEvent {
     pub soul: SoulId,
     /// Index into the soul's arc (0..=3).
     pub beat: u8,
+}
+
+/// One line of the ship's log, stamped with the voyage day it was written.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LogEntry {
+    pub day: u64,
+    pub text: String,
 }
 
 /// A resolved scene, ready to read: title, paragraphs (beats + matching
@@ -210,6 +222,7 @@ fn default_roster() -> Vec<SoulState> {
             station: None,
             arc_beat: 0,
             rest_minutes: 0,
+            left_at: None,
         })
         .collect()
 }
@@ -274,9 +287,10 @@ pub struct VoyageState {
     /// Mementos. No mechanics; the manifest remembers (spec 7).
     #[serde(default)]
     pub keepsakes: Vec<String>,
-    /// The crossing's story so far: one title per scene and beat.
+    /// The crossing's story so far: one line per scene and beat, each
+    /// stamped with the voyage day it was written.
     #[serde(default)]
-    pub log: Vec<String>,
+    pub log: Vec<LogEntry>,
     /// The leg that is underway (or just ended) included a drift.
     #[serde(default)]
     pub drifted_this_leg: bool,
@@ -500,7 +514,7 @@ impl VoyageState {
                                 if !self.heard_banks.contains(&wx.id) {
                                     self.heard_banks.push(wx.id);
                                     if self.grant_next_rumor(road.from) {
-                                        self.log.push(format!(
+                                        self.push_log(format!(
                                             "In {}, running Quiet, the crew heard \
                                              what the silence was hiding.",
                                             wx.name
@@ -630,7 +644,7 @@ impl VoyageState {
                 // The crew gathers at mail-hour, and nothing comes.
                 self.gone_dark = true;
                 self.lower_hope(MAIL_FAILS_HOPE_COST);
-                self.log.push(letters::MAIL_FAILS_LOG.to_string());
+                self.push_log(letters::MAIL_FAILS_LOG.to_string());
                 self.letter_events.push(MAIL_FAILS_EVENT);
             }
         }
@@ -822,7 +836,7 @@ impl VoyageState {
         }
 
         let title = route::waypoint(waypoint).name.to_string();
-        self.log.push(title.clone());
+        self.push_log(title.clone());
         self.drifted_this_leg = false;
 
         Some(ScenePlayback {
@@ -987,11 +1001,15 @@ impl VoyageState {
         }
         self.refit_doors_seen += 1;
         self.pending_refit = None;
-        self.log.push(format!("Refit: {}", chosen.display_name()));
+        self.push_log(format!("Refit: {}", chosen.display_name()));
         Some(chosen)
     }
 
-    /// The finale scene at the Tree, surfaced once (spec 7 owns the rest).
+    /// The finale at the Tree, surfaced once: W37's authored beats, then
+    /// the rail (one line per soul aboard, boarding order), the carved
+    /// names if any were lost, the Sister Verity in the harbor, and the
+    /// closed door with the lamp. A pure function of the save — the same
+    /// crossing always reads the same finale.
     pub fn take_finale_playback(&mut self) -> Option<ScenePlayback> {
         if !self.arrived() || self.finale_shown {
             return None;
@@ -1000,10 +1018,26 @@ impl VoyageState {
         let def = scenes::scene_def(ROUTE_SINK);
         self.hope = (self.hope + def.payout.hope.max(0) as u8).min(HOPE_MAX);
         let title = route::waypoint(ROUTE_SINK).name.to_string();
-        self.log.push(title.clone());
+        self.push_log(title.clone());
+
+        let mut paragraphs: Vec<String> = def.beats.iter().map(|b| b.to_string()).collect();
+        // The rail: souls who stepped ashore earlier said their goodbyes
+        // in the Log; the rail belongs to the ones who crossed.
+        for s in &self.souls {
+            if s.status == SoulStatus::Aboard {
+                paragraphs.push(souls::soul(s.soul).rail_line.to_string());
+            }
+        }
+        let carved = self.carved_names();
+        if !carved.is_empty() {
+            paragraphs.push(scenes::finale_carved_beat(&carved));
+        }
+        paragraphs.push(scenes::FINALE_HARBOR.to_string());
+        paragraphs.push(scenes::FINALE_LAMP.to_string());
+
         Some(ScenePlayback {
             title,
-            paragraphs: def.beats.iter().map(|b| b.to_string()).collect(),
+            paragraphs,
             payout_note: "the crossing is over".to_string(),
         })
     }
@@ -1120,7 +1154,7 @@ impl VoyageState {
         if def.hope > 0 {
             self.hope = (self.hope + def.hope).min(HOPE_MAX);
         }
-        self.log.push(format!("A letter from {}", def.sender));
+        self.push_log(format!("A letter from {}", def.sender));
         self.letter_events.push(event);
     }
 
@@ -1221,7 +1255,7 @@ impl VoyageState {
             // Nothing left to learn: the night pays in spirits instead.
             self.hope = (self.hope + 1).min(HOPE_MAX);
         }
-        self.log.push(nights::log_line(kind, outcome, name));
+        self.push_log(nights::log_line(kind, outcome, name));
     }
 
     /// Learn the next authored rumor not yet held (weather, nights, and
@@ -1277,8 +1311,7 @@ impl VoyageState {
         self.hailed.push(ship.id);
         let at = self.current_road().map(|r| r.from).unwrap_or(ROUTE_START);
         self.grant_next_rumor(at);
-        self.log
-            .push(format!("Hailed {}. {}", ship.name, ship.hail));
+        self.push_log(format!("Hailed {}. {}", ship.name, ship.hail));
         Some(ship)
     }
 
@@ -1347,6 +1380,7 @@ impl VoyageState {
             station: None,
             arc_beat: 0,
             rest_minutes: 0,
+            left_at: None,
         });
         true
     }
@@ -1354,12 +1388,14 @@ impl VoyageState {
     /// Say no. Permanent: the door closes, the name stays on the chart.
     pub fn decline_ask(&mut self) -> Option<SoulId> {
         let id = self.pending_ask.take()?;
+        let here = self.current_waypoint();
         self.souls.push(SoulState {
             soul: id,
             status: SoulStatus::Declined,
             station: None,
             arc_beat: 0,
             rest_minutes: 0,
+            left_at: here,
         });
         Some(id)
     }
@@ -1367,6 +1403,7 @@ impl VoyageState {
     /// A soul steps ashore to free a berth. Remembered in the manifest,
     /// never carved into the hull. Costs a little hope.
     pub fn farewell(&mut self, id: SoulId) -> bool {
+        let here = self.current_waypoint();
         let Some(s) = self
             .souls
             .iter_mut()
@@ -1376,6 +1413,7 @@ impl VoyageState {
         };
         s.status = SoulStatus::Ashore;
         s.station = None;
+        s.left_at = here;
         self.lower_hope(FAREWELL_HOPE_COST);
         true
     }
@@ -1446,6 +1484,12 @@ impl VoyageState {
         self.processed_minutes / MINUTES_PER_DAY
     }
 
+    /// Write a line into the ship's log, stamped with today.
+    fn push_log(&mut self, text: String) {
+        let day = self.day_index();
+        self.log.push(LogEntry { day, text });
+    }
+
     /// Game minutes until arrival at the current trim, if traveling.
     pub fn eta_minutes(&self) -> Option<u64> {
         if let VoyagePhase::Traveling {
@@ -1462,7 +1506,6 @@ impl VoyageState {
         }
     }
 
-    #[allow(dead_code)] // Simulator/tests; the finale (spec 7) reads it in-game.
     pub fn arrived(&self) -> bool {
         matches!(self.phase, VoyagePhase::Arrived { .. })
     }

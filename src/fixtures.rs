@@ -436,3 +436,99 @@ pub fn voyage_holding_at(
     }
     v
 }
+
+/// A finished crossing, moored at the Tree with the finale already read:
+/// the harbor screen's home state. The roster carries one of everything
+/// the manifest can show — souls ashore, a decline, a farewell, and a
+/// carved name — plus keepsakes, letters, a refit, and the Going-Dark.
+pub fn voyage_arrived(
+    character_id: String,
+    now: DateTime<Utc>,
+) -> crate::vessel::voyage::VoyageState {
+    use crate::vessel::refits::RefitId;
+    use crate::vessel::route::{waypoint, RumorId, ROUTE_SINK};
+    use crate::vessel::souls::{SoulId, Station};
+    use crate::vessel::voyage::{
+        LearnedRumor, LogEntry, SoulState, SoulStatus, VoyagePhase, MINUTES_PER_DAY,
+    };
+
+    let mut v = voyage_holding_at(character_id, ROUTE_SINK, 60, 40.0, now);
+    v.phase = VoyagePhase::Arrived {
+        at_min: 60 * MINUTES_PER_DAY,
+    };
+    v.finale_shown = true;
+    v.hope = 9;
+
+    // The cast: the launch trio crossed (Torvald last stood the helm),
+    // Maren came aboard and crossed, Sefa was declined, Ysolt stepped
+    // ashore in a farewell, and Cormac's name is carved into the hull.
+    let met = |soul, status, station, left_at| SoulState {
+        soul,
+        status,
+        station,
+        arc_beat: 4,
+        rest_minutes: 0,
+        left_at,
+    };
+    v.souls = vec![
+        met(SoulId(0), SoulStatus::Aboard, Some(Station::Helm), None),
+        met(SoulId(1), SoulStatus::Aboard, Some(Station::Tender), None),
+        met(SoulId(2), SoulStatus::Aboard, None, None),
+        met(SoulId(3), SoulStatus::Aboard, None, None),
+        met(
+            SoulId(4),
+            SoulStatus::Declined,
+            None,
+            v.visited.get(2).copied(),
+        ),
+        met(
+            SoulId(5),
+            SoulStatus::Ashore,
+            None,
+            v.visited.get(4).copied(),
+        ),
+        met(SoulId(6), SoulStatus::Lost, None, None),
+    ];
+
+    v.keepsakes = vec![
+        "the Warden's token, white and warm".to_string(),
+        "a thorn spar, cut clean at the tip".to_string(),
+    ];
+    v.refits = vec![RefitId::StormSail];
+    v.refit_doors_seen = 1;
+    v.letters_received = 13;
+    v.gone_dark = true;
+    v.rumors = vec![LearnedRumor {
+        rumor: RumorId(1),
+        learned_at: v.visited.get(1).copied().unwrap_or(ROUTE_SINK),
+    }];
+    // ~60 days over the visited spine, a little over two days per port.
+    let ports = v.visited.len().max(1) as u64;
+    v.log = v
+        .visited
+        .iter()
+        .enumerate()
+        .map(|(i, w)| LogEntry {
+            day: i as u64 * 60 / ports,
+            text: waypoint(*w).name.to_string(),
+        })
+        .collect();
+    for (day, text) in [
+        (18, "Refit: Storm Sail"),
+        (42, "No letters. There will be no more letters."),
+    ] {
+        let at = v
+            .log
+            .iter()
+            .position(|e| e.day > day)
+            .unwrap_or(v.log.len());
+        v.log.insert(
+            at,
+            LogEntry {
+                day,
+                text: text.to_string(),
+            },
+        );
+    }
+    v
+}
