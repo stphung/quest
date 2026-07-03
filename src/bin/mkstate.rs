@@ -325,7 +325,10 @@ fn main() {
         let mut colony = fixtures::colony_midera();
         colony.character_id = state.character_id.clone();
         quest::vessel::persistence::save_colony(&colony).expect("failed to write colony.json");
-        println!("Wrote colony.json ({} souls delivered)", colony.souls_delivered);
+        println!(
+            "Wrote colony.json ({} souls delivered)",
+            colony.souls_delivered
+        );
     }
     if overrides.voyage_arrived {
         let voyage = fixtures::voyage_arrived(state.character_id.clone(), Utc::now());
