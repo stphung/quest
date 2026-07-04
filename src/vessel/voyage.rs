@@ -72,13 +72,13 @@ pub const WEAR_BURN_PER_SCAR: f64 = 0.05;
 pub const PROVISIONS_PER_PASSENGER: f64 = 0.00005;
 pub const LAUNCH_HOPE: u8 = 7;
 
-/// How fast time at sea passes relative to the real world: one day of the
-/// crossing passes in one real hour. This is what fits a whole ferry era —
-/// dozens of crossings, ~1,100 days at sea plus the decisions that wait
-/// for the ferryman — inside about three real months of engaged play: the
-/// maiden voyage sails a day and a half of real time, the last crossings
-/// turn around between a morning and an evening check-in.
-pub const GAME_MINUTES_PER_REAL_MINUTE: f64 = 24.0;
+/// How fast time at sea passes relative to the real world — a near-1:1 clock
+/// (a day at sea passes in a little under a real day). The pacing is *earned*,
+/// not compressed: the maiden voyage sails its ~37 days in about a real month
+/// (the slowest crossing of the whole era), and the ramp that follows is the
+/// Drive shortening each crossing — not the clock speeding up. Every crossing
+/// runs on this one uniform scale; only the earned Drive level changes.
+pub const GAME_MINUTES_PER_REAL_MINUTE: f64 = 1.25;
 
 /// Wall-clock multiplier: `QUEST_VOYAGE_TIME_SCALE` (dev/test override; at
 /// 1440x a voyage day passes in one real minute — used by drive-game), or
@@ -624,6 +624,10 @@ impl VoyageState {
             .collect();
 
         // The colony's standing bonuses (districts derive from population).
+        // A ferry run does not manage rations — the crossing's length answers
+        // to Drive, not to how full the hold is — so the passenger load never
+        // deepens her burn (see `provisions_mult_with`), and the base hold
+        // (plus the Granary) always victuals her.
         if colony.has_district(District::Granary) {
             v.provisions_cap = PROVISIONS_CAP + 25.0;
             v.provisions = v.provisions_cap;
@@ -801,9 +805,16 @@ impl VoyageState {
             1.00
         };
         let wear = 1.0 + WEAR_BURN_PER_SCAR * f64::from(self.hull_wear);
-        // Passengers are cargo that eats (spec 9): every passenger adds
-        // a little to the daily burn, so scarcity becomes load management.
-        let load = 1.0 + PROVISIONS_PER_PASSENGER * f64::from(self.passengers);
+        // Passengers are cargo that eats (spec 9): every passenger adds a
+        // little to the daily burn, so scarcity becomes load management — but
+        // only on the maiden voyage, where the hold is managed. A ferry run is
+        // hands-off: no one meters the rations, the colony victuals the
+        // expedition, and her length answers to Drive alone, not the headcount.
+        let load = if self.crossing_number > 1 {
+            1.0
+        } else {
+            1.0 + PROVISIONS_PER_PASSENGER * f64::from(self.passengers)
+        };
         load * trim_mult
             * tender_provisions_mult(
                 tender.is_some(),
@@ -998,14 +1009,29 @@ impl VoyageState {
                 // Auto-sail (pacing): a mid-crossing port with no decision —
                 // exactly one road out, no ask, no refit — gets a brief port
                 // call, then she sails herself; the scene is kept to read on
-                // return. `arrived_by: None` marks the pier (launch / Sail
-                // again): those departures are always the ferryman's.
+                // return. On a *ferry run* (crossing 2+) she also navigates
+                // junctions herself, taking the first road on: the return
+                // crossings are hands-off, and the crossing's length answers
+                // to Drive, not to when the ferryman next looks in. The maiden
+                // voyage (crossing 1) still holds at junctions for the choice.
+                // `arrived_by: None` marks the pier (launch / Sail again):
+                // those departures are always the ferryman's.
+                let ferry_run = self.crossing_number > 1;
+                // No hands work a ferry run's yard — skip the refit so she
+                // does not stall on a decision no one is there to make.
+                if ferry_run && self.pending_refit.is_some() {
+                    self.pending_refit = None;
+                }
                 let mut roads = route::roads_from(waypoint);
-                let only_road = match (roads.next(), roads.next()) {
+                let auto_road = match (roads.next(), roads.next()) {
                     (Some(road), None) => Some(road.id),
+                    (Some(road), Some(_)) if ferry_run => Some(road.id),
                     _ => None,
                 };
-                if let (Some(road_id), Some(_)) = (only_road, arrived_by) {
+                // A ferry run launches herself from the pier too (arrived_by
+                // None); the maiden voyage waits there for the ferryman.
+                let launch_ok = arrived_by.is_some() || ferry_run;
+                if let (Some(road_id), true) = (auto_road, launch_ok) {
                     if self.processed_minutes - arrived_at_min >= PORT_CALL_GAME_MINUTES
                         && self.pending_ask.is_none()
                         && self.pending_refit.is_none()

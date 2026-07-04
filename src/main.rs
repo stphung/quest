@@ -802,6 +802,24 @@ fn main() -> io::Result<()> {
                                                     }
                                                 }
                                             }
+                                            VoyageInputResult::BuyDrive => {
+                                                // Spend Salvage in the Drive yard;
+                                                // the colony owns the ledger (spec 9).
+                                                if let Some(col) = &mut colony {
+                                                    if col.buy_drive() && !debug_mode {
+                                                        let _ =
+                                                            vessel::persistence::save_colony(col);
+                                                    }
+                                                }
+                                            }
+                                            VoyageInputResult::BuyCapacity => {
+                                                if let Some(col) = &mut colony {
+                                                    if col.buy_capacity() && !debug_mode {
+                                                        let _ =
+                                                            vessel::persistence::save_colony(col);
+                                                    }
+                                                }
+                                            }
                                             VoyageInputResult::Handled
                                             | VoyageInputResult::Ignored => {}
                                         }

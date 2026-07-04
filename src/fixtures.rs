@@ -441,21 +441,23 @@ pub fn voyage_holding_at(
     v
 }
 
-/// A colony mid-era for the Reckoning pane: twenty crossings into a long
-/// campaign, half the districts founded, the headline into five figures,
-/// drive compounding. Deterministic; matches the big-world curve.
+/// A colony mid-era for the Reckoning pane: six crossings into the campaign,
+/// half the districts founded, the headline into five figures, both yards
+/// built up and Salvage in hand. Deterministic; matches the tuned curve.
 pub fn colony_midera() -> crate::vessel::colony::ColonyState {
     use crate::vessel::colony::{ColonyState, CrossingRecords};
     let mut c = ColonyState::found("fixture-voyager".to_string());
-    c.souls_delivered = 11_000;
-    c.souls_remaining = 76_000;
-    c.drive = 11_000;
-    c.crossings_completed = 20;
+    c.souls_delivered = 9_500;
+    c.souls_remaining = 45_000;
+    c.drive_level = 6;
+    c.cap_level = 6;
+    c.salvage = 44;
+    c.crossings_completed = 6;
     c.records = CrossingRecords {
-        fastest_days: 27,
-        most_carried: 1_146,
-        total_lightyears: 6_400,
-        total_nights: 610,
+        fastest_days: 5,
+        most_carried: 4_123,
+        total_lightyears: 2_400,
+        total_nights: 220,
     };
     // Well into the era: most of the old world has gone dark, a lit path
     // still runs toward the Tree.

@@ -2052,28 +2052,82 @@ fn render_reckoning(
     )));
     lines.push(Line::from(""));
 
-    // The engine.
+    // The yards — where Salvage is spent between crossings.
     lines.push(Line::from(vec![
         Span::styled(
-            format!("Drive {}", with_commas(c.drive)),
+            "THE YARDS",
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("   \u{2726} {} Salvage in hand", with_commas(c.salvage)),
+            Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+        ),
+    ]));
+    // The Drive yard.
+    let drive_afford = c.salvage >= c.drive_cost();
+    lines.push(Line::from(vec![
+        Span::styled(
+            format!("  [D] Drive \u{2014} Lv {}", c.drive_level),
+            Style::default()
+                .fg(VESSEL_VIOLET)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            {
+                use crate::vessel::colony::{DRIVE_DECAY, DRIVE_FLOOR};
+                let next_mult = DRIVE_DECAY
+                    .powi((c.drive_level + 1) as i32)
+                    .max(DRIVE_FLOOR);
+                format!(
+                    "  sails {:.2}\u{00d7} her old self \u{2192} next Lv {:.2}\u{00d7}",
+                    c.drive_speed_factor(),
+                    1.0 / next_mult
+                )
+            },
+            Style::default().fg(Color::Gray),
+        ),
+    ]));
+    lines.push(Line::from(Span::styled(
+        format!(
+            "      costs {} Salvage{}",
+            with_commas(c.drive_cost()),
+            if drive_afford { "" } else { "  (not yet)" }
+        ),
+        Style::default().fg(if drive_afford { GOLD } else { Color::DarkGray }),
+    )));
+    // The Shipwright.
+    let cap_afford = c.salvage >= c.cap_cost();
+    lines.push(Line::from(vec![
+        Span::styled(
+            format!("  [C] Shipwright \u{2014} Lv {}", c.cap_level),
             Style::default()
                 .fg(VESSEL_VIOLET)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
             format!(
-                "   \u{00b7}   the Vessel sails {:.2}\u{00d7} her old self",
-                c.drive_speed_factor()
+                "  hold carries {}",
+                with_commas(u64::from(c.expedition_size()))
             ),
             Style::default().fg(Color::Gray),
         ),
     ]));
     lines.push(Line::from(Span::styled(
         format!(
-            "{} crossings made \u{00b7} {} carried at most in one",
+            "      costs {} Salvage{}",
+            with_commas(c.cap_cost()),
+            if cap_afford { "" } else { "  (not yet)" }
+        ),
+        Style::default().fg(if cap_afford { GOLD } else { Color::DarkGray }),
+    )));
+    lines.push(Line::from(Span::styled(
+        format!(
+            "  {} crossings made \u{00b7} {} carried at most in one",
             c.crossings_completed, c.records.most_carried
         ),
-        Style::default().fg(Color::Gray),
+        Style::default().fg(Color::DarkGray),
     )));
     lines.push(Line::from(""));
 

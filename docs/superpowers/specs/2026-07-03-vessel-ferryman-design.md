@@ -306,3 +306,15 @@ never stops accelerating:
   and `Sail again` are never the engine's. Without this, ~20 waits ×
   59 crossings would have made the era mostly waiting; with it, a crossing
   asks ~3–5 decisions and the era ~2 a day.
+
+## Follow-up (2026-07-04): the two yards — Drive & Shipwright, earned not compressed
+
+The ramp is now a **choice**, and it is earned by the ship getting faster, not by the clock speeding up. The old cumulative-Drive-speeds-everything model is replaced by two Salvage-bought tracks, decoupled from delivery so the acceleration doesn't wait on the slow early crossings.
+
+- **Two yards, one currency.** Each crossing pays out **Salvage** (`SALVAGE_AT_LANDFALL + carried/SOULS_PER_SALVAGE`). On arrival (the Reckoning, `[D]`/`[C]`) the ferryman spends it:
+  - **Drive** (`drive_level`): crossing sail-time ×`DRIVE_DECAY` (0.70) per level, floored at `DRIVE_FLOOR` (0.085 ≈ 12× top speed). Level 0 = the maiden voyage, the slowest crossing there is.
+  - **Shipwright** (`cap_level`): hold ×`CAP_GROWTH` (1.55) per level. `expedition_size` = `BASE_CAPACITY (430) × CAP_GROWTH^cap_level + district bonuses` (the per-1000-delivered term is gone — the hold only grows when you pay for it).
+- **Uniform clock.** `GAME_MINUTES_PER_REAL_MINUTE` 24 → **1.25** (near-1:1). No per-crossing time scale: the same clock runs every crossing, and only the earned Drive level shortens it. C1 ≈ 30 real days; the tail turns around in ~7 real days.
+- **The decision is real** because the dark bites once *per crossing*: Drive-only runs many short crossings and saves fewer souls (~74%); Shipwright-only saves ~94% but never speeds up; the balanced line (Drive early to compound, hold late to sweep) beats both. Tuned to **~8 crossings, ~3.8 real months, ~97% saved**.
+- **Ferry runs are fully hands-off** (required for the crossing to complete autonomously in Drive-scaled time): crossing 2+ auto-navigates junctions (first road), skips refit doors, launches itself from the pier, and the passenger load no longer deepens the provisions burn (no one meters rations on a ferry run). The maiden voyage is unchanged — decision-rich, navigated by the ferryman.
+- **Superseded constants**: `EXPEDITION_AT_LAUNCH`, `EXPEDITION_PER_1000_DELIVERED`, `FASTEST_CROSSING_TIME_MULT`, `DRIVE_FOR_HALF_SPEEDUP`, and the cumulative `drive` field are gone; `BASE_CAPACITY`, `CAP_GROWTH`, `DRIVE_DECAY`, `DRIVE_FLOOR`, `SALVAGE_*`, `DRIVE_COST_*`, `CAP_COST_*`, and the `drive_level`/`cap_level`/`salvage` fields replace them.
