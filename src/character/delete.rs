@@ -159,4 +159,42 @@ mod tests {
 
         assert_eq!(result, DeleteResult::Continue);
     }
+
+    #[test]
+    fn test_delete_submit_confirmed_deletes_character_file() {
+        let mut screen = CharacterDeleteScreen::new();
+        let (manager, _dir) = temp_manager();
+        let character = create_test_character(); // name "TestHero", filename "testhero.json"
+
+        let state = crate::core::game_state::GameState::new(character.character_name.clone(), 0);
+        manager.save_character(&state).unwrap();
+        assert!(manager.quest_dir.join(&character.filename).exists());
+
+        for c in character.character_name.chars() {
+            process_delete_input(&mut screen, DeleteInput::Char(c), &manager, &character);
+        }
+
+        let result = process_delete_input(&mut screen, DeleteInput::Submit, &manager, &character);
+
+        assert_eq!(result, DeleteResult::Deleted);
+        assert!(!manager.quest_dir.join(&character.filename).exists());
+    }
+
+    #[test]
+    fn test_delete_submit_confirmed_but_file_missing_returns_delete_failed() {
+        let mut screen = CharacterDeleteScreen::new();
+        let (manager, _dir) = temp_manager();
+        let character = create_test_character(); // file never saved to disk
+
+        for c in character.character_name.chars() {
+            process_delete_input(&mut screen, DeleteInput::Char(c), &manager, &character);
+        }
+
+        let result = process_delete_input(&mut screen, DeleteInput::Submit, &manager, &character);
+
+        match result {
+            DeleteResult::DeleteFailed(msg) => assert!(msg.contains("Failed to delete")),
+            other => panic!("expected DeleteFailed, got {:?}", other),
+        }
+    }
 }

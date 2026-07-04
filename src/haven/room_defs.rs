@@ -215,3 +215,223 @@ pub fn tier_cost(room: HavenRoomId, tier: u8) -> u32 {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_all_rooms_have_nonempty_name_and_description() {
+        for room in HavenRoomId::ALL {
+            assert!(!room.name().is_empty(), "{:?} has empty name", room);
+            assert!(
+                !room.description().is_empty(),
+                "{:?} has empty description",
+                room
+            );
+        }
+    }
+
+    #[test]
+    fn test_specific_room_names() {
+        assert_eq!(HavenRoomId::Hearthstone.name(), "Hearthstone");
+        assert_eq!(HavenRoomId::Armory.name(), "Armory");
+        assert_eq!(HavenRoomId::TrainingYard.name(), "Training Yard");
+        assert_eq!(HavenRoomId::TrophyHall.name(), "Trophy Hall");
+        assert_eq!(HavenRoomId::Watchtower.name(), "Watchtower");
+        assert_eq!(HavenRoomId::AlchemyLab.name(), "Alchemy Lab");
+        assert_eq!(HavenRoomId::WarRoom.name(), "War Room");
+        assert_eq!(HavenRoomId::Bedroom.name(), "Bedroom");
+        assert_eq!(HavenRoomId::Garden.name(), "Garden");
+        assert_eq!(HavenRoomId::Library.name(), "Library");
+        assert_eq!(HavenRoomId::FishingDock.name(), "Fishing Dock");
+        assert_eq!(HavenRoomId::Workshop.name(), "Workshop");
+        assert_eq!(HavenRoomId::Vault.name(), "Vault");
+        assert_eq!(HavenRoomId::StormForge.name(), "Storm Forge");
+    }
+
+    #[test]
+    fn test_hearthstone_is_root_with_no_parents() {
+        assert!(HavenRoomId::Hearthstone.parents().is_empty());
+        assert_eq!(HavenRoomId::Hearthstone.depth(), 0);
+    }
+
+    #[test]
+    fn test_capstones_require_both_parents() {
+        assert_eq!(
+            HavenRoomId::WarRoom.parents(),
+            &[HavenRoomId::Watchtower, HavenRoomId::AlchemyLab]
+        );
+        assert_eq!(
+            HavenRoomId::Vault.parents(),
+            &[HavenRoomId::FishingDock, HavenRoomId::Workshop]
+        );
+        assert_eq!(
+            HavenRoomId::StormForge.parents(),
+            &[HavenRoomId::WarRoom, HavenRoomId::Vault]
+        );
+    }
+
+    #[test]
+    fn test_single_parent_rooms() {
+        assert_eq!(HavenRoomId::Armory.parents(), &[HavenRoomId::Hearthstone]);
+        assert_eq!(HavenRoomId::Bedroom.parents(), &[HavenRoomId::Hearthstone]);
+        assert_eq!(HavenRoomId::TrainingYard.parents(), &[HavenRoomId::Armory]);
+        assert_eq!(HavenRoomId::TrophyHall.parents(), &[HavenRoomId::Armory]);
+        assert_eq!(
+            HavenRoomId::Watchtower.parents(),
+            &[HavenRoomId::TrainingYard]
+        );
+        assert_eq!(
+            HavenRoomId::AlchemyLab.parents(),
+            &[HavenRoomId::TrophyHall]
+        );
+        assert_eq!(HavenRoomId::Garden.parents(), &[HavenRoomId::Bedroom]);
+        assert_eq!(HavenRoomId::Library.parents(), &[HavenRoomId::Bedroom]);
+        assert_eq!(HavenRoomId::FishingDock.parents(), &[HavenRoomId::Garden]);
+        assert_eq!(HavenRoomId::Workshop.parents(), &[HavenRoomId::Library]);
+    }
+
+    #[test]
+    fn test_children_mirror_parents() {
+        // Every room listed as a parent of X should list X as a child.
+        for room in HavenRoomId::ALL {
+            for parent in room.parents() {
+                assert!(
+                    parent.children().contains(&room),
+                    "{:?} should be a child of {:?}",
+                    room,
+                    parent
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_storm_forge_has_no_children() {
+        assert!(HavenRoomId::StormForge.children().is_empty());
+    }
+
+    #[test]
+    fn test_hearthstone_children() {
+        assert_eq!(
+            HavenRoomId::Hearthstone.children(),
+            &[HavenRoomId::Armory, HavenRoomId::Bedroom]
+        );
+    }
+
+    #[test]
+    fn test_is_capstone() {
+        assert!(HavenRoomId::WarRoom.is_capstone());
+        assert!(HavenRoomId::Vault.is_capstone());
+        assert!(HavenRoomId::StormForge.is_capstone());
+
+        assert!(!HavenRoomId::Hearthstone.is_capstone());
+        assert!(!HavenRoomId::Armory.is_capstone());
+        assert!(!HavenRoomId::Bedroom.is_capstone());
+        assert!(!HavenRoomId::Watchtower.is_capstone());
+    }
+
+    #[test]
+    fn test_depth_values_for_every_room() {
+        assert_eq!(HavenRoomId::Hearthstone.depth(), 0);
+        assert_eq!(HavenRoomId::Armory.depth(), 1);
+        assert_eq!(HavenRoomId::Bedroom.depth(), 1);
+        assert_eq!(HavenRoomId::TrainingYard.depth(), 2);
+        assert_eq!(HavenRoomId::TrophyHall.depth(), 2);
+        assert_eq!(HavenRoomId::Garden.depth(), 2);
+        assert_eq!(HavenRoomId::Library.depth(), 2);
+        assert_eq!(HavenRoomId::Watchtower.depth(), 3);
+        assert_eq!(HavenRoomId::AlchemyLab.depth(), 3);
+        assert_eq!(HavenRoomId::FishingDock.depth(), 3);
+        assert_eq!(HavenRoomId::Workshop.depth(), 3);
+        assert_eq!(HavenRoomId::WarRoom.depth(), 4);
+        assert_eq!(HavenRoomId::Vault.depth(), 4);
+        assert_eq!(HavenRoomId::StormForge.depth(), 5);
+    }
+
+    #[test]
+    fn test_max_tier_special_cases() {
+        assert_eq!(HavenRoomId::StormForge.max_tier(), 1);
+        assert_eq!(HavenRoomId::FishingDock.max_tier(), 4);
+        // Everything else caps at 3.
+        assert_eq!(HavenRoomId::Hearthstone.max_tier(), 3);
+        assert_eq!(HavenRoomId::Armory.max_tier(), 3);
+        assert_eq!(HavenRoomId::WarRoom.max_tier(), 3);
+        assert_eq!(HavenRoomId::Vault.max_tier(), 3);
+    }
+
+    #[test]
+    fn test_tier_cost_hearthstone_depth_0() {
+        assert_eq!(tier_cost(HavenRoomId::Hearthstone, 1), 1);
+        assert_eq!(tier_cost(HavenRoomId::Hearthstone, 2), 2);
+        assert_eq!(tier_cost(HavenRoomId::Hearthstone, 3), 3);
+    }
+
+    #[test]
+    fn test_tier_cost_depth_1_rooms() {
+        for room in [HavenRoomId::Armory, HavenRoomId::Bedroom] {
+            assert_eq!(tier_cost(room, 1), 1);
+            assert_eq!(tier_cost(room, 2), 3);
+            assert_eq!(tier_cost(room, 3), 5);
+        }
+    }
+
+    #[test]
+    fn test_tier_cost_depth_2_and_3_rooms() {
+        for room in [
+            HavenRoomId::TrainingYard,
+            HavenRoomId::TrophyHall,
+            HavenRoomId::Garden,
+            HavenRoomId::Library,
+            HavenRoomId::Watchtower,
+            HavenRoomId::AlchemyLab,
+            HavenRoomId::FishingDock, // T1-3 follow normal depth-3 costs
+            HavenRoomId::Workshop,
+        ] {
+            assert_eq!(tier_cost(room, 1), 2, "{:?} T1", room);
+            assert_eq!(tier_cost(room, 2), 4, "{:?} T2", room);
+            assert_eq!(tier_cost(room, 3), 6, "{:?} T3", room);
+        }
+    }
+
+    #[test]
+    fn test_tier_cost_capstones() {
+        for room in [HavenRoomId::WarRoom, HavenRoomId::Vault] {
+            assert_eq!(tier_cost(room, 1), 3, "{:?} T1", room);
+            assert_eq!(tier_cost(room, 2), 5, "{:?} T2", room);
+            assert_eq!(tier_cost(room, 3), 7, "{:?} T3", room);
+        }
+    }
+
+    #[test]
+    fn test_tier_cost_fishing_dock_special_t4() {
+        assert_eq!(tier_cost(HavenRoomId::FishingDock, 4), 10);
+    }
+
+    #[test]
+    fn test_tier_cost_storm_forge() {
+        assert_eq!(tier_cost(HavenRoomId::StormForge, 1), 25);
+        // Invalid tiers for a single-tier room return 0.
+        assert_eq!(tier_cost(HavenRoomId::StormForge, 0), 0);
+        assert_eq!(tier_cost(HavenRoomId::StormForge, 2), 0);
+    }
+
+    #[test]
+    fn test_tier_cost_invalid_tier_returns_zero() {
+        // Tier 0 and out-of-range tiers are not valid for any normal room.
+        assert_eq!(tier_cost(HavenRoomId::Hearthstone, 0), 0);
+        assert_eq!(tier_cost(HavenRoomId::Hearthstone, 4), 0);
+        assert_eq!(tier_cost(HavenRoomId::WarRoom, 5), 0);
+        assert_eq!(tier_cost(HavenRoomId::FishingDock, 5), 0);
+    }
+
+    #[test]
+    fn test_all_array_has_fourteen_unique_rooms() {
+        assert_eq!(HavenRoomId::ALL.len(), 14);
+        let mut seen = std::collections::HashSet::new();
+        for room in HavenRoomId::ALL {
+            assert!(seen.insert(room), "Duplicate room {:?} in ALL", room);
+        }
+    }
+}

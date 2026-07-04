@@ -803,4 +803,436 @@ mod tests {
         assert_eq!(prog.kills_in_subzone, 0);
         assert!(!prog.fighting_boss);
     }
+
+    #[test]
+    fn test_on_boss_defeated_final_zone_with_no_successor_returns_storms_end() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // Zone 50 is the last zone in the data table -- get_zone(51) is None.
+        // The legacy on_boss_defeated() (no fracture-cap awareness) falls back
+        // to StormsEnd when there's simply nothing left to advance into.
+        let zone50 = get_zone(50).expect("zone 50 must exist");
+        let last_subzone = zone50.subzones.len() as u32;
+        for sz in 1..last_subzone {
+            prog.defeat_boss(50, sz);
+        }
+        prog.current_zone_id = 50;
+        prog.current_subzone_id = last_subzone;
+        prog.unlock_zone(50);
+        prog.fighting_boss = true;
+
+        let result = prog.on_boss_defeated(50000, &mut achievements);
+        assert_eq!(result, BossDefeatResult::StormsEnd);
+        assert!(prog.is_boss_defeated(50, last_subzone));
+    }
+
+    // =========================================================================
+    // UNKNOWN ZONE ID EARLY RETURN (get_zone returns None)
+    // =========================================================================
+
+    #[test]
+    fn test_on_boss_defeated_unknown_zone_returns_subzone_complete() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // No zone with this ID exists.
+        prog.current_zone_id = 999;
+        prog.current_subzone_id = 3;
+        prog.fighting_boss = true;
+
+        let result = prog.on_boss_defeated(0, &mut achievements);
+        assert_eq!(
+            result,
+            BossDefeatResult::SubzoneComplete { new_subzone_id: 3 }
+        );
+        // State is left untouched (no defeat recorded, no advancement)
+        assert!(!prog.is_boss_defeated(999, 3));
+    }
+
+    #[test]
+    fn test_on_boss_defeated_with_cap_unknown_zone_returns_subzone_complete() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        prog.current_zone_id = 12345;
+        prog.current_subzone_id = 7;
+        prog.fighting_boss = true;
+
+        let result = prog.on_boss_defeated_with_cap(0, &mut achievements, 30, 50);
+        assert_eq!(
+            result,
+            BossDefeatResult::SubzoneComplete { new_subzone_id: 7 }
+        );
+    }
+
+    // =========================================================================
+    // on_boss_defeated_with_cap: WEAPON GATE / STORMS END PARITY
+    // =========================================================================
+
+    #[test]
+    fn test_with_cap_weapon_required_for_zone_10_without_stormbreaker() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        prog.current_zone_id = 10;
+        prog.current_subzone_id = 4;
+        prog.unlock_zone(10);
+        prog.fighting_boss = true;
+
+        let result = prog.on_boss_defeated_with_cap(20, &mut achievements, 11, 30);
+        match result {
+            BossDefeatResult::WeaponRequired { weapon_name } => {
+                assert_eq!(weapon_name, "Stormbreaker");
+            }
+            _ => panic!("Expected WeaponRequired, got {:?}", result),
+        }
+        assert!(!prog.is_boss_defeated(10, 4));
+        assert!(!prog.fighting_boss);
+        assert_eq!(prog.kills_in_subzone, 0);
+    }
+
+    #[test]
+    fn test_with_cap_storms_end_unlocks_expanse() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+        achievements.unlock(AchievementId::TheStormbreaker, None);
+
+        prog.current_zone_id = 10;
+        prog.current_subzone_id = 4;
+        prog.unlock_zone(10);
+        prog.fighting_boss = true;
+        prog.defeat_boss(10, 1);
+        prog.defeat_boss(10, 2);
+        prog.defeat_boss(10, 3);
+
+        let result = prog.on_boss_defeated_with_cap(20, &mut achievements, 11, 30);
+        assert_eq!(result, BossDefeatResult::StormsEnd);
+        assert!(achievements.is_unlocked(AchievementId::StormsEnd));
+        assert!(prog.is_zone_unlocked(EXPANSE_ZONE_ID));
+        assert_eq!(prog.current_zone_id, EXPANSE_ZONE_ID);
+        assert_eq!(prog.current_subzone_id, 1);
+    }
+
+    // =========================================================================
+    // DEATH-RETREAT MEMORY CLEARED ON ZONE-BOSS DEFEAT (not just subzone boss)
+    // =========================================================================
+
+    #[test]
+    fn test_zone_boss_defeat_clears_death_retreat_memory_for_own_zone() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // Player retreated from zone 1 previously (e.g. re-entered and died again later),
+        // then comes back and clears the final zone boss.
+        prog.current_zone_id = 1;
+        prog.record_death_retreat();
+        assert_eq!(prog.death_retreat_zone, Some(1));
+
+        prog.defeat_boss(1, 1);
+        prog.defeat_boss(1, 2);
+        prog.current_subzone_id = 3;
+        prog.fighting_boss = true;
+
+        let result = prog.on_boss_defeated_with_cap(0, &mut achievements, 11, 30);
+        assert!(matches!(
+            result,
+            BossDefeatResult::ZoneComplete { new_zone_id: 2, .. }
+        ));
+        assert_eq!(prog.death_retreat_zone, None);
+        assert_eq!(prog.frontier_cooldown_cycles, 0);
+    }
+
+    // =========================================================================
+    // ZONE 11 -> ZONE 12 TRANSITION (fracture zones unlocked)
+    // =========================================================================
+
+    #[test]
+    fn test_with_cap_expanse_classic_cycle_when_fracture_cap_at_11() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // fracture_zone_cap == EXPANSE_ZONE_ID (11): no fracture zones unlocked
+        // yet, so on_boss_defeated_with_cap takes its own "classic cycle"
+        // branch (distinct from the legacy on_boss_defeated's Expanse handling).
+        prog.current_zone_id = EXPANSE_ZONE_ID;
+        prog.current_subzone_id = 4;
+        prog.unlock_zone(EXPANSE_ZONE_ID);
+        prog.fighting_boss = true;
+
+        let result = prog.on_boss_defeated_with_cap(20, &mut achievements, 11, 30);
+        assert_eq!(result, BossDefeatResult::ExpanseCycle);
+        assert_eq!(prog.current_zone_id, EXPANSE_ZONE_ID);
+        assert_eq!(prog.current_subzone_id, 1);
+        assert_eq!(prog.kills_in_subzone, 0);
+    }
+
+    #[test]
+    fn test_expanse_advances_to_zone_12_when_fracture_unlocked_and_zone_ready() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        prog.current_zone_id = EXPANSE_ZONE_ID;
+        prog.current_subzone_id = 4;
+        prog.unlock_zone(EXPANSE_ZONE_ID);
+        prog.unlock_zone(12);
+        prog.fighting_boss = true;
+
+        // fracture_zone_cap > EXPANSE_ZONE_ID, and zone 12 is unlocked
+        let result = prog.on_boss_defeated_with_cap(50, &mut achievements, 14, 30);
+        assert!(
+            matches!(
+                result,
+                BossDefeatResult::ZoneComplete {
+                    old_zone_id: EXPANSE_ZONE_ID,
+                    new_zone_id: 12,
+                    ..
+                }
+            ),
+            "Expected ZoneComplete advancing Expanse -> 12, got {:?}",
+            result
+        );
+        assert_eq!(prog.current_zone_id, 12);
+        assert_eq!(prog.current_subzone_id, 1);
+    }
+
+    #[test]
+    fn test_expanse_falls_back_to_cycle_when_zone_12_not_yet_unlocked() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // fracture_zone_cap says fracture zones exist, but zone 12 itself
+        // hasn't been unlocked yet (e.g. sync hasn't run) -- must not panic
+        // or advance into a locked zone.
+        prog.current_zone_id = EXPANSE_ZONE_ID;
+        prog.current_subzone_id = 4;
+        prog.unlock_zone(EXPANSE_ZONE_ID);
+        prog.fighting_boss = true;
+
+        let result = prog.on_boss_defeated_with_cap(50, &mut achievements, 14, 30);
+        assert_eq!(result, BossDefeatResult::ExpanseCycle);
+        assert_eq!(prog.current_zone_id, EXPANSE_ZONE_ID);
+        assert_eq!(prog.current_subzone_id, 1);
+        assert_eq!(prog.kills_in_subzone, 0);
+    }
+
+    // =========================================================================
+    // FRACTURE REGION UNLOCK THRESHOLDS (Deep layers 3/7/12/18/25/30)
+    // =========================================================================
+
+    /// Sets up `prog` at the given zone's final subzone, ready to defeat the zone boss.
+    fn setup_zone_boss_fight(prog: &mut ZoneProgression, zone_id: u32) {
+        let zone = get_zone(zone_id).expect("zone must exist");
+        let last_subzone = zone.subzones.len() as u32;
+        for sz in 1..last_subzone {
+            prog.defeat_boss(zone_id, sz);
+        }
+        prog.current_zone_id = zone_id;
+        prog.current_subzone_id = last_subzone;
+        prog.unlock_zone(zone_id);
+        prog.fighting_boss = true;
+    }
+
+    #[test]
+    fn test_red_fault_cap_zone_14_cycles_at_deep_layer_3() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        setup_zone_boss_fight(&mut prog, 14);
+        // fracture_zone_cap = 14 (Deep Layer 3 breakthrough, RedFault only)
+        let result = prog.on_boss_defeated_with_cap(50, &mut achievements, 14, 30);
+        assert_eq!(result, BossDefeatResult::FractureCycle { zone_id: 14 });
+        assert_eq!(prog.current_subzone_id, 1);
+    }
+
+    #[test]
+    fn test_mirror_scar_cap_zone_17_cycles_at_deep_layer_7() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        setup_zone_boss_fight(&mut prog, 17);
+        let result = prog.on_boss_defeated_with_cap(75, &mut achievements, 17, 30);
+        assert_eq!(result, BossDefeatResult::FractureCycle { zone_id: 17 });
+    }
+
+    #[test]
+    fn test_black_mouth_cap_zone_20_cycles_at_deep_layer_12() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        setup_zone_boss_fight(&mut prog, 20);
+        let result = prog.on_boss_defeated_with_cap(100, &mut achievements, 20, 30);
+        assert_eq!(result, BossDefeatResult::FractureCycle { zone_id: 20 });
+    }
+
+    #[test]
+    fn test_hollow_throne_cap_zone_23_cycles_at_deep_layer_18() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        setup_zone_boss_fight(&mut prog, 23);
+        let result = prog.on_boss_defeated_with_cap(150, &mut achievements, 23, 30);
+        assert_eq!(result, BossDefeatResult::FractureCycle { zone_id: 23 });
+    }
+
+    #[test]
+    fn test_wailing_reach_cap_zone_26_cycles_at_deep_layer_25() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        setup_zone_boss_fight(&mut prog, 26);
+        let result = prog.on_boss_defeated_with_cap(200, &mut achievements, 26, 30);
+        assert_eq!(result, BossDefeatResult::FractureCycle { zone_id: 26 });
+    }
+
+    #[test]
+    fn test_origin_wound_cap_zone_30_cycles_at_deep_layer_30() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        setup_zone_boss_fight(&mut prog, 30);
+        let result = prog.on_boss_defeated_with_cap(300, &mut achievements, 30, 30);
+        assert_eq!(result, BossDefeatResult::FractureCycle { zone_id: 30 });
+    }
+
+    #[test]
+    fn test_fracture_zone_just_below_cap_advances_forward() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // Zone 13, one below the RedFault cap (14) -- should advance forward,
+        // not cycle, since it isn't the cap zone yet.
+        setup_zone_boss_fight(&mut prog, 13);
+        prog.unlock_zone(14);
+        let result = prog.on_boss_defeated_with_cap(50, &mut achievements, 14, 30);
+        assert!(
+            matches!(
+                result,
+                BossDefeatResult::ZoneComplete {
+                    new_zone_id: 14,
+                    ..
+                }
+            ),
+            "Expected advance to 14, got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_fracture_zone_below_cap_but_prestige_gated_for_next_chapter_cycles_in_place() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // Deep Layer 7 has broken through (fracture_zone_cap = 17, MirrorScar
+        // reachable), but the player's prestige rank (50) hasn't yet reached
+        // the P75 required for zone 15. Zone 14 is not the cap, so the
+        // explicit cap-cycle branch is skipped -- but advance_to_next_zone
+        // still fails on the prestige gate, so we fall back to cycling zone
+        // 14 in place (fracture zones never emit ZoneCompleteButGated).
+        setup_zone_boss_fight(&mut prog, 14);
+        let result = prog.on_boss_defeated_with_cap(50, &mut achievements, 17, 30);
+        assert_eq!(result, BossDefeatResult::FractureCycle { zone_id: 14 });
+        assert_eq!(prog.current_zone_id, 14);
+        assert_eq!(prog.current_subzone_id, 1);
+    }
+
+    // =========================================================================
+    // LOOM ZONE FALLBACK: PRESTIGE-GATED NEXT CHAPTER CYCLES IN PLACE
+    // =========================================================================
+
+    #[test]
+    fn test_loom_zone_below_cap_but_prestige_gated_for_next_chapter_cycles_in_place() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // Zone 34 (top of Thread Wilds, P2000) is not the loom cap (38), and
+        // the player's prestige (2000) satisfies zone 34 but not zone 35's
+        // P5000 requirement -- advance fails, falls back to cycling zone 34.
+        setup_zone_boss_fight(&mut prog, 34);
+        let result = prog.on_boss_defeated_with_cap(2000, &mut achievements, 30, 38);
+        assert_eq!(result, BossDefeatResult::LoomZoneCycle { zone_id: 34 });
+        assert_eq!(prog.current_zone_id, 34);
+        assert_eq!(prog.current_subzone_id, 1);
+        assert!(!prog.fighting_boss);
+    }
+
+    // =========================================================================
+    // on_boss_defeated_with_cap: PRE-GAME PRESTIGE-GATED ZONE COMPLETION
+    // =========================================================================
+
+    #[test]
+    fn test_with_cap_pre_game_zone_completion_prestige_gated() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // Clear zone 1 and zone 2 via with_cap, then get gated entering zone 3 (needs P5).
+        for _subzone in 1..=3 {
+            for _ in 0..KILLS_FOR_BOSS {
+                prog.record_kill();
+            }
+            prog.on_boss_defeated_with_cap(0, &mut achievements, 11, 30);
+        }
+        for _subzone in 1..=3 {
+            for _ in 0..KILLS_FOR_BOSS {
+                prog.record_kill();
+            }
+            prog.on_boss_defeated_with_cap(0, &mut achievements, 11, 30);
+        }
+        assert_eq!(prog.current_zone_id, 2);
+
+        match prog.on_boss_defeated_with_cap(0, &mut achievements, 11, 30) {
+            BossDefeatResult::ZoneCompleteButGated {
+                zone_name,
+                required_prestige,
+                ..
+            } => {
+                assert_eq!(zone_name, "Dark Forest");
+                assert_eq!(required_prestige, 5);
+            }
+            other => panic!("Expected ZoneCompleteButGated, got {:?}", other),
+        }
+        // Still stuck in zone 2 -- gating does not advance
+        assert_eq!(prog.current_zone_id, 2);
+    }
+
+    // =========================================================================
+    // NO-PRESTIGE VS P15+ EDGE CASE: EARLY GAME BOSS DEFEAT
+    // =========================================================================
+
+    #[test]
+    fn test_zone_1_boss_defeat_with_zero_prestige_rank() {
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        // A brand-new character (P0, no prestige ever) can still clear zone 1's
+        // subzone bosses and advance into zone 2 (P0 requirement).
+        for _ in 0..KILLS_FOR_BOSS {
+            prog.record_kill();
+        }
+        let result = prog.on_boss_defeated_with_cap(0, &mut achievements, 11, 30);
+        assert!(matches!(
+            result,
+            BossDefeatResult::SubzoneComplete { new_subzone_id: 2 }
+        ));
+    }
+
+    #[test]
+    fn test_fracture_zone_boss_defeat_requires_p15_or_higher_in_practice() {
+        // Fracture zones start at P50 (RedFault); this test documents that
+        // defeating a fracture-zone boss at P0 still resolves deterministically
+        // (the cap-cycle/advance logic does not itself re-check prestige for
+        // the *current* zone, only for the *next* one) -- it should cycle in
+        // place rather than panic or silently no-op.
+        let mut prog = ZoneProgression::new();
+        let mut achievements = Achievements::default();
+
+        setup_zone_boss_fight(&mut prog, 12);
+        prog.unlock_zone(13);
+        // Even though prestige_rank passed is 0 (well below any fracture
+        // requirement), zone 13 has no additional prestige requirement beyond
+        // zone 12's own, and advance_to_next_zone's prestige check is against
+        // the *next* zone (also P50) -- so at P0 it is gated, cycling in place.
+        let result = prog.on_boss_defeated_with_cap(0, &mut achievements, 14, 30);
+        assert_eq!(result, BossDefeatResult::FractureCycle { zone_id: 12 });
+    }
 }

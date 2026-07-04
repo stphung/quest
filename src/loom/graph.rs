@@ -718,4 +718,251 @@ mod tests {
             "edge rate should be non-zero after tracker update"
         );
     }
+
+    #[test]
+    fn test_update_edge_rates_zero_for_upgrading_extractor() {
+        let mut loom = loom_with_unlocked_extractors(6);
+        let shuttle = Shuttle::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        loom.persistent.shuttles.push(shuttle);
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].upgrading = true;
+
+        let mut lg = build_graph(&loom);
+        update_edge_rates(&mut lg, &loom);
+
+        let ember_ni = lg.node_indices[&LoomGraphNode::Extractor(NodeId::EmberSpindle)];
+        let outgoing: Vec<_> = lg
+            .graph
+            .edges_directed(ember_ni, petgraph::Direction::Outgoing)
+            .collect();
+        assert_eq!(outgoing.len(), 1);
+        assert_eq!(
+            outgoing[0].weight().current_rate,
+            0.0,
+            "upgrading extractor should produce zero flow"
+        );
+    }
+
+    #[test]
+    fn test_update_edge_rates_zero_for_under_construction_shuttle() {
+        let mut loom = loom_with_unlocked_extractors(6);
+        let mut shuttle = Shuttle::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        shuttle.under_construction = true;
+        loom.persistent.shuttles.push(shuttle);
+
+        let mut lg = build_graph(&loom);
+        update_edge_rates(&mut lg, &loom);
+
+        let shuttle_ni = lg.node_indices[&LoomGraphNode::Shuttle(0)];
+        let incoming: Vec<_> = lg
+            .graph
+            .edges_directed(shuttle_ni, petgraph::Direction::Incoming)
+            .collect();
+        assert_eq!(incoming.len(), 2);
+        for edge in incoming {
+            assert_eq!(
+                edge.weight().current_rate,
+                0.0,
+                "shuttle under construction should not pull any flow"
+            );
+        }
+    }
+
+    #[test]
+    fn test_update_edge_rates_contention_splits_shared_source() {
+        let mut loom = loom_with_unlocked_extractors(6);
+        // Two T1 shuttles both pull input A from the same extractor.
+        let shuttle_a = Shuttle::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        let shuttle_b = Shuttle::new(
+            Resource::Ember,
+            Resource::Memory,
+            NodeNature::Heat,
+            Resource::EchoGlass,
+            1.0,
+            1,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::MemoryArchive)],
+        );
+        loom.persistent.shuttles.push(shuttle_a);
+        loom.persistent.shuttles.push(shuttle_b);
+
+        let mut lg = build_graph(&loom);
+        update_edge_rates(&mut lg, &loom);
+
+        let ember_ni = lg.node_indices[&LoomGraphNode::Extractor(NodeId::EmberSpindle)];
+        let outgoing: Vec<_> = lg
+            .graph
+            .edges_directed(ember_ni, petgraph::Direction::Outgoing)
+            .collect();
+        assert_eq!(outgoing.len(), 2, "both shuttles pull from EmberSpindle");
+        let rates: Vec<f64> = outgoing.iter().map(|e| e.weight().current_rate).collect();
+        assert!(
+            (rates[0] - rates[1]).abs() < 1e-9,
+            "contention should split the source evenly: {:?}",
+            rates
+        );
+    }
+
+    #[test]
+    fn test_update_edge_rates_pattern_sink_uses_full_source_rate() {
+        let mut loom = loom_with_unlocked_extractors(6);
+        loom.persistent.patterns.push(WovenPattern {
+            index: 0,
+            name: "Sink Test".to_string(),
+            requirements: vec![PatternRequirement {
+                resource: Resource::Ember,
+                required_rate: 5.0,
+                sustain_duration_secs: 100.0,
+                sustained_secs: 0.0,
+                completed: false,
+                amount: 0.0,
+                accumulated: 0.0,
+            }],
+            completed: false,
+            flavor: String::new(),
+            eternal: false,
+        });
+        loom.persistent.active_pattern = 0;
+
+        let mut lg = build_graph(&loom);
+        update_edge_rates(&mut lg, &loom);
+
+        let sink_ni = lg.node_indices[&LoomGraphNode::PatternSink(0)];
+        let incoming: Vec<_> = lg
+            .graph
+            .edges_directed(sink_ni, petgraph::Direction::Incoming)
+            .collect();
+        assert_eq!(incoming.len(), 1);
+        // Full extractor rate should flow into the pattern sink (not divided
+        // by any consumer count), and max_rate should track it (>= 0.1 floor).
+        let edge = incoming[0].weight();
+        assert!(edge.current_rate > 0.0);
+        assert!(edge.max_rate >= 0.1);
+    }
+
+    #[test]
+    fn test_refresh_graph_builds_on_first_call() {
+        let mut loom = loom_with_unlocked_extractors(6);
+        let mut ui = LoomUiState::new();
+        assert!(ui.loom_graph.is_none());
+
+        refresh_graph(&mut ui, &mut loom, 400.0, 300.0);
+
+        assert!(ui.loom_graph.is_some());
+        assert!(ui.loom_layout.is_some());
+        assert!(!ui.graph_dirty);
+        assert!(!loom.graph_dirty);
+        assert!(
+            ui.selected_graph_node.is_some(),
+            "a default selection should be assigned"
+        );
+        assert_eq!(ui.particle_phases.len(), 0, "no edges yet without shuttles");
+    }
+
+    #[test]
+    fn test_refresh_graph_skips_rebuild_when_clean() {
+        let mut loom = loom_with_unlocked_extractors(6);
+        let mut ui = LoomUiState::new();
+        refresh_graph(&mut ui, &mut loom, 400.0, 300.0);
+
+        let selected_before = ui.selected_graph_node;
+        // Neither dirty flag set and graph already present => should not rebuild,
+        // just update rates/particles.
+        refresh_graph(&mut ui, &mut loom, 400.0, 300.0);
+        assert_eq!(ui.selected_graph_node, selected_before);
+    }
+
+    #[test]
+    fn test_refresh_graph_rebuilds_when_loom_flag_dirty() {
+        let mut loom = loom_with_unlocked_extractors(6);
+        let mut ui = LoomUiState::new();
+        refresh_graph(&mut ui, &mut loom, 400.0, 300.0);
+
+        loom.graph_dirty = true;
+        refresh_graph(&mut ui, &mut loom, 400.0, 300.0);
+        assert!(!loom.graph_dirty, "flag should be cleared after rebuild");
+    }
+
+    #[test]
+    fn test_refresh_graph_resets_invalid_selection() {
+        let mut loom = loom_with_unlocked_extractors(6);
+        let mut ui = LoomUiState::new();
+        refresh_graph(&mut ui, &mut loom, 400.0, 300.0);
+
+        // Point selection at a node index that cannot exist in a freshly
+        // rebuilt graph (only 6 nodes exist).
+        ui.selected_graph_node = Some(NodeIndex::new(999));
+        ui.graph_dirty = true;
+        refresh_graph(&mut ui, &mut loom, 400.0, 300.0);
+
+        let selected = ui.selected_graph_node.expect("should reassign a default");
+        assert!(lg_contains(&ui, selected));
+    }
+
+    fn lg_contains(ui: &LoomUiState, ni: NodeIndex) -> bool {
+        ui.loom_graph
+            .as_ref()
+            .map(|g| g.graph.node_weight(ni).is_some())
+            .unwrap_or(false)
+    }
+
+    #[test]
+    fn test_refresh_graph_advances_particle_phase_with_flow() {
+        let mut loom = loom_with_unlocked_extractors(6);
+        let shuttle = Shuttle::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        loom.persistent.shuttles.push(shuttle);
+        let mut ui = LoomUiState::new();
+
+        refresh_graph(&mut ui, &mut loom, 400.0, 300.0);
+        assert!(
+            !ui.particle_phases.is_empty(),
+            "edges should have particle phase entries"
+        );
+        let phase_before: f64 = ui.particle_phases.values().copied().sum();
+
+        // Second call without any dirty flags: rates recompute and phases advance.
+        refresh_graph(&mut ui, &mut loom, 400.0, 300.0);
+        let phase_after: f64 = ui.particle_phases.values().copied().sum();
+        assert!(
+            phase_after >= phase_before,
+            "particle phase should not decrease: before={} after={}",
+            phase_before,
+            phase_after
+        );
+    }
 }

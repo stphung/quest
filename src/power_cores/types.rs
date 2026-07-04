@@ -192,6 +192,55 @@ mod tests {
     }
 
     #[test]
+    fn fill_ratio_zero_at_start() {
+        assert_eq!(fill_ratio(0, 100), 0.0);
+    }
+
+    #[test]
+    fn fill_ratio_half_way() {
+        assert!((fill_ratio(50, 100) - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn fill_ratio_caps_at_one() {
+        assert_eq!(fill_ratio(150, 100), 1.0);
+        assert_eq!(fill_ratio(100, 100), 1.0);
+    }
+
+    #[test]
+    fn fill_ratio_clamps_negative_elapsed_to_zero() {
+        assert_eq!(fill_ratio(-50, 100), 0.0);
+    }
+
+    #[test]
+    fn fill_ratio_returns_one_when_fill_secs_zero_or_negative() {
+        assert_eq!(fill_ratio(50, 0), 1.0);
+        assert_eq!(fill_ratio(50, -10), 1.0);
+    }
+
+    #[test]
+    fn format_core_time_remaining_ready_when_ratio_at_least_one() {
+        assert_eq!(format_core_time_remaining(0, 1.0), "Ready!");
+        assert_eq!(format_core_time_remaining(100, 1.5), "Ready!");
+    }
+
+    #[test]
+    fn format_core_time_remaining_shows_hours_and_minutes() {
+        // 2h 30m = 9000s
+        assert_eq!(format_core_time_remaining(9000, 0.5), "2h 30m");
+    }
+
+    #[test]
+    fn format_core_time_remaining_shows_minutes_only_under_an_hour() {
+        assert_eq!(format_core_time_remaining(600, 0.5), "10m");
+    }
+
+    #[test]
+    fn format_core_time_remaining_clamps_negative_remaining_to_zero() {
+        assert_eq!(format_core_time_remaining(-100, 0.5), "0m");
+    }
+
+    #[test]
     fn core_definitions_ascending_pr_rate() {
         // Each successive core should grant at least as many PR/day as the previous.
         for window in ALL_POWER_CORES.windows(2) {

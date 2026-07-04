@@ -1363,6 +1363,214 @@ mod tests {
         );
     }
 
+    // =========================================================================
+    // STORM LURE TESTS
+    // =========================================================================
+
+    #[test]
+    fn test_storm_lure_consumed_on_leviathan_catch() {
+        // With the lure active and all 10 encounters done, a catch should
+        // consume the lure and reset the miss ramp.
+        let haven = HavenFishingBonuses::default();
+        let mut caught = false;
+
+        for seed in 0u64..10000 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut state = create_test_game_state();
+            state.fishing.rank = 40;
+            state.fishing.leviathan_encounters = 10;
+            state.fishing.storm_lure_active = true;
+            state.fishing.lure_miss_ramp = 0.05;
+
+            let session = FishingSession {
+                spot_name: "Deep Sea".to_string(),
+                total_fish: 100,
+                fish_caught: Vec::new(),
+                items_found: Vec::new(),
+                ticks_remaining: 1,
+                phase: FishingPhase::Reeling,
+            };
+            state.active_fishing = Some(session);
+
+            let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven, 0.0);
+
+            if result.caught_storm_leviathan {
+                assert!(result.lure_consumed, "Lure should be consumed on catch");
+                assert!(
+                    !state.fishing.storm_lure_active,
+                    "Lure should be deactivated after catch"
+                );
+                assert_eq!(
+                    state.fishing.lure_miss_ramp, 0.0,
+                    "Miss ramp should reset after catch"
+                );
+                caught = true;
+                break;
+            }
+        }
+
+        assert!(
+            caught,
+            "Should catch Leviathan with lure active + guaranteed bonuses eventually"
+        );
+    }
+
+    #[test]
+    fn test_storm_lure_consumed_on_encounter_and_boosts_tracking() {
+        // With the lure active and encounters remaining, an escape should
+        // consume the lure and add to the permanent tracking bonus.
+        let haven = HavenFishingBonuses::default();
+        let mut encountered = false;
+
+        for seed in 0u64..5000 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut state = create_test_game_state();
+            state.fishing.rank = 40;
+            state.fishing.leviathan_encounters = 0;
+            state.fishing.storm_lure_active = true;
+            let initial_tracking = state.fishing.lure_tracking_bonus;
+
+            let session = FishingSession {
+                spot_name: "Deep Sea".to_string(),
+                total_fish: 100,
+                fish_caught: Vec::new(),
+                items_found: Vec::new(),
+                ticks_remaining: 1,
+                phase: FishingPhase::Reeling,
+            };
+            state.active_fishing = Some(session);
+
+            let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven, 0.0);
+
+            if let Some(enc) = result.leviathan_encounter {
+                assert_eq!(enc, 1);
+                assert!(result.lure_consumed, "Lure should be consumed on encounter");
+                assert!(
+                    !state.fishing.storm_lure_active,
+                    "Lure should be deactivated after encounter"
+                );
+                assert!(
+                    state.fishing.lure_tracking_bonus > initial_tracking,
+                    "Tracking bonus should increase after encounter"
+                );
+                assert_eq!(
+                    state.fishing.lure_miss_ramp, 0.0,
+                    "Miss ramp should reset after encounter"
+                );
+                encountered = true;
+                break;
+            }
+        }
+
+        assert!(encountered, "Should encounter Leviathan with lure active");
+    }
+
+    #[test]
+    fn test_storm_lure_catch_miss_increments_ramp() {
+        // With the lure active and all 10 encounters done, a failed catch roll
+        // (CatchMiss) should consume the lure and bump the miss ramp.
+        let haven = HavenFishingBonuses::default();
+        let mut missed = false;
+
+        for seed in 0u64..10000 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut state = create_test_game_state();
+            state.fishing.rank = 40;
+            state.fishing.leviathan_encounters = 10;
+            state.fishing.storm_lure_active = true;
+            state.fishing.lure_miss_ramp = 0.0;
+            // A positive lure bonus is required for CatchMiss to be signalled
+            // (see generate_fish_with_rank: `if lure_catch_bonus > 0.0`).
+            state.fishing.lure_tracking_bonus = 0.05;
+
+            let session = FishingSession {
+                spot_name: "Deep Sea".to_string(),
+                total_fish: 100,
+                fish_caught: Vec::new(),
+                items_found: Vec::new(),
+                ticks_remaining: 1,
+                phase: FishingPhase::Reeling,
+            };
+            state.active_fishing = Some(session);
+
+            let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven, 0.0);
+
+            if result.leviathan_catch_miss {
+                assert!(
+                    result.lure_consumed,
+                    "Lure should be consumed on catch miss"
+                );
+                assert!(
+                    !state.fishing.storm_lure_active,
+                    "Lure should be deactivated after catch miss"
+                );
+                assert!(
+                    state.fishing.lure_miss_ramp > 0.0,
+                    "Miss ramp should increase after catch miss"
+                );
+                missed = true;
+                break;
+            }
+        }
+
+        assert!(
+            missed,
+            "Should eventually get a catch miss with lure active at 10 encounters"
+        );
+    }
+
+    #[test]
+    fn test_lure_miss_ramp_increments_on_no_encounter_with_lure_active() {
+        // LeviathanResult::None while the lure is active (encounters < 10) should
+        // still bump the miss ramp for legendary catches at rank 40+.
+        let haven = HavenFishingBonuses::default();
+        let mut ramped = false;
+
+        for seed in 0u64..2000 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut state = create_test_game_state();
+            state.fishing.rank = 40;
+            state.fishing.leviathan_encounters = 0;
+            state.fishing.storm_lure_active = true;
+            // Force a legendary catch on the first roll by cranking rank stats
+            // is not directly controllable; instead run many seeds and check
+            // whenever a legendary was caught without an encounter/catch event.
+            let initial_ramp = state.fishing.lure_miss_ramp;
+
+            let session = FishingSession {
+                spot_name: "Deep Sea".to_string(),
+                total_fish: 100,
+                fish_caught: Vec::new(),
+                items_found: Vec::new(),
+                ticks_remaining: 1,
+                phase: FishingPhase::Reeling,
+            };
+            state.active_fishing = Some(session);
+
+            let result = tick_fishing_with_haven_result(&mut state, &mut rng, &haven, 0.0);
+
+            let caught_legendary_no_event = state
+                .active_fishing
+                .as_ref()
+                .and_then(|s| s.fish_caught.last())
+                .map(|f| f.rarity == FishRarity::Legendary)
+                .unwrap_or(false)
+                && result.leviathan_encounter.is_none()
+                && !result.caught_storm_leviathan
+                && !result.leviathan_catch_miss;
+
+            if caught_legendary_no_event && state.fishing.lure_miss_ramp > initial_ramp {
+                ramped = true;
+                break;
+            }
+        }
+
+        assert!(
+            ramped,
+            "Miss ramp should increase on legendary catches with lure active but no encounter"
+        );
+    }
+
     #[test]
     fn test_god_item_fishing_reduction_stacks_with_haven() {
         let base_ticks = 100;

@@ -239,4 +239,160 @@ mod tests {
         let loaded: PatternMilestone = serde_json::from_str(&json).unwrap();
         assert_eq!(loaded, PatternMilestone::GrandDesign);
     }
+
+    const ALL_MILESTONES: [PatternMilestone; 5] = [
+        PatternMilestone::ThreadWilds,
+        PatternMilestone::WovenFrontier,
+        PatternMilestone::TheUnraveling,
+        PatternMilestone::GrandDesign,
+        PatternMilestone::FinalWeave,
+    ];
+
+    #[test]
+    fn test_from_count_round_trips_with_pattern_count() {
+        // Every milestone variant should be re-derivable from its own pattern_count().
+        for milestone in ALL_MILESTONES {
+            assert_eq!(
+                PatternMilestone::from_count(milestone.pattern_count()),
+                Some(milestone)
+            );
+        }
+    }
+
+    #[test]
+    fn test_zone_ranges_all_variants_and_ordering() {
+        for milestone in ALL_MILESTONES {
+            let start = milestone.start_zone_id();
+            let end = milestone.end_zone_id();
+            assert!(
+                start <= end,
+                "{:?}: start {} should be <= end {}",
+                milestone,
+                start,
+                end
+            );
+            // Each milestone unlocks exactly a 4-zone span.
+            assert_eq!(end - start, 3, "{:?} should span 4 zones", milestone);
+        }
+        assert_eq!(PatternMilestone::WovenFrontier.start_zone_id(), 35);
+        assert_eq!(PatternMilestone::WovenFrontier.end_zone_id(), 38);
+        assert_eq!(PatternMilestone::TheUnraveling.start_zone_id(), 39);
+        assert_eq!(PatternMilestone::TheUnraveling.end_zone_id(), 42);
+        assert_eq!(PatternMilestone::GrandDesign.start_zone_id(), 43);
+        assert_eq!(PatternMilestone::GrandDesign.end_zone_id(), 46);
+    }
+
+    #[test]
+    fn test_unlock_headline_all_variants_nonempty() {
+        for milestone in ALL_MILESTONES {
+            assert!(!milestone.unlock_headline().is_empty());
+        }
+        assert_eq!(
+            PatternMilestone::ThreadWilds.unlock_headline(),
+            "THE THREAD WILDS AWAKEN"
+        );
+        assert_eq!(
+            PatternMilestone::FinalWeave.unlock_headline(),
+            "THE FINAL WEAVE COMPLETES"
+        );
+    }
+
+    #[test]
+    fn test_unlock_atmospheric_all_variants_nonempty() {
+        for milestone in ALL_MILESTONES {
+            assert!(!milestone.unlock_atmospheric().is_empty());
+        }
+    }
+
+    #[test]
+    fn test_unlock_mechanical_all_variants_mention_zones() {
+        for milestone in ALL_MILESTONES {
+            assert!(!milestone.unlock_mechanical().is_empty());
+        }
+        assert_eq!(
+            PatternMilestone::FinalWeave.unlock_mechanical(),
+            "Zones 47-50 are now reachable. The Loom is complete."
+        );
+    }
+
+    #[test]
+    fn test_ascension_level_unlocked_all_variants() {
+        assert_eq!(
+            PatternMilestone::ThreadWilds.ascension_level_unlocked(),
+            None
+        );
+        assert_eq!(
+            PatternMilestone::WovenFrontier.ascension_level_unlocked(),
+            Some(7)
+        );
+        assert_eq!(
+            PatternMilestone::TheUnraveling.ascension_level_unlocked(),
+            Some(8)
+        );
+        assert_eq!(
+            PatternMilestone::GrandDesign.ascension_level_unlocked(),
+            Some(9)
+        );
+        assert_eq!(
+            PatternMilestone::FinalWeave.ascension_level_unlocked(),
+            Some(10)
+        );
+    }
+
+    #[test]
+    fn test_ascension_narrative_all_variants() {
+        // ThreadWilds is the only milestone with no new Ascension tier, so its
+        // narrative bridge text is intentionally empty; all others are non-empty.
+        assert_eq!(PatternMilestone::ThreadWilds.ascension_narrative(), "");
+        for milestone in ALL_MILESTONES {
+            if milestone != PatternMilestone::ThreadWilds {
+                assert!(!milestone.ascension_narrative().is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn test_unlock_log_line_all_variants_nonempty() {
+        for milestone in ALL_MILESTONES {
+            assert!(!milestone.unlock_log_line().is_empty());
+        }
+        assert_eq!(
+            PatternMilestone::TheUnraveling.unlock_log_line(),
+            "The Unraveling has begun beyond the woven frontier."
+        );
+    }
+
+    #[test]
+    fn test_unlock_ticker_text_all_variants_nonempty() {
+        for milestone in ALL_MILESTONES {
+            assert!(!milestone.unlock_ticker_text().is_empty());
+        }
+        assert_eq!(
+            PatternMilestone::GrandDesign.unlock_ticker_text(),
+            "Grand Design revealed"
+        );
+    }
+
+    #[test]
+    fn test_wr_pr_narrative_only_final_weave() {
+        for milestone in ALL_MILESTONES {
+            if milestone == PatternMilestone::FinalWeave {
+                assert!(milestone.wr_pr_narrative().is_some());
+            } else {
+                assert!(milestone.wr_pr_narrative().is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn test_milestone_debug_and_hash() {
+        // Debug + Hash are derived; exercise them via a HashSet insertion.
+        use std::collections::HashSet;
+        let mut set = HashSet::new();
+        for milestone in ALL_MILESTONES {
+            set.insert(milestone);
+            assert!(!format!("{:?}", milestone).is_empty());
+        }
+        assert_eq!(set.len(), 5);
+    }
 }

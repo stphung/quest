@@ -279,6 +279,79 @@ mod tests {
     }
 
     #[test]
+    fn offline_catchup_initialises_uninitialised_core_without_granting() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let mut deep = DeepState::default(); // all timestamps missing (0)
+        let achievements = unlocked_achievements();
+
+        let pr_before = state.prestige_rank;
+        let granted = apply_offline_power_cores(&mut state, &mut deep, &achievements);
+
+        assert_eq!(granted, 0);
+        assert_eq!(state.prestige_rank, pr_before);
+        assert!(deep
+            .persistent
+            .power_core_last_granted
+            .contains_key(&AchievementId::PowerCoreI));
+    }
+
+    #[test]
+    fn offline_catchup_no_grant_when_fill_timer_not_elapsed() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let mut deep = DeepState::default();
+        let achievements = unlocked_achievements();
+
+        let now = Utc::now().timestamp();
+        // Last granted just now — no elapsed time, so no offline catchup.
+        deep.persistent
+            .power_core_last_granted
+            .insert(AchievementId::PowerCoreI, now);
+
+        let pr_before = state.prestige_rank;
+        let granted = apply_offline_power_cores(&mut state, &mut deep, &achievements);
+
+        assert_eq!(granted, 0);
+        assert_eq!(state.prestige_rank, pr_before);
+    }
+
+    #[test]
+    fn init_new_core_sets_timestamp_when_absent() {
+        let mut deep = DeepState::default();
+        assert!(!deep
+            .persistent
+            .power_core_last_granted
+            .contains_key(&AchievementId::PowerCoreI));
+
+        init_new_core(&mut deep, AchievementId::PowerCoreI);
+
+        let ts = *deep
+            .persistent
+            .power_core_last_granted
+            .get(&AchievementId::PowerCoreI)
+            .unwrap();
+        assert!(ts > 0);
+    }
+
+    #[test]
+    fn init_new_core_is_idempotent_when_already_set() {
+        let mut deep = DeepState::default();
+        deep.persistent
+            .power_core_last_granted
+            .insert(AchievementId::PowerCoreI, 12345);
+
+        init_new_core(&mut deep, AchievementId::PowerCoreI);
+
+        // Existing timestamp should not be overwritten.
+        assert_eq!(
+            deep.persistent
+                .power_core_last_granted
+                .get(&AchievementId::PowerCoreI)
+                .copied(),
+            Some(12345)
+        );
+    }
+
+    #[test]
     fn no_grant_for_locked_cores() {
         let mut state = GameState::new("Test".to_string(), 0);
         let mut deep = DeepState::default();

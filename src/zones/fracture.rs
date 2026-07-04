@@ -233,6 +233,251 @@ mod tests {
     }
 
     #[test]
+    fn test_unlock_headline_all_variants() {
+        assert_eq!(
+            FractureRegion::MirrorScar.unlock_headline(),
+            "THE MIRROR SCAR AWAKES"
+        );
+        assert_eq!(
+            FractureRegion::BlackMouth.unlock_headline(),
+            "THE BLACK MOUTH UNSEALS"
+        );
+        assert_eq!(
+            FractureRegion::HollowThrone.unlock_headline(),
+            "THE HOLLOW THRONE REVEALS"
+        );
+        assert_eq!(
+            FractureRegion::WailingReach.unlock_headline(),
+            "THE WAILING REACH CALLS"
+        );
+        assert_eq!(
+            FractureRegion::OriginWound.unlock_headline(),
+            "THE ORIGIN WOUND OPENS"
+        );
+    }
+
+    const ALL_REGIONS: [FractureRegion; 6] = [
+        FractureRegion::RedFault,
+        FractureRegion::MirrorScar,
+        FractureRegion::BlackMouth,
+        FractureRegion::HollowThrone,
+        FractureRegion::WailingReach,
+        FractureRegion::OriginWound,
+    ];
+
+    #[test]
+    fn test_unlock_atmospheric_all_variants() {
+        assert_eq!(
+            FractureRegion::RedFault.unlock_atmospheric(),
+            "The surface has split, and the wound is burning."
+        );
+        assert_eq!(
+            FractureRegion::MirrorScar.unlock_atmospheric(),
+            "The horizon has cracked. Reflection now bleeds into the world."
+        );
+        assert_eq!(
+            FractureRegion::BlackMouth.unlock_atmospheric(),
+            "The final wound has opened wide enough to hunger."
+        );
+        assert_eq!(
+            FractureRegion::HollowThrone.unlock_atmospheric(),
+            "Beyond the wound, a kingdom older than the world still waits."
+        );
+        assert_eq!(
+            FractureRegion::WailingReach.unlock_atmospheric(),
+            "Reality forgets itself here. Sound has learned to weep."
+        );
+        assert_eq!(
+            FractureRegion::OriginWound.unlock_atmospheric(),
+            "The first fracture. The wound that was here before the world it broke."
+        );
+    }
+
+    #[test]
+    fn test_power_core_narrative_all_variants() {
+        assert!(FractureRegion::RedFault
+            .power_core_narrative()
+            .contains("Red Fault"));
+        assert_eq!(
+            FractureRegion::MirrorScar.power_core_narrative(),
+            "A second core awakens in the Mirror Scar."
+        );
+        assert_eq!(
+            FractureRegion::BlackMouth.power_core_narrative(),
+            "A core pulses in the Black Mouth, feeding on the dark."
+        );
+        assert_eq!(
+            FractureRegion::HollowThrone.power_core_narrative(),
+            "The Hollow Throne yields an ancient core."
+        );
+        assert_eq!(
+            FractureRegion::WailingReach.power_core_narrative(),
+            "The Wailing Reach resonates with a core beyond hearing."
+        );
+        assert_eq!(
+            FractureRegion::OriginWound.power_core_narrative(),
+            "Its final core beats at the origin."
+        );
+    }
+
+    #[test]
+    fn test_unlock_mechanical_all_variants() {
+        assert_eq!(
+            FractureRegion::RedFault.unlock_mechanical(),
+            "Zones 12-14 are now reachable beyond the current frontier."
+        );
+        assert_eq!(
+            FractureRegion::MirrorScar.unlock_mechanical(),
+            "Zones 15-17 are now reachable beyond the current frontier."
+        );
+        assert_eq!(
+            FractureRegion::BlackMouth.unlock_mechanical(),
+            "Zones 18-20 are now reachable beyond the current frontier."
+        );
+        assert_eq!(
+            FractureRegion::HollowThrone.unlock_mechanical(),
+            "Zones 21-23 are now reachable beyond the current frontier."
+        );
+        assert_eq!(
+            FractureRegion::WailingReach.unlock_mechanical(),
+            "Zones 24-26 are now reachable beyond the current frontier."
+        );
+        assert_eq!(
+            FractureRegion::OriginWound.unlock_mechanical(),
+            "Zones 27-30 are now reachable beyond the current frontier."
+        );
+    }
+
+    #[test]
+    fn test_ascension_narrative_all_variants() {
+        assert_eq!(
+            FractureRegion::RedFault.ascension_narrative(),
+            "The fracture has tested you. Your strength can now transcend mortal limits."
+        );
+        assert_eq!(
+            FractureRegion::MirrorScar.ascension_narrative(),
+            "The rift deepens. Greater power stirs within you."
+        );
+        assert_eq!(
+            FractureRegion::BlackMouth.ascension_narrative(),
+            "The abyss answers. Unimaginable power awaits those who dare claim it."
+        );
+        assert_eq!(
+            FractureRegion::HollowThrone.ascension_narrative(),
+            "The throne's guardians have fallen. Power beyond reckoning yields to your will."
+        );
+        assert_eq!(
+            FractureRegion::WailingReach.ascension_narrative(),
+            "The reach has acknowledged you. Even silence bows before your strength."
+        );
+        assert_eq!(
+            FractureRegion::OriginWound.ascension_narrative(),
+            "You stand at the source of all breaking. Nothing remains that can challenge you."
+        );
+    }
+
+    #[test]
+    fn test_ascension_level_unlocked_all_variants() {
+        assert_eq!(FractureRegion::RedFault.ascension_level_unlocked(), 1);
+        assert_eq!(FractureRegion::MirrorScar.ascension_level_unlocked(), 2);
+        assert_eq!(FractureRegion::BlackMouth.ascension_level_unlocked(), 3);
+        assert_eq!(FractureRegion::HollowThrone.ascension_level_unlocked(), 4);
+        assert_eq!(FractureRegion::WailingReach.ascension_level_unlocked(), 5);
+        assert_eq!(FractureRegion::OriginWound.ascension_level_unlocked(), 6);
+    }
+
+    #[test]
+    fn test_unlock_log_line_all_variants() {
+        assert_eq!(
+            FractureRegion::RedFault.unlock_log_line(),
+            "The Red Fault has opened beyond the Expanse."
+        );
+        assert_eq!(
+            FractureRegion::MirrorScar.unlock_log_line(),
+            "The Mirror Scar has awakened beyond the frontier."
+        );
+        assert_eq!(
+            FractureRegion::BlackMouth.unlock_log_line(),
+            "The Black Mouth has unsealed beyond the world's wound."
+        );
+        assert_eq!(
+            FractureRegion::HollowThrone.unlock_log_line(),
+            "The Hollow Throne has revealed itself beneath the wound."
+        );
+        assert_eq!(
+            FractureRegion::WailingReach.unlock_log_line(),
+            "The Wailing Reach calls from the boundary of existence."
+        );
+        assert_eq!(
+            FractureRegion::OriginWound.unlock_log_line(),
+            "The Origin Wound has opened at the source of all fractures."
+        );
+    }
+
+    #[test]
+    fn test_unlock_ticker_text_all_variants() {
+        assert_eq!(
+            FractureRegion::RedFault.unlock_ticker_text(),
+            "Red Fault available"
+        );
+        assert_eq!(
+            FractureRegion::MirrorScar.unlock_ticker_text(),
+            "Mirror Scar available"
+        );
+        assert_eq!(
+            FractureRegion::BlackMouth.unlock_ticker_text(),
+            "Black Mouth available"
+        );
+        assert_eq!(
+            FractureRegion::HollowThrone.unlock_ticker_text(),
+            "Hollow Throne available"
+        );
+        assert_eq!(
+            FractureRegion::WailingReach.unlock_ticker_text(),
+            "Wailing Reach available"
+        );
+        assert_eq!(
+            FractureRegion::OriginWound.unlock_ticker_text(),
+            "Origin Wound available"
+        );
+    }
+
+    #[test]
+    fn test_all_regions_have_non_empty_narrative_text() {
+        for region in ALL_REGIONS {
+            assert!(!region.unlock_headline().is_empty());
+            assert!(!region.unlock_atmospheric().is_empty());
+            assert!(!region.power_core_narrative().is_empty());
+            assert!(!region.unlock_mechanical().is_empty());
+            assert!(!region.ascension_narrative().is_empty());
+            assert!(!region.unlock_log_line().is_empty());
+            assert!(!region.unlock_ticker_text().is_empty());
+        }
+    }
+
+    #[test]
+    fn test_all_layer_gates_round_trip_to_matching_region() {
+        for region in ALL_REGIONS {
+            assert_eq!(
+                FractureRegion::from_layer(region.unlock_layer()),
+                Some(region)
+            );
+        }
+    }
+
+    #[test]
+    fn test_end_zone_id_is_start_plus_two_except_origin_wound() {
+        for region in ALL_REGIONS {
+            if region == FractureRegion::OriginWound {
+                // Origin Wound has 4 zones (finale chapter), not 3.
+                assert_eq!(region.end_zone_id(), region.start_zone_id() + 3);
+            } else {
+                assert_eq!(region.end_zone_id(), region.start_zone_id() + 2);
+            }
+        }
+    }
+
+    #[test]
     fn test_serde_round_trip() {
         let region = FractureRegion::MirrorScar;
         let json = serde_json::to_string(&region).unwrap();

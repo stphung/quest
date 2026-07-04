@@ -38,7 +38,17 @@ mod tests {
     /// share one test to keep set/restore ordering deterministic.
     #[test]
     fn test_quest_dir_env_override() {
+        // Pin a known prior value ourselves (rather than trusting whatever the
+        // ambient environment happens to have) so `saved` is deterministically
+        // `Some(..)` below, exercising the "restore a prior value" branch
+        // regardless of whether QUEST_DIR was set before this test ran. This
+        // matches the save/restore pattern used elsewhere for this same
+        // process-global env var (e.g. haven/logic.rs, character/manager.rs):
+        // each guarded test restores to whatever it captured as `saved`, not
+        // necessarily the absolute pre-suite value.
+        std::env::set_var(QUEST_DIR_ENV, "/tmp/quest-test-prior-marker");
         let saved = std::env::var(QUEST_DIR_ENV).ok();
+        assert_eq!(saved.as_deref(), Some("/tmp/quest-test-prior-marker"));
 
         std::env::set_var(QUEST_DIR_ENV, "/tmp/quest-test-override");
         assert_eq!(

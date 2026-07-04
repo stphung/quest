@@ -263,4 +263,53 @@ mod tests {
         let loaded: CombatState = serde_json::from_str(&json).unwrap();
         assert!((loaded.current_fight_elapsed - 0.0).abs() < f64::EPSILON);
     }
+
+    fn flash(remaining: f64) -> DamageFlash {
+        DamageFlash {
+            text: "10".to_string(),
+            color: ratatui::style::Color::Red,
+            bold: false,
+            remaining,
+        }
+    }
+
+    #[test]
+    fn test_tick_hud_removes_expired_flashes() {
+        let mut cs = CombatState::new(50);
+        cs.player_damage_floats.push(flash(0.5));
+        cs.enemy_damage_floats.push(flash(0.2));
+
+        // Not expired yet
+        cs.tick_hud(0.1);
+        assert_eq!(cs.player_damage_floats.len(), 1);
+        assert_eq!(cs.enemy_damage_floats.len(), 1);
+
+        // Enemy flash expires (0.2 - 0.3 <= 0.0), player flash survives
+        cs.tick_hud(0.3);
+        assert_eq!(cs.player_damage_floats.len(), 1);
+        assert_eq!(cs.enemy_damage_floats.len(), 0);
+
+        // Player flash now expires too
+        cs.tick_hud(1.0);
+        assert!(cs.player_damage_floats.is_empty());
+    }
+
+    #[test]
+    fn test_tick_hud_keeps_multiple_active_flashes() {
+        let mut cs = CombatState::new(50);
+        cs.player_damage_floats.push(flash(1.0));
+        cs.player_damage_floats.push(flash(2.0));
+
+        cs.tick_hud(0.5);
+
+        assert_eq!(cs.player_damage_floats.len(), 2);
+        assert!(cs.player_damage_floats.iter().all(|f| f.remaining > 0.0));
+    }
+
+    #[test]
+    fn test_is_player_alive_false_when_hp_zero() {
+        let mut cs = CombatState::new(50);
+        cs.player_current_hp = 0;
+        assert!(!cs.is_player_alive());
+    }
 }

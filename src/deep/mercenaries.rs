@@ -1619,6 +1619,363 @@ mod tests {
         assert_eq!(merc.expertise, pre_expertise + 4 + 2); // flat + primary
     }
 
+    // ── Recruit Quality Distribution (Ranks 3-5) ─────────────────────────────
+
+    #[test]
+    fn test_roll_recruit_quality_rank3_distribution() {
+        let mut rng = seeded_rng(909);
+        let n = 10_000;
+        let mut common = 0u32;
+        let mut uncommon = 0u32;
+        let mut rare = 0u32;
+        for _ in 0..n {
+            match roll_recruit_quality(GuildRank(3), &mut rng) {
+                MercQuality::Common => common += 1,
+                MercQuality::Uncommon => uncommon += 1,
+                MercQuality::Rare => rare += 1,
+                q => panic!("Rank 3 should not produce {:?}", q),
+            }
+        }
+        let common_rate = common as f64 / n as f64;
+        let uncommon_rate = uncommon as f64 / n as f64;
+        let rare_rate = rare as f64 / n as f64;
+        // Expected: 30% Common, 50% Uncommon, 20% Rare (±3% tolerance)
+        assert!(
+            (common_rate - 0.30).abs() < 0.03,
+            "Rank 3 Common rate: {:.2}%",
+            common_rate * 100.0
+        );
+        assert!(
+            (uncommon_rate - 0.50).abs() < 0.03,
+            "Rank 3 Uncommon rate: {:.2}%",
+            uncommon_rate * 100.0
+        );
+        assert!(
+            (rare_rate - 0.20).abs() < 0.03,
+            "Rank 3 Rare rate: {:.2}%",
+            rare_rate * 100.0
+        );
+    }
+
+    #[test]
+    fn test_roll_recruit_quality_rank4_distribution() {
+        let mut rng = seeded_rng(910);
+        let n = 10_000;
+        let mut uncommon = 0u32;
+        let mut rare = 0u32;
+        let mut elite = 0u32;
+        for _ in 0..n {
+            match roll_recruit_quality(GuildRank(4), &mut rng) {
+                MercQuality::Uncommon => uncommon += 1,
+                MercQuality::Rare => rare += 1,
+                MercQuality::Elite => elite += 1,
+                q => panic!("Rank 4 should never produce {:?}", q),
+            }
+        }
+        let uncommon_rate = uncommon as f64 / n as f64;
+        let rare_rate = rare as f64 / n as f64;
+        let elite_rate = elite as f64 / n as f64;
+        // Expected: 40% Uncommon, 50% Rare, 10% Elite (±3% tolerance)
+        assert!(
+            (uncommon_rate - 0.40).abs() < 0.03,
+            "Rank 4 Uncommon rate: {:.2}%",
+            uncommon_rate * 100.0
+        );
+        assert!(
+            (rare_rate - 0.50).abs() < 0.03,
+            "Rank 4 Rare rate: {:.2}%",
+            rare_rate * 100.0
+        );
+        assert!(
+            (elite_rate - 0.10).abs() < 0.03,
+            "Rank 4 Elite rate: {:.2}%",
+            elite_rate * 100.0
+        );
+    }
+
+    #[test]
+    fn test_roll_recruit_quality_rank5_distribution() {
+        let mut rng = seeded_rng(911);
+        let n = 10_000;
+        let mut uncommon = 0u32;
+        let mut rare = 0u32;
+        let mut elite = 0u32;
+        for _ in 0..n {
+            match roll_recruit_quality(GuildRank(5), &mut rng) {
+                MercQuality::Uncommon => uncommon += 1,
+                MercQuality::Rare => rare += 1,
+                MercQuality::Elite => elite += 1,
+                q => panic!("Rank 5 should never produce {:?}", q),
+            }
+        }
+        let uncommon_rate = uncommon as f64 / n as f64;
+        let rare_rate = rare as f64 / n as f64;
+        let elite_rate = elite as f64 / n as f64;
+        // Expected: 20% Uncommon, 50% Rare, 30% Elite (±3% tolerance)
+        assert!(
+            (uncommon_rate - 0.20).abs() < 0.03,
+            "Rank 5 Uncommon rate: {:.2}%",
+            uncommon_rate * 100.0
+        );
+        assert!(
+            (rare_rate - 0.50).abs() < 0.03,
+            "Rank 5 Rare rate: {:.2}%",
+            rare_rate * 100.0
+        );
+        assert!(
+            (elite_rate - 0.30).abs() < 0.03,
+            "Rank 5 Elite rate: {:.2}%",
+            elite_rate * 100.0
+        );
+    }
+
+    // ── Archetype Gating by Rank ──────────────────────────────────────────────
+
+    #[test]
+    fn test_recruit_pool_rank2_includes_arcanist_but_not_saboteur() {
+        let mut rng = seeded_rng(912);
+        let mut id_counter = 0u64;
+        let mut saw_arcanist = false;
+        for _ in 0..100 {
+            let pool = generate_recruit_pool(
+                GuildRank(2),
+                || {
+                    id_counter += 1;
+                    id_counter
+                },
+                &mut rng,
+            );
+            for merc in &pool.candidates {
+                assert_ne!(
+                    merc.archetype,
+                    MercArchetype::Saboteur,
+                    "Rank 2 should never produce Saboteur"
+                );
+                if merc.archetype == MercArchetype::Arcanist {
+                    saw_arcanist = true;
+                }
+            }
+        }
+        assert!(saw_arcanist, "Rank 2 should be able to produce Arcanist");
+    }
+
+    #[test]
+    fn test_recruit_pool_rank3_includes_saboteur() {
+        let mut rng = seeded_rng(913);
+        let mut id_counter = 0u64;
+        let mut saw_saboteur = false;
+        for _ in 0..100 {
+            let pool = generate_recruit_pool(
+                GuildRank(3),
+                || {
+                    id_counter += 1;
+                    id_counter
+                },
+                &mut rng,
+            );
+            for merc in &pool.candidates {
+                if merc.archetype == MercArchetype::Saboteur {
+                    saw_saboteur = true;
+                }
+            }
+        }
+        assert!(saw_saboteur, "Rank 3+ should be able to produce Saboteur");
+    }
+
+    // ── Archetype Primary Flags ──────────────────────────────────────────────
+
+    #[test]
+    fn test_archetype_primary_flags_all_variants() {
+        assert_eq!(
+            archetype_primary_flags(MercArchetype::Vanguard),
+            (true, true, false)
+        );
+        assert_eq!(
+            archetype_primary_flags(MercArchetype::Scout),
+            (false, true, true)
+        );
+        assert_eq!(
+            archetype_primary_flags(MercArchetype::Arcanist),
+            (false, false, true)
+        );
+        assert_eq!(
+            archetype_primary_flags(MercArchetype::Medic),
+            (false, true, true)
+        );
+        assert_eq!(
+            archetype_primary_flags(MercArchetype::Saboteur),
+            (false, false, true)
+        );
+    }
+
+    // ── Starter Roster Quality Scaling ────────────────────────────────────────
+
+    #[test]
+    fn test_generate_starter_roster_quality_scales_with_rank() {
+        let mut rng = seeded_rng(914);
+        let mut id_counter = 0u64;
+        let mut next_id = || {
+            id_counter += 1;
+            id_counter
+        };
+
+        let r1 = generate_starter_roster(GuildRank(1), &mut next_id, &mut rng);
+        assert!(r1.iter().all(|m| m.quality == MercQuality::Common));
+
+        let r2 = generate_starter_roster(GuildRank(2), &mut next_id, &mut rng);
+        assert!(r2.iter().all(|m| m.quality == MercQuality::Common));
+
+        let r3 = generate_starter_roster(GuildRank(3), &mut next_id, &mut rng);
+        assert!(r3.iter().all(|m| m.quality == MercQuality::Uncommon));
+
+        let r4 = generate_starter_roster(GuildRank(4), &mut next_id, &mut rng);
+        assert!(r4.iter().all(|m| m.quality == MercQuality::Rare));
+
+        let r5 = generate_starter_roster(GuildRank(5), &mut next_id, &mut rng);
+        assert!(r5.iter().all(|m| m.quality == MercQuality::Rare));
+    }
+
+    // ── apply_merc_xp ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_apply_merc_xp_gains_levels_and_scales_stats_up() {
+        let mut rng = seeded_rng(1);
+        let mut merc =
+            generate_mercenary(1, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+        let pre_power = merc.power;
+        let gained = apply_merc_xp(&mut merc, 3);
+        assert_eq!(gained, 3);
+        assert_eq!(merc.level, 4);
+        assert!(
+            merc.power > pre_power,
+            "Power should increase after leveling up (before {}, after {})",
+            pre_power,
+            merc.power
+        );
+    }
+
+    #[test]
+    fn test_apply_merc_xp_zero_levels_gained_is_noop() {
+        let mut rng = seeded_rng(2);
+        let mut merc = generate_mercenary(1, MercArchetype::Scout, MercQuality::Common, &mut rng);
+        let pre_power = merc.power;
+        let gained = apply_merc_xp(&mut merc, 0);
+        assert_eq!(gained, 0);
+        assert_eq!(merc.level, 1);
+        assert_eq!(merc.power, pre_power);
+    }
+
+    #[test]
+    fn test_apply_merc_xp_caps_at_max_level_20() {
+        let mut rng = seeded_rng(3);
+        let mut merc =
+            generate_mercenary(1, MercArchetype::Arcanist, MercQuality::Common, &mut rng);
+        let gained = apply_merc_xp(&mut merc, 25); // Try to gain more than the cap allows
+        assert_eq!(gained, 19); // 1 -> 20 is 19 levels
+        assert_eq!(merc.level, 20);
+
+        // Once at level 20, further XP grants nothing.
+        let gained_again = apply_merc_xp(&mut merc, 5);
+        assert_eq!(gained_again, 0);
+        assert_eq!(merc.level, 20);
+    }
+
+    // ── promotion_cost edge cases ─────────────────────────────────────────────
+
+    #[test]
+    fn test_promotion_cost_common_is_always_zero() {
+        // Common is unreachable as a promotion target (min == max == 0).
+        for id in [0u64, 1, 42, 999] {
+            assert_eq!(promotion_cost(id, MercQuality::Common), 0);
+        }
+    }
+
+    // ── promote_merc_by_id ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_promote_merc_by_id_success() {
+        use crate::deep::types::DeepPrestige;
+        let mut rng = seeded_rng(1);
+        let mut merc = generate_mercenary(10, MercArchetype::Medic, MercQuality::Common, &mut rng);
+        merc.missions_completed = 5;
+        let merc_name = merc.name.clone();
+
+        let mut prestige = DeepPrestige {
+            warband_marks: 1000,
+            ..Default::default()
+        };
+        prestige.roster.insert(merc.id, merc);
+
+        let result = promote_merc_by_id(10, &mut prestige, GuildRank(2));
+        assert!(result.is_ok());
+        let (name, quality_name, cost) = result.unwrap();
+        assert_eq!(name, merc_name);
+        assert_eq!(quality_name, "Uncommon");
+        assert_eq!(cost, promotion_cost(10, MercQuality::Uncommon));
+        assert_eq!(
+            prestige.find_merc(10).unwrap().quality,
+            MercQuality::Uncommon
+        );
+    }
+
+    #[test]
+    fn test_promote_merc_by_id_not_found() {
+        use crate::deep::types::DeepPrestige;
+        let mut prestige = DeepPrestige {
+            warband_marks: 1000,
+            ..Default::default()
+        };
+        let result = promote_merc_by_id(999, &mut prestige, GuildRank(2));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_promote_merc_by_id_insufficient_marks() {
+        use crate::deep::types::DeepPrestige;
+        let mut rng = seeded_rng(1);
+        let mut merc =
+            generate_mercenary(11, MercArchetype::Vanguard, MercQuality::Common, &mut rng);
+        merc.missions_completed = 5;
+
+        let mut prestige = DeepPrestige {
+            warband_marks: 0,
+            ..Default::default()
+        };
+        prestige.roster.insert(merc.id, merc);
+
+        let result = promote_merc_by_id(11, &mut prestige, GuildRank(2));
+        assert!(matches!(
+            result,
+            Err(PromotionError::InsufficientMarks { .. })
+        ));
+        // Roster/marks should be unchanged on failure.
+        assert_eq!(prestige.warband_marks, 0);
+        assert_eq!(prestige.find_merc(11).unwrap().quality, MercQuality::Common);
+    }
+
+    // ── Injury Severity (Light) ───────────────────────────────────────────────
+
+    #[test]
+    fn test_injure_merc_light_severity() {
+        let mut rng = seeded_rng(500);
+        let now = Utc::now();
+        let mut merc =
+            generate_mercenary(1, MercArchetype::Saboteur, MercQuality::Common, &mut rng);
+        injure_merc(&mut merc, InjurySeverity::Light, now, &mut rng);
+        let MercStatus::Injured { recover_at } = merc.status else {
+            panic!("Merc should be Injured");
+        };
+        let (min, max) = InjurySeverity::Light.recovery_secs();
+        let secs = (recover_at - now).num_seconds();
+        assert!(
+            (min as i64..=max as i64).contains(&secs),
+            "Light recovery {}s should be in [{}, {}]",
+            secs,
+            min,
+            max
+        );
+    }
+
     #[test]
     fn test_promote_mercenary_uncommon_to_rare() {
         use crate::deep::types::DeepPrestige;

@@ -369,6 +369,224 @@ mod tests {
     }
 
     #[test]
+    fn test_equipment_slot_names() {
+        assert_eq!(EquipmentSlot::Weapon.name(), "Weapon");
+        assert_eq!(EquipmentSlot::Armor.name(), "Armor");
+        assert_eq!(EquipmentSlot::Helmet.name(), "Helmet");
+        assert_eq!(EquipmentSlot::Gloves.name(), "Gloves");
+        assert_eq!(EquipmentSlot::Boots.name(), "Boots");
+        assert_eq!(EquipmentSlot::Amulet.name(), "Amulet");
+        assert_eq!(EquipmentSlot::Ring.name(), "Ring");
+    }
+
+    #[test]
+    fn test_equipment_slot_icons() {
+        assert_eq!(EquipmentSlot::Weapon.icon(), "\u{2694}");
+        assert_eq!(EquipmentSlot::Armor.icon(), "\u{1f6e1}");
+        assert_eq!(EquipmentSlot::Helmet.icon(), "\u{1fa96}");
+        assert_eq!(EquipmentSlot::Gloves.icon(), "\u{1f9e4}");
+        assert_eq!(EquipmentSlot::Boots.icon(), "\u{1f462}");
+        assert_eq!(EquipmentSlot::Amulet.icon(), "\u{1f4ff}");
+        assert_eq!(EquipmentSlot::Ring.icon(), "\u{1f48d}");
+    }
+
+    #[test]
+    fn test_equipment_slot_icon_width() {
+        // Weapon and Armor render as single-width text glyphs.
+        assert_eq!(EquipmentSlot::Weapon.icon_width(), 1);
+        assert_eq!(EquipmentSlot::Armor.icon_width(), 1);
+        // All other slots use double-width emoji.
+        assert_eq!(EquipmentSlot::Helmet.icon_width(), 2);
+        assert_eq!(EquipmentSlot::Gloves.icon_width(), 2);
+        assert_eq!(EquipmentSlot::Boots.icon_width(), 2);
+        assert_eq!(EquipmentSlot::Amulet.icon_width(), 2);
+        assert_eq!(EquipmentSlot::Ring.icon_width(), 2);
+    }
+
+    fn empty_item(slot: EquipmentSlot) -> Item {
+        Item {
+            slot,
+            rarity: Rarity::Common,
+            ilvl: 10,
+            tier: 1,
+            base_name: "Test".to_string(),
+            display_name: "Test Item".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![],
+            god_item_id: None,
+        }
+    }
+
+    #[test]
+    fn test_slot_name_delegates_to_equipment_slot() {
+        let item = empty_item(EquipmentSlot::Helmet);
+        assert_eq!(item.slot_name(), "Helmet");
+    }
+
+    #[test]
+    fn test_stat_summary_empty_item_is_empty_string() {
+        let item = empty_item(EquipmentSlot::Weapon);
+        assert_eq!(item.stat_summary(), "");
+    }
+
+    #[test]
+    fn test_stat_summary_attributes_only() {
+        let mut item = empty_item(EquipmentSlot::Weapon);
+        item.attributes = AttributeBonuses {
+            str: 8,
+            dex: 3,
+            con: 0,
+            int: 0,
+            wis: 0,
+            cha: 0,
+        };
+        let summary = item.stat_summary();
+        assert_eq!(summary, "+8 STR +3 DEX");
+    }
+
+    #[test]
+    fn test_stat_summary_all_attributes_present() {
+        let mut item = empty_item(EquipmentSlot::Weapon);
+        item.attributes = AttributeBonuses {
+            str: 1,
+            dex: 2,
+            con: 3,
+            int: 4,
+            wis: 5,
+            cha: 6,
+        };
+        assert_eq!(
+            item.stat_summary(),
+            "+1 STR +2 DEX +3 CON +4 INT +5 WIS +6 CHA"
+        );
+    }
+
+    #[test]
+    fn test_stat_summary_covers_every_affix_type() {
+        let mut item = empty_item(EquipmentSlot::Ring);
+        item.affixes = vec![
+            Affix {
+                affix_type: AffixType::DamagePercent,
+                value: 10.0,
+            },
+            Affix {
+                affix_type: AffixType::CritChance,
+                value: 5.0,
+            },
+            Affix {
+                affix_type: AffixType::CritMultiplier,
+                value: 1.5,
+            },
+            Affix {
+                affix_type: AffixType::AttackSpeed,
+                value: 12.0,
+            },
+            Affix {
+                affix_type: AffixType::HPBonus,
+                value: 20.0,
+            },
+            Affix {
+                affix_type: AffixType::DamageReduction,
+                value: 7.0,
+            },
+            Affix {
+                affix_type: AffixType::HPRegen,
+                value: 3.0,
+            },
+            Affix {
+                affix_type: AffixType::DamageReflection,
+                value: 9.0,
+            },
+            Affix {
+                affix_type: AffixType::XPGain,
+                value: 40.0,
+            },
+        ];
+        let summary = item.stat_summary();
+        assert!(summary.contains("+10% Dmg"));
+        assert!(summary.contains("+5% Crit"));
+        assert!(summary.contains("+1.5x CritDmg"));
+        assert!(summary.contains("+12% AtkSpd"));
+        assert!(summary.contains("+20 HP"));
+        assert!(summary.contains("+7% DR"));
+        assert!(summary.contains("+3 Regen"));
+        assert!(summary.contains("+9% Reflect"));
+        assert!(summary.contains("+40% XP"));
+    }
+
+    #[test]
+    fn test_stat_summary_skips_unknown_affix() {
+        let mut item = empty_item(EquipmentSlot::Ring);
+        item.affixes = vec![
+            Affix {
+                affix_type: AffixType::Unknown,
+                value: 5.0,
+            },
+            Affix {
+                affix_type: AffixType::DamagePercent,
+                value: 10.0,
+            },
+        ];
+        // Unknown affix should be skipped entirely, leaving only the DamagePercent entry.
+        assert_eq!(item.stat_summary(), "+10% Dmg");
+    }
+
+    #[test]
+    fn test_power_score_attributes_only() {
+        let mut item = empty_item(EquipmentSlot::Weapon);
+        item.attributes = AttributeBonuses {
+            str: 5,
+            dex: 5,
+            con: 0,
+            int: 0,
+            wis: 0,
+            cha: 0,
+        };
+        assert_eq!(item.power(), 10);
+    }
+
+    #[test]
+    fn test_power_score_weights_affixes() {
+        let mut item = empty_item(EquipmentSlot::Weapon);
+        // DamagePercent has weight 2.0, so 10.0 value contributes 20.0 power.
+        item.affixes = vec![Affix {
+            affix_type: AffixType::DamagePercent,
+            value: 10.0,
+        }];
+        assert_eq!(item.power(), 20);
+    }
+
+    #[test]
+    fn test_power_score_combines_attributes_and_affixes() {
+        let mut item = empty_item(EquipmentSlot::Weapon);
+        item.attributes = AttributeBonuses {
+            str: 10,
+            dex: 0,
+            con: 0,
+            int: 0,
+            wis: 0,
+            cha: 0,
+        };
+        item.affixes = vec![Affix {
+            affix_type: AffixType::HPBonus, // weight 0.5
+            value: 20.0,
+        }];
+        // 10 (attrs) + 20*0.5 (affix) = 20
+        assert_eq!(item.power(), 20);
+    }
+
+    #[test]
+    fn test_power_score_rounds_to_nearest_u32() {
+        let mut item = empty_item(EquipmentSlot::Weapon);
+        // CritChance weight 1.5 * 3.0 = 4.5, rounds to 5 (round-half-away-from-zero... actually round-half-to-even isn't used by f64::round)
+        item.affixes = vec![Affix {
+            affix_type: AffixType::CritChance,
+            value: 3.0,
+        }];
+        assert_eq!(item.power(), 5);
+    }
+
+    #[test]
     fn test_deserialize_removed_affix_types() {
         // Old saves may contain DropRate, PrestigeBonus, or OfflineRate affixes.
         // These should deserialize as Unknown instead of failing.

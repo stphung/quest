@@ -389,6 +389,15 @@ mod tests {
     }
 
     #[test]
+    fn test_construction_earns_no_marks_in_void_layers() {
+        // Construction's (0, 0) arm in the void (layer >= 26) scaling branch.
+        assert_eq!(
+            base_marks_earned(MissionType::Construction(Infrastructure::Bridge), 26),
+            0
+        );
+    }
+
+    #[test]
     fn test_marks_increase_with_depth() {
         for layer in 1..25 {
             let a = base_marks_earned(MissionType::Expedition, layer);
@@ -698,6 +707,15 @@ mod tests {
     }
 
     #[test]
+    fn test_base_xp_reward_recon_and_construction() {
+        assert_eq!(base_xp_reward(MissionType::Recon, 1), 335); // 300 + 35
+        assert_eq!(
+            base_xp_reward(MissionType::Construction(Infrastructure::Outpost), 5),
+            0
+        );
+    }
+
+    #[test]
     fn test_xp_reward_scales_with_outcome() {
         let success = xp_reward(MissionType::Expedition, 5, MissionOutcome::Success);
         let partial = xp_reward(MissionType::Expedition, 5, MissionOutcome::PartialSuccess);
@@ -742,5 +760,101 @@ mod tests {
         // Level 2: 200 * 2^1.3 ≈ 200 * 2.462 ≈ 492
         let l2 = merc_xp_to_next_level(2);
         assert!((l2 as i32 - 492).abs() <= 2, "Level 2 XP was {}", l2);
+    }
+
+    #[test]
+    fn test_merc_xp_to_next_level_zero_returns_base() {
+        assert_eq!(merc_xp_to_next_level(0), 200);
+    }
+
+    // ── marks_variance_multiplier ─────────────────────────────────────────────
+
+    #[test]
+    fn test_marks_variance_multiplier_bounds() {
+        assert!((marks_variance_multiplier(0.0) - 0.85).abs() < 1e-9);
+        assert!((marks_variance_multiplier(1.0) - 1.15).abs() < 1e-9);
+        assert!((marks_variance_multiplier(0.5) - 1.0).abs() < 1e-9);
+    }
+
+    // ── RecruitQuality ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_recruit_quality_cost_range_all_variants() {
+        assert_eq!(RecruitQuality::Common.cost_range(), (50, 80));
+        assert_eq!(RecruitQuality::Uncommon.cost_range(), (80, 130));
+        assert_eq!(RecruitQuality::Rare.cost_range(), (130, 200));
+        assert_eq!(RecruitQuality::Elite.cost_range(), (200, 300));
+    }
+
+    #[test]
+    fn test_recruit_quality_cost_interpolates_within_range() {
+        for quality in [
+            RecruitQuality::Common,
+            RecruitQuality::Uncommon,
+            RecruitQuality::Rare,
+            RecruitQuality::Elite,
+        ] {
+            let (min, max) = quality.cost_range();
+            assert_eq!(quality.cost(0.0), min);
+            assert_eq!(quality.cost(1.0), max);
+            let mid = quality.cost(0.5);
+            assert!(
+                mid >= min && mid <= max,
+                "{:?} mid-cost {} should fall within [{}, {}]",
+                quality,
+                mid,
+                min,
+                max
+            );
+        }
+    }
+
+    #[test]
+    fn test_recruit_quality_stat_bonus_all_variants() {
+        assert_eq!(RecruitQuality::Common.stat_bonus(), (0, 0, 0));
+        assert_eq!(RecruitQuality::Uncommon.stat_bonus(), (2, 2, 2));
+        assert_eq!(RecruitQuality::Rare.stat_bonus(), (4, 4, 4));
+        assert_eq!(RecruitQuality::Elite.stat_bonus(), (8, 8, 8));
+    }
+
+    #[test]
+    fn test_recruit_quality_primary_stat_bonus_all_variants() {
+        assert_eq!(RecruitQuality::Common.primary_stat_bonus(), 0);
+        assert_eq!(RecruitQuality::Uncommon.primary_stat_bonus(), 2);
+        assert_eq!(RecruitQuality::Rare.primary_stat_bonus(), 4);
+        assert_eq!(RecruitQuality::Elite.primary_stat_bonus(), 8);
+    }
+
+    // ── recruit_quality_distribution ──────────────────────────────────────────
+
+    #[test]
+    fn test_recruit_quality_distribution_rank_2_common_and_uncommon() {
+        let dist = recruit_quality_distribution(GuildRank(2));
+        assert_eq!(dist.len(), 2);
+        assert!(dist.iter().any(|(q, _)| *q == RecruitQuality::Common));
+        assert!(dist.iter().any(|(q, _)| *q == RecruitQuality::Uncommon));
+    }
+
+    #[test]
+    fn test_recruit_quality_distribution_rank_3_includes_rare() {
+        let dist = recruit_quality_distribution(GuildRank(3));
+        assert_eq!(dist.len(), 3);
+        assert!(dist.iter().any(|(q, _)| *q == RecruitQuality::Rare));
+    }
+
+    #[test]
+    fn test_recruit_quality_distribution_rank_4_no_common() {
+        let dist = recruit_quality_distribution(GuildRank(4));
+        assert_eq!(dist.len(), 3);
+        assert!(!dist.iter().any(|(q, _)| *q == RecruitQuality::Common));
+        assert!(dist.iter().any(|(q, _)| *q == RecruitQuality::Elite));
+    }
+
+    #[test]
+    fn test_recruit_quality_distribution_out_of_range_rank_falls_back_to_common() {
+        // The `_` arm handles any rank value outside 1-5 (defensive default).
+        let dist = recruit_quality_distribution(GuildRank(6));
+        assert_eq!(dist.len(), 1);
+        assert_eq!(dist[0].0, RecruitQuality::Common);
     }
 }

@@ -361,4 +361,220 @@ mod tests {
             pos.1
         );
     }
+
+    #[test]
+    fn test_layout_empty_graph() {
+        // No unlocked extractors, no shuttles, no patterns => 0 nodes.
+        let loom = loom_with_unlocked_extractors(0);
+        let lg = build_graph(&loom);
+        assert_eq!(lg.graph.node_count(), 0);
+
+        let width = 120.0;
+        let height = 90.0;
+        let layout = compute_layout(&lg, &loom, width, height);
+
+        assert!(layout.node_positions.is_empty());
+        assert!(layout.dummy_paths.is_empty());
+        assert_eq!(layout.bounds, (width, height));
+    }
+
+    #[test]
+    fn test_layout_only_one_active_layer_centers_x() {
+        // Multiple extractors, no shuttles/patterns => only layer 0 is active.
+        let loom = loom_with_unlocked_extractors(4);
+        let lg = build_graph(&loom);
+        assert_eq!(lg.graph.node_count(), 4);
+
+        let width = 200.0;
+        let height = 100.0;
+        let layout = compute_layout(&lg, &loom, width, height);
+
+        // With a single active layer, every node should be centered on x.
+        for &(x, _y) in layout.node_positions.values() {
+            assert!(
+                (x - width / 2.0).abs() < f64::EPSILON,
+                "expected x centered at {}, got {}",
+                width / 2.0,
+                x
+            );
+        }
+        // No edges at all => no dummy paths.
+        assert!(layout.dummy_paths.is_empty());
+    }
+
+    #[test]
+    fn test_layout_disconnected_node_uses_fallback_barycenter() {
+        // A shuttle with no sources_a/sources_b is disconnected from layer 0,
+        // exercising the "no neighbors in adjacent layer" branch of
+        // barycenter_reorder (relevant.is_empty()).
+        let mut loom = loom_with_unlocked_extractors(6);
+        let disconnected = Shuttle::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+            vec![], // no sources for input A
+            vec![], // no sources for input B
+        );
+        loom.persistent.shuttles.push(disconnected);
+
+        let lg = build_graph(&loom);
+        assert_eq!(lg.graph.edge_count(), 0, "shuttle should have no edges");
+
+        let layout = compute_layout(&lg, &loom, 300.0, 200.0);
+        // Should still assign a position without panicking.
+        assert_eq!(layout.node_positions.len(), 7);
+        for &(x, y) in layout.node_positions.values() {
+            assert!((0.0..=300.0).contains(&x));
+            assert!((0.0..=200.0).contains(&y));
+        }
+    }
+
+    #[test]
+    fn test_layout_backward_sweep_reorders_multi_tier_chain() {
+        // A T1 -> T2 shuttle chain activates layers 0, 1, 2 so both the
+        // forward (incoming) and the odd-sweep backward (outgoing) barycenter
+        // passes run.
+        let mut loom = loom_with_unlocked_extractors(6);
+
+        let t1 = Shuttle::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        loom.persistent.shuttles.push(t1);
+
+        let t2 = Shuttle::new(
+            Resource::ForgedLight,
+            Resource::Memory,
+            NodeNature::Pattern,
+            Resource::EchoGlass,
+            1.0,
+            2,
+            vec![LoomNodeRef::Shuttle(0)],
+            vec![LoomNodeRef::Extractor(NodeId::MemoryArchive)],
+        );
+        loom.persistent.shuttles.push(t2);
+
+        let lg = build_graph(&loom);
+        let layout = compute_layout(&lg, &loom, 400.0, 300.0);
+
+        let t1_ni = lg.node_indices[&LoomGraphNode::Shuttle(0)];
+        let t2_ni = lg.node_indices[&LoomGraphNode::Shuttle(1)];
+        let ext_ni = lg.node_indices[&LoomGraphNode::Extractor(NodeId::EmberSpindle)];
+
+        let ext_x = layout.node_positions[&ext_ni].0;
+        let t1_x = layout.node_positions[&t1_ni].0;
+        let t2_x = layout.node_positions[&t2_ni].0;
+
+        assert!(ext_x < t1_x, "extractor layer should precede T1 layer");
+        assert!(t1_x < t2_x, "T1 layer should precede T2 layer");
+    }
+
+    #[test]
+    fn test_layout_generates_dummy_path_for_long_span_edge() {
+        // A pattern sink (layer 4) fed directly by an extractor (layer 0)
+        // spans 4 layers, so compute_layout should synthesize 3 waypoints.
+        let mut loom = loom_with_unlocked_extractors(6);
+        loom.persistent.patterns.push(WovenPattern {
+            index: 0,
+            name: "Long Span".to_string(),
+            requirements: vec![PatternRequirement {
+                resource: Resource::Ember,
+                required_rate: 5.0,
+                sustain_duration_secs: 100.0,
+                sustained_secs: 0.0,
+                completed: false,
+                amount: 0.0,
+                accumulated: 0.0,
+            }],
+            completed: false,
+            flavor: String::new(),
+            eternal: false,
+        });
+        loom.persistent.active_pattern = 0;
+
+        let lg = build_graph(&loom);
+        let layout = compute_layout(&lg, &loom, 500.0, 300.0);
+
+        let ext_ni = lg.node_indices[&LoomGraphNode::Extractor(NodeId::EmberSpindle)];
+        let sink_ni = lg.node_indices[&LoomGraphNode::PatternSink(0)];
+
+        let waypoints = layout
+            .dummy_paths
+            .get(&(ext_ni, sink_ni))
+            .expect("long-span edge should get a dummy path");
+        assert_eq!(waypoints.len(), 3, "span of 4 should produce 3 waypoints");
+
+        // Waypoints should move monotonically from source toward target on x.
+        let ext_x = layout.node_positions[&ext_ni].0;
+        let sink_x = layout.node_positions[&sink_ni].0;
+        let mut prev = ext_x;
+        for &(x, _y) in waypoints {
+            if ext_x <= sink_x {
+                assert!(x >= prev - 1e-9, "waypoints should move toward target");
+            }
+            prev = x;
+        }
+    }
+
+    #[test]
+    fn test_layout_adjacent_layer_edge_has_no_dummy_path() {
+        // Extractor -> T1 shuttle is a span-1 edge; no dummy path expected.
+        let mut loom = loom_with_unlocked_extractors(6);
+        let shuttle = Shuttle::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        loom.persistent.shuttles.push(shuttle);
+
+        let lg = build_graph(&loom);
+        let layout = compute_layout(&lg, &loom, 200.0, 150.0);
+        assert!(
+            layout.dummy_paths.is_empty(),
+            "adjacent-layer edges should not need dummy paths"
+        );
+    }
+
+    #[test]
+    fn test_node_layer_direct() {
+        let loom = loom_with_unlocked_extractors(1);
+        assert_eq!(
+            node_layer(&LoomGraphNode::Extractor(NodeId::EmberSpindle), &loom),
+            0
+        );
+        assert_eq!(node_layer(&LoomGraphNode::PatternSink(0), &loom), 4);
+        // Unknown shuttle index falls back to layer 1.
+        assert_eq!(node_layer(&LoomGraphNode::Shuttle(99), &loom), 1);
+    }
+
+    #[test]
+    fn test_node_layer_uses_shuttle_tier() {
+        let mut loom = loom_with_unlocked_extractors(6);
+        let t3 = Shuttle::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::WovenReality,
+            1.0,
+            3,
+            vec![],
+            vec![],
+        );
+        loom.persistent.shuttles.push(t3);
+        assert_eq!(node_layer(&LoomGraphNode::Shuttle(0), &loom), 3);
+    }
 }

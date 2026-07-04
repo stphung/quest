@@ -278,6 +278,36 @@ mod tests {
     }
 
     #[test]
+    fn enhancement_color_rgb_covers_every_tier() {
+        // Each tier maps to a distinct RGB match arm in enhancement_color_rgb;
+        // the test above only exercises tier 4 (Gold). Cover the rest here.
+        assert_eq!(enhancement_color_rgb(0), (128, 128, 128)); // tier 0: DarkGray
+        assert_eq!(enhancement_color_rgb(2), (255, 255, 255)); // tier 1: White
+        assert_eq!(enhancement_color_rgb(6), (255, 255, 0)); // tier 2: Yellow
+        assert_eq!(enhancement_color_rgb(9), (255, 0, 255)); // tier 3: Magenta
+    }
+
+    #[test]
+    fn enhancement_progress_default_matches_new() {
+        let default_progress = EnhancementProgress::default();
+        let new_progress = EnhancementProgress::new();
+        assert_eq!(default_progress.discovered, new_progress.discovered);
+        assert_eq!(default_progress.levels, new_progress.levels);
+        assert_eq!(default_progress.highest_level_reached, 0);
+    }
+
+    #[test]
+    fn soulforge_ui_state_default_matches_new() {
+        let default_ui = SoulforgeUiState::default();
+        assert!(!default_ui.open);
+        assert_eq!(default_ui.selected_slot, 0);
+        assert_eq!(default_ui.phase, SoulforgePhase::Menu);
+        assert_eq!(default_ui.animation_tick, 0);
+        assert!(default_ui.last_result.is_none());
+        assert!(!default_ui.soul_tithe);
+    }
+
+    #[test]
     fn soulforge_ui_open_and_close_reset_transient_state() {
         let mut ui = SoulforgeUiState::new();
         ui.selected_slot = 4;

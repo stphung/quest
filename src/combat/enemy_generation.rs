@@ -575,4 +575,67 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_loom_zones_have_unique_prefixes_and_suffixes() {
+        // Loom zones (31-50) each have their own themed prefix/suffix arrays,
+        // one per chapter range: 31..=34, 35..=38, 39..=42, 43..=46, 47..=50.
+        for zone_id in 31..=50 {
+            let prefixes = get_zone_enemy_prefixes(zone_id);
+            let suffixes = get_zone_enemy_suffixes(zone_id);
+            assert!(
+                prefixes.len() >= 5,
+                "Zone {} should have at least 5 prefixes, got {}",
+                zone_id,
+                prefixes.len()
+            );
+            assert!(
+                suffixes.len() >= 5,
+                "Zone {} should have at least 5 suffixes, got {}",
+                zone_id,
+                suffixes.len()
+            );
+            assert_ne!(
+                prefixes[0], "Wild",
+                "Zone {} should not use fallback prefixes",
+                zone_id
+            );
+            assert_ne!(
+                suffixes[0], "Beast",
+                "Zone {} should not use fallback suffixes",
+                zone_id
+            );
+        }
+    }
+
+    #[test]
+    fn test_zone_enemy_name_covers_every_defined_zone() {
+        // Exercise generate_zone_enemy_name for every zone 1-50 (plus the
+        // undefined zone 11 fallback) so every prefix/suffix match arm runs
+        // at least once, including the Loom zone ranges that no other test
+        // reaches directly.
+        for zone_id in 1..=50u32 {
+            let name = generate_zone_enemy_name(zone_id);
+            assert!(!name.is_empty(), "zone {zone_id} produced an empty name");
+            assert!(
+                name.contains(' '),
+                "zone {zone_id} name missing prefix/suffix separator: {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_generate_boss_for_current_zone_static() {
+        // Valid zone/subzone: delegates to generate_subzone_boss with real data.
+        let boss = generate_boss_for_current_zone(1, 1);
+        assert_eq!(boss.name, "Field Guardian");
+        assert!(boss.max_hp >= 50);
+
+        // Invalid zone/subzone: falls back to "Unknown Boss" with zone-boss
+        // multipliers applied to zone_id's base stats (depth 1).
+        let fallback = generate_boss_for_current_zone(999, 1);
+        assert_eq!(fallback.name, "Unknown Boss");
+        assert!(fallback.max_hp >= 1);
+        assert!(fallback.damage >= 1);
+    }
 }

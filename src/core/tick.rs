@@ -450,6 +450,93 @@ mod tests {
     }
 
     #[test]
+    fn test_fracture_region_unlock_consumption_emits_event() {
+        use crate::core::tick_context::TickContext;
+        use crate::zones::FractureRegion;
+
+        let mut state = GameState::new("Fracture Test".to_string(), 0);
+        let mut tick_counter = 0u32;
+        let mut haven = Haven::default();
+        let mut enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
+        let mut loom = crate::loom::LoomState::new();
+        let mut achievements = Achievements::default();
+
+        deep.persistent.pending_fracture_region_unlock = Some(FractureRegion::RedFault);
+        deep.persistent.fracture_zone_cap = 14;
+
+        let mut ctx = TickContext {
+            state: &mut state,
+            tick_counter: &mut tick_counter,
+            haven: &mut haven,
+            enhancement: &mut enhancement,
+            deep: &mut deep,
+            achievements: &mut achievements,
+            loom: &mut loom,
+            debug_mode: false,
+        };
+        let mut rng = test_rng();
+        let result = game_tick_with_context(&mut ctx, &mut rng);
+
+        assert!(
+            result
+                .events
+                .iter()
+                .any(|e| matches!(e, TickEvent::FractureRegionUnlocked { region, .. } if *region == FractureRegion::RedFault)),
+            "Should emit FractureRegionUnlocked for the pending region"
+        );
+        assert!(result.deep_changed, "deep_changed should be set");
+        assert!(
+            deep.persistent.pending_fracture_region_unlock.is_none(),
+            "Pending unlock should be consumed"
+        );
+        assert_eq!(state.cached_fracture_zone_cap, 14);
+    }
+
+    #[test]
+    fn test_pattern_milestone_consumption_emits_events() {
+        use crate::core::tick_context::TickContext;
+        use crate::loom::PatternMilestone;
+
+        let mut state = GameState::new("Pattern Test".to_string(), 0);
+        let mut tick_counter = 0u32;
+        let mut haven = Haven::default();
+        let mut enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
+        let mut loom = crate::loom::LoomState::new();
+        let mut achievements = Achievements::default();
+
+        loom.persistent.pending_pattern_milestones = vec![PatternMilestone::ThreadWilds];
+
+        let mut ctx = TickContext {
+            state: &mut state,
+            tick_counter: &mut tick_counter,
+            haven: &mut haven,
+            enhancement: &mut enhancement,
+            deep: &mut deep,
+            achievements: &mut achievements,
+            loom: &mut loom,
+            debug_mode: false,
+        };
+        let mut rng = test_rng();
+        let result = game_tick_with_context(&mut ctx, &mut rng);
+
+        assert!(
+            result.events.iter().any(|e| matches!(
+                e,
+                TickEvent::PatternMilestoneReached { milestone, .. }
+                    if *milestone == PatternMilestone::ThreadWilds
+            )),
+            "Should emit PatternMilestoneReached for the pending milestone"
+        );
+        assert!(result.loom_changed, "loom_changed should be set");
+        assert!(
+            loom.persistent.pending_pattern_milestones.is_empty(),
+            "Pending milestones should be drained"
+        );
+    }
+
+    #[test]
     fn test_game_tick_combat_produces_events() {
         use crate::character::attributes::AttributeType;
         use crate::character::derived_stats::DerivedStats;

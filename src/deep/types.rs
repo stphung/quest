@@ -286,7 +286,7 @@ pub enum MissionStatus {
 }
 
 /// Outcome of a completed mission.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MissionOutcome {
     /// Full rewards awarded.
     Success,
@@ -613,7 +613,7 @@ impl Mission {
 /// Available mission in the mission pool (not yet accepted).
 ///
 /// Regenerated at each pool refresh.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AvailableMission {
     pub mission_type: MissionType,
     pub layer: u32,
@@ -1671,6 +1671,392 @@ mod tests {
         };
         assert_eq!(event.effective_choice(), 0);
         assert!(!event.is_resolved());
+    }
+
+    // ── DeepView tabs ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_deep_view_tab_cycle_forward_and_backward() {
+        let start = DeepView::Infrastructure;
+        let mut v = start;
+        for _ in 0..DeepView::TABS.len() {
+            v = v.next_tab();
+        }
+        assert_eq!(
+            v, start,
+            "Cycling forward through all tabs returns to start"
+        );
+
+        let mut v2 = start;
+        for _ in 0..DeepView::TABS.len() {
+            v2 = v2.prev_tab();
+        }
+        assert_eq!(
+            v2, start,
+            "Cycling backward through all tabs returns to start"
+        );
+    }
+
+    #[test]
+    fn test_deep_view_next_prev_tab_non_tab_variant_is_noop() {
+        // EventResponse isn't in TABS, so next_tab/prev_tab must be a no-op.
+        assert_eq!(DeepView::EventResponse.next_tab(), DeepView::EventResponse);
+        assert_eq!(DeepView::EventResponse.prev_tab(), DeepView::EventResponse);
+    }
+
+    #[test]
+    fn test_deep_view_tab_labels() {
+        assert_eq!(DeepView::Active.tab_label(), "Active");
+        assert_eq!(DeepView::NewMission.tab_label(), "Deploy");
+        assert_eq!(DeepView::Roster.tab_label(), "Roster");
+        assert_eq!(DeepView::Infrastructure.tab_label(), "Layers");
+        assert_eq!(DeepView::EventResponse.tab_label(), "Events");
+        assert_eq!(DeepView::Recruit.tab_label(), "Recruit");
+    }
+
+    // ── Display names ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_merc_archetype_display_names() {
+        assert_eq!(MercArchetype::Vanguard.display_name(), "Vanguard");
+        assert_eq!(MercArchetype::Scout.display_name(), "Scout");
+        assert_eq!(MercArchetype::Arcanist.display_name(), "Arcanist");
+        assert_eq!(MercArchetype::Medic.display_name(), "Medic");
+        assert_eq!(MercArchetype::Saboteur.display_name(), "Saboteur");
+    }
+
+    #[test]
+    fn test_layer_tier_display_names() {
+        assert_eq!(LayerTier::Shallows.display_name(), "The Shallows");
+        assert_eq!(LayerTier::Warrens.display_name(), "The Warrens");
+        assert_eq!(LayerTier::Hollows.display_name(), "The Hollows");
+        assert_eq!(LayerTier::SunkenReach.display_name(), "The Sunken Reach");
+        assert_eq!(LayerTier::Abyss.display_name(), "The Abyss");
+        assert_eq!(LayerTier::Void.display_name(), "The Void");
+    }
+
+    #[test]
+    fn test_infrastructure_display_names_descriptions_and_icons_are_distinct() {
+        use std::collections::HashSet;
+        let mut names = HashSet::new();
+        let mut icons = HashSet::new();
+        for &infra in Infrastructure::ALL {
+            assert!(!infra.display_name().is_empty());
+            assert!(!infra.description().is_empty());
+            names.insert(infra.display_name());
+            icons.insert(infra.icon());
+        }
+        assert_eq!(
+            names.len(),
+            Infrastructure::ALL.len(),
+            "Display names should be unique"
+        );
+        assert_eq!(
+            icons.len(),
+            Infrastructure::ALL.len(),
+            "Icons should be unique"
+        );
+    }
+
+    #[test]
+    fn test_mission_type_display_names() {
+        assert_eq!(MissionType::SupplyRun.display_name(), "Supply Run");
+        assert_eq!(MissionType::Recon.display_name(), "Recon");
+        assert_eq!(MissionType::Expedition.display_name(), "Expedition");
+        assert_eq!(MissionType::Breakthrough.display_name(), "Breakthrough");
+        assert_eq!(
+            MissionType::Construction(Infrastructure::Outpost).display_name(),
+            "Construction"
+        );
+        assert_eq!(
+            MissionType::GatewayExpedition.display_name(),
+            "Gateway Expedition"
+        );
+    }
+
+    // ── Mission ───────────────────────────────────────────────────────────────
+
+    fn make_test_mission(status: MissionStatus, events: Vec<CheckInEvent>) -> Mission {
+        let now = Utc::now();
+        Mission {
+            id: 1,
+            mission_type: MissionType::Expedition,
+            layer: 1,
+            squad: vec![],
+            started_at: now - chrono::Duration::hours(1),
+            ends_at: now + chrono::Duration::hours(1),
+            events,
+            pending_event_index: 0,
+            status,
+            result: None,
+            is_first_orders: false,
+        }
+    }
+
+    #[test]
+    fn test_mission_progress_clamped_0_to_1() {
+        let now = Utc::now();
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::Recon,
+            layer: 1,
+            squad: vec![],
+            started_at: now,
+            ends_at: now + chrono::Duration::hours(10),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+        assert_eq!(mission.progress(now - chrono::Duration::hours(1)), 0.0);
+        assert!((mission.progress(now + chrono::Duration::hours(5)) - 0.5).abs() < 0.01);
+        assert_eq!(mission.progress(now + chrono::Duration::hours(20)), 1.0);
+    }
+
+    #[test]
+    fn test_mission_is_time_elapsed() {
+        let now = Utc::now();
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::Recon,
+            layer: 1,
+            squad: vec![],
+            started_at: now - chrono::Duration::hours(2),
+            ends_at: now - chrono::Duration::hours(1),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+        assert!(mission.is_time_elapsed(now));
+        assert!(!mission.is_time_elapsed(now - chrono::Duration::hours(3)));
+    }
+
+    #[test]
+    fn test_mission_has_pending_event_and_unresolved_count() {
+        let event_unresolved = CheckInEvent {
+            title: "T".to_string(),
+            description: "D".to_string(),
+            choices: vec![],
+            auto_resolve_choice: 0,
+            archetype_bonus: None,
+            fired_at: Utc::now(),
+            resolved_choice: None,
+        };
+        let event_resolved = CheckInEvent {
+            resolved_choice: Some(0),
+            ..event_unresolved.clone()
+        };
+        let mission = make_test_mission(
+            MissionStatus::EventPending,
+            vec![event_unresolved, event_resolved],
+        );
+        assert!(mission.has_pending_event());
+        assert_eq!(mission.unresolved_event_count(), 1);
+    }
+
+    // ── RecruitPool ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_recruit_pool_needs_refresh_boundary() {
+        let now = Utc::now();
+        let pool_fresh = RecruitPool {
+            candidates: vec![],
+            refreshed_at: now - chrono::Duration::hours(23),
+            recruit_costs: vec![],
+        };
+        assert!(!pool_fresh.needs_refresh(now));
+
+        let pool_stale = RecruitPool {
+            candidates: vec![],
+            refreshed_at: now - chrono::Duration::hours(25),
+            recruit_costs: vec![],
+        };
+        assert!(pool_stale.needs_refresh(now));
+    }
+
+    // ── Layer / LayerRecord ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_layer_available_infrastructure_slots() {
+        let layer = Layer {
+            index: 1,
+            tier: LayerTier::Shallows,
+            theme_name: "Test".to_string(),
+            difficulty: 1.0,
+            familiarity: 0,
+            infrastructure: vec![Infrastructure::Outpost, Infrastructure::Bridge],
+            cleared: false,
+        };
+        assert_eq!(layer.available_infrastructure_slots(), 2);
+    }
+
+    #[test]
+    fn test_layer_record_has_infrastructure_and_duration_reduction() {
+        let mut record = LayerRecord::new(5);
+        assert!(!record.has_infrastructure(Infrastructure::Outpost));
+        assert_eq!(record.total_duration_reduction(), 0.0);
+        record.infrastructure.push(Infrastructure::Outpost);
+        assert!(record.has_infrastructure(Infrastructure::Outpost));
+        assert!(record.total_duration_reduction() > 0.0);
+    }
+
+    // ── DeepPrestige lookups ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_deep_prestige_find_merc_and_mission_lookups() {
+        let mut prestige = DeepPrestige::new();
+        let merc = Mercenary {
+            id: 7,
+            name: "Test".to_string(),
+            archetype: MercArchetype::Scout,
+            power: 8,
+            resilience: 10,
+            expertise: 12,
+            level: 1,
+            missions_completed: 0,
+            quality: MercQuality::Common,
+            status: MercStatus::Available,
+        };
+        prestige.roster.insert(7, merc);
+        assert!(prestige.find_merc(7).is_some());
+        assert!(prestige.find_merc_mut(7).is_some());
+        assert!(prestige.find_merc(999).is_none());
+
+        let now = Utc::now();
+        let mission = Mission {
+            id: 42,
+            mission_type: MissionType::Recon,
+            layer: 1,
+            squad: vec![7],
+            started_at: now,
+            ends_at: now + chrono::Duration::hours(1),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+        prestige.active_missions.push(mission);
+        assert!(prestige.find_mission_mut(42).is_some());
+        assert!(prestige.find_mission_mut(999).is_none());
+        assert_eq!(prestige.active_mission_count(), 1);
+        assert!(!prestige.has_any_pending_event());
+
+        prestige.active_missions[0].status = MissionStatus::EventPending;
+        assert!(prestige.has_any_pending_event());
+        assert_eq!(
+            prestige.active_mission_count(),
+            1,
+            "EventPending missions still count as active"
+        );
+    }
+
+    // ── DeepPersistent::layer_record ──────────────────────────────────────────
+
+    #[test]
+    fn test_deep_persistent_layer_record_returns_created_record() {
+        let mut dp = DeepPersistent::new();
+        dp.layer_record_mut(2).cleared = true;
+        let record = dp.layer_record(2).unwrap();
+        assert!(record.cleared);
+        assert_eq!(record.index, 2);
+    }
+
+    // ── DeepState generation records ──────────────────────────────────────────
+
+    #[test]
+    fn test_deep_state_generation_records_capped_at_ten() {
+        let mut ds = DeepState::new();
+        for _ in 0..12 {
+            ds.on_prestige();
+        }
+        assert_eq!(ds.persistent.generation_records.len(), 10);
+        // Generations 1 and 2 should have been dropped, leaving 3..=12.
+        assert_eq!(ds.persistent.generation_records[0].generation, 3);
+        assert_eq!(
+            ds.persistent.generation_records.last().unwrap().generation,
+            12
+        );
+    }
+
+    // ── MercStatus legacy migration edge case ─────────────────────────────────
+
+    #[test]
+    fn test_merc_status_legacy_injured_no_fields_defaults_to_one_mission() {
+        let json = r#"{"Injured":{}}"#;
+        let before = Utc::now();
+        let loaded: MercStatus = serde_json::from_str(json).unwrap();
+        let MercStatus::Injured { recover_at } = loaded else {
+            panic!("Should remain Injured");
+        };
+        let remaining = (recover_at - before).num_seconds();
+        // Defaults to 1 mission-equivalent = 6h.
+        assert!((5 * 3600..=6 * 3600 + 60).contains(&remaining));
+    }
+
+    // ── DeepUiState ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_deep_ui_state_open_sets_defaults() {
+        let mut ui = DeepUiState::new();
+        ui.selected_index = 5;
+        ui.flash_message = Some("hi".to_string());
+        ui.open();
+        assert!(ui.open);
+        assert_eq!(ui.selected_index, 0);
+        assert_eq!(ui.view, DeepView::Infrastructure);
+        assert!(ui.flash_message.is_none());
+        assert_eq!(ui.hub_visit_count, 1);
+    }
+
+    #[test]
+    fn test_deep_ui_state_open_at_frontier_uses_frontier_layer() {
+        let mut dp = DeepPersistent::new();
+        dp.layer_record_mut(1).cleared = true;
+        dp.layer_record_mut(2).cleared = true;
+        let _ = dp.layer_record_mut(3); // frontier = 3 -> index 2
+
+        let mut ui = DeepUiState::new();
+        ui.open_at_frontier(&dp);
+        assert_eq!(ui.selected_index, 2);
+        assert!(ui.open);
+    }
+
+    #[test]
+    fn test_deep_ui_state_open_at_frontier_clamps_to_layers_len() {
+        // frontier_layer() can exceed layers.len() when nothing has been recorded yet.
+        let dp = DeepPersistent::new(); // frontier_layer() == 1, layers empty
+        let mut ui = DeepUiState::new();
+        ui.open_at_frontier(&dp);
+        assert_eq!(ui.selected_index, 0);
+    }
+
+    #[test]
+    fn test_deep_ui_state_close_resets_state() {
+        let mut ui = DeepUiState::new();
+        ui.open();
+        ui.view = DeepView::Roster;
+        ui.selected_index = 3;
+        ui.staged_squad.push(1);
+        ui.close();
+        assert!(!ui.open);
+        assert_eq!(ui.view, DeepView::Infrastructure);
+        assert_eq!(ui.selected_index, 0);
+        assert!(ui.staged_squad.is_empty());
+    }
+
+    // ── Default impls ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_default_impls_construct_without_panicking() {
+        let _ = DeepPersistent::default();
+        let _ = DeepPrestige::default();
+        let _ = DeepState::default();
+        let _ = DeepUiState::default();
+        assert_eq!(GuildRank::default(), GuildRank::MIN);
     }
 
     #[test]

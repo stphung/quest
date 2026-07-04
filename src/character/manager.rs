@@ -1693,4 +1693,203 @@ mod tests {
         );
         assert_eq!(loaded.session_kills, 0, "transient session_kills reset");
     }
+
+    // =========================================================================
+    // ADDITIONAL COVERAGE: CharacterManager::new(), load_character_header(),
+    // list_characters() edge cases, save/rename I/O failures
+    // =========================================================================
+
+    #[test]
+    fn test_character_manager_new_uses_quest_dir_env_override() {
+        use crate::core::paths::QUEST_DIR_ENV;
+        use std::env;
+
+        let saved = env::var(QUEST_DIR_ENV).ok();
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let target = dir.path().join("quest_new_test");
+        env::set_var(QUEST_DIR_ENV, &target);
+
+        let manager = CharacterManager::new().expect("CharacterManager::new should succeed");
+        assert_eq!(manager.quest_dir, target);
+        assert!(target.exists(), "quest dir should be created by new()");
+
+        match saved {
+            Some(v) => env::set_var(QUEST_DIR_ENV, v),
+            None => env::remove_var(QUEST_DIR_ENV),
+        }
+    }
+
+    #[test]
+    fn test_load_character_header_ok_none_for_account_file() {
+        let (manager, _dir) = temp_manager();
+        fs::write(
+            manager.quest_dir.join("haven2.json"),
+            r#"{"buildings": [], "version": 1}"#,
+        )
+        .unwrap();
+
+        let result = manager.load_character_header("haven2.json");
+        assert!(matches!(result, Ok(None)));
+    }
+
+    #[test]
+    fn test_load_character_header_ok_none_when_character_name_not_string() {
+        let (manager, _dir) = temp_manager();
+        fs::write(
+            manager.quest_dir.join("weirdname.json"),
+            r#"{"character_name": 12345}"#,
+        )
+        .unwrap();
+
+        let result = manager.load_character_header("weirdname.json");
+        assert!(
+            matches!(result, Ok(None)),
+            "non-string character_name should be treated as an account file, got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_load_character_header_err_for_malformed_json() {
+        let (manager, _dir) = temp_manager();
+        fs::write(manager.quest_dir.join("badjson.json"), "{ not valid json").unwrap();
+
+        let result = manager.load_character_header("badjson.json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_character_header_err_for_missing_required_fields() {
+        let (manager, _dir) = temp_manager();
+        // Has character_name (so it's recognized as a character file) but is
+        // missing the other required header fields.
+        fs::write(
+            manager.quest_dir.join("partialheader.json"),
+            r#"{"character_name": "Partial"}"#,
+        )
+        .unwrap();
+
+        let result = manager.load_character_header("partialheader.json");
+        assert!(
+            result.is_err(),
+            "should error when header fields are incomplete, got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_load_character_header_err_for_nonexistent_file() {
+        let (manager, _dir) = temp_manager();
+        let result = manager.load_character_header("does_not_exist_header.json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_list_characters_header_ok_but_full_load_fails_shows_corrupted_with_header_data() {
+        let (manager, _dir) = temp_manager();
+
+        // Enough fields for CharacterHeader to parse, but missing combat_state/
+        // equipment/etc. so the full CharacterSaveData load fails.
+        let json = r#"{
+            "character_id": "hdr-id",
+            "character_name": "HeaderOnly",
+            "character_level": 7,
+            "prestige_rank": 2,
+            "play_time_seconds": 500,
+            "last_save_time": 12345
+        }"#;
+        fs::write(manager.quest_dir.join("headeronly.json"), json).unwrap();
+
+        let list = manager.list_characters().expect("list_characters failed");
+        assert_eq!(list.len(), 1);
+
+        let entry = &list[0];
+        assert!(entry.is_corrupted);
+        assert_eq!(entry.character_id, "hdr-id");
+        assert_eq!(entry.character_name, "HeaderOnly");
+        assert_eq!(entry.character_level, 7);
+        assert_eq!(entry.prestige_rank, 2);
+        assert_eq!(entry.play_time_seconds, 500);
+        assert_eq!(entry.last_save_time, 12345);
+        assert_eq!(entry.ascension_level, 0);
+    }
+
+    #[test]
+    fn test_list_characters_header_malformed_shows_default_corrupted_placeholder() {
+        let (manager, _dir) = temp_manager();
+
+        // character_name present (string) but character_level has the wrong type,
+        // so load_character_header() itself fails (not just the full load).
+        let json = r#"{"character_name": "BadHeader", "character_level": "oops"}"#;
+        fs::write(manager.quest_dir.join("badheader.json"), json).unwrap();
+
+        let list = manager.list_characters().expect("list_characters failed");
+        assert_eq!(list.len(), 1);
+
+        let entry = &list[0];
+        assert!(entry.is_corrupted);
+        assert_eq!(entry.character_name, "[CORRUPTED]");
+        assert_eq!(entry.filename, "badheader.json");
+        assert_eq!(entry.character_id, "");
+    }
+
+    #[test]
+    fn test_list_characters_ignores_non_json_files() {
+        let (manager, _dir) = temp_manager();
+        fs::write(manager.quest_dir.join("notes.txt"), "not a save file").unwrap();
+
+        let state = make_test_state("JsonOnly");
+        manager.save_character(&state).unwrap();
+
+        let list = manager.list_characters().expect("list_characters failed");
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].character_name, "JsonOnly");
+    }
+
+    #[test]
+    fn test_list_characters_empty_directory() {
+        let (manager, _dir) = temp_manager();
+        let list = manager.list_characters().expect("list_characters failed");
+        assert!(list.is_empty());
+    }
+
+    #[test]
+    fn test_save_character_fails_when_target_path_is_a_directory() {
+        let (manager, _dir) = temp_manager();
+        // Put a directory where the character's save file would go so
+        // fs::write() returns an I/O error instead of succeeding.
+        fs::create_dir(manager.quest_dir.join("dirclash.json")).unwrap();
+
+        let state = make_test_state("DirClash");
+        let result = manager.save_character(&state);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_rename_to_name_with_same_sanitized_filename_preserves_character() {
+        // Regression test: renaming to a new display name that sanitizes to the
+        // *same* filename (e.g. only a case change) must not delete the
+        // character. Previously rename_character() always removed
+        // `old_filename` after saving under the new (sanitized) name; when the
+        // two filenames coincide, that unconditional removal deleted the file
+        // save_character() had just written.
+        let (manager, _dir) = temp_manager();
+        let state = make_test_state("Hero");
+        manager.save_character(&state).unwrap();
+        assert!(manager.quest_dir.join("hero.json").exists());
+
+        manager
+            .rename_character("hero.json", "HERO".to_string())
+            .expect("rename should succeed");
+
+        assert!(
+            manager.quest_dir.join("hero.json").exists(),
+            "character file must still exist after a same-filename rename"
+        );
+        let loaded = manager
+            .load_character("hero.json")
+            .expect("character should still load after rename");
+        assert_eq!(loaded.character_name, "HERO");
+    }
 }

@@ -260,9 +260,16 @@ impl CharacterManager {
         // Save with new name
         self.save_character(&state)?;
 
-        // Delete old file
-        let old_filepath = self.quest_dir.join(old_filename);
-        fs::remove_file(old_filepath)?;
+        // Delete old file — but only if it differs from the new one. A rename
+        // that only changes case/whitespace (e.g. "Hero" -> "HERO") sanitizes to
+        // the *same* filename, and save_character() above already overwrote it
+        // in place; removing "the old file" in that case would delete the
+        // character we just renamed instead of leaving it intact.
+        let new_filename = format!("{}.json", sanitize_name(&new_name));
+        if old_filename != new_filename {
+            let old_filepath = self.quest_dir.join(old_filename);
+            fs::remove_file(old_filepath)?;
+        }
 
         Ok(())
     }

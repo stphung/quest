@@ -772,4 +772,113 @@ mod tests {
         assert_eq!(state.save_time(), 1000);
         assert_eq!(state.play_time(), 0);
     }
+
+    #[test]
+    fn test_player_identity_accessors() {
+        let mut state = GameState::new("Identity Hero".to_string(), 500);
+        state.character_level = 7;
+        state.character_xp = 12345;
+        state.prestige_rank = 3;
+
+        assert_eq!(state.player_level(), 7);
+        assert_eq!(state.player_xp(), 12345);
+        assert_eq!(state.player_name(), "Identity Hero");
+        assert_eq!(state.player_prestige_rank(), 3);
+        assert_eq!(state.player_attributes().get(AttributeType::Strength), 10);
+    }
+
+    #[test]
+    fn test_player_attributes_mut_allows_modification() {
+        let mut state = GameState::new("Mut Hero".to_string(), 0);
+        state
+            .player_attributes_mut()
+            .set(AttributeType::Dexterity, 42);
+        assert_eq!(state.player_attributes().get(AttributeType::Dexterity), 42);
+    }
+
+    #[test]
+    fn test_combat_context_zone_accessors() {
+        let mut state = GameState::new("Zone Hero".to_string(), 0);
+        assert_eq!(state.current_zone_id(), 1);
+        assert_eq!(state.current_subzone_id(), 1);
+
+        state.zone_progression.current_zone_id = 5;
+        state.zone_progression.current_subzone_id = 3;
+        assert_eq!(state.current_zone_id(), 5);
+        assert_eq!(state.current_subzone_id(), 3);
+    }
+
+    #[test]
+    fn test_xp_per_hour_none_when_insufficient_samples() {
+        let mut state = GameState::new("XpRate Hero".to_string(), 0);
+        assert!(state.xp_per_hour().is_none());
+
+        // Fewer than 10 samples should still return None.
+        for i in 0..9 {
+            state.xp_rate_samples.push_back(i);
+        }
+        assert!(state.xp_per_hour().is_none());
+    }
+
+    #[test]
+    fn test_xp_per_hour_computes_rate_from_samples() {
+        let mut state = GameState::new("XpRate Hero".to_string(), 0);
+        // 10 samples of 2 XP/sec each -> average 2 XP/sec -> 7200 XP/hr
+        for _ in 0..10 {
+            state.xp_rate_samples.push_back(2);
+        }
+        assert_eq!(state.xp_per_hour(), Some(7200));
+    }
+
+    #[test]
+    fn test_recalculate_derived_stats_clears_dirty_flag() {
+        let mut state = GameState::new("Derived Hero".to_string(), 0);
+        state.derived_stats_dirty = true;
+        state.attributes.set(AttributeType::Strength, 20);
+
+        state.recalculate_derived_stats(&[0; 7]);
+
+        assert!(!state.derived_stats_dirty);
+        // Derived stats should reflect the boosted Strength attribute.
+        assert!(state.cached_derived_stats.physical_damage > 0);
+    }
+
+    #[test]
+    fn test_invalidate_derived_stats_sets_dirty_flag() {
+        let mut state = GameState::new("Dirty Hero".to_string(), 0);
+        state.recalculate_derived_stats(&[0; 7]);
+        assert!(!state.derived_stats_dirty);
+
+        state.invalidate_derived_stats();
+        assert!(state.derived_stats_dirty);
+    }
+
+    #[test]
+    fn test_invalidate_bonuses_sets_dirty_flag() {
+        let mut state = GameState::new("Bonuses Hero".to_string(), 0);
+        state.bonuses_dirty = false;
+
+        state.invalidate_bonuses();
+        assert!(state.bonuses_dirty);
+    }
+
+    #[test]
+    fn test_recalculate_prestige_bonuses_updates_cache() {
+        let mut state = GameState::new("Prestige Hero".to_string(), 0);
+        assert_eq!(state.cached_prestige_bonuses.flat_damage, 0);
+
+        state.prestige_rank = 10;
+        state.recalculate_prestige_bonuses();
+
+        let expected = PrestigeCombatBonuses::from_rank(10);
+        assert_eq!(
+            state.cached_prestige_bonuses.flat_damage,
+            expected.flat_damage
+        );
+        assert_eq!(
+            state.cached_prestige_bonuses.flat_defense,
+            expected.flat_defense
+        );
+        assert!(state.cached_prestige_bonuses.flat_damage > 0);
+    }
 }

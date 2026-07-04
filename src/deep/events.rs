@@ -2039,6 +2039,390 @@ mod tests {
         }
     }
 
+    // ── generate_mission_events_with_names ───────────────────────────────────
+
+    #[test]
+    fn test_generate_mission_events_with_names_personalizes_description() {
+        let mut rng = seeded_rng();
+        let events = generate_mission_events_with_names(
+            MissionType::Expedition,
+            1,
+            &[MercArchetype::Scout],
+            &["Gareth".to_string()],
+            &mut rng,
+        );
+        assert!(!events.is_empty());
+        assert!(
+            events[0].description.contains("Gareth"),
+            "Description should mention squad member name: {}",
+            events[0].description
+        );
+    }
+
+    #[test]
+    fn test_generate_mission_events_empty_names_uses_generic_description() {
+        let mut rng = seeded_rng();
+        let events = generate_mission_events_with_names(
+            MissionType::Expedition,
+            1,
+            &[MercArchetype::Scout],
+            &[],
+            &mut rng,
+        );
+        assert!(!events.is_empty());
+        // No tier-flavour line is prepended when squad_names is empty.
+        assert!(!events[0].description.contains("Gareth"));
+    }
+
+    #[test]
+    fn test_generate_mission_events_with_names_personalizes_across_all_tiers() {
+        // Exercises pick_tier_description() for every LayerTier match arm
+        // (Shallows, Warrens, Hollows, SunkenReach, Abyss, Void).
+        let mut rng = seeded_rng();
+        for layer in [1u32, 4, 8, 13, 19, 26] {
+            let events = generate_mission_events_with_names(
+                MissionType::Expedition,
+                layer,
+                &[],
+                &["Gareth".to_string()],
+                &mut rng,
+            );
+            assert!(!events.is_empty(), "layer {layer} should produce events");
+        }
+    }
+
+    // ── Gateway Expedition events ─────────────────────────────────────────────
+
+    #[test]
+    fn test_generate_mission_events_gateway_expedition_fixed_narrative() {
+        let mut rng = seeded_rng();
+        let events = generate_mission_events(MissionType::GatewayExpedition, 30, &[], &mut rng);
+        assert_eq!(events.len(), 5);
+        assert_eq!(events[0].title, "THE SEALED ROOT");
+        assert_eq!(events[4].title, "THE GATEWAY");
+    }
+
+    // ── tick_mission_events ───────────────────────────────────────────────────
+
+    fn make_mission(
+        mission_type: MissionType,
+        layer: u32,
+        started_at: DateTime<Utc>,
+        duration_secs: i64,
+        events: Vec<CheckInEvent>,
+    ) -> Mission {
+        Mission {
+            id: 1,
+            mission_type,
+            layer,
+            squad: vec![],
+            started_at,
+            ends_at: started_at + Duration::seconds(duration_secs),
+            events,
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        }
+    }
+
+    #[test]
+    fn test_tick_mission_events_ignores_non_active_mission() {
+        let mut rng = seeded_rng();
+        let now = Utc::now();
+        let events = generate_mission_events(MissionType::Expedition, 1, &[], &mut rng);
+        let mut mission = make_mission(
+            MissionType::Expedition,
+            1,
+            now - Duration::hours(10),
+            100_000,
+            events,
+        );
+        mission.status = MissionStatus::Completed;
+        let result = tick_mission_events(&mut mission, &[], now, &mut rng);
+        assert!(result.newly_pending.is_empty());
+        assert!(result.auto_resolved.is_empty());
+    }
+
+    #[test]
+    fn test_tick_mission_events_no_fire_before_trigger() {
+        let mut rng = seeded_rng();
+        let started_at = Utc::now();
+        let events = generate_mission_events(MissionType::Expedition, 1, &[], &mut rng);
+        let mut mission = make_mission(MissionType::Expedition, 1, started_at, 100_000, events);
+        let result = tick_mission_events(&mut mission, &[], started_at, &mut rng);
+        assert!(result.newly_pending.is_empty());
+        assert_eq!(mission.status, MissionStatus::Active);
+    }
+
+    #[test]
+    fn test_tick_mission_events_fires_event_at_trigger_and_stays_pending() {
+        let mut rng = seeded_rng();
+        let started_at = Utc::now();
+        let duration_secs = 100_000i64;
+        let events = generate_mission_events(MissionType::Expedition, 1, &[], &mut rng);
+        let mut mission = make_mission(
+            MissionType::Expedition,
+            1,
+            started_at,
+            duration_secs,
+            events,
+        );
+        let trigger1_time = started_at + Duration::seconds((0.33 * duration_secs as f64) as i64);
+        let result = tick_mission_events(&mut mission, &[], trigger1_time, &mut rng);
+        assert_eq!(result.newly_pending, vec![0]);
+        assert!(result.auto_resolved.is_empty());
+        assert_eq!(mission.status, MissionStatus::EventPending);
+        assert_eq!(mission.pending_event_index, 0);
+    }
+
+    #[test]
+    fn test_tick_mission_events_auto_resolves_after_timeout_and_resumes() {
+        let mut rng = seeded_rng();
+        let started_at = Utc::now();
+        let duration_secs = 100_000i64;
+        let events = generate_mission_events(MissionType::Expedition, 1, &[], &mut rng);
+        let mut mission = make_mission(
+            MissionType::Expedition,
+            1,
+            started_at,
+            duration_secs,
+            events,
+        );
+        let trigger1_time = started_at + Duration::seconds((0.33 * duration_secs as f64) as i64);
+
+        // First tick: event fires and becomes pending.
+        tick_mission_events(&mut mission, &[], trigger1_time, &mut rng);
+        assert_eq!(mission.status, MissionStatus::EventPending);
+
+        // Second tick: 3 hours later — past the 2h auto-resolve timeout, but
+        // before the second trigger point (0.66 * 100_000s = 66_000s).
+        let later = trigger1_time + Duration::hours(3);
+        let result = tick_mission_events(&mut mission, &[], later, &mut rng);
+        assert_eq!(result.auto_resolved.len(), 1);
+        assert_eq!(result.auto_resolved[0].0, 0);
+        assert!(result.auto_resolved[0].1.was_auto_resolved);
+        assert_eq!(mission.pending_event_index, 1);
+        assert_eq!(
+            mission.status,
+            MissionStatus::Active,
+            "Mission should resume Active once the pending event auto-resolves"
+        );
+    }
+
+    #[test]
+    fn test_tick_mission_events_offline_fast_forward_resolves_all_events() {
+        let mut rng = seeded_rng();
+        let started_at = Utc::now();
+        let duration_secs = 100_000i64;
+        let events = generate_mission_events(MissionType::Breakthrough, 1, &[], &mut rng);
+        let expected_count = events.len();
+        let mut mission = make_mission(
+            MissionType::Breakthrough,
+            1,
+            started_at,
+            duration_secs,
+            events,
+        );
+        // Simulate the game being closed for a long time — well past mission end.
+        let now = started_at + Duration::seconds(duration_secs) + Duration::hours(24);
+        let result = tick_mission_events(&mut mission, &[], now, &mut rng);
+        assert_eq!(result.auto_resolved.len(), expected_count);
+        assert_eq!(mission.pending_event_index, expected_count);
+        assert_eq!(mission.status, MissionStatus::Active);
+    }
+
+    #[test]
+    fn test_tick_mission_events_skips_already_resolved_event() {
+        // If the player resolves the pending event directly (not via auto-resolve),
+        // the next tick should just advance pending_event_index past it instead of
+        // re-processing or re-firing it.
+        let mut rng = seeded_rng();
+        let started_at = Utc::now();
+        let duration_secs = 100_000i64;
+        let events = generate_mission_events(MissionType::Expedition, 1, &[], &mut rng);
+        let mut mission = make_mission(
+            MissionType::Expedition,
+            1,
+            started_at,
+            duration_secs,
+            events,
+        );
+        let trigger1_time = started_at + Duration::seconds((0.33 * duration_secs as f64) as i64);
+
+        // Fire the first event and have the player resolve it directly.
+        tick_mission_events(&mut mission, &[], trigger1_time, &mut rng);
+        assert_eq!(mission.status, MissionStatus::EventPending);
+        let auto_choice = mission.events[0].auto_resolve_choice;
+        resolve_event(&mut mission.events[0], Some(auto_choice), &[], &mut rng);
+        assert!(mission.events[0].resolved_choice.is_some());
+
+        // Next tick (still within the same window) should just advance the index.
+        let result = tick_mission_events(&mut mission, &[], trigger1_time, &mut rng);
+        assert!(
+            result.auto_resolved.is_empty(),
+            "already-resolved event should not be auto-resolved again"
+        );
+        assert_eq!(mission.pending_event_index, 1);
+    }
+
+    // ── resolve_event: risky choices ──────────────────────────────────────────
+
+    #[test]
+    fn test_resolve_event_risky_choice_explicit_outcomes() {
+        // SUBTERRANEAN_NEST's risky choice has no risk_success_tag/risk_failure_tag,
+        // so both branches assert cleanly without depending on the chain-tag fallback.
+        let mut saw_success = false;
+        let mut saw_failure = false;
+        for seed in 0u64..200 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut event = template_to_check_in_event(&SUBTERRANEAN_NEST, 1, Utc::now(), &[]);
+            let risky_index = event.choices.iter().position(|c| c.is_risky).unwrap();
+            let res = resolve_event(&mut event, Some(risky_index), &[], &mut rng).unwrap();
+            assert!(!res.was_auto_resolved);
+            assert_eq!(event.resolved_choice, Some(risky_index));
+            if res.may_injure {
+                saw_failure = true;
+                assert!(res.injury_chance > 0.0);
+            } else {
+                saw_success = true;
+            }
+        }
+        assert!(
+            saw_success,
+            "Expected at least one risky success in 200 seeds"
+        );
+        assert!(
+            saw_failure,
+            "Expected at least one risky failure in 200 seeds"
+        );
+    }
+
+    #[test]
+    fn test_resolve_event_unknown_template_uses_fallback_values() {
+        let mut rng = seeded_rng();
+        let mut event = CheckInEvent {
+            title: "A Title Not In Any Template".to_string(),
+            description: "Test".to_string(),
+            choices: vec![
+                EventChoice {
+                    label: "Safe".to_string(),
+                    required_archetype: None,
+                    time_delta_secs: 0,
+                    is_risky: false,
+                    unlocks_bonus_event: false,
+                    risk_percent: None,
+                },
+                EventChoice {
+                    label: "Risky".to_string(),
+                    required_archetype: None,
+                    time_delta_secs: 0,
+                    is_risky: true,
+                    unlocks_bonus_event: false,
+                    risk_percent: Some(35),
+                },
+            ],
+            auto_resolve_choice: 0,
+            archetype_bonus: None,
+            fired_at: Utc::now(),
+            resolved_choice: None,
+        };
+        let res = resolve_event(&mut event, Some(1), &[], &mut rng).unwrap();
+        assert!(!res.was_auto_resolved);
+        // Falls back to (power_modifier 1.0, bonus_marks 0) template extras.
+        assert_eq!(res.power_modifier, 1.0);
+    }
+
+    // ── Narrative personalisation ─────────────────────────────────────────────
+
+    #[test]
+    fn test_personalise_description_replaces_placeholder() {
+        let result = personalise_description("{merc_name} looks around.", &["Gareth".to_string()]);
+        assert_eq!(result, "Gareth looks around.");
+    }
+
+    #[test]
+    fn test_personalise_description_falls_back_to_your_squad() {
+        let result = personalise_description("{merc_name} looks around.", &[]);
+        assert_eq!(result, "Your squad looks around.");
+    }
+
+    // ── void_scale (full triple) ───────────────────────────────────────────────
+
+    #[test]
+    fn test_void_scale_injury_scale_increases_past_layer_25() {
+        let (_, _, is26) = void_scale(26);
+        let (_, _, is30) = void_scale(30);
+        assert!(is26 > 1.0);
+        assert!(is30 > is26);
+    }
+
+    // ── Template lookup helpers ────────────────────────────────────────────────
+
+    #[test]
+    fn test_find_template_by_title_known_and_unknown() {
+        assert!(find_template_by_title("FLOODED PASSAGE").is_some());
+        assert!(find_template_by_title("Not A Real Title").is_none());
+    }
+
+    #[test]
+    fn test_find_template_choice_extras_known_template() {
+        // SHALLOWS_BOSS choice index 1 ("Tactical approach") has power_modifier 1.15.
+        let (power_mod, marks) = find_template_choice_extras("THE GUARDIAN'S CHAMBER", 1);
+        assert!((power_mod - 1.15).abs() < 1e-9);
+        assert_eq!(marks, 0);
+    }
+
+    #[test]
+    fn test_find_template_choice_extras_unknown_template_returns_default() {
+        let (power_mod, marks) = find_template_choice_extras("Nope", 0);
+        assert_eq!(power_mod, 1.0);
+        assert_eq!(marks, 0);
+    }
+
+    #[test]
+    fn test_find_template_risky_data_unknown_template_returns_default() {
+        let (chance, injury, fail_tag, success_tag) = find_template_risky_data("Nope", 0);
+        assert!((chance - 0.65).abs() < 1e-9);
+        assert!((injury - 0.20).abs() < 1e-9);
+        assert!(fail_tag.is_none());
+        assert!(success_tag.is_none());
+    }
+
+    #[test]
+    fn test_find_template_choice_extras_known_template_out_of_bounds_index() {
+        // Known template, but the choice index doesn't exist on it.
+        let (power_mod, marks) = find_template_choice_extras("FLOODED PASSAGE", 999);
+        assert_eq!(power_mod, 1.0);
+        assert_eq!(marks, 0);
+    }
+
+    #[test]
+    fn test_find_template_risky_data_known_template_out_of_bounds_index() {
+        // Known template, but the choice index doesn't exist on it.
+        let (chance, injury, fail_tag, success_tag) =
+            find_template_risky_data("FLOODED PASSAGE", 999);
+        assert!((chance - 0.65).abs() < 1e-9);
+        assert!((injury - 0.20).abs() < 1e-9);
+        assert!(fail_tag.is_none());
+        assert!(success_tag.is_none());
+    }
+
+    #[test]
+    fn test_resolve_event_applies_template_power_modifier() {
+        // SHALLOWS_BOSS choice index 1 ("Tactical approach") has power_modifier 1.15,
+        // which resolve_event should surface on the EventResolution (overriding the
+        // default 1.0 computed for a non-risky choice).
+        let mut rng = seeded_rng();
+        let mut event = template_to_check_in_event(&SHALLOWS_BOSS, 1, Utc::now(), &[]);
+        let res = resolve_event(&mut event, Some(1), &[MercArchetype::Scout], &mut rng).unwrap();
+        assert!(
+            (res.power_modifier - 1.15).abs() < 1e-9,
+            "expected power_modifier 1.15, got {}",
+            res.power_modifier
+        );
+    }
+
     #[test]
     fn test_boss_templates_exist_for_all_tiers() {
         for tier in [
@@ -2053,5 +2437,56 @@ mod tests {
             assert_eq!(boss.category, EventCategory::BossApproach);
             assert!(!boss.title.is_empty());
         }
+    }
+
+    // ── resolve_event: chain-tag propagation on risky success ─────────────────
+
+    #[test]
+    fn test_resolve_event_risky_success_with_chain_applies_success_tag() {
+        // FORK_IN_PATH's risky choice has unlocks_bonus_event = true and the
+        // template's risk_success_tag is ExploredSidePath — a successful roll
+        // must carry that tag through as the chain tag.
+        let mut saw_success = false;
+        for seed in 0u64..200 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut event = template_to_check_in_event(&FORK_IN_PATH, 1, Utc::now(), &[]);
+            let risky_index = event.choices.iter().position(|c| c.is_risky).unwrap();
+            let res = resolve_event(&mut event, Some(risky_index), &[], &mut rng).unwrap();
+            if !res.may_injure {
+                saw_success = true;
+                assert_eq!(
+                    res.chain_tag,
+                    Some(EventTag::ExploredSidePath),
+                    "successful chaining risky choice should carry the template's risk_success_tag"
+                );
+            }
+        }
+        assert!(saw_success, "expected at least one success in 200 seeds");
+    }
+
+    #[test]
+    fn test_resolve_event_risky_failure_applies_failure_tag_fallback() {
+        // TOXIC VENT's risky choice does not chain (unlocks_bonus_event = false),
+        // but the template's risk_failure_tag (TookRisk) is applied via the
+        // fallback `.or(...)` in resolve_event whenever the choice isn't
+        // auto-resolved — including, notably, on a successful roll (the
+        // fallback isn't gated on the risky outcome, only on was_auto_resolved).
+        // This test pins down that current behavior for regression coverage.
+        let mut saw_success = false;
+        let mut saw_failure = false;
+        for seed in 0u64..200 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut event = template_to_check_in_event(&POISON_GAS_VENT, 1, Utc::now(), &[]);
+            let risky_index = event.choices.iter().position(|c| c.is_risky).unwrap();
+            let res = resolve_event(&mut event, Some(risky_index), &[], &mut rng).unwrap();
+            assert_eq!(res.chain_tag, Some(EventTag::TookRisk));
+            if res.may_injure {
+                saw_failure = true;
+            } else {
+                saw_success = true;
+            }
+        }
+        assert!(saw_success, "expected at least one success in 200 seeds");
+        assert!(saw_failure, "expected at least one failure in 200 seeds");
     }
 }
