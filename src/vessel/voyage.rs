@@ -78,7 +78,7 @@ pub const LAUNCH_HOPE: u8 = 7;
 /// (the slowest crossing of the whole era), and the ramp that follows is the
 /// Drive shortening each crossing — not the clock speeding up. Every crossing
 /// runs on this one uniform scale; only the earned Drive level changes.
-pub const GAME_MINUTES_PER_REAL_MINUTE: f64 = 1.25;
+pub const GAME_MINUTES_PER_REAL_MINUTE: f64 = 2.64;
 
 /// Wall-clock multiplier: `QUEST_VOYAGE_TIME_SCALE` (dev/test override; at
 /// 1440x a voyage day passes in one real minute — used by drive-game), or

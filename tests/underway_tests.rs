@@ -6,7 +6,9 @@ use quest::vessel::nights::NightKind;
 use quest::vessel::pilgrims::{pilgrim_road, PILGRIMS};
 use quest::vessel::route::{roads_from, RoadId, ROUTE_START};
 use quest::vessel::souls::{SoulId, Station};
-use quest::vessel::voyage::{SoulStatus, Trim, VoyagePhase, VoyageState};
+use quest::vessel::voyage::{
+    real_duration_for_game_minutes, SoulStatus, Trim, VoyagePhase, VoyageState,
+};
 use quest::vessel::weather::{self, WeatherKind};
 
 fn t0() -> DateTime<Utc> {
@@ -138,14 +140,14 @@ fn quiet_trim_hears_a_silence_bank_once() {
     let mut v = traveling_on(seed, road, hour * 60);
     v.set_trim(Trim::Quiet);
     let rumors_before = v.rumors.len();
-    v.tick(t0() + Duration::minutes((hour * 60 + 120) as i64));
+    v.tick(t0() + real_duration_for_game_minutes((hour * 60 + 120) as i64));
     assert!(!v.heard_banks.is_empty(), "Quiet heard the bank");
     assert!(v.rumors.len() > rumors_before, "and it paid in knowledge");
     // Un-Quiet, the same bank frays hope instead.
     let mut w = traveling_on(seed, road, hour * 60);
     w.set_trim(Trim::Cruise);
     w.hope = 7;
-    w.tick(t0() + Duration::minutes((hour * 60 + 30 * 60) as i64));
+    w.tick(t0() + real_duration_for_game_minutes((hour * 60 + 30 * 60) as i64));
     assert!(
         w.silence_minutes > 0 || w.hope < 7,
         "the silence pressed in"

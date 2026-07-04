@@ -23,11 +23,11 @@ pub const INITIAL_SOULS: u64 = 100_000;
 /// The ferry's hold at Shipwright level 0 — how many souls a fresh ferry
 /// carries before you spend any Salvage widening her. The Shipwright yard
 /// grows this; the districts add standing bonuses on top.
-pub const BASE_CAPACITY: u32 = 430;
+pub const BASE_CAPACITY: u32 = 180;
 
 /// Each Shipwright level multiplies the hold by this — a compounding widen,
 /// so late loads climb into the tens of thousands. Paid for with Salvage.
-pub const CAP_GROWTH: f64 = 1.55;
+pub const CAP_GROWTH: f64 = 1.36;
 
 /// Each Drive level multiplies the crossing's sail-time by this (0.70 =
 /// 30% faster per level), compounding down toward the floor. The ramp is
@@ -35,8 +35,8 @@ pub const CAP_GROWTH: f64 = 1.55;
 /// level you buy shortens every crossing that follows.
 pub const DRIVE_DECAY: f64 = 0.70;
 /// The quickest a crossing can ever get, as a fraction of its launch time
-/// (0.085 ≈ twelve times as fast). Drive levels approach but never pass it.
-pub const DRIVE_FLOOR: f64 = 0.085;
+/// (0.05 = twenty times as fast). Drive levels approach but never pass it.
+pub const DRIVE_FLOOR: f64 = 0.05;
 
 /// Salvage — the currency of the yards — earned on every landfall: a flat
 /// base plus a share of the souls carried, so a fuller hold funds faster
@@ -44,9 +44,9 @@ pub const DRIVE_FLOOR: f64 = 0.085;
 pub const SALVAGE_AT_LANDFALL: u64 = 3;
 /// One Salvage for every this-many souls delivered in a crossing.
 pub const SOULS_PER_SALVAGE: u64 = 30;
-/// The founding grant — enough Salvage after the maiden voyage to make the
-/// first yard choice (Drive or hold) matter immediately.
-pub const STARTING_SALVAGE: u64 = 10;
+/// The founding grant — enough Salvage after the maiden voyage that the early
+/// yard choices bite at once and the ramp takes hold from the second crossing.
+pub const STARTING_SALVAGE: u64 = 40;
 
 /// The Drive yard's price ladder: level `L` costs `4 × 1.5^L` Salvage,
 /// rounded — cheap early, steep late, so Salvage is always scarce and the
@@ -61,7 +61,7 @@ pub const CAP_COST_GROWTH: f64 = 1.42;
 /// a visible per-crossing toll, not a slow drip. Small, but it makes pure
 /// speed a trap: a Drive-only build runs many short crossings and the dark
 /// bites on every one, saving fewer souls than a balanced hand.
-pub const DARK_TAKES_EACH_CROSSING: f64 = 0.0045;
+pub const DARK_TAKES_EACH_CROSSING: f64 = 0.011;
 
 /// The colony's districts, unlocked in order by population. Pure growth —
 /// every one lands eventually; the choices live on the water.

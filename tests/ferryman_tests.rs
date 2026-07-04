@@ -31,6 +31,55 @@ fn balanced_spend(c: &mut ColonyState) {
     }
 }
 
+#[allow(dead_code)]
+fn drive_only_spend(c: &mut ColonyState) {
+    while c.buy_drive() {}
+}
+#[allow(dead_code)]
+fn cap_only_spend(c: &mut ColonyState) {
+    while c.buy_capacity() {}
+}
+/// Souls-first optimal line: empty the world in the fewest crossings (each
+/// crossing is a dark toll), so lean into the hold — but keep just enough
+/// Drive that the crossings still turn around fast. Two hold levels per Drive.
+#[allow(dead_code)]
+fn cap_lean_spend(c: &mut ColonyState) {
+    loop {
+        let bought = if c.cap_level <= c.drive_level * 2 && c.salvage >= c.cap_cost() {
+            c.buy_capacity()
+        } else if c.salvage >= c.drive_cost() {
+            c.buy_drive()
+        } else if c.salvage >= c.cap_cost() {
+            c.buy_capacity()
+        } else {
+            false
+        };
+        if !bought {
+            break;
+        }
+    }
+}
+
+#[test]
+#[ignore = "tuning sweep — run with --ignored --nocapture"]
+fn strategy_sweep() {
+    let scale = quest::vessel::voyage::time_scale();
+    for (name, spend) in [
+        ("drive-only", drive_only_spend as fn(&mut ColonyState)),
+        ("cap-only", cap_only_spend),
+        ("balanced", balanced_spend),
+        ("cap-lean (souls-first)", cap_lean_spend),
+    ] {
+        let (crossings, first, _last, delivered, total) = run_era_with(spend);
+        eprintln!(
+            "{name:>24}: {crossings:>3} crossings  {:>4.1} mo  {:>4.1}% saved  (C1 {:.0}d)",
+            (total as f64 / scale) / 30.0,
+            delivered as f64 / 1000.0,
+            first as f64 / scale,
+        );
+    }
+}
+
 /// Sail a whole crossing to the Tree, staffing the crew, and return its
 /// day count and the finale.
 fn cross(v: &mut VoyageState) -> u64 {
@@ -71,6 +120,13 @@ fn cross(v: &mut VoyageState) -> u64 {
 /// Play a full era: crossing after crossing until the world empties.
 /// Returns (crossings, first-crossing days, last-crossing days, delivered).
 fn run_era() -> (u32, u64, u64, u64) {
+    let (c, f, l, d, _) = run_era_with(balanced_spend);
+    (c, f, l, d)
+}
+
+/// Play a full era under an arbitrary spend policy. Returns
+/// (crossings, first-days, last-days, delivered, total-game-days).
+fn run_era_with(spend: fn(&mut ColonyState)) -> (u32, u64, u64, u64, u64) {
     let mut colony = ColonyState::found("era".to_string());
     let mut crew: Vec<quest::vessel::voyage::SoulState> = Vec::new();
     let mut first_days = 0;
@@ -110,24 +166,26 @@ fn run_era() -> (u32, u64, u64, u64) {
         } else {
             v.passengers
         };
-        colony.deliver_crossing(delivered, days, days * 10, days);
-        // On arrival, spend the crossing's Salvage in the yards — the
-        // balanced line the campaign is tuned around.
-        balanced_spend(&mut colony);
-        if colony.era_over() {
-            let real_days = total_days as f64 / quest::vessel::voyage::time_scale();
+        if std::env::var("RAMPDBG").is_ok() {
             eprintln!(
-                "  TOTAL: {} game-days = {:.0} real days = {:.1} real months (C1 = {:.1} real days)",
-                total_days,
-                real_days,
-                real_days / 30.0,
-                first_days as f64 / quest::vessel::voyage::time_scale(),
+                "  C{:>2}: {:>4.1} real-days  (drive Lv{} cap Lv{})  carried {}",
+                colony.crossings_completed + 1,
+                days as f64 / quest::vessel::voyage::time_scale(),
+                colony.drive_level,
+                colony.cap_level,
+                delivered
             );
+        }
+        colony.deliver_crossing(delivered, days, days * 10, days);
+        // On arrival, spend the crossing's Salvage in the yards.
+        spend(&mut colony);
+        if colony.era_over() {
             return (
                 colony.crossings_completed,
                 first_days,
                 last_days,
                 colony.souls_delivered,
+                total_days,
             );
         }
     }
@@ -212,16 +270,16 @@ fn a_ferry_run_carries_passengers_and_the_rested_crew() {
 fn an_era_ferries_most_of_the_world_across_a_ramping_run_of_crossings() {
     let (crossings, first_days, last_days, delivered) = run_era();
     eprintln!("era: {crossings} crossings, {first_days}d -> {last_days}d, {delivered} delivered");
-    // The tuned campaign: a handful of crossings you feel the loop in, most
-    // of the 100k world carried home, the crossings shortening the whole way
-    // as Drive is bought up.
+    // The tuned campaign: a long run of crossings you feel the ramp in — a
+    // two-week maiden voyage that builds up over the first handful, then a fast
+    // fun stretch of quick turnarounds while the loads climb.
     assert!(
-        (7..=18).contains(&crossings),
-        "the era is a felt run of crossings ({crossings})"
+        (15..=30).contains(&crossings),
+        "the era is a long, felt run of crossings ({crossings})"
     );
     assert!(
-        delivered >= 90_000,
-        "the balanced line saves ~96% of the 100k world ({delivered} delivered)"
+        delivered >= 78_000,
+        "the balanced line still carries most of the 100k world ({delivered} delivered)"
     );
     assert!(
         last_days < first_days,
@@ -275,6 +333,30 @@ fn an_era_ferries_most_of_the_world_across_a_ramping_run_of_crossings() {
         "the ferry ends far larger than it began ({} -> {})",
         sizes[1],
         sizes.last().unwrap()
+    );
+}
+
+#[test]
+fn skilled_play_saves_far_more_souls_than_reckless_play() {
+    // The design intent, as a gate: because the dark takes a toll every
+    // crossing, leaning into the hold (the souls-first line) saves most of the
+    // world, while chasing pure speed runs dozens of near-empty crossings and
+    // the dark bleeds it white. The margin is meant to be *wide* — skill is
+    // rewarded, not marginal.
+    let (_, _, _, souls_first, _) = run_era_with(cap_lean_spend);
+    let (_, _, _, reckless, _) = run_era_with(drive_only_spend);
+    eprintln!("souls-first {souls_first} vs reckless {reckless}");
+    assert!(
+        souls_first >= 82_000,
+        "the souls-first line carries most of the world home ({souls_first})"
+    );
+    assert!(
+        reckless <= 68_000,
+        "the reckless drive-only line bleeds the world to the dark ({reckless})"
+    );
+    assert!(
+        souls_first >= reckless + 18_000,
+        "skilled play saves far more — a wide margin ({souls_first} vs {reckless})"
     );
 }
 

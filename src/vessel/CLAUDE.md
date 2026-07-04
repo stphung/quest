@@ -93,7 +93,7 @@ Content/read-model types for each sub-system; see their file headers for the aut
 ### The Voyage (sub-project 2+)
 Once `vessel_launched` (and `act2_enabled()`), `main.rs`'s game loop hands control to the Voyage: Act 1 systems idle untouched underneath while the Crossing screen owns rendering and input.
 
-- **Lazy tick, whole game-minutes**: `VoyageState::tick(now)` computes elapsed game minutes since `launched_at` and steps `step_minute()` in a loop until caught up. This makes `tick(t2)` produce bitwise-identical state to `tick(t1); tick(t2)` — the "offline equivalence" property that lets long absences resolve exactly like live play. The clock is near-1:1 (`GAME_MINUTES_PER_REAL_MINUTE = 1.25` — a sea-day passes in a little under a real day), so the maiden voyage's ~37 sea-days is about a real month. The campaign's ramp is *earned*, not compressed: the clock never changes, only the Drive level shortens each crossing. Fixtures and tests express exact offsets through `real_duration_for_game_minutes()` so they are scale-agnostic.
+- **Lazy tick, whole game-minutes**: `VoyageState::tick(now)` computes elapsed game minutes since `launched_at` and steps `step_minute()` in a loop until caught up. This makes `tick(t2)` produce bitwise-identical state to `tick(t1); tick(t2)` — the "offline equivalence" property that lets long absences resolve exactly like live play. The clock is `GAME_MINUTES_PER_REAL_MINUTE = 2.64` (a sea-day passes in ~9 real hours), so the maiden voyage's ~37 sea-days is **about two real weeks**. The campaign's ramp is *earned*, not compressed: the clock never changes, only the Drive level shortens each crossing. Fixtures and tests express exact offsets through `real_duration_for_game_minutes()` so they are scale-agnostic.
 - **Auto-sail (pacing)**: a mid-crossing port with no decision — exactly one road out, no recruit ask, no refit door — gets a `PORT_CALL_GAME_MINUTES` port call, then the ship sails herself; the arrival scene is played by the engine and queued in `unread_scenes` for the ferryman to read on return (drained one at a time by `main.rs`). On the **maiden voyage** (crossing 1) decisions hold the ship: junctions, asks, refit doors, and the pier (`arrived_by: None`). On a **ferry run** (crossing 2+, `crossing_number > 1`) the whole crossing is hands-off — she auto-navigates junctions too (taking the first road), skips refit doors, and launches herself from the pier — so the crossing completes autonomously in Drive-scaled time. The passenger load also stops deepening her provisions burn on ferry runs (`provisions_mult_with`): no one meters rations, so the crossing's length answers to Drive alone, not the headcount.
 - **Route**: a spine-and-diamond DAG (`route.rs`) — branches split at 7 junctions and rejoin within the same chapter; each chapter ends at a single gateway waypoint; the Tree (`ROUTE_SINK`, waypoint 37) is the graph's only sink.
 - **Gauges**: `provisions` (burn while traveling, composed from trim × tender-station × weather) and `hope` (the "wind" — its one mechanical effect is `time_mult`; ashen hope enters the Long Silence, pausing arcs and slowing everything to the worst rate until a rest stop relights it).
@@ -136,7 +136,7 @@ Once `vessel_launched` (and `act2_enabled()`), `main.rs`'s game loop hands contr
 | Constant | Value | Notes |
 |----------|-------|-------|
 | `MINUTES_PER_DAY` | 1440 | Game minutes |
-| `GAME_MINUTES_PER_REAL_MINUTE` | 1.25 | Near-1:1 clock (a sea-day ≈ a real day); maiden voyage ≈ a real month; `QUEST_VOYAGE_TIME_SCALE` env overrides for dev |
+| `GAME_MINUTES_PER_REAL_MINUTE` | 2.64 | A sea-day ≈ 9 real hours; maiden voyage ≈ two real weeks; `QUEST_VOYAGE_TIME_SCALE` env overrides for dev |
 | `PORT_CALL_GAME_MINUTES` | 360 | Hold at a no-decision port before auto-sail |
 | `PROVISIONS_CAP` | 100.0 | 150.0 with the Long Hold refit |
 | `LAUNCH_PROVISIONS` | 100.0 | Hold is full at launch |
@@ -155,18 +155,18 @@ The crossing is the *run*; the Colony is what persists above it. Each crossing d
 - **Drive** (`drive_level`) — each level multiplies every future crossing's sail-time by `DRIVE_DECAY`, compounding down to `DRIVE_FLOOR`. Level 0 is the maiden voyage (the slowest crossing there is); the ramp is entirely earned by buying levels.
 - **Shipwright** (`cap_level`) — each level multiplies the hold by `CAP_GROWTH`. `expedition_size()` = `BASE_CAPACITY × CAP_GROWTH^cap_level + district bonuses`.
 
-The tension is speed-vs-salvation: because the dark bites once *per crossing*, a Drive-only build runs many short crossings and saves fewer souls, while a Shipwright-only build saves nearly all but never speeds up — the balanced line (Drive early so it compounds, hold late to sweep) beats both. Tuned to **~8 crossings, ~3.8 real months, ~97% saved, C1 ≈ 30 real days**.
+The tension is speed-vs-salvation, and it is meant to be a **wide** margin: because the dark bites once *per crossing*, a reckless Drive-only build runs ~85 near-empty crossings and bleeds the world to the dark (**~54% saved**), while a souls-first build (lean into the hold, just enough Drive to keep her quick) carries most of it home (**~87% saved**). Skill is rewarded, not marginal. The ramp is a **buildup then a fast-fun stretch**: a two-week maiden voyage, ~14 → ~3 real-days over the first handful, then a long run of ~3-day turnarounds while the loads climb into the thousands. Tuned to **~19 crossings, ~3 real months, ~87% saved with skilled play, C1 ≈ 14 real days (two weeks)**.
 
 | Constant | Value | Notes |
 |----------|-------|-------|
 | `INITIAL_SOULS` | 100,000 | The dying world's pool; the era spends it down |
-| `DRIVE_DECAY` / `DRIVE_FLOOR` | 0.70 / 0.085 | Sail-time ×0.70 per Drive level, floored at 0.085 (≈12× top speed) |
-| `BASE_CAPACITY` / `CAP_GROWTH` | 430 / 1.55 | Hold at Shipwright 0; ×1.55 per level |
+| `DRIVE_DECAY` / `DRIVE_FLOOR` | 0.70 / 0.05 | Sail-time ×0.70 per Drive level, floored at 0.05 (≈20× top speed) |
+| `BASE_CAPACITY` / `CAP_GROWTH` | 180 / 1.36 | Hold at Shipwright 0; ×1.36 per level |
 | `SALVAGE_AT_LANDFALL` / `SOULS_PER_SALVAGE` | 3 / 30 | Salvage earned = 3 + carried/30 per crossing |
-| `STARTING_SALVAGE` | 10 | Founding grant, enough for the first yard choice |
+| `STARTING_SALVAGE` | 40 | Founding grant — the ramp takes hold from the second crossing |
 | `DRIVE_COST_BASE` / `DRIVE_COST_GROWTH` | 4 / 1.5 | Drive level L costs `4×1.5^L` Salvage |
 | `CAP_COST_BASE` / `CAP_COST_GROWTH` | 5 / 1.42 | Shipwright level L costs `5×1.42^L` Salvage |
-| `DARK_TAKES_EACH_CROSSING` | 0.0045 | Fraction of the still-waiting world lost each crossing |
+| `DARK_TAKES_EACH_CROSSING` | 0.011 | Fraction of the still-waiting world lost each crossing — the toll that makes crossing-count matter for souls saved |
 | districts | Quay 500 … Charthouse 66,000 | Founded by population (= souls delivered); each adds a standing hold bonus |
 
 Buying is player-driven (`buy_drive`/`buy_capacity`, wired through `VoyageInputResult::BuyDrive`/`BuyCapacity` → `main.rs` → the colony); there is no in-game auto-invest (the balanced line lives only in the tests/sim as a policy helper).
