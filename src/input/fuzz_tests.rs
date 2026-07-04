@@ -1,7 +1,9 @@
 //! Randomized input fuzzing: feed [`InputHarness`] long sequences of
-//! unscripted key presses across several discovery states, seeds, and active
-//! minigames, and assert only that `handle_game_input` (and the base-screen
-//! renderer) never panics.
+//! unscripted key presses across the key scenarios of Act 1 — fresh start,
+//! mid-progression, prestige-ready, boss encounter, active dungeon, active
+//! fishing session, every major system discovered at once, and all 14
+//! minigames — and assert only that `handle_game_input` (and the
+//! base-screen renderer) never panics.
 //!
 //! [`replay_tests`](super::replay_tests) proves specific scripted paths
 //! behave correctly; this file complements it by hammering paths nobody
@@ -114,6 +116,50 @@ fn scenario_boss(seed: u64) -> InputHarness {
     InputHarness::new(fixtures::boss("Fuzz", FROZEN_CREATED_AT, &mut rng))
 }
 
+/// Mid Act 1 progression (level 45, P5, Zone 8, rare/epic gear) — the bulk
+/// of a real playthrough sits here, between the fresh start and the fully
+/// discovered late game.
+fn scenario_midgame(seed: u64) -> InputHarness {
+    let mut rng = ChaCha8Rng::seed_from_u64(seed);
+    InputHarness::new(fixtures::midgame("Fuzz", FROZEN_CREATED_AT, &mut rng))
+}
+
+/// Level high enough that `[P]` reliably passes `can_prestige` and opens
+/// `PrestigeConfirm`, so random Enter/Esc/y/n presses actually exercise the
+/// confirm-or-cancel dialog instead of bouncing off the eligibility gate.
+fn scenario_prestige_ready(seed: u64) -> InputHarness {
+    let mut rng = ChaCha8Rng::seed_from_u64(seed);
+    let mut h = InputHarness::new(fixtures::midgame("Fuzz", FROZEN_CREATED_AT, &mut rng));
+    h.state.character_level = 999;
+    h
+}
+
+/// An active dungeon underneath the base game — hotkeys (Haven, Soulforge,
+/// etc.) can still be pressed mid-dungeon in the real game, since dungeon
+/// progress is tick-driven rather than input-driven.
+fn scenario_dungeon(seed: u64) -> InputHarness {
+    let mut rng = ChaCha8Rng::seed_from_u64(seed);
+    let mut h = InputHarness::new(fixtures::midgame("Fuzz", FROZEN_CREATED_AT, &mut rng));
+    h.state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(
+        h.state.character_level,
+        h.state.prestige_rank,
+        h.state.zone_progression.current_zone_id,
+    ));
+    h
+}
+
+/// An active fishing session underneath the base game — same rationale as
+/// [`scenario_dungeon`]: fishing ticks in the background, so overlay hotkeys
+/// must keep working while it's running.
+fn scenario_fishing(seed: u64) -> InputHarness {
+    let mut rng = ChaCha8Rng::seed_from_u64(seed);
+    let mut h = InputHarness::new(fixtures::midgame("Fuzz", FROZEN_CREATED_AT, &mut rng));
+    h.state.active_fishing = Some(crate::fishing::generation::generate_fishing_session(
+        &mut rng,
+    ));
+    h
+}
+
 /// Every major system discovered and populated with real content, so
 /// hotkeys open live overlays (Haven, Soulforge, Stormglass, Deep, Loom,
 /// Achievements) instead of bouncing off a discovery gate — the scenario
@@ -152,6 +198,26 @@ fn fuzz_fresh_state_never_panics() {
 #[test]
 fn fuzz_boss_encounter_never_panics() {
     run_fuzz_suite("boss", scenario_boss);
+}
+
+#[test]
+fn fuzz_midgame_never_panics() {
+    run_fuzz_suite("midgame", scenario_midgame);
+}
+
+#[test]
+fn fuzz_prestige_ready_never_panics() {
+    run_fuzz_suite("prestige_ready", scenario_prestige_ready);
+}
+
+#[test]
+fn fuzz_dungeon_active_never_panics() {
+    run_fuzz_suite("dungeon", scenario_dungeon);
+}
+
+#[test]
+fn fuzz_fishing_active_never_panics() {
+    run_fuzz_suite("fishing", scenario_fishing);
 }
 
 #[test]
