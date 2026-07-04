@@ -15,15 +15,21 @@ use super::route::{WaypointId, ROUTE_SINK, ROUTE_START, WAYPOINTS};
 use serde::{Deserialize, Serialize};
 
 /// Souls in the dying world at the first launch. The whole era spends
-/// this pool down — some carried across, the rest lost to the dark.
-pub const INITIAL_SOULS: u64 = 3_000;
+/// this pool down — some carried across, the rest lost to the dark. A big
+/// pool so the campaign is long: dozens of crossings, the headline number
+/// climbing into the tens of thousands.
+pub const INITIAL_SOULS: u64 = 100_000;
 
-/// How many souls the *first* ferry carries, before any district is built
+/// How many souls the *first* ferry carries, before the colony has grown it
 /// (crossing 1 carries the authored cast, not passengers — see
-/// `expedition_size`). Every founded district adds more room on top, so
-/// the expeditions swell as the colony does — a whole era is a handful of big,
-/// deliberate crossings, not a long drip of small ones.
+/// `expedition_size`).
 pub const EXPEDITION_AT_LAUNCH: u32 = 160;
+
+/// Berths the ferry gains for every 1,000 souls already delivered — the
+/// colony you build is the ship that carries the next crossing, so the
+/// expedition grows on *every* run, not just when a district is founded.
+/// This is what keeps a long era feeling like progress the whole way.
+pub const EXPEDITION_PER_1000_DELIVERED: u64 = 75;
 
 /// The quickest a crossing can ever get, as a fraction of its launch time
 /// (0.5 = twice as fast). Drive pulls crossing time down toward this.
@@ -34,10 +40,10 @@ pub const FASTEST_CROSSING_TIME_MULT: f64 = 0.5;
 pub const DRIVE_FOR_HALF_SPEEDUP: f64 = 2_500.0;
 
 /// The share of the still-waiting world the dark takes each crossing —
-/// a visible per-crossing toll, not a slow drip. It bites hardest while
-/// the world is full (you are losing the race), and eases as it empties
-/// (you catch up, and carry the last of them home yourself).
-pub const DARK_TAKES_EACH_CROSSING: f64 = 0.065;
+/// a visible per-crossing toll, not a slow drip. Small, because a long era
+/// gives it many crossings to compound over: at this rate you still carry
+/// ~80% of the world home, and lose the other fifth to the dark.
+pub const DARK_TAKES_EACH_CROSSING: f64 = 0.007;
 
 /// The colony's districts, unlocked in order by population. Pure growth —
 /// every one lands eventually; the choices live on the water.
@@ -61,17 +67,17 @@ impl District {
         District::Charthouse,
     ];
 
-    /// Population at which this district is founded. Spaced so that a
-    /// full era founds one district per crossing — six crossings, six
-    /// beats, the Charthouse landing on the last of them.
+    /// Population at which this district is founded. Spaced across the whole
+    /// long era so a milestone lands roughly every several crossings — the
+    /// Quay early, the Charthouse near the finale.
     pub fn founded_at(&self) -> u64 {
         match self {
-            District::Quay => 3,
-            District::Granary => 260,
-            District::Hearth => 620,
-            District::Shipyard => 1_080,
-            District::Beacon => 1_620,
-            District::Charthouse => 2_150,
+            District::Quay => 500,
+            District::Granary => 3_500,
+            District::Hearth => 10_000,
+            District::Shipyard => 22_000,
+            District::Beacon => 42_000,
+            District::Charthouse => 66_000,
         }
     }
 
@@ -182,16 +188,19 @@ impl ColonyState {
         self.population() >= d.founded_at()
     }
 
-    /// Souls a ferry run carries: the launch base plus every founded
-    /// district's bonus. The colony grows the ship, so the
-    /// expeditions grow with it.
+    /// Souls a ferry run carries: the launch base, plus a share that grows
+    /// with the colony's population, plus every founded district's bonus.
+    /// The population term is the main engine — it climbs on every crossing,
+    /// so the expedition never stops growing across a long era; the districts
+    /// are milestone jumps on top of it.
     pub fn expedition_size(&self) -> u32 {
-        EXPEDITION_AT_LAUNCH
-            + self
-                .districts()
-                .iter()
-                .map(|d| d.expedition_bonus())
-                .sum::<u32>()
+        let from_population = (self.souls_delivered * EXPEDITION_PER_1000_DELIVERED / 1_000) as u32;
+        let from_districts = self
+            .districts()
+            .iter()
+            .map(|d| d.expedition_bonus())
+            .sum::<u32>();
+        EXPEDITION_AT_LAUNCH + from_population + from_districts
     }
 
     /// How many souls the next ferry run embarks: capacity, or whatever
@@ -322,9 +331,9 @@ mod tests {
     fn districts_unlock_in_order_by_population() {
         let mut c = ColonyState::found("t".into());
         assert!(c.districts().is_empty());
-        c.souls_delivered = 30;
+        c.souls_delivered = 600; // past the Quay (500), short of the Granary
         assert_eq!(c.districts(), vec![District::Quay]);
-        c.souls_delivered = 2_500;
+        c.souls_delivered = 66_000; // the Charthouse threshold — all founded
         assert_eq!(c.districts().len(), 6, "the whole colony is founded");
     }
 
@@ -340,35 +349,38 @@ mod tests {
     }
 
     #[test]
-    fn capacity_grows_with_every_district() {
+    fn the_expedition_grows_with_population_and_districts() {
         let mut c = ColonyState::found("t".into());
         assert_eq!(
             c.expedition_size(),
             EXPEDITION_AT_LAUNCH,
             "launch: base only"
         );
-        // Quay + Granary founded → base plus both their bonuses.
-        c.souls_delivered = 300;
-        assert_eq!(c.expedition_size(), 160 + 110 + 140);
-        // The whole colony founded → every district's bonus stacks.
-        c.souls_delivered = 2_200;
-        assert_eq!(c.expedition_size(), 160 + 110 + 140 + 170 + 210 + 260 + 320);
+        // Population alone grows the ferry: 1,000 delivered adds 75 berths,
+        // and 1,000 is past the Quay (500) so its bonus (110) stacks too.
+        c.souls_delivered = 1_000;
+        assert_eq!(c.expedition_size(), 160 + 75 + 110);
+        // The whole colony founded, deep into the era: the population term
+        // dominates, every district's bonus on top.
+        c.souls_delivered = 80_000;
+        let bonuses = 110 + 140 + 170 + 210 + 260 + 320;
+        assert_eq!(c.expedition_size(), 160 + (80_000 * 75 / 1_000) + bonuses);
     }
 
     #[test]
     fn delivering_grows_the_colony_and_the_dark_takes_its_share() {
         let mut c = ColonyState::found("t".into());
-        let new = c.deliver_crossing(40, 35, 200, 12);
-        assert_eq!(c.souls_delivered, 40);
+        let new = c.deliver_crossing(600, 35, 200, 12);
+        assert_eq!(c.souls_delivered, 600);
         assert_eq!(c.crossings_completed, 1);
-        assert_eq!(c.records.most_carried, 40);
+        assert_eq!(c.records.most_carried, 600);
         assert_eq!(c.records.fastest_days, 35);
         assert!(
             new.contains(&District::Quay),
-            "40 delivered founds the Quay"
+            "600 delivered founds the Quay"
         );
-        // The pool fell by more than the 40 carried — the dimming took some.
-        assert!(c.souls_remaining < INITIAL_SOULS - 40);
+        // The pool fell by more than the 600 carried — the dark took some.
+        assert!(c.souls_remaining < INITIAL_SOULS - 600);
     }
 
     #[test]

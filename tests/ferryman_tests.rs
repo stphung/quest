@@ -112,10 +112,11 @@ fn the_first_crossing_founds_the_colony_and_delivers_its_crew() {
 #[test]
 fn a_ferry_run_carries_passengers_and_the_rested_crew() {
     let mut colony = ColonyState::found("ferry".to_string());
-    // Quay + Granary + Hearth founded → base 160 + 110 + 140 + 170.
-    colony.souls_delivered = 620;
-    colony.drive = 620;
-    let expected_capacity = 160 + 110 + 140 + 170;
+    // 8,000 delivered: population term 8000*75/1000 = 600, plus the Quay
+    // (500) and Granary (3,500) bonuses — Hearth (10k) not yet.
+    colony.souls_delivered = 8_000;
+    colony.drive = 8_000;
+    let expected_capacity = 160 + (8_000 * 75 / 1_000) + 110 + 140;
     // A crew with a strained soul (spec 8) — coming home is rest.
     let mut crew: Vec<_> = {
         let mut v = VoyageState::begin("ferry".to_string(), 1, t0());
@@ -161,55 +162,70 @@ fn a_ferry_run_carries_passengers_and_the_rested_crew() {
 }
 
 #[test]
-fn a_short_era_of_big_meaningful_crossings_founds_the_whole_colony() {
+fn a_long_era_ferries_most_of_a_huge_world_across_growing_crossings() {
     let (crossings, first_days, last_days, delivered) = run_era();
     eprintln!("era: {crossings} crossings, {first_days}d -> {last_days}d, {delivered} delivered");
-    // A handful of weighty crossings, not a long drip: one district founded
-    // per crossing, the Charthouse (pop 2,150) landing on the last.
+    // A long campaign of many crossings — you feel the loop — carrying most
+    // of a huge world home, the expedition growing the whole way.
     assert!(
-        (5..=7).contains(&crossings),
-        "the era is a short handful of crossings ({crossings})"
+        (25..=60).contains(&crossings),
+        "the era is a long run of many crossings ({crossings})"
     );
     assert!(
-        delivered >= 2_000,
-        "the colony saves most of the world ({delivered} delivered)"
+        delivered >= 75_000,
+        "the colony saves ~80% of the 100k world ({delivered} delivered)"
     );
     assert!(
         last_days < first_days,
-        "drive still trims each crossing, gently ({first_days}d -> {last_days}d)"
+        "drive still trims each crossing ({first_days}d -> {last_days}d)"
     );
 
-    // Prove every district is reachable — the Charthouse is no longer dead
-    // content — and that they arrive one per crossing.
+    // Prove the loop feels like progress the whole way: the expedition grows
+    // on essentially every crossing (the population engine), all six districts
+    // are founded, and they land spread across the era — not all at once.
     let mut colony = ColonyState::found("districts".to_string());
     let mut founded_on = Vec::new();
+    let mut sizes = Vec::new();
     let mut crossing = 0;
     while !colony.era_over() {
         crossing += 1;
-        // Crossing 1 delivers the authored crew (~6); every ferry run after
-        // carries a passenger expedition sized by the colony so far.
         let carried = if crossing == 1 {
             6
         } else {
             colony.next_expedition()
         };
+        sizes.push(colony.expedition_size());
         let new = colony.deliver_crossing(carried, 32, 320, 10);
-        if !new.is_empty() {
-            founded_on.push((colony.crossings_completed, new));
+        for d in new {
+            founded_on.push((colony.crossings_completed, d));
         }
     }
-    let total_founded: usize = founded_on.iter().map(|(_, ds)| ds.len()).sum();
     assert_eq!(
-        total_founded, 6,
-        "all six districts are founded: {founded_on:?}"
-    );
-    assert!(
-        founded_on.iter().all(|(_, ds)| ds.len() == 1),
-        "one district per crossing — every crossing is a beat: {founded_on:?}"
+        founded_on.len(),
+        6,
+        "all six districts founded: {founded_on:?}"
     );
     assert!(
         colony.has_district(District::Charthouse),
-        "the Charthouse is reached, on the final crossing"
+        "the Charthouse (pop 66k) is reached near the finale"
+    );
+    // Districts are spread out, not bunched — at least four distinct crossings.
+    let distinct: std::collections::HashSet<u32> = founded_on.iter().map(|(c, _)| *c).collect();
+    assert!(
+        distinct.len() >= 4,
+        "milestones are spread across the era: {founded_on:?}"
+    );
+    // The expedition never shrinks — every crossing is at least as big as the
+    // last — and grows dramatically from launch to finale.
+    assert!(
+        sizes.windows(2).all(|w| w[1] >= w[0]),
+        "the expedition grows (or holds) every crossing"
+    );
+    assert!(
+        *sizes.last().unwrap() > sizes[1] * 10,
+        "the ferry ends far larger than it began ({} -> {})",
+        sizes[1],
+        sizes.last().unwrap()
     );
 }
 
@@ -217,10 +233,10 @@ fn a_short_era_of_big_meaningful_crossings_founds_the_whole_colony() {
 fn the_colony_grows_through_its_districts() {
     let mut colony = ColonyState::found("grow".to_string());
     assert!(colony.districts().is_empty());
-    // Deliver until the Hearth (pop 620).
+    // Deliver until the Hearth (pop 10,000).
     while !colony.has_district(District::Hearth) {
-        colony.souls_remaining = colony.souls_remaining.max(60);
-        colony.deliver_crossing(60, 30, 300, 10);
+        colony.souls_remaining = colony.souls_remaining.max(600);
+        colony.deliver_crossing(600, 30, 300, 10);
     }
     assert!(colony.has_district(District::Quay));
     assert!(colony.has_district(District::Granary));

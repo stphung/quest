@@ -59,9 +59,10 @@ pub const HARD_RATIONS_BURN_MULT: f64 = 0.75;
 pub const HULL_WEAR_MAX: u8 = 6;
 pub const WEAR_BURN_PER_SCAR: f64 = 0.05;
 /// Extra daily provisions each passenger aboard a ferry run eats (spec 9).
-/// Kept small so the big expeditions of a short era — hundreds of souls — still
-/// leave the hold enough to make the crossing.
-pub const PROVISIONS_PER_PASSENGER: f64 = 0.0006;
+/// Tiny, because a long era's expeditions run into the thousands of souls —
+/// a steeper draw would leave a full ship unable to make the crossing at
+/// all. Even a 7,000-soul expedition only lifts the daily burn by ~35%.
+pub const PROVISIONS_PER_PASSENGER: f64 = 0.00005;
 pub const LAUNCH_HOPE: u8 = 7;
 
 /// Dev/test wall-clock multiplier (`QUEST_VOYAGE_TIME_SCALE`, default 1.0).
