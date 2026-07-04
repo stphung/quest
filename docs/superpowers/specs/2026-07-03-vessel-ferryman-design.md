@@ -277,3 +277,32 @@ The tuning knobs were also renamed for legibility — `FERRY_BERTHS_AT_LAUNCH`,
 `District::added_berths` / `District::founded_at`, `DARK_TAKES_EACH_CROSSING`,
 `RESONANCE_FOR_HALF_SPEEDUP`, `FASTEST_CROSSING_TIME_MULT`,
 `PROVISIONS_PER_PASSENGER` — so the era's shape reads without a decoder.
+
+## Follow-up shipped: the three-month campaign (scale, ramp, auto-sail)
+
+The big-world pass made the era huge but left it real-time honest (~3 years
+at 1:1) and flat-paced. Reshaped into a **~3-real-month campaign with a felt
+ramp** — the maiden voyage is the slowest crossing of the era, and the ferry
+never stops accelerating:
+
+- **Time at sea is compressed**: `GAME_MINUTES_PER_REAL_MINUTE = 24` — one
+  sea-day per real hour. The maiden voyage sails ~1.5 real days; late
+  crossings turn around between a morning and an evening check-in. Fixtures
+  and tests express exact offsets via `real_duration_for_game_minutes()`,
+  so they are scale-agnostic.
+- **The ramp is the point**: `FASTEST_CROSSING_TIME_MULT` 0.5 → 0.2 (up to
+  5× her launch speed) and `DRIVE_FOR_HALF_SPEEDUP` 2,500 → 6,000 — felt
+  early, still climbing at the era's end. Sim: 36 → 9 sail-days over 59
+  crossings.
+- **More crossings**: `EXPEDITION_PER_1000_DELIVERED` 75 → 35 and
+  `DARK_TAKES_EACH_CROSSING` 0.7% → 0.45% stretch the 100k world across
+  **59 crossings, ~83% saved**, districts spread crossing ~4 to ~54.
+- **Auto-sail** (the compression made it necessary): a mid-crossing port
+  with no decision — one road out, no ask, no refit door — gets a
+  6-game-hour port call, then the ship sails herself. The scene is played
+  by the engine and queued (`unread_scenes`, serialized) for the ferryman
+  to read on return, oldest first. Decisions always hold the ship:
+  junctions, asks, refit doors, and the pier (`arrived_by: None`) — launch
+  and `Sail again` are never the engine's. Without this, ~20 waits ×
+  59 crossings would have made the era mostly waiting; with it, a crossing
+  asks ~3–5 decisions and the era ~2 a day.

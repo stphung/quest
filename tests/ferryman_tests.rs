@@ -112,11 +112,12 @@ fn the_first_crossing_founds_the_colony_and_delivers_its_crew() {
 #[test]
 fn a_ferry_run_carries_passengers_and_the_rested_crew() {
     let mut colony = ColonyState::found("ferry".to_string());
-    // 8,000 delivered: population term 8000*75/1000 = 600, plus the Quay
-    // (500) and Granary (3,500) bonuses — Hearth (10k) not yet.
+    // 8,000 delivered: the population term, plus the Quay (500) and
+    // Granary (3,500) bonuses — Hearth (10k) not yet.
     colony.souls_delivered = 8_000;
     colony.drive = 8_000;
-    let expected_capacity = 160 + (8_000 * 75 / 1_000) + 110 + 140;
+    let expected_capacity =
+        160 + (8 * quest::vessel::colony::EXPEDITION_PER_1000_DELIVERED) as u32 + 110 + 140;
     // A crew with a strained soul (spec 8) — coming home is rest.
     let mut crew: Vec<_> = {
         let mut v = VoyageState::begin("ferry".to_string(), 1, t0());

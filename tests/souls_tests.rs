@@ -10,6 +10,18 @@ fn t0() -> DateTime<Utc> {
     "2026-07-03T12:00:00Z".parse().unwrap()
 }
 
+/// Real durations in which N game-days / -hours / -minutes pass under the
+/// voyage time scale — these tests assert exact points in *game* time.
+fn gd(d: i64) -> Duration {
+    quest::vessel::voyage::real_duration_for_game_minutes(d * 1440)
+}
+fn gh(h: i64) -> Duration {
+    quest::vessel::voyage::real_duration_for_game_minutes(h * 60)
+}
+fn gm(m: i64) -> Duration {
+    quest::vessel::voyage::real_duration_for_game_minutes(m)
+}
+
 fn started() -> VoyageState {
     let mut v = VoyageState::begin("souls-test".to_string(), 5, t0());
     v.intro_pending = false;
@@ -94,7 +106,7 @@ fn declining_is_permanent_and_the_ask_never_returns() {
     let mut v = started();
     v.depart(roads_from(ROUTE_START).next().unwrap().id)
         .unwrap();
-    v.tick(t0() + Duration::days(2));
+    v.tick(t0() + gd(2));
     v.play_arrival_scene();
     assert_eq!(v.pending_ask, Some(SoulId(3)), "Maren asks at the Vigil");
     v.decline_ask();
@@ -114,7 +126,7 @@ fn arcs_advance_on_rest_days_and_pause_on_post() {
 
     // Hold station for 3 days: the resting souls' first beats (ready from
     // boarding) fire after 2 rest days; Torvald's does not.
-    v.tick(t0() + Duration::days(3));
+    v.tick(t0() + gd(3));
     assert_eq!(
         v.soul_state(SoulId(0)).unwrap().arc_beat,
         0,
@@ -135,7 +147,7 @@ fn arcs_advance_on_rest_days_and_pause_on_post() {
 
     // Relieve Torvald: his beat fires after two further rest days.
     assert!(v.set_station(SoulId(0), None));
-    v.tick(t0() + Duration::days(3 + ARC_BEAT_REST_DAYS as i64));
+    v.tick(t0() + gd(3 + ARC_BEAT_REST_DAYS as i64));
     assert_eq!(v.soul_state(SoulId(0)).unwrap().arc_beat, 1);
 
     // Beats pay hope: 7 -> capped rises by the fired payouts.
@@ -195,7 +207,7 @@ fn hope_is_the_wind_and_the_long_silence_breaks_at_a_hearth() {
         v.hope = hope;
         v.depart(roads_from(ROUTE_START).next().unwrap().id)
             .unwrap();
-        v.tick(t0() + Duration::hours(26));
+        v.tick(t0() + gh(26));
         matches!(v.phase, VoyagePhase::HoldingStation { .. })
     };
     assert!(
@@ -214,25 +226,25 @@ fn hope_is_the_wind_and_the_long_silence_breaks_at_a_hearth() {
     assert!(v.long_silence);
 
     // Arcs pause in the silence.
-    v.tick(t0() + Duration::days(4));
+    v.tick(t0() + gd(4));
     assert_eq!(v.soul_state(SoulId(0)).unwrap().arc_beat, 0, "arcs paused");
 
     // Sail to the Kelp Meadows (W2 -> W5 is a RestStop) — via W1/W2.
     v.depart(roads_from(ROUTE_START).next().unwrap().id)
         .unwrap();
-    v.tick(t0() + Duration::days(7)); // slow legs under the silence
+    v.tick(t0() + gd(7)); // slow legs under the silence
     v.play_arrival_scene();
     if v.pending_ask.is_some() {
         v.decline_ask(); // Maren asks at W1; the silence declines
     }
     v.depart(roads_from(WaypointId(1)).next().unwrap().id)
         .unwrap();
-    v.tick(t0() + Duration::days(10));
+    v.tick(t0() + gd(10));
     v.play_arrival_scene();
     assert_eq!(v.current_waypoint(), Some(WaypointId(2)));
     // W2 -> W5 (the Kelp Meadows, a RestStop).
     v.depart(quest::vessel::route::RoadId(3)).unwrap();
-    v.tick(t0() + Duration::days(16));
+    v.tick(t0() + gd(16));
     assert_eq!(v.current_waypoint(), Some(WaypointId(5)));
     assert!(!v.long_silence, "the hearth breaks the silence");
     // The break restores hope to "low" (3); arcs resume immediately and any
@@ -253,7 +265,7 @@ fn the_covenant_no_offline_stretch_touches_the_roster() {
     let statuses: Vec<_> = v.souls.iter().map(|s| (s.soul, s.status)).collect();
     v.depart(roads_from(ROUTE_START).next().unwrap().id)
         .unwrap();
-    v.tick(t0() + Duration::days(60));
+    v.tick(t0() + gd(60));
     let after: Vec<_> = v.souls.iter().map(|s| (s.soul, s.status)).collect();
     // Maren's ask may be pending (that is a door, not a change) — but the
     // met roster is byte-identical.
@@ -273,12 +285,12 @@ fn offline_equivalence_holds_with_arcs_and_wind_in_play() {
             .unwrap();
         v
     };
-    let horizon = t0() + Duration::days(9);
+    let horizon = t0() + gd(9);
 
     let mut live = build();
     let mut now = t0();
     while now < horizon {
-        now += Duration::minutes(137);
+        now += gm(137);
         live.tick(now.min(horizon));
     }
     let mut offline = build();

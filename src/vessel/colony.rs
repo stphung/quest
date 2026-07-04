@@ -29,21 +29,23 @@ pub const EXPEDITION_AT_LAUNCH: u32 = 160;
 /// colony you build is the ship that carries the next crossing, so the
 /// expedition grows on *every* run, not just when a district is founded.
 /// This is what keeps a long era feeling like progress the whole way.
-pub const EXPEDITION_PER_1000_DELIVERED: u64 = 75;
+pub const EXPEDITION_PER_1000_DELIVERED: u64 = 35;
 
 /// The quickest a crossing can ever get, as a fraction of its launch time
-/// (0.5 = twice as fast). Drive pulls crossing time down toward this.
-pub const FASTEST_CROSSING_TIME_MULT: f64 = 0.5;
-/// How much drive it takes to reach *halfway* to top speed. Set high
-/// so a short era's crossings stay weighty — each shortens only a little,
-/// never snapping straight to the fastest.
-pub const DRIVE_FOR_HALF_SPEEDUP: f64 = 2_500.0;
+/// (0.2 = five times as fast). The ramp is the point: the maiden voyage is
+/// the slowest crossing of the whole era, and by the end the ferry turns
+/// a run around in a fraction of that.
+pub const FASTEST_CROSSING_TIME_MULT: f64 = 0.2;
+/// How much drive it takes to reach *halfway* to top speed. Tuned so the
+/// speedup is *felt* early (a fifth faster by ~2,000 delivered) but the
+/// top speed is still being approached at era's end.
+pub const DRIVE_FOR_HALF_SPEEDUP: f64 = 6_000.0;
 
 /// The share of the still-waiting world the dark takes each crossing —
 /// a visible per-crossing toll, not a slow drip. Small, because a long era
 /// gives it many crossings to compound over: at this rate you still carry
 /// ~80% of the world home, and lose the other fifth to the dark.
-pub const DARK_TAKES_EACH_CROSSING: f64 = 0.007;
+pub const DARK_TAKES_EACH_CROSSING: f64 = 0.0045;
 
 /// The colony's districts, unlocked in order by population. Pure growth —
 /// every one lands eventually; the choices live on the water.
@@ -342,7 +344,11 @@ mod tests {
         let mut c = ColonyState::found("t".into());
         assert!((c.drive_time_mult() - 1.0).abs() < 1e-9, "launch: no bonus");
         c.drive = DRIVE_FOR_HALF_SPEEDUP as u64;
-        assert!((c.drive_time_mult() - 0.75).abs() < 0.01, "half point");
+        let half_point = 1.0 - (1.0 - FASTEST_CROSSING_TIME_MULT) / 2.0;
+        assert!(
+            (c.drive_time_mult() - half_point).abs() < 0.01,
+            "half point"
+        );
         c.drive = 1_000_000;
         assert!(c.drive_time_mult() > FASTEST_CROSSING_TIME_MULT - 0.01);
         assert!(c.drive_time_mult() < FASTEST_CROSSING_TIME_MULT + 0.02);
@@ -356,15 +362,22 @@ mod tests {
             EXPEDITION_AT_LAUNCH,
             "launch: base only"
         );
-        // Population alone grows the ferry: 1,000 delivered adds 75 berths,
-        // and 1,000 is past the Quay (500) so its bonus (110) stacks too.
+        // Population alone grows the ferry: 1,000 delivered adds the
+        // per-1,000 berths, and 1,000 is past the Quay (500) so its bonus
+        // (110) stacks too.
         c.souls_delivered = 1_000;
-        assert_eq!(c.expedition_size(), 160 + 75 + 110);
+        assert_eq!(
+            c.expedition_size(),
+            160 + EXPEDITION_PER_1000_DELIVERED as u32 + 110
+        );
         // The whole colony founded, deep into the era: the population term
         // dominates, every district's bonus on top.
         c.souls_delivered = 80_000;
         let bonuses = 110 + 140 + 170 + 210 + 260 + 320;
-        assert_eq!(c.expedition_size(), 160 + (80_000 * 75 / 1_000) + bonuses);
+        assert_eq!(
+            c.expedition_size(),
+            160 + (80 * EXPEDITION_PER_1000_DELIVERED) as u32 + bonuses
+        );
     }
 
     #[test]

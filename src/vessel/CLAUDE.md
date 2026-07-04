@@ -92,7 +92,8 @@ Content/read-model types for each sub-system; see their file headers for the aut
 ### The Voyage (sub-project 2+)
 Once `vessel_launched` (and `act2_enabled()`), `main.rs`'s game loop hands control to the Voyage: Act 1 systems idle untouched underneath while the Crossing screen owns rendering and input.
 
-- **Lazy tick, whole game-minutes**: `VoyageState::tick(now)` computes elapsed game minutes since `launched_at` and steps `step_minute()` in a loop until caught up. This makes `tick(t2)` produce bitwise-identical state to `tick(t1); tick(t2)` — the "offline equivalence" property that lets long absences resolve exactly like live play.
+- **Lazy tick, whole game-minutes**: `VoyageState::tick(now)` computes elapsed game minutes since `launched_at` and steps `step_minute()` in a loop until caught up. This makes `tick(t2)` produce bitwise-identical state to `tick(t1); tick(t2)` — the "offline equivalence" property that lets long absences resolve exactly like live play. Time at sea is compressed: `GAME_MINUTES_PER_REAL_MINUTE = 24` (one sea-day per real hour); fixtures and tests express exact offsets through `real_duration_for_game_minutes()` so they are scale-agnostic.
+- **Auto-sail (pacing)**: a mid-crossing port with no decision — exactly one road out, no recruit ask, no refit door — gets a `PORT_CALL_GAME_MINUTES` port call, then the ship sails herself; the arrival scene is played by the engine and queued in `unread_scenes` for the ferryman to read on return (drained one at a time by `main.rs`). Decisions always hold the ship: junctions, asks, refit doors, and the pier itself (`arrived_by: None` never auto-sails — launch and `Sail again` are the player's acts).
 - **Route**: a spine-and-diamond DAG (`route.rs`) — branches split at 7 junctions and rejoin within the same chapter; each chapter ends at a single gateway waypoint; the Tree (`ROUTE_SINK`, waypoint 37) is the graph's only sink.
 - **Gauges**: `provisions` (burn while traveling, composed from trim × tender-station × weather) and `hope` (the "wind" — its one mechanical effect is `time_mult`; ashen hope enters the Long Silence, pausing arcs and slowing everything to the worst rate until a rest stop relights it).
 - **Affordability invariant**: at every junction, the cheapest outgoing road never costs more than `DRIFT_RECOVERY_PROVISIONS` (25) — asserted in `route.rs` tests — so running the hold dry always means drifting in place (36-hour recovery), never getting stuck.
@@ -133,7 +134,9 @@ Once `vessel_launched` (and `act2_enabled()`), `main.rs`'s game loop hands contr
 ### Voyage (`voyage.rs`)
 | Constant | Value | Notes |
 |----------|-------|-------|
-| `MINUTES_PER_DAY` | 1440 | |
+| `MINUTES_PER_DAY` | 1440 | Game minutes |
+| `GAME_MINUTES_PER_REAL_MINUTE` | 24 | One sea-day per real hour; `QUEST_VOYAGE_TIME_SCALE` env overrides for dev |
+| `PORT_CALL_GAME_MINUTES` | 360 | Hold at a no-decision port before auto-sail |
 | `PROVISIONS_CAP` | 100.0 | 150.0 with the Long Hold refit |
 | `LAUNCH_PROVISIONS` | 100.0 | Hold is full at launch |
 | `DRIFT_RECOVERY_PROVISIONS` | 25 | Also the affordability floor (every junction's cheapest road) |

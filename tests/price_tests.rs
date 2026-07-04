@@ -13,6 +13,18 @@ fn t0() -> DateTime<Utc> {
     "2026-07-03T12:00:00Z".parse().unwrap()
 }
 
+/// Real durations in which N game-days / -hours / -minutes pass under the
+/// voyage time scale — these tests assert exact points in *game* time.
+fn gd(d: i64) -> Duration {
+    quest::vessel::voyage::real_duration_for_game_minutes(d * 1440)
+}
+fn gh(h: i64) -> Duration {
+    quest::vessel::voyage::real_duration_for_game_minutes(h * 60)
+}
+fn gm(m: i64) -> Duration {
+    quest::vessel::voyage::real_duration_for_game_minutes(m)
+}
+
 fn underway(seed: u64) -> VoyageState {
     let mut v = VoyageState::begin(format!("price-{seed}"), seed, t0());
     v.intro_pending = false;
@@ -27,7 +39,7 @@ fn underway(seed: u64) -> VoyageState {
 #[test]
 fn pressing_spends_hope_and_shortens_the_leg_once() {
     let mut v = underway(5);
-    v.tick(t0() + Duration::hours(12));
+    v.tick(t0() + gh(12));
     let hope0 = v.hope;
     let eta0 = v.eta_minutes().unwrap();
 
@@ -47,7 +59,7 @@ fn pressing_spends_hope_and_shortens_the_leg_once() {
 #[test]
 fn pressing_needs_hope_to_spend() {
     let mut v = underway(5);
-    v.tick(t0() + Duration::hours(6));
+    v.tick(t0() + gh(6));
     v.hope = HOPE_SPEND_FLOOR - 1;
     assert!(!v.can_press());
     assert!(!v.press_helm(), "you cannot buy your way into the silence");
@@ -57,7 +69,7 @@ fn pressing_needs_hope_to_spend() {
 fn the_second_press_in_a_chapter_strains_the_helm() {
     let mut v = underway(5);
     v.set_station(SoulId(0), Some(Station::Helm));
-    v.tick(t0() + Duration::hours(6));
+    v.tick(t0() + gh(6));
     assert!(v.press_helm());
     assert_eq!(
         v.soul_state(SoulId(0)).unwrap().strain,
@@ -66,9 +78,9 @@ fn the_second_press_in_a_chapter_strains_the_helm() {
     );
 
     // Arrive, depart the next leg (same chapter), press again.
-    let mut now = t0() + Duration::hours(6);
+    let mut now = t0() + gh(6);
     while v.current_waypoint().is_none() {
-        now += Duration::hours(6);
+        now += gh(6);
         v.tick(now);
     }
     v.play_arrival_scene();
@@ -77,7 +89,7 @@ fn the_second_press_in_a_chapter_strains_the_helm() {
     }
     let next = roads_from(v.current_waypoint().unwrap()).next().unwrap();
     v.depart(next.id).unwrap();
-    now += Duration::hours(6);
+    now += gh(6);
     v.tick(now);
     assert!(v.press_helm(), "a new leg allows a new press");
     assert_eq!(
@@ -107,7 +119,7 @@ fn hard_rations_stretch_the_hold_and_charge_hope_daily() {
         }
         let p0 = v.provisions;
         let h0 = v.hope;
-        v.tick(t0() + Duration::hours(26)); // past one full day underway
+        v.tick(t0() + gh(26)); // past one full day underway
         (p0 - v.provisions, h0 as i32 - v.hope as i32)
     };
     let (burn_full, hope_full) = run(false);
@@ -173,7 +185,7 @@ fn worn_souls_cannot_hold_a_post_and_rest_stops_mend_the_off_post() {
                 v.depart(road).unwrap();
             }
         }
-        now += Duration::hours(6);
+        now += gh(6);
         v.tick(now);
     }
     assert_eq!(
@@ -213,7 +225,7 @@ fn a_leg_driven_at_run_scars_the_hull_and_scars_make_her_eat() {
     let mult0 = v.provisions_mult_with(Trim::Cruise);
     let mut now = t0();
     while v.current_waypoint().is_none() {
-        now += Duration::hours(6);
+        now += gh(6);
         v.tick(now);
     }
     assert_eq!(v.hull_wear, 1, "the leg made good at Run leaves a mark");
@@ -324,11 +336,11 @@ fn offline_equivalence_holds_with_the_prices_in_play() {
         assert!(v.press_helm() || v.hope < HOPE_SPEND_FLOOR);
         v
     };
-    let horizon = t0() + Duration::days(9);
+    let horizon = t0() + gd(9);
     let mut live = build();
     let mut now = t0();
     while now < horizon {
-        now += Duration::minutes(199);
+        now += gm(199);
         live.tick(now.min(horizon));
     }
     let mut offline = build();

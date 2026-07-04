@@ -55,6 +55,13 @@ pub const PRESS_HOPE_COST: u8 = 2;
 pub const PRESS_TIME_SAVED: f64 = 0.15;
 /// Hard rations: the hold stretches, the people pay.
 pub const HARD_RATIONS_BURN_MULT: f64 = 0.75;
+/// How long the ship waters and takes on mail at a port with no decision
+/// to make (one road out, nobody asking to board, no refit door) before
+/// she sails herself onward. Decisions — junctions, asks, refit doors,
+/// the pier itself — always wait for the ferryman; plain ports do not,
+/// or a compressed era would spend itself waiting instead of sailing.
+pub const PORT_CALL_GAME_MINUTES: u64 = 6 * 60;
+
 /// Scars on the hull: cap, and what each one eats.
 pub const HULL_WEAR_MAX: u8 = 6;
 pub const WEAR_BURN_PER_SCAR: f64 = 0.05;
@@ -65,9 +72,17 @@ pub const WEAR_BURN_PER_SCAR: f64 = 0.05;
 pub const PROVISIONS_PER_PASSENGER: f64 = 0.00005;
 pub const LAUNCH_HOPE: u8 = 7;
 
-/// Dev/test wall-clock multiplier (`QUEST_VOYAGE_TIME_SCALE`, default 1.0).
-/// At 1440x a voyage "day" passes in one real minute — used by drive-game
-/// fixtures and the simulator. Read once.
+/// How fast time at sea passes relative to the real world: one day of the
+/// crossing passes in one real hour. This is what fits a whole ferry era —
+/// dozens of crossings, ~1,100 days at sea plus the decisions that wait
+/// for the ferryman — inside about three real months of engaged play: the
+/// maiden voyage sails a day and a half of real time, the last crossings
+/// turn around between a morning and an evening check-in.
+pub const GAME_MINUTES_PER_REAL_MINUTE: f64 = 24.0;
+
+/// Wall-clock multiplier: `QUEST_VOYAGE_TIME_SCALE` (dev/test override; at
+/// 1440x a voyage day passes in one real minute — used by drive-game), or
+/// the production [`GAME_MINUTES_PER_REAL_MINUTE`]. Read once.
 pub fn time_scale() -> f64 {
     static SCALE: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
     *SCALE.get_or_init(|| {
@@ -75,8 +90,16 @@ pub fn time_scale() -> f64 {
             .ok()
             .and_then(|v| v.parse::<f64>().ok())
             .filter(|s| s.is_finite() && *s > 0.0)
-            .unwrap_or(1.0)
+            .unwrap_or(GAME_MINUTES_PER_REAL_MINUTE)
     })
+}
+
+/// The real (wall-clock) duration in which `game_minutes` of the crossing
+/// pass, under the active [`time_scale`]. Fixtures and tests use this to
+/// place a voyage "N game-days in" regardless of the scale.
+pub fn real_duration_for_game_minutes(game_minutes: i64) -> chrono::Duration {
+    let real_secs = (game_minutes as f64) * 60.0 / time_scale();
+    chrono::Duration::milliseconds((real_secs * 1000.0).round() as i64)
 }
 
 /// Whole game minutes elapsed since launch at wall time `now`.
@@ -296,8 +319,10 @@ pub enum PassageEvent {
 }
 
 /// A resolved scene, ready to read: title, paragraphs (beats + matching
-/// color lines + ledger lines), and the payout in small print.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// color lines + ledger lines), and the payout in small print. Serialized
+/// when a port was auto-sailed while the ferryman was away — the reading
+/// waits; the sailing does not.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScenePlayback {
     pub title: String,
     pub paragraphs: Vec<String>,
@@ -469,6 +494,11 @@ pub struct VoyageState {
     /// constant for the crossing so offline == live stays bitwise.
     #[serde(default = "default_one", alias = "resonance_time_mult")]
     pub drive_time_mult: f64,
+    /// Port scenes the ship sailed through while the ferryman was away
+    /// (auto-sail): played by the engine, waiting to be *read*. Drained
+    /// oldest-first by the UI when the player returns.
+    #[serde(default)]
+    pub unread_scenes: Vec<ScenePlayback>,
 }
 
 fn default_provisions_cap() -> f64 {
@@ -557,6 +587,7 @@ impl VoyageState {
             crossing_number: 1,
             passengers: 0,
             drive_time_mult: 1.0,
+            unread_scenes: Vec::new(),
         }
     }
 
@@ -958,7 +989,37 @@ impl VoyageState {
                     };
                 }
             }
-            VoyagePhase::HoldingStation { arrived_at_min, .. } => {
+            VoyagePhase::HoldingStation {
+                waypoint,
+                arrived_at_min,
+                arrived_by,
+                ..
+            } => {
+                // Auto-sail (pacing): a mid-crossing port with no decision —
+                // exactly one road out, no ask, no refit — gets a brief port
+                // call, then she sails herself; the scene is kept to read on
+                // return. `arrived_by: None` marks the pier (launch / Sail
+                // again): those departures are always the ferryman's.
+                let mut roads = route::roads_from(waypoint);
+                let only_road = match (roads.next(), roads.next()) {
+                    (Some(road), None) => Some(road.id),
+                    _ => None,
+                };
+                if let (Some(road_id), Some(_)) = (only_road, arrived_by) {
+                    if self.processed_minutes - arrived_at_min >= PORT_CALL_GAME_MINUTES
+                        && self.pending_ask.is_none()
+                        && self.pending_refit.is_none()
+                    {
+                        if let Some(playback) = self.play_arrival_scene() {
+                            self.unread_scenes.push(playback);
+                        }
+                        // Guards re-checked inside; a refused departure
+                        // simply keeps holding (and the decay below applies
+                        // on later minutes).
+                        let _ = self.depart(road_id);
+                        return;
+                    }
+                }
                 let days_held = (self.processed_minutes - arrived_at_min) / MINUTES_PER_DAY;
                 let expected = days_held.saturating_sub(HOLD_STATION_GRACE_DAYS) as u32;
                 while self.hold_decay_applied < expected {
@@ -1551,6 +1612,17 @@ impl VoyageState {
         std::mem::take(&mut self.pending_recovery_scene)
     }
 
+    /// The oldest port scene the ship sailed through unattended (auto-sail),
+    /// if any — drained one at a time so the ferryman reads the ports in
+    /// the order she made them.
+    pub fn take_next_unread_scene(&mut self) -> Option<ScenePlayback> {
+        if self.unread_scenes.is_empty() {
+            None
+        } else {
+            Some(self.unread_scenes.remove(0))
+        }
+    }
+
     /// Deliver one letter: the parcel, the hope, the log, the queue.
     fn deliver_letter(&mut self, event: u8) {
         let Some(def) = letters::letter_by_event(event) else {
@@ -1984,6 +2056,12 @@ mod tests {
         "2026-07-03T12:00:00Z".parse().unwrap()
     }
 
+    /// Real duration in which `h` *game*-hours pass (scale-aware) — for
+    /// tests that assert exact points in game time.
+    fn gh(h: i64) -> Duration {
+        real_duration_for_game_minutes(h * 60)
+    }
+
     fn started() -> VoyageState {
         let mut v = VoyageState::begin("test-char".to_string(), 7, t0());
         v.play_arrival_scene();
@@ -2038,11 +2116,11 @@ mod tests {
         let road = route::roads_from(ROUTE_START).next().unwrap();
         v.depart(road.id).unwrap();
 
-        // Road 0 is 1.0 base days at Cruise: not there at 23 hours...
-        v.tick(t0() + Duration::hours(23));
+        // Road 0 is 1.0 base days at Cruise: not there at 23 game-hours...
+        v.tick(t0() + gh(23));
         assert!(matches!(v.phase, VoyagePhase::Traveling { .. }));
         // ...there within the next two.
-        v.tick(t0() + Duration::hours(25));
+        v.tick(t0() + gh(25));
         assert_eq!(v.current_waypoint(), Some(road.to));
         assert!(matches!(
             v.phase,
@@ -2071,8 +2149,8 @@ mod tests {
         cruise.depart(road.id).unwrap();
         run.depart(road.id).unwrap();
 
-        // At 20 hours: Run (0.8 days = 19.2h) has arrived, Cruise has not.
-        let at = t0() + Duration::hours(20);
+        // At 20 game-hours: Run (0.8 days = 19.2h) has arrived, Cruise has not.
+        let at = t0() + gh(20);
         cruise.tick(at);
         run.tick(at);
         assert!(matches!(cruise.phase, VoyagePhase::Traveling { .. }));
@@ -2097,7 +2175,7 @@ mod tests {
         // sail road 0 (1 day base = 1.4 days at Mourn).
         let road = route::roads_from(ROUTE_START).next().unwrap();
         v.depart(road.id).unwrap();
-        v.tick(t0() + Duration::hours(25)); // past one full day, still at sea
+        v.tick(t0() + gh(25)); // past one full game-day, still at sea
         assert!(matches!(v.phase, VoyagePhase::Traveling { .. }));
         assert_eq!(v.hope, 6, "one full Mourn day raises hope once");
     }
@@ -2114,7 +2192,7 @@ mod tests {
         v.depart(road.id).unwrap();
 
         // 5/12ths of the day in, the hold runs dry and the ship drifts.
-        v.tick(t0() + Duration::hours(12));
+        v.tick(t0() + gh(12));
         let VoyagePhase::Drifting { progress_days, .. } = v.phase else {
             panic!("expected drift, got {:?}", v.phase);
         };
@@ -2123,15 +2201,61 @@ mod tests {
 
         // 36 hours later: recovered, resumed at the same progress, +25 —
         // minus whatever the nights and weather priced in the interim.
-        v.tick(t0() + Duration::hours(12 + 36 + 1));
+        v.tick(t0() + gh(12 + 36 + 1));
         assert!(matches!(v.phase, VoyagePhase::Traveling { .. }));
         assert!(v.provisions > 10.0 && v.provisions <= 25.0);
         assert!(v.take_pending_recovery_scene());
         assert!(!v.take_pending_recovery_scene(), "shown once");
 
         // And the leg still finishes.
-        v.tick(t0() + Duration::days(4));
+        v.tick(t0() + gh(4 * 24));
         assert_eq!(v.current_waypoint(), Some(road.to));
+    }
+
+    #[test]
+    fn plain_ports_auto_sail_after_the_port_call_and_keep_the_scene() {
+        // W0 -> W1 (the Lightship Vigil): one road onward, but Maren asks
+        // to board there — the ask holds the ship until it is answered.
+        let mut v = started();
+        let road = route::roads_from(ROUTE_START).next().unwrap();
+        v.depart(road.id).unwrap();
+        v.tick(t0() + gh(24 + 12));
+        assert!(
+            v.pending_ask.is_some(),
+            "an ask is a decision: the ship waits"
+        );
+        assert!(matches!(v.phase, VoyagePhase::HoldingStation { .. }));
+
+        // Decline her; the next step_minute makes the port call and sails.
+        v.decline_ask();
+        v.tick(t0() + gh(24 + 13));
+        assert!(
+            matches!(v.phase, VoyagePhase::Traveling { .. }),
+            "no decision left: she sails herself, got {:?}",
+            v.phase
+        );
+        // The scene was played by the engine and kept for the ferryman.
+        assert_eq!(v.unread_scenes.len(), 1);
+        assert_eq!(
+            v.unread_scenes[0].title,
+            route::waypoint(road.to).name,
+            "the auto-sailed port's scene waits to be read"
+        );
+
+        // The pier never auto-sails: a fresh voyage holds at the start
+        // (arrived_by: None) for as long as the ferryman needs.
+        let mut fresh = started();
+        fresh.tick(t0() + gh(24 * 30));
+        assert!(
+            matches!(
+                fresh.phase,
+                VoyagePhase::HoldingStation {
+                    waypoint: ROUTE_START,
+                    ..
+                }
+            ),
+            "launch is the ferryman's act, never the engine's"
+        );
     }
 
     #[test]

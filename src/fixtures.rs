@@ -332,25 +332,27 @@ pub fn unlock_power_cores(achievements: &mut Achievements, count: usize, unlocke
     }
 }
 
-/// A voyage six days in, holding station at the Shoal Markets (the first
-/// junction), scene played, ready to chart a course. Launch time is
-/// `now - 6 days` so wall-clock ticks are deterministic for tests.
+/// A voyage six game-days in, holding station at the Shoal Markets (the
+/// first junction), scene played, ready to chart a course. Offsets are in
+/// *game* time (converted through the voyage time scale) so the fixture is
+/// identical whatever the scale — and deterministic for tests.
 pub fn voyage_at_first_junction(now: DateTime<Utc>) -> crate::vessel::voyage::VoyageState {
     use crate::vessel::route::{roads_from, WaypointId, ROUTE_START};
-    let launched = now - Duration::days(6);
+    use crate::vessel::voyage::real_duration_for_game_minutes as game_min;
+    let launched = now - game_min(6 * 1440);
     let mut v =
         crate::vessel::voyage::VoyageState::begin("fixture-voyager".to_string(), 42, launched);
     v.intro_pending = false;
     v.play_arrival_scene();
     v.depart(roads_from(ROUTE_START).next().unwrap().id)
         .unwrap();
-    v.tick(launched + Duration::days(2));
+    v.tick(launched + game_min(2 * 1440));
     v.play_arrival_scene();
     // Maren asks to board at the Lightship Vigil; the fixture takes her.
     assert!(v.accept_ask(), "Maren's ask expected at W1");
     v.depart(roads_from(WaypointId(1)).next().unwrap().id)
         .unwrap();
-    v.tick(launched + Duration::days(4));
+    v.tick(launched + game_min(4 * 1440));
     v.play_arrival_scene();
     v.tick(now);
     // A rumor aboard so the junction card shows an annotation and a
@@ -366,7 +368,8 @@ pub fn voyage_at_first_junction(now: DateTime<Utc>) -> crate::vessel::voyage::Vo
 /// roughly half way along, at Quiet trim.
 pub fn voyage_mid_leg(now: DateTime<Utc>) -> crate::vessel::voyage::VoyageState {
     use crate::vessel::route::roads_from;
-    let mut v = voyage_at_first_junction(now - Duration::hours(22));
+    use crate::vessel::voyage::real_duration_for_game_minutes as game_min;
+    let mut v = voyage_at_first_junction(now - game_min(22 * 60));
     v.set_trim(crate::vessel::voyage::Trim::Quiet);
     let junction = v.current_waypoint().unwrap();
     v.depart(roads_from(junction).next().unwrap().id).unwrap();
@@ -405,7 +408,8 @@ pub fn voyage_holding_at(
         }
     };
 
-    let launched = now - Duration::days(day as i64);
+    let launched =
+        now - crate::vessel::voyage::real_duration_for_game_minutes((day * MINUTES_PER_DAY) as i64);
     let mut v = VoyageState::begin(character_id, 42, launched);
     v.intro_pending = false;
     v.processed_minutes = day * MINUTES_PER_DAY;
