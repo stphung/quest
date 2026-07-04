@@ -616,7 +616,7 @@ pub const WAYPOINTS: [Waypoint; 38] = [
     },
 ];
 
-/// The v1 roads (~46 authored; 7 junctions: 2/2/2/1 by chapter).
+/// The v1 roads (45 authored; 7 junctions: 2/2/2/1 by chapter).
 pub const ROADS: [Road; 45] = [
     // ── Chapter I: The Shallows (12..20 provisions) ─────────────────────────
     Road {
