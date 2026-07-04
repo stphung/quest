@@ -108,6 +108,15 @@ you last looked: X landed, Y's numbers moved, Z is newly undecided" — because
 dossier from scratch when a refresh will do; the diff history of the dossier
 is itself a record of the system's evolution.
 
+Every refresh also runs a **decision retrospective**: scan this system's
+entries in `docs/decisions.md` for decisions whose logged *expected outcome*
+is now measurable, re-measure (phase 2 instruments), and report held/missed
+in the briefing. A missed prediction is not re-litigated silently — it goes
+back to the designer as a decision-brief question ("we chose X expecting Y;
+we got Z — stand pat or revisit?"). This is the judgment-layer analogue of
+what meta-audit does for factual findings: recommendations earn trust by
+having their predictions checked.
+
 ### Phase 2: Evidence — balance and pacing
 
 Claims about balance come from running things, not from reading constants.
@@ -196,8 +205,11 @@ Open Questions section for the next round.
 
 - Append each resolved decision to `docs/decisions.md` in its existing house
   style: system-level `##` heading, the options considered (table if numeric),
-  **Decision** line with rationale. This log is why future sessions don't
-  re-litigate settled questions — check it *before* drafting a brief, too.
+  **Decision** line with rationale. When the decision predicts something
+  measurable ("this should bring crossings to ~19"), add an **Expected
+  outcome** line — that's what the next refresh's decision retrospective
+  checks. This log is why future sessions don't re-litigate settled
+  questions — check it *before* drafting a brief, too.
 - Turn approved directions into implementation work (normal dev workflow —
   worktrees, `make check`, the verification table in CLAUDE.md).
 - After changes land, re-run the affected slice of phases 1-3 and refresh the
@@ -218,6 +230,21 @@ Open Questions section for the next round.
 - **Respect the kill-switch.** Act 2 work happens behind `ACT2_ENABLED =
   false`; preview with `QUEST_ACT2=1`, never flip the constant as part of
   this loop.
+
+## Staying Honest — How This Skill Gets Audited
+
+This skill's outputs have two layers with different feedback loops:
+
+- **Factual layer** (dossier constants, citations, interrelation edges):
+  `docs/dossiers/*.md` is in **doc-audit**'s scope universe, so stale dossier
+  facts surface in every doc audit — and since **meta-audit** evaluates
+  doc-audit's findings, dossier accuracy gets adversarially re-verified
+  transitively. Keep dossiers auditable: present-tense claims live in
+  Mechanics & Constants and Interrelations; evidence sections stay dated.
+- **Judgment layer** (fun scores, recommendations): not re-derivable by an
+  agent, so deliberately *not* wired into meta-audit's re-verification.
+  Its check is the decision retrospective above — predictions logged with
+  decisions, re-measured on refresh, misses surfaced to the designer.
 
 ## When to Use
 

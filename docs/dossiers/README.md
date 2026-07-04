@@ -9,6 +9,12 @@ with constants cited to source and balance claims backed by simulator runs.
 Each carries a `Last refreshed: <date> @ <sha>` header so refreshes can diff
 against what landed since.
 
+Dossiers' factual sections (Mechanics & Constants, Interrelations) are in
+`doc-audit`'s scope, so stale facts surface in doc audits and get re-verified
+by `meta-audit` transitively. Judgment sections (Balance Evidence, Fun
+Assessment) are dated snapshots checked by design-iteration's own decision
+retrospectives, not by the audits.
+
 Dossiers complement, not replace:
 - `docs/plans/` — point-in-time design intent (what a system was *meant* to be)
 - `docs/decisions.md` — the log of resolved design decisions

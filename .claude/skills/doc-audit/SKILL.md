@@ -3,7 +3,7 @@ name: doc-audit
 description: Multi-agent developer documentation audit — finds stale constants, missing files, and outdated types across CLAUDE.md files, README.md, and docs/. Use when docs are stale, after adding features, or before releases.
 ---
 
-<!-- meta-audit scope-universe: CLAUDE.md docs/*.md src/*/CLAUDE.md README.md -->
+<!-- meta-audit scope-universe: CLAUDE.md docs/*.md docs/dossiers/*.md src/*/CLAUDE.md README.md -->
 
 # Audit Developer Documentation
 
@@ -25,9 +25,18 @@ Spawn 6 Explore agents simultaneously. Each agent cross-references documentation
 
 **Agent 1 — Root & Architecture**
 
-Scope: `CLAUDE.md`, `docs/*.md` (system-design, core-systems, secondary-systems, balancing, challenge-minigames, decisions, infrastructure)
+Scope: `CLAUDE.md`, `docs/*.md` (system-design, core-systems, secondary-systems, balancing, challenge-minigames, decisions, infrastructure), `docs/dossiers/*.md`
 
 Check: Module navigation table completeness, key constants accuracy, dependency versions, architecture descriptions.
+
+Dossier caveat (`docs/dossiers/*.md`, maintained by the `design-iteration` skill; the
+`README.md` there is exempt): only the **Mechanics & Constants** and **Interrelations**
+sections make present-tense claims — cross-reference those against source as usual. The
+**Balance Evidence** and **Fun Assessment** sections are *dated snapshots* of past
+simulator runs and rubric scores; do not flag them for disagreeing with current source.
+A dossier whose `Last refreshed` sha is far behind HEAD while commits have touched its
+system's paths gets one MEDIUM "stale dossier — needs a design-iteration refresh"
+finding (flag for review, not auto-fixed), not a per-line teardown.
 
 **Agent 2 — Core Engine**
 
