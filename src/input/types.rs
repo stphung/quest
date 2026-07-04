@@ -142,6 +142,7 @@ pub enum GameOverlay {
 ///    `UpdateToken`
 /// 4. **Game routing** -- `route_game_input()` handles `Continue`, `QuitToSelect`,
 ///    `NeedsSave`, `NeedsSaveAll`, `NeedsSaveWithEvent`, `NeedsSaveAllWithEvent`
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputResult {
     /// Continue the game loop normally.
     Continue,
