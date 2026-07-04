@@ -1,6 +1,6 @@
 ---
 name: drive-game
-description: Drive the real game in tmux against fixture save states, inspect PNG screenshots of the rendered TUI to verify your own UI changes, and iterate until they render correctly. Use PROACTIVELY after any change to src/ui/, when asked to "screenshot the game", "show me the change", "drive the game", or before opening a PR that touches UI.
+description: Drive the real game in tmux against fixture save states, inspect PNG screenshots or short video recordings of the rendered TUI to verify your own UI changes, and iterate until they render correctly. Use PROACTIVELY after any change to src/ui/, when asked to "screenshot the game", "record the game", "show me the change/transition/animation", "drive the game", or before opening a PR that touches UI.
 ---
 
 # Drive the Game
@@ -17,6 +17,7 @@ color PNG screenshots to embed in PRs.
 | `mkstate` binary | Writes character save fixtures for named scenarios into `QUEST_DIR` |
 | `--debug` flag | Disables saves, enables debug menu (backtick key) with content jumps: trigger dungeons, fishing, all challenges, Deep, god items, stormglass grants |
 | `scripts/screenshot.sh` | tmux pane → ANSI capture → HTML → headless-Chromium PNG (colors + emoji preserved) |
+| `scripts/record.sh` | Same pipeline, sampled repeatedly over time and encoded with ffmpeg into a video — for transitions/animations a single screenshot can't show |
 
 ## Fixture scenarios (`mkstate --list`)
 
@@ -61,6 +62,11 @@ tmux send-keys -t quest '`'                       # debug menu (--debug only)
 
 scripts/screenshot.sh quest shot.png              # color PNG of the pane
 
+# For a transition/animation, record instead of a single screenshot:
+scripts/record.sh quest transition.webm 4 8       # 4s @ 8fps, sampled while the tick loop runs
+# (send-keys to trigger the transition in another shell/subshell while this samples,
+# or run it right after an action whose aftermath plays out over the next few seconds)
+
 tmux kill-session -t quest                        # cleanup when done
 ```
 
@@ -95,35 +101,54 @@ Iteration tips:
 - Verify at two pane sizes before calling it done (`-x 80 -y 24` smallest
   supported, `-x 200 -y 50` large) — responsive bugs hide in the size you
   didn't try.
-- For animated/transient UI (combat effects, ticker, modals), capture 2-3
-  frames a second apart and Read each — a single frame can miss flicker or
-  a stuck state.
+- For animated/transient UI (combat effects, ticker, modals), either capture
+  2-3 frames a second apart and Read each, or use `scripts/record.sh` to get
+  the whole transition as one video — better for judging pacing/smoothness,
+  not just presence of frames. Extract a frame to inspect with
+  `ffmpeg -i clip.webm -vf "select=eq(n\,N)" -vframes 1 -update 1 frame.png`
+  (needs `-update 1` for a single-image output), then Read the PNG.
 - Don't stop at "it compiles and the screenshot looks plausible" — check the
   specific pixels/cells your change was supposed to affect, and at least one
   neighboring panel for accidental layout shifts.
 
-## Embedding screenshots in a PR
+## Embedding screenshots (or recordings) in a PR
 
-GitHub's API cannot upload comment attachments, so commit the PNGs to the
-PR branch and reference them by raw URL:
+GitHub's API cannot upload comment attachments, so commit the PNGs/videos to
+the PR branch and reference them by raw URL:
 
 ```bash
 mkdir -p docs/screenshots
 scripts/screenshot.sh quest docs/screenshots/<feature>-after.png
+scripts/record.sh quest docs/screenshots/<feature>-transition.webm 4 8
 git add docs/screenshots && git commit -m "docs: add UI screenshots"
 ```
 
 ```markdown
 ![combat after change](https://raw.githubusercontent.com/stphung/quest/<branch>/docs/screenshots/<feature>-after.png)
+
+https://github.com/stphung/quest/raw/<branch>/docs/screenshots/<feature>-transition.webm
 ```
 
-Capture before/after pairs when changing existing UI: screenshot `main`'s
-rendering first (`git stash` or a worktree), then your change, same pane size.
+GitHub renders `.webm`/`.mp4` links as an inline player in PRs/issues for
+files uploaded via drag-and-drop; for files committed to the repo and linked
+by raw URL it may just show as a clickable download instead — check how it
+actually renders once posted, and fall back to a couple of `record.sh`
+frames as PNGs (via `screenshot.sh` or the `ffmpeg -vf select=...` trick
+above) if the video doesn't preview inline. Keep clips short (a few seconds)
+to keep the repo light.
+
+Capture before/after pairs when changing existing UI: screenshot/record
+`main`'s rendering first (`git stash` or a worktree), then your change, same
+pane size.
 
 ## When to use
 
 - After EVERY change to `src/ui/` — run the self-verification loop before
   considering the change done, then attach at least one screenshot to the PR.
+- When working on a transition or animation specifically (combat ticker,
+  modal fade, progress bar fill, overlay open/close) — a screenshot only
+  proves one frame is correct; use `scripts/record.sh` to confirm the
+  in-between frames actually look right and attach the clip to the PR.
 - To reproduce/verify UI bug reports: build the closest fixture, drive to the
   scene, compare against the report.
 - Sanity-checking rendering at multiple terminal sizes.
