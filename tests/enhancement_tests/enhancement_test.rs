@@ -283,7 +283,7 @@ fn test_attempt_enhancement_failure_penalty_minus_1() {
     // At level 4, attempting +5 with 70% rate.
     // Use a seeded RNG to find a seed that produces a failure.
     // We try multiple seeds to find one that fails at +5.
-    for seed in 0..1000u64 {
+    for seed in 0..100u64 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let mut ep = EnhancementProgress::new();
         ep.set_level(0, 4);
@@ -295,13 +295,13 @@ fn test_attempt_enhancement_failure_penalty_minus_1() {
             return;
         }
     }
-    panic!("Could not find a seed that fails at +5 within 1000 attempts");
+    panic!("Could not find a seed that fails at +5 within 100 attempts");
 }
 
 #[test]
 fn test_attempt_enhancement_failure_penalty_minus_2() {
     // At level 9, attempting +10 with 5% rate (only +10 has -2 penalty now).
-    for seed in 0..1000u64 {
+    for seed in 0..100u64 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let mut ep = EnhancementProgress::new();
         ep.set_level(0, 9);
@@ -313,7 +313,7 @@ fn test_attempt_enhancement_failure_penalty_minus_2() {
             return;
         }
     }
-    panic!("Could not find a seed that fails at +10 within 1000 attempts");
+    panic!("Could not find a seed that fails at +10 within 100 attempts");
 }
 
 #[test]
@@ -981,7 +981,7 @@ fn test_roll_enhancement_direct_at_max() {
 fn test_roll_enhancement_fail_drops_level() {
     // At level 4, attempting +5 (60% rate, penalty -1)
     // We need to find a seed that fails
-    for seed in 0..1000u64 {
+    for seed in 0..100u64 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let (success, new_level) = roll_enhancement(4, &mut rng);
         if !success {
@@ -990,7 +990,7 @@ fn test_roll_enhancement_fail_drops_level() {
             return;
         }
     }
-    panic!("Could not find a seed that fails at +5 within 1000 attempts");
+    panic!("Could not find a seed that fails at +5 within 100 attempts");
 }
 
 #[test]
