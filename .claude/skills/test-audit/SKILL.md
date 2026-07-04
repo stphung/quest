@@ -3,6 +3,8 @@ name: test-audit
 description: Multi-agent test health audit — finds flaky tests and performance bottlenecks by area, auto-fixes safe patterns, and verifies with 10x runs. Use when tests are flaky, slow, or before releases.
 ---
 
+<!-- meta-audit scope-universe: tests/*_tests/ -->
+
 # Test Health Audit
 
 Multi-agent audit of test suite health. Finds flakiness and performance issues, auto-fixes safe patterns, and verifies with 10x consecutive runs.
@@ -94,3 +96,55 @@ Spawn fix agents based on audit findings.
 ## Output
 
 Report the PR URL and final status when done (use `/ship` skill).
+
+## Log This Run
+
+`commit_sha` and the PR URL must be captured correctly, or `meta-audit`'s later
+re-verification will check the wrong code state or lose track of provenance:
+
+- **`commit_sha`**: `git merge-base HEAD origin/main` — the commit `main` was at when
+  this audit's agents did their read-only cross-referencing, i.e. the exact state every
+  finding's `correct_value` describes. Do NOT use `git rev-parse HEAD` (that's this
+  branch's own commit, not the code being audited) or the PR's eventual merge commit
+  (for skills that modify the audited code itself — e.g. perf-audit, test-audit — the
+  merge commit contains the *fix*, not the pre-fix state a finding describes). Capture
+  this before the branch is deleted.
+- **PR URL**: from `/ship`'s own reported result, once it completes.
+
+1. Build a JSON summary: date (YYYY-MM-DD), the `commit_sha` above, the PR URL, agent
+   count, the scope actually covered, and every finding (location, claim, correct value,
+   severity, category, whether auto-fixed). Example:
+   ```json
+   {
+     "type": "run",
+     "date": "2026-07-10",
+     "commit_sha": "abc1234...",
+     "pr_url": "https://github.com/stphung/quest/pull/999",
+     "agent_count": 3,
+     "scope": ["tests/game_tick_tests/", "tests/combat_tests/"],
+     "findings": [
+       {
+         "location": "tests/combat_tests/foo_test.rs:42",
+         "claim": "...",
+         "correct_value": "...",
+         "severity": "HIGH",
+         "category": "unseeded-rng",
+         "auto_fixed": true
+       }
+     ]
+   }
+   ```
+   `findings` is `[]` for an all-clear run — still log it, it counts toward the threshold.
+2. Write it to a temp file and run:
+   ```bash
+   scripts/audit-eval-log.sh test-audit /tmp/test-audit-run.json
+   ```
+3. Check the threshold:
+   ```bash
+   scripts/audit-eval-check.sh test-audit
+   ```
+   If it prints `TRIGGER`, invoke the `meta-audit` skill for `test-audit` next. If it
+   prints `SKIP: n/5`, nothing further to do.
+4. Commit the updated history log on a small new branch and land it on `main` via the
+   same branch+PR+`/ship` convention used for the audit fix itself — this file lives in
+   the main repo and needs its own merge to become visible to future runs.
