@@ -4140,6 +4140,48 @@ mod tests {
     }
 
     #[test]
+    fn test_release_squad_from_mission_skips_ids_missing_from_roster() {
+        // Defensive guard mirroring the risky-casualties loop's own
+        // `let Some(merc) = ... else { continue }`: a safe mission's squad
+        // may reference a merc id that's no longer in the roster (e.g. purged
+        // after being marked Lost via an unrelated mission). Release must skip
+        // the missing id rather than panicking, while still freeing present
+        // squad members.
+        let persistent = DeepPersistent::new();
+        let mut merc = make_merc(1, MercArchetype::Vanguard, 30);
+        merc.status = MercStatus::OnMission(1);
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            squad: vec![1, 999], // 999 is absent from the roster
+            started_at: Utc::now(),
+            ends_at: Utc::now() + Duration::hours(2),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+        let mut rng = seeded_rng();
+        let (injured, lost) = apply_mission_casualties(
+            &mission,
+            &mut prestige,
+            &persistent,
+            &MissionOutcome::Success,
+            Utc::now(),
+            &mut rng,
+        );
+        assert!(injured.is_empty());
+        assert!(lost.is_empty());
+        assert!(
+            prestige.find_merc(1).unwrap().is_available(),
+            "the present squad member should still be released"
+        );
+    }
+
+    #[test]
     fn test_apply_mission_casualties_high_risk_failure_produces_injuries_and_losses() {
         let persistent = DeepPersistent::new();
         // Low resilience, high-risk mission type, Failure outcome -> high injury/loss chance.
