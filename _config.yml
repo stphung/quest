@@ -1,0 +1,26 @@
+# GitHub Pages / Jekyll build scope.
+#
+# Without this file, Jekyll treats the entire repo as its source and tries
+# to render everything — including Rust source, test fixtures, and UI
+# snapshot files — as pages. That's how internal working docs containing
+# shell/YAML snippets (e.g. `{{`, `${{ }}`) ended up being parsed as Liquid
+# templates and breaking the build. Scope the build to actual doc content.
+exclude:
+  - src
+  - tests
+  - benches
+  - scripts
+  - target
+  - quest.wiki
+  - install.sh
+  - Cargo.toml
+  - Cargo.lock
+  - Makefile
+  - build.rs
+  - docs/archive
+  - docs/design
+  - docs/dossiers
+  - docs/plans
+  - docs/reviews
+  - docs/screenshots
+  - docs/superpowers
