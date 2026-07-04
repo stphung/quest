@@ -229,3 +229,23 @@ the loop consumes and builds, never rewinds.
   antagonist and it does not check in.
 - Era seed: one per account (deterministic era) vs. per crossing —
   lean: per account, so the dimming order is *your* world's story.
+
+## Follow-up shipped: the dimming render
+
+The dimming *schedule* landed with the first Ferryman PR, but the chart did
+not yet draw it — the deferred "port-by-port dimming visual." That render is
+now in: on a ferry-era crossing the chart draws snuffed ports as a cold `⊘`
+("gone dark") with their roads faded and a matching legend entry, while the
+home pier, the Tree, and the lit path ahead still stand. The keepsake chart
+never dims (it is a memento of one crossing, not a live map of the world).
+
+Fixing the render surfaced a pacing bug it would otherwise have exposed: the
+old schedule (`dimmed_as_of(crossings_completed × 35)` days against a
+`port_dim_day` that maxed ~150) blacked the whole map out by ~crossing 5,
+while the population takes the full ~28-crossing era to empty — a static
+blackout for 80% of the era. Replaced with `dark_ports()`, which keeps
+`port_dim_order` (this world's deterministic story, home-biased) but paces
+the blackout to how empty the world actually is: the fraction of ports dark
+tracks `1 − souls_remaining / INITIAL_SOULS`, so the chart empties in step
+with the manifest. Purely cosmetic — no souls, resonance, capacity, or
+routing changed.

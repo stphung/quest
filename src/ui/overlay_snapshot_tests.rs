@@ -274,6 +274,22 @@ fn snapshot_voyage_chart_mid_leg() {
 }
 
 #[test]
+fn snapshot_voyage_chart_dimming_mid_era() {
+    // A ferry run well into the era: the old world has gone dark behind the
+    // Vessel, ⊘ ports scattered across the chart, a lit path still ahead.
+    assert_overlay_snapshot("voyage_chart_dimming_xl_160x45", || {
+        let voyage = fixtures::voyage_mid_leg(frozen_utc());
+        let colony = fixtures::colony_midera();
+        let ui = crate::vessel::VoyageUiState::default();
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, Some(&colony));
+        })
+    });
+}
+
+#[test]
 fn snapshot_voyage_trim_panel_mid_leg() {
     assert_overlay_snapshot("voyage_trim_xl_160x45", || {
         let voyage = fixtures::voyage_mid_leg(frozen_utc());
@@ -516,7 +532,14 @@ fn keepsake_chart_never_reveals_the_fog() {
         voyage.untaken.iter().map(|r| route::road(*r).to).collect();
 
     for (cx, cy) in [(0u16, 0u16), (30, 22), (60, 45), (90, 67), (119, 89)] {
-        let lines = super::voyage_scene::chart_lines_centered(&voyage, 100, 44, cx, cy);
+        let lines = super::voyage_scene::chart_lines_centered(
+            &voyage,
+            100,
+            44,
+            cx,
+            cy,
+            &std::collections::HashSet::new(),
+        );
         let text: String = lines
             .iter()
             .flat_map(|l| l.spans.iter().map(|s| s.content.clone()))

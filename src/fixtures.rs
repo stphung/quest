@@ -452,6 +452,9 @@ pub fn colony_midera() -> crate::vessel::colony::ColonyState {
         total_leagues: 8_640,
         total_nights: 214,
     };
+    // Well into the era: most of the old world has gone dark, a lit path
+    // still runs toward the Tree.
+    c.dimmed_ports = c.dark_ports();
     c
 }
 

@@ -197,26 +197,39 @@ impl ColonyState {
         lost.round() as u64
     }
 
-    /// The game-day (since the era began) a port goes dark. Deterministic
-    /// per (era_seed, port) — the chart dims in *this* world's order.
-    pub fn port_dim_day(&self, port: WaypointId) -> u64 {
-        // Spread across a long era; earlier ports (nearer home) tend to
-        // dim sooner, so the dark rolls outward from the old world.
+    /// The order a port goes dark — deterministic per (era_seed, port), so
+    /// the chart dims in *this* world's story. Lower goes first; ports nearer
+    /// home (lower id) carry a small bias to go first, so the dark rolls
+    /// outward from the old world. Only a sort key, not an absolute day —
+    /// the *pace* of the blackout is set by how empty the world is
+    /// (see [`dark_ports`](Self::dark_ports)).
+    pub fn port_dim_order(&self, port: WaypointId) -> u64 {
         let base = mix64(self.era_seed ^ (port.0 as u64).wrapping_mul(0x9E37));
-        let spread = 30 + (base % 120); // 30–150 game-days
+        let spread = 30 + (base % 120);
         let nearness = (port.0 as u64).min(37);
         spread.saturating_sub(nearness / 2)
     }
 
-    /// Ports dark as of `day` (drives the chart's dimming). Never the
-    /// start or the Tree — home pier and destination always stand.
-    pub fn dimmed_as_of(&self, day: u64) -> Vec<WaypointId> {
-        WAYPOINTS
+    /// The ports the dark has taken so far, paced to how empty the world is:
+    /// the blackout keeps `port_dim_order` (this world's story) but spreads
+    /// across the *whole* era, so the chart empties in step with the manifest
+    /// rather than all at once in the first few crossings. Never the start or
+    /// the Tree — home pier and destination always stand. Drives the chart's
+    /// dimming.
+    pub fn dark_ports(&self) -> Vec<WaypointId> {
+        let mut dimmable: Vec<WaypointId> = WAYPOINTS
             .iter()
             .map(|w| w.id)
             .filter(|id| *id != ROUTE_START && *id != ROUTE_SINK)
-            .filter(|id| self.port_dim_day(*id) <= day)
-            .collect()
+            .collect();
+        // Fraction of the old world no longer out there (delivered or taken
+        // by the dark): 0 at launch, 1 when the era ends.
+        let gone = INITIAL_SOULS.saturating_sub(self.souls_remaining);
+        let frac = (gone as f64 / INITIAL_SOULS as f64).clamp(0.0, 1.0);
+        let count = (frac * dimmable.len() as f64).round() as usize;
+        dimmable.sort_by_key(|id| (self.port_dim_order(*id), id.0));
+        dimmable.truncate(count);
+        dimmable
     }
 
     /// Fold a completed crossing into the colony: deliver its passengers,
@@ -247,7 +260,7 @@ impl ColonyState {
         if days > 0 && (self.records.fastest_days == 0 || days < self.records.fastest_days) {
             self.records.fastest_days = days;
         }
-        self.dimmed_ports = self.dimmed_as_of(self.crossings_completed as u64 * 35);
+        self.dimmed_ports = self.dark_ports();
 
         District::ALL
             .into_iter()
@@ -328,6 +341,40 @@ mod tests {
         );
         // The pool fell by more than the 40 carried — the dimming took some.
         assert!(c.souls_remaining < INITIAL_SOULS - 40);
+    }
+
+    #[test]
+    fn the_dark_spreads_in_step_with_the_emptying_world() {
+        let mut c = ColonyState::found("t".into());
+        let dimmable = WAYPOINTS
+            .iter()
+            .filter(|w| w.id != ROUTE_START && w.id != ROUTE_SINK)
+            .count();
+
+        // At launch the whole world is lit; the era's end leaves it all dark.
+        assert!(c.dark_ports().is_empty(), "launch: nothing has gone dark");
+        c.souls_remaining = 0;
+        assert_eq!(c.dark_ports().len(), dimmable, "era's end: all dark");
+
+        // Halfway emptied dims about half the ports, and the blackout only
+        // ever grows — the dark is never un-taken.
+        c.souls_remaining = INITIAL_SOULS / 2;
+        let half = c.dark_ports();
+        assert!(
+            (half.len() as i64 - (dimmable as i64 / 2)).abs() <= 1,
+            "half emptied ⇒ ~half dark, got {}",
+            half.len()
+        );
+        c.souls_remaining = INITIAL_SOULS / 4;
+        let later = c.dark_ports();
+        assert!(later.len() > half.len(), "the dark only spreads");
+        let half_set: std::collections::HashSet<_> = half.iter().collect();
+        assert!(
+            half_set.iter().all(|id| later.contains(id)),
+            "a port that went dark stays dark"
+        );
+        // The home pier and the Tree always stand.
+        assert!(!later.contains(&ROUTE_START) && !later.contains(&ROUTE_SINK));
     }
 
     #[test]

@@ -27,6 +27,14 @@ use super::vessel_scene::VESSEL_VIOLET;
 const VIOLET_DIM: Color = Color::Rgb(120, 90, 160);
 const SEA_DIM: Color = Color::Rgb(70, 80, 110);
 const GOLD: Color = Color::Rgb(255, 215, 0);
+/// A port whose lights have gone out — the old world dimming behind the
+/// Vessel as the era wears on (spec 9). Colder and darker than anything the
+/// living chart uses, so a snuffed harbor reads at a glance.
+const DARK_PORT: Color = Color::Rgb(56, 58, 78);
+/// A road running into the dark: fainter still than the unknown sea.
+const DARK_ROAD: Color = Color::Rgb(44, 48, 66);
+/// The glyph for a port gone dark: a lantern put out.
+const DARK_GLYPH: char = '\u{2298}'; // ⊘
 
 /// Entry point: the whole Act 2 frame.
 pub fn render_voyage(
@@ -51,7 +59,7 @@ pub fn render_voyage(
         VoyageView::Record { scroll } => render_record(frame, area, voyage, scroll),
         VoyageView::Reckoning => render_reckoning(frame, area, colony),
         _ => match ctx.tier {
-            SizeTier::XL | SizeTier::L => render_full(frame, area, voyage, ui),
+            SizeTier::XL | SizeTier::L => render_full(frame, area, voyage, ui, colony),
             _ => render_strip(frame, area, voyage, ui),
         },
     }
@@ -266,13 +274,19 @@ fn render_intro(frame: &mut Frame, area: Rect) {
 
 // ── Full layout (XL/L) ──────────────────────────────────────────────────────
 
-fn render_full(frame: &mut Frame, area: Rect, voyage: &VoyageState, ui: &VoyageUiState) {
+fn render_full(
+    frame: &mut Frame,
+    area: Rect,
+    voyage: &VoyageState,
+    ui: &VoyageUiState,
+    colony: Option<&crate::vessel::colony::ColonyState>,
+) {
     let cols = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Min(50), Constraint::Length(42)])
         .split(area);
 
-    render_chart_panel(frame, cols[0], voyage);
+    render_chart_panel(frame, cols[0], voyage, colony);
 
     match ui.view {
         VoyageView::Junction { selected } => {
@@ -296,7 +310,18 @@ fn render_full(frame: &mut Frame, area: Rect, voyage: &VoyageState, ui: &VoyageU
 
 // ── The chart ───────────────────────────────────────────────────────────────
 
-fn render_chart_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
+fn render_chart_panel(
+    frame: &mut Frame,
+    area: Rect,
+    voyage: &VoyageState,
+    colony: Option<&crate::vessel::colony::ColonyState>,
+) {
+    // Ports the old world has already lost (spec 9): the dark rolls outward
+    // from home as the era wears on. The set only ever grows, one crossing
+    // to the next — so the chart empties beneath the ferry.
+    let dimmed: std::collections::HashSet<WaypointId> = colony
+        .map(|c| c.dimmed_ports.iter().copied().collect())
+        .unwrap_or_default();
     let chapter = current_chapter(voyage);
     let title = format!(
         " \u{2726} The Crossing \u{2014} Chapter {} \u{00b7} {} ",
@@ -336,11 +361,11 @@ fn render_chart_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
         rows[0],
     );
 
-    let lines = chart_lines(voyage, rows[1].width, rows[1].height);
+    let lines = chart_lines(voyage, rows[1].width, rows[1].height, &dimmed);
     frame.render_widget(Paragraph::new(lines), rows[1]);
 
     frame.render_widget(
-        Paragraph::new(legend_line(rows[2].width)).alignment(Alignment::Center),
+        Paragraph::new(legend_line(rows[2].width, !dimmed.is_empty())).alignment(Alignment::Center),
         rows[2],
     );
 }
@@ -348,9 +373,9 @@ fn render_chart_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
 /// One-line chart legend. The journey reads bottom-to-top, so the legend
 /// also anchors the direction of travel. Compact wording under narrow
 /// panels (the L tier gives the chart ~38 columns).
-fn legend_line(width: u16) -> Line<'static> {
-    let entries: &[(&str, Color, &str)] = if width >= 70 {
-        &[
+fn legend_line(width: u16, has_dark: bool) -> Line<'static> {
+    let mut entries: Vec<(&str, Color, &str)> = if width >= 70 {
+        vec![
             ("\u{25c6}", GOLD, " you"),
             ("\u{25c9}", VESSEL_VIOLET, " visited"),
             ("\u{25cb}", Color::Gray, " known ahead"),
@@ -358,13 +383,17 @@ fn legend_line(width: u16) -> Line<'static> {
             ("\u{2715}", Color::DarkGray, " passed by"),
         ]
     } else {
-        &[
+        vec![
             ("\u{25c6}", GOLD, " you"),
             ("\u{25c9}", VESSEL_VIOLET, " past"),
             ("\u{25cb}", Color::Gray, " ahead"),
             ("\u{2715}", Color::DarkGray, " shut"),
         ]
     };
+    // Once the old world starts going dark, name what the snuffed ports are.
+    if has_dark {
+        entries.push(("\u{2298}", DARK_PORT, " gone dark"));
+    }
     let mut spans = Vec::new();
     for (i, (glyph, color, label)) in entries.iter().enumerate() {
         if i > 0 {
@@ -373,10 +402,13 @@ fn legend_line(width: u16) -> Line<'static> {
                 Style::default().fg(Color::DarkGray),
             ));
         }
-        spans.push(Span::styled(*glyph, Style::default().fg(*color)));
-        spans.push(Span::styled(*label, Style::default().fg(Color::DarkGray)));
+        spans.push(Span::styled(glyph.to_string(), Style::default().fg(*color)));
+        spans.push(Span::styled(
+            label.to_string(),
+            Style::default().fg(Color::DarkGray),
+        ));
     }
-    if width >= 100 {
+    if width >= 100 && !has_dark {
         spans.push(Span::styled(
             "  \u{00b7}  the Tree lies north",
             Style::default().fg(Color::DarkGray),
@@ -391,9 +423,14 @@ pub const CANVAS_H: i32 = 90;
 
 /// Pure chart rendering: the viewport around the Vessel as styled lines.
 /// Exposed for snapshot tests.
-pub fn chart_lines(voyage: &VoyageState, width: u16, height: u16) -> Vec<Line<'static>> {
+pub fn chart_lines(
+    voyage: &VoyageState,
+    width: u16,
+    height: u16,
+    dimmed: &std::collections::HashSet<WaypointId>,
+) -> Vec<Line<'static>> {
     let (ship_x, ship_y) = ship_position(voyage);
-    chart_lines_centered(voyage, width, height, ship_x, ship_y)
+    chart_lines_centered(voyage, width, height, ship_x, ship_y, dimmed)
 }
 
 /// The chart viewport centered on an arbitrary canvas point (the keepsake
@@ -405,6 +442,7 @@ pub fn chart_lines_centered(
     height: u16,
     center_x: u16,
     center_y: u16,
+    dimmed: &std::collections::HashSet<WaypointId>,
 ) -> Vec<Line<'static>> {
     let (ship_x, ship_y) = ship_position(voyage);
     let w = width.max(10) as i32;
@@ -438,7 +476,11 @@ pub fn chart_lines_centered(
             .windows(2)
             .any(|p| p[0] == road.from && p[1] == road.to)
             || voyage.current_road().is_some_and(|r| r.id == road.id);
-        let color = if taken {
+        // A road running into a snuffed port fades with it — the dark
+        // reaches back along the lanes that used to lead home.
+        let color = if dimmed.contains(&road.from) || dimmed.contains(&road.to) {
+            DARK_ROAD
+        } else if taken {
             VIOLET_DIM
         } else if voyage.untaken.contains(&road.id) {
             Color::DarkGray
@@ -457,7 +499,10 @@ pub fn chart_lines_centered(
             .untaken
             .iter()
             .any(|rid| route::road(*rid).to == wp.id && !visited.contains(&wp.id));
-        let (glyph, color) = if visited.contains(&wp.id) {
+        let dark = dimmed.contains(&wp.id);
+        let (glyph, color) = if dark {
+            (DARK_GLYPH, DARK_PORT) // ⊘ a port gone dark — the world emptying
+        } else if visited.contains(&wp.id) {
             ('\u{25c9}', VESSEL_VIOLET) // ◉ visited
         } else if untaken_dest {
             ('\u{2715}', Color::DarkGray) // ✕ untaken, named forever
@@ -468,9 +513,14 @@ pub fn chart_lines_centered(
         };
         put(x, y, glyph, color, &mut grid);
 
-        // Labels: only what the fog allows — visited, known, untaken names.
-        if visited.contains(&wp.id) || known.contains(&wp.id) || untaken_dest {
-            let label_color = if untaken_dest {
+        // Labels: a snuffed port keeps its name (dimmed) if the fog ever
+        // showed it — you remember the places that went dark. Otherwise:
+        // only what the fog allows — visited, known, untaken names.
+        let named = visited.contains(&wp.id) || known.contains(&wp.id) || untaken_dest;
+        if named {
+            let label_color = if dark {
+                DARK_PORT
+            } else if untaken_dest {
                 Color::DarkGray
             } else if known.contains(&wp.id) && !visited.contains(&wp.id) {
                 Color::Gray
@@ -1829,7 +1879,16 @@ fn render_keepsake_chart(frame: &mut Frame, area: Rect, voyage: &VoyageState, x:
         .constraints([Constraint::Min(4), Constraint::Length(1)])
         .split(inner);
 
-    let lines = chart_lines_centered(voyage, rows[0].width, rows[0].height, x, y);
+    // The keepsake is a memento of *this* crossing, not a live map of the
+    // world — it never dims, no matter how dark the era has grown.
+    let lines = chart_lines_centered(
+        voyage,
+        rows[0].width,
+        rows[0].height,
+        x,
+        y,
+        &std::collections::HashSet::new(),
+    );
     frame.render_widget(Paragraph::new(lines), rows[0]);
 
     frame.render_widget(
