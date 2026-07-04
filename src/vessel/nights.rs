@@ -7,7 +7,7 @@
 //! Watch-affine stander resolves one grade kinder. Nights price provisions
 //! (and keep the odd secret) — they never injure, remove, or advance-to-loss a soul.
 //!
-//! See `docs/superpowers/specs/2026-07-03-vessel-underway-design.md`.
+//! See `openspec/specs/vessel-act2/spec.md`.
 
 /// The five night types. Quiet nights need no watch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

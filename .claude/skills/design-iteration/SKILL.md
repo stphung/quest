@@ -56,8 +56,9 @@ and not "one constant".
 
 ### Phase 1: Dissect — build or refresh the dossier
 
-Read the system's source, its `CLAUDE.md`, and its design docs in
-`docs/plans/` (grep by system name — designs and plans are dated files there).
+Read the system's source, its `CLAUDE.md`, and its capability spec in
+`openspec/specs/` (the code-grounded source of truth for current behavior;
+prior design/plan docs live in git history if you need rationale).
 For a large system, fan out parallel Explore agents (one per subsystem/file
 cluster) and synthesize; for a module-sized system, read directly.
 

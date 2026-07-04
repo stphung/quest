@@ -7,7 +7,7 @@
 //! dissipate after 2–5 days. Weather prices time and provisions —
 //! the things the player already trades. It never touches souls.
 //!
-//! See `docs/superpowers/specs/2026-07-03-vessel-underway-design.md`.
+//! See `openspec/specs/vessel-act2/spec.md`.
 
 use super::route::{self, Chapter, RoadId};
 

@@ -6,7 +6,7 @@
 //! waypoint is the graph's only sink. The graph is data so a second crossing
 //! could exist someday without new code.
 //!
-//! See `docs/superpowers/specs/2026-07-03-vessel-route-waypoints-design.md`.
+//! See `openspec/specs/vessel-act2/spec.md`.
 
 use serde::{Deserialize, Serialize};
 

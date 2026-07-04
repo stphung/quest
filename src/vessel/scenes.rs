@@ -6,7 +6,7 @@
 //! interactive moments are doors the design sanctions — asks (spec 3) and
 //! refits (engine logic in `voyage.rs`, not scene data).
 //!
-//! See `docs/superpowers/specs/2026-07-03-vessel-arrival-scenes-design.md`.
+//! See `openspec/specs/vessel-act2/spec.md`.
 
 use super::route::{Chapter, RoadId, RumorId, WaypointId};
 use super::souls::SoulId;
