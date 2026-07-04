@@ -29,10 +29,13 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 # Pane size -> pixel size (14px mono glyphs are ~8.5px wide, 17.5px tall,
-# plus the 12px padding on each side of the <pre>).
+# plus the 12px padding on each side of the <pre>). Some glyphs used by the
+# game (compass/weather symbols, emoji) fall back to a font whose line height
+# exceeds the plain-text 17.5px assumption, so add slack or the bottom rows
+# get clipped by the fixed-size screenshot viewport (no scrolling to save us).
 read -r COLS ROWS < <(tmux display-message -p -t "$SESSION" '#{pane_width} #{pane_height}')
 WIDTH=$(((COLS * 85 + 5) / 10 + 24))
-HEIGHT=$(((ROWS * 175 + 5) / 10 + 24))
+HEIGHT=$(((ROWS * 175 + 5) / 10 + 24 + 100))
 
 tmux capture-pane -e -p -t "$SESSION" > "$WORK/screen.ansi"
 python3 "$SCRIPT_DIR/ansi2html.py" "$WORK/screen.ansi" > "$WORK/screen.html"

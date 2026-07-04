@@ -49,9 +49,13 @@ fi
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
+# Some glyphs used by the game (compass/weather symbols, emoji) fall back to
+# a font whose line height exceeds the plain-text 17.5px assumption, so add
+# slack or the bottom rows get clipped by the fixed-size screenshot viewport
+# (no scrolling to save us) -- see the matching note in screenshot.sh.
 read -r COLS ROWS < <(tmux display-message -p -t "$SESSION" '#{pane_width} #{pane_height}')
 WIDTH=$(((COLS * 85 + 5) / 10 + 24))
-HEIGHT=$(((ROWS * 175 + 5) / 10 + 24))
+HEIGHT=$(((ROWS * 175 + 5) / 10 + 24 + 100))
 # ffmpeg's video encoders require even dimensions.
 WIDTH=$((WIDTH + WIDTH % 2))
 HEIGHT=$((HEIGHT + HEIGHT % 2))
