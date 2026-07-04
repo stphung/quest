@@ -568,23 +568,22 @@ fn main() -> io::Result<()> {
                                         Event::Key(key_event)
                                             if key_event.kind == KeyEventKind::Press
                                                 && key_event.code
-                                                    == ratatui::crossterm::event::KeyCode::Enter =>
+                                                    == ratatui::crossterm::event::KeyCode::Enter
+                                                && launch_transition.advance() =>
                                         {
-                                            if launch_transition.advance() {
-                                                state.vessel_transition_played = true;
-                                                if !debug_mode {
-                                                    save_files(
-                                                        &character_manager,
-                                                        &state,
-                                                        &global_achievements,
-                                                        &haven,
-                                                        &enhancement,
-                                                        &deep_state,
-                                                        &loom_state,
-                                                    );
-                                                }
-                                                terminal.clear()?;
+                                            state.vessel_transition_played = true;
+                                            if !debug_mode {
+                                                save_files(
+                                                    &character_manager,
+                                                    &state,
+                                                    &global_achievements,
+                                                    &haven,
+                                                    &enhancement,
+                                                    &deep_state,
+                                                    &loom_state,
+                                                );
                                             }
+                                            terminal.clear()?;
                                         }
                                         _ => {}
                                     }
