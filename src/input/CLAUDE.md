@@ -17,6 +17,8 @@ Keyboard input routing for the Game screen, dispatching to overlay handlers, min
 | `stormglass_input.rs` | Stormglass Exchange overlay: menu navigation, Invoke Trial (rolling animation + pick), Chrono Surge, Storm Sigils (etch/reroll/pick), Storm Lure |
 | `time_vault_input.rs` | Time Vault overlay: branch/commit browsing, restore, fork, delete; GitHub cloud sync (token entry, repo selection, push/pull, divergence resolution) |
 | `voyage_input.rs` | Act 2 "Crossing" screen input (`handle_voyage_input()` / `VoyageInputResult`): intro/scene/moment playback, boarding-ask and refit prompts, chart/junction/trim/souls/watch/farewell/rumors/manifest/keepsake view navigation |
+| `harness.rs` | `#[cfg(test)]`-only headless input-replay harness (`InputHarness`) driving `handle_game_input`; see "Testing" below |
+| `replay_tests.rs` | `#[cfg(test)]`-only replay test suite exercising key input paths via `InputHarness`; see "Testing" below |
 
 ## Key Types
 

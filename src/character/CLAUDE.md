@@ -60,7 +60,7 @@ Characters are saved as individual JSON files in `~/.quest/`:
 - Auto-save every 30 seconds (driven by `main.rs` timer)
 - Name validation (`name_validation.rs`): 1-16 chars, alphanumeric + spaces/hyphens/underscores, no leading/trailing spaces, reserved names blocked
 
-`manager.rs` defines the `CharacterManager` struct, `CharacterSaveData`, and `CharacterInfo` types. `persistence.rs` implements the file I/O methods on `CharacterManager`.
+`manager.rs` defines the `CharacterManager` struct, `CharacterSaveData`, `CharacterInfo`, and `CharacterHeader` types (`CharacterHeader` is a lightweight subset of the save format used by `persistence.rs::list_characters()` for fast listing without deserializing full `combat_state`/`equipment`/`dungeon` data). `persistence.rs` implements the file I/O methods on `CharacterManager`.
 
 ### Character CRUD Operations
 - Character creation flows through `creation.rs::process_creation_input()` → `GameState::new()` → `persistence.rs::save_character()` (no standalone `create_character()` function)

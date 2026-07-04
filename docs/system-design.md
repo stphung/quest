@@ -71,7 +71,7 @@ Quest is a terminal-based idle RPG built in Rust using Ratatui for UI rendering 
 
 ### Key Architectural Patterns
 
-- **Event-driven tick processing**: `game_tick_with_context()` returns a `TickResult` containing `Vec<TickEvent>` (48 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
+- **Event-driven tick processing**: `game_tick_with_context()` returns a `TickResult` containing `Vec<TickEvent>` (50 event variants). The presentation layer maps events to combat log entries, visual effects, and overlays. Game logic has zero UI imports.
 - **Generic RNG**: `game_tick_with_context<R: Rng>()` uses a generic type parameter because `rand::Rng` is not dyn-compatible. Production uses `thread_rng()`, tests use seeded `ChaCha8Rng` for determinism.
 - **Haven bonus injection**: Haven bonuses are passed as explicit parameters to game systems rather than accessed globally, keeping modules decoupled.
 
@@ -1101,7 +1101,11 @@ quest/
 │   │   ├── snake/           # Serpent's Path (Snake)
 │   │   ├── flappy/          # Skyward Gauntlet (Flappy Bird)
 │   │   ├── jezzball/        # Containment Breach (JezzBall)
-│   │   └── runic_shift/     # Sigil Surge (panel-matching)
+│   │   ├── runic_shift/     # Sigil Surge (panel-matching)
+│   │   ├── sudoku/          # Sudoku
+│   │   ├── shard_fusion/    # Shard Fusion
+│   │   ├── runic_lights/    # Runic Lights
+│   │   └── vault_warden/    # Vault Warden
 │   ├── haven/               # Haven base building
 │   │   ├── types.rs         # Haven struct, upgrade tiers, bonus types
 │   │   ├── logic.rs         # Construction, upgrade orchestration
@@ -1160,6 +1164,20 @@ quest/
 │   │   ├── graph.rs         # DAG representation of the production network (petgraph)
 │   │   ├── layout.rs        # Sugiyama-style layered DAG layout engine for GraphView
 │   │   └── persistence.rs   # Save/load from ~/.quest/loom.json
+│   ├── vessel/              # Act 2: Vessel launch gate + Voyage engine (dark behind ACT2_ENABLED)
+│   │   ├── mod.rs           # Public re-exports, ACT2_ENABLED kill-switch, act2_enabled()
+│   │   ├── voyage.rs        # VoyageState tick loop, Drive/Shipwright/Ward decay
+│   │   ├── route.rs         # Waypoints, roads, rumors, chapters, junctions
+│   │   ├── colony.rs        # Colony districts, thresholds
+│   │   ├── souls.rs         # Soul candidates and roster
+│   │   ├── letters.rs       # Letters/correspondence content
+│   │   ├── pilgrims.rs      # Pilgrim passenger state
+│   │   ├── refits.rs        # Ship refit options and costs
+│   │   ├── junction.rs      # Junction (route branch) resolution
+│   │   ├── nights.rs        # Night/watch event resolution
+│   │   ├── weather.rs       # Weather effects on the crossing
+│   │   ├── scenes.rs        # Authored scene content
+│   │   └── persistence.rs   # Save/load from ~/.quest/voyage.json
 │   ├── history/             # Time Vault — git-based save versioning
 │   │   ├── mod.rs           # Public re-exports: HistoryRepo, HistoryError, SaveEvent, CommitInfo, TimelineInfo
 │   │   ├── types.rs         # SaveEvent enum (21 variants), CommitInfo, TimelineInfo, commit message formatting
@@ -1216,7 +1234,7 @@ quest/
 │       ├── throbber.rs      # Spinner animations
 │       └── character_select.rs, character_creation.rs,
 │           character_delete.rs, character_rename.rs
-├── tests/                   # 22 integration test files
+├── tests/                   # 24 integration test files
 ├── .github/workflows/       # CI/CD pipeline
 ├── scripts/                 # Quality checks (ci-checks.sh)
 ├── docs/                    # Design documents
@@ -1257,6 +1275,7 @@ Each major module has its own `CLAUDE.md` with implementation patterns, integrat
 - `src/god_items/CLAUDE.md` -- Norse mythology endgame items and passives
 - `src/history/CLAUDE.md` -- Time Vault git-based save versioning
 - `src/loom/CLAUDE.md` -- Resource production chains, direct-pull refineries
+- `src/vessel/CLAUDE.md` -- Act 2: Vessel launch gate + Voyage engine, dark behind ACT2_ENABLED
 - `src/main_helpers/CLAUDE.md` -- Orchestration helpers extracted from main.rs
 
 ---
