@@ -87,15 +87,21 @@ picked up) ranks higher than one that just appeared.
 
 ## Phase 6: Ship
 
-1. Append an `eval_marker` entry to the target skill's log:
+The `eval_marker` needs the PR's own URL, which doesn't exist until the PR is created —
+so commit the fix(es) and open the PR first, then append the marker as a follow-up
+commit onto that same still-open branch before it merges:
+
+1. Branch, commit the `SKILL.md` fix(es) and the updated history log, open a PR (same
+   pattern as every other audit skill — no direct commits to `main`). PR body includes
+   the full report: confirmed inaccuracies (with citations), scope gaps/rot, what was
+   auto-fixed, what's flagged for review.
+2. Now that the PR exists, append the `eval_marker` entry with its real URL:
    ```bash
-   echo '{"type":"eval_marker","date":"<today>","pr_url":"<this PR>","runs_covered":<n>}' > /tmp/marker.json
+   echo '{"type":"eval_marker","date":"<today>","pr_url":"<the PR URL from step 1>","runs_covered":<n>}' > /tmp/marker.json
    scripts/audit-eval-log.sh <skill-name> /tmp/marker.json
    ```
-2. Branch, commit the `SKILL.md` fix(es) and the updated history log, open a PR (same
-   pattern as every other audit skill — no direct commits to `main`).
-3. PR body includes the full report: confirmed inaccuracies (with citations), scope
-   gaps/rot, what was auto-fixed, what's flagged for review.
+3. Commit and push this marker addition as one more commit on the same PR branch
+   (multiple commits on one PR are normal — squash-merge collapses them at merge time).
 
 ## Output
 

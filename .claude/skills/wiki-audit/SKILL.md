@@ -111,13 +111,27 @@ git add quest.wiki
 git commit -m "docs: update quest.wiki submodule pointer"
 ```
 
+## Output
+
+Report the PR URL and final status when done (use `/ship` skill).
+
 ## Log This Run
 
-After verification passes, record this run for `meta-audit`:
+`commit_sha` and the PR URL must be captured correctly, or `meta-audit`'s later
+re-verification will check the wrong code state or lose track of provenance:
 
-1. Build a JSON summary: date (YYYY-MM-DD), current commit SHA (`git rev-parse HEAD`), PR
-   URL, agent count, the scope actually covered, and every finding (location, claim,
-   correct value, severity, category, whether auto-fixed). Example:
+- **`commit_sha`**: `git merge-base HEAD origin/main` — the commit `main` was at when
+  this audit's agents did their read-only cross-referencing, i.e. the exact state every
+  finding's `correct_value` describes. Do NOT use `git rev-parse HEAD` (that's this
+  branch's own commit, not the code being audited) or the PR's eventual merge commit
+  (for skills that modify the audited code itself — e.g. perf-audit, test-audit — the
+  merge commit contains the *fix*, not the pre-fix state a finding describes). Capture
+  this before the branch is deleted.
+- **PR URL**: from `/ship`'s own reported result, once it completes.
+
+1. Build a JSON summary: date (YYYY-MM-DD), the `commit_sha` above, the PR URL, agent
+   count, the scope actually covered, and every finding (location, claim, correct value,
+   severity, category, whether auto-fixed). Example:
    ```json
    {
      "type": "run",
@@ -147,9 +161,8 @@ After verification passes, record this run for `meta-audit`:
    ```bash
    scripts/audit-eval-check.sh wiki-audit
    ```
-   If it prints `TRIGGER`, invoke the `meta-audit` skill for `wiki-audit` as a follow-up
-   after this run's own PR is up. If it prints `SKIP: n/5`, nothing further to do.
-
-## Output
-
-Report the PR URL and final status when done (use `/ship` skill).
+   If it prints `TRIGGER`, invoke the `meta-audit` skill for `wiki-audit` next. If it
+   prints `SKIP: n/5`, nothing further to do.
+4. Commit the updated history log on a small new branch and land it on `main` via the
+   same branch+PR+`/ship` convention used for the audit fix itself — this file lives in
+   the main repo and needs its own merge to become visible to future runs.
