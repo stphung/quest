@@ -214,7 +214,7 @@ fn test_enhancement_result_failure_variant() {
 #[test]
 fn test_roll_enhancement_deterministic_success_at_risky_level() {
     // Find a seed that succeeds at level 4->5 (60% rate)
-    for seed in 0..1000u64 {
+    for seed in 0..100u64 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let (success, new_level) = roll_enhancement(4, &mut rng);
         if success {
@@ -222,13 +222,13 @@ fn test_roll_enhancement_deterministic_success_at_risky_level() {
             return;
         }
     }
-    panic!("Could not find a seed that succeeds at +5 within 1000 attempts");
+    panic!("Could not find a seed that succeeds at +5 within 100 attempts");
 }
 
 #[test]
 fn test_roll_enhancement_deterministic_success_at_level_10() {
     // Find a seed that succeeds at level 9->10 (10% rate)
-    for seed in 0..1000u64 {
+    for seed in 0..100u64 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let (success, new_level) = roll_enhancement(9, &mut rng);
         if success {
@@ -236,7 +236,7 @@ fn test_roll_enhancement_deterministic_success_at_level_10() {
             return;
         }
     }
-    panic!("Could not find a seed that succeeds at +10 within 1000 attempts");
+    panic!("Could not find a seed that succeeds at +10 within 100 attempts");
 }
 
 #[test]
@@ -258,7 +258,7 @@ fn test_roll_enhancement_at_each_safe_level() {
 #[test]
 fn test_roll_enhancement_fail_at_level_9_penalty_minus_1() {
     // At level 8, attempting +9 (20% rate, penalty -1)
-    for seed in 0..1000u64 {
+    for seed in 0..100u64 {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let (success, new_level) = roll_enhancement(8, &mut rng);
         if !success {
@@ -269,7 +269,7 @@ fn test_roll_enhancement_fail_at_level_9_penalty_minus_1() {
             return;
         }
     }
-    panic!("Could not find a seed that fails at +9 within 1000 attempts");
+    panic!("Could not find a seed that fails at +9 within 100 attempts");
 }
 
 #[test]
