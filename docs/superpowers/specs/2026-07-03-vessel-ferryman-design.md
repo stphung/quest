@@ -249,3 +249,31 @@ the blackout to how empty the world actually is: the fraction of ports dark
 tracks `1 − souls_remaining / INITIAL_SOULS`, so the chart empties in step
 with the manifest. Purely cosmetic — no souls, resonance, capacity, or
 routing changed.
+
+## Follow-up shipped: fewer, weightier crossings
+
+The first cut ran ~28 crossings, of which ~17 were mechanically identical
+(deliver 40–60, dark takes ~50, repeat) and the top district was unreachable
+(the dark took 53% of the world, capping delivery at ~1,421 of 3,000). The
+"numbers go up" spine ran dry around crossing 11 while the era ground on for
+another ~two real-world years. Rebalanced to **a short era of big, deliberate
+crossings** — one district founded per crossing, the whole colony reached:
+
+- **The colony grows the ship.** `ferry_capacity` is now the launch base plus
+  every founded district's berths, so cohorts swell 270 → 410 → 580 → 790 as
+  the colony does — the growth you watch is the size of each delivery.
+- **The dark is a per-crossing bite,** not a per-day drip: `dark_toll` takes a
+  fixed share (`DARK_TAKES_EACH_CROSSING`) of whoever is still waiting — hard
+  while the world is full (you're losing the race), easing as it empties (you
+  carry the last of them home yourself).
+- **Result (sim-proven, `run_era`):** 6 crossings, 36 → 32 days each,
+  ~2,400 of 3,000 saved (80%), one district per crossing, the Charthouse
+  landing on the finale. `RESONANCE_FOR_HALF_SPEEDUP` raised to 2,500 so a
+  short era's crossings stay weighty rather than snapping to the speed floor;
+  `PROVISIONS_PER_PASSENGER` lowered so cohorts of hundreds still make the
+  crossing.
+
+The tuning knobs were also renamed for legibility — `FERRY_BERTHS_AT_LAUNCH`,
+`District::added_berths` / `District::founded_at`, `DARK_TAKES_EACH_CROSSING`,
+`RESONANCE_FOR_HALF_SPEEDUP`, `FASTEST_CROSSING_TIME_MULT`,
+`PROVISIONS_PER_PASSENGER` — so the era's shape reads without a decoder.

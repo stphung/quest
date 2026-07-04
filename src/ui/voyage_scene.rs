@@ -2094,7 +2094,7 @@ fn render_reckoning(
         let detail = if founded {
             format!("{} \u{2014} {}", d.name(), d.bonus())
         } else {
-            format!("{} at pop. {}", d.name(), with_commas(d.threshold()))
+            format!("{} at pop. {}", d.name(), with_commas(d.founded_at()))
         };
         lines.push(Line::from(vec![
             Span::styled(format!("  {mark}"), style),

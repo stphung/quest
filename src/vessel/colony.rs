@@ -18,21 +18,26 @@ use serde::{Deserialize, Serialize};
 /// this pool down — some carried across, the rest lost to the dark.
 pub const INITIAL_SOULS: u64 = 3_000;
 
-/// A ferry run's base passenger berths (crossing 1 carries the authored
-/// cast, not passengers — see `ferry_capacity`). The Shipyard district
-/// grows this.
-pub const FERRY_CAPACITY_BASE: u32 = 40;
+/// How many souls the *first* ferry carries, before any district is built
+/// (crossing 1 carries the authored cast, not passengers — see
+/// `ferry_capacity`). Every founded district adds more berths on top, so
+/// the cohorts swell as the colony does — a whole era is a handful of big,
+/// deliberate crossings, not a long drip of small ones.
+pub const FERRY_BERTHS_AT_LAUNCH: u32 = 160;
 
-/// Resonance curve: the time multiplier shrinks from 1.0 toward this
-/// floor as resonance grows (0.5 = twice her launch speed at the cap).
-pub const RESONANCE_SPEED_FLOOR: f64 = 0.5;
-/// Half-speedup point: at this much resonance she sails at the midpoint
-/// between 1.0 and the floor.
-pub const RESONANCE_HALF: f64 = 500.0;
+/// The quickest a crossing can ever get, as a fraction of its launch time
+/// (0.5 = twice as fast). Resonance pulls crossing time down toward this.
+pub const FASTEST_CROSSING_TIME_MULT: f64 = 0.5;
+/// How much resonance it takes to reach *halfway* to top speed. Set high
+/// so a short era's crossings stay weighty — each shortens only a little,
+/// never snapping straight to the fastest.
+pub const RESONANCE_FOR_HALF_SPEEDUP: f64 = 2_500.0;
 
-/// Souls the dark takes per game-day underway, at the era's start. The
-/// rate climbs as the world empties (see [`ColonyState::dimming_loss`]).
-pub const DIMMING_BASE_PER_DAY: f64 = 1.5;
+/// The share of the still-waiting world the dark takes each crossing —
+/// a visible per-crossing toll, not a slow drip. It bites hardest while
+/// the world is full (you are losing the race), and eases as it empties
+/// (you catch up, and carry the last of them home yourself).
+pub const DARK_TAKES_EACH_CROSSING: f64 = 0.065;
 
 /// The colony's districts, unlocked in order by population. Pure growth —
 /// every one lands eventually; the choices live on the water.
@@ -56,15 +61,31 @@ impl District {
         District::Charthouse,
     ];
 
-    /// Population at which this district is founded.
-    pub fn threshold(&self) -> u64 {
+    /// Population at which this district is founded. Spaced so that a
+    /// full era founds one district per crossing — six crossings, six
+    /// beats, the Charthouse landing on the last of them.
+    pub fn founded_at(&self) -> u64 {
         match self {
-            District::Quay => 25,
-            District::Granary => 60,
-            District::Hearth => 150,
-            District::Shipyard => 400,
-            District::Beacon => 1_000,
-            District::Charthouse => 2_500,
+            District::Quay => 3,
+            District::Granary => 260,
+            District::Hearth => 620,
+            District::Shipyard => 1_080,
+            District::Beacon => 1_620,
+            District::Charthouse => 2_150,
+        }
+    }
+
+    /// Passenger berths this district adds to the ferry once founded. The
+    /// colony you build is the ship that carries the next crossing — so
+    /// each district makes the next cohort larger.
+    pub fn added_berths(&self) -> u32 {
+        match self {
+            District::Quay => 110,
+            District::Granary => 140,
+            District::Hearth => 170,
+            District::Shipyard => 210,
+            District::Beacon => 260,
+            District::Charthouse => 320,
         }
     }
 
@@ -81,12 +102,14 @@ impl District {
 
     pub fn bonus(&self) -> &'static str {
         match self {
-            District::Quay => "the running back is quicker",
-            District::Granary => "the hold carries more; way-stations pay better",
-            District::Hearth => "the ship launches brighter; rest heals fully",
-            District::Shipyard => "half again the berths; the hull mends at the Tree",
-            District::Beacon => "the crossings resonate louder",
-            District::Charthouse => "the chart's knowledge keeps between crossings",
+            District::Quay => "proper berths at last — the first real cohort",
+            District::Granary => "stores to victual a fuller ship",
+            District::Hearth => "warmth enough to carry more, and rest heals fully",
+            District::Shipyard => {
+                "the great slips; the largest cohorts, and the hull mends at the Tree"
+            }
+            District::Beacon => "a light the far shore steers by; the crossings resonate louder",
+            District::Charthouse => "the whole colony behind each sailing",
         }
     }
 }
@@ -149,21 +172,24 @@ impl ColonyState {
     pub fn districts(&self) -> Vec<District> {
         District::ALL
             .into_iter()
-            .filter(|d| self.population() >= d.threshold())
+            .filter(|d| self.population() >= d.founded_at())
             .collect()
     }
 
     pub fn has_district(&self, d: District) -> bool {
-        self.population() >= d.threshold()
+        self.population() >= d.founded_at()
     }
 
-    /// Passenger berths a ferry run carries — base, grown by the Shipyard.
+    /// Passenger berths a ferry run carries: the launch base plus every
+    /// founded district's berths. The colony grows the ship, so the
+    /// cohorts grow with it.
     pub fn ferry_capacity(&self) -> u32 {
-        if self.has_district(District::Shipyard) {
-            (FERRY_CAPACITY_BASE as f64 * 1.5) as u32
-        } else {
-            FERRY_CAPACITY_BASE
-        }
+        FERRY_BERTHS_AT_LAUNCH
+            + self
+                .districts()
+                .iter()
+                .map(|d| d.added_berths())
+                .sum::<u32>()
     }
 
     /// How many souls the next ferry run embarks: capacity, or whatever
@@ -176,7 +202,7 @@ impl ColonyState {
     /// more of the old world she has carried. Soft-capped at the floor.
     pub fn resonance_time_mult(&self) -> f64 {
         let r = self.resonance as f64;
-        let speedup = (1.0 - RESONANCE_SPEED_FLOOR) * (r / (r + RESONANCE_HALF));
+        let speedup = (1.0 - FASTEST_CROSSING_TIME_MULT) * (r / (r + RESONANCE_FOR_HALF_SPEEDUP));
         1.0 - speedup
     }
 
@@ -185,16 +211,11 @@ impl ColonyState {
         1.0 / self.resonance_time_mult()
     }
 
-    /// The dark's toll over a span of game-days underway — a pure,
-    /// accelerating function of how far into the era those days fall.
-    /// The world empties faster the emptier it already is.
-    pub fn dimming_loss(&self, day_from: u64, day_to: u64) -> u64 {
-        let mut lost = 0.0;
-        for day in day_from..day_to {
-            // Accelerates: +1% of the base per day elapsed in the era.
-            lost += DIMMING_BASE_PER_DAY * (1.0 + day as f64 * 0.01);
-        }
-        lost.round() as u64
+    /// Souls the dark takes this crossing: a fixed share of whoever is
+    /// still waiting. A big, visible bite while the world is full; a small
+    /// one once it has emptied — so late crossings are yours to finish.
+    pub fn dark_toll(&self) -> u64 {
+        (self.souls_remaining as f64 * DARK_TAKES_EACH_CROSSING).round() as u64
     }
 
     /// The order a port goes dark — deterministic per (era_seed, port), so
@@ -249,8 +270,8 @@ impl ColonyState {
         self.souls_remaining -= carried;
         self.resonance += carried;
 
-        // The dark took its share of the rest while we sailed.
-        let toll = self.dimming_loss(0, days).min(self.souls_remaining);
+        // The dark took its share of whoever was still waiting.
+        let toll = self.dark_toll().min(self.souls_remaining);
         self.souls_remaining -= toll;
 
         self.crossings_completed += 1;
@@ -312,19 +333,27 @@ mod tests {
             (c.resonance_time_mult() - 1.0).abs() < 1e-9,
             "launch: no bonus"
         );
-        c.resonance = RESONANCE_HALF as u64;
+        c.resonance = RESONANCE_FOR_HALF_SPEEDUP as u64;
         assert!((c.resonance_time_mult() - 0.75).abs() < 0.01, "half point");
         c.resonance = 1_000_000;
-        assert!(c.resonance_time_mult() > RESONANCE_SPEED_FLOOR - 0.01);
-        assert!(c.resonance_time_mult() < RESONANCE_SPEED_FLOOR + 0.02);
+        assert!(c.resonance_time_mult() > FASTEST_CROSSING_TIME_MULT - 0.01);
+        assert!(c.resonance_time_mult() < FASTEST_CROSSING_TIME_MULT + 0.02);
     }
 
     #[test]
-    fn capacity_grows_with_the_shipyard() {
+    fn capacity_grows_with_every_district() {
         let mut c = ColonyState::found("t".into());
-        assert_eq!(c.ferry_capacity(), FERRY_CAPACITY_BASE);
-        c.souls_delivered = 400;
-        assert_eq!(c.ferry_capacity(), 60);
+        assert_eq!(
+            c.ferry_capacity(),
+            FERRY_BERTHS_AT_LAUNCH,
+            "launch: base only"
+        );
+        // Quay + Granary founded → base plus both their berths.
+        c.souls_delivered = 300;
+        assert_eq!(c.ferry_capacity(), 160 + 110 + 140);
+        // The whole colony founded → every district's berths stack.
+        c.souls_delivered = 2_200;
+        assert_eq!(c.ferry_capacity(), 160 + 110 + 140 + 170 + 210 + 260 + 320);
     }
 
     #[test]

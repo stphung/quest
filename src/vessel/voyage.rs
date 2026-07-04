@@ -58,9 +58,10 @@ pub const HARD_RATIONS_BURN_MULT: f64 = 0.75;
 /// Scars on the hull: cap, and what each one eats.
 pub const HULL_WEAR_MAX: u8 = 6;
 pub const WEAR_BURN_PER_SCAR: f64 = 0.05;
-/// Each passenger aboard a ferry run adds this much to the daily burn
-/// (spec 9): a full hold of 40 eats ~40% more than an empty one.
-pub const PASSENGER_BURN_PER_SOUL: f64 = 0.004;
+/// Extra daily provisions each passenger aboard a ferry run eats (spec 9).
+/// Kept small so the big cohorts of a short era — hundreds of souls — still
+/// leave the hold enough to make the crossing.
+pub const PROVISIONS_PER_PASSENGER: f64 = 0.0006;
 pub const LAUNCH_HOPE: u8 = 7;
 
 /// Dev/test wall-clock multiplier (`QUEST_VOYAGE_TIME_SCALE`, default 1.0).
@@ -770,7 +771,7 @@ impl VoyageState {
         let wear = 1.0 + WEAR_BURN_PER_SCAR * f64::from(self.hull_wear);
         // Passengers are cargo that eats (spec 9): every full berth adds
         // a little to the daily burn, so scarcity becomes load management.
-        let load = 1.0 + PASSENGER_BURN_PER_SOUL * f64::from(self.passengers);
+        let load = 1.0 + PROVISIONS_PER_PASSENGER * f64::from(self.passengers);
         load * trim_mult
             * tender_provisions_mult(
                 tender.is_some(),
