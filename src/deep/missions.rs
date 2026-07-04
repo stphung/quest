@@ -5439,4 +5439,164 @@ mod tests {
         let result = validate_squad_assignment(&available, &[1], &prestige, &persistent, false);
         assert!(result.is_ok());
     }
+
+    // ── tick_all_missions: check-in event firing + auto-resolve ──────────────
+
+    fn stale_check_in_event(time_delta_secs: i64) -> CheckInEvent {
+        CheckInEvent {
+            title: "Test Stale Event".to_string(),
+            description: "A test-only event.".to_string(),
+            choices: vec![EventChoice {
+                label: "Wait it out".to_string(),
+                required_archetype: None,
+                time_delta_secs,
+                is_risky: false,
+                unlocks_bonus_event: false,
+                risk_percent: None,
+            }],
+            auto_resolve_choice: 0,
+            archetype_bonus: None,
+            // Overwritten by `tick_mission_events` the first time it's encountered.
+            fired_at: Utc::now(),
+            resolved_choice: None,
+        }
+    }
+
+    #[test]
+    fn test_tick_all_missions_fires_and_auto_resolves_event_applying_time_delta() {
+        // A Recon mission (single trigger at 50% progress) started long enough
+        // ago that its check-in event both (a) newly fires this tick, since the
+        // mission has crossed the 50% trigger point, and (b) is immediately
+        // auto-resolved in the same tick, since its computed fire time is
+        // already more than the 2h auto-resolve timeout in the past. This
+        // exercises `events_fired`, `events_auto_resolved`, and the time-delta
+        // application to `ends_at` all within a single `tick_all_missions` call.
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let merc = make_merc(1, MercArchetype::Vanguard, 50);
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
+
+        let now = Utc::now();
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::Recon,
+            layer: 1,
+            squad: vec![1],
+            started_at: now - Duration::hours(20),
+            ends_at: now + Duration::hours(4), // 24h total; 50% trigger = 12h in
+            events: vec![stale_check_in_event(3600)],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+        let original_ends_at = mission.ends_at;
+        prestige.active_missions.push(mission);
+
+        let summary = tick_all_missions(&mut prestige, &mut persistent, now, &mut rng);
+
+        assert_eq!(summary.events_fired, 1);
+        assert_eq!(summary.events_auto_resolved, 1);
+        assert_eq!(summary.missions_completed, 0, "mission still has 4h left");
+        let updated = &prestige.active_missions[0];
+        assert_eq!(
+            updated.ends_at,
+            original_ends_at + Duration::seconds(3600),
+            "auto-resolved choice's time delta should extend ends_at"
+        );
+        assert!(updated.events[0].resolved_choice.is_some());
+    }
+
+    #[test]
+    fn test_tick_all_missions_force_resolves_pending_event_when_time_elapses() {
+        // A Recon mission whose overall timer has already elapsed, but whose
+        // single check-in event only just became pending (fired_at close to
+        // `now`) so it has NOT yet crossed the 2h auto-resolve timeout inside
+        // `tick_mission_events`. This exercises the force-resolve loop that
+        // drains any remaining unresolved events once the mission's time is up,
+        // clearing `EventPending` back to `Active` so completion can proceed.
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let _ = persistent.layer_record_mut(1);
+        let merc = make_merc(1, MercArchetype::Vanguard, 50);
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
+
+        let now = Utc::now();
+        // Total duration ~3h; the 50% trigger point lands ~1.5h before `now`,
+        // comfortably under the 2h auto-resolve timeout, so the event is still
+        // freshly pending (not yet auto-resolved) when the mission time elapses.
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::Recon,
+            layer: 1,
+            squad: vec![1],
+            started_at: now - Duration::hours(3),
+            ends_at: now - Duration::seconds(1),
+            events: vec![stale_check_in_event(0)],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+        prestige.active_missions.push(mission);
+
+        let summary = tick_all_missions(&mut prestige, &mut persistent, now, &mut rng);
+
+        assert_eq!(
+            summary.missions_completed, 1,
+            "mission time has elapsed and its lone event should be force-resolved"
+        );
+        assert_eq!(prestige.pending_results.len(), 1);
+        assert!(
+            prestige.pending_results[0].events[0]
+                .resolved_choice
+                .is_some(),
+            "the force-resolve loop should resolve the event rather than leaving it pending"
+        );
+    }
+
+    // ── resolve_offline_missions: check-in event auto-resolve ────────────────
+
+    #[test]
+    fn test_offline_resolution_auto_resolves_stale_event_and_applies_time_delta() {
+        // Mirrors `test_tick_all_missions_fires_and_auto_resolves_event_applying_time_delta`
+        // but through the offline-catch-up path, which runs the same
+        // `tick_mission_events` call and time-delta application independently.
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let merc = make_merc(1, MercArchetype::Vanguard, 50);
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
+
+        let now = Utc::now();
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::Recon,
+            layer: 1,
+            squad: vec![1],
+            started_at: now - Duration::hours(20),
+            ends_at: now + Duration::hours(4),
+            events: vec![stale_check_in_event(7200)],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+        let original_ends_at = mission.ends_at;
+        prestige.active_missions.push(mission);
+
+        let summary = resolve_offline_missions(&mut prestige, &mut persistent, &mut rng);
+
+        assert_eq!(
+            summary.missions_resolved, 0,
+            "mission has not reached its end time yet"
+        );
+        assert_eq!(summary.events_auto_resolved, 1);
+        assert_eq!(prestige.active_missions.len(), 1);
+        let updated = &prestige.active_missions[0];
+        assert_eq!(updated.ends_at, original_ends_at + Duration::seconds(7200));
+        assert!(updated.events[0].resolved_choice.is_some());
+    }
 }

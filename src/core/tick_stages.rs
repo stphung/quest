@@ -3643,4 +3643,172 @@ mod tests {
             .iter()
             .any(|e| matches!(e, TickEvent::WovenRealityPRGranted { .. })));
     }
+
+    #[test]
+    fn tick_loom_applies_time_warp_and_unlocks_neighbor_nodes() {
+        let mut deep = crate::deep::DeepState::new();
+        deep.persistent.discovered = true;
+        deep.persistent.gateway_opened = true;
+
+        let mut loom = crate::loom::LoomState::new();
+        crate::loom::complete_discovery(&mut loom);
+
+        // Pre-fill Ember Spindle's buffer above the 50% neighbor-unlock threshold
+        // so the fill-ratio gate is satisfied regardless of this tick's own
+        // (warp-inflated) production.
+        loom.persistent.nodes[crate::loom::NodeId::EmberSpindle.index()].buffer = 200.0;
+
+        // A large time warp (branch at "loom.time_warp > 1.0") inflates a single
+        // nominal 100ms tick into hours of wall-clock-equivalent progress, enough
+        // to cross the 2.0-hour neighbor unlock threshold from a cold start.
+        loom.time_warp = 100_000.0;
+
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        tick_loom(&deep, &mut loom, &mut state, &mut achievements, &mut result);
+
+        assert!(result.loom_changed);
+        assert!(loom.graph_dirty);
+        // Ember Spindle's two cycle-neighbors (Reflection Lens, Resonance Forge)
+        // should both have unlocked in this single tick.
+        assert!(loom.persistent.nodes[crate::loom::NodeId::ReflectionLens.index()].unlocked);
+        assert!(loom.persistent.nodes[crate::loom::NodeId::ResonanceForge.index()].unlocked);
+    }
+
+    #[test]
+    fn tick_loom_completes_shuttle_construction_and_merges_shuttle_output_into_rates() {
+        let mut deep = crate::deep::DeepState::new();
+        deep.persistent.discovered = true;
+        deep.persistent.gateway_opened = true;
+
+        let mut loom = crate::loom::LoomState::new();
+        crate::loom::complete_discovery(&mut loom);
+        // Manually unlock Void Condenser too so the active shuttle below has a
+        // producing source for its second input slot.
+        loom.persistent.nodes[crate::loom::NodeId::VoidCondenser.index()].unlocked = true;
+
+        // Shuttle #0: already built and active, pulling from both extractors.
+        // Its output (ForgedLight) is not itself an extractor resource, so it
+        // only ends up in the tick's merged `produced` map (and thus the loom's
+        // rate trackers) via the shuttle_produced merge loop.
+        let mut active_shuttle = crate::loom::Shuttle::new(
+            crate::loom::Resource::Ember,
+            crate::loom::Resource::VoidEssence,
+            crate::loom::NodeNature::Heat,
+            crate::loom::Resource::ForgedLight,
+            1.0,
+            1,
+            vec![crate::loom::LoomNodeRef::Extractor(
+                crate::loom::NodeId::EmberSpindle,
+            )],
+            vec![crate::loom::LoomNodeRef::Extractor(
+                crate::loom::NodeId::VoidCondenser,
+            )],
+        );
+        active_shuttle.under_construction = false;
+        loom.persistent.shuttles.push(active_shuttle);
+
+        // Shuttle #1: still under construction, but nearly done — a large time
+        // warp on a single nominal tick pushes it over the finish line.
+        let mut building_shuttle = crate::loom::Shuttle::new(
+            crate::loom::Resource::Ember,
+            crate::loom::Resource::VoidEssence,
+            crate::loom::NodeNature::Heat,
+            crate::loom::Resource::ForgedLight,
+            1.0,
+            1,
+            vec![],
+            vec![],
+        );
+        building_shuttle.under_construction = true;
+        building_shuttle.construction_secs_remaining = 5.0;
+        loom.persistent.shuttles.push(building_shuttle);
+
+        loom.time_warp = 1_000.0;
+
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        tick_loom(&deep, &mut loom, &mut state, &mut achievements, &mut result);
+
+        assert!(
+            result.loom_changed,
+            "completing a shuttle should flag a save"
+        );
+        assert!(!loom.persistent.shuttles[1].under_construction);
+        assert_eq!(loom.persistent.shuttles[1].construction_secs_remaining, 0.0);
+
+        // The active shuttle's ForgedLight output only reaches the loom-level
+        // rate trackers through the shuttle_produced merge in tick_loom.
+        let forged_rate = loom
+            .rate_trackers
+            .get(&crate::loom::Resource::ForgedLight)
+            .map(|t| t.rate_per_hour())
+            .unwrap_or(0.0);
+        assert!(
+            forged_rate > 0.0,
+            "expected ForgedLight production merged into rate trackers, got {forged_rate}"
+        );
+    }
+
+    #[test]
+    fn tick_loom_reaching_a_pattern_milestone_queues_it_for_consumption() {
+        let mut deep = crate::deep::DeepState::new();
+        deep.persistent.discovered = true;
+        deep.persistent.gateway_opened = true;
+
+        let mut loom = crate::loom::LoomState::new();
+        crate::loom::complete_discovery(&mut loom);
+
+        // Three already-completed patterns plus one about to complete this tick
+        // lands exactly on completed_pattern_count() == 4, the ThreadWilds
+        // milestone threshold.
+        let mut patterns: Vec<crate::loom::WovenPattern> = (0..3)
+            .map(|i| crate::loom::WovenPattern {
+                index: i,
+                name: format!("Done {i}"),
+                requirements: vec![],
+                completed: true,
+                flavor: String::new(),
+                eternal: false,
+            })
+            .collect();
+        patterns.push(crate::loom::WovenPattern {
+            index: 3,
+            name: "Almost Done".to_string(),
+            requirements: vec![crate::loom::PatternRequirement {
+                resource: crate::loom::Resource::Ember,
+                required_rate: 0.0,
+                sustain_duration_secs: 0.01,
+                sustained_secs: 0.0,
+                completed: false,
+                amount: 0.0,
+                accumulated: 0.0,
+            }],
+            completed: false,
+            flavor: String::new(),
+            eternal: false,
+        });
+        loom.persistent.patterns = patterns;
+        loom.persistent.active_pattern = 3;
+        // Force a real wall-clock delta so the sustain timer clearly exceeds the
+        // tiny requirement duration on the very next tick.
+        loom.last_tick_at = Some(chrono::Utc::now() - chrono::Duration::seconds(1));
+
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        tick_loom(&deep, &mut loom, &mut state, &mut achievements, &mut result);
+
+        assert!(loom.persistent.patterns[3].completed);
+        assert_eq!(loom.persistent.completed_pattern_count(), 4);
+        assert_eq!(
+            loom.persistent.pending_pattern_milestones,
+            vec![crate::loom::PatternMilestone::ThreadWilds]
+        );
+    }
 }
