@@ -739,7 +739,7 @@ pub fn fast_forward_all(quest_dir: &Path) -> Result<bool, String> {
     let head_branch = repo
         .head()
         .ok()
-        .and_then(|r| r.shorthand().map(|s| s.to_string()));
+        .and_then(|r| r.shorthand().ok().map(|s| s.to_string()));
 
     // Collect remote branch names.
     let remote_branches: Vec<String> = repo
@@ -988,7 +988,7 @@ pub fn reset_to_remote(quest_dir: &Path, branch_name: &str) -> Result<(), String
     let head_branch = repo
         .head()
         .ok()
-        .and_then(|r| r.shorthand().map(|s| s.to_string()));
+        .and_then(|r| r.shorthand().ok().map(|s| s.to_string()));
     if head_branch.as_deref() == Some(branch_name) {
         repo.reset(remote_commit.as_object(), git2::ResetType::Hard, None)
             .map_err(|e| format!("Failed to reset to remote: {e}"))?;
@@ -1041,7 +1041,7 @@ pub fn backup_and_reset(quest_dir: &Path, branch_name: &str) -> Result<String, S
     let head_branch = repo
         .head()
         .ok()
-        .and_then(|r| r.shorthand().map(|s| s.to_string()));
+        .and_then(|r| r.shorthand().ok().map(|s| s.to_string()));
     if head_branch.as_deref() == Some(branch_name) {
         repo.reset(remote_commit.as_object(), git2::ResetType::Hard, None)
             .map_err(|e| format!("Failed to reset to remote: {e}"))?;
@@ -1072,7 +1072,11 @@ fn configure_fetch_refspec(repo: &Repository) -> Result<(), String> {
     let expected = format!("+refs/heads/*:refs/remotes/{REMOTE_NAME}/*");
     let has_refspec = remote
         .fetch_refspecs()
-        .map(|specs| specs.iter().any(|s| s.is_some_and(|s| s == expected)))
+        .map(|specs| {
+            specs
+                .iter()
+                .any(|s| s.ok().flatten().is_some_and(|s| s == expected))
+        })
         .unwrap_or(false);
 
     if !has_refspec {
