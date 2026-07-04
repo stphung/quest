@@ -1581,25 +1581,25 @@ fn weather_hint(wx: &crate::vessel::weather::WeatherObj, voyage: &VoyageState) -
                 if wx.with_bearing {
                     "riding it; the miles come cheap".to_string()
                 } else {
-                    "running against it; the hold pays".to_string()
+                    "driving against it; the hold pays".to_string()
                 }
             } else if wx.with_bearing {
-                "a following set \u{2014} Run would ride it".to_string()
+                "a following set \u{2014} Grueling would ride it".to_string()
             } else {
                 "set against the road".to_string()
             }
         }
         WeatherKind::SilenceBank => {
             if voyage.trim == Trim::Quiet {
-                "running Quiet through it; listening".to_string()
+                "at Easy through it; listening".to_string()
             } else {
-                "hope frays inside \u{2014} Quiet nullifies it".to_string()
+                "hope frays inside \u{2014} Easy nullifies it".to_string()
             }
         }
         WeatherKind::Squall => match voyage.trim {
-            Trim::Run => "running it doubles the tax".to_string(),
+            Trim::Run => "driving it doubles the tax".to_string(),
             Trim::Quiet | Trim::Mourn => "sheltered through; half tax".to_string(),
-            Trim::Cruise => "taxing the hold \u{2014} shelter at Quiet/Mourn".to_string(),
+            Trim::Cruise => "taxing the hold \u{2014} shelter at Easy/Restful".to_string(),
         },
     }
 }

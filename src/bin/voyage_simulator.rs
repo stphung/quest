@@ -138,7 +138,7 @@ fn simulate(strategy: Strategy, seed: u64, checkin_hours: i64) -> RunResult {
                 }
             }
         }
-        // Boarding asks block departure: say yes while a berth is free.
+        // Boarding asks block departure: say yes while a crew seat is free.
         if v.pending_ask.is_some() && !v.accept_ask() {
             v.decline_ask();
         }

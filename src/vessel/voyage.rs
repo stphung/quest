@@ -269,7 +269,7 @@ impl StrainCause {
     pub fn text(&self) -> &'static str {
         match self {
             StrainCause::ThirdWatch => "three nights on watch, back to back",
-            StrainCause::SquallAtRun => "a squall crossed at Run, on deck the whole way",
+            StrainCause::SquallAtRun => "a squall crossed while driven hard, on deck the whole way",
             StrainCause::SilenceHelm => "the helm held through the silence, alone with it",
             StrainCause::PressedHard => "the ship pressed hard twice, and the wheel remembers",
         }
@@ -292,8 +292,8 @@ pub enum WearCause {
 impl WearCause {
     pub fn text(&self) -> &'static str {
         match self {
-            WearCause::RunHard => "a whole leg driven at Run, start to finish",
-            WearCause::SquallAtRun => "a squall taken at Run",
+            WearCause::RunHard => "a whole leg driven at the Grueling pace, start to finish",
+            WearCause::SquallAtRun => "a squall taken at the Grueling pace",
             WearCause::ThreatRoad => "the road took its price from her skin",
             WearCause::PressedWorn => "pressed hard on a hull already carrying scars",
         }
@@ -887,7 +887,7 @@ impl VoyageState {
                                     self.heard_banks.push(wx.id);
                                     if self.grant_next_rumor(road.from) {
                                         self.push_log(format!(
-                                            "In {}, running Quiet, the crew heard \
+                                            "In {}, held at Easy, the crew heard \
                                              what the silence was hiding.",
                                             wx.name
                                         ));
