@@ -3,6 +3,8 @@ name: wiki-audit
 description: Multi-agent wiki audit — finds stale numbers, missing systems, and broken links in the player-facing wiki. Use when wiki is stale, after game changes, or before releases.
 ---
 
+<!-- meta-audit scope-universe: quest.wiki/*.md -->
+
 # Audit Player-Facing Wiki
 
 Multi-agent audit of the GitHub wiki (`quest.wiki/` submodule). Finds stale content, missing systems, and broken links, then auto-fixes safe patterns.
@@ -112,3 +114,55 @@ git commit -m "docs: update quest.wiki submodule pointer"
 ## Output
 
 Report the PR URL and final status when done (use `/ship` skill).
+
+## Log This Run
+
+`commit_sha` and the PR URL must be captured correctly, or `meta-audit`'s later
+re-verification will check the wrong code state or lose track of provenance:
+
+- **`commit_sha`**: `git merge-base HEAD origin/main` — the commit `main` was at when
+  this audit's agents did their read-only cross-referencing, i.e. the exact state every
+  finding's `correct_value` describes. Do NOT use `git rev-parse HEAD` (that's this
+  branch's own commit, not the code being audited) or the PR's eventual merge commit
+  (for skills that modify the audited code itself — e.g. perf-audit, test-audit — the
+  merge commit contains the *fix*, not the pre-fix state a finding describes). Capture
+  this before the branch is deleted.
+- **PR URL**: from `/ship`'s own reported result, once it completes.
+
+1. Build a JSON summary: date (YYYY-MM-DD), the `commit_sha` above, the PR URL, agent
+   count, the scope actually covered, and every finding (location, claim, correct value,
+   severity, category, whether auto-fixed). Example:
+   ```json
+   {
+     "type": "run",
+     "date": "2026-07-10",
+     "commit_sha": "abc1234...",
+     "pr_url": "https://github.com/stphung/quest/pull/999",
+     "agent_count": 4,
+     "scope": ["Combat.md", "Equipment.md"],
+     "findings": [
+       {
+         "location": "Combat.md:42",
+         "claim": "...",
+         "correct_value": "...",
+         "severity": "HIGH",
+         "category": "stale-constant",
+         "auto_fixed": true
+       }
+     ]
+   }
+   ```
+   `findings` is `[]` for an all-clear run — still log it, it counts toward the threshold.
+2. Write it to a temp file and run:
+   ```bash
+   scripts/audit-eval-log.sh wiki-audit /tmp/wiki-audit-run.json
+   ```
+3. Check the threshold:
+   ```bash
+   scripts/audit-eval-check.sh wiki-audit
+   ```
+   If it prints `TRIGGER`, invoke the `meta-audit` skill for `wiki-audit` next. If it
+   prints `SKIP: n/5`, nothing further to do.
+4. Commit the updated history log on a small new branch and land it on `main` via the
+   same branch+PR+`/ship` convention used for the audit fix itself — this file lives in
+   the main repo and needs its own merge to become visible to future runs.
