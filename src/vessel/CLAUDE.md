@@ -96,7 +96,7 @@ Once `vessel_launched` (and `act2_enabled()`), `main.rs`'s game loop hands contr
 - **Route**: a spine-and-diamond DAG (`route.rs`) — branches split at 7 junctions and rejoin within the same chapter; each chapter ends at a single gateway waypoint; the Tree (`ROUTE_SINK`, waypoint 37) is the graph's only sink.
 - **Gauges**: `provisions` (burn while traveling, composed from trim × tender-station × weather) and `hope` (the "wind" — its one mechanical effect is `time_mult`; ashen hope enters the Long Silence, pausing arcs and slowing everything to the worst rate until a rest stop relights it).
 - **Affordability invariant**: at every junction, the cheapest outgoing road never costs more than `DRIFT_RECOVERY_PROVISIONS` (25) — asserted in `route.rs` tests — so running the hold dry always means drifting in place (36-hour recovery), never getting stuck.
-- **Souls**: recruit asks block departure until answered; stations (Helm/Tender/Watch) grant multipliers; arcs pay hope/rumors on a rest-day timer; farewelling frees a berth at a small hope cost; loss is authored-scene-only.
+- **Souls**: recruit asks block departure until answered; stations (Helm/Tender/Watch) grant multipliers; arcs pay hope/rumors on a rest-day timer; farewelling frees a crew seat at a small hope cost; loss is authored-scene-only.
 - **Refits**: the first 3 distinct shipyards visited each offer one permanent A/B door (`REFIT_PAIRS`); picking one closes the other forever.
 - **Weather & nights**: weather is a pure function of `(voyage_seed, hour)` so it never needs saving; nights are typed per day from `(voyage_seed, day)` and price provisions/hope based on who stands the watch.
 - **Letters & the Going-Dark**: one letter per Chapter I/II arrival, delivered at ports (never on timers); the Threshold hands over the Last Letter; the first arrival past the Last Lantern is the night the mail does not come (`gone_dark`).
@@ -147,7 +147,7 @@ Once `vessel_launched` (and `act2_enabled()`), `main.rs`'s game loop hands contr
 ### Souls (`souls.rs`)
 | Constant | Value | Notes |
 |----------|-------|-------|
-| `BERTHS` | 7 | 8 souls total (3 launch + 5 found) compete for 7 |
+| `CREW` | 7 | 8 souls total (3 launch + 5 found) compete for 7 |
 | `ARC_BEAT_REST_DAYS` | 2 | Rest days before a ready beat fires |
 | `LOSS_HOPE_COST` | 3 | Authored-scenes-only |
 | `FAREWELL_HOPE_COST` | 1 | |

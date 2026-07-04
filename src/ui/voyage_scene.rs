@@ -760,9 +760,9 @@ fn render_vessel_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         format!(
-            "Souls aboard: {} of {}",
+            "Crew: {} of {}",
             voyage.aboard_count(),
-            crate::vessel::souls::BERTHS
+            crate::vessel::souls::CREW
         ),
         Style::default().fg(Color::Gray),
     )));
@@ -1415,7 +1415,7 @@ fn render_farewell_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, se
     if let Some(asking) = voyage.pending_ask {
         lines.push(Line::from(Span::styled(
             format!(
-                "The berths are full, and {} is asking.",
+                "The crew is full, and {} is asking.",
                 souls::soul(asking).name
             ),
             Style::default().fg(Color::White),
@@ -1455,7 +1455,7 @@ fn render_ask_modal(
     voyage: &VoyageState,
     asking: crate::vessel::souls::SoulId,
 ) {
-    use crate::vessel::souls::{self, BERTHS};
+    use crate::vessel::souls::{self, CREW};
 
     let def = souls::soul(asking);
     let width = area.width.clamp(30, 64);
@@ -1472,7 +1472,7 @@ fn render_ask_modal(
     let inner = block.inner(rect);
     frame.render_widget(block, rect);
 
-    let full = voyage.aboard_count() >= BERTHS;
+    let full = voyage.aboard_count() >= CREW;
     let mut lines = vec![
         Line::from(""),
         Line::from(Span::styled(
@@ -1487,7 +1487,7 @@ fn render_ask_modal(
     ];
     if full {
         lines.push(Line::from(Span::styled(
-            "The berths are full. Taking them aboard means a farewell.",
+            "The crew is full. Taking them aboard means a farewell.",
             Style::default().fg(Color::LightRed),
         )));
     }
@@ -2055,7 +2055,7 @@ fn render_reckoning(
     // The engine.
     lines.push(Line::from(vec![
         Span::styled(
-            format!("Resonance {}", with_commas(c.resonance)),
+            format!("Drive {}", with_commas(c.drive)),
             Style::default()
                 .fg(VESSEL_VIOLET)
                 .add_modifier(Modifier::BOLD),
@@ -2063,7 +2063,7 @@ fn render_reckoning(
         Span::styled(
             format!(
                 "   \u{00b7}   the Vessel sails {:.2}\u{00d7} her old self",
-                c.resonance_speed_factor()
+                c.drive_speed_factor()
             ),
             Style::default().fg(Color::Gray),
         ),
@@ -2119,9 +2119,9 @@ fn render_reckoning(
     )));
     lines.push(Line::from(Span::styled(
         format!(
-            "  fastest crossing {}d \u{00b7} {} leagues sailed \u{00b7} {} nights stood",
+            "  fastest crossing {}d \u{00b7} {} lightyears sailed \u{00b7} {} nights stood",
             c.records.fastest_days,
-            with_commas(c.records.total_leagues),
+            with_commas(c.records.total_lightyears),
             with_commas(c.records.total_nights)
         ),
         Style::default().fg(Color::Gray),

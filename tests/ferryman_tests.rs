@@ -1,5 +1,5 @@
 //! Integration tests for The Ferryman (spec 9): the crossing loop, the
-//! colony's growth, Resonance compounding, and the era ending.
+//! colony's growth, Drive compounding, and the era ending.
 
 use chrono::{DateTime, Duration, Utc};
 use quest::vessel::colony::{ColonyState, District};
@@ -106,16 +106,16 @@ fn the_first_crossing_founds_the_colony_and_delivers_its_crew() {
     colony.deliver_crossing(survivors, v.day_index(), 200, 12);
     assert_eq!(colony.souls_delivered, survivors as u64);
     assert_eq!(colony.crossings_completed, 1);
-    assert!(colony.resonance > 0, "delivery grows resonance");
+    assert!(colony.drive > 0, "delivery grows drive");
 }
 
 #[test]
 fn a_ferry_run_carries_passengers_and_the_rested_crew() {
     let mut colony = ColonyState::found("ferry".to_string());
-    // Quay + Granary + Hearth founded → base 160 + 110 + 140 + 170 berths.
+    // Quay + Granary + Hearth founded → base 160 + 110 + 140 + 170.
     colony.souls_delivered = 620;
-    colony.resonance = 620;
-    let expected_berths = 160 + 110 + 140 + 170;
+    colony.drive = 620;
+    let expected_capacity = 160 + 110 + 140 + 170;
     // A crew with a strained soul (spec 8) — coming home is rest.
     let mut crew: Vec<_> = {
         let mut v = VoyageState::begin("ferry".to_string(), 1, t0());
@@ -127,10 +127,10 @@ fn a_ferry_run_carries_passengers_and_the_rested_crew() {
     let v = VoyageState::begin_ferry("ferry".to_string(), 5, t0(), &colony, crew);
     assert_eq!(v.crossing_number, 2);
     assert_eq!(
-        v.passengers, expected_berths,
-        "base berths plus every founded district's"
+        v.passengers, expected_capacity,
+        "base plus every founded district's bonus"
     );
-    assert!(v.resonance_time_mult < 1.0, "resonance sails her faster");
+    assert!(v.drive_time_mult < 1.0, "drive sails her faster");
     assert!(
         v.souls.iter().all(|s| s.strain == 0),
         "the crew came home to rest"
@@ -176,7 +176,7 @@ fn a_short_era_of_big_meaningful_crossings_founds_the_whole_colony() {
     );
     assert!(
         last_days < first_days,
-        "resonance still trims each crossing, gently ({first_days}d -> {last_days}d)"
+        "drive still trims each crossing, gently ({first_days}d -> {last_days}d)"
     );
 
     // Prove every district is reachable — the Charthouse is no longer dead
@@ -187,11 +187,11 @@ fn a_short_era_of_big_meaningful_crossings_founds_the_whole_colony() {
     while !colony.era_over() {
         crossing += 1;
         // Crossing 1 delivers the authored crew (~6); every ferry run after
-        // carries a passenger cohort sized by the colony so far.
+        // carries a passenger expedition sized by the colony so far.
         let carried = if crossing == 1 {
             6
         } else {
-            colony.next_passengers()
+            colony.next_expedition()
         };
         let new = colony.deliver_crossing(carried, 32, 320, 10);
         if !new.is_empty() {
@@ -235,11 +235,11 @@ fn old_saves_have_no_colony_and_resume_on_crossing_one() {
     let obj = json.as_object_mut().unwrap();
     obj.remove("crossing_number");
     obj.remove("passengers");
-    obj.remove("resonance_time_mult");
+    obj.remove("drive_time_mult");
     let loaded: VoyageState = serde_json::from_value(json).unwrap();
     assert_eq!(loaded.crossing_number, 1);
     assert_eq!(loaded.passengers, 0);
-    assert_eq!(loaded.resonance_time_mult, 1.0);
+    assert_eq!(loaded.drive_time_mult, 1.0);
 }
 
 #[test]
@@ -247,7 +247,7 @@ fn the_ferry_loop_is_offline_equivalent() {
     let colony = {
         let mut c = ColonyState::found("eq".to_string());
         c.souls_delivered = 500;
-        c.resonance = 600;
+        c.drive = 600;
         c
     };
     let crew = {

@@ -20,7 +20,7 @@ use super::route::{
 use super::scenes::{self, ColorKey};
 use super::souls::{
     self, helm_time_mult, tender_provisions_mult, wind_time_mult, ArcTrigger, SoulId, Station,
-    ARC_BEAT_REST_DAYS, BERTHS, FAREWELL_HOPE_COST, LOSS_HOPE_COST,
+    ARC_BEAT_REST_DAYS, CREW, FAREWELL_HOPE_COST, LOSS_HOPE_COST,
 };
 use super::weather::{self, WeatherKind, WeatherObj};
 use chrono::{DateTime, Utc};
@@ -59,7 +59,7 @@ pub const HARD_RATIONS_BURN_MULT: f64 = 0.75;
 pub const HULL_WEAR_MAX: u8 = 6;
 pub const WEAR_BURN_PER_SCAR: f64 = 0.05;
 /// Extra daily provisions each passenger aboard a ferry run eats (spec 9).
-/// Kept small so the big cohorts of a short era — hundreds of souls — still
+/// Kept small so the big expeditions of a short era — hundreds of souls — still
 /// leave the hold enough to make the crossing.
 pub const PROVISIONS_PER_PASSENGER: f64 = 0.0006;
 pub const LAUNCH_HOPE: u8 = 7;
@@ -183,7 +183,7 @@ pub enum SoulStatus {
     Aboard,
     /// The ask was refused. The door closed.
     Declined,
-    /// Stepped ashore in a farewell (to free a berth). Remembered, not lost.
+    /// Stepped ashore in a farewell (to free a seat). Remembered, not lost.
     Ashore,
     /// Lost — authored scenes only (spec 4). Carved into the hull.
     Lost,
@@ -464,10 +464,10 @@ pub struct VoyageState {
     /// first). Cargo that eats: the hold burns faster the fuller she is.
     #[serde(default)]
     pub passengers: u32,
-    /// The Resonance speed multiplier baked in at launch (≤ 1.0). Held
+    /// The Drive speed multiplier baked in at launch (≤ 1.0). Held
     /// constant for the crossing so offline == live stays bitwise.
-    #[serde(default = "default_one")]
-    pub resonance_time_mult: f64,
+    #[serde(default = "default_one", alias = "resonance_time_mult")]
+    pub drive_time_mult: f64,
 }
 
 fn default_provisions_cap() -> f64 {
@@ -555,12 +555,12 @@ impl VoyageState {
             passage_events: Vec::new(),
             crossing_number: 1,
             passengers: 0,
-            resonance_time_mult: 1.0,
+            drive_time_mult: 1.0,
         }
     }
 
     /// A ferry run (crossing 2+, spec 9): the surviving crew sail again,
-    /// rested; the hold carries passengers by the count; Resonance and the
+    /// rested; the hold carries passengers by the count; Drive and the
     /// Colony's districts fold their bonuses into a fresh crossing. The
     /// intro and the authored recruit asks are behind us — passengers, not
     /// pilgrims, ride now.
@@ -575,8 +575,8 @@ impl VoyageState {
         let mut v = VoyageState::begin(character_id, voyage_seed, now);
         v.intro_pending = false;
         v.crossing_number = colony.crossings_completed + 2;
-        v.passengers = colony.next_passengers();
-        v.resonance_time_mult = colony.resonance_time_mult();
+        v.passengers = colony.next_expedition();
+        v.drive_time_mult = colony.drive_time_mult();
 
         // Coming home was rest: the crew sail sound, their stations kept
         // where they can be, arcs already told.
@@ -733,9 +733,9 @@ impl VoyageState {
         } else {
             1.00
         };
-        // Resonance (spec 9) sails her faster the more of the old world
+        // Drive (spec 9) sails her faster the more of the old world
         // she has carried — a constant baked in at launch.
-        self.resonance_time_mult
+        self.drive_time_mult
             * trim.time_mult()
             * wind_time_mult(self.hope, self.long_silence)
             * helm_time_mult(
@@ -769,7 +769,7 @@ impl VoyageState {
             1.00
         };
         let wear = 1.0 + WEAR_BURN_PER_SCAR * f64::from(self.hull_wear);
-        // Passengers are cargo that eats (spec 9): every full berth adds
+        // Passengers are cargo that eats (spec 9): every passenger adds
         // a little to the daily burn, so scarcity becomes load management.
         let load = 1.0 + PROVISIONS_PER_PASSENGER * f64::from(self.passengers);
         load * trim_mult
@@ -1802,12 +1802,12 @@ impl VoyageState {
     }
 
     /// Say yes to the pending ask. Fails (returning `false`) when the
-    /// berths are full — free one with [`Self::farewell`] first, or decline.
+    /// the crew is full — free a seat with [`Self::farewell`] first, or decline.
     pub fn accept_ask(&mut self) -> bool {
         let Some(id) = self.pending_ask else {
             return false;
         };
-        if self.aboard_count() >= BERTHS {
+        if self.aboard_count() >= CREW {
             return false;
         }
         self.pending_ask = None;
@@ -1841,7 +1841,7 @@ impl VoyageState {
         Some(id)
     }
 
-    /// A soul steps ashore to free a berth. Remembered in the manifest,
+    /// A soul steps ashore to free a seat. Remembered in the manifest,
     /// never carved into the hull. Costs a little hope.
     pub fn farewell(&mut self, id: SoulId) -> bool {
         let here = self.current_waypoint();

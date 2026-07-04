@@ -438,19 +438,19 @@ pub fn voyage_holding_at(
 }
 
 /// A colony mid-era for the Reckoning pane: three big crossings in, half
-/// the districts founded, resonance compounding. Deterministic, and matches
+/// the districts founded, drive compounding. Deterministic, and matches
 /// the short-era curve (six weighty crossings, one district each).
 pub fn colony_midera() -> crate::vessel::colony::ColonyState {
     use crate::vessel::colony::{ColonyState, CrossingRecords};
     let mut c = ColonyState::found("fixture-voyager".to_string());
     c.souls_delivered = 826;
     c.souls_remaining = 1_600;
-    c.resonance = 826;
+    c.drive = 826;
     c.crossings_completed = 3;
     c.records = CrossingRecords {
         fastest_days: 32,
         most_carried: 410,
-        total_leagues: 1_020,
+        total_lightyears: 1_020,
         total_nights: 99,
     };
     // Well into the era: most of the old world has gone dark, a lit path

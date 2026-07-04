@@ -1,9 +1,9 @@
 //! Integration tests for the Act 2 souls engine (spec 3): the roster
-//! invariants, berths, arcs on rest days, the wind, and the covenant.
+//! invariants, crew seats, arcs on rest days, the wind, and the covenant.
 
 use chrono::{DateTime, Duration, Utc};
 use quest::vessel::route::{self, roads_from, WaypointId, ROUTE_START};
-use quest::vessel::souls::{self, SoulId, Station, ARC_BEAT_REST_DAYS, BERTHS, SOULS};
+use quest::vessel::souls::{self, SoulId, Station, ARC_BEAT_REST_DAYS, CREW, SOULS};
 use quest::vessel::voyage::{SoulStatus, Trim, VoyagePhase, VoyageState};
 
 fn t0() -> DateTime<Utc> {
@@ -54,7 +54,7 @@ fn every_route_meets_every_recruitable_soul() {
 }
 
 #[test]
-fn eight_asks_against_seven_berths_forces_exactly_one_choice() {
+fn eight_asks_against_seven_crew_seats_forces_exactly_one_choice() {
     let mut v = started();
     assert_eq!(v.aboard_count(), 3, "the launch trio");
 
@@ -67,20 +67,20 @@ fn eight_asks_against_seven_berths_forces_exactly_one_choice() {
     for (i, id) in recruits.iter().enumerate() {
         v.pending_ask = Some(*id);
         if i < 4 {
-            assert!(v.accept_ask(), "berths 4..=7 accept freely");
+            assert!(v.accept_ask(), "seats 4..=7 accept freely");
         } else {
-            // The eighth ask: berths are full.
+            // The eighth ask: the crew is full.
             assert!(!v.accept_ask(), "the 8th ask cannot board a full ship");
             assert!(v.pending_ask.is_some(), "the ask still waits");
             // Depart is blocked until it is answered.
             let road = roads_from(ROUTE_START).next().unwrap();
             assert!(v.depart(road.id).is_err());
-            // A farewell frees the berth; the ask then boards.
+            // A farewell frees a seat; the ask then boards.
             assert!(v.farewell(SoulId(0)), "Torvald steps ashore");
             assert!(v.accept_ask());
         }
     }
-    assert_eq!(v.aboard_count(), BERTHS);
+    assert_eq!(v.aboard_count(), CREW);
     assert_eq!(
         v.soul_state(SoulId(0)).unwrap().status,
         SoulStatus::Ashore,

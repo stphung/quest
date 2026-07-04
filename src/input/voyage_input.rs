@@ -205,7 +205,7 @@ fn handle_ask_keys(
                 });
                 VoyageInputResult::HandledNeedsSave
             } else {
-                // Berths full: someone must step ashore first.
+                // Crew full: someone must step ashore first.
                 ui.view = VoyageView::Farewell { selected: 0 };
                 VoyageInputResult::Handled
             }
