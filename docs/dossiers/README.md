@@ -16,7 +16,9 @@ Assessment) are dated snapshots checked by design-iteration's own decision
 retrospectives, not by the audits.
 
 Dossiers complement, not replace:
-- `docs/plans/` — point-in-time design intent (what a system was *meant* to be)
+- `openspec/specs/` — the source of truth for what a system *does* now
+- `openspec/changes/archive/` — point-in-time design intent per shipped change
+  (what a system was *meant* to be, with its proposal/design/tasks)
 - `docs/decisions.md` — the log of resolved design decisions
 - `src/<module>/CLAUDE.md` — implementation-eye documentation for developers
 

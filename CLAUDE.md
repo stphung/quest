@@ -23,6 +23,10 @@ Development is **spec-driven** via [OpenSpec](https://github.com/Fission-AI/Open
 
 Use `/opsx:explore` for read-only investigation before proposing. Requirements carry exact balance numbers — keep them in sync with "Key Constants" below. When a spec and the code disagree, that is a bug in one of them; reconcile deliberately.
 
+**Design-process docs** (the *how/why*, which the behavioral specs don't hold) — see [docs/README.md](docs/README.md) for the "where does this doc go?" map:
+- Per-change design + plan live in that change's `design.md` / `tasks.md`, preserved in `openspec/changes/archive/` when it ships. Historical pre-OpenSpec design docs were backported there. **Never delete `openspec/changes/archive/`** — it is the durable design-rationale trail.
+- Cross-act / cross-system story and world design lives in `docs/dossiers/` (e.g. `world-and-narrative.md`); pre-commitment exploration lives in `docs/explorations/`; resolved decisions go in `docs/decisions.md`.
+
 ## Development Workflow
 
 **Use git worktrees for feature work.** Create isolated worktrees for branches instead of switching branches in the main workspace.

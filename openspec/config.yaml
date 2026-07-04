@@ -53,6 +53,15 @@ rules:
   design:
     - Name the exact source modules touched and the verification command(s)
       from the root CLAUDE.md "How to Verify Your Change" table.
+    - This is the home for forward design that the behavioral spec can't hold.
+      Include, when relevant: Alternatives considered and why rejected; the
+      experiential / narrative intent (tone, pacing, what it should feel like);
+      a UX sketch; and Risks / open questions. This artifact is the durable
+      design-rationale record once the change is archived — write it for a
+      future designer, not just the implementer.
+    - For cross-act or cross-system story/world design that outlives this one
+      change, put it in docs/dossiers/ instead (e.g. world-and-narrative.md),
+      and reference it here.
   tasks:
     - End with a task to run the relevant targeted verification AND `make check`
       before pushing.
