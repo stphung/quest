@@ -2162,6 +2162,40 @@ fn render_reckoning(
         ),
         Style::default().fg(if cap_afford { GOLD } else { Color::DarkGray }),
     )));
+    // The Ward — the third yard: buy down the dark's per-crossing toll.
+    let ward_afford = c.salvage >= c.ward_cost();
+    lines.push(Line::from(vec![
+        Span::styled(
+            format!("  [W] Ward \u{2014} Lv {}", c.ward_level),
+            Style::default()
+                .fg(VESSEL_VIOLET)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            {
+                use crate::vessel::colony::{
+                    DARK_TAKES_EACH_CROSSING, WARD_DECAY, WARD_TOLL_FLOOR,
+                };
+                let next_mult = WARD_DECAY
+                    .powi((c.ward_level + 1) as i32)
+                    .max(WARD_TOLL_FLOOR);
+                format!(
+                    "  the dark takes {:.1}% \u{2192} next Lv {:.1}%",
+                    c.dark_toll_rate() * 100.0,
+                    DARK_TAKES_EACH_CROSSING * next_mult * 100.0
+                )
+            },
+            Style::default().fg(Color::Gray),
+        ),
+    ]));
+    lines.push(Line::from(Span::styled(
+        format!(
+            "      costs {} Salvage{}",
+            with_commas(c.ward_cost()),
+            if ward_afford { "" } else { "  (not yet)" }
+        ),
+        Style::default().fg(if ward_afford { GOLD } else { Color::DarkGray }),
+    )));
     lines.push(Line::from(Span::styled(
         format!(
             "  {} crossings made \u{00b7} {} carried at most in one",

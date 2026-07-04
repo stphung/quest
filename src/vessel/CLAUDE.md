@@ -150,10 +150,11 @@ Once `vessel_launched` (and `act2_enabled()`), `main.rs`'s game loop hands contr
 
 ### Colony / the ferry loop (`colony.rs`)
 
-The crossing is the *run*; the Colony is what persists above it. Each crossing delivers souls (the headline number only ever rises), pays out **Salvage**, and the dark takes a per-crossing toll of whoever still waits. Two yards spend Salvage, and the choice between them is the loop's decision (`[D]`/`[C]` in the Reckoning):
+The crossing is the *run*; the Colony is what persists above it. Each crossing delivers souls (the headline number only ever rises), pays out **Salvage**, and the dark takes a per-crossing toll of whoever still waits. Three yards spend Salvage, and the choice between them is the loop's decision (`[D]`/`[C]`/`[W]` in the Reckoning):
 
 - **Drive** (`drive_level`) — each level multiplies every future crossing's sail-time by `DRIVE_DECAY`, compounding down to `DRIVE_FLOOR`. Level 0 is the maiden voyage (the slowest crossing there is); the ramp is entirely earned by buying levels.
 - **Shipwright** (`cap_level`) — each level multiplies the hold by `CAP_GROWTH`. `expedition_size()` = `BASE_CAPACITY × CAP_GROWTH^cap_level + district bonuses`.
+- **Ward** (`ward_level`) — each level multiplies the dark's per-crossing toll by `WARD_DECAY`, compounding down to `WARD_TOLL_FLOOR` (never zero — a residual bite always remains). `dark_toll()` = `souls_remaining × DARK_TAKES_EACH_CROSSING × WARD_DECAY^ward_level`. The attrition axis: the souls-first hand's answer to a long era.
 
 The tension is speed-vs-salvation, and it is meant to be a **wide** margin: because the dark bites once *per crossing*, a reckless Drive-only build runs ~85 near-empty crossings and bleeds the world to the dark (**~54% saved**), while a souls-first build (lean into the hold, just enough Drive to keep her quick) carries most of it home (**~87% saved**). Skill is rewarded, not marginal. The ramp is a **buildup then a fast-fun stretch**: a two-week maiden voyage, ~14 → ~3 real-days over the first handful, then a long run of ~3-day turnarounds while the loads climb into the thousands. Tuned to **~19 crossings, ~3 real months, ~87% saved with skilled play, C1 ≈ 14 real days (two weeks)**.
 
@@ -166,10 +167,12 @@ The tension is speed-vs-salvation, and it is meant to be a **wide** margin: beca
 | `STARTING_SALVAGE` | 40 | Founding grant — the ramp takes hold from the second crossing |
 | `DRIVE_COST_BASE` / `DRIVE_COST_GROWTH` | 4 / 1.5 | Drive level L costs `4×1.5^L` Salvage |
 | `CAP_COST_BASE` / `CAP_COST_GROWTH` | 5 / 1.42 | Shipwright level L costs `5×1.42^L` Salvage |
-| `DARK_TAKES_EACH_CROSSING` | 0.011 | Fraction of the still-waiting world lost each crossing — the toll that makes crossing-count matter for souls saved |
+| `DARK_TAKES_EACH_CROSSING` | 0.011 | Base fraction of the still-waiting world lost each crossing — the toll the Ward buys down |
+| `WARD_DECAY` / `WARD_TOLL_FLOOR` | 0.80 / 0.15 | Toll ×0.80 per Ward level, floored at 0.15× base (≥85% cut max, never zero) |
+| `WARD_COST_BASE` / `WARD_COST_GROWTH` | 6 / 1.6 | Ward level L costs `6×1.6^L` Salvage — steeper than Drive/Shipwright |
 | districts | Quay 500 … Charthouse 66,000 | Founded by population (= souls delivered); each adds a standing hold bonus |
 
-Buying is player-driven (`buy_drive`/`buy_capacity`, wired through `VoyageInputResult::BuyDrive`/`BuyCapacity` → `main.rs` → the colony); there is no in-game auto-invest (the balanced line lives only in the tests/sim as a policy helper).
+Buying is player-driven (`buy_drive`/`buy_capacity`/`buy_ward`, wired through `VoyageInputResult::BuyDrive`/`BuyCapacity`/`BuyWard` → `main.rs` → the colony); there is no in-game auto-invest (the balanced line lives only in the tests/sim as a policy helper).
 
 ### Souls (`souls.rs`)
 | Constant | Value | Notes |

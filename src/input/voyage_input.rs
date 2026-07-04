@@ -26,6 +26,9 @@ pub enum VoyageInputResult {
     BuyDrive,
     /// At the Reckoning: spend Salvage at the Shipwright (spec 9).
     BuyCapacity,
+    /// At the Reckoning: spend Salvage in the Ward yard — buys down the dark's
+    /// per-crossing toll on the still-waiting world.
+    BuyWard,
     Ignored,
 }
 
@@ -168,6 +171,7 @@ pub fn handle_voyage_input(
             }
             KeyCode::Char('d') | KeyCode::Char('D') => VoyageInputResult::BuyDrive,
             KeyCode::Char('c') | KeyCode::Char('C') => VoyageInputResult::BuyCapacity,
+            KeyCode::Char('w') | KeyCode::Char('W') => VoyageInputResult::BuyWard,
             _ => VoyageInputResult::Handled,
         },
         VoyageView::Record { scroll } => {
