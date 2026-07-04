@@ -313,3 +313,72 @@ pub fn layer_narrative(layer: u32, mission_type: &MissionType) -> &'static str {
         _ => "",
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const NON_CONSTRUCTION: &[MissionType] = &[
+        MissionType::SupplyRun,
+        MissionType::Recon,
+        MissionType::Expedition,
+        MissionType::Breakthrough,
+        MissionType::GatewayExpedition,
+    ];
+
+    const CONSTRUCTION: &[MissionType] = &[
+        MissionType::Construction(Infrastructure::Outpost),
+        MissionType::Construction(Infrastructure::SupplyCache),
+        MissionType::Construction(Infrastructure::Watchtower),
+        MissionType::Construction(Infrastructure::Bridge),
+    ];
+
+    #[test]
+    fn every_layer_has_narratives_for_all_mission_types_except_gateway_expedition() {
+        for layer in 1..=30u32 {
+            for mission_type in NON_CONSTRUCTION.iter().chain(CONSTRUCTION.iter()) {
+                if *mission_type == MissionType::GatewayExpedition {
+                    continue;
+                }
+                let text = layer_narrative(layer, mission_type);
+                assert!(
+                    !text.is_empty(),
+                    "expected narrative for layer {layer}, mission {mission_type:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn layer_30_has_gateway_expedition_narrative() {
+        let text = layer_narrative(30, &MissionType::GatewayExpedition);
+        assert!(!text.is_empty());
+        assert!(text.contains("Gateway opens"));
+    }
+
+    #[test]
+    fn gateway_expedition_narrative_is_empty_below_layer_30() {
+        for layer in 1..30u32 {
+            assert_eq!(layer_narrative(layer, &MissionType::GatewayExpedition), "");
+        }
+    }
+
+    #[test]
+    fn out_of_range_layer_returns_empty_string() {
+        assert_eq!(layer_narrative(0, &MissionType::SupplyRun), "");
+        assert_eq!(layer_narrative(31, &MissionType::SupplyRun), "");
+        assert_eq!(layer_narrative(100, &MissionType::Breakthrough), "");
+    }
+
+    #[test]
+    fn specific_known_narratives_match_expected_text() {
+        assert_eq!(
+            layer_narrative(1, &MissionType::SupplyRun),
+            "Ration caches behind a collapsed barracks door. Mostly intact."
+        );
+        assert_eq!(
+            layer_narrative(30, &MissionType::Construction(Infrastructure::Bridge)),
+            "The bridge reaches the Origin Wound. The void did not resist. It agreed."
+        );
+    }
+}
