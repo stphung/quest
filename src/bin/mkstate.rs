@@ -110,7 +110,7 @@ fn usage() -> ! {
          \x20 --stormbreaker       Grant Stormbreaker (Zone 10 boss gate)\n\
          \x20 --boss-ready         Subzone boss spawns on the first tick\n\
          \x20 --vessel-signal      Vessel signal discovered (Z50 boss fallen)\n\
-         \x20 --vessel-launched    Vessel already launched (100k PR burned)\n\
+         \x20 --vessel-launched    Vessel already launched (250k PR burned)\n\
          \x20 --loom-patterns <n>  Write loom.json with n completed patterns\n\
          \x20 --voyage <waypoint>  Write voyage.json holding at waypoint 0-37\n\
          \x20                      (implies --vessel-launched; needs QUEST_ACT2=1 to see)\n\

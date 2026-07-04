@@ -83,7 +83,8 @@ pub struct GameState {
     /// True after the Zone 50 final boss first falls — enables Vessel ticker
     /// whispers and the [V] overlay (persistent, survives prestige)
     pub vessel_signal_discovered: bool,
-    /// True after the player confirms the Vessel launch and burns 100,000 PR
+    /// True after the player confirms the Vessel launch and burns
+    /// `vessel::LAUNCH_PR_COST` (250,000) PR
     pub vessel_launched: bool,
     /// True once the Vessel reaches the Tree — the crossing is over and
     /// Act 3, whenever it exists, keys off this the way Act 2 keyed off
