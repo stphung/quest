@@ -2552,6 +2552,101 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_ensure_emergency_recovery_merc_ignores_lost_mercs_in_status_filter() {
+        // A Lost merc alongside an Injured one exercises the `_ => None` arm of
+        // the status filter_map (Lost is neither Available nor Injured), while
+        // the Injured merc still gets promoted so the warband isn't soft-locked.
+        let now = Utc::now();
+        let mut prestige = DeepPrestige::new();
+        let mut lost = make_merc(1, MercArchetype::Vanguard, 30);
+        lost.status = MercStatus::Lost;
+        let mut injured = make_merc(2, MercArchetype::Scout, 28);
+        injured.status = MercStatus::Injured {
+            recover_at: now + Duration::hours(6),
+        };
+        prestige.roster = vec![(1, lost), (2, injured)].into_iter().collect();
+
+        let changed = ensure_emergency_recovery_merc(&mut prestige);
+
+        assert!(changed);
+        assert!(prestige.roster[&2].is_available());
+        assert!(matches!(prestige.roster[&1].status, MercStatus::Lost));
+    }
+
+    #[test]
+    fn test_ensure_emergency_recovery_merc_noop_when_merc_already_available() {
+        let mut prestige = DeepPrestige::new();
+        let merc = make_merc(1, MercArchetype::Vanguard, 30);
+        prestige.roster.insert(1, merc);
+
+        let changed = ensure_emergency_recovery_merc(&mut prestige);
+
+        assert!(!changed);
+    }
+
+    #[test]
+    fn test_ensure_emergency_supply_run_replaces_most_expensive_when_no_supply_run_exists() {
+        let mut rng = seeded_rng();
+        let persistent = DeepPersistent::new();
+        let mut prestige = DeepPrestige::new();
+        prestige.warband_marks = 0;
+        prestige.available_missions = vec![make_available_mission(MissionType::Recon, 1), {
+            let mut m = make_available_mission(MissionType::Expedition, 1);
+            m.marks_cost = 999;
+            m
+        }];
+
+        let changed = ensure_emergency_supply_run(&mut prestige, &persistent, &mut rng);
+
+        assert!(changed);
+        assert_eq!(
+            prestige.available_missions.len(),
+            2,
+            "the most expensive mission should be replaced in-place, not appended"
+        );
+        let free_supply = prestige
+            .available_missions
+            .iter()
+            .find(|m| m.mission_type == MissionType::SupplyRun)
+            .expect("a free Supply Run should have replaced the most expensive mission");
+        assert_eq!(free_supply.marks_cost, 0);
+    }
+
+    #[test]
+    fn test_ensure_emergency_recruit_noop_when_pool_lengths_mismatched() {
+        let mut prestige = DeepPrestige::new();
+        prestige.roster = std::collections::HashMap::new();
+        prestige.recruit_pool.candidates = vec![
+            make_merc(100, MercArchetype::Vanguard, 20),
+            make_merc(101, MercArchetype::Scout, 20),
+        ];
+        // Mismatched lengths: candidates.len() != recruit_costs.len().
+        prestige.recruit_pool.recruit_costs = vec![20];
+
+        let changed = ensure_emergency_recruit(&mut prestige);
+
+        assert!(!changed);
+    }
+
+    #[test]
+    fn test_ensure_emergency_recruit_noop_when_a_candidate_is_already_affordable() {
+        let mut prestige = DeepPrestige::new();
+        prestige.warband_marks = 15;
+        prestige.roster = std::collections::HashMap::new();
+        prestige.recruit_pool.candidates = vec![
+            make_merc(100, MercArchetype::Vanguard, 20),
+            make_merc(101, MercArchetype::Scout, 20),
+        ];
+        // One candidate (10 marks) is already affordable at 15 marks in the bank.
+        prestige.recruit_pool.recruit_costs = vec![10, 50];
+
+        let changed = ensure_emergency_recruit(&mut prestige);
+
+        assert!(!changed);
+        assert_eq!(prestige.recruit_pool.recruit_costs, vec![10, 50]);
+    }
+
     // ── validate_squad_assignment ─────────────────────────────────────────────
 
     #[test]
@@ -4058,6 +4153,90 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_apply_mission_casualties_skips_squad_members_missing_from_roster() {
+        let persistent = DeepPersistent::new();
+        let now = Utc::now();
+        // Empty roster: the squad references a merc id that isn't present,
+        // exercising the `let Some(merc) = ... else { continue; }` guard.
+        let mut prestige = make_prestige_with_mercs(vec![]);
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::Breakthrough,
+            layer: 5,
+            squad: vec![999],
+            started_at: now - Duration::hours(4),
+            ends_at: now,
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+        let mut rng = seeded_rng();
+
+        let (injured, lost) = apply_mission_casualties(
+            &mission,
+            &mut prestige,
+            &persistent,
+            &MissionOutcome::Failure,
+            now,
+            &mut rng,
+        );
+
+        assert!(injured.is_empty());
+        assert!(lost.is_empty());
+    }
+
+    #[test]
+    fn test_apply_mission_casualties_partial_success_uses_low_loss_chance_branch() {
+        // PartialSuccess routes casualty resolution through the `_ => 0.05` arm
+        // of the loss-chance match (only Failure gets the higher, risk-scaled
+        // loss chance). Loop seeds until at least one casualty roll triggers.
+        let persistent = DeepPersistent::new();
+        let now = Utc::now();
+        let mut triggered = false;
+
+        for seed in 0u64..60 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut merc = make_merc(1, MercArchetype::Vanguard, 30);
+            merc.resilience = 0;
+            merc.status = MercStatus::OnMission(1);
+            let mut prestige = make_prestige_with_mercs(vec![merc]);
+            let mission = Mission {
+                id: 1,
+                mission_type: MissionType::Breakthrough,
+                layer: 5,
+                squad: vec![1],
+                started_at: now - Duration::hours(4),
+                ends_at: now,
+                events: vec![],
+                pending_event_index: 0,
+                status: MissionStatus::Active,
+                result: None,
+                is_first_orders: false,
+            };
+
+            let (injured, lost) = apply_mission_casualties(
+                &mission,
+                &mut prestige,
+                &persistent,
+                &MissionOutcome::PartialSuccess,
+                now,
+                &mut rng,
+            );
+            if !injured.is_empty() || !lost.is_empty() {
+                triggered = true;
+                break;
+            }
+        }
+
+        assert!(
+            triggered,
+            "expected at least one PartialSuccess casualty roll to trigger within 60 seeds"
+        );
+    }
+
     // ── apply_squad_progression ─────────────────────────────────────────────────
 
     #[test]
@@ -4136,6 +4315,29 @@ mod tests {
             0,
             "Lost mercs should not accrue mission-count progression"
         );
+    }
+
+    #[test]
+    fn test_apply_squad_progression_skips_squad_members_missing_from_roster() {
+        // Empty roster: the squad references a merc id that isn't present,
+        // exercising the `let Some(merc) = ... else { continue; }` guard.
+        let mut prestige = make_prestige_with_mercs(vec![]);
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::Expedition,
+            layer: 1,
+            squad: vec![999],
+            started_at: Utc::now(),
+            ends_at: Utc::now(),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+
+        let level_ups = apply_squad_progression(&mission, &mut prestige);
+        assert!(level_ups.is_empty());
     }
 
     // ── resolve_mission: additional branches ───────────────────────────────────
@@ -4994,6 +5196,72 @@ mod tests {
         assert!(pool
             .iter()
             .any(|m| m.mission_type == MissionType::GatewayExpedition));
+    }
+
+    #[test]
+    fn test_replenish_mission_pool_gateway_replaces_at_capacity() {
+        // Pool is already at the target count, forcing `push_or_replace_for_role`
+        // to search for a replacement candidate (the closure branch) instead of
+        // just pushing.
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        for layer in 1..=GATEWAY_LAYER {
+            persistent.layer_record_mut(layer).cleared = true;
+        }
+        persistent.deepest_layer_reached = GATEWAY_LAYER;
+
+        let mut pool = vec![make_available_mission(
+            MissionType::SupplyRun,
+            GATEWAY_LAYER,
+        )];
+        let changed = replenish_mission_pool(&mut pool, &persistent, &[], 1, &mut rng);
+
+        assert!(changed);
+        assert!(pool
+            .iter()
+            .any(|m| m.mission_type == MissionType::GatewayExpedition));
+    }
+
+    #[test]
+    fn test_replenish_mission_pool_forces_progression_replace_at_capacity_when_missing() {
+        // Pool is at capacity with only a Safe-role mission; the frontier is
+        // uncleared so a Progression candidate (Breakthrough) exists and must
+        // replace the sole existing (non-Progression) entry via the
+        // `push_or_replace_for_role` search closure.
+        let mut rng = seeded_rng();
+        let persistent = DeepPersistent::new();
+        let mut pool = vec![make_available_mission(MissionType::SupplyRun, 1)];
+
+        let changed = replenish_mission_pool(&mut pool, &persistent, &[], 1, &mut rng);
+
+        assert!(changed);
+        assert!(pool
+            .iter()
+            .any(|m| m.mission_type == MissionType::Breakthrough));
+    }
+
+    #[test]
+    fn test_replenish_mission_pool_safe_and_mid_role_search_closures_at_capacity() {
+        // Pool is at capacity with only a Progression-role mission (Breakthrough),
+        // missing both Safe and Mid roles. Both role searches must evaluate their
+        // `push_or_replace_for_role` predicate closure against the sole entry.
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        // Frontier stays uncleared at layer 1 so the Breakthrough already present
+        // remains a *valid* Progression candidate throughout (not overwritten).
+        let _ = persistent.layer_record_mut(1);
+        let mut pool = vec![make_available_mission(MissionType::Breakthrough, 1)];
+
+        let _ = replenish_mission_pool(&mut pool, &persistent, &[], 1, &mut rng);
+
+        // The Breakthrough already satisfies the Progression role, so neither
+        // the Safe nor the Mid replacement candidate found a match to swap —
+        // the assertion here is just that this ran without panicking and the
+        // original Progression-role entry is still present (search failed to
+        // replace, since it's the only entry and it doesn't match either role).
+        assert!(pool
+            .iter()
+            .any(|m| m.mission_type == MissionType::Breakthrough));
     }
 
     #[test]
