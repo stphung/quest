@@ -89,7 +89,7 @@ jobs:
       - uses: taiki-e/install-action@cargo-llvm-cov
       - run: |
           cargo llvm-cov --lib --summary-only --quiet \
-            --ignore-filename-regex "(ui/|utils/updater|utils/build_info|utils/debug_menu|tick_events|history/|deep/discovery|deep/persistence|enhancement/logic|enhancement/persistence|stormglass/earning|stormglass/spending|stormglass/types|loom/graph|loom/layout|loom/milestones)" \
+            --ignore-filename-regex "(ui/|utils/updater|utils/build_info|utils/debug_menu|tick_events|history/|deep/persistence|enhancement/persistence|loom/graph|loom/layout|loom/milestones)" \
             --fail-under-lines 90
 
   ci-pass:

@@ -47,7 +47,7 @@ echo ""
 if command -v cargo-llvm-cov &> /dev/null; then
     echo "📊 5/5 Checking game logic coverage (≥90% lines)..."
     cargo llvm-cov --lib --summary-only --quiet \
-        --ignore-filename-regex "(ui/|utils/updater|utils/build_info|tick_events|history/|deep/discovery|deep/persistence|enhancement/logic|enhancement/persistence|stormglass/earning|stormglass/spending|stormglass/types)" \
+        --ignore-filename-regex "(ui/|utils/updater|utils/build_info|tick_events|history/|deep/persistence|enhancement/persistence)" \
         --fail-under-lines 90
     echo "✅ Coverage check passed"
     echo ""
