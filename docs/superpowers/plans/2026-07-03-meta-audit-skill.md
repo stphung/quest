@@ -883,10 +883,6 @@ re-verification will check the wrong code state or lose track of provenance:
 4. Commit the updated history log on a small new branch and land it on `main` via the
    same branch+PR+`/ship` convention used for the audit fix itself — this file lives in
    the main repo and needs its own merge to become visible to future runs.
-
-## Output
-
-Report the PR URL and final status when done (use `/ship` skill).
 ```
 
 - [ ] **Step 3: Commit**
@@ -1005,10 +1001,6 @@ re-verification will check the wrong code state or lose track of provenance:
 4. Commit the updated history log on a small new branch and land it on `main` via the
    same branch+PR+`/ship` convention used for the audit fix itself — this file lives in
    the main repo and needs its own merge to become visible to future runs.
-
-## Output
-
-Report the PR URL and final status when done (use `/ship` skill).
 ```
 
 - [ ] **Step 3: Commit**
