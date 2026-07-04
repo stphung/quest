@@ -1,6 +1,6 @@
 //! The Souls — Act 2's authored roster (sub-project 3).
 //!
-//! Eight people against seven berths. Each soul is a bundle of hooks into
+//! Eight people against seven crew seats. Each soul is a bundle of hooks into
 //! systems that already exist: one **affinity** axis (strengthens the
 //! matching station and is what nights read — spec 5), **counsel** lines on
 //! junction cards, and an **arc** paid for in rest days. The load-bearing
@@ -12,14 +12,14 @@
 use super::route::{Chapter, Feature, RoadId, RumorId, WaypointId};
 use serde::{Deserialize, Serialize};
 
-/// Berths aboard the Vessel. 3 launch souls + 5 found = 8 asks against 7.
-pub const BERTHS: usize = 7;
+/// Crew seats aboard the Vessel. 3 launch souls + 5 found = 8 asks against 7.
+pub const CREW: usize = 7;
 /// Rest days a ready arc beat costs before it fires.
 pub const ARC_BEAT_REST_DAYS: u64 = 2;
 /// Hope cost of losing a soul (authored scenes only, spec 4).
 #[allow(dead_code)] // Consumed by `mark_lost`, spec 4's loss API.
 pub const LOSS_HOPE_COST: u8 = 3;
-/// Hope cost of a farewell (stepping ashore to free a berth).
+/// Hope cost of a farewell (stepping ashore to free a seat).
 pub const FAREWELL_HOPE_COST: u8 = 1;
 
 /// The three standing posts — one per system the ship runs on:
@@ -646,7 +646,7 @@ mod tests {
 
     #[test]
     fn ids_are_ordinal_and_the_cast_is_eight() {
-        assert_eq!(SOULS.len(), 8, "eight asks against seven berths");
+        assert_eq!(SOULS.len(), 8, "eight asks against seven crew seats");
         for (i, s) in SOULS.iter().enumerate() {
             assert_eq!(s.id.0 as usize, i, "soul {} id mismatch", s.name);
         }
@@ -670,7 +670,7 @@ mod tests {
             );
         }
         // And two souls carry no affinity at all: counsel and arc alone
-        // justify a berth.
+        // justify a seat.
         assert_eq!(SOULS.iter().filter(|s| s.affinity.is_none()).count(), 2);
     }
 

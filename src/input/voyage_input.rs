@@ -21,6 +21,11 @@ pub enum VoyageInputResult {
     /// in main.rs rebuilds the voyage carrying the crew and the colony's
     /// bonuses; ignored when the era is over.
     SailAgain,
+    /// At the Reckoning: spend Salvage in the Drive yard (spec 9). The loop
+    /// in main.rs owns the colony, so it applies the buy and saves.
+    BuyDrive,
+    /// At the Reckoning: spend Salvage at the Shipwright (spec 9).
+    BuyCapacity,
     Ignored,
 }
 
@@ -156,15 +161,15 @@ pub fn handle_voyage_input(
             }
             VoyageInputResult::Handled
         }
-        VoyageView::Reckoning => {
-            if matches!(
-                key.code,
-                KeyCode::Esc | KeyCode::Char('l') | KeyCode::Char('L')
-            ) {
+        VoyageView::Reckoning => match key.code {
+            KeyCode::Esc | KeyCode::Char('l') | KeyCode::Char('L') => {
                 ui.view = VoyageView::Chart;
+                VoyageInputResult::Handled
             }
-            VoyageInputResult::Handled
-        }
+            KeyCode::Char('d') | KeyCode::Char('D') => VoyageInputResult::BuyDrive,
+            KeyCode::Char('c') | KeyCode::Char('C') => VoyageInputResult::BuyCapacity,
+            _ => VoyageInputResult::Handled,
+        },
         VoyageView::Record { scroll } => {
             match key.code {
                 KeyCode::Up | KeyCode::Char('k') => {
@@ -205,7 +210,7 @@ fn handle_ask_keys(
                 });
                 VoyageInputResult::HandledNeedsSave
             } else {
-                // Berths full: someone must step ashore first.
+                // Crew full: someone must step ashore first.
                 ui.view = VoyageView::Farewell { selected: 0 };
                 VoyageInputResult::Handled
             }

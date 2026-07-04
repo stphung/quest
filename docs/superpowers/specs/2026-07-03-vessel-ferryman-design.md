@@ -249,3 +249,72 @@ the blackout to how empty the world actually is: the fraction of ports dark
 tracks `1 − souls_remaining / INITIAL_SOULS`, so the chart empties in step
 with the manifest. Purely cosmetic — no souls, resonance, capacity, or
 routing changed.
+
+## Follow-up shipped: fewer, weightier crossings
+
+The first cut ran ~28 crossings, of which ~17 were mechanically identical
+(deliver 40–60, dark takes ~50, repeat) and the top district was unreachable
+(the dark took 53% of the world, capping delivery at ~1,421 of 3,000). The
+"numbers go up" spine ran dry around crossing 11 while the era ground on for
+another ~two real-world years. Rebalanced to **a short era of big, deliberate
+crossings** — one district founded per crossing, the whole colony reached:
+
+- **The colony grows the ship.** `ferry_capacity` is now the launch base plus
+  every founded district's berths, so cohorts swell 270 → 410 → 580 → 790 as
+  the colony does — the growth you watch is the size of each delivery.
+- **The dark is a per-crossing bite,** not a per-day drip: `dark_toll` takes a
+  fixed share (`DARK_TAKES_EACH_CROSSING`) of whoever is still waiting — hard
+  while the world is full (you're losing the race), easing as it empties (you
+  carry the last of them home yourself).
+- **Result (sim-proven, `run_era`):** 6 crossings, 36 → 32 days each,
+  ~2,400 of 3,000 saved (80%), one district per crossing, the Charthouse
+  landing on the finale. `RESONANCE_FOR_HALF_SPEEDUP` raised to 2,500 so a
+  short era's crossings stay weighty rather than snapping to the speed floor;
+  `PROVISIONS_PER_PASSENGER` lowered so cohorts of hundreds still make the
+  crossing.
+
+The tuning knobs were also renamed for legibility — `FERRY_BERTHS_AT_LAUNCH`,
+`District::added_berths` / `District::founded_at`, `DARK_TAKES_EACH_CROSSING`,
+`RESONANCE_FOR_HALF_SPEEDUP`, `FASTEST_CROSSING_TIME_MULT`,
+`PROVISIONS_PER_PASSENGER` — so the era's shape reads without a decoder.
+
+## Follow-up shipped: the three-month campaign (scale, ramp, auto-sail)
+
+The big-world pass made the era huge but left it real-time honest (~3 years
+at 1:1) and flat-paced. Reshaped into a **~3-real-month campaign with a felt
+ramp** — the maiden voyage is the slowest crossing of the era, and the ferry
+never stops accelerating:
+
+- **Time at sea is compressed**: `GAME_MINUTES_PER_REAL_MINUTE = 24` — one
+  sea-day per real hour. The maiden voyage sails ~1.5 real days; late
+  crossings turn around between a morning and an evening check-in. Fixtures
+  and tests express exact offsets via `real_duration_for_game_minutes()`,
+  so they are scale-agnostic.
+- **The ramp is the point**: `FASTEST_CROSSING_TIME_MULT` 0.5 → 0.2 (up to
+  5× her launch speed) and `DRIVE_FOR_HALF_SPEEDUP` 2,500 → 6,000 — felt
+  early, still climbing at the era's end. Sim: 36 → 9 sail-days over 59
+  crossings.
+- **More crossings**: `EXPEDITION_PER_1000_DELIVERED` 75 → 35 and
+  `DARK_TAKES_EACH_CROSSING` 0.7% → 0.45% stretch the 100k world across
+  **59 crossings, ~83% saved**, districts spread crossing ~4 to ~54.
+- **Auto-sail** (the compression made it necessary): a mid-crossing port
+  with no decision — one road out, no ask, no refit door — gets a
+  6-game-hour port call, then the ship sails herself. The scene is played
+  by the engine and queued (`unread_scenes`, serialized) for the ferryman
+  to read on return, oldest first. Decisions always hold the ship:
+  junctions, asks, refit doors, and the pier (`arrived_by: None`) — launch
+  and `Sail again` are never the engine's. Without this, ~20 waits ×
+  59 crossings would have made the era mostly waiting; with it, a crossing
+  asks ~3–5 decisions and the era ~2 a day.
+
+## Follow-up (2026-07-04): the two yards — Drive & Shipwright, earned not compressed
+
+The ramp is now a **choice**, and it is earned by the ship getting faster, not by the clock speeding up. The old cumulative-Drive-speeds-everything model is replaced by two Salvage-bought tracks, decoupled from delivery so the acceleration doesn't wait on the slow early crossings.
+
+- **Two yards, one currency.** Each crossing pays out **Salvage** (`SALVAGE_AT_LANDFALL + carried/SOULS_PER_SALVAGE`). On arrival (the Reckoning, `[D]`/`[C]`) the ferryman spends it:
+  - **Drive** (`drive_level`): crossing sail-time ×`DRIVE_DECAY` (0.70) per level, floored at `DRIVE_FLOOR` (0.05 ≈ 20× top speed). Level 0 = the maiden voyage, the slowest crossing there is.
+  - **Shipwright** (`cap_level`): hold ×`CAP_GROWTH` (1.36) per level. `expedition_size` = `BASE_CAPACITY (180) × CAP_GROWTH^cap_level + district bonuses` (the per-1000-delivered term is gone — the hold only grows when you pay for it). `STARTING_SALVAGE` 40 so the ramp bites from the second crossing.
+- **Uniform clock.** `GAME_MINUTES_PER_REAL_MINUTE` 24 → **2.64** (a sea-day ≈ 9 real hours). No per-crossing time scale: the same clock runs every crossing, and only the earned Drive level shortens it. **C1 ≈ 14 real days (two weeks)**; a buildup over the first handful (14 → ~4 real-days), then a long fast-fun stretch of ~3-real-day turnarounds while the loads climb into the thousands.
+- **The decision is real, and the margin is wide** (`DARK_TAKES_EACH_CROSSING` 0.0045 → **0.011** — the toll that makes crossing-count matter for souls saved). Reckless Drive-only runs ~85 near-empty crossings and bleeds the world to the dark (**~54% saved**); a souls-first line (lean into the hold, just enough Drive to stay quick) carries most of it home (**~87% saved**) — skill is rewarded, not marginal. Tuned to **~19 crossings, ~3 real months, ~87% saved with skilled play**.
+- **Ferry runs are fully hands-off** (required for the crossing to complete autonomously in Drive-scaled time): crossing 2+ auto-navigates junctions (first road), skips refit doors, launches itself from the pier, and the passenger load no longer deepens the provisions burn (no one meters rations on a ferry run). The maiden voyage is unchanged — decision-rich, navigated by the ferryman.
+- **Superseded constants**: `EXPEDITION_AT_LAUNCH`, `EXPEDITION_PER_1000_DELIVERED`, `FASTEST_CROSSING_TIME_MULT`, `DRIVE_FOR_HALF_SPEEDUP`, and the cumulative `drive` field are gone; `BASE_CAPACITY`, `CAP_GROWTH`, `DRIVE_DECAY`, `DRIVE_FLOOR`, `SALVAGE_*`, `DRIVE_COST_*`, `CAP_COST_*`, and the `drive_level`/`cap_level`/`salvage` fields replace them.

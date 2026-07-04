@@ -10,6 +10,18 @@ fn t0() -> DateTime<Utc> {
     "2026-07-03T12:00:00Z".parse().unwrap()
 }
 
+/// Real durations in which N game-days / -hours / -minutes pass under the
+/// voyage time scale — these tests assert exact points in *game* time.
+fn gd(d: i64) -> Duration {
+    quest::vessel::voyage::real_duration_for_game_minutes(d * 1440)
+}
+fn gh(h: i64) -> Duration {
+    quest::vessel::voyage::real_duration_for_game_minutes(h * 60)
+}
+fn gm(m: i64) -> Duration {
+    quest::vessel::voyage::real_duration_for_game_minutes(m)
+}
+
 /// Walk the cheapest route to the Tree, answering every door, collecting
 /// the letter events as they surface.
 fn cross_collecting() -> (VoyageState, Vec<(WaypointId, Vec<u8>)>) {
@@ -39,7 +51,7 @@ fn cross_collecting() -> (VoyageState, Vec<(WaypointId, Vec<u8>)>) {
                 v.depart(road).unwrap();
             }
         }
-        now += Duration::hours(6);
+        now += gh(6);
         v.tick(now);
     }
     (v, deliveries)
@@ -113,7 +125,7 @@ fn letters_pay_their_parcel_and_hope_exactly_once() {
     v.depart(roads_from(ROUTE_START).next().unwrap().id)
         .unwrap();
     v.hope = 7;
-    v.tick(t0() + Duration::days(2)); // arrive W1
+    v.tick(t0() + gd(2)); // arrive W1
     assert_eq!(v.hope, 8, "letter 0 lifts hope on arrival");
     assert_eq!(v.letters_received, 1);
     let events = v.take_letter_events();
@@ -130,7 +142,7 @@ fn the_mail_thins_past_twelve() {
     v.play_arrival_scene();
     v.depart(roads_from(ROUTE_START).next().unwrap().id)
         .unwrap();
-    v.tick(t0() + Duration::days(2)); // arrive W1
+    v.tick(t0() + gd(2)); // arrive W1
     assert!(
         v.take_letter_events().is_empty(),
         "arrivals past twelve get nothing — the mail is thinning"
@@ -158,11 +170,11 @@ fn offline_equivalence_holds_with_the_mail_in_play() {
             .unwrap();
         v
     };
-    let horizon = t0() + Duration::days(8);
+    let horizon = t0() + gd(8);
     let mut live = build();
     let mut now = t0();
     while now < horizon {
-        now += Duration::minutes(211);
+        now += gm(211);
         live.tick(now.min(horizon));
     }
     let mut offline = build();

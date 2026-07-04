@@ -15,24 +15,53 @@ use super::route::{WaypointId, ROUTE_SINK, ROUTE_START, WAYPOINTS};
 use serde::{Deserialize, Serialize};
 
 /// Souls in the dying world at the first launch. The whole era spends
-/// this pool down — some carried across, the rest lost to the dark.
-pub const INITIAL_SOULS: u64 = 3_000;
+/// this pool down — some carried across, the rest lost to the dark. A big
+/// pool so the campaign is long: dozens of crossings, the headline number
+/// climbing into the tens of thousands.
+pub const INITIAL_SOULS: u64 = 100_000;
 
-/// A ferry run's base passenger berths (crossing 1 carries the authored
-/// cast, not passengers — see `ferry_capacity`). The Shipyard district
-/// grows this.
-pub const FERRY_CAPACITY_BASE: u32 = 40;
+/// The ferry's hold at Shipwright level 0 — how many souls a fresh ferry
+/// carries before you spend any Salvage widening her. The Shipwright yard
+/// grows this; the districts add standing bonuses on top.
+pub const BASE_CAPACITY: u32 = 180;
 
-/// Resonance curve: the time multiplier shrinks from 1.0 toward this
-/// floor as resonance grows (0.5 = twice her launch speed at the cap).
-pub const RESONANCE_SPEED_FLOOR: f64 = 0.5;
-/// Half-speedup point: at this much resonance she sails at the midpoint
-/// between 1.0 and the floor.
-pub const RESONANCE_HALF: f64 = 500.0;
+/// Each Shipwright level multiplies the hold by this — a compounding widen,
+/// so late loads climb into the tens of thousands. Paid for with Salvage.
+pub const CAP_GROWTH: f64 = 1.36;
 
-/// Souls the dark takes per game-day underway, at the era's start. The
-/// rate climbs as the world empties (see [`ColonyState::dimming_loss`]).
-pub const DIMMING_BASE_PER_DAY: f64 = 1.5;
+/// Each Drive level multiplies the crossing's sail-time by this (0.70 =
+/// 30% faster per level), compounding down toward the floor. The ramp is
+/// *earned*: the maiden voyage launches at Drive 0 (full time), and every
+/// level you buy shortens every crossing that follows.
+pub const DRIVE_DECAY: f64 = 0.70;
+/// The quickest a crossing can ever get, as a fraction of its launch time
+/// (0.05 = twenty times as fast). Drive levels approach but never pass it.
+pub const DRIVE_FLOOR: f64 = 0.05;
+
+/// Salvage — the currency of the yards — earned on every landfall: a flat
+/// base plus a share of the souls carried, so a fuller hold funds faster
+/// upgrades. This is the loop's economy: carry more → build more.
+pub const SALVAGE_AT_LANDFALL: u64 = 3;
+/// One Salvage for every this-many souls delivered in a crossing.
+pub const SOULS_PER_SALVAGE: u64 = 30;
+/// The founding grant — enough Salvage after the maiden voyage that the early
+/// yard choices bite at once and the ramp takes hold from the second crossing.
+pub const STARTING_SALVAGE: u64 = 40;
+
+/// The Drive yard's price ladder: level `L` costs `4 × 1.5^L` Salvage,
+/// rounded — cheap early, steep late, so Salvage is always scarce and the
+/// Drive-vs-hold choice always bites.
+pub const DRIVE_COST_BASE: f64 = 4.0;
+pub const DRIVE_COST_GROWTH: f64 = 1.5;
+/// The Shipwright's price ladder: level `L` costs `5 × 1.42^L` Salvage.
+pub const CAP_COST_BASE: f64 = 5.0;
+pub const CAP_COST_GROWTH: f64 = 1.42;
+
+/// The share of the still-waiting world the dark takes each crossing —
+/// a visible per-crossing toll, not a slow drip. Small, but it makes pure
+/// speed a trap: a Drive-only build runs many short crossings and the dark
+/// bites on every one, saving fewer souls than a balanced hand.
+pub const DARK_TAKES_EACH_CROSSING: f64 = 0.011;
 
 /// The colony's districts, unlocked in order by population. Pure growth —
 /// every one lands eventually; the choices live on the water.
@@ -56,15 +85,31 @@ impl District {
         District::Charthouse,
     ];
 
-    /// Population at which this district is founded.
-    pub fn threshold(&self) -> u64 {
+    /// Population at which this district is founded. Spaced across the whole
+    /// long era so a milestone lands roughly every several crossings — the
+    /// Quay early, the Charthouse near the finale.
+    pub fn founded_at(&self) -> u64 {
         match self {
-            District::Quay => 25,
-            District::Granary => 60,
-            District::Hearth => 150,
-            District::Shipyard => 400,
-            District::Beacon => 1_000,
-            District::Charthouse => 2_500,
+            District::Quay => 500,
+            District::Granary => 3_500,
+            District::Hearth => 10_000,
+            District::Shipyard => 22_000,
+            District::Beacon => 42_000,
+            District::Charthouse => 66_000,
+        }
+    }
+
+    /// Souls this district adds to each expedition once founded. The
+    /// colony you build is the ship that carries the next crossing — so
+    /// each district makes the next expedition larger.
+    pub fn expedition_bonus(&self) -> u32 {
+        match self {
+            District::Quay => 110,
+            District::Granary => 140,
+            District::Hearth => 170,
+            District::Shipyard => 210,
+            District::Beacon => 260,
+            District::Charthouse => 320,
         }
     }
 
@@ -81,12 +126,14 @@ impl District {
 
     pub fn bonus(&self) -> &'static str {
         match self {
-            District::Quay => "the running back is quicker",
-            District::Granary => "the hold carries more; way-stations pay better",
-            District::Hearth => "the ship launches brighter; rest heals fully",
-            District::Shipyard => "half again the berths; the hull mends at the Tree",
-            District::Beacon => "the crossings resonate louder",
-            District::Charthouse => "the chart's knowledge keeps between crossings",
+            District::Quay => "room at last for a proper expedition",
+            District::Granary => "stores to victual a fuller ship",
+            District::Hearth => "warmth enough to carry more, and rest heals fully",
+            District::Shipyard => {
+                "the great slips; the largest expeditions, and the hull mends at the Tree"
+            }
+            District::Beacon => "a light the far shore steers by; each crossing builds more drive",
+            District::Charthouse => "the whole colony behind each sailing",
         }
     }
 }
@@ -96,7 +143,8 @@ impl District {
 pub struct CrossingRecords {
     pub fastest_days: u64,
     pub most_carried: u32,
-    pub total_leagues: u64,
+    #[serde(alias = "total_leagues")]
+    pub total_lightyears: u64,
     pub total_nights: u64,
 }
 
@@ -110,8 +158,18 @@ pub struct ColonyState {
     /// The pressure: souls still in the dying world (delivery and the
     /// dimming both spend it down).
     pub souls_remaining: u64,
-    /// The engine: rises with every delivery, multiplies every crossing.
-    pub resonance: u64,
+    /// The Drive yard's level: each one multiplies every future crossing's
+    /// sail-time by `DRIVE_DECAY`, down to `DRIVE_FLOOR`. Bought with Salvage.
+    #[serde(default)]
+    pub drive_level: u32,
+    /// The Shipwright's level: each one multiplies the hold by `CAP_GROWTH`.
+    /// Bought with Salvage.
+    #[serde(default)]
+    pub cap_level: u32,
+    /// Salvage in hand — the yards' currency, earned on every landfall and
+    /// spent on Drive or hold.
+    #[serde(default)]
+    pub salvage: u64,
     pub crossings_completed: u32,
     #[serde(default)]
     pub records: CrossingRecords,
@@ -132,7 +190,9 @@ impl ColonyState {
             character_id,
             souls_delivered: 0,
             souls_remaining: INITIAL_SOULS,
-            resonance: 0,
+            drive_level: 0,
+            cap_level: 0,
+            salvage: STARTING_SALVAGE,
             crossings_completed: 0,
             records: CrossingRecords::default(),
             dimmed_ports: Vec::new(),
@@ -149,52 +209,90 @@ impl ColonyState {
     pub fn districts(&self) -> Vec<District> {
         District::ALL
             .into_iter()
-            .filter(|d| self.population() >= d.threshold())
+            .filter(|d| self.population() >= d.founded_at())
             .collect()
     }
 
     pub fn has_district(&self, d: District) -> bool {
-        self.population() >= d.threshold()
+        self.population() >= d.founded_at()
     }
 
-    /// Passenger berths a ferry run carries — base, grown by the Shipyard.
-    pub fn ferry_capacity(&self) -> u32 {
-        if self.has_district(District::Shipyard) {
-            (FERRY_CAPACITY_BASE as f64 * 1.5) as u32
-        } else {
-            FERRY_CAPACITY_BASE
-        }
+    /// Souls a ferry run carries: the base hold widened by every Shipwright
+    /// level you have bought, plus every founded district's standing bonus.
+    /// The hold is the Shipwright track — it only grows when you spend Salvage
+    /// on it; the districts are passive milestone jumps on top.
+    pub fn expedition_size(&self) -> u32 {
+        let widened = (f64::from(BASE_CAPACITY) * CAP_GROWTH.powi(self.cap_level as i32)).round();
+        let from_districts = self
+            .districts()
+            .iter()
+            .map(|d| d.expedition_bonus())
+            .sum::<u32>();
+        widened as u32 + from_districts
     }
 
     /// How many souls the next ferry run embarks: capacity, or whatever
     /// the world has left, whichever is smaller.
-    pub fn next_passengers(&self) -> u32 {
-        (self.ferry_capacity() as u64).min(self.souls_remaining) as u32
+    pub fn next_expedition(&self) -> u32 {
+        (self.expedition_size() as u64).min(self.souls_remaining) as u32
     }
 
-    /// The Resonance time multiplier (≤ 1.0): the Vessel sails faster the
-    /// more of the old world she has carried. Soft-capped at the floor.
-    pub fn resonance_time_mult(&self) -> f64 {
-        let r = self.resonance as f64;
-        let speedup = (1.0 - RESONANCE_SPEED_FLOOR) * (r / (r + RESONANCE_HALF));
-        1.0 - speedup
+    /// The Drive time multiplier (≤ 1.0): every Drive level shortens the
+    /// crossing by `DRIVE_DECAY`, compounding down to `DRIVE_FLOOR`. At level
+    /// 0 (the maiden voyage) it is exactly 1.0 — the slowest crossing there is.
+    pub fn drive_time_mult(&self) -> f64 {
+        DRIVE_DECAY.powi(self.drive_level as i32).max(DRIVE_FLOOR)
     }
 
     /// A human "×N.N her old self" for the Reckoning.
-    pub fn resonance_speed_factor(&self) -> f64 {
-        1.0 / self.resonance_time_mult()
+    pub fn drive_speed_factor(&self) -> f64 {
+        1.0 / self.drive_time_mult()
     }
 
-    /// The dark's toll over a span of game-days underway — a pure,
-    /// accelerating function of how far into the era those days fall.
-    /// The world empties faster the emptier it already is.
-    pub fn dimming_loss(&self, day_from: u64, day_to: u64) -> u64 {
-        let mut lost = 0.0;
-        for day in day_from..day_to {
-            // Accelerates: +1% of the base per day elapsed in the era.
-            lost += DIMMING_BASE_PER_DAY * (1.0 + day as f64 * 0.01);
+    /// Salvage the Drive yard charges to reach the next level.
+    pub fn drive_cost(&self) -> u64 {
+        (DRIVE_COST_BASE * DRIVE_COST_GROWTH.powi(self.drive_level as i32)).round() as u64
+    }
+
+    /// Salvage the Shipwright charges to reach the next hold level.
+    pub fn cap_cost(&self) -> u64 {
+        (CAP_COST_BASE * CAP_COST_GROWTH.powi(self.cap_level as i32)).round() as u64
+    }
+
+    /// Spend Salvage to raise the Drive one level. Returns false (no change)
+    /// if there isn't enough in hand.
+    pub fn buy_drive(&mut self) -> bool {
+        let cost = self.drive_cost();
+        if self.salvage < cost {
+            return false;
         }
-        lost.round() as u64
+        self.salvage -= cost;
+        self.drive_level += 1;
+        true
+    }
+
+    /// Spend Salvage to widen the hold one level. Returns false if short.
+    pub fn buy_capacity(&mut self) -> bool {
+        let cost = self.cap_cost();
+        if self.salvage < cost {
+            return false;
+        }
+        self.salvage -= cost;
+        self.cap_level += 1;
+        true
+    }
+
+    /// Salvage a crossing yields at landfall: a flat base plus a share of the
+    /// souls it carried — a fuller hold funds faster upgrades.
+    pub fn salvage_income(carried: u64) -> u64 {
+        SALVAGE_AT_LANDFALL + carried / SOULS_PER_SALVAGE
+    }
+
+    /// Souls the dark takes this crossing: a fixed share of whoever is
+    /// still waiting. A big, visible bite while the world is full; a small
+    /// one once it has emptied — so late crossings are yours to finish.
+    pub fn dark_toll(&self) -> u64 {
+        (self.souls_remaining as f64 * DARK_TAKES_EACH_CROSSING).round() as u64
     }
 
     /// The order a port goes dark — deterministic per (era_seed, port), so
@@ -233,13 +331,13 @@ impl ColonyState {
     }
 
     /// Fold a completed crossing into the colony: deliver its passengers,
-    /// grow resonance and population, spend the dark's toll, keep records.
+    /// grow drive and population, spend the dark's toll, keep records.
     /// Returns the districts newly founded (for the letters that greet them).
     pub fn deliver_crossing(
         &mut self,
         passengers: u32,
         days: u64,
-        leagues: u64,
+        lightyears: u64,
         nights: u64,
     ) -> Vec<District> {
         let before = self.districts();
@@ -247,14 +345,15 @@ impl ColonyState {
         let carried = (passengers as u64).min(self.souls_remaining);
         self.souls_delivered += carried;
         self.souls_remaining -= carried;
-        self.resonance += carried;
+        // The crossing pays out in Salvage for the yards.
+        self.salvage += Self::salvage_income(carried);
 
-        // The dark took its share of the rest while we sailed.
-        let toll = self.dimming_loss(0, days).min(self.souls_remaining);
+        // The dark took its share of whoever was still waiting.
+        let toll = self.dark_toll().min(self.souls_remaining);
         self.souls_remaining -= toll;
 
         self.crossings_completed += 1;
-        self.records.total_leagues += leagues;
+        self.records.total_lightyears += lightyears;
         self.records.total_nights += nights;
         self.records.most_carried = self.records.most_carried.max(passengers);
         if days > 0 && (self.records.fastest_days == 0 || days < self.records.fastest_days) {
@@ -299,48 +398,91 @@ mod tests {
     fn districts_unlock_in_order_by_population() {
         let mut c = ColonyState::found("t".into());
         assert!(c.districts().is_empty());
-        c.souls_delivered = 30;
+        c.souls_delivered = 600; // past the Quay (500), short of the Granary
         assert_eq!(c.districts(), vec![District::Quay]);
-        c.souls_delivered = 2_500;
+        c.souls_delivered = 66_000; // the Charthouse threshold — all founded
         assert_eq!(c.districts().len(), 6, "the whole colony is founded");
     }
 
     #[test]
-    fn resonance_speeds_her_up_toward_the_floor() {
+    fn drive_levels_speed_her_up_toward_the_floor() {
         let mut c = ColonyState::found("t".into());
         assert!(
-            (c.resonance_time_mult() - 1.0).abs() < 1e-9,
-            "launch: no bonus"
+            (c.drive_time_mult() - 1.0).abs() < 1e-9,
+            "launch (level 0): the slowest crossing there is"
         );
-        c.resonance = RESONANCE_HALF as u64;
-        assert!((c.resonance_time_mult() - 0.75).abs() < 0.01, "half point");
-        c.resonance = 1_000_000;
-        assert!(c.resonance_time_mult() > RESONANCE_SPEED_FLOOR - 0.01);
-        assert!(c.resonance_time_mult() < RESONANCE_SPEED_FLOOR + 0.02);
+        // Each level compounds the decay.
+        c.drive_level = 1;
+        assert!(
+            (c.drive_time_mult() - DRIVE_DECAY).abs() < 1e-9,
+            "one level"
+        );
+        c.drive_level = 3;
+        assert!(
+            (c.drive_time_mult() - DRIVE_DECAY.powi(3)).abs() < 1e-9,
+            "three levels compound"
+        );
+        // Far past the floor, she never goes quicker than the floor.
+        c.drive_level = 100;
+        assert!((c.drive_time_mult() - DRIVE_FLOOR).abs() < 1e-9, "floor");
     }
 
     #[test]
-    fn capacity_grows_with_the_shipyard() {
+    fn the_hold_grows_with_the_shipwright_and_districts() {
         let mut c = ColonyState::found("t".into());
-        assert_eq!(c.ferry_capacity(), FERRY_CAPACITY_BASE);
-        c.souls_delivered = 400;
-        assert_eq!(c.ferry_capacity(), 60);
+        assert_eq!(
+            c.expedition_size(),
+            BASE_CAPACITY,
+            "level 0, no districts: the base hold only"
+        );
+        // A Shipwright level widens the hold by CAP_GROWTH — nothing else does.
+        c.cap_level = 1;
+        let widened = (f64::from(BASE_CAPACITY) * CAP_GROWTH).round() as u32;
+        assert_eq!(c.expedition_size(), widened, "one Shipwright level");
+        // Districts (founded by population) stack their standing bonuses on top.
+        c.souls_delivered = 66_000; // all six districts founded
+        let bonuses = 110 + 140 + 170 + 210 + 260 + 320;
+        assert_eq!(c.expedition_size(), widened + bonuses);
     }
 
     #[test]
-    fn delivering_grows_the_colony_and_the_dark_takes_its_share() {
+    fn the_yards_spend_salvage_on_drive_and_hold() {
         let mut c = ColonyState::found("t".into());
-        let new = c.deliver_crossing(40, 35, 200, 12);
-        assert_eq!(c.souls_delivered, 40);
+        let start = c.salvage;
+        // The first Drive level is affordable out of the founding grant.
+        let cost0 = c.drive_cost();
+        assert!(
+            c.buy_drive(),
+            "the founding grant buys the first Drive level"
+        );
+        assert_eq!(c.drive_level, 1);
+        assert_eq!(c.salvage, start - cost0);
+        // Costs climb with the level.
+        assert!(c.drive_cost() > cost0, "the ladder steepens");
+        // Drained of Salvage, the yard refuses.
+        c.salvage = 0;
+        assert!(!c.buy_drive(), "no Salvage, no upgrade");
+        assert!(!c.buy_capacity());
+        assert_eq!(c.drive_level, 1, "a refused buy changes nothing");
+    }
+
+    #[test]
+    fn delivering_grows_the_colony_pays_salvage_and_the_dark_takes_its_share() {
+        let mut c = ColonyState::found("t".into());
+        let salvage_before = c.salvage;
+        let new = c.deliver_crossing(600, 35, 200, 12);
+        assert_eq!(c.souls_delivered, 600);
         assert_eq!(c.crossings_completed, 1);
-        assert_eq!(c.records.most_carried, 40);
+        assert_eq!(c.records.most_carried, 600);
         assert_eq!(c.records.fastest_days, 35);
+        // The crossing paid out Salvage: base plus a share of the 600 carried.
+        assert_eq!(c.salvage, salvage_before + ColonyState::salvage_income(600));
         assert!(
             new.contains(&District::Quay),
-            "40 delivered founds the Quay"
+            "600 delivered founds the Quay"
         );
-        // The pool fell by more than the 40 carried — the dimming took some.
-        assert!(c.souls_remaining < INITIAL_SOULS - 40);
+        // The pool fell by more than the 600 carried — the dark took some.
+        assert!(c.souls_remaining < INITIAL_SOULS - 600);
     }
 
     #[test]

@@ -760,9 +760,9 @@ fn render_vessel_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         format!(
-            "Souls aboard: {} of {}",
+            "Crew: {} of {}",
             voyage.aboard_count(),
-            crate::vessel::souls::BERTHS
+            crate::vessel::souls::CREW
         ),
         Style::default().fg(Color::Gray),
     )));
@@ -1415,7 +1415,7 @@ fn render_farewell_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, se
     if let Some(asking) = voyage.pending_ask {
         lines.push(Line::from(Span::styled(
             format!(
-                "The berths are full, and {} is asking.",
+                "The crew is full, and {} is asking.",
                 souls::soul(asking).name
             ),
             Style::default().fg(Color::White),
@@ -1455,7 +1455,7 @@ fn render_ask_modal(
     voyage: &VoyageState,
     asking: crate::vessel::souls::SoulId,
 ) {
-    use crate::vessel::souls::{self, BERTHS};
+    use crate::vessel::souls::{self, CREW};
 
     let def = souls::soul(asking);
     let width = area.width.clamp(30, 64);
@@ -1472,7 +1472,7 @@ fn render_ask_modal(
     let inner = block.inner(rect);
     frame.render_widget(block, rect);
 
-    let full = voyage.aboard_count() >= BERTHS;
+    let full = voyage.aboard_count() >= CREW;
     let mut lines = vec![
         Line::from(""),
         Line::from(Span::styled(
@@ -1487,7 +1487,7 @@ fn render_ask_modal(
     ];
     if full {
         lines.push(Line::from(Span::styled(
-            "The berths are full. Taking them aboard means a farewell.",
+            "The crew is full. Taking them aboard means a farewell.",
             Style::default().fg(Color::LightRed),
         )));
     }
@@ -2052,28 +2052,82 @@ fn render_reckoning(
     )));
     lines.push(Line::from(""));
 
-    // The engine.
+    // The yards — where Salvage is spent between crossings.
     lines.push(Line::from(vec![
         Span::styled(
-            format!("Resonance {}", with_commas(c.resonance)),
+            "THE YARDS",
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("   \u{2726} {} Salvage in hand", with_commas(c.salvage)),
+            Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+        ),
+    ]));
+    // The Drive yard.
+    let drive_afford = c.salvage >= c.drive_cost();
+    lines.push(Line::from(vec![
+        Span::styled(
+            format!("  [D] Drive \u{2014} Lv {}", c.drive_level),
+            Style::default()
+                .fg(VESSEL_VIOLET)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            {
+                use crate::vessel::colony::{DRIVE_DECAY, DRIVE_FLOOR};
+                let next_mult = DRIVE_DECAY
+                    .powi((c.drive_level + 1) as i32)
+                    .max(DRIVE_FLOOR);
+                format!(
+                    "  sails {:.2}\u{00d7} her old self \u{2192} next Lv {:.2}\u{00d7}",
+                    c.drive_speed_factor(),
+                    1.0 / next_mult
+                )
+            },
+            Style::default().fg(Color::Gray),
+        ),
+    ]));
+    lines.push(Line::from(Span::styled(
+        format!(
+            "      costs {} Salvage{}",
+            with_commas(c.drive_cost()),
+            if drive_afford { "" } else { "  (not yet)" }
+        ),
+        Style::default().fg(if drive_afford { GOLD } else { Color::DarkGray }),
+    )));
+    // The Shipwright.
+    let cap_afford = c.salvage >= c.cap_cost();
+    lines.push(Line::from(vec![
+        Span::styled(
+            format!("  [C] Shipwright \u{2014} Lv {}", c.cap_level),
             Style::default()
                 .fg(VESSEL_VIOLET)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
             format!(
-                "   \u{00b7}   the Vessel sails {:.2}\u{00d7} her old self",
-                c.resonance_speed_factor()
+                "  hold carries {}",
+                with_commas(u64::from(c.expedition_size()))
             ),
             Style::default().fg(Color::Gray),
         ),
     ]));
     lines.push(Line::from(Span::styled(
         format!(
-            "{} crossings made \u{00b7} {} carried at most in one",
+            "      costs {} Salvage{}",
+            with_commas(c.cap_cost()),
+            if cap_afford { "" } else { "  (not yet)" }
+        ),
+        Style::default().fg(if cap_afford { GOLD } else { Color::DarkGray }),
+    )));
+    lines.push(Line::from(Span::styled(
+        format!(
+            "  {} crossings made \u{00b7} {} carried at most in one",
             c.crossings_completed, c.records.most_carried
         ),
-        Style::default().fg(Color::Gray),
+        Style::default().fg(Color::DarkGray),
     )));
     lines.push(Line::from(""));
 
@@ -2094,7 +2148,7 @@ fn render_reckoning(
         let detail = if founded {
             format!("{} \u{2014} {}", d.name(), d.bonus())
         } else {
-            format!("{} at pop. {}", d.name(), with_commas(d.threshold()))
+            format!("{} at pop. {}", d.name(), with_commas(d.founded_at()))
         };
         lines.push(Line::from(vec![
             Span::styled(format!("  {mark}"), style),
@@ -2119,9 +2173,9 @@ fn render_reckoning(
     )));
     lines.push(Line::from(Span::styled(
         format!(
-            "  fastest crossing {}d \u{00b7} {} leagues sailed \u{00b7} {} nights stood",
+            "  fastest crossing {}d \u{00b7} {} lightyears sailed \u{00b7} {} nights stood",
             c.records.fastest_days,
-            with_commas(c.records.total_leagues),
+            with_commas(c.records.total_lightyears),
             with_commas(c.records.total_nights)
         ),
         Style::default().fg(Color::Gray),

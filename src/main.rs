@@ -719,6 +719,19 @@ fn main() -> io::Result<()> {
                                     );
                                 }
                             }
+                            // Ports the ship made on her own while the
+                            // ferryman was away (auto-sail): read them one
+                            // at a time, oldest first, whenever the screen
+                            // is otherwise clear.
+                            if voyage_ui.scene_play.is_none()
+                                && voyage_ui.scene_modal.is_none()
+                                && voyage_ui.moments.is_empty()
+                            {
+                                if let Some(playback) = v.take_next_unread_scene() {
+                                    voyage_ui.scene_play =
+                                        Some(vessel::ScenePlay { playback, index: 0 });
+                                }
+                            }
 
                             terminal.draw(|frame| {
                                 let ctx = ui::responsive::LayoutContext::from_frame(frame);
@@ -786,6 +799,24 @@ fn main() -> io::Result<()> {
                                                                 vessel::persistence::save_voyage(v);
                                                         }
                                                         terminal.clear()?;
+                                                    }
+                                                }
+                                            }
+                                            VoyageInputResult::BuyDrive => {
+                                                // Spend Salvage in the Drive yard;
+                                                // the colony owns the ledger (spec 9).
+                                                if let Some(col) = &mut colony {
+                                                    if col.buy_drive() && !debug_mode {
+                                                        let _ =
+                                                            vessel::persistence::save_colony(col);
+                                                    }
+                                                }
+                                            }
+                                            VoyageInputResult::BuyCapacity => {
+                                                if let Some(col) = &mut colony {
+                                                    if col.buy_capacity() && !debug_mode {
+                                                        let _ =
+                                                            vessel::persistence::save_colony(col);
                                                     }
                                                 }
                                             }

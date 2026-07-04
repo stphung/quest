@@ -648,7 +648,7 @@ pub fn finale_carved_beat(names: &[&str]) -> String {
 /// The Sister Verity, moored in the root-harbor. The act's one outward hook.
 pub const FINALE_HARBOR: &str =
     "The Sister Verity lies alongside the root-quay, lamps banked, hull \
-     scarred by her own crossing. Her mate waves the Vessel in to the berth \
+     scarred by her own crossing. Her mate waves the Vessel in to the mooring \
      beside her as if it had been held. \u{201c}The rest of you made it,\u{201d} \
      she calls across the water. \u{201c}Good. She said you would.\u{201d}";
 
