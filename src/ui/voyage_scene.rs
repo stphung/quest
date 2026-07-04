@@ -797,7 +797,7 @@ fn gauge_lines(voyage: &VoyageState, width: u16) -> Vec<Line<'static>> {
     } else {
         Color::Green
     };
-    vec![
+    let mut lines = vec![
         Line::from(vec![
             Span::styled("Provisions ", Style::default().fg(Color::Gray)),
             Span::styled(bar, Style::default().fg(prov_color)),
@@ -841,7 +841,23 @@ fn gauge_lines(voyage: &VoyageState, width: u16) -> Vec<Line<'static>> {
                 Style::default().fg(Color::Gray),
             ),
         ]),
-    ]
+    ];
+    // Ferry runs carry a counted hold toward the Tree (the maiden voyage
+    // carries the named cast instead, so `passengers` is 0 and this hides).
+    if voyage.passengers > 0 {
+        lines.push(Line::from(vec![
+            Span::styled("Carrying   ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                format!("{} souls", with_commas(u64::from(voyage.passengers))),
+                Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                " \u{2014} bound for the Tree",
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]));
+    }
+    lines
 }
 
 fn phase_lines(voyage: &VoyageState) -> Vec<Line<'static>> {

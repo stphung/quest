@@ -321,6 +321,24 @@ fn snapshot_voyage_strip_small_tier() {
 }
 
 #[test]
+fn snapshot_voyage_strip_ferry_run() {
+    // A ferry run (crossing 2+) embarks a counted hold, so the gauge strip
+    // gains a "Carrying N souls — bound for the Tree" line the maiden voyage
+    // does not show.
+    assert_overlay_snapshot("voyage_strip_ferry_m_60x24", || {
+        let mut voyage = fixtures::voyage_mid_leg(frozen_utc());
+        voyage.crossing_number = 2;
+        voyage.passengers = 1238;
+        let ui = crate::vessel::VoyageUiState::default();
+        render_overlay_sized(60, 24, |f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, None);
+        })
+    });
+}
+
+#[test]
 fn snapshot_voyage_intro() {
     assert_overlay_snapshot("voyage_intro_xl_160x45", || {
         let mut voyage = fixtures::voyage_at_first_junction(frozen_utc());
