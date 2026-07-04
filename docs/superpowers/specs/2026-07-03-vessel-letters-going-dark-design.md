@@ -1,5 +1,15 @@
 # Letters From Home & the Going-Dark
 
+> **Doc-alignment note (2026-07-04):** every "hope ±N" price and the
+> `MAIL_FAILS_HOPE_COST` constant below are stale — Hope was retired
+> entirely (commit d39ad67). The shipped `LetterDef` (`letters.rs:22-28`)
+> has only `sender/text/postscript`, no hope field; the mail-fails
+> (Going-Dark) beat still fires exactly as described narratively, but costs
+> nothing mechanically now — unlike the Silence-bank (which got a strain-
+> soul mechanic to replace its hope cost), this beat's price was simply
+> removed with no substitute. `LETTER_PARCEL_PROVISIONS` (provisions, not
+> hope) is unaffected and still shipped as designed.
+
 **Parent spec:** [2026-03-27-the-vessel-design.md](2026-03-27-the-vessel-design.md)
 **Sub-project:** 6 of 7
 **Depends on:** specs 2–5 (shipped — arrivals, the Log, the moments queue,

@@ -4,6 +4,28 @@
 > of Souls* — see the rewritten parent spec and
 > [2026-07-02-act2-voyage-experience-exploration.md](2026-07-02-act2-voyage-experience-exploration.md).
 > The 5-beat launch transition, gauge/drift model, and offline rules survive into the new spec queue; the continuous-distance shell does not. Kept for salvage, not for implementation.
+>
+> **Doc-alignment note (2026-07-04):** confirmed the continuous-distance
+> shell (fuel/hull/distance/void-matter/harvesting below) is fully
+> abandoned — no such fields exist anywhere in `src/vessel/`; Provisions +
+> the route-graph model replaced it entirely.
+>
+> **The 5-beat launch transition shipped this same day**, as part of this
+> design-iteration pass: `src/vessel/transition.rs` (the beat content and
+> `LaunchTransitionState` state machine), rendered by
+> `ui::vessel_scene::render_launch_transition()`, gated by the new
+> persistent `GameState::vessel_transition_played` flag and wired into
+> `main.rs`'s `'game_loop` right before the Voyage takes over. The five
+> beats (Farewell/Unweaving/Construction/Launch/Void) keep the story and
+> structure below, with two implementation differences from the original
+> design: presentation is static full-screen text per beat exactly as this
+> spec allowed ("static text screens per beat are sufficient" — no
+> character-scatter/dissolve animation was added), and a small `"N / 5 —
+> <heading>"` marker was added in the corner (not in the original design)
+> so the player always knows a fixed-length sequence is playing, not an
+> indefinite loading screen. Covered by `overlay_snapshot_tests.rs`
+> (`snapshot_launch_transition_first_beat`/`_final_beat`) and
+> `transition.rs`'s own unit tests.
 
 **Parent spec:** `docs/superpowers/specs/2026-03-27-the-vessel-design.md`
 **Sub-project:** 2 of 7

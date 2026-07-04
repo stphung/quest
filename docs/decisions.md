@@ -305,3 +305,72 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 - **1.6x stat multiplier per zone**: Steep enough to require real power investment (specifically Ascension), but not so steep that any single zone feels impossible after buying the next Ascension level.
 - **5 subzones per fracture zone**: More than standard zones (3-4 subzones), providing more content density per chapter.
 - **Cap zone cycling**: Only the highest unlocked zone cycles; all previous fracture zones advance forward. This allows players to choose their farming spot (highest zone they can sustain vs. a lower zone for speed).
+
+## Act 2 Ferryman Era: Retiring Hope for a Three-Yard Reckoning
+
+**Logged retroactively** — this decision shipped in PR #654 (d39ad67), before the design-iteration skill existed to log it at the time. Recorded now because the 2026-07-04 dossier refresh (`docs/dossiers/act2-pilgrimage.md`) flagged it as the resolution to that dossier's open question #1.
+
+**Problem**: the Ferryman era (spec 9) originally shipped with two Reckoning purchases (Drive, Shipwright) plus a carried-over Hope gauge as the era's "second gauge" / attrition pressure. Balance sim evidence showed Hope pinned at its maximum (10/10, floor of 7) under every attentive play strategy across 24 of 25 runs — it never engaged, contributing nothing to the decision or the felt stakes.
+
+**Options considered**:
+| Option | Effect |
+|---|---|
+| Tune Hope's thresholds tighter | Might make it engage, but patches a gauge nobody was reading rather than fixing why it never mattered |
+| Redesign Hope's mechanic | More engineering for a system with no proven identity |
+| **Retire Hope, replace with a Ward yard** (chosen) | Removes the dead gauge; makes the dark's toll a per-day rate all three yards (Drive, Shipwright, Ward) now visibly bear on |
+
+**Decision**: Retire Hope entirely (`HOPE_MAX`, `LAUNCH_HOPE`, `HOPE_FLOOR_STEADY`, Press-the-helm, Hard Rations — all removed). Add a third yard, **Ward** (`ward_level`, cost `5×1.45^L` Salvage), that multiplies the dark's toll rate down (`WARD_DECAY` 0.72 per level, floored at `WARD_TOLL_FLOOR` 0.12 — never zero). Change the dark's toll from a flat per-crossing tax to a **per-day** rate (`DARK_TAKES_PER_DAY` 0.0006, compounding over the crossing's length), so Drive (fewer days) and Shipwright (fewer crossings) also now reduce the total toll, not just Ward.
+
+**Expected outcome** (from the commit message and `CLAUDE.md`): balanced play ~88% of the world saved across ~19–24 crossings/~3 months; reckless Drive-only or Shipwright-only play traps at ~70–74%; leaning on Ward pushes higher (~94%) at the cost of a longer era. Verified in this refresh via `ferryman_tests::strategy_sweep`: 88.1% (balanced, 24 crossings), 70.5%/74.2% (the two naive traps), and 94.3% at 32 crossings for a Ward-leaning line — matching the expectation, though the Ward-lean figure runs longer (~5 months) than the era's stated "~3 months," which the current refresh flags as a new open question rather than a miss (see dossier Open Questions #5).
+
+## Act 2 Ward Pacing: Keep the Long Line as an Intended Branch
+
+**Why now**: the 2026-07-04 dossier refresh measured a Ward-leaning spend policy at 94.3% souls saved but ~32 crossings / ~5 real months — beyond the era's stated "~19–24 crossings, ~3 real months" and past the `ferryman_tests` era gate's 15–30 band (not itself broken, since the committed test only exercises the balanced policy).
+
+**Options considered**: keep as an intended "go slower, save more" branch and restate the language; tighten `WARD_COST_GROWTH` so no viable line can exceed ~24-25 crossings; or just widen the test's band without touching intent.
+
+**Decision**: Keep it as an intended branch. `src/vessel/CLAUDE.md` now states the balanced line ("~88% saved, ~3 real months") alongside the Ward-heavy line ("~94% saved, ~5 real months") as two valid skilled outcomes, not one target with a miss. No constants changed.
+
+**Expected outcome**: players who read "leaning on Ward saves more souls" and commit to it should feel that tradeoff as a deliberate, wide, legible choice (a slower, more careful era) rather than the era silently overrunning its own promise. Next refresh's retrospective: check whether real playtesting (once Act 2 is previewed via `QUEST_ACT2=1` in an actual session, not just the sim) treats the ~5-month line as a satisfying alternate route or as the era overstaying its welcome.
+
+## Act 2 Discovery Drought: Accepted as Intentional
+
+**Why now**: the dossier has flagged since its first refresh that the ferry era (crossing 2+) reveals only 6 district population thresholds as new nouns across ~19-32 crossings, versus the maiden voyage's constant stream of new weather/nights/souls/rumors/refits/letters.
+
+**Options considered**: accept the front-load-then-flatten curve as intentional; add a new mid-era noun (a soul, a threat, a rare event at specific crossings); or add lightweight per-crossing flavor-text variation without new mechanics.
+
+**Decision**: Accept it as intentional. The maiden voyage is deliberately the decision-rich, discovery-dense half of the act; the ferry era is a hands-off victory-lap glide with a rising number, matching the "earned ramp, then fast-fun stretch" framing already present in spec 9. No new mid-era content planned.
+
+**Expected outcome**: players should read the ferry era's flatness as a deliberate tonal shift (from active pilgrimage to a passive victory lap) rather than as the game running out of ideas. Next refresh's retrospective: if playtesting surfaces the ferry era as boring rather than restful, revisit — this decision assumes the rising numbers (souls delivered, districts, hold size) carry enough of their own momentum without new nouns.
+
+**Superseded the same day**: see "Act 2: World Milestones" below. The designer asked for actual construction work rather than a second round of decisions, so this was revisited and built after all.
+
+## Act 2 Launch Transition: Keep the Single Screen
+
+**Why now**: spec 4 (`2026-03-27-vessel-mode-transition-design.md`) designed a 5-beat cinematic transition for the launch moment (Zone 50 kill → burn → Voyage begins); only a single static confirmation screen shipped.
+
+**Options considered**: build the full 5-beat transition, matching the ceremony of the act's biggest single moment; or keep the current single screen.
+
+**Decision**: Keep the single screen. It's a one-time, ~30-second moment in an act that is still dark-shipped, and the existing anticipation instruments (ticker whispers, the fuel bar) already do the emotional work leading up to it. Low payoff-per-effort relative to the other open items in the act.
+
+**Expected outcome**: no measurable balance impact — this is a pure feel/ceremony question. Next refresh's retrospective: revisit if Act 2 approaches being flipped on for real (`ACT2_ENABLED = true`), since a launch-day audience will experience this moment once, for real, in a way sim runs and dossier refreshes don't capture.
+
+**Superseded the same day**: see "Act 2: The 5-Beat Launch Transition" below. The designer asked for actual construction work rather than a second round of decisions, so this was revisited and built after all.
+
+## Act 2: World Milestones — a Second Discovery Axis for the Ferry Era
+
+**Why now**: immediately after "Act 2 Discovery Drought" was resolved as "accept as intentional," the designer clarified they wanted actual implementation work, not another round of settled decisions. Revisited the same question with a concrete build instead.
+
+**What shipped**: `WorldMilestone` (`src/vessel/colony.rs`) — five milestones (10%/25%/50%/75%/90% of `INITIAL_SOULS` gone from the dying world, delivered or lost to the dark) that fire an authored log moment each, exactly once, in order. Deliberately the *other side* of the race from districts: districts mark the colony's growth (population, a rising number), milestones mark the old world's decline (a falling one). Both are pure functions of state — nothing is stored as "already fired"; `deliver_crossing()` diffs before/after and now returns a `CrossingDelivery { new_districts, new_world_milestones }` struct instead of a bare `Vec<District>`.
+
+**Why this counts as a genuinely new noun, not districts twice**: because a milestone is keyed to `souls_remaining` rather than population, it lands on a different crossing depending on spend policy — a Ward-heavy line and a Shipwright-heavy line pass "half gone" at different points in the era, whereas district thresholds are pinned to the same population regardless of strategy. Verified with a dedicated integration test asserting all five milestones fire exactly once, in order, spread across a full era run.
+
+**Expected outcome**: the ferry era's discovery-cadence rubric score should move up from its "front-load then flatline" 3/5 — re-scored to 4/5 this session, held below 5 because both new-noun axes are still text-only log moments rather than new mechanical levers. Next refresh's retrospective: check whether real (non-sim) play experiences these as a meaningful second thread of "what's new" or as indistinguishable from district log spam.
+
+## Act 2: The 5-Beat Launch Transition
+
+**Why now**: same designer clarification as World Milestones above — revisited "keep the single screen" with an actual build.
+
+**What shipped**: `src/vessel/transition.rs` (new) — spec 4's five beats (Farewell/Unweaving/Construction/Launch/Void) as a full-screen, Enter-advanced sequence, static text per beat (per the original spec's own allowance — no character-scatter animation was added), rendered by `ui::vessel_scene::render_launch_transition()`. Gated by a new persistent `GameState::vessel_transition_played` flag; `main.rs`'s `'game_loop` shows the transition instead of the Voyage until it completes, then falls through to normal Voyage init. An interrupted transition (game closed mid-sequence) simply restarts at beat 1 next launch — the beat counter itself is transient, only "has this ever completed" is durable. One small addition beyond the original spec: a `"N / 5 — <heading>"` marker in the corner so a fixed-length sequence reads as a sequence, not an indefinite loading screen.
+
+**Expected outcome**: no balance impact (pure ceremony), but should raise the act's biggest single moment (Zone 50 kill → burn → Voyage begins) from a bare confirmation screen to a fitting sendoff for everything the burn represents. Next refresh's retrospective: revisit once Act 2 is previewed in a real session (`QUEST_ACT2=1`) rather than only via snapshot tests — a one-time cutscene lands differently played than read as a frame dump.

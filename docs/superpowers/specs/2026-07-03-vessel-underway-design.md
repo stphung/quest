@@ -1,6 +1,19 @@
 # Underway — Weather, Trim, and the Watch
 
-**Parent spec:** [2026-03-27-the-vessel-design.md](2026-03-27-the-vessel-design.md)
+> **Doc-alignment note (2026-07-04):** every hope-priced effect below
+> (Silence-bank "hope −1/day," Mourn "the only trim that raises hope,"
+> Strange-night-unstood "hope −2") is stale — Hope was retired entirely
+> (commit d39ad67). Two of these were replaced, not just deleted: the
+> Silence-bank at non-Quiet trim now strains the Helm soul instead
+> (`StrainCause::SilenceHelm`, `voyage.rs`) — a genuine mechanic swap — and
+> Mourn's identity was re-authored as the thriftiest hold (×0.80 burn)
+> rather than a hope-gaining trim (`voyage.rs`, explicit comment: "it no
+> longer raises hope... its identity now that hope is retired"). The
+> Strange-night cost is provisions (−3.0), not hope, and was already
+> provisions-priced before the retirement in the shipped build. "The two
+> existing gauges" language just below no longer applies — Provisions is
+> now the only crossing-level gauge; the equivalent pressure during the
+> Colony era lives in the Ward yard instead (`colony.rs`).
 **Sub-project:** 5 of 7 (replaces the old "Vessel Underway" scope)
 **Mockups:** the "Traveling — Mid-Leg Check-In" set (four screens: return/log,
 living chart, trim, watches)

@@ -1,5 +1,15 @@
 # The Souls — Roster, Stations, Arcs, and the Wind
 
+> **Doc-alignment note (2026-07-04):** the roster, stations, and arcs
+> below shipped as designed and remain accurate (8 souls, 7 berths,
+> Helm/Tender/Watch, `ARC_BEAT_REST_DAYS = 2`). **"Hope is the Wind"
+> (the whole section below) did not survive** — Hope was retired entirely
+> (commit d39ad67), so it has no mechanical effect, no wind, no Long
+> Silence, and no bands. Every "hope ±N" beat payout, `LOSS_HOPE_COST = 3`,
+> and `FAREWELL_HOPE_COST = 1` are gone too — `farewell()` and `mark_lost()`
+> (`voyage.rs`) cost nothing now. Loss stays authored-scenes-only and
+> memorialized exactly as designed; only its hope price is gone.
+
 **Parent spec:** [2026-03-27-the-vessel-design.md](2026-03-27-the-vessel-design.md)
 **Sub-project:** 3 of 7
 **Depends on:** spec 2 (shipped — route graph, voyage state machine, junction

@@ -291,6 +291,7 @@ fn an_era_ferries_most_of_the_world_across_a_ramping_run_of_crossings() {
     // the era, all six districts are founded, and they land spread out.
     let mut colony = ColonyState::found("districts".to_string());
     let mut founded_on = Vec::new();
+    let mut world_milestones_on = Vec::new();
     let mut sizes = Vec::new();
     let mut crossing = 0;
     while !colony.era_over() {
@@ -301,9 +302,12 @@ fn an_era_ferries_most_of_the_world_across_a_ramping_run_of_crossings() {
             colony.next_expedition()
         };
         sizes.push(colony.expedition_size());
-        let new = colony.deliver_crossing(carried, 32, 320, 10);
-        for d in new {
+        let delivery = colony.deliver_crossing(carried, 32, 320, 10);
+        for d in delivery.new_districts {
             founded_on.push((colony.crossings_completed, d));
+        }
+        for m in delivery.new_world_milestones {
+            world_milestones_on.push((colony.crossings_completed, m));
         }
         balanced_spend(&mut colony);
     }
@@ -311,6 +315,20 @@ fn an_era_ferries_most_of_the_world_across_a_ramping_run_of_crossings() {
         founded_on.len(),
         6,
         "all six districts founded: {founded_on:?}"
+    );
+    // World milestones (the ferry era's other discovery axis, the old
+    // world's decline rather than the colony's growth) all fire exactly
+    // once each, in order, somewhere across the era.
+    assert_eq!(
+        world_milestones_on.len(),
+        5,
+        "all five world milestones pass exactly once: {world_milestones_on:?}"
+    );
+    assert!(
+        world_milestones_on
+            .windows(2)
+            .all(|w| w[0].0 <= w[1].0 && w[0].1.title() != w[1].1.title()),
+        "world milestones fire in order, one each: {world_milestones_on:?}"
     );
     assert!(
         colony.has_district(District::Charthouse),

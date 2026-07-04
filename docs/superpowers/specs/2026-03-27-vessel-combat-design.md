@@ -4,6 +4,13 @@
 > of Souls* — see the rewritten parent spec and
 > [2026-07-02-act2-voyage-experience-exploration.md](2026-07-02-act2-voyage-experience-exploration.md).
 > Replaced by leg ambience and named waypoint threats (spec 5: The Vessel Underway). The enemy-tier ladder and scaling formulas are cut. Kept for salvage, not for implementation.
+>
+> **Confirmed abandoned (2026-07-04 doc-alignment pass):** nothing in this
+> spec shipped. There is no combat module, no Firepower/Hull/Engines/Sensors
+> ship stats, no distance-based encounter scaling, and no Norse boss gates
+> anywhere in `src/vessel/`. The Voyage has no combat system at all — weather
+> (`weather.rs`), nights (`nights.rs`), and named waypoint threats (route/scene
+> content) fully replaced it, per `src/vessel/CLAUDE.md`.
 
 **Parent spec:** `docs/superpowers/specs/2026-03-27-the-vessel-design.md`
 **Sub-project:** 4 of 7

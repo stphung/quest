@@ -155,6 +155,83 @@ impl District {
     }
 }
 
+/// The old world's decline, watched from the other side of the race:
+/// districts mark the *colony's* growth (population, a rising number);
+/// these mark the *dying world's* end (how much of it is gone — delivered
+/// or lost — a falling one). Like districts, this is a pure function of
+/// state, not stored progress: nothing needs to remember which already
+/// fired, `world_milestones()` just recomputes from `souls_remaining` every
+/// time. The one new mid-era noun of an otherwise flat ferry era — every
+/// milestone here can land on any crossing depending on Drive/Ward/Shipwright
+/// spend, so it isn't just "district thresholds again" on a different axis.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorldMilestone {
+    Tenth,
+    Quarter,
+    Half,
+    ThreeQuarters,
+    NinetyPercent,
+}
+
+impl WorldMilestone {
+    pub const ALL: [WorldMilestone; 5] = [
+        WorldMilestone::Tenth,
+        WorldMilestone::Quarter,
+        WorldMilestone::Half,
+        WorldMilestone::ThreeQuarters,
+        WorldMilestone::NinetyPercent,
+    ];
+
+    /// The fraction of `INITIAL_SOULS` that must be gone (delivered or lost
+    /// to the dark) for this milestone to have passed.
+    fn threshold_fraction(self) -> f64 {
+        match self {
+            WorldMilestone::Tenth => 0.10,
+            WorldMilestone::Quarter => 0.25,
+            WorldMilestone::Half => 0.50,
+            WorldMilestone::ThreeQuarters => 0.75,
+            WorldMilestone::NinetyPercent => 0.90,
+        }
+    }
+
+    pub fn title(self) -> &'static str {
+        match self {
+            WorldMilestone::Tenth => "The first tenth",
+            WorldMilestone::Quarter => "A quarter gone",
+            WorldMilestone::Half => "Halfway",
+            WorldMilestone::ThreeQuarters => "Three parts gone",
+            WorldMilestone::NinetyPercent => "Nearly done",
+        }
+    }
+
+    pub fn body(self) -> &'static str {
+        match self {
+            WorldMilestone::Tenth => {
+                "One soul in ten who waited when you launched is now accounted \
+                 for \u{2014} carried home, or lost. The rest still wait, not \
+                 knowing which they will be."
+            }
+            WorldMilestone::Quarter => {
+                "A quarter of the old world is gone from the ledger. The \
+                 Vessel's wake is the only mark the dark leaves behind."
+            }
+            WorldMilestone::Half => {
+                "Half the world you left behind is gone \u{2014} delivered or \
+                 dark, there is no third answer. The ferryman does not slow \
+                 to grieve either kind."
+            }
+            WorldMilestone::ThreeQuarters => {
+                "Three in four are gone now. What is left waits closer \
+                 together, in ports that have not dimmed yet \u{2014} for now."
+            }
+            WorldMilestone::NinetyPercent => {
+                "Nine in ten, gone. Whatever remains of the old world could \
+                 almost fit in a single crossing \u{2014} almost."
+            }
+        }
+    }
+}
+
 /// The trophy shelf — records, not the engine.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrossingRecords {
@@ -163,6 +240,15 @@ pub struct CrossingRecords {
     #[serde(alias = "total_leagues")]
     pub total_lightyears: u64,
     pub total_nights: u64,
+}
+
+/// What's newly true after folding a landfall into the colony — the
+/// districts and world milestones that crossed their threshold this
+/// crossing, for the caller to turn into letters/log moments.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CrossingDelivery {
+    pub new_districts: Vec<District>,
+    pub new_world_milestones: Vec<WorldMilestone>,
 }
 
 /// The persistent side of Act 2's loop. Population is exactly
@@ -244,6 +330,23 @@ impl ColonyState {
         self.population() >= d.founded_at()
     }
 
+    /// Fraction of `INITIAL_SOULS` gone from the old world — delivered or
+    /// taken by the dark. 0 at launch, 1 when the era ends. Shared by
+    /// `dark_ports()`'s chart-dimming pace and `world_milestones()`.
+    fn world_emptied_fraction(&self) -> f64 {
+        let gone = INITIAL_SOULS.saturating_sub(self.souls_remaining);
+        (gone as f64 / INITIAL_SOULS as f64).clamp(0.0, 1.0)
+    }
+
+    /// World milestones passed so far, in order.
+    pub fn world_milestones(&self) -> Vec<WorldMilestone> {
+        let frac = self.world_emptied_fraction();
+        WorldMilestone::ALL
+            .into_iter()
+            .filter(|m| frac >= m.threshold_fraction())
+            .collect()
+    }
+
     /// Souls a ferry run carries: the base hold widened by every Shipwright
     /// level you have bought, plus every founded district's standing bonus.
     /// The hold is the Shipwright track — it only grows when you spend Salvage
@@ -286,11 +389,21 @@ impl ColonyState {
         (CAP_COST_BASE * CAP_COST_GROWTH.powi(self.cap_level as i32)).round() as u64
     }
 
+    /// True once the next Drive level would buy no more speed — she's
+    /// already at `DRIVE_FLOOR`. The yard should stop offering it here.
+    pub fn drive_maxed(&self) -> bool {
+        let next = DRIVE_DECAY
+            .powi((self.drive_level + 1) as i32)
+            .max(DRIVE_FLOOR);
+        (self.drive_time_mult() - next).abs() < 1e-9
+    }
+
     /// Spend Salvage to raise the Drive one level. Returns false (no change)
-    /// if there isn't enough in hand.
+    /// if there isn't enough in hand, or if she's already at her limit — a
+    /// level that buys zero speed is never worth escalating Salvage for.
     pub fn buy_drive(&mut self) -> bool {
         let cost = self.drive_cost();
-        if self.salvage < cost {
+        if self.salvage < cost || self.drive_maxed() {
             return false;
         }
         self.salvage -= cost;
@@ -327,10 +440,20 @@ impl ColonyState {
         (WARD_COST_BASE * WARD_COST_GROWTH.powi(self.ward_level as i32)).round() as u64
     }
 
-    /// Spend Salvage to raise the Ward one level. Returns false if short.
+    /// True once the next Ward level would blunt the dark no further — the
+    /// toll is already down at `WARD_TOLL_FLOOR`.
+    pub fn ward_maxed(&self) -> bool {
+        let next = WARD_DECAY
+            .powi((self.ward_level + 1) as i32)
+            .max(WARD_TOLL_FLOOR);
+        (self.ward_toll_mult() - next).abs() < 1e-9
+    }
+
+    /// Spend Salvage to raise the Ward one level. Returns false if short, or
+    /// if she's already at the floor — same reasoning as `buy_drive`.
     pub fn buy_ward(&mut self) -> bool {
         let cost = self.ward_cost();
-        if self.salvage < cost {
+        if self.salvage < cost || self.ward_maxed() {
             return false;
         }
         self.salvage -= cost;
@@ -390,10 +513,7 @@ impl ColonyState {
             .map(|w| w.id)
             .filter(|id| *id != ROUTE_START && *id != ROUTE_SINK)
             .collect();
-        // Fraction of the old world no longer out there (delivered or taken
-        // by the dark): 0 at launch, 1 when the era ends.
-        let gone = INITIAL_SOULS.saturating_sub(self.souls_remaining);
-        let frac = (gone as f64 / INITIAL_SOULS as f64).clamp(0.0, 1.0);
+        let frac = self.world_emptied_fraction();
         let count = (frac * dimmable.len() as f64).round() as usize;
         dimmable.sort_by_key(|id| (self.port_dim_order(*id), id.0));
         dimmable.truncate(count);
@@ -402,15 +522,17 @@ impl ColonyState {
 
     /// Fold a completed crossing into the colony: deliver its passengers,
     /// grow drive and population, spend the dark's toll, keep records.
-    /// Returns the districts newly founded (for the letters that greet them).
+    /// Returns what's newly true this landfall (for the letters/log moments
+    /// that greet it).
     pub fn deliver_crossing(
         &mut self,
         passengers: u32,
         days: u64,
         lightyears: u64,
         nights: u64,
-    ) -> Vec<District> {
-        let before = self.districts();
+    ) -> CrossingDelivery {
+        let districts_before = self.districts();
+        let milestones_before = self.world_milestones();
 
         let carried = (passengers as u64).min(self.souls_remaining);
         self.souls_delivered += carried;
@@ -433,10 +555,16 @@ impl ColonyState {
         }
         self.dimmed_ports = self.dark_ports();
 
-        District::ALL
-            .into_iter()
-            .filter(|d| !before.contains(d) && self.districts().contains(d))
-            .collect()
+        CrossingDelivery {
+            new_districts: District::ALL
+                .into_iter()
+                .filter(|d| !districts_before.contains(d) && self.districts().contains(d))
+                .collect(),
+            new_world_milestones: WorldMilestone::ALL
+                .into_iter()
+                .filter(|m| !milestones_before.contains(m) && self.world_milestones().contains(m))
+                .collect(),
+        }
     }
 
     /// True once the old world is empty — the next arrival is the end.
@@ -539,10 +667,38 @@ mod tests {
     }
 
     #[test]
+    fn the_drive_yard_refuses_a_purchase_at_the_floor() {
+        let mut c = ColonyState::found("t".into());
+        c.drive_level = 100; // far past DRIVE_FLOOR
+        c.salvage = 1_000_000_000;
+        assert!(c.drive_maxed(), "100 levels is well past the floor");
+        assert!(
+            !c.buy_drive(),
+            "a level that buys zero speed should never escalate Salvage"
+        );
+        assert_eq!(c.drive_level, 100, "the refused buy changes nothing");
+        assert_eq!(c.salvage, 1_000_000_000, "and spends nothing");
+    }
+
+    #[test]
+    fn the_ward_yard_refuses_a_purchase_at_the_floor() {
+        let mut c = ColonyState::found("t".into());
+        c.ward_level = 100; // far past WARD_TOLL_FLOOR
+        c.salvage = 1_000_000_000;
+        assert!(c.ward_maxed(), "100 levels is well past the floor");
+        assert!(
+            !c.buy_ward(),
+            "a level that blunts the toll no further should never escalate Salvage"
+        );
+        assert_eq!(c.ward_level, 100, "the refused buy changes nothing");
+        assert_eq!(c.salvage, 1_000_000_000, "and spends nothing");
+    }
+
+    #[test]
     fn delivering_grows_the_colony_pays_salvage_and_the_dark_takes_its_share() {
         let mut c = ColonyState::found("t".into());
         let salvage_before = c.salvage;
-        let new = c.deliver_crossing(600, 35, 200, 12);
+        let delivery = c.deliver_crossing(600, 35, 200, 12);
         assert_eq!(c.souls_delivered, 600);
         assert_eq!(c.crossings_completed, 1);
         assert_eq!(c.records.most_carried, 600);
@@ -550,7 +706,7 @@ mod tests {
         // The crossing paid out Salvage: base plus a share of the 600 carried.
         assert_eq!(c.salvage, salvage_before + ColonyState::salvage_income(600));
         assert!(
-            new.contains(&District::Quay),
+            delivery.new_districts.contains(&District::Quay),
             "600 delivered founds the Quay"
         );
         // The pool fell by more than the 600 carried — the dark took some.
@@ -639,6 +795,59 @@ mod tests {
         );
         // The home pier and the Tree always stand.
         assert!(!later.contains(&ROUTE_START) && !later.contains(&ROUTE_SINK));
+    }
+
+    #[test]
+    fn world_milestones_pass_in_order_as_the_world_empties() {
+        let mut c = ColonyState::found("t".into());
+        assert!(
+            c.world_milestones().is_empty(),
+            "launch: none of the old world is gone yet"
+        );
+
+        c.souls_remaining = INITIAL_SOULS - INITIAL_SOULS / 10; // 10% gone
+        assert_eq!(
+            c.world_milestones(),
+            vec![WorldMilestone::Tenth],
+            "exactly the first milestone passes at 10% gone"
+        );
+
+        c.souls_remaining = INITIAL_SOULS / 2; // 50% gone
+        assert_eq!(
+            c.world_milestones(),
+            vec![
+                WorldMilestone::Tenth,
+                WorldMilestone::Quarter,
+                WorldMilestone::Half,
+            ],
+            "milestones accumulate, they never un-pass"
+        );
+
+        c.souls_remaining = 0; // the whole world gone
+        assert_eq!(
+            c.world_milestones().len(),
+            WorldMilestone::ALL.len(),
+            "every milestone has passed once the era is over"
+        );
+    }
+
+    #[test]
+    fn delivering_a_crossing_reports_newly_passed_world_milestones() {
+        let mut c = ColonyState::found("t".into());
+        // Just short of 10% gone — a couple more souls accounted for tips it over.
+        c.souls_remaining = INITIAL_SOULS - INITIAL_SOULS / 10 + 5;
+        let delivery = c.deliver_crossing(10, 0, 100, 0); // 0 days: no dark toll, just delivery
+        assert_eq!(
+            delivery.new_world_milestones,
+            vec![WorldMilestone::Tenth],
+            "crossing the threshold this landfall reports it once"
+        );
+        // The next crossing, still short of the next threshold, reports none.
+        let delivery = c.deliver_crossing(1, 0, 100, 0);
+        assert!(
+            delivery.new_world_milestones.is_empty(),
+            "no new milestone until the next threshold is actually crossed"
+        );
     }
 
     #[test]

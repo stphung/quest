@@ -1973,14 +1973,20 @@ fn yard_header(lines: &mut Vec<Line<'static>>, key: &str, level: u32, role: &str
 }
 
 /// One yard's effect line: `        <now → next · effect>   ·  N Salvage`,
-/// gold when affordable now, dim (with "not yet") when not.
-fn yard_effect(lines: &mut Vec<Line<'static>>, detail: String, cost: u64, afford: bool) {
-    lines.push(Line::from(Span::styled(
-        format!(
+/// gold when affordable now, dim (with "not yet") when not. `cost: None`
+/// means the yard is maxed — nothing left to spend Salvage on here, so no
+/// price or "(not yet)" is shown (there is no "yet").
+fn yard_effect(lines: &mut Vec<Line<'static>>, detail: String, cost: Option<u64>, afford: bool) {
+    let line = match cost {
+        Some(cost) => format!(
             "        {detail}    {} Salvage{}",
             with_commas(cost),
             if afford { "" } else { "  (not yet)" }
         ),
+        None => format!("        {detail}"),
+    };
+    lines.push(Line::from(Span::styled(
+        line,
         Style::default().fg(if afford { GOLD } else { Color::DarkGray }),
     )));
 }
@@ -2084,35 +2090,39 @@ fn render_reckoning(
     lines.push(Line::from(""));
 
     // ── [D] Drive — the engine ──────────────────────────────────────────────
-    let drive_afford = c.salvage >= c.drive_cost();
+    let drive_maxed = c.drive_maxed();
+    let drive_afford = !drive_maxed && c.salvage >= c.drive_cost();
     yard_header(
         &mut lines,
         "D",
         c.drive_level,
         "the engine: how fast she crosses",
     );
-    let drive_detail = {
+    let drive_detail = if drive_maxed {
+        format!(
+            "{:.1}\u{00d7} speed  \u{00b7}  already at her limit \u{2014} no more Salvage to spend here",
+            c.drive_speed_factor()
+        )
+    } else {
         use crate::vessel::colony::{DRIVE_DECAY, DRIVE_FLOOR};
         let cur = c.drive_time_mult();
         let next = DRIVE_DECAY
             .powi((c.drive_level + 1) as i32)
             .max(DRIVE_FLOOR);
-        if (cur - next).abs() < 1e-9 {
-            format!(
-                "{:.1}\u{00d7} speed  \u{00b7}  already at her limit",
-                c.drive_speed_factor()
-            )
-        } else {
-            let shorter = ((1.0 - next / cur) * 100.0).round() as i64;
-            format!(
-                "{:.1}\u{00d7} \u{2192} {:.1}\u{00d7} speed  \u{00b7}  ~{}% shorter, fewer days lost",
-                c.drive_speed_factor(),
-                1.0 / next,
-                shorter
-            )
-        }
+        let shorter = ((1.0 - next / cur) * 100.0).round() as i64;
+        format!(
+            "{:.1}\u{00d7} \u{2192} {:.1}\u{00d7} speed  \u{00b7}  ~{}% shorter, fewer days lost",
+            c.drive_speed_factor(),
+            1.0 / next,
+            shorter
+        )
     };
-    yard_effect(&mut lines, drive_detail, c.drive_cost(), drive_afford);
+    let drive_cost = if drive_maxed {
+        None
+    } else {
+        Some(c.drive_cost())
+    };
+    yard_effect(&mut lines, drive_detail, drive_cost, drive_afford);
     // ── [C] Shipwright — the hold ───────────────────────────────────────────
     let cap_afford = c.salvage >= c.cap_cost();
     yard_header(
@@ -2137,17 +2147,23 @@ fn render_reckoning(
             with_commas(delta)
         )
     };
-    yard_effect(&mut lines, cap_detail, c.cap_cost(), cap_afford);
+    yard_effect(&mut lines, cap_detail, Some(c.cap_cost()), cap_afford);
 
     // ── [W] Ward — the lantern ──────────────────────────────────────────────
-    let ward_afford = c.salvage >= c.ward_cost();
+    let ward_maxed = c.ward_maxed();
+    let ward_afford = !ward_maxed && c.salvage >= c.ward_cost();
     yard_header(
         &mut lines,
         "W",
         c.ward_level,
         "the lantern: how deep the dark cuts each day",
     );
-    let ward_detail = {
+    let ward_detail = if ward_maxed {
+        format!(
+            "{:.3}%/day  \u{00b7}  already at her floor \u{2014} no more Salvage to spend here",
+            c.dark_daily_rate() * 100.0
+        )
+    } else {
         use crate::vessel::colony::{DARK_TAKES_PER_DAY, WARD_DECAY, WARD_TOLL_FLOOR};
         let next_mult = WARD_DECAY
             .powi((c.ward_level + 1) as i32)
@@ -2164,7 +2180,12 @@ fn render_reckoning(
             with_commas(spared)
         )
     };
-    yard_effect(&mut lines, ward_detail, c.ward_cost(), ward_afford);
+    let ward_cost = if ward_maxed {
+        None
+    } else {
+        Some(c.ward_cost())
+    };
+    yard_effect(&mut lines, ward_detail, ward_cost, ward_afford);
     lines.push(Line::from(Span::styled(
         format!(
             "  {} crossings made \u{00b7} {} carried at most in one",

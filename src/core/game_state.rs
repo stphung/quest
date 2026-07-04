@@ -94,6 +94,12 @@ pub struct GameState {
     /// the dark (spec 9). Act 3's real gate; `vessel_arrived` remains the
     /// record of the first arrival (persistent, survives everything)
     pub last_crossing_complete: bool,
+    /// True once the 5-beat launch transition has played through to its end.
+    /// While `vessel_launched && !vessel_transition_played`, the game loop
+    /// shows the transition instead of the Voyage (persistent, so an
+    /// interrupted transition resumes from its first beat next launch
+    /// rather than replaying every session or getting skipped forever)
+    pub vessel_transition_played: bool,
     /// Play-time seconds when the last Vessel whisper was pushed (transient)
     pub vessel_last_whisper_at: u64,
     /// Active challenge minigame (transient, not saved)
@@ -178,6 +184,7 @@ impl GameState {
             vessel_launched: false,
             vessel_arrived: false,
             last_crossing_complete: false,
+            vessel_transition_played: false,
             vessel_last_whisper_at: 0,
             active_minigame: None,
             session_kills: 0,

@@ -49,6 +49,19 @@ toggle, no third tier:
 Together, Act 2's supply layer now reads as a deliberate Oregon Trail
 homage — a **Pace** dial and a **Rations** dial, both named by feel.
 
+> **Doc-alignment note (2026-07-04):** the **Pace** rename shipped exactly
+> as designed — `voyage.rs`'s `display_name()` returns
+> Grueling/Steady/Easy/Restful for the `Trim` enum, matching the table
+> above. Restful's "hope climbs" side-effect is stale (Hope retired,
+> commit d39ad67); its shipped identity is purely thrift (×0.80 burn, "the
+> thriftiest hold"). The **Rations toggle described here never shipped at
+> all, and no longer exists as a concept** — `HARD_RATIONS_BURN_MULT` and
+> the Press-the-helm/Hard-Rations mechanics were removed in the same
+> Hope-retirement commit (grep confirms zero hits for
+> `Rations`/`Filling`/`Bare Bones` as a mechanic anywhere in `src/vessel/`
+> or `src/input/voyage_input.rs` — only flavor-text comments survive).
+> Act 2's supply layer today is Pace alone, not a Pace-and-Rations pair.
+
 ## Scope (what does NOT change)
 
 - **No mechanics.** Every multiplier, gate, and effect is identical;
