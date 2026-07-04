@@ -512,15 +512,21 @@ picked up) ranks higher than one that just appeared.
 
 ## Phase 6: Ship
 
-1. Append an `eval_marker` entry to the target skill's log:
+The `eval_marker` needs the PR's own URL, which doesn't exist until the PR is created —
+so commit the fix(es) and open the PR first, then append the marker as a follow-up
+commit onto that same still-open branch before it merges:
+
+1. Branch, commit the `SKILL.md` fix(es) and the updated history log, open a PR (same
+   pattern as every other audit skill — no direct commits to `main`). PR body includes
+   the full report: confirmed inaccuracies (with citations), scope gaps/rot, what was
+   auto-fixed, what's flagged for review.
+2. Now that the PR exists, append the `eval_marker` entry with its real URL:
    ```bash
-   echo '{"type":"eval_marker","date":"<today>","pr_url":"<this PR>","runs_covered":<n>}' > /tmp/marker.json
+   echo '{"type":"eval_marker","date":"<today>","pr_url":"<the PR URL from step 1>","runs_covered":<n>}' > /tmp/marker.json
    scripts/audit-eval-log.sh <skill-name> /tmp/marker.json
    ```
-2. Branch, commit the `SKILL.md` fix(es) and the updated history log, open a PR (same
-   pattern as every other audit skill — no direct commits to `main`).
-3. PR body includes the full report: confirmed inaccuracies (with citations), scope
-   gaps/rot, what was auto-fixed, what's flagged for review.
+3. Commit and push this marker addition as one more commit on the same PR branch
+   (multiple commits on one PR are normal — squash-merge collapses them at merge time).
 
 ## Output
 
@@ -590,13 +596,27 @@ git add quest.wiki
 git commit -m "docs: update quest.wiki submodule pointer"
 ```
 
+## Output
+
+Report the PR URL and final status when done (use `/ship` skill).
+
 ## Log This Run
 
-After verification passes, record this run for `meta-audit`:
+`commit_sha` and the PR URL must be captured correctly, or `meta-audit`'s later
+re-verification will check the wrong code state or lose track of provenance:
 
-1. Build a JSON summary: date (YYYY-MM-DD), current commit SHA (`git rev-parse HEAD`), PR
-   URL, agent count, the scope actually covered, and every finding (location, claim,
-   correct value, severity, category, whether auto-fixed). Example:
+- **`commit_sha`**: `git merge-base HEAD origin/main` — the commit `main` was at when
+  this audit's agents did their read-only cross-referencing, i.e. the exact state every
+  finding's `correct_value` describes. Do NOT use `git rev-parse HEAD` (that's this
+  branch's own commit, not the code being audited) or the PR's eventual merge commit
+  (for skills that modify the audited code itself — e.g. perf-audit, test-audit — the
+  merge commit contains the *fix*, not the pre-fix state a finding describes). Capture
+  this before the branch is deleted.
+- **PR URL**: from `/ship`'s own reported result, once it completes.
+
+1. Build a JSON summary: date (YYYY-MM-DD), the `commit_sha` above, the PR URL, agent
+   count, the scope actually covered, and every finding (location, claim, correct value,
+   severity, category, whether auto-fixed). Example:
    ```json
    {
      "type": "run",
@@ -626,12 +646,11 @@ After verification passes, record this run for `meta-audit`:
    ```bash
    scripts/audit-eval-check.sh wiki-audit
    ```
-   If it prints `TRIGGER`, invoke the `meta-audit` skill for `wiki-audit` as a follow-up
-   after this run's own PR is up. If it prints `SKIP: n/5`, nothing further to do.
-
-## Output
-
-Report the PR URL and final status when done (use `/ship` skill).
+   If it prints `TRIGGER`, invoke the `meta-audit` skill for `wiki-audit` next. If it
+   prints `SKIP: n/5`, nothing further to do.
+4. Commit the updated history log on a small new branch and land it on `main` via the
+   same branch+PR+`/ship` convention used for the audit fix itself — this file lives in
+   the main repo and needs its own merge to become visible to future runs.
 ```
 
 - [ ] **Step 3: Commit**
@@ -693,13 +712,27 @@ Replace it with:
 | Key Constants | If applicable |
 | Adding / Extending | If applicable |
 
+## Output
+
+Report the PR URL and final status when done (use `/ship` skill).
+
 ## Log This Run
 
-After verification passes, record this run for `meta-audit`:
+`commit_sha` and the PR URL must be captured correctly, or `meta-audit`'s later
+re-verification will check the wrong code state or lose track of provenance:
 
-1. Build a JSON summary: date (YYYY-MM-DD), current commit SHA (`git rev-parse HEAD`), PR
-   URL, agent count, the scope actually covered, and every finding (location, claim,
-   correct value, severity, category, whether auto-fixed). Example:
+- **`commit_sha`**: `git merge-base HEAD origin/main` — the commit `main` was at when
+  this audit's agents did their read-only cross-referencing, i.e. the exact state every
+  finding's `correct_value` describes. Do NOT use `git rev-parse HEAD` (that's this
+  branch's own commit, not the code being audited) or the PR's eventual merge commit
+  (for skills that modify the audited code itself — e.g. perf-audit, test-audit — the
+  merge commit contains the *fix*, not the pre-fix state a finding describes). Capture
+  this before the branch is deleted.
+- **PR URL**: from `/ship`'s own reported result, once it completes.
+
+1. Build a JSON summary: date (YYYY-MM-DD), the `commit_sha` above, the PR URL, agent
+   count, the scope actually covered, and every finding (location, claim, correct value,
+   severity, category, whether auto-fixed). Example:
    ```json
    {
      "type": "run",
@@ -729,12 +762,11 @@ After verification passes, record this run for `meta-audit`:
    ```bash
    scripts/audit-eval-check.sh doc-audit
    ```
-   If it prints `TRIGGER`, invoke the `meta-audit` skill for `doc-audit` as a follow-up
-   after this run's own PR is up. If it prints `SKIP: n/5`, nothing further to do.
-
-## Output
-
-Report the PR URL and final status when done (use `/ship` skill).
+   If it prints `TRIGGER`, invoke the `meta-audit` skill for `doc-audit` next. If it
+   prints `SKIP: n/5`, nothing further to do.
+4. Commit the updated history log on a small new branch and land it on `main` via the
+   same branch+PR+`/ship` convention used for the audit fix itself — this file lives in
+   the main repo and needs its own merge to become visible to future runs.
 ```
 
 - [ ] **Step 3: Commit**
@@ -796,13 +828,27 @@ Replace it with:
 | Ignoring Monte Carlo tests as "probably fine" | Check margins are generous (2-5x expected range) |
 | Skipping the 10x verification | Flakiness is probabilistic; 1 run proves nothing |
 
+## Output
+
+Report the PR URL and final status when done (use `/ship` skill).
+
 ## Log This Run
 
-After verification passes, record this run for `meta-audit`:
+`commit_sha` and the PR URL must be captured correctly, or `meta-audit`'s later
+re-verification will check the wrong code state or lose track of provenance:
 
-1. Build a JSON summary: date (YYYY-MM-DD), current commit SHA (`git rev-parse HEAD`), PR
-   URL, agent count, the scope actually covered, and every finding (location, claim,
-   correct value, severity, category, whether auto-fixed). Example:
+- **`commit_sha`**: `git merge-base HEAD origin/main` — the commit `main` was at when
+  this audit's agents did their read-only cross-referencing, i.e. the exact state every
+  finding's `correct_value` describes. Do NOT use `git rev-parse HEAD` (that's this
+  branch's own commit, not the code being audited) or the PR's eventual merge commit
+  (for skills that modify the audited code itself — e.g. perf-audit, test-audit — the
+  merge commit contains the *fix*, not the pre-fix state a finding describes). Capture
+  this before the branch is deleted.
+- **PR URL**: from `/ship`'s own reported result, once it completes.
+
+1. Build a JSON summary: date (YYYY-MM-DD), the `commit_sha` above, the PR URL, agent
+   count, the scope actually covered, and every finding (location, claim, correct value,
+   severity, category, whether auto-fixed). Example:
    ```json
    {
      "type": "run",
@@ -832,8 +878,11 @@ After verification passes, record this run for `meta-audit`:
    ```bash
    scripts/audit-eval-check.sh test-audit
    ```
-   If it prints `TRIGGER`, invoke the `meta-audit` skill for `test-audit` as a follow-up
-   after this run's own PR is up. If it prints `SKIP: n/5`, nothing further to do.
+   If it prints `TRIGGER`, invoke the `meta-audit` skill for `test-audit` next. If it
+   prints `SKIP: n/5`, nothing further to do.
+4. Commit the updated history log on a small new branch and land it on `main` via the
+   same branch+PR+`/ship` convention used for the audit fix itself — this file lives in
+   the main repo and needs its own merge to become visible to future runs.
 
 ## Output
 
@@ -901,13 +950,27 @@ Replace it with:
 2. `cargo bench` runs without errors
 3. Report summary of: findings, auto-fixes applied, items flagged for review, benchmark baselines
 
+## Output
+
+Report the PR URL and final status when done (use `/ship` skill).
+
 ## Log This Run
 
-After verification passes, record this run for `meta-audit`:
+`commit_sha` and the PR URL must be captured correctly, or `meta-audit`'s later
+re-verification will check the wrong code state or lose track of provenance:
 
-1. Build a JSON summary: date (YYYY-MM-DD), current commit SHA (`git rev-parse HEAD`), PR
-   URL, agent count, the scope actually covered, and every finding (location, claim,
-   correct value, severity, category, whether auto-fixed). Example:
+- **`commit_sha`**: `git merge-base HEAD origin/main` — the commit `main` was at when
+  this audit's agents did their read-only cross-referencing, i.e. the exact state every
+  finding's `correct_value` describes. Do NOT use `git rev-parse HEAD` (that's this
+  branch's own commit, not the code being audited) or the PR's eventual merge commit
+  (for skills that modify the audited code itself — e.g. perf-audit, test-audit — the
+  merge commit contains the *fix*, not the pre-fix state a finding describes). Capture
+  this before the branch is deleted.
+- **PR URL**: from `/ship`'s own reported result, once it completes.
+
+1. Build a JSON summary: date (YYYY-MM-DD), the `commit_sha` above, the PR URL, agent
+   count, the scope actually covered, and every finding (location, claim, correct value,
+   severity, category, whether auto-fixed). Example:
    ```json
    {
      "type": "run",
@@ -937,8 +1000,11 @@ After verification passes, record this run for `meta-audit`:
    ```bash
    scripts/audit-eval-check.sh perf-audit
    ```
-   If it prints `TRIGGER`, invoke the `meta-audit` skill for `perf-audit` as a follow-up
-   after this run's own PR is up. If it prints `SKIP: n/5`, nothing further to do.
+   If it prints `TRIGGER`, invoke the `meta-audit` skill for `perf-audit` next. If it
+   prints `SKIP: n/5`, nothing further to do.
+4. Commit the updated history log on a small new branch and land it on `main` via the
+   same branch+PR+`/ship` convention used for the audit fix itself — this file lives in
+   the main repo and needs its own merge to become visible to future runs.
 
 ## Output
 
@@ -980,13 +1046,27 @@ Replace it with:
 | Security advisories | N | list |
 | Flagged for review | N | list |
 
+## Output
+
+Report the PR URL and final status when done (use `/ship` skill).
+
 ## Log This Run
 
-After verification passes, record this run for `meta-audit`:
+`commit_sha` and the PR URL must be captured correctly, or `meta-audit`'s later
+re-verification will check the wrong code state or lose track of provenance:
 
-1. Build a JSON summary: date (YYYY-MM-DD), current commit SHA (`git rev-parse HEAD`), PR
-   URL, agent count, the scope actually covered, and every finding (location, claim,
-   correct value, severity, category, whether auto-fixed). Example:
+- **`commit_sha`**: `git merge-base HEAD origin/main` — the commit `main` was at when
+  this audit's agents did their read-only cross-referencing, i.e. the exact state every
+  finding's `correct_value` describes. Do NOT use `git rev-parse HEAD` (that's this
+  branch's own commit, not the code being audited) or the PR's eventual merge commit
+  (for skills that modify the audited code itself — e.g. perf-audit, test-audit — the
+  merge commit contains the *fix*, not the pre-fix state a finding describes). Capture
+  this before the branch is deleted.
+- **PR URL**: from `/ship`'s own reported result, once it completes.
+
+1. Build a JSON summary: date (YYYY-MM-DD), the `commit_sha` above, the PR URL, agent
+   count, the scope actually covered, and every finding (location, claim, correct value,
+   severity, category, whether auto-fixed). Example:
    ```json
    {
      "type": "run",
@@ -1016,12 +1096,11 @@ After verification passes, record this run for `meta-audit`:
    ```bash
    scripts/audit-eval-check.sh dependency-audit
    ```
-   If it prints `TRIGGER`, invoke the `meta-audit` skill for `dependency-audit` as a
-   follow-up after this run's own PR is up. If it prints `SKIP: n/5`, nothing further to do.
-
-## Output
-
-Report the PR URL and final status when done (use `/ship` skill).
+   If it prints `TRIGGER`, invoke the `meta-audit` skill for `dependency-audit` next. If
+   it prints `SKIP: n/5`, nothing further to do.
+4. Commit the updated history log on a small new branch and land it on `main` via the
+   same branch+PR+`/ship` convention used for the audit fix itself — this file lives in
+   the main repo and needs its own merge to become visible to future runs.
 ```
 
 - [ ] **Step 2: Commit**
