@@ -182,6 +182,20 @@
   .chip { font-size: 12px; letter-spacing: 0.04em; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; background: var(--void-2); }
   .chip b { color: var(--gold); font-weight: 600; }
 
+  /* Player-experience beats: a session, told in moments */
+  .session { display: grid; gap: 2px; margin-top: 16px; }
+  .moment { display: grid; grid-template-columns: 92px 1fr; gap: 18px; padding: 16px 0; border-top: 1px solid var(--line-soft); }
+  .moment:first-child { border-top: none; }
+  .moment .m-t { font-family: ui-monospace, monospace; font-size: 12px; letter-spacing: 0.04em; color: var(--faint); padding-top: 2px; white-space: nowrap; }
+  .moment .m-b p { margin: 0; max-width: 60ch; }
+  .moment .m-b p + p { margin-top: 6px; }
+  @media (max-width: 560px) { .moment { grid-template-columns: 1fr; gap: 4px; } .moment .m-t { color: var(--storm-2); } }
+
+  /* Inline "what it feels like" aside — grounds a mechanic in the moment a player meets it */
+  .feels { margin-top: 16px; border-left: 3px solid var(--gold); padding: 4px 0 4px 16px; }
+  .feels p { margin: 0; font-size: 0.98rem; font-style: italic; color: var(--ink); max-width: 60ch; }
+  .feels p b { font-style: normal; }
+
   /* Core loop diagram */
   .loop { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; }
   .loop .step { border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; background: var(--panel); flex: 1 1 130px; min-width: 130px; }
@@ -310,6 +324,42 @@
     </div>
   </header>
 
+  <!-- ===== PLAYER EXPERIENCE: A FIRST SITTING ===== -->
+  <section class="block">
+    <p class="kicker"><span class="ord">·</span> Before the systems, the session</p>
+    <h2>What it's actually like to <span class="roman">sit down and play</span></h2>
+    <p class="lede">Everything below this is mechanics. Here's the part a spec can't show directly: the arc a real player lives through, told in the order they'd feel it.</p>
+    <div class="session">
+      <div class="moment"><div class="m-t">minute 0</div><div class="m-b">
+        <p>You open the game to a sunny field and a hero who starts swinging on her own. You don't do anything — and that's the pitch landing. A kill counter ticks up. An XP bar creeps. You watch for a minute, satisfied, half-tempted to just leave it running.</p>
+      </div></div>
+      <div class="moment"><div class="m-t">~20 min</div><div class="m-b">
+        <p>Ten kills in, a subzone boss shows up mid-fight with no warning telegraphed beyond the kill counter. First real flicker of tension: is she going to make it? She does. The HP bar dips and recovers. You realize the counter you'd been ignoring was actually a countdown.</p>
+      </div></div>
+      <div class="moment"><div class="m-t">~2 hrs</div><div class="m-b">
+        <p>Levels tick by, zones scroll past — forest, frozen pass, buried kingdom — and loot starts dropping in visibly different shades. You don't know the tier math yet, you just know gold text is better than white text, and you're checking gear after every boss now instead of every zone.</p>
+      </div></div>
+      <div class="moment"><div class="m-t">~4-6 hrs</div><div class="m-b">
+        <p>The Storm Citadel boss simply will not die. No amount of grinding levels moves the needle — this is the game's one hard stop, and it takes a beat to realize the wall isn't about being stronger, it's about a specific weapon you don't have yet. The first "oh, I need to go get <em>that</em>" moment.</p>
+      </div></div>
+      <div class="moment"><div class="m-t">first prestige</div><div class="m-b">
+        <p>Eventually the choice sits in front of you: give up the run — level, gear, zone progress, all of it — for a permanent multiplier that makes the next run faster. It's the idle-genre gut-check, and the game doesn't disguise it. You hesitate, then do it anyway, because the number on the other side is bigger.</p>
+      </div></div>
+      <div class="moment"><div class="m-t">the alt-tab</div><div class="m-b">
+        <p>You close the laptop for the day. Eight hours later you're back, and she's kept fighting without you — not full speed, a quarter rate, but she didn't stop. That's the moment idle-RPG players are chasing: the game as a thing that was working <em>for</em> you while you weren't there.</p>
+      </div></div>
+      <div class="moment"><div class="m-t">the drip</div><div class="m-b">
+        <p>Somewhere past prestige rank ten, things start appearing that you didn't unlock on purpose — a challenge minigame, then a base-building screen called Haven, then an enhancement forge. None of them announce themselves on a roadmap. They just show up, by chance, and each one is a small "wait, there's <em>more</em>?"</p>
+      </div></div>
+      <div class="moment"><div class="m-t">the long grind</div><div class="m-b">
+        <p>By the deep endgame the rhythm has changed entirely — you're not watching combat anymore, you're managing mercenary squads on wall-clock timers, routing resources through a production graph, deciding which of six ascension paths to fund next. The auto-battle from hour one is still running underneath, quietly, but it's no longer the point.</p>
+      </div></div>
+      <div class="moment"><div class="m-t">Zone 50</div><div class="m-b">
+        <p>The final boss of the fiftieth zone falls, and the game doesn't throw confetti — it drops one line into your save file and goes quiet. It reads like an ending. It isn't. Something distant has just noticed you, and Act I is over.</p>
+      </div></div>
+    </div>
+  </section>
+
   <!-- ===== 0. CORE LOOP ===== -->
   <section class="block">
     <p class="kicker"><span class="ord">00</span> The core loop</p>
@@ -347,6 +397,7 @@
       <div class="attr"><div class="a-k">WIS</div><div class="a-n">Wisdom</div><div class="a-d">XP gain · +5% / modifier</div></div>
       <div class="attr"><div class="a-k">CHA</div><div class="a-n">Charisma</div><div class="a-d">Prestige multiplier · +10% / mod</div></div>
     </div>
+    <div class="feels"><p>You never allocate a point mid-fight — you set attributes between runs and watch the effect show up later, in bigger numbers on a screen you're not staring at. It's spreadsheet satisfaction, not action-game feedback.</p></div>
   </section>
 
   <!-- ===== 2. THE 50-ZONE SPINE ===== -->
@@ -430,6 +481,7 @@
       <div class="loot-card"><h4>Item level</h4><p><code>zone × 10</code>. Zone 1 = ilvl 10; Zone 50 = ilvl 500.</p></div>
       <div class="loot-card"><h4>Seeded generation</h4><p>One RNG entry point (<code>generate_item_with_rng</code>) so drops are reproducible.</p></div>
     </div>
+    <div class="feels"><p>A boss dying is the moment you actually lean in — mob drops are a low background hum, but boss loot is guaranteed, and for one second before the color renders, it could be gold text.</p></div>
   </section>
 
   <!-- ===== 4. COMBAT PIPELINES ===== -->
@@ -461,6 +513,7 @@
         </ol>
       </div>
     </div>
+    <div class="feels"><p>None of this is visible mid-fight — you see a number fall off an enemy's HP bar, not a pipeline. The eight steps above are what makes that one number feel earned by the time you're twenty prestiges deep.</p></div>
   </section>
 
   <!-- ===== 5. PRESTIGE ===== -->
@@ -517,6 +570,7 @@
         <p>A Factorio-style production graph: 6 extractors feed buildable shuttles through direct-pull chains to sustain <strong>28 Woven Patterns</strong>. Complete all 28 and the WR→PR conversion switches on — self-multiplying passive prestige — and Loom zones 31–50 open.</p>
       </div></div>
     </div>
+    <div class="feels"><p>None of this was on a tutorial checklist — each layer arrived as a surprise mid-session, on top of a combat loop you'd long since stopped watching closely. By the time you're routing the Loom's production graph, "the game" has quietly become a different game than the one you opened.</p></div>
   </section>
 
   <!-- ===== 7. SIDE TRACKS ===== -->
