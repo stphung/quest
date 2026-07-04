@@ -9,8 +9,7 @@
 use crate::vessel::junction::{current_junction_cards, RoadCard};
 use crate::vessel::route::{self, Feature, WaypointId};
 use crate::vessel::voyage::{
-    hope_label, SceneState, Trim, VoyagePhase, VoyageState, DRIFT_RECOVERY_HOURS, MINUTES_PER_DAY,
-    RUMOR_PRICE,
+    SceneState, Trim, VoyagePhase, VoyageState, DRIFT_RECOVERY_HOURS, MINUTES_PER_DAY, RUMOR_PRICE,
 };
 use crate::vessel::{SceneModal, VoyageUiState, VoyageView};
 use ratatui::{
@@ -702,7 +701,7 @@ fn render_vessel_panel(
     let mut lines: Vec<Line> = Vec::new();
     lines.push(Line::from(""));
     lines.extend(gauge_lines(voyage, inner.width, colony));
-    // The hull and the table (spec 8): scars eat, rations stretch.
+    // The hull (spec 8): scars eat into the hold.
     if voyage.hull_wear > 0 {
         lines.push(Line::from(Span::styled(
             format!(
@@ -713,20 +712,8 @@ fn render_vessel_panel(
             Style::default().fg(Color::LightRed),
         )));
     }
-    if voyage.hard_rations {
-        lines.push(Line::from(Span::styled(
-            "Rations    Bare Bones \u{2014} the hold stretches, hope pays daily",
-            Style::default().fg(Color::Yellow),
-        )));
-    }
     lines.push(Line::from(""));
     lines.extend(phase_lines(voyage));
-    if voyage.can_press() {
-        lines.push(Line::from(Span::styled(
-            "[P] Press the helm \u{2014} \u{2212}2 hope, the leg shortens",
-            Style::default().fg(GOLD),
-        )));
-    }
     // The sky over this leg, and the night ahead (spec 5).
     for wx in voyage.weather_on_leg() {
         lines.push(Line::from(Span::styled(
@@ -813,30 +800,6 @@ fn gauge_lines(
             Span::styled(
                 format!(" {}", voyage.provisions_display()),
                 Style::default().fg(prov_color),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("Hope       ", Style::default().fg(Color::Gray)),
-            Span::styled(
-                hope_label(voyage.hope).to_string(),
-                Style::default()
-                    .fg(VESSEL_VIOLET)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                {
-                    let arrow = crate::vessel::souls::wind_arrow(voyage.hope, voyage.long_silence);
-                    if arrow.is_empty() {
-                        String::new()
-                    } else {
-                        format!(" {arrow}")
-                    }
-                },
-                Style::default().fg(if voyage.hope >= 8 {
-                    Color::Green
-                } else {
-                    Color::LightRed
-                }),
             ),
         ]),
         Line::from(vec![
@@ -1141,7 +1104,7 @@ fn render_trim_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, select
     frame.render_widget(block, area);
 
     let mut lines: Vec<Line> = vec![Line::from("")];
-    let selected = selected.min(Trim::ALL.len()); // last row: hard rations
+    let selected = selected.min(Trim::ALL.len() - 1);
     for (i, trim) in Trim::ALL.iter().enumerate() {
         let is_selected = i == selected;
         let is_current = *trim == voyage.trim;
@@ -1168,45 +1131,6 @@ fn render_trim_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, select
         )));
         lines.push(Line::from(""));
     }
-    // Rations — Oregon Trail's other dial (spec 10): Filling by default,
-    // Bare Bones stretches the hold and the people pay in hope.
-    {
-        let is_selected = selected == Trim::ALL.len();
-        let marker = if is_selected { "\u{25b8} " } else { "  " };
-        let name_style = if voyage.hard_rations {
-            Style::default().fg(GOLD).add_modifier(Modifier::BOLD)
-        } else if is_selected {
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::White)
-        };
-        lines.push(Line::from(vec![
-            Span::styled(format!("{marker}Rations \u{2014} "), name_style),
-            Span::styled(
-                if voyage.hard_rations {
-                    "Bare Bones"
-                } else {
-                    "Filling"
-                }
-                .to_string(),
-                name_style,
-            ),
-        ]));
-        lines.push(Line::from(Span::styled(
-            if voyage.hard_rations {
-                "    the hold burns a quarter slower \u{00b7} hope \u{2212}1 each day".to_string()
-            } else if voyage.hope < crate::vessel::voyage::HOPE_SPEND_FLOOR {
-                "    Bare Bones would ask hope you don't have to spare".to_string()
-            } else {
-                "    the crew eats their fill \u{2014} Bare Bones stretches it, at a cost"
-                    .to_string()
-            },
-            Style::default().fg(Color::Gray),
-        )));
-        lines.push(Line::from(""));
-    }
     lines.push(Line::from(Span::styled(
         "\u{2191}\u{2193} choose  \u{00b7}  [Enter] set  \u{00b7}  [Esc] back",
         Style::default().fg(Color::DarkGray),
@@ -1225,14 +1149,14 @@ fn trim_effect_line(voyage: &VoyageState, trim: Trim) -> String {
     {
         let r = route::road(road);
         let remaining = (f64::from(r.base_days) - progress_days).max(0.0);
-        // Wind and stations compose in — the panel shows what would
-        // actually happen, not the trim's raw dial.
+        // Stations compose in — the panel shows what would actually
+        // happen, not the trim's raw dial.
         let hours = (remaining * voyage.time_mult_with(trim) * 24.0).round() as u64;
         let provisions = (remaining * f64::from(r.base_provisions) / f64::from(r.base_days)
             * voyage.provisions_mult_with(trim))
         .round() as u64;
         let extra = match trim {
-            Trim::Mourn => " \u{00b7} hope rises daily",
+            Trim::Mourn => " \u{00b7} the thriftiest hold",
             Trim::Quiet => " \u{00b7} hears the dark",
             Trim::Run => " \u{00b7} scars the hull",
             Trim::Cruise => "",
@@ -1246,7 +1170,7 @@ fn trim_effect_line(voyage: &VoyageState, trim: Trim) -> String {
             Trim::Run => "fastest \u{2014} the hold empties and she scars".to_string(),
             Trim::Cruise => "the honest middle; never wrong, never best".to_string(),
             Trim::Quiet => "slower, sparing \u{2014} quiet enough to hear the dark".to_string(),
-            Trim::Mourn => "slowest \u{2014} the crew mends and hope climbs".to_string(),
+            Trim::Mourn => "slowest \u{2014} the thriftiest hold there is".to_string(),
         }
     }
 }
@@ -1393,8 +1317,6 @@ fn render_souls_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, selec
                 "story told".to_string()
             } else if s.station.is_some() {
                 "arc paused (on post)".to_string()
-            } else if voyage.long_silence {
-                "arc paused (the Long Silence)".to_string()
             } else {
                 let need = ARC_BEAT_REST_DAYS * MINUTES_PER_DAY;
                 let done_days = s.rest_minutes as f64 / MINUTES_PER_DAY as f64;
@@ -1633,7 +1555,7 @@ fn weather_hint(wx: &crate::vessel::weather::WeatherObj, voyage: &VoyageState) -
             if voyage.trim == Trim::Quiet {
                 "at Easy through it; listening".to_string()
             } else {
-                "hope frays inside \u{2014} Easy nullifies it".to_string()
+                "sail it at Easy to hear what it hides".to_string()
             }
         }
         WeatherKind::Squall => match voyage.trim {

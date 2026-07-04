@@ -8,9 +8,7 @@
 //!
 //! See `docs/superpowers/specs/2026-07-03-vessel-route-waypoints-design.md`.
 
-use super::letters::{
-    self, LAST_LETTER_EVENT, LETTER_PARCEL_PROVISIONS, MAIL_FAILS_EVENT, MAIL_FAILS_HOPE_COST,
-};
+use super::letters::{self, LAST_LETTER_EVENT, LETTER_PARCEL_PROVISIONS, MAIL_FAILS_EVENT};
 use super::nights::{self, NightKind, NightOutcome};
 use super::pilgrims::{self, PilgrimShip};
 use super::refits::{RefitId, REFIT_PAIRS};
@@ -19,8 +17,8 @@ use super::route::{
 };
 use super::scenes::{self, ColorKey};
 use super::souls::{
-    self, helm_time_mult, tender_provisions_mult, wind_time_mult, ArcTrigger, SoulId, Station,
-    ARC_BEAT_REST_DAYS, CREW, FAREWELL_HOPE_COST, LOSS_HOPE_COST,
+    self, helm_time_mult, tender_provisions_mult, ArcTrigger, SoulId, Station, ARC_BEAT_REST_DAYS,
+    CREW,
 };
 use super::weather::{self, WeatherKind, WeatherObj};
 use chrono::{DateTime, Utc};
@@ -39,22 +37,8 @@ pub const LAUNCH_PROVISIONS: f64 = 100.0;
 /// every junction's cheapest road costs no more than this (CI-asserted).
 pub const DRIFT_RECOVERY_PROVISIONS: u32 = 25;
 pub const DRIFT_RECOVERY_HOURS: u64 = 36;
-/// Days a played arrival can be held before hope starts to fray.
-pub const HOLD_STATION_GRACE_DAYS: u64 = 3;
 /// Buying a rumor at a way-station (one per visit).
 pub const RUMOR_PRICE: f64 = 6.0;
-/// Hope is a small number with a name, never a percentage.
-pub const HOPE_MAX: u8 = 10;
-/// Hold-station decay never drags hope below "steady" — the eager-souls rule.
-pub const HOPE_FLOOR_STEADY: u8 = 5;
-/// Below this, hope cannot be *spent* (spec 8): you can be worn down
-/// into the Long Silence, never buy your way in.
-pub const HOPE_SPEND_FLOOR: u8 = 3;
-/// Press the Helm: the price and what it buys.
-pub const PRESS_HOPE_COST: u8 = 2;
-pub const PRESS_TIME_SAVED: f64 = 0.15;
-/// Hard rations: the hold stretches, the people pay.
-pub const HARD_RATIONS_BURN_MULT: f64 = 0.75;
 /// How long the ship waters and takes on mail at a port with no decision
 /// to make (one road out, nobody asking to board, no refit door) before
 /// she sails herself onward. Decisions — junctions, asks, refit doors,
@@ -70,7 +54,6 @@ pub const WEAR_BURN_PER_SCAR: f64 = 0.05;
 /// a steeper draw would leave a full ship unable to make the crossing at
 /// all. Even a 7,000-soul expedition only lifts the daily burn by ~35%.
 pub const PROVISIONS_PER_PASSENGER: f64 = 0.00005;
-pub const LAUNCH_HOPE: u8 = 7;
 
 /// How fast time at sea passes relative to the real world — a near-1:1 clock
 /// (a day at sea passes in a little under a real day). The pacing is *earned*,
@@ -137,7 +120,9 @@ impl Trim {
             Trim::Run => 1.30,
             Trim::Cruise => 1.00,
             Trim::Quiet => 0.90,
-            Trim::Mourn => 0.90,
+            // Restful is the thriftiest hold there is — its identity now that
+            // it no longer raises hope (the hope system is retired).
+            Trim::Mourn => 0.80,
         }
     }
 
@@ -262,7 +247,6 @@ pub enum StrainCause {
     ThirdWatch,
     SquallAtRun,
     SilenceHelm,
-    PressedHard,
 }
 
 impl StrainCause {
@@ -271,22 +255,20 @@ impl StrainCause {
             StrainCause::ThirdWatch => "three nights on watch, back to back",
             StrainCause::SquallAtRun => "a squall crossed while driven hard, on deck the whole way",
             StrainCause::SilenceHelm => "the helm held through the silence, alone with it",
-            StrainCause::PressedHard => "the ship pressed hard twice, and the wheel remembers",
         }
     }
 }
 
 /// Why the hull took a scar (spec 8).
-// Wear comes only from choices — Run through squalls, hungry roads,
-// pressing a scarred hull — never from drifting. Drift is the covenant's
-// gentle failure; letting it scar would compound the very state it
-// rescues (probe-verified death-spiral, 2026-07-03).
+// Wear comes only from choices — Run through squalls, hungry roads —
+// never from drifting. Drift is the covenant's gentle failure; letting it
+// scar would compound the very state it rescues (probe-verified
+// death-spiral, 2026-07-03).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WearCause {
     RunHard,
     SquallAtRun,
     ThreatRoad,
-    PressedWorn,
 }
 
 impl WearCause {
@@ -295,7 +277,6 @@ impl WearCause {
             WearCause::RunHard => "a whole leg driven at the Grueling pace, start to finish",
             WearCause::SquallAtRun => "a squall taken at the Grueling pace",
             WearCause::ThreatRoad => "the road took its price from her skin",
-            WearCause::PressedWorn => "pressed hard on a hull already carrying scars",
         }
     }
 }
@@ -364,7 +345,6 @@ pub struct VoyageState {
     #[serde(default)]
     pub trim: Trim,
     pub provisions: f64,
-    pub hope: u8,
     /// Larger cap once the Long Hold refit exists (spec 4); saved so refits
     /// survive reload.
     #[serde(default = "default_provisions_cap")]
@@ -382,13 +362,6 @@ pub struct VoyageState {
     /// A drift recovery scene waits to be shown (authored per chapter, spec 4).
     #[serde(default)]
     pub pending_recovery_scene: bool,
-    /// Whole minutes spent traveling at Mourn since the last hope raise
-    /// (integer so day boundaries are exact).
-    #[serde(default)]
-    pub mourn_minutes: u64,
-    /// Hope already decayed during the current hold (idempotent lazy decay).
-    #[serde(default)]
-    pub hold_decay_applied: u32,
     /// Set false after the first-boot 5-beat transition has played.
     #[serde(default = "default_true")]
     pub intro_pending: bool,
@@ -421,11 +394,7 @@ pub struct VoyageState {
     /// A strange night already visited this leg (max one per leg).
     #[serde(default)]
     pub strange_seen_this_leg: bool,
-    /// Whole minutes spent inside silence-banks un-Quiet since the last
-    /// hope toll (integer so day boundaries are exact).
-    #[serde(default)]
-    pub silence_minutes: u64,
-    /// Silence-banks already listened into at Quiet (one rumor per bank).
+    /// Silence-banks already listened into at Easy (one rumor per bank).
     #[serde(default)]
     pub heard_banks: Vec<u32>,
     /// Pilgrim ships already hailed (once per ship).
@@ -449,9 +418,6 @@ pub struct VoyageState {
     /// a door, and doors are answered, never slipped past.
     #[serde(default)]
     pub pending_ask: Option<SoulId>,
-    /// Hope hit ashen: legs crawl and arcs pause until a rest stop.
-    #[serde(default)]
-    pub long_silence: bool,
     /// Arc beats fired since last read (possibly offline) — the return
     /// view's log moments.
     #[serde(default)]
@@ -460,18 +426,6 @@ pub struct VoyageState {
     /// burn. Mended only at shipyards, in place of a refit (spec 8).
     #[serde(default)]
     pub hull_wear: u8,
-    /// Hard rations: burn ×0.75, hope −1 per full day underway while on.
-    #[serde(default)]
-    pub hard_rations: bool,
-    /// Whole minutes underway on hard rations since the last hope toll.
-    #[serde(default)]
-    pub rations_minutes: u64,
-    /// The helm was already pressed on this leg.
-    #[serde(default)]
-    pub pressed_this_leg: bool,
-    /// Presses this chapter — the second strains the helm soul.
-    #[serde(default)]
-    pub presses_this_chapter: u8,
     /// Squalls that already took their price at Run (strain + scar), by id.
     #[serde(default)]
     pub priced_squalls: Vec<u32>,
@@ -532,7 +486,7 @@ pub enum DepartError {
 
 impl VoyageState {
     /// `voyage::begin` — a new crossing at the Last Harbor with a full hold,
-    /// three souls' worth of hope, and everything ahead.
+    /// three souls aboard, and everything ahead.
     pub fn begin(character_id: String, voyage_seed: u64, now: DateTime<Utc>) -> Self {
         VoyageState {
             character_id,
@@ -547,19 +501,15 @@ impl VoyageState {
             },
             trim: Trim::Cruise,
             provisions: LAUNCH_PROVISIONS,
-            hope: LAUNCH_HOPE,
             provisions_cap: PROVISIONS_CAP,
             visited: vec![ROUTE_START],
             untaken: Vec::new(),
             rumors: Vec::new(),
             rumor_bought_this_visit: false,
             pending_recovery_scene: false,
-            mourn_minutes: 0,
-            hold_decay_applied: 0,
             intro_pending: true,
             souls: default_roster(),
             pending_ask: None,
-            long_silence: false,
             soul_events: Vec::new(),
             refits: Vec::new(),
             refit_doors_seen: 0,
@@ -570,17 +520,12 @@ impl VoyageState {
             finale_shown: false,
             night_assignments: Vec::new(),
             strange_seen_this_leg: false,
-            silence_minutes: 0,
             heard_banks: Vec::new(),
             hailed: Vec::new(),
             letters_received: 0,
             gone_dark: false,
             letter_events: Vec::new(),
             hull_wear: 0,
-            hard_rations: false,
-            rations_minutes: 0,
-            pressed_this_leg: false,
-            presses_this_chapter: 0,
             priced_squalls: Vec::new(),
             strained_banks: Vec::new(),
             passage_events: Vec::new(),
@@ -631,9 +576,6 @@ impl VoyageState {
         if colony.has_district(District::Granary) {
             v.provisions_cap = PROVISIONS_CAP + 25.0;
             v.provisions = v.provisions_cap;
-        }
-        if colony.has_district(District::Hearth) {
-            v.hope = (LAUNCH_HOPE + 1).min(HOPE_MAX);
         }
         v
     }
@@ -686,62 +628,6 @@ impl VoyageState {
         std::mem::take(&mut self.passage_events)
     }
 
-    /// Whether the helm can be pressed right now (the UI's hint gate).
-    pub fn can_press(&self) -> bool {
-        matches!(self.phase, VoyagePhase::Traveling { .. })
-            && !self.pressed_this_leg
-            && self.hope >= HOPE_SPEND_FLOOR
-    }
-
-    /// Spend hope to drive the ship: the leg's remaining time shrinks by
-    /// 15%, once per leg. The second press in a chapter strains the helm
-    /// soul; pressing a hull already at 4+ scars costs her another.
-    pub fn press_helm(&mut self) -> bool {
-        if !self.can_press() {
-            return false;
-        }
-        let VoyagePhase::Traveling {
-            road,
-            departed_at_min,
-            progress_days,
-        } = self.phase
-        else {
-            return false;
-        };
-        let base_days = f64::from(route::road(road).base_days);
-        let remaining = (base_days - progress_days).max(0.0);
-        self.phase = VoyagePhase::Traveling {
-            road,
-            departed_at_min,
-            progress_days: progress_days + remaining * PRESS_TIME_SAVED,
-        };
-        self.lower_hope(PRESS_HOPE_COST);
-        self.pressed_this_leg = true;
-        self.presses_this_chapter = self.presses_this_chapter.saturating_add(1);
-        if self.presses_this_chapter >= 2 {
-            if let Some(helm) = self.station_soul(Station::Helm) {
-                self.strain_soul(helm, StrainCause::PressedHard);
-            }
-        }
-        if self.hull_wear >= 4 {
-            self.scar_hull(WearCause::PressedWorn);
-        }
-        self.push_log("The helm pressed, and the ship answered.".to_string());
-        true
-    }
-
-    /// Turn hard rations on (requires hope to spend) or off (always free).
-    pub fn set_hard_rations(&mut self, on: bool) -> bool {
-        if on && self.hope < HOPE_SPEND_FLOOR {
-            return false;
-        }
-        if self.hard_rations != on {
-            self.hard_rations = on;
-            self.rations_minutes = 0;
-        }
-        true
-    }
-
     /// The yard's third door: mend the hull instead of refitting. Zeroes
     /// the scars; that yard's refit pair closes forever, unchosen.
     pub fn choose_mend(&mut self) -> bool {
@@ -756,12 +642,12 @@ impl VoyageState {
     }
 
     // ── Multiplier composition ──────────────────────────────────────────────
-    // Fixed order, documented once: time = base × trim × wind × helm;
+    // Fixed order, documented once: time = base × trim × helm;
     // provisions = base × trim × tender. The UI only ever shows the composed
     // integers these produce.
 
     /// Leg-time multiplier at a hypothetical trim (the trim panel previews
-    /// all four). Wind and helm ride along.
+    /// all four). The helm rides along.
     pub fn time_mult_with(&self, trim: Trim) -> f64 {
         let helm = self.station_soul(Station::Helm);
         let storm_sail = if self.has_refit(RefitId::StormSail) {
@@ -773,7 +659,6 @@ impl VoyageState {
         // she has carried — a constant baked in at launch.
         self.drive_time_mult
             * trim.time_mult()
-            * wind_time_mult(self.hope, self.long_silence)
             * helm_time_mult(
                 helm.is_some(),
                 // A strained hand loses the affine edge (spec 8).
@@ -792,18 +677,13 @@ impl VoyageState {
     /// Leg-provisions multiplier at a hypothetical trim.
     pub fn provisions_mult_with(&self, trim: Trim) -> f64 {
         let tender = self.station_soul(Station::Tender);
-        // Mourning Colors deepens Mourn's thrift (0.80 instead of 0.90).
+        // Mourning Colors deepens Restful's thrift (0.70 instead of 0.80).
         let trim_mult = if trim == Trim::Mourn && self.has_refit(RefitId::MourningColors) {
-            0.80
+            0.70
         } else {
             trim.provisions_mult()
         };
-        // Spec 8: hard rations stretch the hold; scars make her eat.
-        let rations = if self.hard_rations {
-            HARD_RATIONS_BURN_MULT
-        } else {
-            1.00
-        };
+        // Spec 8: scars make her eat.
         let wear = 1.0 + WEAR_BURN_PER_SCAR * f64::from(self.hull_wear);
         // Passengers are cargo that eats (spec 9): every passenger adds a
         // little to the daily burn, so scarcity becomes load management — but
@@ -822,7 +702,6 @@ impl VoyageState {
                     souls::soul(id).affinity == Some(Station::Tender) && self.soul_sound(id)
                 }),
             )
-            * rations
             * wear
     }
 
@@ -894,14 +773,9 @@ impl VoyageState {
                                     }
                                 }
                             } else {
-                                // Hope frays inside, one point per full day.
-                                self.silence_minutes += 1;
-                                if self.silence_minutes >= MINUTES_PER_DAY {
-                                    self.silence_minutes -= MINUTES_PER_DAY;
-                                    self.lower_hope(1);
-                                }
-                                // The helm holds it alone (spec 8): once
-                                // per bank, the wheel-hand strains.
+                                // Not at Easy: the helm holds the silence
+                                // alone (spec 8) — once per bank, the
+                                // wheel-hand strains.
                                 if !self.strained_banks.contains(&wx.id) {
                                     if let Some(helm) = self.station_soul(Station::Helm) {
                                         self.strained_banks.push(wx.id);
@@ -947,22 +821,6 @@ impl VoyageState {
                 }
 
                 self.provisions -= burn;
-                if self.trim == Trim::Mourn {
-                    self.mourn_minutes += 1;
-                    if self.mourn_minutes >= MINUTES_PER_DAY {
-                        self.mourn_minutes -= MINUTES_PER_DAY;
-                        self.hope = (self.hope + 1).min(HOPE_MAX);
-                    }
-                }
-                // Hard rations: the hold stretches, the people pay a
-                // point of hope per full day underway (spec 8).
-                if self.hard_rations {
-                    self.rations_minutes += 1;
-                    if self.rations_minutes >= MINUTES_PER_DAY {
-                        self.rations_minutes -= MINUTES_PER_DAY;
-                        self.lower_hope(1);
-                    }
-                }
 
                 let new_progress = progress_days + dp;
                 if new_progress >= f64::from(road.base_days) {
@@ -1040,18 +898,8 @@ impl VoyageState {
                             self.unread_scenes.push(playback);
                         }
                         // Guards re-checked inside; a refused departure
-                        // simply keeps holding (and the decay below applies
-                        // on later minutes).
+                        // simply keeps holding.
                         let _ = self.depart(road_id);
-                        return;
-                    }
-                }
-                let days_held = (self.processed_minutes - arrived_at_min) / MINUTES_PER_DAY;
-                let expected = days_held.saturating_sub(HOLD_STATION_GRACE_DAYS) as u32;
-                while self.hold_decay_applied < expected {
-                    self.hold_decay_applied += 1;
-                    if self.hope > HOPE_FLOOR_STEADY {
-                        self.hope -= 1;
                     }
                 }
             }
@@ -1065,21 +913,8 @@ impl VoyageState {
         if arrived_by.is_some() && self.trim == Trim::Run {
             self.scar_hull(WearCause::RunHard);
         }
-        // A new chapter forgives the chapter's presses (spec 8).
-        let prev_chapter = self.visited.last().map(|w| route::waypoint(*w).chapter);
-        if prev_chapter != Some(route::waypoint(waypoint).chapter) {
-            self.presses_this_chapter = 0;
-        }
         self.visited.push(waypoint);
         self.rumor_bought_this_visit = false;
-        self.hold_decay_applied = 0;
-
-        // A hearth breaks the Long Silence: the fire is relit, hope
-        // returns to "low", and the ship can breathe again.
-        if self.long_silence && route::waypoint(waypoint).has_feature(Feature::RestStop) {
-            self.long_silence = false;
-            self.hope = self.hope.max(3);
-        }
 
         // Rest stops mend the off-post by one level (spec 8) — posts are
         // not rest; relieving someone is the decision.
@@ -1119,7 +954,6 @@ impl VoyageState {
             } else if self.visited.contains(&WaypointId(24)) && waypoint != WaypointId(24) {
                 // The crew gathers at mail-hour, and nothing comes.
                 self.gone_dark = true;
-                self.lower_hope(MAIL_FAILS_HOPE_COST);
                 self.push_log(letters::MAIL_FAILS_LOG.to_string());
                 self.letter_events.push(MAIL_FAILS_EVENT);
             }
@@ -1180,12 +1014,8 @@ impl VoyageState {
     // ── Arcs ────────────────────────────────────────────────────────────────
 
     /// One minute of arc time: souls aboard and off-station rest; a soul
-    /// whose next beat is ready converts rest into story. The Long Silence
-    /// pauses all of it.
+    /// whose next beat is ready converts rest into story.
     fn step_arcs_minute(&mut self) {
-        if self.long_silence {
-            return;
-        }
         for i in 0..self.souls.len() {
             let s = self.souls[i];
             if s.status != SoulStatus::Aboard || s.station.is_some() {
@@ -1236,7 +1066,6 @@ impl VoyageState {
         let Some(beat) = def.arc.get(s.arc_beat as usize) else {
             return;
         };
-        self.hope = (self.hope + beat.payout.hope).min(HOPE_MAX);
         if let Some(rumor) = beat.payout.rumor {
             if !self.knows_rumor(rumor) {
                 let learned_at = self.visited.last().copied().unwrap_or(ROUTE_START);
@@ -1297,17 +1126,6 @@ impl VoyageState {
                 (self.provisions + f64::from(payout.provisions)).min(self.provisions_cap);
             payout_notes.push(format!("the hold gains {}", payout.provisions));
         }
-        match payout.hope.cmp(&0) {
-            std::cmp::Ordering::Greater => {
-                self.hope = (self.hope + payout.hope as u8).min(HOPE_MAX);
-                payout_notes.push("hope rises".to_string());
-            }
-            std::cmp::Ordering::Less => {
-                self.lower_hope(payout.hope.unsigned_abs());
-                payout_notes.push("hope dims".to_string());
-            }
-            std::cmp::Ordering::Equal => {}
-        }
         if let Some(rumor) = payout.rumor {
             if !self.knows_rumor(rumor) {
                 self.rumors.push(LearnedRumor {
@@ -1341,8 +1159,6 @@ impl VoyageState {
             ColorKey::ArrivedBy(road) => arrived_by == Some(road),
             ColorKey::TrimIs(trim) => self.trim == trim,
             ColorKey::KnowsRumor(rumor) => self.knows_rumor(rumor),
-            ColorKey::HopeAtLeast(n) => self.hope >= n,
-            ColorKey::HopeBelow(n) => self.hope < n,
             ColorKey::Drifted => self.drifted_this_leg,
         }
     }
@@ -1379,14 +1195,13 @@ impl VoyageState {
                     )
                 } else {
                     self.provisions = (self.provisions - 15.0).max(0.0);
-                    self.lower_hope(2);
                     self.scar_hull(WearCause::ThreatRoad);
                     (
                         vec!["You hurry the reef, and the Warden hurries with you. It \
                              takes its toll from the hold and something less \
                              replaceable from the crew's sleep."
                             .to_string()],
-                        vec!["the Warden takes 15 \u{00b7} hope dims".to_string()],
+                        vec!["the Warden takes 15 \u{00b7} the hull scars".to_string()],
                     )
                 }
             }
@@ -1402,13 +1217,13 @@ impl VoyageState {
                         vec![],
                     )
                 } else {
-                    self.lower_hope(2);
+                    self.provisions = (self.provisions - 10.0).max(0.0);
                     (
                         vec!["Every soul stood a post and nobody held the middle of \
                              the ship. The Silence sat there instead, and the leg's \
                              log is three blank pages."
                             .to_string()],
-                        vec!["hope dims".to_string()],
+                        vec!["the Silence takes 10".to_string()],
                     )
                 }
             }
@@ -1457,18 +1272,17 @@ impl VoyageState {
                                      count is called, {name} does not answer it. The \
                                      post stands empty. The hull carries a new name."
                             )],
-                            vec![format!("{name} is lost \u{00b7} hope falls")],
+                            vec![format!("{name} is lost")],
                         )
                     } else {
                         self.provisions = (self.provisions - 20.0).max(0.0);
-                        self.lower_hope(2);
                         self.scar_hull(WearCause::ThreatRoad);
                         (
                             vec!["With every soul below, the ship takes the thorns on \
-                                 her own skin. She holds. It costs the hold and the \
-                                 crew's certainty, and the scars stay."
+                                 her own skin. She holds. It costs the hold, and the \
+                                 scars stay."
                                 .to_string()],
-                            vec!["the thorns take 20 \u{00b7} hope dims".to_string()],
+                            vec!["the thorns take 20 \u{00b7} the hull scars".to_string()],
                         )
                     }
                 }
@@ -1508,7 +1322,6 @@ impl VoyageState {
         }
         self.finale_shown = true;
         let def = scenes::scene_def(ROUTE_SINK);
-        self.hope = (self.hope + def.payout.hope.max(0) as u8).min(HOPE_MAX);
         let title = route::waypoint(ROUTE_SINK).name.to_string();
         self.push_log(title.clone());
 
@@ -1536,10 +1349,7 @@ impl VoyageState {
 
     /// Set the ship's posture. Takes effect from the next unprocessed minute.
     pub fn set_trim(&mut self, trim: Trim) {
-        if self.trim != trim {
-            self.trim = trim;
-            self.mourn_minutes = 0;
-        }
+        self.trim = trim;
     }
 
     /// A road can always be sailed if it is affordable — or if it is the
@@ -1591,10 +1401,9 @@ impl VoyageState {
                 self.untaken.push(sibling.id);
             }
         }
-        // A new leg: the strange-night cap resets, the press is spent,
-        // stale watch overrides (nights already past) are pruned.
+        // A new leg: the strange-night cap resets, and stale watch
+        // overrides (nights already past) are pruned.
         self.strange_seen_this_leg = false;
-        self.pressed_this_leg = false;
         let today = self.processed_minutes / MINUTES_PER_DAY;
         self.night_assignments.retain(|(d, _)| *d >= today);
         self.phase = VoyagePhase::Traveling {
@@ -1649,15 +1458,12 @@ impl VoyageState {
         }
     }
 
-    /// Deliver one letter: the parcel, the hope, the log, the queue.
+    /// Deliver one letter: the parcel, the log, the queue.
     fn deliver_letter(&mut self, event: u8) {
         let Some(def) = letters::letter_by_event(event) else {
             return;
         };
         self.provisions = (self.provisions + LETTER_PARCEL_PROVISIONS).min(self.provisions_cap);
-        if def.hope > 0 {
-            self.hope = (self.hope + def.hope).min(HOPE_MAX);
-        }
         self.push_log(format!("A letter from {}", def.sender));
         self.letter_events.push(event);
     }
@@ -1780,12 +1586,10 @@ impl VoyageState {
         if effect.provisions < 0.0 {
             self.provisions = (self.provisions + effect.provisions).max(0.0);
         }
-        if effect.hope < 0 {
-            self.lower_hope(effect.hope.unsigned_abs());
-        }
-        if effect.rumor && !self.grant_next_rumor(route::road(road).from) {
-            // Nothing left to learn: the night pays in spirits instead.
-            self.hope = (self.hope + 1).min(HOPE_MAX);
+        if effect.rumor {
+            // A singing/strange night stood by the right soul yields a rumor
+            // (a no-op once every rumor is already known).
+            self.grant_next_rumor(route::road(road).from);
         }
         self.push_log(nights::log_line(kind, outcome, name));
     }
@@ -1941,7 +1745,7 @@ impl VoyageState {
     }
 
     /// A soul steps ashore to free a seat. Remembered in the manifest,
-    /// never carved into the hull. Costs a little hope.
+    /// never carved into the hull.
     pub fn farewell(&mut self, id: SoulId) -> bool {
         let here = self.current_waypoint();
         let Some(s) = self
@@ -1954,7 +1758,6 @@ impl VoyageState {
         s.status = SoulStatus::Ashore;
         s.station = None;
         s.left_at = here;
-        self.lower_hope(FAREWELL_HOPE_COST);
         true
     }
 
@@ -1972,7 +1775,6 @@ impl VoyageState {
         };
         s.status = SoulStatus::Lost;
         s.station = None;
-        self.lower_hope(LOSS_HOPE_COST);
         true
     }
 
@@ -1988,14 +1790,6 @@ impl VoyageState {
     /// Drain arc moments queued for the log (possibly fired offline).
     pub fn take_soul_events(&mut self) -> Vec<SoulEvent> {
         std::mem::take(&mut self.soul_events)
-    }
-
-    /// Lower hope, entering the Long Silence at ashen.
-    fn lower_hope(&mut self, by: u8) {
-        self.hope = self.hope.saturating_sub(by);
-        if self.hope == 0 {
-            self.long_silence = true;
-        }
     }
 
     // ── Read model ──────────────────────────────────────────────────────────
@@ -2056,23 +1850,6 @@ impl VoyageState {
     }
 }
 
-/// Hope's name. Never a number on screen without its word.
-pub fn hope_label(hope: u8) -> &'static str {
-    match hope {
-        0 => "ashen",
-        1 => "guttering",
-        2 => "failing",
-        3 => "low",
-        4 => "uneasy",
-        5 => "steady",
-        6 => "warm",
-        7 => "bright",
-        8 => "high",
-        9 => "singing",
-        _ => "radiant",
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2121,8 +1898,6 @@ mod tests {
         let v = VoyageState::begin("c".into(), 1, t0());
         assert_eq!(v.current_waypoint(), Some(ROUTE_START));
         assert_eq!(v.provisions, LAUNCH_PROVISIONS);
-        assert_eq!(v.hope, LAUNCH_HOPE);
-        assert_eq!(hope_label(v.hope), "bright");
         assert_eq!(v.visited, vec![ROUTE_START]);
     }
 
@@ -2155,14 +1930,15 @@ mod tests {
                 ..
             }
         ));
-        // The leg burned about its base price (net of the letter parcel
-        // that was waiting at the arrival — spec 6).
+        // The leg burned about its base price — at least the base, plus
+        // whatever weather it met (net of the letter parcel that was waiting
+        // at the arrival — spec 6).
         let burned =
             LAUNCH_PROVISIONS - v.provisions + crate::vessel::letters::LETTER_PARCEL_PROVISIONS;
+        let base = f64::from(road.base_provisions);
         assert!(
-            (burned - f64::from(road.base_provisions)).abs() < 1.0,
-            "burned {burned}, expected ~{}",
-            road.base_provisions
+            (base - 1.0..=base + 6.0).contains(&burned),
+            "burned {burned}, expected ~{base} (+ any weather)"
         );
     }
 
@@ -2190,20 +1966,14 @@ mod tests {
     }
 
     #[test]
-    fn mourn_raises_hope_one_per_day_at_sea() {
-        let mut v = started();
-        v.hope = 5;
-        v.set_trim(Trim::Mourn);
-        // Runa stands the nights (Watch-affine) so night prices don't
-        // muddy the Mourn measurement.
-        v.set_station(SoulId(2), Some(Station::Watch));
-        // Road 12 is the longest early road; use a long leg instead:
-        // sail road 0 (1 day base = 1.4 days at Mourn).
-        let road = route::roads_from(ROUTE_START).next().unwrap();
-        v.depart(road.id).unwrap();
-        v.tick(t0() + gh(25)); // past one full game-day, still at sea
-        assert!(matches!(v.phase, VoyagePhase::Traveling { .. }));
-        assert_eq!(v.hope, 6, "one full Mourn day raises hope once");
+    fn restful_is_the_thriftiest_hold() {
+        // Restful (Mourn) now earns its identity through thrift, not hope:
+        // it burns less per leg than every other pace.
+        let v = started();
+        let restful = v.provisions_mult_with(Trim::Mourn);
+        assert!(restful < v.provisions_mult_with(Trim::Quiet));
+        assert!(restful < v.provisions_mult_with(Trim::Cruise));
+        assert!(restful < v.provisions_mult_with(Trim::Run));
     }
 
     #[test]
@@ -2285,17 +2055,6 @@ mod tests {
     }
 
     #[test]
-    fn holding_past_grace_frays_hope_to_steady_and_no_further() {
-        let mut v = started();
-        v.hope = 8;
-        // Hold at the start (scene already played) for 10 days.
-        v.tick(t0() + Duration::days(10));
-        assert_eq!(v.hope, HOPE_FLOOR_STEADY, "8 -> floor after 3-day grace");
-        v.tick(t0() + Duration::days(30));
-        assert_eq!(v.hope, HOPE_FLOOR_STEADY, "never below steady from holding");
-    }
-
-    #[test]
     fn committing_grays_siblings_permanently() {
         let (mut v, _) = at_first_junction();
 
@@ -2357,15 +2116,6 @@ mod tests {
 
         assert_eq!(live.phase, offline.phase);
         assert_eq!(live.provisions.to_bits(), offline.provisions.to_bits());
-        assert_eq!(live.hope, offline.hope);
         assert_eq!(live.processed_minutes, offline.processed_minutes);
-    }
-
-    #[test]
-    fn hope_labels_cover_the_scale() {
-        for h in 0..=HOPE_MAX {
-            assert!(!hope_label(h).is_empty());
-        }
-        assert_eq!(hope_label(HOPE_FLOOR_STEADY), "steady");
     }
 }

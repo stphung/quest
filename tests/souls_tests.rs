@@ -1,22 +1,19 @@
 //! Integration tests for the Act 2 souls engine (spec 3): the roster
-//! invariants, crew seats, arcs on rest days, the wind, and the covenant.
+//! invariants, crew seats, arcs on rest days, and the covenant.
 
 use chrono::{DateTime, Duration, Utc};
 use quest::vessel::route::{self, roads_from, WaypointId, ROUTE_START};
 use quest::vessel::souls::{self, SoulId, Station, ARC_BEAT_REST_DAYS, CREW, SOULS};
-use quest::vessel::voyage::{SoulStatus, Trim, VoyagePhase, VoyageState};
+use quest::vessel::voyage::{SoulStatus, Trim, VoyageState};
 
 fn t0() -> DateTime<Utc> {
     "2026-07-03T12:00:00Z".parse().unwrap()
 }
 
-/// Real durations in which N game-days / -hours / -minutes pass under the
-/// voyage time scale — these tests assert exact points in *game* time.
+/// Real durations in which N game-days / -minutes pass under the voyage time
+/// scale — these tests assert exact points in *game* time.
 fn gd(d: i64) -> Duration {
     quest::vessel::voyage::real_duration_for_game_minutes(d * 1440)
-}
-fn gh(h: i64) -> Duration {
-    quest::vessel::voyage::real_duration_for_game_minutes(h * 60)
 }
 fn gm(m: i64) -> Duration {
     quest::vessel::voyage::real_duration_for_game_minutes(m)
@@ -98,7 +95,6 @@ fn eight_asks_against_seven_crew_seats_forces_exactly_one_choice() {
         SoulStatus::Ashore,
         "farewell is permanent and remembered"
     );
-    assert_eq!(v.hope, 6, "a farewell costs one hope");
 }
 
 #[test]
@@ -149,9 +145,6 @@ fn arcs_advance_on_rest_days_and_pause_on_post() {
     assert!(v.set_station(SoulId(0), None));
     v.tick(t0() + gd(3 + ARC_BEAT_REST_DAYS as i64));
     assert_eq!(v.soul_state(SoulId(0)).unwrap().arc_beat, 1);
-
-    // Beats pay hope: 7 -> capped rises by the fired payouts.
-    assert!(v.hope > 7, "beats raise hope (got {})", v.hope);
 }
 
 #[test]
@@ -200,63 +193,6 @@ fn stations_change_the_composed_prices() {
 }
 
 #[test]
-fn hope_is_the_wind_and_the_long_silence_breaks_at_a_hearth() {
-    // Two identical ships, different hope: the hopeful one arrives first.
-    let leg = |hope: u8| {
-        let mut v = started();
-        v.hope = hope;
-        v.depart(roads_from(ROUTE_START).next().unwrap().id)
-            .unwrap();
-        v.tick(t0() + gh(26));
-        matches!(v.phase, VoyagePhase::HoldingStation { .. })
-    };
-    assert!(
-        leg(9),
-        "high hope: the 1.0-day leg is done inside 26h (0.9x)"
-    );
-    assert!(!leg(2), "guttering hope: the same leg drags (1.25x)");
-
-    // The Long Silence: hope hits ashen, legs crawl, arcs pause — until a
-    // rest-stop hearth breaks it.
-    let mut v = started();
-    v.hope = 1;
-    // A farewell at hope 1 lands on ashen and the silence falls.
-    assert!(v.farewell(SoulId(2)));
-    assert_eq!(v.hope, 0);
-    assert!(v.long_silence);
-
-    // Arcs pause in the silence.
-    v.tick(t0() + gd(4));
-    assert_eq!(v.soul_state(SoulId(0)).unwrap().arc_beat, 0, "arcs paused");
-
-    // Sail to the Kelp Meadows (W2 -> W5 is a RestStop) — via W1/W2.
-    v.depart(roads_from(ROUTE_START).next().unwrap().id)
-        .unwrap();
-    v.tick(t0() + gd(7)); // slow legs under the silence
-    v.play_arrival_scene();
-    if v.pending_ask.is_some() {
-        v.decline_ask(); // Maren asks at W1; the silence declines
-    }
-    v.depart(roads_from(WaypointId(1)).next().unwrap().id)
-        .unwrap();
-    v.tick(t0() + gd(10));
-    v.play_arrival_scene();
-    assert_eq!(v.current_waypoint(), Some(WaypointId(2)));
-    // W2 -> W5 (the Kelp Meadows, a RestStop).
-    v.depart(quest::vessel::route::RoadId(3)).unwrap();
-    v.tick(t0() + gd(16));
-    assert_eq!(v.current_waypoint(), Some(WaypointId(5)));
-    assert!(!v.long_silence, "the hearth breaks the silence");
-    // The break restores hope to "low" (3); arcs resume immediately and any
-    // beats that fire in the same stretch raise it further.
-    assert!(v.hope >= 3, "hope came back (got {})", v.hope);
-    assert!(
-        v.souls.iter().any(|s| s.arc_beat > 0),
-        "arcs resumed after the silence"
-    );
-}
-
-#[test]
 fn the_covenant_no_offline_stretch_touches_the_roster() {
     // Hold, travel, and drift for 60 days without a single player action:
     // the roster count and statuses never change, and no loss fires.
@@ -277,7 +213,7 @@ fn the_covenant_no_offline_stretch_touches_the_roster() {
 }
 
 #[test]
-fn offline_equivalence_holds_with_arcs_and_wind_in_play() {
+fn offline_equivalence_holds_with_arcs_in_play() {
     let build = || {
         let mut v = started();
         v.set_station(SoulId(0), Some(Station::Helm));
@@ -298,7 +234,6 @@ fn offline_equivalence_holds_with_arcs_and_wind_in_play() {
 
     assert_eq!(live.phase, offline.phase);
     assert_eq!(live.provisions.to_bits(), offline.provisions.to_bits());
-    assert_eq!(live.hope, offline.hope);
     assert_eq!(live.souls, offline.souls);
     assert_eq!(live.soul_events, offline.soul_events);
 }
@@ -312,12 +247,10 @@ fn old_voyage_saves_load_with_the_launch_trio() {
     let obj = json.as_object_mut().unwrap();
     obj.remove("souls");
     obj.remove("pending_ask");
-    obj.remove("long_silence");
     obj.remove("soul_events");
     let loaded: VoyageState = serde_json::from_value(json).unwrap();
     assert_eq!(loaded.aboard_count(), 3);
     assert!(loaded.pending_ask.is_none());
-    assert!(!loaded.long_silence);
     let names: Vec<_> = loaded.aboard().map(|s| souls::soul(s.soul).name).collect();
     assert_eq!(names, vec!["Torvald", "Eir", "Runa"]);
 }
@@ -340,19 +273,25 @@ fn threat_ledgers_are_functions_of_prior_choices() {
     };
     let reef = quest::vessel::route::WaypointId(9);
 
-    // Hurried and unsung: the Warden takes provisions AND hope.
+    // Hurried and unsung: the Warden takes provisions AND scars the hull.
     let mut v = stage(RoadId(9), reef);
     v.set_trim(Trim::Run);
-    let (p0, h0) = (v.provisions, v.hope);
+    let p0 = v.provisions;
     v.play_arrival_scene().unwrap();
-    assert!(v.provisions < p0 && v.hope < h0);
+    assert!(
+        v.provisions < p0 && v.hull_wear > 0,
+        "hurried: hold and hull"
+    );
 
-    // Slow and respectful: provisions only.
+    // Slow and respectful: the hold pays, but the hull is spared.
     let mut v = stage(RoadId(9), reef);
     v.set_trim(Trim::Quiet);
-    let h0 = v.hope;
+    let p0 = v.provisions;
     v.play_arrival_scene().unwrap();
-    assert_eq!(v.hope, h0, "respectful passage spares hope");
+    assert!(
+        v.provisions < p0 && v.hull_wear == 0,
+        "respectful spares the hull"
+    );
 
     // Sefa aboard: safe, and a keepsake.
     let mut v = stage(RoadId(9), reef);

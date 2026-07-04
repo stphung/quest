@@ -427,5 +427,4 @@ fn the_ferry_loop_is_offline_equivalent() {
     offline.tick(horizon);
     assert_eq!(live.phase, offline.phase);
     assert_eq!(live.provisions.to_bits(), offline.provisions.to_bits());
-    assert_eq!(live.hope, offline.hope);
 }

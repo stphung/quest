@@ -486,7 +486,6 @@ pub fn voyage_arrived(
         at_min: 60 * MINUTES_PER_DAY,
     };
     v.finale_shown = true;
-    v.hope = 9;
 
     // The cast: the launch trio crossed (Torvald last stood the helm),
     // Maren came aboard and crossed, Sefa was declined, Ysolt stepped

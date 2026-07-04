@@ -5,7 +5,7 @@
 //! night is a soul's job: the Watch-station soul stands by default, any
 //! soul can be assigned per night (costing them a rest day), and a
 //! Watch-affine stander resolves one grade kinder. Nights price provisions
-//! and hope — they never injure, remove, or advance-to-loss a soul.
+//! (and keep the odd secret) — they never injure, remove, or advance-to-loss a soul.
 //!
 //! See `docs/superpowers/specs/2026-07-03-vessel-underway-design.md`.
 
@@ -52,14 +52,12 @@ pub enum NightOutcome {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct NightEffect {
     pub provisions: f64,
-    pub hope: i8,
     /// The night yields a rumor (singing/strange, stood by the right soul).
     pub rumor: bool,
 }
 
 const NONE: NightEffect = NightEffect {
     provisions: 0.0,
-    hope: 0,
     rumor: false,
 };
 
@@ -81,7 +79,7 @@ pub fn raw_night_kind(seed: u64, day: u64) -> NightKind {
 }
 
 /// The outcome matrix. Small numbers, no dice, no harm to souls — the
-/// worst any night does is priced provisions/hope and a secret kept.
+/// worst any night does is priced provisions and a secret kept.
 pub fn night_effect(kind: NightKind, outcome: NightOutcome) -> NightEffect {
     use NightKind::*;
     use NightOutcome::*;
@@ -116,7 +114,10 @@ pub fn night_effect(kind: NightKind, outcome: NightOutcome) -> NightEffect {
             ..NONE
         },
         (Singing, _) => NONE,
-        (Strange, Unstood) => NightEffect { hope: -2, ..NONE },
+        (Strange, Unstood) => NightEffect {
+            provisions: -3.0,
+            ..NONE
+        },
         (Strange, StoodAffine) => NightEffect {
             rumor: true,
             ..NONE
@@ -213,12 +214,11 @@ mod tests {
             for outcome in [Unstood, Stood, StoodAffine, StoodByPilgrim] {
                 let e = night_effect(kind, outcome);
                 // Bounded prices, no catastrophe.
-                assert!(e.provisions >= -6.0 && e.hope >= -2);
+                assert!(e.provisions >= -6.0);
                 // Standing is never worse than not standing.
                 let unstood = night_effect(kind, Unstood);
                 if outcome != Unstood {
                     assert!(e.provisions >= unstood.provisions);
-                    assert!(e.hope >= unstood.hope);
                 }
             }
         }

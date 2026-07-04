@@ -109,24 +109,16 @@ fn the_mail_flows_then_stops_forever() {
 }
 
 #[test]
-fn letters_pay_their_parcel_and_hope_exactly_once() {
+fn letters_arrive_and_pay_their_parcel_exactly_once() {
     // The mail catches up at ports of call, not at the launch pier: the
     // first letter waits at the first arrival.
     let mut v = VoyageState::begin("parcel".to_string(), 5, t0());
     v.intro_pending = false;
     v.play_arrival_scene();
     assert!(v.take_letter_events().is_empty(), "no mail at the pier");
-    // Post the whole trio so no arc beats fire mid-leg: the only hope
-    // movement left is the letter's.
-    use quest::vessel::souls::{SoulId, Station};
-    v.set_station(SoulId(0), Some(Station::Helm));
-    v.set_station(SoulId(1), Some(Station::Tender));
-    v.set_station(SoulId(2), Some(Station::Watch));
     v.depart(roads_from(ROUTE_START).next().unwrap().id)
         .unwrap();
-    v.hope = 7;
     v.tick(t0() + gd(2)); // arrive W1
-    assert_eq!(v.hope, 8, "letter 0 lifts hope on arrival");
     assert_eq!(v.letters_received, 1);
     let events = v.take_letter_events();
     assert_eq!(events, vec![0]);
@@ -182,7 +174,6 @@ fn offline_equivalence_holds_with_the_mail_in_play() {
 
     assert_eq!(live.phase, offline.phase);
     assert_eq!(live.provisions.to_bits(), offline.provisions.to_bits());
-    assert_eq!(live.hope, offline.hope);
     assert_eq!(live.letters_received, offline.letters_received);
     assert_eq!(live.letter_events, offline.letter_events);
     assert_eq!(live.log, offline.log);

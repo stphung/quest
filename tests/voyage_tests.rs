@@ -6,7 +6,7 @@ use chrono::{DateTime, Duration, Utc};
 use quest::vessel::junction::current_junction_cards;
 use quest::vessel::persistence::{load_voyage_from_path, save_voyage_to_path};
 use quest::vessel::route::{self, ROUTE_SINK, ROUTE_START};
-use quest::vessel::voyage::{Trim, VoyagePhase, VoyageState, HOPE_FLOOR_STEADY};
+use quest::vessel::voyage::{Trim, VoyagePhase, VoyageState};
 
 fn t0() -> DateTime<Utc> {
     "2026-07-03T12:00:00Z".parse().unwrap()
@@ -95,21 +95,13 @@ fn priciest_road_crossing_survives_by_drifting() {
         (20..=160).contains(&days),
         "run-hard crossing took {days} days"
     );
-    // Travel itself never harms hope — drift included. Arc beats can only
-    // raise it, so an attended crossing lands at launch hope or better.
-    assert!(
-        v.hope >= 7,
-        "travel/drift must not harm hope (got {})",
-        v.hope
-    );
 }
 
 #[test]
-fn mourn_crossing_arrives_with_hope_high() {
+fn mourn_crossing_is_slow_and_reaches_the_tree() {
     let (v, days) = cross(|_| 0, Trim::Mourn);
     assert!(v.arrived());
-    // Mourn is slow (x1.40) but the only trim that raises hope at sea.
-    assert!(v.hope >= 7, "mourn crossing ended with hope {}", v.hope);
+    // Restful is the slowest pace (x1.40) — its identity is thrift, not speed.
     assert!(
         days >= 30,
         "mourn crossing was implausibly fast: {days} days"
@@ -148,20 +140,17 @@ fn offline_equivalence_across_a_save_load_boundary() {
 
     assert_eq!(live.phase, offline.phase);
     assert_eq!(live.provisions.to_bits(), offline.provisions.to_bits());
-    assert_eq!(live.hope, offline.hope);
     assert_eq!(live.visited, offline.visited);
     assert_eq!(live.processed_minutes, offline.processed_minutes);
 }
 
 #[test]
 fn a_week_away_never_harms_the_voyage_beyond_its_prices() {
-    // The covenant: the worst offline outcome is priced provisions/hope.
-    // Hold a station for a month — hope floors at "steady", nothing else
-    // moves, and the ship still departs fine afterward.
+    // The covenant: holding station costs nothing — a month at anchor moves
+    // nothing, and the ship still departs fine afterward.
     let mut v = VoyageState::begin("away".to_string(), 3, t0());
     v.play_arrival_scene();
     v.tick(t0() + Duration::days(30));
-    assert_eq!(v.hope, HOPE_FLOOR_STEADY);
     assert_eq!(
         v.provisions_display(),
         100,

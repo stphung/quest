@@ -8,7 +8,7 @@ The dark-shipped Act 2: after Zone 50 falls, a signal from Yggdrasil is discover
 |------|---------|
 | `mod.rs` | Kill-switch (`ACT2_ENABLED`, `act2_enabled()`), launch gate (`can_launch`, `perform_launch`), whisper rotation, `VoyageUiState`/`VoyageView`/`ScenePlay`/`SceneModal` (transient UI state) |
 | `route.rs` | The static authored route graph: 38 waypoints, 45 roads, 8 rumors, 4 chapters, 7 junctions — a spine-and-diamond DAG from the Last Harbor to the Roots of Light |
-| `voyage.rs` | `VoyageState` — the whole crossing's state machine: lazy wall-clock tick, phases (Traveling/Drifting/HoldingStation/Arrived), trim, provisions/hope gauges, arcs, mail, refits, night resolution |
+| `voyage.rs` | `VoyageState` — the whole crossing's state machine: lazy wall-clock tick, phases (Traveling/Drifting/HoldingStation/Arrived), trim, the provisions gauge, arcs, mail, refits, night resolution. **Hope was retired** — the Ward yard (`colony.rs`) is Act 2's attrition lever now |
 | `souls.rs` | The 8-person authored roster: stations (Helm/Tender/Watch), affinities, arcs (3 beats + resolution), junction counsel lines |
 | `scenes.rs` | Arrival scene content: beats + state-conditioned color lines + payout, one `SceneDef` per waypoint; drift-recovery scenes per chapter; the finale |
 | `weather.rs` | Void weather (Current/SilenceBank/Squall) — a pure function of `(voyage_seed, game-hour)`, no stored state |
@@ -54,7 +54,7 @@ pub enum VoyageView {
 ```
 
 ### `VoyageState` (`voyage.rs`)
-The whole crossing. Persisted to `voyage.json` via `persistence.rs`. Key fields: `phase: VoyagePhase`, `trim: Trim`, `provisions: f64` / `provisions_cap: f64`, `hope: u8`, `visited: Vec<WaypointId>`, `untaken: Vec<RoadId>`, `souls: Vec<SoulState>`, `refits: Vec<RefitId>`, `log: Vec<LogEntry>`, plus per-system bookkeeping (rumors, night assignments, letters, weather-derived silence tracking).
+The whole crossing. Persisted to `voyage.json` via `persistence.rs`. Key fields: `phase: VoyagePhase`, `trim: Trim`, `provisions: f64` / `provisions_cap: f64`, `visited: Vec<WaypointId>`, `untaken: Vec<RoadId>`, `souls: Vec<SoulState>`, `refits: Vec<RefitId>`, `log: Vec<LogEntry>`, plus per-system bookkeeping (rumors, night assignments, letters, weather-derived silence tracking). (Legacy `hope`/`long_silence`/`hard_rations` fields on older saves are ignored on load — the hope system is retired.)
 
 ```rust
 pub enum VoyagePhase {
@@ -68,7 +68,7 @@ pub enum VoyagePhase {
 Key methods: `begin()`, `tick(now)` (lazy wall-clock advance), `play_arrival_scene()`, `depart(road_id)`, `set_trim()`, `set_station()`, `accept_ask()` / `decline_ask()` / `farewell()` / `mark_lost()`, `buy_rumor()`, `hail()`, `take_finale_playback()`.
 
 ### `Trim` (`voyage.rs`)
-The one posture dial: `Run` (faster, hungrier), `Cruise` (default), `Quiet` (slower, thriftier, hears silence-banks), `Mourn` (slowest, thriftiest, raises hope after a full day at sea). Composes into leg time and provisions burn alongside wind (hope) and station bonuses — see `time_mult_with()` / `provisions_mult_with()`.
+The one posture dial (player-facing **Pace**): `Run`/Grueling (faster, hungrier), `Cruise`/Steady (default), `Quiet`/Easy (slower, thriftier, hears silence-banks), `Mourn`/Restful (slowest, **thriftiest hold** — 0.80× burn, its identity now that hope is retired). Composes into leg time and provisions burn alongside station bonuses — see `time_mult_with()` / `provisions_mult_with()`.
 
 ### `SoulState` / `SoulStatus` / `SoulId` (`voyage.rs` state, `souls.rs` content)
 `SoulStatus`: `Aboard`, `Declined` (permanent), `Ashore` (farewelled, remembered), `Lost` (authored scenes only — `mark_lost()` is never called from tick-driven code, "the covenant in one sentence"). A soul's `arc_beat` advances through `SoulDef::arc` (3 beats + a resolution) as `rest_minutes` accumulates (`ARC_BEAT_REST_DAYS` days), gated by an `ArcTrigger` (`Aboard`, `ReachChapter`, `VisitFeature`, `VisitWaypoint`).
@@ -96,11 +96,11 @@ Once `vessel_launched` (and `act2_enabled()`), `main.rs`'s game loop hands contr
 - **Lazy tick, whole game-minutes**: `VoyageState::tick(now)` computes elapsed game minutes since `launched_at` and steps `step_minute()` in a loop until caught up. This makes `tick(t2)` produce bitwise-identical state to `tick(t1); tick(t2)` — the "offline equivalence" property that lets long absences resolve exactly like live play. The clock is `GAME_MINUTES_PER_REAL_MINUTE = 2.64` (a sea-day passes in ~9 real hours), so the maiden voyage's ~37 sea-days is **about two real weeks**. The campaign's ramp is *earned*, not compressed: the clock never changes, only the Drive level shortens each crossing. Fixtures and tests express exact offsets through `real_duration_for_game_minutes()` so they are scale-agnostic.
 - **Auto-sail (pacing)**: a mid-crossing port with no decision — exactly one road out, no recruit ask, no refit door — gets a `PORT_CALL_GAME_MINUTES` port call, then the ship sails herself; the arrival scene is played by the engine and queued in `unread_scenes` for the ferryman to read on return (drained one at a time by `main.rs`). On the **maiden voyage** (crossing 1) decisions hold the ship: junctions, asks, refit doors, and the pier (`arrived_by: None`). On a **ferry run** (crossing 2+, `crossing_number > 1`) the whole crossing is hands-off — she auto-navigates junctions too (taking the first road), skips refit doors, and launches herself from the pier — so the crossing completes autonomously in Drive-scaled time. The passenger load also stops deepening her provisions burn on ferry runs (`provisions_mult_with`): no one meters rations, so the crossing's length answers to Drive alone, not the headcount.
 - **Route**: a spine-and-diamond DAG (`route.rs`) — branches split at 7 junctions and rejoin within the same chapter; each chapter ends at a single gateway waypoint; the Tree (`ROUTE_SINK`, waypoint 37) is the graph's only sink.
-- **Gauges**: `provisions` (burn while traveling, composed from trim × tender-station × weather) and `hope` (the "wind" — its one mechanical effect is `time_mult`; ashen hope enters the Long Silence, pausing arcs and slowing everything to the worst rate until a rest stop relights it).
+- **Gauges**: `provisions` (burn while traveling, composed from trim × tender-station × weather; running dry drifts in place). Speed = Drive × Pace × helm-station × Storm Sail. (Hope, the old "wind" gauge, is **retired** — see the note in the file table.)
 - **Affordability invariant**: at every junction, the cheapest outgoing road never costs more than `DRIFT_RECOVERY_PROVISIONS` (25) — asserted in `route.rs` tests — so running the hold dry always means drifting in place (36-hour recovery), never getting stuck.
-- **Souls**: recruit asks block departure until answered; stations (Helm/Tender/Watch) grant multipliers; arcs pay hope/rumors on a rest-day timer; farewelling frees a crew seat at a small hope cost; loss is authored-scene-only.
+- **Souls**: recruit asks block departure until answered; stations (Helm/Tender/Watch) grant multipliers; arcs pay rumors (and fire as log moments) on a rest-day timer; farewelling frees a crew seat; loss is authored-scene-only.
 - **Refits**: the first 3 distinct shipyards visited each offer one permanent A/B door (`REFIT_PAIRS`); picking one closes the other forever.
-- **Weather & nights**: weather is a pure function of `(voyage_seed, hour)` so it never needs saving; nights are typed per day from `(voyage_seed, day)` and price provisions/hope based on who stands the watch.
+- **Weather & nights**: weather is a pure function of `(voyage_seed, hour)` so it never needs saving; nights are typed per day from `(voyage_seed, day)` and price provisions (and soul strain) based on who stands the watch.
 - **Letters & the Going-Dark**: one letter per Chapter I/II arrival, delivered at ports (never on timers); the Threshold hands over the Last Letter; the first arrival past the Last Lantern is the night the mail does not come (`gone_dark`).
 - **Finale**: `take_finale_playback()` fires once on arrival, setting `state.vessel_arrived = true` — the hook a future Act 3 would key off, the way Act 2 keys off `vessel_launched`.
 - **Persistence**: `voyage.json` (via `persistence.rs`), keyed by `character_id` so a different character never inherits a crossing in progress.
@@ -142,11 +142,9 @@ Once `vessel_launched` (and `act2_enabled()`), `main.rs`'s game loop hands contr
 | `LAUNCH_PROVISIONS` | 100.0 | Hold is full at launch |
 | `DRIFT_RECOVERY_PROVISIONS` | 25 | Also the affordability floor (every junction's cheapest road) |
 | `DRIFT_RECOVERY_HOURS` | 36 | |
-| `HOLD_STATION_GRACE_DAYS` | 3 | Before hope starts to fray while holding |
 | `RUMOR_PRICE` | 6.0 | Per way-station visit |
-| `HOPE_MAX` | 10 | |
-| `HOPE_FLOOR_STEADY` | 5 | Holding-station decay never drops hope below this |
-| `LAUNCH_HOPE` | 7 ("bright") | |
+
+(The hope constants — `HOPE_MAX`, `HOPE_FLOOR_STEADY`, `LAUNCH_HOPE`, `HOPE_SPEND_FLOOR`, `PRESS_*`, `HARD_RATIONS_BURN_MULT`, `HOLD_STATION_GRACE_DAYS` — and the Press-the-helm / Rations levers were removed when hope was retired.)
 
 ### Colony / the ferry loop (`colony.rs`)
 
@@ -179,8 +177,6 @@ Buying is player-driven (`buy_drive`/`buy_capacity`/`buy_ward`, wired through `V
 |----------|-------|-------|
 | `CREW` | 7 | 8 souls total (3 launch + 5 found) compete for 7 |
 | `ARC_BEAT_REST_DAYS` | 2 | Rest days before a ready beat fires |
-| `LOSS_HOPE_COST` | 3 | Authored-scenes-only |
-| `FAREWELL_HOPE_COST` | 1 | |
 
 ### Route (`route.rs`)
 38 waypoints, 45 roads, 8 rumors, 4 chapters, 7 junctions (2/2/2/1 by chapter). Every maximal route sees ~24 waypoints and passes >=5 soul-candidate scenes, >=2 shipyards, >=2 rest stops (content-parity tests). Road prices range 12-55 provisions (chapter-ramped); base days 1.0-3.0 at Cruise.
