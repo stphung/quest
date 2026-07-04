@@ -3,6 +3,8 @@ name: wiki-audit
 description: Multi-agent wiki audit — finds stale numbers, missing systems, and broken links in the player-facing wiki. Use when wiki is stale, after game changes, or before releases.
 ---
 
+<!-- meta-audit scope-universe: quest.wiki/*.md -->
+
 # Audit Player-Facing Wiki
 
 Multi-agent audit of the GitHub wiki (`quest.wiki/` submodule). Finds stale content, missing systems, and broken links, then auto-fixes safe patterns.
@@ -108,6 +110,45 @@ cd quest.wiki && git add -A && git commit -m "docs: audit updates" && git push o
 git add quest.wiki
 git commit -m "docs: update quest.wiki submodule pointer"
 ```
+
+## Log This Run
+
+After verification passes, record this run for `meta-audit`:
+
+1. Build a JSON summary: date (YYYY-MM-DD), current commit SHA (`git rev-parse HEAD`), PR
+   URL, agent count, the scope actually covered, and every finding (location, claim,
+   correct value, severity, category, whether auto-fixed). Example:
+   ```json
+   {
+     "type": "run",
+     "date": "2026-07-10",
+     "commit_sha": "abc1234...",
+     "pr_url": "https://github.com/stphung/quest/pull/999",
+     "agent_count": 4,
+     "scope": ["Combat.md", "Equipment.md"],
+     "findings": [
+       {
+         "location": "Combat.md:42",
+         "claim": "...",
+         "correct_value": "...",
+         "severity": "HIGH",
+         "category": "stale-constant",
+         "auto_fixed": true
+       }
+     ]
+   }
+   ```
+   `findings` is `[]` for an all-clear run — still log it, it counts toward the threshold.
+2. Write it to a temp file and run:
+   ```bash
+   scripts/audit-eval-log.sh wiki-audit /tmp/wiki-audit-run.json
+   ```
+3. Check the threshold:
+   ```bash
+   scripts/audit-eval-check.sh wiki-audit
+   ```
+   If it prints `TRIGGER`, invoke the `meta-audit` skill for `wiki-audit` as a follow-up
+   after this run's own PR is up. If it prints `SKIP: n/5`, nothing further to do.
 
 ## Output
 
