@@ -58,6 +58,27 @@ Each of the 14 minigames follows the same structure in `minigame_input.rs`:
 
 The **forfeit pattern** (first Esc sets `forfeit_pending`, second Esc confirms) is implemented inside each minigame's logic, not in the input module.
 
+## Testing: the Input-Replay Harness
+
+`handle_game_input` is exercised by [`harness.rs`](harness.rs) + [`replay_tests.rs`](replay_tests.rs) (both `#[cfg(test)]`, so they compile and run only under `cargo test`, in the binary crate where `input` lives). This is the programmable, assertable counterpart to the manual `drive-game` skill — the input analog of the UI snapshot tests.
+
+`InputHarness` owns every piece of state a [`GameContext`](../main_helpers/game_context.rs) borrows, feeds `KeyEvent`s through the real dispatcher, records each `InputResult`, and can render the base frame for content assertions:
+
+```rust
+let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+h.haven.discovered = true;         // [H] is gated on discovery
+h.char('h');                       // press a key, get the InputResult back
+assert!(h.haven_ui.showing);
+h.replay("Esc");                   // compact whitespace key script
+assert!(!h.haven_ui.showing);
+```
+
+- All state fields are `pub` — arrange a scenario (open an overlay, flip a discovery flag) before pressing keys.
+- `press` / `char` / `press_event` drive one key; `type_str` types a word; `replay` runs a whitespace-separated script (`"Tab Down Down Enter Esc"`; named keys `Enter Esc Tab Up Down Left Right Space Backspace Home End Delete`, else single chars).
+- `results()` / `last()` expose the recorded `InputResult` history; `render(w, h)` returns the base-screen buffer debug string for `contains`-style assertions (byte-exact frames belong in `ui::snapshot_tests`, which can freeze the clock).
+
+**Add coverage** for any input change by extending `replay_tests.rs` — cover the discovery gate, the modal-interception order (higher-priority overlays must swallow keys first), and Enter-only vs any-key dismissal.
+
 ## Integration Points
 
 - **Imports from**: `challenges/` (menu processing, all 14 minigame input handlers), `character/prestige` (can_prestige, perform_prestige), `haven/` (try_build_room, can_forge_stormbreaker), `enhancement/` (roll_enhancement, costs), `deep/` (mission management, guild rank), `stormglass/` (sigils, spending), `achievements/` (browser, titles, sync), `ascension/` (ascend), `zones/` (sync_account_zone_unlocks), `loom/` (Loom of Worlds state), `vessel/` (functions: `can_launch`, `perform_launch`; types: `route`, `voyage::*`, `SceneModal`, `VoyageUiState`, `VoyageView`), `utils/debug_menu` (DebugMenu), `history/` (SaveEvent)

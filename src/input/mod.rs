@@ -13,6 +13,13 @@ pub mod time_vault_input;
 pub mod types;
 pub mod voyage_input;
 
+// Headless input-replay harness and its tests — the programmable counterpart
+// to the manual `drive-game` skill. Compiled only for `cargo test`.
+#[cfg(test)]
+mod harness;
+#[cfg(test)]
+mod replay_tests;
+
 // Re-export all types for backward compatibility
 pub use types::*;
 
