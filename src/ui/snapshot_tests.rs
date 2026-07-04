@@ -188,6 +188,28 @@ fn snapshot_all_minigames() {
     }
 }
 
+/// An in-progress dungeon run with Storm Sigils etched and a god item
+/// equipped — three Act 1 endgame systems with no other snapshot coverage.
+#[test]
+fn snapshot_dungeon_with_sigils_and_god_item() {
+    let mut state = fixtures::endgame("Dungeon", CREATED_AT, &mut gear_rng());
+    state.active_dungeon = Some(fixtures::dungeon_in_progress(11));
+    fixtures::unlock_storm_sigils(&mut state);
+    fixtures::equip_god_item(&mut state, crate::god_items::GodItemId::Megingjord);
+    assert_frame_snapshot("dungeon_active_xl_160x45", &state, 160, 45);
+    assert_frame_snapshot("dungeon_active_l_80x30", &state, 80, 30);
+}
+
+/// An in-progress fishing session — one fish already landed, mid-reel on
+/// the next.
+#[test]
+fn snapshot_fishing_active() {
+    let mut state = fixtures::endgame("Fishing", CREATED_AT, &mut gear_rng());
+    fixtures::active_fishing_session(&mut state);
+    assert_frame_snapshot("fishing_active_xl_160x45", &state, 160, 45);
+    assert_frame_snapshot("fishing_active_l_80x30", &state, 80, 30);
+}
+
 /// Two renders of the same state must be byte-identical. If this fails, a
 /// nondeterministic input (wall clock, thread RNG, iteration order) leaked
 /// into the render path — fix that before touching any snapshot.
