@@ -99,11 +99,16 @@ One JSONL file per audited skill. Two entry types.
 
 `commit_sha` is always a commit in the main `quest` repo (never the `quest.wiki`
 submodule) — every finding's `correct_value`, including wiki-audit's, is ultimately
-derived from `src/` source, which only lives in the main repo. It's the branch HEAD at
-audit time — critical for re-verification, since it lets `meta-audit` check the claim
-against source *as it was*, not against however the codebase looks by the time the
-deep-eval runs. Without it, a re-check months later can't tell "the original audit was
-wrong" apart from "the game changed since then."
+derived from `src/` source, which only lives in the main repo. It's found via
+`git merge-base HEAD origin/main` — the commit `main` was at when the audit's agents
+did their read-only cross-referencing, i.e. the exact state every finding's
+`correct_value` describes. It is deliberately NOT the branch's own HEAD (`git rev-parse
+HEAD`) and NOT the eventual PR merge commit: for skills that modify the audited code
+itself (e.g. perf-audit, test-audit), the merge commit contains the *fix*, not the
+pre-fix state a finding describes. This is critical for re-verification, since it lets
+`meta-audit` check the claim against source *as it was*, not against however the
+codebase looks by the time the deep-eval runs. Without it, a re-check months later can't
+tell "the original audit was wrong" apart from "the game changed since then."
 
 A `run` entry is logged even when `findings` is empty (an "all clear" run, e.g. PR #593)
 — it still counts toward the 5-run threshold in `audit-eval-check.sh`.
@@ -138,9 +143,9 @@ mechanically checkable definition of "everything that could be in scope" for tha
 | perf-audit | `src/*/` (top-level module directories only — perf-audit's scope is thematic, not exhaustive; staleness here means "a new module exists with no agent assigned to it," not "every file must be listed") |
 | dependency-audit | *(none — scope is inherently `Cargo.toml`'s current contents, which can't go stale by definition)* |
 
-**2. A new `## Log This Run` section**, inserted right before the existing `## Output`
-section (so it doesn't require renumbering each skill's differently-numbered Phase
-sequence):
+**2. A new `## Log This Run` section**, inserted right after the existing `## Output`
+section — it can't go before `## Output`, because `## Output` is where `/ship` runs and
+creates the PR, and `Log This Run` needs that PR's URL to already exist:
 
 ```markdown
 ## Log This Run
@@ -194,9 +199,13 @@ confirmed inaccuracies by how long they've been present (older = higher priority
 - *Flag for review:* anything that would change agent count, phase structure, or the
   auto-fix/flag-for-review policy itself.
 
-**Phase 6 — Ship.** Append the `eval_marker` entry, then branch + PR (same pattern as
-every other audit skill — no direct commits to `main`). PR body includes the full report:
-confirmed inaccuracies, scope gaps/rot, what was auto-fixed, what's flagged.
+**Phase 6 — Ship.** The `eval_marker` needs the PR's own URL, which doesn't exist until
+the PR is created, so the order is: (1) branch, commit the `SKILL.md` fix(es), and open
+the PR first (same pattern as every other audit skill — no direct commits to `main`); PR
+body includes the full report: confirmed inaccuracies, scope gaps/rot, what was
+auto-fixed, what's flagged; (2) only now, with a real PR URL in hand, append the
+`eval_marker` entry; (3) commit that marker addition as a follow-up commit on the same
+still-open branch before it merges.
 
 ## Historical backfill
 
@@ -214,7 +223,12 @@ start. Instead, backfill each skill's log now from data that already exists:
   the auto-trigger.
 
 This is a one-time manual pass as part of implementing this skill, not an ongoing
-mechanism — `commit_sha` for backfilled entries is the PR's merge commit.
+mechanism. `commit_sha` for backfilled entries follows the same rule as live runs: for
+doc-audit/wiki-audit, whose audited PRs never touch the `src/` code their findings
+describe, the PR's merge commit and its pre-fix parent commit are equivalent, so either
+works. For perf-audit/test-audit, whose audited PRs *do* modify the code being
+evaluated, the merge commit contains the fix rather than the pre-fix state a finding
+describes — so backfilled `commit_sha` must be the PR's parent (pre-fix) commit instead.
 
 ## Testing / validation
 
