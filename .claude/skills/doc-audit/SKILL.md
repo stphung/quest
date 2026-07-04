@@ -39,7 +39,7 @@ Scope: `src/dungeon/CLAUDE.md`, `src/fishing/CLAUDE.md`, `src/items/CLAUDE.md`, 
 
 **Agent 4 — Progression Systems**
 
-Scope: `src/haven/CLAUDE.md`, `src/enhancement/CLAUDE.md`, `src/ascension/CLAUDE.md`, `src/stormglass/CLAUDE.md`, `src/deep/CLAUDE.md`, `src/power_cores/CLAUDE.md`, `src/god_items/CLAUDE.md`, `src/loom/CLAUDE.md`
+Scope: `src/haven/CLAUDE.md`, `src/enhancement/CLAUDE.md`, `src/ascension/CLAUDE.md`, `src/stormglass/CLAUDE.md`, `src/deep/CLAUDE.md`, `src/power_cores/CLAUDE.md`, `src/god_items/CLAUDE.md`, `src/loom/CLAUDE.md`, `src/vessel/CLAUDE.md`
 
 **Agent 5 — Infrastructure**
 
