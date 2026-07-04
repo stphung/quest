@@ -39,6 +39,9 @@ never its logged `correct_value`. If `location` names multiple files, the agent 
 actually was **as of that finding's `commit_sha`**, reading source read-only via
 `git show <commit_sha>:<path>` only. Never run `git checkout`, `git switch`, `git reset`,
 `git stash`, or edit any file — nothing in this phase may change what's in the working tree.
+
+`location` identifies where the wrong claim was written, not necessarily where the truth lives. For wiki-audit findings, `location` is a page inside the `quest.wiki` submodule — a separate git history not reachable via `git show <commit_sha>:<path>` against the main repo (confirmed: this always fails with "path does not exist"). In that case, and generally whenever `location` isn't a path that resolves in the main repo, derive the correct value from whatever main-repo source file the `claim` or `correct_value` text names or implies — search for it if it isn't named explicitly.
+
 The agent reports its own independently-derived value plus the source location it based that on.
 
 Diff the agent's answer against the logged `correct_value`. A mismatch is a confirmed
