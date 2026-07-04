@@ -465,6 +465,27 @@ fn snapshot_voyage_harbor_strip() {
 }
 
 #[test]
+fn snapshot_voyage_reckoning_early() {
+    // A few crossings in, all three yards still affordable — the state where
+    // the yard comparison is a live decision.
+    assert_overlay_snapshot("voyage_reckoning_early_xl_160x45", || {
+        let voyage = fixtures::voyage_mid_leg(frozen_utc());
+        let colony = fixtures::colony_early();
+        let ui = crate::vessel::VoyageUiState {
+            view: crate::vessel::VoyageView::Reckoning,
+            scene_play: None,
+            scene_modal: None,
+            moments: Default::default(),
+        };
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, Some(&colony));
+        })
+    });
+}
+
+#[test]
 fn snapshot_voyage_reckoning() {
     assert_overlay_snapshot("voyage_reckoning_xl_160x45", || {
         let voyage = fixtures::voyage_mid_leg(frozen_utc());

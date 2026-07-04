@@ -466,6 +466,29 @@ pub fn colony_midera() -> crate::vessel::colony::ColonyState {
     c
 }
 
+/// The colony a few crossings in, when all three yards are still live buys —
+/// the state where the Reckoning's yard comparison actually matters.
+pub fn colony_early() -> crate::vessel::colony::ColonyState {
+    use crate::vessel::colony::{ColonyState, CrossingRecords};
+    let mut c = ColonyState::found("fixture-voyager".to_string());
+    c.souls_delivered = 12_000;
+    c.souls_remaining = 82_000;
+    c.drive_level = 2;
+    c.cap_level = 2;
+    c.ward_level = 1;
+    c.salvage = 26;
+    c.crossings_completed = 4;
+    c.days_last_crossing = 18;
+    c.records = CrossingRecords {
+        fastest_days: 18,
+        most_carried: 333,
+        total_lightyears: 900,
+        total_nights: 74,
+    };
+    c.dimmed_ports = c.dark_ports();
+    c
+}
+
 /// A finished crossing, moored at the Tree with the finale already read:
 /// the harbor screen's home state. The roster carries one of everything
 /// the manifest can show — souls ashore, a decline, a farewell, and a

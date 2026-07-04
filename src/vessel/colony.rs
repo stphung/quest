@@ -57,11 +57,12 @@ pub const DRIVE_COST_GROWTH: f64 = 1.5;
 pub const CAP_COST_BASE: f64 = 5.0;
 pub const CAP_COST_GROWTH: f64 = 1.42;
 
-/// The share of the still-waiting world the dark takes each crossing —
-/// a visible per-crossing toll, not a slow drip. Small, but it makes pure
-/// speed a trap: a Drive-only build runs many short crossings and the dark
-/// bites on every one, saving fewer souls than a balanced hand.
-pub const DARK_TAKES_EACH_CROSSING: f64 = 0.011;
+/// The share of the still-waiting world the dark takes **each day** the
+/// crossing is underway. The dark is always eating; a long crossing lets it
+/// eat longer. This makes every day cost souls, so *speed saves lives* —
+/// Drive (fewer days per crossing) and the Ward (a gentler dark) both cut the
+/// toll, and the slow maiden voyage is the costliest crossing there is.
+pub const DARK_TAKES_PER_DAY: f64 = 0.0006;
 
 /// The Ward yard — the third Salvage track (speed / capacity / **attrition**).
 /// Each level multiplies the dark's per-crossing toll by `WARD_DECAY`,
@@ -182,10 +183,14 @@ pub struct ColonyState {
     /// Bought with Salvage.
     #[serde(default)]
     pub cap_level: u32,
-    /// The Ward yard's level: each one multiplies the dark's per-crossing toll
+    /// The Ward yard's level: each one multiplies the dark's per-day toll
     /// by `WARD_DECAY`, down to `WARD_TOLL_FLOOR`. Bought with Salvage.
     #[serde(default)]
     pub ward_level: u32,
+    /// Sea-days the last crossing took — lets the Reckoning project the dark's
+    /// per-day rate into a concrete per-crossing figure.
+    #[serde(default)]
+    pub days_last_crossing: u64,
     /// Salvage in hand — the yards' currency, earned on every landfall and
     /// spent on Drive or hold.
     #[serde(default)]
@@ -213,6 +218,7 @@ impl ColonyState {
             drive_level: 0,
             cap_level: 0,
             ward_level: 0,
+            days_last_crossing: 0,
             salvage: STARTING_SALVAGE,
             crossings_completed: 0,
             records: CrossingRecords::default(),
@@ -310,10 +316,10 @@ impl ColonyState {
         WARD_DECAY.powi(self.ward_level as i32).max(WARD_TOLL_FLOOR)
     }
 
-    /// The dark's effective per-crossing rate after the Ward, as a fraction —
-    /// the number the Reckoning shows as a percentage.
-    pub fn dark_toll_rate(&self) -> f64 {
-        DARK_TAKES_EACH_CROSSING * self.ward_toll_mult()
+    /// The dark's effective **per-day** rate after the Ward, as a fraction of
+    /// the still-waiting world — the number the Reckoning shows as a percentage.
+    pub fn dark_daily_rate(&self) -> f64 {
+        DARK_TAKES_PER_DAY * self.ward_toll_mult()
     }
 
     /// Salvage the Ward charges to reach the next level.
@@ -338,11 +344,25 @@ impl ColonyState {
         SALVAGE_AT_LANDFALL + carried / SOULS_PER_SALVAGE
     }
 
-    /// Souls the dark takes this crossing: a fixed share of whoever is
-    /// still waiting. A big, visible bite while the world is full; a small
-    /// one once it has emptied — so late crossings are yours to finish.
-    pub fn dark_toll(&self) -> u64 {
-        (self.souls_remaining as f64 * self.dark_toll_rate()).round() as u64
+    /// Souls the dark takes over a crossing of `days` sea-days: it eats a
+    /// `dark_daily_rate()` share of the still-waiting world every day, so a
+    /// long crossing compounds into a larger bite. A big share while the world
+    /// is full; a small one once it has emptied — late crossings are yours.
+    pub fn dark_toll_for_days(&self, days: u64) -> u64 {
+        let frac = 1.0 - (1.0 - self.dark_daily_rate()).powf(days as f64);
+        (self.souls_remaining as f64 * frac).round() as u64
+    }
+
+    /// The dark's bite over a crossing like the last one — for the Reckoning's
+    /// concrete "≈ N a crossing" projection (defaults to a nominal crossing
+    /// before the first landfall records a real day count).
+    pub fn dark_toll_projected(&self) -> u64 {
+        let days = if self.days_last_crossing == 0 {
+            10
+        } else {
+            self.days_last_crossing
+        };
+        self.dark_toll_for_days(days)
     }
 
     /// The order a port goes dark — deterministic per (era_seed, port), so
@@ -398,8 +418,10 @@ impl ColonyState {
         // The crossing pays out in Salvage for the yards.
         self.salvage += Self::salvage_income(carried);
 
-        // The dark took its share of whoever was still waiting.
-        let toll = self.dark_toll().min(self.souls_remaining);
+        // The dark took its share of whoever was still waiting — a day at a
+        // time, so a long crossing costs more than a short one.
+        self.days_last_crossing = days;
+        let toll = self.dark_toll_for_days(days).min(self.souls_remaining);
         self.souls_remaining -= toll;
 
         self.crossings_completed += 1;
@@ -539,7 +561,7 @@ mod tests {
     fn the_ward_buys_the_dark_toll_down_toward_a_floor() {
         let mut c = ColonyState::found("t".into());
         c.souls_remaining = 10_000;
-        let base_toll = c.dark_toll();
+        let base_toll = c.dark_toll_for_days(10);
         assert!(base_toll > 0, "the dark bites at Ward 0");
 
         // Each level blunts the toll, compounding.
@@ -548,7 +570,16 @@ mod tests {
             (c.ward_toll_mult() - WARD_DECAY).abs() < 1e-9,
             "one level = one decay step"
         );
-        assert!(c.dark_toll() < base_toll, "a warded toll is smaller");
+        assert!(
+            c.dark_toll_for_days(10) < base_toll,
+            "a warded toll is smaller"
+        );
+
+        // A longer crossing costs more than a short one.
+        assert!(
+            c.dark_toll_for_days(20) > c.dark_toll_for_days(5),
+            "more days at sea, more souls to the dark"
+        );
 
         // It floors — the dark never fully stops.
         c.ward_level = 100;
@@ -556,7 +587,10 @@ mod tests {
             (c.ward_toll_mult() - WARD_TOLL_FLOOR).abs() < 1e-9,
             "the Ward can only blunt, never negate"
         );
-        assert!(c.dark_toll() > 0, "a residual bite always remains");
+        assert!(
+            c.dark_toll_for_days(10) > 0,
+            "a residual bite always remains"
+        );
     }
 
     #[test]

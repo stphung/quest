@@ -1951,6 +1951,40 @@ fn render_record(frame: &mut Frame, area: Rect, voyage: &VoyageState, scroll: u1
 
 // ── The Reckoning (spec 9: the numbers pane) ────────────────────────────────
 
+/// One yard's header line: `  [K] Name Lv N — role`, name violet, role gray.
+fn yard_header(lines: &mut Vec<Line<'static>>, key: &str, level: u32, role: &str) {
+    let name = match key {
+        "D" => "Drive",
+        "C" => "Shipwright",
+        _ => "Ward",
+    };
+    lines.push(Line::from(vec![
+        Span::styled(
+            format!("  [{key}] {name} Lv {level}"),
+            Style::default()
+                .fg(VESSEL_VIOLET)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("  \u{2014} {role}"),
+            Style::default().fg(Color::Gray),
+        ),
+    ]));
+}
+
+/// One yard's effect line: `        <now → next · effect>   ·  N Salvage`,
+/// gold when affordable now, dim (with "not yet") when not.
+fn yard_effect(lines: &mut Vec<Line<'static>>, detail: String, cost: u64, afford: bool) {
+    lines.push(Line::from(Span::styled(
+        format!(
+            "        {detail}    {} Salvage{}",
+            with_commas(cost),
+            if afford { "" } else { "  (not yet)" }
+        ),
+        Style::default().fg(if afford { GOLD } else { Color::DarkGray }),
+    )));
+}
+
 fn render_reckoning(
     frame: &mut Frame,
     area: Rect,
@@ -2027,101 +2061,108 @@ fn render_reckoning(
             Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
         ),
     ]));
-    // The Drive yard.
+    // A crossing like the last one — the horizon every projection uses.
+    let pdays = if c.days_last_crossing == 0 {
+        10
+    } else {
+        c.days_last_crossing
+    };
+    // The baseline: what a crossing costs and carries as she stands now.
+    lines.push(Line::from(Span::styled(
+        format!(
+            "  As she stands: carries {} home  \u{00b7}  the dark takes ~{} a crossing \
+             ({:.3}%/day of the {} still waiting)",
+            with_commas(u64::from(c.expedition_size())),
+            with_commas(c.dark_toll_projected()),
+            c.dark_daily_rate() * 100.0,
+            with_commas(c.souls_remaining),
+        ),
+        Style::default().fg(Color::DarkGray),
+    )));
+    lines.push(Line::from(""));
+
+    // ── [D] Drive — the engine ──────────────────────────────────────────────
     let drive_afford = c.salvage >= c.drive_cost();
-    lines.push(Line::from(vec![
-        Span::styled(
-            format!("  [D] Drive \u{2014} Lv {}", c.drive_level),
-            Style::default()
-                .fg(VESSEL_VIOLET)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            {
-                use crate::vessel::colony::{DRIVE_DECAY, DRIVE_FLOOR};
-                let next_mult = DRIVE_DECAY
-                    .powi((c.drive_level + 1) as i32)
-                    .max(DRIVE_FLOOR);
-                format!(
-                    "  sails {:.2}\u{00d7} her old self \u{2192} next Lv {:.2}\u{00d7}",
-                    c.drive_speed_factor(),
-                    1.0 / next_mult
-                )
-            },
-            Style::default().fg(Color::Gray),
-        ),
-    ]));
-    lines.push(Line::from(Span::styled(
-        format!(
-            "      costs {} Salvage{}",
-            with_commas(c.drive_cost()),
-            if drive_afford { "" } else { "  (not yet)" }
-        ),
-        Style::default().fg(if drive_afford { GOLD } else { Color::DarkGray }),
-    )));
-    // The Shipwright.
-    let cap_afford = c.salvage >= c.cap_cost();
-    lines.push(Line::from(vec![
-        Span::styled(
-            format!("  [C] Shipwright \u{2014} Lv {}", c.cap_level),
-            Style::default()
-                .fg(VESSEL_VIOLET)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
+    yard_header(
+        &mut lines,
+        "D",
+        c.drive_level,
+        "the engine: how fast she crosses",
+    );
+    let drive_detail = {
+        use crate::vessel::colony::{DRIVE_DECAY, DRIVE_FLOOR};
+        let cur = c.drive_time_mult();
+        let next = DRIVE_DECAY
+            .powi((c.drive_level + 1) as i32)
+            .max(DRIVE_FLOOR);
+        if (cur - next).abs() < 1e-9 {
             format!(
-                "  hold carries {}",
-                with_commas(u64::from(c.expedition_size()))
-            ),
-            Style::default().fg(Color::Gray),
-        ),
-    ]));
-    lines.push(Line::from(Span::styled(
+                "{:.1}\u{00d7} speed  \u{00b7}  already at her limit",
+                c.drive_speed_factor()
+            )
+        } else {
+            let shorter = ((1.0 - next / cur) * 100.0).round() as i64;
+            format!(
+                "{:.1}\u{00d7} \u{2192} {:.1}\u{00d7} speed  \u{00b7}  ~{}% shorter, fewer days lost",
+                c.drive_speed_factor(),
+                1.0 / next,
+                shorter
+            )
+        }
+    };
+    yard_effect(&mut lines, drive_detail, c.drive_cost(), drive_afford);
+    // ── [C] Shipwright — the hold ───────────────────────────────────────────
+    let cap_afford = c.salvage >= c.cap_cost();
+    yard_header(
+        &mut lines,
+        "C",
+        c.cap_level,
+        "the hold: how many souls she carries",
+    );
+    let cap_detail = {
+        use crate::vessel::colony::{BASE_CAPACITY, CAP_GROWTH};
+        let hold_now = c.expedition_size();
+        let base_now = (f64::from(BASE_CAPACITY) * CAP_GROWTH.powi(c.cap_level as i32)).round();
+        let districts = f64::from(hold_now) - base_now;
+        let hold_next = ((f64::from(BASE_CAPACITY) * CAP_GROWTH.powi((c.cap_level + 1) as i32))
+            + districts)
+            .round() as u64;
+        let delta = hold_next.saturating_sub(u64::from(hold_now));
         format!(
-            "      costs {} Salvage{}",
-            with_commas(c.cap_cost()),
-            if cap_afford { "" } else { "  (not yet)" }
-        ),
-        Style::default().fg(if cap_afford { GOLD } else { Color::DarkGray }),
-    )));
-    // The Ward — the third yard: buy down the dark's per-crossing toll.
+            "{} \u{2192} {} aboard  \u{00b7}  +{} carried home",
+            with_commas(u64::from(hold_now)),
+            with_commas(hold_next),
+            with_commas(delta)
+        )
+    };
+    yard_effect(&mut lines, cap_detail, c.cap_cost(), cap_afford);
+
+    // ── [W] Ward — the lantern ──────────────────────────────────────────────
     let ward_afford = c.salvage >= c.ward_cost();
-    lines.push(Line::from(vec![
-        Span::styled(
-            format!("  [W] Ward \u{2014} Lv {}", c.ward_level),
-            Style::default()
-                .fg(VESSEL_VIOLET)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            {
-                use crate::vessel::colony::{
-                    DARK_TAKES_EACH_CROSSING, WARD_DECAY, WARD_TOLL_FLOOR,
-                };
-                let next_mult = WARD_DECAY
-                    .powi((c.ward_level + 1) as i32)
-                    .max(WARD_TOLL_FLOOR);
-                let now_toll = c.dark_toll();
-                let next_toll = (c.souls_remaining as f64 * DARK_TAKES_EACH_CROSSING * next_mult)
-                    .round() as u64;
-                format!(
-                    "  the dark takes {} next crossing \u{2192} Lv {}: {}",
-                    with_commas(now_toll),
-                    c.ward_level + 1,
-                    with_commas(next_toll)
-                )
-            },
-            Style::default().fg(Color::Gray),
-        ),
-    ]));
-    lines.push(Line::from(Span::styled(
+    yard_header(
+        &mut lines,
+        "W",
+        c.ward_level,
+        "the lantern: how deep the dark cuts each day",
+    );
+    let ward_detail = {
+        use crate::vessel::colony::{DARK_TAKES_PER_DAY, WARD_DECAY, WARD_TOLL_FLOOR};
+        let next_mult = WARD_DECAY
+            .powi((c.ward_level + 1) as i32)
+            .max(WARD_TOLL_FLOOR);
+        let next_rate = DARK_TAKES_PER_DAY * next_mult;
+        let now_toll = c.dark_toll_projected();
+        let next_toll = (c.souls_remaining as f64 * (1.0 - (1.0 - next_rate).powf(pdays as f64)))
+            .round() as u64;
+        let spared = now_toll.saturating_sub(next_toll);
         format!(
-            "      costs {} Salvage{}",
-            with_commas(c.ward_cost()),
-            if ward_afford { "" } else { "  (not yet)" }
-        ),
-        Style::default().fg(if ward_afford { GOLD } else { Color::DarkGray }),
-    )));
+            "{:.3}%/day \u{2192} {:.3}%/day  \u{00b7}  ~{} fewer lost a crossing",
+            c.dark_daily_rate() * 100.0,
+            next_rate * 100.0,
+            with_commas(spared)
+        )
+    };
+    yard_effect(&mut lines, ward_detail, c.ward_cost(), ward_afford);
     lines.push(Line::from(Span::styled(
         format!(
             "  {} crossings made \u{00b7} {} carried at most in one",

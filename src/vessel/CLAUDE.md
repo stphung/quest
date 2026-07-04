@@ -148,13 +148,13 @@ Once `vessel_launched` (and `act2_enabled()`), `main.rs`'s game loop hands contr
 
 ### Colony / the ferry loop (`colony.rs`)
 
-The crossing is the *run*; the Colony is what persists above it. Each crossing delivers souls (the headline number only ever rises), pays out **Salvage**, and the dark takes a per-crossing toll of whoever still waits. Three yards spend Salvage, and the choice between them is the loop's decision (`[D]`/`[C]`/`[W]` in the Reckoning):
+The crossing is the *run*; the Colony is what persists above it. Each crossing delivers souls (the headline number only ever rises), pays out **Salvage**, and the dark takes a toll of whoever still waits — **a share every day the crossing is underway** (`dark_toll_for_days(days)`), so a slow crossing bleeds longer and a fast one starves it. Three yards spend Salvage, and the choice between them is the loop's decision (`[D]`/`[C]`/`[W]` in the Reckoning):
 
 - **Drive** (`drive_level`) — each level multiplies every future crossing's sail-time by `DRIVE_DECAY`, compounding down to `DRIVE_FLOOR`. Level 0 is the maiden voyage (the slowest crossing there is); the ramp is entirely earned by buying levels.
 - **Shipwright** (`cap_level`) — each level multiplies the hold by `CAP_GROWTH`. `expedition_size()` = `BASE_CAPACITY × CAP_GROWTH^cap_level + district bonuses`.
-- **Ward** (`ward_level`) — each level multiplies the dark's per-crossing toll by `WARD_DECAY`, compounding down to `WARD_TOLL_FLOOR` (never zero — a residual bite always remains). `dark_toll()` = `souls_remaining × DARK_TAKES_EACH_CROSSING × WARD_DECAY^ward_level`. The attrition axis: the souls-first hand's answer to a long era.
+- **Ward** (`ward_level`) — each level multiplies the dark's per-**day** rate by `WARD_DECAY`, compounding down to `WARD_TOLL_FLOOR` (never zero — a residual bite always remains). `dark_daily_rate()` = `DARK_TAKES_PER_DAY × WARD_DECAY^ward_level`; the toll over a crossing of `days` compounds it (`dark_toll_for_days`). The attrition axis, front-loaded: it spares the most while the world is full and the level is low, so it wants buying early.
 
-The tension is speed-vs-salvation, and it is meant to be a **wide** margin: because the dark bites once *per crossing*, a reckless Drive-only build runs ~85 near-empty crossings and bleeds the world to the dark (**~54% saved**), while a souls-first build (lean into the hold, just enough Drive to keep her quick) carries most of it home (**~87% saved**). Skill is rewarded, not marginal. The ramp is a **buildup then a fast-fun stretch**: a two-week maiden voyage, ~14 → ~3 real-days over the first handful, then a long run of ~3-day turnarounds while the loads climb into the thousands. Tuned to **~19 crossings, ~3 real months, ~87% saved with skilled play, C1 ≈ 14 real days (two weeks)**.
+The tension is speed-vs-salvation, a **wide** margin, and now *all three* yards bear on it because the toll is per-day: **Drive** (fewer days per crossing) and **Shipwright** (fewer crossings to empty the world) both cut the total days the world spends waiting, and the **Ward** softens the daily bite. A souls-first line (big hold, just enough Drive to stay quick) saves most of the world (**~88% saved**); leaning on the Ward pushes it to **~94%** at the cost of more crossings; both naive extremes are traps — pure Drive never widens the hold so the world stays full and bleeds (**~70%**), and pure Shipwright runs crossings so slow the dark eats them (**~74%**). Skill is rewarded, not marginal. The ramp is a **buildup then a fast-fun stretch**: a two-week maiden voyage (the costliest crossing there is — slowest, so the dark feeds longest), ~14 → ~3 real-days over the first handful, then ~3-day turnarounds while the loads climb into the thousands. Tuned to **~19–24 crossings, ~3 real months, ~88% saved with skilled play, C1 ≈ 14 real days**.
 
 | Constant | Value | Notes |
 |----------|-------|-------|
@@ -165,7 +165,7 @@ The tension is speed-vs-salvation, and it is meant to be a **wide** margin: beca
 | `STARTING_SALVAGE` | 40 | Founding grant — the ramp takes hold from the second crossing |
 | `DRIVE_COST_BASE` / `DRIVE_COST_GROWTH` | 4 / 1.5 | Drive level L costs `4×1.5^L` Salvage |
 | `CAP_COST_BASE` / `CAP_COST_GROWTH` | 5 / 1.42 | Shipwright level L costs `5×1.42^L` Salvage |
-| `DARK_TAKES_EACH_CROSSING` | 0.011 | Base fraction of the still-waiting world lost each crossing — the toll the Ward buys down |
+| `DARK_TAKES_PER_DAY` | 0.0006 | Base fraction of the still-waiting world the dark takes **each day** underway — compounds over a crossing's days; the toll the Ward buys down |
 | `WARD_DECAY` / `WARD_TOLL_FLOOR` | 0.72 / 0.12 | Toll ×0.72 per Ward level (~28% off), floored at 0.12× base (≤88% cut, never zero) |
 | `WARD_COST_BASE` / `WARD_COST_GROWTH` | 5 / 1.45 | Ward level L costs `5×1.45^L` Salvage — between Drive and Shipwright |
 | districts | Quay 500 … Charthouse 66,000 | Founded by population (= souls delivered); each adds a standing hold bonus |
