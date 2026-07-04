@@ -46,7 +46,7 @@ There is no separate `PowerCoreState` runtime struct. Core-grant timestamps live
 
 - `tick_power_cores(state, deep, achievements, result)` — Per-tick processing. For each unlocked core, checks if fill timer elapsed (using `deep.persistent.power_core_last_granted`) and grants +1 PR per completed cycle. Sets `result.deep_changed`.
 - `apply_offline_power_cores(state, deep, achievements) -> u32` — Offline catchup. Returns total PR granted.
-- `init_new_core(deep, achievement_id)` — Initialise a newly unlocked core's timestamp to now.
+- `init_new_core(deep, achievement_id)` — Initialise a newly unlocked core's timestamp to now. Currently `#[allow(dead_code)]`: `tick_power_cores()` inlines the same "last==0" initialization itself rather than calling this helper.
 
 ## Tick Behavior
 

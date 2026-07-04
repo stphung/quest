@@ -216,13 +216,24 @@ ActiveMinigame::NewGame(game) => {
 
 ### 7. Add to Debug Menu (`src/utils/debug_menu.rs`)
 
+Add a variant to the `DebugAction` enum and include it in the `CHALLENGE_ACTIONS: &[DebugAction]` const array, then add its label match arm and dispatch match arm:
+
 ```rust
-pub const DEBUG_OPTIONS: &[&str] = &[
+enum DebugAction {
     // ...
-    "Trigger NewGame Challenge",
+    TriggerNewGameChallenge,
+}
+
+const CHALLENGE_ACTIONS: &[DebugAction] = &[
+    // ...
+    DebugAction::TriggerNewGameChallenge,
 ];
 
-fn trigger_newgame_challenge(state: &mut GameState) -> &'static str {
+// label match arm:
+DebugAction::TriggerNewGameChallenge => "Trigger NewGame Challenge",
+
+// dispatch match arm:
+DebugAction::TriggerNewGameChallenge => {
     if state.challenge_menu.has_challenge(&ChallengeType::NewGame) {
         return "NewGame challenge already pending!";
     }

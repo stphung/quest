@@ -103,4 +103,4 @@ A single etched sigil: `effect: SigilEffectType`, `value: f64`, `grade: SigilGra
 - **ui/stormglass_scene.rs**: Exchange overlay rendering (menu, trial selection, surge animation, sigils list, pick-1-of-3)
 - **input/stormglass_input.rs**: Exchange overlay input handling
 - **fishing/types.rs**: `FishingState.storm_lure_active` flag, consumed on Leviathan encounter
-- **spending.rs**: `can_purchase_storm_lure()` checks balance, active status, Leviathan not yet caught, and fishing rank
+- **spending.rs**: `can_purchase_storm_lure()` checks balance, active status, Leviathan not yet caught, and fishing rank. Currently `#[allow(dead_code)]`: the real gating logic is duplicated inline in `src/input/stormglass_input.rs`

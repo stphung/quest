@@ -72,7 +72,7 @@ Instead of discrete pipe objects, shuttles pull directly from their declared sou
 
 Shuttles are recipe-locked processing nodes that create multi-step production chains.
 
-**Building**: `build_shuttle(loom, recipe_index, sources_a, sources_b)` validates tier unlock, source restrictions, resource cost, and shuttle limit, then pushes a new `Shuttle` to `loom.persistent.shuttles`.
+**Building**: `build_shuttle(loom, input_a: Resource, input_b: Resource, nature: NodeNature, sources_a, sources_b)` validates tier unlock, source restrictions, resource cost, and shuttle limit, then pushes a new `Shuttle` to `loom.persistent.shuttles`.
 
 **Tiers and gating**:
 | Tier | Pattern gate | Resource cost |

@@ -68,7 +68,7 @@ Characters are saved as individual JSON files in `~/.quest/`:
 - `save_character(state)` — Serializes GameState to JSON (`persistence.rs`)
 - `delete_character(name)` — Removes JSON file (`persistence.rs`)
 - `rename_character(old, new)` — Renames file, updates internal state (`persistence.rs`)
-- `list_characters()` — Lists all `.json` files in `~/.quest/` (`persistence.rs`)
+- `list_characters()` — Lists all `.json` files in `~/.quest/` (`persistence.rs`), skipping account-level files without a `character_name`; marks entries `is_corrupted: true` when full load fails, and sorts results by `last_save_time` descending
 
 ## Leveling System
 
