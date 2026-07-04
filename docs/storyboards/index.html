@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quest — Gameplay Storyboards</title>
+<style>
+  :root {
+    --bg: #eaeff7; --bg2: #e0e7f1; --panel: #f5f8fd;
+    --ink: #16202f; --muted: #526079; --line: rgba(40,70,110,0.16);
+    --storm: #0d8296; --gold: #a9761a; --violet: #6a55c0;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0a0d16; --bg2: #111726; --panel: #141b2b45;
+      --ink: #e8edf8; --muted: #93a1be; --line: rgba(150,178,224,0.15);
+      --storm: #3ad2e2; --gold: #e8b24a; --violet: #9887e6;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    display: flex; align-items: center; justify-content: center; padding: 48px 24px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .shell { max-width: 940px; width: 100%; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+    letter-spacing: 0.34em; text-transform: uppercase; color: var(--storm); margin: 0 0 18px;
+  }
+  h1 { font-size: clamp(2.4rem, 7vw, 4rem); font-weight: 500; font-style: italic; letter-spacing: -0.02em; margin: 0 0 14px; line-height: 1; }
+  .sub { color: var(--muted); font-size: 1.15rem; max-width: 56ch; margin: 0 0 44px; }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 680px) { .cards { grid-template-columns: 1fr; } }
+  .card {
+    display: block; text-decoration: none; color: inherit; position: relative; overflow: hidden;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 30px 28px 26px;
+    border-top: 4px solid var(--accent); transition: transform .25s ease, border-color .25s ease;
+  }
+  .card:hover { transform: translateY(-4px); }
+  .card.one { --accent: var(--storm); }
+  .card.two { --accent: var(--gold); }
+  .card .act { font-family: ui-monospace, monospace; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); }
+  .card h2 { font-size: 2rem; font-weight: 500; font-style: italic; margin: 10px 0 10px; }
+  .card p { color: var(--muted); margin: 0 0 22px; font-size: 0.98rem; }
+  .card .go { font-family: ui-monospace, monospace; font-size: 12px; letter-spacing: 0.06em; color: var(--accent); }
+  footer { margin-top: 40px; font-family: ui-monospace, monospace; font-size: 12px; letter-spacing: 0.04em; color: var(--muted); }
+</style>
+</head>
+<body>
+  <div class="shell">
+    <p class="eyebrow">Quest · A terminal-based idle RPG</p>
+    <h1>Gameplay Storyboards</h1>
+    <p class="sub">Two scrollable walkthroughs of the game's design — the fifty-zone ascent, and the dark-shipped voyage that waits past the summit.</p>
+    <div class="cards">
+      <a class="card one" href="act1-the-ascent.html">
+        <div class="act">⚡ Act I</div>
+        <h2>The Ascent</h2>
+        <p>Fifty zones from a sunny meadow to the roots of the world — auto-battle, loot, prestige, and an endgame that never stops stacking.</p>
+        <div class="go">Read the storyboard →</div>
+      </a>
+      <a class="card two" href="act2-the-crossing.html">
+        <div class="act">🕯️ Act II</div>
+        <h2>The Crossing</h2>
+        <p>Burn everything you built to launch a vessel into the void and ferry a dying world home. Fully built, dark by default.</p>
+        <div class="go">Read the storyboard →</div>
+      </a>
+    </div>
+    <footer>Design reference · generated from the Quest source tree</footer>
+  </div>
+</body>
+</html>
