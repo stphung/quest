@@ -307,7 +307,7 @@ Character JSON files contain the full `GameState` struct. Notable fields that pe
 | rand | - | RNG for all procedural systems |
 | chrono | - | Date/time for offline progression |
 | dirs | 6.0 | Platform-appropriate save paths |
-| git2 | 0.20 | Git operations for Time Vault history |
+| git2 | 0.21 | Git operations for Time Vault history |
 | tar | 0.4 | Archive extraction for updates |
 | uuid | 1.23 | Character IDs |
 | serde_json | 1.0 | JSON serialization |

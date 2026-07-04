@@ -55,7 +55,7 @@ Main state struct (serialized to disk). Contains:
 
 - `unlocked: HashMap<AchievementId, UnlockedAchievement>` -- which achievements are unlocked and when
 - `progress: HashMap<AchievementId, AchievementProgress>` -- current/target for multi-stage achievements
-- Aggregate counters: `total_kills`, `total_bosses_defeated`, `total_fish_caught`, `total_dungeons_completed`, `total_minigame_wins`, `highest_prestige_rank`, `highest_level`, `highest_fishing_rank`, `zones_fully_cleared`, `expanse_cycles_completed`
+- Aggregate counters: `total_kills`, `total_bosses_defeated`, `total_fish_caught`, `total_dungeons_completed`, `total_minigame_wins`, `highest_prestige_rank`, `highest_level`, `highest_fishing_rank`, `zones_fully_cleared`, `expanse_cycles_completed`, `total_deep_missions_completed`, `highest_deep_layer`, `highest_guild_rank`
 - `ui_border_style: UiBorderStyle` -- global border style for panel UI
 - `selected_title: Option<AchievementId>` -- currently selected character title (account-wide)
 - Transient fields (`#[serde(skip)]`): `pending_notifications`, `newly_unlocked`, `modal_queue`, `recently_unlocked`, `accumulation_start`

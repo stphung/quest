@@ -120,7 +120,7 @@ See "Unified Combat Bonuses" below for the full field-level breakdown of `Combat
 ## Boss Encounters
 
 - After 10 kills in a subzone, the next enemy is the subzone boss
-- Boss defined in `zones/data.rs` with specific stats
+- Boss identity (`name`, `is_zone_boss`) defined in `zones/data.rs::SubzoneBoss`; stats are computed in `combat/enemy_generation.rs::generate_subzone_boss()` by multiplying the zone's base `ZONE_ENEMY_STATS` by `SUBZONE_BOSS_MULTIPLIERS`/`ZONE_BOSS_MULTIPLIERS`
 - Defeating boss advances to next subzone
 - Death to boss resets `kills_in_subzone = 0` (full 10 kills needed to retry)
 - Zone 10 final boss requires Stormbreaker weapon (checked via `boss_weapon_blocked()` in `zones/gates.rs`)

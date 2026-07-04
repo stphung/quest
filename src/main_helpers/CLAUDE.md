@@ -16,7 +16,7 @@ Thin orchestration wrappers extracted from `main.rs` to keep the game loop reada
 | `input_routing.rs` | `InputAction` enum and `route_game_input()` -- maps `InputResult` variants to side effects (save, quit, etc.); bridges input handling and persistence |
 | `offline.rs` | `resolve_deep_offline()` -- resolves Deep missions completed while game was closed; `apply_offline_xp()` -- processes offline XP progression with combat log entries; `resolve_loom_offline()` -- simulates Loom production while game was closed |
 | `overlay.rs` | `draw_game_overlays()` -- renders all active game overlays on top of the main UI (modals, Haven, Soulforge, Stormglass, Deep, Loom, Vessel, Chrono Surge, debug menu, save indicator) |
-| `persistence.rs` | `save_all()` -- saves character, achievements, Haven, enhancement, and Deep state to disk; optionally creates a git history commit |
+| `persistence.rs` | `save_all()` -- saves character, achievements, Haven, enhancement, Deep, and Loom state to disk; optionally creates a git history commit |
 | `scene.rs` | `is_realtime_minigame()`, `SceneKind` enum, `current_scene_kind()`, `is_wide_scene()` -- scene classification helpers for terminal redraw management |
 | `update.rs` | Update check helpers, jittered interval, startup splash screen with character select, cloud sync polling, and the full character select loop |
 
