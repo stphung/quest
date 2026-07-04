@@ -189,7 +189,7 @@ chmod +x scripts/audit-eval-log.sh
 ./scripts/audit-eval-log.test.sh
 ```
 
-Expected: `All tests passed.` with 6 `PASS:` lines and exit code 0.
+Expected: `All tests passed.` with 7 `PASS:` lines and exit code 0.
 
 - [ ] **Step 5: Commit**
 
@@ -291,6 +291,14 @@ else
   pass "exits non-zero for unknown skill name"
 fi
 
+# --- Test 6: partial/word-component skill name is rejected (not just wholesale garbage) ---
+run_test "partial skill name (word component of a valid one) is rejected"
+if "$CHECK_SCRIPT" wiki 2>/dev/null; then
+  fail "expected non-zero exit for partial skill name 'wiki'"
+else
+  pass "exits non-zero for partial skill name 'wiki'"
+fi
+
 echo ""
 if [ "$FAILURES" -eq 0 ]; then
   echo "All tests passed."
@@ -324,7 +332,6 @@ Expected: `bash: scripts/audit-eval-check.sh: No such file or directory` (or sim
 # Set META_AUDIT_HISTORY_DIR to override the log directory (used by tests).
 set -euo pipefail
 
-VALID_SKILLS="perf-audit test-audit doc-audit wiki-audit dependency-audit"
 THRESHOLD=5
 
 if ! command -v jq &> /dev/null; then
@@ -339,12 +346,17 @@ if [ -z "$SKILL_NAME" ]; then
   exit 1
 fi
 
-if ! echo "$VALID_SKILLS" | grep -qw "$SKILL_NAME"; then
-  echo "Error: unknown skill '$SKILL_NAME'. Must be one of: $VALID_SKILLS" >&2
-  exit 1
-fi
+case "$SKILL_NAME" in
+  perf-audit|test-audit|doc-audit|wiki-audit|dependency-audit) ;;
+  *)
+    echo "Error: unknown skill '$SKILL_NAME'. Must be one of: perf-audit test-audit doc-audit wiki-audit dependency-audit" >&2
+    exit 1
+    ;;
+esac
 
-REPO_ROOT="$(git rev-parse --show-toplevel)"
+if [ -z "${META_AUDIT_HISTORY_DIR:-}" ]; then
+  REPO_ROOT="$(git rev-parse --show-toplevel)"
+fi
 LOG_FILE="${META_AUDIT_HISTORY_DIR:-$REPO_ROOT/.claude/skills/meta-audit/history}/${SKILL_NAME}.jsonl"
 
 if [ ! -f "$LOG_FILE" ] || [ ! -s "$LOG_FILE" ]; then
@@ -374,7 +386,7 @@ chmod +x scripts/audit-eval-check.sh
 ./scripts/audit-eval-check.test.sh
 ```
 
-Expected: `All tests passed.` with 5 `PASS:` lines and exit code 0.
+Expected: `All tests passed.` with 6 `PASS:` lines and exit code 0.
 
 - [ ] **Step 5: Commit**
 
