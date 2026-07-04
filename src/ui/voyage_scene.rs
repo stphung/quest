@@ -60,7 +60,7 @@ pub fn render_voyage(
         VoyageView::Reckoning => render_reckoning(frame, area, colony),
         _ => match ctx.tier {
             SizeTier::XL | SizeTier::L => render_full(frame, area, voyage, ui, colony),
-            _ => render_strip(frame, area, voyage, ui),
+            _ => render_strip(frame, area, voyage, ui, colony),
         },
     }
 
@@ -299,12 +299,12 @@ fn render_full(
         VoyageView::Farewell { selected } => {
             render_farewell_panel(frame, cols[1], voyage, selected)
         }
-        VoyageView::Chart => render_vessel_panel(frame, cols[1], voyage),
+        VoyageView::Chart => render_vessel_panel(frame, cols[1], voyage, colony),
         // Full-frame rooms are intercepted in `render_voyage`.
         VoyageView::Manifest { .. }
         | VoyageView::Keepsake { .. }
         | VoyageView::Record { .. }
-        | VoyageView::Reckoning => render_vessel_panel(frame, cols[1], voyage),
+        | VoyageView::Reckoning => render_vessel_panel(frame, cols[1], voyage, colony),
     }
 }
 
@@ -679,7 +679,12 @@ fn line_points(from: (u16, u16), to: (u16, u16)) -> Vec<(i32, i32)> {
 
 // ── The Vessel panel (right column, chart view) ─────────────────────────────
 
-fn render_vessel_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
+fn render_vessel_panel(
+    frame: &mut Frame,
+    area: Rect,
+    voyage: &VoyageState,
+    colony: Option<&crate::vessel::colony::ColonyState>,
+) {
     // Moored at the Tree, the panel becomes the harbor: the gauges retire
     // (they were the crossing), and the rooms open.
     if matches!(voyage.phase, VoyagePhase::Arrived { .. }) {
@@ -696,7 +701,7 @@ fn render_vessel_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
 
     let mut lines: Vec<Line> = Vec::new();
     lines.push(Line::from(""));
-    lines.extend(gauge_lines(voyage, inner.width));
+    lines.extend(gauge_lines(voyage, inner.width, colony));
     // The hull and the table (spec 8): scars eat, rations stretch.
     if voyage.hull_wear > 0 {
         lines.push(Line::from(Span::styled(
@@ -784,7 +789,11 @@ fn render_vessel_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
     frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
 }
 
-fn gauge_lines(voyage: &VoyageState, width: u16) -> Vec<Line<'static>> {
+fn gauge_lines(
+    voyage: &VoyageState,
+    width: u16,
+    colony: Option<&crate::vessel::colony::ColonyState>,
+) -> Vec<Line<'static>> {
     let bar_width = (width.saturating_sub(20)).clamp(10, 20) as usize;
     let cap = voyage.provisions_cap.max(1.0);
     let filled = ((voyage.provisions / cap) * bar_width as f64).round() as usize;
@@ -856,6 +865,21 @@ fn gauge_lines(voyage: &VoyageState, width: u16) -> Vec<Line<'static>> {
                 Style::default().fg(Color::DarkGray),
             ),
         ]));
+        // Pair the hold with what the old world still holds. `souls_remaining`
+        // still counts the in-transit hold until it lands, so subtract it to
+        // show who is truly still ashore behind us.
+        if let Some(c) = colony {
+            let still_waiting = c
+                .souls_remaining
+                .saturating_sub(u64::from(voyage.passengers));
+            lines.push(Line::from(Span::styled(
+                format!(
+                    "           {} still wait in the old world",
+                    with_commas(still_waiting)
+                ),
+                Style::default().fg(Color::DarkGray),
+            )));
+        }
     }
     lines
 }
@@ -2231,7 +2255,13 @@ fn with_commas(n: u64) -> String {
 
 // ── Strip layout (S/M) ──────────────────────────────────────────────────────
 
-fn render_strip(frame: &mut Frame, area: Rect, voyage: &VoyageState, _ui: &VoyageUiState) {
+fn render_strip(
+    frame: &mut Frame,
+    area: Rect,
+    voyage: &VoyageState,
+    _ui: &VoyageUiState,
+    colony: Option<&crate::vessel::colony::ColonyState>,
+) {
     let block = Block::default()
         .title(" \u{2726} The Crossing ")
         .borders(Borders::ALL)
@@ -2253,7 +2283,7 @@ fn render_strip(frame: &mut Frame, area: Rect, voyage: &VoyageState, _ui: &Voyag
     lines.push(Line::from(""));
     lines.extend(phase_lines(voyage));
     lines.push(Line::from(""));
-    lines.extend(gauge_lines(voyage, inner.width));
+    lines.extend(gauge_lines(voyage, inner.width, colony));
     lines.push(Line::from(""));
     for key_line in footer_keys(voyage) {
         lines.push(key_line);

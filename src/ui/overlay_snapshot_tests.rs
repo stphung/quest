@@ -329,11 +329,12 @@ fn snapshot_voyage_strip_ferry_run() {
         let mut voyage = fixtures::voyage_mid_leg(frozen_utc());
         voyage.crossing_number = 2;
         voyage.passengers = 1238;
+        let colony = fixtures::colony_midera();
         let ui = crate::vessel::VoyageUiState::default();
         render_overlay_sized(60, 24, |f| {
             let area = f.area();
             let ctx = LayoutContext::from_frame(f);
-            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, None);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, Some(&colony));
         })
     });
 }
