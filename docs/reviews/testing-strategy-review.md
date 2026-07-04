@@ -23,8 +23,8 @@ The 9-point drop between the first two rows isn't only "`tests/` doesn't run und
 The exclusion-list claim checks out with real numbers, though it's more nuanced than "all excluded files are secretly fine": re-running coverage with the exclusion regex removed, of the 6 currently-excluded files, `enhancement/logic.rs` (100%), `stormglass/earning.rs` (100%), `stormglass/types.rs` (97.27%), `deep/discovery.rs` (86.84%), and `stormglass/spending.rs` (76.19%) are genuinely well-tested and should not be blanket-excluded from the gate. Only `deep/persistence.rs` (28.57%) and `enhancement/persistence.rs` (9.52%) are the legitimately-hard-to-test I/O glue the exclusion list was presumably meant for.
 
 **Fix, in two independent parts:**
-1. For files reachable from `lib.rs` (the 6 currently excluded, and any future ones): drop `enhancement/logic.rs`, `stormglass/{earning,spending,types}.rs`, and `deep/discovery.rs` from the ignore regex — they're already covered and the gate should be watching them. Keep `deep/persistence.rs` and `enhancement/persistence.rs` excluded, or better, narrow the exclusion to their specific I/O-error branches.
-2. For `input/`, `main_helpers/`, `tick_events` (bin-only, structurally unreachable by `tests/`): these need their own explicit coverage measurement — either move testable logic into `lib.rs`-reachable modules (the input-replay harness pattern already does this for some handlers, e.g. `time_vault_input.rs` at 95.30% and `harness.rs` at 85.35% show it works when done), or add a second, separate coverage gate scoped to the binary crate so these files stop being invisible to CI rather than lumping them into the same 90% number as the library.
+1. ✅ **Done** (this PR): dropped `enhancement/logic.rs`, `stormglass/{earning,spending,types}.rs`, and `deep/discovery.rs` from the ignore regex in both `ci.yml` and `ci-checks.sh` — they were already covered (76–100%), so the gate should watch them. Kept `deep/persistence.rs` and `enhancement/persistence.rs` excluded (28.57%/9.52% — genuinely hard-to-test I/O glue). Verified locally: the gate still clears comfortably at 91.03% (up slightly from 90.57%, since the newly-included files pull the average up rather than down).
+2. **Tracked in [#673](https://github.com/stphung/quest/issues/673)**: `input/`, `main_helpers/`, `tick_events` (bin-only, structurally unreachable by `tests/`) need their own explicit coverage measurement — either move testable logic into `lib.rs`-reachable modules (the input-replay harness pattern already does this for some handlers, e.g. `time_vault_input.rs` at 95.30% and `harness.rs` at 85.35% show it works when done), or add a second, separate coverage gate scoped to the binary crate. That issue tracks writing the missing tests first (several files are a literal 0%) before gating on the number, so CI doesn't just start failing for no immediate benefit.
 
 Separately, add a small test asserting `ci.yml`'s and `ci-checks.sh`'s coverage-ignore regexes stay identical — they've already drifted once (documented in CLAUDE.md) and nothing currently prevents it from recurring.
 
@@ -93,8 +93,9 @@ Covered in items #2 and #4 above (the HashMap-ordering bug, the clock-bypass bug
 
 ## Suggested sequencing
 
-1. Fix the two live bugs (#2) — small, isolated, immediately valuable regardless of any strategy change.
-2. Re-run coverage with integration tests included and rebuild the exclusion list from what's actually still uncovered (#1) — this changes what "90%" means, so do it before chasing more coverage.
-3. Thread seeded RNG through item drops (#3) — restores determinism guarantees the rest of the codebase already relies on.
-4. Add a routing-level test for `input_routing.rs`'s save/commit/reload sequence and an end-to-end `QUEST_ACT2=1` smoke test (#4).
-5. Everything else in "Per-area findings" is real but lower-urgency — worth working through opportunistically alongside feature work in each area, rather than as a dedicated pass.
+1. ✅ Rebuild the lib-reachable exclusion list from measured coverage (#1, part 1) — landed in this PR.
+2. Fix the two live bugs (#2) — small, isolated, immediately valuable regardless of any strategy change.
+3. Give `input/`/`main_helpers/` real coverage, then their own gate (#1, part 2) — tracked in [#673](https://github.com/stphung/quest/issues/673).
+4. Thread seeded RNG through item drops (#3) — restores determinism guarantees the rest of the codebase already relies on.
+5. Add a routing-level test for `input_routing.rs`'s save/commit/reload sequence and an end-to-end `QUEST_ACT2=1` smoke test (#4) — the `input_routing.rs` piece is the top item in #673; the Act 2 smoke test is separate follow-up.
+6. Everything else in "Per-area findings" is real but lower-urgency — worth working through opportunistically alongside feature work in each area, rather than as a dedicated pass.
