@@ -2074,6 +2074,23 @@ mod tests {
         assert!(!events[0].description.contains("Gareth"));
     }
 
+    #[test]
+    fn test_generate_mission_events_with_names_personalizes_across_all_tiers() {
+        // Exercises pick_tier_description() for every LayerTier match arm
+        // (Shallows, Warrens, Hollows, SunkenReach, Abyss, Void).
+        let mut rng = seeded_rng();
+        for layer in [1u32, 4, 8, 13, 19, 26] {
+            let events = generate_mission_events_with_names(
+                MissionType::Expedition,
+                layer,
+                &[],
+                &["Gareth".to_string()],
+                &mut rng,
+            );
+            assert!(!events.is_empty(), "layer {layer} should produce events");
+        }
+    }
+
     // ── Gateway Expedition events ─────────────────────────────────────────────
 
     #[test]
@@ -2215,6 +2232,40 @@ mod tests {
         assert_eq!(mission.status, MissionStatus::Active);
     }
 
+    #[test]
+    fn test_tick_mission_events_skips_already_resolved_event() {
+        // If the player resolves the pending event directly (not via auto-resolve),
+        // the next tick should just advance pending_event_index past it instead of
+        // re-processing or re-firing it.
+        let mut rng = seeded_rng();
+        let started_at = Utc::now();
+        let duration_secs = 100_000i64;
+        let events = generate_mission_events(MissionType::Expedition, 1, &[], &mut rng);
+        let mut mission = make_mission(
+            MissionType::Expedition,
+            1,
+            started_at,
+            duration_secs,
+            events,
+        );
+        let trigger1_time = started_at + Duration::seconds((0.33 * duration_secs as f64) as i64);
+
+        // Fire the first event and have the player resolve it directly.
+        tick_mission_events(&mut mission, &[], trigger1_time, &mut rng);
+        assert_eq!(mission.status, MissionStatus::EventPending);
+        let auto_choice = mission.events[0].auto_resolve_choice;
+        resolve_event(&mut mission.events[0], Some(auto_choice), &[], &mut rng);
+        assert!(mission.events[0].resolved_choice.is_some());
+
+        // Next tick (still within the same window) should just advance the index.
+        let result = tick_mission_events(&mut mission, &[], trigger1_time, &mut rng);
+        assert!(
+            result.auto_resolved.is_empty(),
+            "already-resolved event should not be auto-resolved again"
+        );
+        assert_eq!(mission.pending_event_index, 1);
+    }
+
     // ── resolve_event: risky choices ──────────────────────────────────────────
 
     #[test]
@@ -2336,6 +2387,40 @@ mod tests {
         assert!((injury - 0.20).abs() < 1e-9);
         assert!(fail_tag.is_none());
         assert!(success_tag.is_none());
+    }
+
+    #[test]
+    fn test_find_template_choice_extras_known_template_out_of_bounds_index() {
+        // Known template, but the choice index doesn't exist on it.
+        let (power_mod, marks) = find_template_choice_extras("FLOODED PASSAGE", 999);
+        assert_eq!(power_mod, 1.0);
+        assert_eq!(marks, 0);
+    }
+
+    #[test]
+    fn test_find_template_risky_data_known_template_out_of_bounds_index() {
+        // Known template, but the choice index doesn't exist on it.
+        let (chance, injury, fail_tag, success_tag) =
+            find_template_risky_data("FLOODED PASSAGE", 999);
+        assert!((chance - 0.65).abs() < 1e-9);
+        assert!((injury - 0.20).abs() < 1e-9);
+        assert!(fail_tag.is_none());
+        assert!(success_tag.is_none());
+    }
+
+    #[test]
+    fn test_resolve_event_applies_template_power_modifier() {
+        // SHALLOWS_BOSS choice index 1 ("Tactical approach") has power_modifier 1.15,
+        // which resolve_event should surface on the EventResolution (overriding the
+        // default 1.0 computed for a non-risky choice).
+        let mut rng = seeded_rng();
+        let mut event = template_to_check_in_event(&SHALLOWS_BOSS, 1, Utc::now(), &[]);
+        let res = resolve_event(&mut event, Some(1), &[MercArchetype::Scout], &mut rng).unwrap();
+        assert!(
+            (res.power_modifier - 1.15).abs() < 1e-9,
+            "expected power_modifier 1.15, got {}",
+            res.power_modifier
+        );
     }
 
     #[test]

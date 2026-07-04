@@ -2407,6 +2407,186 @@ mod shuttle_tests {
         );
     }
 
+    #[test]
+    fn test_tick_shuttle_pull_sources_from_another_shuttle() {
+        // Exercises the LoomNodeRef::Shuttle branch of source_available_rate:
+        // a T2 shuttle pulling directly from a T1 shuttle's own output rate.
+        let mut loom = LoomState::new();
+        for node in loom.persistent.nodes.iter_mut() {
+            node.unlocked = true;
+        }
+        let mut t1 = Shuttle::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        t1.under_construction = false;
+        loom.persistent.shuttles.push(t1);
+
+        let mut t2 = Shuttle::new(
+            Resource::ForgedLight,
+            Resource::Memory,
+            NodeNature::Form,
+            Resource::EmberEcho,
+            1.0,
+            2,
+            vec![LoomNodeRef::Shuttle(0)],
+            vec![LoomNodeRef::Extractor(NodeId::MemoryArchive)],
+        );
+        t2.under_construction = false;
+        loom.persistent.shuttles.push(t2);
+
+        // Tick a few times so the T1 shuttle first accumulates ForgedLight output,
+        // which becomes the T2 shuttle's source_available_rate on later ticks.
+        for _ in 0..5 {
+            tick_shuttle_pull(&mut loom, 3600.0);
+        }
+        assert!(
+            loom.persistent.shuttles[1].buffer > 0.0,
+            "T2 shuttle should have produced EmberEcho by pulling from the T1 shuttle"
+        );
+    }
+
+    #[test]
+    fn test_build_shuttle_fails_at_capacity_when_slots_full() {
+        // With exactly 1 completed pattern, tier 1 is unlocked AND the shuttle
+        // slot cap is exactly 1 — so a second T1 build should hit AtCapacity
+        // specifically (not TierLocked, which the existing 0-pattern test hits).
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        setup_patterns(&mut loom, 1);
+        for node in loom.persistent.nodes.iter_mut() {
+            node.unlocked = true;
+        }
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 1000.0;
+
+        let first = build_shuttle(
+            &mut loom,
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        assert!(first.is_ok());
+
+        let second = build_shuttle(
+            &mut loom,
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        assert_eq!(second, Err(ShuttleError::AtCapacity));
+    }
+
+    #[test]
+    fn test_tick_shuttle_construction_skips_already_built_shuttle() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        // Shuttle 0: already built (not under construction) — should be skipped.
+        let mut built = Shuttle::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+            vec![],
+            vec![],
+        );
+        built.under_construction = false;
+        loom.persistent.shuttles.push(built);
+        // Shuttle 1: still under construction, about to finish.
+        let mut building = Shuttle::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+            vec![],
+            vec![],
+        );
+        building.under_construction = true;
+        building.construction_secs_remaining = 0.5;
+        loom.persistent.shuttles.push(building);
+
+        let completed = tick_shuttle_construction(&mut loom, 1.0);
+        assert_eq!(
+            completed,
+            vec![1],
+            "only the building shuttle should complete"
+        );
+        assert!(!loom.persistent.shuttles[0].under_construction);
+        assert!(!loom.persistent.shuttles[1].under_construction);
+    }
+
+    #[test]
+    fn test_reindex_sources_decrements_indices_above_removed() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        // Three shuttles; the third sources from the second (index 1).
+        for i in 0..3 {
+            let mut r = Shuttle::new(
+                Resource::Ember,
+                Resource::VoidEssence,
+                NodeNature::Heat,
+                Resource::ForgedLight,
+                1.0,
+                1,
+                if i == 2 {
+                    vec![LoomNodeRef::Shuttle(1)]
+                } else {
+                    vec![]
+                },
+                vec![],
+            );
+            r.under_construction = false;
+            loom.persistent.shuttles.push(r);
+        }
+
+        // Demolish shuttle 0 — shuttle 2's reference to Shuttle(1) should decrement to Shuttle(0).
+        demolish_shuttle(&mut loom, 0);
+        assert_eq!(loom.persistent.shuttles.len(), 2);
+        assert_eq!(
+            loom.persistent.shuttles[1].sources_a,
+            vec![LoomNodeRef::Shuttle(0)],
+            "reference to a shuttle above the removed index should decrement by one"
+        );
+    }
+
+    #[test]
+    fn test_tick_shuttle_stall_detection_skips_under_construction() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        let mut r = Shuttle::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+            vec![],
+            vec![],
+        );
+        r.under_construction = true;
+        r.buffer = r.buffer_capacity; // would look "full" if checked
+        loom.persistent.shuttles.push(r);
+
+        tick_shuttle_stall_detection(&mut loom);
+        assert!(
+            !loom.persistent.shuttles[0].stalled,
+            "under-construction shuttle should be skipped, never marked stalled"
+        );
+    }
+
     // ── demolish_shuttle out-of-bounds no-op ──────────────────────────────────
 
     #[test]
@@ -2550,8 +2730,40 @@ mod shuttle_tests {
     }
 
     #[test]
+    fn test_tier_intake_cap_all_named_tiers() {
+        assert_eq!(tier_intake_cap(1), 20.0);
+        assert_eq!(tier_intake_cap(2), 30.0);
+        assert_eq!(tier_intake_cap(3), 40.0);
+    }
+
+    #[test]
     fn test_shuttle_construction_secs_default_arm() {
         assert_eq!(shuttle_construction_secs(0), 7200.0);
         assert_eq!(shuttle_construction_secs(99), 7200.0);
+    }
+
+    #[test]
+    fn test_shuttle_construction_secs_all_named_tiers() {
+        assert_eq!(shuttle_construction_secs(1), 7200.0);
+        assert_eq!(shuttle_construction_secs(2), 14400.0);
+        assert_eq!(shuttle_construction_secs(3), 21600.0);
+    }
+
+    // ── codex_hint_indices: malformed entry ───────────────────────────────────
+
+    #[test]
+    fn test_codex_hint_indices_ignores_malformed_entry_with_too_few_inputs() {
+        use super::super::types::{CodexEntry, NodeNature};
+        // A discovered entry with fewer than 2 inputs is malformed (shouldn't happen
+        // in practice) — codex_hint_indices should skip it rather than panic.
+        let codex = vec![CodexEntry {
+            inputs: vec![Resource::Ember],
+            node_nature: NodeNature::Heat,
+            output: Resource::ForgedLight,
+            output_amount: 1.0,
+            discovered: true,
+        }];
+        let hints = codex_hint_indices(&codex);
+        assert!(hints.is_empty(), "malformed entry should yield no hints");
     }
 }

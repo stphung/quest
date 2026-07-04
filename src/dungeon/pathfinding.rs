@@ -228,6 +228,24 @@ mod tests {
         dungeon.get_room_mut(x, y).unwrap().state = RoomState::Revealed;
     }
 
+    #[test]
+    fn test_connect_helper_supports_all_four_directions() {
+        // Other tests in this file only ever call connect() left-to-right or
+        // top-to-bottom; exercise the reverse-order arms here too.
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+        place(&mut dungeon, 1, 1, RoomType::Combat);
+        place(&mut dungeon, 2, 1, RoomType::Combat);
+        place(&mut dungeon, 1, 2, RoomType::Combat);
+
+        connect(&mut dungeon, (2, 1), (1, 1)); // dx = -1
+        connect(&mut dungeon, (1, 2), (1, 1)); // dy = -1
+
+        assert!(dungeon.get_room(2, 1).unwrap().connections[DIR_LEFT]);
+        assert!(dungeon.get_room(1, 1).unwrap().connections[DIR_RIGHT]);
+        assert!(dungeon.get_room(1, 2).unwrap().connections[DIR_UP]);
+        assert!(dungeon.get_room(1, 1).unwrap().connections[DIR_DOWN]);
+    }
+
     // ── find_path_to ──────────────────────────────────────────────────────────
 
     #[test]
@@ -290,6 +308,22 @@ mod tests {
 
         let next = find_next_room(&dungeon);
         assert_eq!(next, Some((1, 0)));
+    }
+
+    #[test]
+    fn test_find_next_room_no_destination_when_already_standing_on_boss() {
+        // Player is already in the boss room (current == boss_position): the
+        // BFS path from a position to itself is a single-element path, so
+        // `path.len() > 1` is false and the boss-seeking early return is
+        // skipped. With nothing else revealed, exploration finds no
+        // destination either.
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+        place(&mut dungeon, 1, 0, RoomType::Boss);
+        dungeon.player_position = (1, 0);
+        dungeon.boss_position = (1, 0);
+        dungeon.has_key = true;
+
+        assert_eq!(find_next_room(&dungeon), None);
     }
 
     #[test]

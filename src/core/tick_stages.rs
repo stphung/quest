@@ -1509,6 +1509,102 @@ mod tests {
         assert!(state.stormglass > 0);
     }
 
+    #[test]
+    fn process_dungeon_events_treasure_room_equipped_item_skips_all_stormglass_branches() {
+        use crate::dungeon::types::{Dungeon, DungeonSize, Room, RoomState, RoomType, DIR_RIGHT};
+
+        let mut rng = ChaCha8Rng::seed_from_u64(100);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        // Below the Stormglass gate and never discovered: both salvage branches
+        // in process_dungeon_events must be skipped (false path of each `if`).
+        state.prestige_rank = 0;
+        state.zone_progression.current_zone_id = 5;
+        // Fresh character has no equipment in any slot, so the treasure item
+        // always auto-equips (better than nothing), forcing `equipped == true`.
+
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+        dungeon.entrance_position = (0, 0);
+        dungeon.boss_position = (4, 4);
+        dungeon.player_position = (0, 0);
+        dungeon.current_room_cleared = true;
+        dungeon.move_timer = 10.0;
+
+        let mut entrance = Room::new(RoomType::Entrance, (0, 0));
+        entrance.state = RoomState::Current;
+        entrance.connections[DIR_RIGHT] = true;
+        dungeon.grid[0][0] = Some(entrance);
+
+        let mut treasure = Room::new(RoomType::Treasure, (1, 0));
+        treasure.state = RoomState::Revealed;
+        dungeon.grid[0][1] = Some(treasure);
+
+        state.active_dungeon = Some(dungeon);
+
+        let haven_bonuses = Haven::new().compute_bonuses();
+        let mut result = TickResult::default();
+
+        process_dungeon_events(&mut state, 0.1, &haven_bonuses, &mut result, &mut rng);
+
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::DungeonTreasureFound { equipped: true, .. })));
+        assert!(!result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::StormglassSalvaged { .. })));
+        assert!(!result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::StormglassDungeonCache { .. })));
+        assert!(!state.stormglass_discovered);
+        assert_eq!(state.stormglass, 0);
+    }
+
+    #[test]
+    fn process_dungeon_events_treasure_room_prestige_rank_alone_unlocks_stormglass_cache() {
+        use crate::dungeon::types::{Dungeon, DungeonSize, Room, RoomState, RoomType, DIR_RIGHT};
+
+        let mut rng = ChaCha8Rng::seed_from_u64(101);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        // Stormglass not yet discovered, but prestige rank alone clears the gate,
+        // exercising the second disjunct of the `||` in the dungeon-cache check
+        // (the equipped item skips the first, unequipped-item salvage check).
+        state.prestige_rank = 20;
+        state.zone_progression.current_zone_id = 5;
+
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+        dungeon.entrance_position = (0, 0);
+        dungeon.boss_position = (4, 4);
+        dungeon.player_position = (0, 0);
+        dungeon.current_room_cleared = true;
+        dungeon.move_timer = 10.0;
+
+        let mut entrance = Room::new(RoomType::Entrance, (0, 0));
+        entrance.state = RoomState::Current;
+        entrance.connections[DIR_RIGHT] = true;
+        dungeon.grid[0][0] = Some(entrance);
+
+        let mut treasure = Room::new(RoomType::Treasure, (1, 0));
+        treasure.state = RoomState::Revealed;
+        dungeon.grid[0][1] = Some(treasure);
+
+        state.active_dungeon = Some(dungeon);
+
+        let haven_bonuses = Haven::new().compute_bonuses();
+        let mut result = TickResult::default();
+
+        process_dungeon_events(&mut state, 0.1, &haven_bonuses, &mut result, &mut rng);
+
+        // Dungeon cache fires purely off the prestige-rank gate, independent of
+        // whether the treasure item itself got salvaged.
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::StormglassDungeonCache { .. })));
+        assert!(state.stormglass > 0);
+    }
+
     // ── process_fishing_tick ─────────────────────────────────────────────────
 
     #[test]
@@ -1533,6 +1629,53 @@ mod tests {
 
         assert!(!handled);
         assert_eq!(tick_counter, 0);
+    }
+
+    #[test]
+    fn process_fishing_tick_records_xp_sample_and_evicts_oldest_when_window_full() {
+        let mut rng = ChaCha8Rng::seed_from_u64(4);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.active_fishing = Some(crate::fishing::FishingSession {
+            spot_name: "Sample Cove".to_string(),
+            total_fish: 100,
+            fish_caught: Vec::new(),
+            items_found: Vec::new(),
+            ticks_remaining: 1,
+            phase: crate::fishing::FishingPhase::Reeling,
+        });
+        // Pre-fill the rolling XP/sec window to capacity so the next sample
+        // triggers the eviction branch (pop_front) in process_fishing_tick.
+        state.xp_rate_samples = (0..crate::core::constants::XP_RATE_WINDOW_SECONDS)
+            .map(|i| i as u64)
+            .collect();
+        state.combat_seconds_this_tick = true;
+        state.xp_this_second = 42;
+        let mut tick_counter = TICKS_PER_SECOND - 1;
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        process_fishing_tick(
+            &mut state,
+            &mut tick_counter,
+            0.1,
+            &haven_bonuses,
+            &mut achievements,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        // Window stays capped at XP_RATE_WINDOW_SECONDS after the push+evict.
+        assert_eq!(
+            state.xp_rate_samples.len(),
+            crate::core::constants::XP_RATE_WINDOW_SECONDS
+        );
+        // The oldest sample (0) was evicted; the newest pushed sample (42) is last.
+        assert_eq!(state.xp_rate_samples.back(), Some(&42));
+        assert_eq!(state.xp_rate_samples.front(), Some(&1));
+        assert!(!state.combat_seconds_this_tick);
+        assert_eq!(state.xp_this_second, 0);
     }
 
     #[test]
@@ -1878,6 +2021,82 @@ mod tests {
             .events
             .iter()
             .any(|e| matches!(e, TickEvent::DungeonEliteDefeated { xp_gained: 400, .. })));
+    }
+
+    #[test]
+    fn process_combat_events_elite_defeated_without_active_dungeon_awards_xp_only() {
+        let mut rng = ChaCha8Rng::seed_from_u64(34);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut deep = crate::deep::DeepState::new();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        state.combat_state.current_enemy = Some(Enemy::new("Guardian".to_string(), 100, 20));
+        // No active dungeon: the `if let Some(dungeon) = &mut state.active_dungeon`
+        // guard in the EliteDefeated arm must take its false path.
+        state.active_dungeon = None;
+
+        process_combat_events(
+            &mut state,
+            vec![CombatEvent::EliteDefeated { xp_gained: 400 }],
+            &haven_bonuses,
+            &mut achievements,
+            &mut deep,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(state.active_dungeon.is_none());
+        assert!(!result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::DungeonKeyFound)));
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::DungeonEliteDefeated { xp_gained: 400, .. })));
+    }
+
+    #[test]
+    fn process_combat_events_boss_enrage_maps_weapon_blocked_and_death_messages() {
+        let mut rng = ChaCha8Rng::seed_from_u64(35);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut deep = crate::deep::DeepState::new();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        process_combat_events(
+            &mut state,
+            vec![
+                CombatEvent::BossEnrage {
+                    weapon_blocked: true,
+                    enemy_name: "Storm Warden".to_string(),
+                },
+                CombatEvent::BossEnrage {
+                    weapon_blocked: false,
+                    enemy_name: "Storm Warden".to_string(),
+                },
+            ],
+            &haven_bonuses,
+            &mut achievements,
+            &mut deep,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert_eq!(result.events.len(), 2);
+        assert!(matches!(
+            &result.events[0],
+            TickEvent::BossEnrage { message } if message.contains("lack the weapon")
+        ));
+        assert!(matches!(
+            &result.events[1],
+            TickEvent::BossEnrage { message } if message.contains("Boss encounter reset")
+        ));
     }
 
     #[test]
@@ -2914,6 +3133,245 @@ mod tests {
         );
     }
 
+    #[test]
+    fn tick_deep_missions_breakthrough_success_with_cap_already_satisfied_skips_region_unlock() {
+        use crate::deep::{
+            MercArchetype, MercQuality, MercStatus, Mercenary, Mission, MissionStatus, MissionType,
+        };
+        use chrono::{Duration, Utc};
+
+        let mut succeeded = false;
+        for seed in 0u64..20 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let state = GameState::new("Hero".to_string(), 0);
+            let mut deep = crate::deep::DeepState::new();
+            deep.persistent.discovered = true;
+            // Fracture cap already at (or above) the Red Fault region's end zone,
+            // so the breakthrough's `new_cap > fracture_zone_cap` check must take
+            // its false path even though a FractureRegion is found for this layer.
+            deep.persistent.fracture_zone_cap = 14;
+
+            let merc = Mercenary {
+                id: 1,
+                name: "Bruiser".to_string(),
+                archetype: MercArchetype::Vanguard,
+                power: 999_999,
+                resilience: 999_999,
+                expertise: 0,
+                level: 1,
+                missions_completed: 0,
+                quality: MercQuality::Common,
+                status: MercStatus::OnMission(1),
+            };
+            deep.prestige.roster.insert(merc.id, merc);
+
+            let now = Utc::now();
+            let mission = Mission {
+                id: 1,
+                mission_type: MissionType::Breakthrough,
+                layer: 3,
+                squad: vec![1],
+                started_at: now - Duration::hours(4),
+                ends_at: now - Duration::seconds(5),
+                events: Vec::new(),
+                pending_event_index: 0,
+                status: MissionStatus::Active,
+                result: None,
+                is_first_orders: false,
+            };
+            deep.prestige.active_missions.push(mission);
+
+            let mut achievements = Achievements::default();
+            let mut result = TickResult::default();
+
+            tick_deep_missions(
+                &state,
+                &mut deep,
+                &mut achievements,
+                false,
+                &mut result,
+                &mut rng,
+            );
+
+            if achievements
+                .take_newly_unlocked()
+                .contains(&AchievementId::FirstBreakthrough)
+            {
+                assert!(deep.persistent.pending_fracture_region_unlock.is_none());
+                assert_eq!(deep.persistent.fracture_zone_cap, 14);
+                succeeded = true;
+                break;
+            }
+        }
+
+        assert!(
+            succeeded,
+            "An overpowered Breakthrough mission should succeed within 20 seeds"
+        );
+    }
+
+    #[test]
+    fn tick_deep_missions_gateway_expedition_success_fires_gateway_achievement() {
+        use crate::deep::{
+            GuildRank, MercArchetype, MercQuality, MercStatus, Mercenary, Mission, MissionStatus,
+            MissionType, GATEWAY_LAYER,
+        };
+        use chrono::{Duration, Utc};
+
+        let mut succeeded = false;
+        for seed in 0u64..20 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let state = GameState::new("Hero".to_string(), 0);
+            let mut deep = crate::deep::DeepState::new();
+            deep.persistent.discovered = true;
+            deep.persistent.guild_rank = GuildRank::MAX;
+
+            let merc = Mercenary {
+                id: 1,
+                name: "Vanguard".to_string(),
+                archetype: MercArchetype::Vanguard,
+                power: 999_999,
+                resilience: 999_999,
+                expertise: 0,
+                level: 1,
+                missions_completed: 0,
+                quality: MercQuality::Common,
+                status: MercStatus::OnMission(1),
+            };
+            deep.prestige.roster.insert(merc.id, merc);
+
+            let now = Utc::now();
+            let mission = Mission {
+                id: 1,
+                mission_type: MissionType::GatewayExpedition,
+                layer: GATEWAY_LAYER,
+                squad: vec![1],
+                started_at: now - Duration::hours(72),
+                ends_at: now - Duration::seconds(5),
+                events: Vec::new(),
+                pending_event_index: 0,
+                status: MissionStatus::Active,
+                result: None,
+                is_first_orders: false,
+            };
+            deep.prestige.active_missions.push(mission);
+
+            let mut achievements = Achievements::default();
+            let mut result = TickResult::default();
+
+            tick_deep_missions(
+                &state,
+                &mut deep,
+                &mut achievements,
+                false,
+                &mut result,
+                &mut rng,
+            );
+
+            if deep.persistent.gateway_opened {
+                assert!(achievements
+                    .take_newly_unlocked()
+                    .contains(&AchievementId::GatewayOpened));
+                succeeded = true;
+                break;
+            }
+        }
+
+        assert!(
+            succeeded,
+            "An overpowered Gateway Expedition should succeed within 20 seeds"
+        );
+    }
+
+    #[test]
+    fn tick_deep_missions_weak_squad_yields_partial_and_failure_outcomes_with_casualties() {
+        use crate::deep::{
+            MercArchetype, MercQuality, MercStatus, Mercenary, Mission, MissionStatus, MissionType,
+        };
+        use chrono::{Duration, Utc};
+
+        let mut saw_partial = false;
+        let mut saw_failure = false;
+        let mut saw_merc_lost = false;
+
+        for seed in 0u64..80 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let state = GameState::new("Hero".to_string(), 0);
+            let mut deep = crate::deep::DeepState::new();
+            deep.persistent.discovered = true;
+
+            let merc = Mercenary {
+                id: 1,
+                name: "Recruit".to_string(),
+                archetype: MercArchetype::Scout,
+                power: 1,
+                resilience: 1,
+                expertise: 0,
+                level: 1,
+                missions_completed: 0,
+                quality: MercQuality::Common,
+                status: MercStatus::OnMission(1),
+            };
+            deep.prestige.roster.insert(merc.id, merc);
+
+            let now = Utc::now();
+            let mission = Mission {
+                id: 1,
+                mission_type: MissionType::Breakthrough,
+                layer: 7,
+                squad: vec![1],
+                started_at: now - Duration::hours(12),
+                ends_at: now - Duration::seconds(5),
+                events: Vec::new(),
+                pending_event_index: 0,
+                status: MissionStatus::Active,
+                result: None,
+                is_first_orders: false,
+            };
+            deep.prestige.active_missions.push(mission);
+
+            let mut achievements = Achievements::default();
+            let mut result = TickResult::default();
+
+            tick_deep_missions(
+                &state,
+                &mut deep,
+                &mut achievements,
+                false,
+                &mut result,
+                &mut rng,
+            );
+
+            for event in &result.events {
+                if let TickEvent::DeepMissionComplete { message } = event {
+                    if message.contains("(Partial Success)") {
+                        saw_partial = true;
+                    }
+                    if message.contains("(Failure)") {
+                        saw_failure = true;
+                    }
+                }
+            }
+            if achievements
+                .take_newly_unlocked()
+                .contains(&AchievementId::FirstMercLost)
+            {
+                saw_merc_lost = true;
+            }
+
+            if saw_partial && saw_failure && saw_merc_lost {
+                break;
+            }
+        }
+
+        assert!(saw_partial, "expected at least one Partial Success outcome");
+        assert!(saw_failure, "expected at least one Failure outcome");
+        assert!(
+            saw_merc_lost,
+            "expected at least one lost merc within 80 seeds"
+        );
+    }
+
     // ── tick_loom ────────────────────────────────────────────────────────────
 
     #[test]
@@ -3024,5 +3482,53 @@ mod tests {
         assert!(loom.persistent.patterns[0].completed);
         assert!(result.loom_changed);
         assert_ne!(loom.persistent.wr_pr_last_granted_at, 0);
+    }
+
+    #[test]
+    fn tick_loom_wr_pr_conversion_grants_pr_once_fill_period_has_elapsed() {
+        let mut deep = crate::deep::DeepState::new();
+        deep.persistent.discovered = true;
+        deep.persistent.gateway_opened = true;
+
+        let mut loom = crate::loom::LoomState::new();
+        crate::loom::complete_discovery(&mut loom);
+        // A single already-completed, non-eternal pattern satisfies
+        // `all_patterns_complete()` without needing all 28 real patterns.
+        loom.persistent.patterns = vec![crate::loom::WovenPattern {
+            index: 0,
+            name: "Already Done".to_string(),
+            requirements: vec![],
+            completed: true,
+            flavor: String::new(),
+            eternal: false,
+        }];
+
+        // Seed a measured Woven Reality rate so `wr_to_pr_per_hour` returns > 0.
+        // tick_loom's "no production this tick" pass appends one 0.0 sample after
+        // this, so the resulting rate is diluted but still well above zero.
+        let mut tracker = crate::loom::RateTracker::new();
+        tracker.push(0.02);
+        loom.rate_trackers
+            .insert(crate::loom::Resource::WovenReality, tracker);
+
+        // Last grant far enough in the past that `elapsed >= fill_secs` on this tick.
+        let now_ts = chrono::Utc::now().timestamp();
+        loom.persistent.wr_pr_last_granted_at = now_ts - 1000;
+        loom.last_tick_at = Some(chrono::Utc::now() - chrono::Duration::milliseconds(100));
+
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let prestige_before = state.prestige_rank;
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        tick_loom(&deep, &mut loom, &mut state, &mut achievements, &mut result);
+
+        assert!(state.prestige_rank > prestige_before);
+        assert!(result.loom_changed);
+        assert!(loom.persistent.wr_pr_last_granted_at > now_ts - 1000);
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::WovenRealityPRGranted { .. })));
     }
 }

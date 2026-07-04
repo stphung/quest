@@ -4852,6 +4852,35 @@ mod tests {
     }
 
     #[test]
+    fn test_prune_invalid_pool_missions_keeps_construction_when_active_mission_differs() {
+        // Same layer, but the active mission builds a *different* infrastructure
+        // type — the conflict check's inner `if` must fall through (false) rather
+        // than remove the pool entry, exercising the non-conflicting fallthrough.
+        let mut persistent = DeepPersistent::new();
+        persistent.layer_record_mut(1).cleared = true;
+        let mut pool = vec![make_available_mission(
+            MissionType::Construction(Infrastructure::Outpost),
+            1,
+        )];
+        let active = Mission {
+            id: 1,
+            mission_type: MissionType::Construction(Infrastructure::Bridge),
+            layer: 1,
+            squad: vec![],
+            started_at: Utc::now(),
+            ends_at: Utc::now() + Duration::hours(1),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+        let changed = prune_invalid_pool_missions(&mut pool, &persistent, &[active]);
+        assert!(!changed);
+        assert_eq!(pool.len(), 1);
+    }
+
+    #[test]
     fn test_prune_invalid_pool_missions_dedupes_layer_type_pairs() {
         let persistent = DeepPersistent::new();
         let mut pool = vec![

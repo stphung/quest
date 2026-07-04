@@ -346,6 +346,14 @@ mod tests {
     }
 
     #[test]
+    fn test_wiki_url_for_browser_prepends_https() {
+        // WIKI_URL is a bare host+path (no scheme), so the function should
+        // add the https:// prefix.
+        assert!(!WIKI_URL.starts_with("http://") && !WIKI_URL.starts_with("https://"));
+        assert_eq!(wiki_url_for_browser(), format!("https://{WIKI_URL}"));
+    }
+
+    #[test]
     fn test_fracture_zone_scaling_consistency() {
         // Verify each fracture zone Z12-Z30 is approximately 1.6x the previous zone's base_hp
         for zone_id in 12..=30u32 {

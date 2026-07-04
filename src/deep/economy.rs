@@ -389,6 +389,15 @@ mod tests {
     }
 
     #[test]
+    fn test_construction_earns_no_marks_in_void_layers() {
+        // Construction's (0, 0) arm in the void (layer >= 26) scaling branch.
+        assert_eq!(
+            base_marks_earned(MissionType::Construction(Infrastructure::Bridge), 26),
+            0
+        );
+    }
+
+    #[test]
     fn test_marks_increase_with_depth() {
         for layer in 1..25 {
             let a = base_marks_earned(MissionType::Expedition, layer);
@@ -695,6 +704,15 @@ mod tests {
     fn test_base_xp_reward_layer_10() {
         assert_eq!(base_xp_reward(MissionType::SupplyRun, 10), 350); // 150 + 200
         assert_eq!(base_xp_reward(MissionType::Expedition, 10), 1200); // 600 + 600
+    }
+
+    #[test]
+    fn test_base_xp_reward_recon_and_construction() {
+        assert_eq!(base_xp_reward(MissionType::Recon, 1), 335); // 300 + 35
+        assert_eq!(
+            base_xp_reward(MissionType::Construction(Infrastructure::Outpost), 5),
+            0
+        );
     }
 
     #[test]
