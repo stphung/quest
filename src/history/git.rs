@@ -205,7 +205,7 @@ impl HistoryRepo {
         let head_ref = self.repo.head().ok();
         let active_branch = head_ref
             .as_ref()
-            .and_then(|r| r.shorthand().map(|s| s.to_string()));
+            .and_then(|r| r.shorthand().ok().map(|s| s.to_string()));
 
         let mut branches: Vec<TimelineInfo> = Vec::new();
 
@@ -347,7 +347,7 @@ impl HistoryRepo {
         let head_ref = self.repo.head().ok();
         let active = head_ref
             .as_ref()
-            .and_then(|r| r.shorthand().map(|s| s.to_string()));
+            .and_then(|r| r.shorthand().ok().map(|s| s.to_string()));
         if active.as_deref() == Some(branch_name) {
             return Err(HistoryError::InvalidBranchName(
                 "cannot delete active branch".to_string(),
