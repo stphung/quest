@@ -4,7 +4,7 @@
 //! stored or serialized, so offline resolution and live play see identical
 //! skies by construction, and save-scumming changes nothing. Objects live on
 //! the route graph's edges, drift to an adjacent road once a day, and
-//! dissipate after 2–5 days. Weather prices time, hope, and provisions —
+//! dissipate after 2–5 days. Weather prices time and provisions —
 //! the things the player already trades. It never touches souls.
 //!
 //! See `docs/superpowers/specs/2026-07-03-vessel-underway-design.md`.
@@ -17,8 +17,8 @@ pub enum WeatherKind {
     /// `≋` A running current with a bearing. Opportunity, not tax: Run
     /// rides a with-bearing current; Run against one costs more.
     Current,
-    /// `▒` A region where sound declines. Hope frays inside unless the
-    /// ship goes Quiet — and Quiet can hear what the silence hides.
+    /// `▒` A region where sound declines. Sail it at Easy and the crew can
+    /// hear what the silence hides — a rumor, one per bank.
     SilenceBank,
     /// `≈` Fast dirty water. Taxes provisions; shelter through it at
     /// Mourn/Quiet, or pay double for Running it.

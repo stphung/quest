@@ -1,13 +1,10 @@
-//! Integration tests for The Price of Passage (spec 8): hope sinks,
-//! the strain ledger, hull wear, and the yard's third door.
+//! Integration tests for The Price of Passage (spec 8): the strain ledger,
+//! hull wear, and the yard's third door.
 
 use chrono::{DateTime, Duration, Utc};
 use quest::vessel::route::{roads_from, RoadId, WaypointId, ROUTE_START};
 use quest::vessel::souls::{SoulId, Station};
-use quest::vessel::voyage::{
-    PassageEvent, SceneState, SoulStatus, StrainCause, Trim, VoyagePhase, VoyageState,
-    HOPE_SPEND_FLOOR, PRESS_HOPE_COST,
-};
+use quest::vessel::voyage::{PassageEvent, SceneState, SoulStatus, Trim, VoyagePhase, VoyageState};
 
 fn t0() -> DateTime<Utc> {
     "2026-07-03T12:00:00Z".parse().unwrap()
@@ -32,121 +29,6 @@ fn underway(seed: u64) -> VoyageState {
     v.depart(roads_from(ROUTE_START).next().unwrap().id)
         .unwrap();
     v
-}
-
-// ── Press the Helm ──────────────────────────────────────────────────────────
-
-#[test]
-fn pressing_spends_hope_and_shortens_the_leg_once() {
-    let mut v = underway(5);
-    v.tick(t0() + gh(12));
-    let hope0 = v.hope;
-    let eta0 = v.eta_minutes().unwrap();
-
-    assert!(v.can_press());
-    assert!(v.press_helm());
-    assert_eq!(v.hope, hope0 - PRESS_HOPE_COST);
-    let eta1 = v.eta_minutes().unwrap();
-    assert!(
-        (eta1 as f64) < eta0 as f64 * 0.90,
-        "the remaining leg shortens ~15% ({eta0} -> {eta1})"
-    );
-    // Once per leg, and the hint gate agrees.
-    assert!(!v.can_press());
-    assert!(!v.press_helm());
-}
-
-#[test]
-fn pressing_needs_hope_to_spend() {
-    let mut v = underway(5);
-    v.tick(t0() + gh(6));
-    v.hope = HOPE_SPEND_FLOOR - 1;
-    assert!(!v.can_press());
-    assert!(!v.press_helm(), "you cannot buy your way into the silence");
-}
-
-#[test]
-fn the_second_press_in_a_chapter_strains_the_helm() {
-    let mut v = underway(5);
-    v.set_station(SoulId(0), Some(Station::Helm));
-    v.tick(t0() + gh(6));
-    assert!(v.press_helm());
-    assert_eq!(
-        v.soul_state(SoulId(0)).unwrap().strain,
-        0,
-        "one press is free"
-    );
-
-    // Arrive, depart the next leg (same chapter), press again.
-    let mut now = t0() + gh(6);
-    while v.current_waypoint().is_none() {
-        now += gh(6);
-        v.tick(now);
-    }
-    v.play_arrival_scene();
-    if v.pending_ask.is_some() {
-        v.decline_ask();
-    }
-    let next = roads_from(v.current_waypoint().unwrap()).next().unwrap();
-    v.depart(next.id).unwrap();
-    now += gh(6);
-    v.tick(now);
-    assert!(v.press_helm(), "a new leg allows a new press");
-    assert_eq!(
-        v.soul_state(SoulId(0)).unwrap().strain,
-        1,
-        "the second press in one chapter wears on the wheel-hand"
-    );
-    assert!(v.take_passage_events().iter().any(|e| matches!(
-        e,
-        PassageEvent::Strained {
-            cause: StrainCause::PressedHard,
-            ..
-        }
-    )));
-}
-
-// ── Hard rations ────────────────────────────────────────────────────────────
-
-#[test]
-fn hard_rations_stretch_the_hold_and_charge_hope_daily() {
-    // Two identical ships, one on hard rations: compare a day's burn.
-    let run = |rations: bool| {
-        let mut v = underway(9);
-        v.set_station(SoulId(1), Some(Station::Tender));
-        if rations {
-            assert!(v.set_hard_rations(true));
-        }
-        let p0 = v.provisions;
-        let h0 = v.hope;
-        v.tick(t0() + gh(26)); // past one full day underway
-        (p0 - v.provisions, h0 as i32 - v.hope as i32)
-    };
-    let (burn_full, hope_full) = run(false);
-    let (burn_hard, hope_hard) = run(true);
-    assert!(
-        burn_hard < burn_full * 0.80,
-        "hard rations burn ~25% less ({burn_full:.2} -> {burn_hard:.2})"
-    );
-    // Nights can move hope on both ships (a singing night lifts it);
-    // rations' price is the difference between the twins.
-    assert_eq!(
-        hope_hard - hope_full,
-        1,
-        "hard rations cost a point a day over full rations"
-    );
-}
-
-#[test]
-fn rations_cannot_be_asked_of_the_hopeless() {
-    let mut v = underway(9);
-    v.hope = HOPE_SPEND_FLOOR - 1;
-    assert!(!v.set_hard_rations(true));
-    v.hope = HOPE_SPEND_FLOOR;
-    assert!(v.set_hard_rations(true));
-    v.hope = 0;
-    assert!(v.set_hard_rations(false), "turning it off is always free");
-    assert!(!v.hard_rations);
 }
 
 // ── The strain ledger ───────────────────────────────────────────────────────
@@ -300,22 +182,26 @@ fn the_thorns_take_the_most_strained_stationed_soul_first() {
 // ── Compat and the covenant ─────────────────────────────────────────────────
 
 #[test]
-fn old_saves_load_sound_unworn_and_fully_rationed() {
+fn old_saves_load_sound_and_unworn() {
     let v = VoyageState::begin("compat".to_string(), 1, t0());
     let mut json: serde_json::Value = serde_json::to_value(&v).unwrap();
     let obj = json.as_object_mut().unwrap();
+    // Spec-8 fields absent from an older save default cleanly. Retired-hope
+    // fields (hope, long_silence, hard_rations, …) are handled the other way:
+    // serde ignores them if a legacy save still carries them.
     for key in [
         "hull_wear",
-        "hard_rations",
-        "rations_minutes",
-        "pressed_this_leg",
-        "presses_this_chapter",
         "priced_squalls",
         "strained_banks",
         "passage_events",
     ] {
         obj.remove(key);
     }
+    // A legacy save may still carry the now-retired hope fields; serde must
+    // load past them (unknown fields are ignored, not rejected).
+    obj.insert("hope".to_string(), serde_json::json!(7));
+    obj.insert("long_silence".to_string(), serde_json::json!(false));
+    obj.insert("hard_rations".to_string(), serde_json::json!(true));
     for soul in json["souls"].as_array_mut().unwrap() {
         let s = soul.as_object_mut().unwrap();
         s.remove("strain");
@@ -323,7 +209,6 @@ fn old_saves_load_sound_unworn_and_fully_rationed() {
     }
     let loaded: VoyageState = serde_json::from_value(json).unwrap();
     assert_eq!(loaded.hull_wear, 0);
-    assert!(!loaded.hard_rations);
     assert!(loaded.souls.iter().all(|s| s.strain == 0));
 }
 
@@ -332,8 +217,6 @@ fn offline_equivalence_holds_with_the_prices_in_play() {
     let build = || {
         let mut v = underway(29);
         v.set_station(SoulId(0), Some(Station::Helm));
-        v.set_hard_rations(true);
-        assert!(v.press_helm() || v.hope < HOPE_SPEND_FLOOR);
         v
     };
     let horizon = t0() + gd(9);
@@ -348,7 +231,6 @@ fn offline_equivalence_holds_with_the_prices_in_play() {
 
     assert_eq!(live.phase, offline.phase);
     assert_eq!(live.provisions.to_bits(), offline.provisions.to_bits());
-    assert_eq!(live.hope, offline.hope);
     assert_eq!(live.hull_wear, offline.hull_wear);
     assert_eq!(live.passage_events, offline.passage_events);
     assert_eq!(

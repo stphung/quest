@@ -26,6 +26,9 @@ pub enum VoyageInputResult {
     BuyDrive,
     /// At the Reckoning: spend Salvage at the Shipwright (spec 9).
     BuyCapacity,
+    /// At the Reckoning: spend Salvage in the Ward yard — buys down the dark's
+    /// per-crossing toll on the still-waiting world.
+    BuyWard,
     Ignored,
 }
 
@@ -168,6 +171,7 @@ pub fn handle_voyage_input(
             }
             KeyCode::Char('d') | KeyCode::Char('D') => VoyageInputResult::BuyDrive,
             KeyCode::Char('c') | KeyCode::Char('C') => VoyageInputResult::BuyCapacity,
+            KeyCode::Char('w') | KeyCode::Char('W') => VoyageInputResult::BuyWard,
             _ => VoyageInputResult::Handled,
         },
         VoyageView::Record { scroll } => {
@@ -507,19 +511,6 @@ fn handle_chart_keys(
                 VoyageInputResult::Handled
             }
         }
-        KeyCode::Char('p') | KeyCode::Char('P') => {
-            if voyage.press_helm() {
-                ui.scene_modal = Some(SceneModal {
-                    title: "The helm, pressed".to_string(),
-                    body: "Two points of hope, spent on purpose. The ship answers \
-                           and the leg shortens."
-                        .to_string(),
-                });
-                VoyageInputResult::HandledNeedsSave
-            } else {
-                VoyageInputResult::Handled
-            }
-        }
         KeyCode::Char('q') | KeyCode::Char('Q') => VoyageInputResult::Quit,
         _ => VoyageInputResult::Ignored,
     }
@@ -573,8 +564,8 @@ fn handle_trim_keys(
     ui: &mut VoyageUiState,
     selected: usize,
 ) -> VoyageInputResult {
-    // Rows: the four trims, then hard rations (spec 8).
-    let selected = selected.min(Trim::ALL.len());
+    // Rows: the four paces.
+    let selected = selected.min(Trim::ALL.len() - 1);
     match key.code {
         KeyCode::Up | KeyCode::Char('k') => {
             ui.view = VoyageView::Trim {
@@ -584,16 +575,11 @@ fn handle_trim_keys(
         }
         KeyCode::Down | KeyCode::Char('j') => {
             ui.view = VoyageView::Trim {
-                selected: (selected + 1).min(Trim::ALL.len()),
+                selected: (selected + 1).min(Trim::ALL.len() - 1),
             };
             VoyageInputResult::Handled
         }
         KeyCode::Enter => {
-            if selected == Trim::ALL.len() {
-                let on = !voyage.hard_rations;
-                voyage.set_hard_rations(on);
-                return VoyageInputResult::HandledNeedsSave;
-            }
             voyage.set_trim(Trim::ALL[selected]);
             ui.view = VoyageView::Chart;
             VoyageInputResult::HandledNeedsSave

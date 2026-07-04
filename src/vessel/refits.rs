@@ -37,7 +37,7 @@ impl RefitId {
             RefitId::QuietKeel => "named threats treat the hull kindly",
             RefitId::DeepLarder => "a drift ends with 40 in the hold",
             RefitId::LanternMast => "the chart names what lies one road further",
-            RefitId::MourningColors => "Mourn sails thriftier still",
+            RefitId::MourningColors => "the Restful pace sails thriftier still",
         }
     }
 }

@@ -80,7 +80,7 @@ pub enum RoadTag {
     Tolled,
     /// Singing nights are common here.
     Singing,
-    /// Silence and cold; hope frays.
+    /// Silence and cold; the long dark presses in.
     Dark,
     /// Gentle water; souls rest well.
     Kind,

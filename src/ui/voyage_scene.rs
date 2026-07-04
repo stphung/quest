@@ -9,8 +9,7 @@
 use crate::vessel::junction::{current_junction_cards, RoadCard};
 use crate::vessel::route::{self, Feature, WaypointId};
 use crate::vessel::voyage::{
-    hope_label, SceneState, Trim, VoyagePhase, VoyageState, DRIFT_RECOVERY_HOURS, MINUTES_PER_DAY,
-    RUMOR_PRICE,
+    SceneState, Trim, VoyagePhase, VoyageState, DRIFT_RECOVERY_HOURS, MINUTES_PER_DAY, RUMOR_PRICE,
 };
 use crate::vessel::{SceneModal, VoyageUiState, VoyageView};
 use ratatui::{
@@ -60,7 +59,7 @@ pub fn render_voyage(
         VoyageView::Reckoning => render_reckoning(frame, area, colony),
         _ => match ctx.tier {
             SizeTier::XL | SizeTier::L => render_full(frame, area, voyage, ui, colony),
-            _ => render_strip(frame, area, voyage, ui),
+            _ => render_strip(frame, area, voyage, ui, colony),
         },
     }
 
@@ -299,12 +298,12 @@ fn render_full(
         VoyageView::Farewell { selected } => {
             render_farewell_panel(frame, cols[1], voyage, selected)
         }
-        VoyageView::Chart => render_vessel_panel(frame, cols[1], voyage),
+        VoyageView::Chart => render_vessel_panel(frame, cols[1], voyage, colony),
         // Full-frame rooms are intercepted in `render_voyage`.
         VoyageView::Manifest { .. }
         | VoyageView::Keepsake { .. }
         | VoyageView::Record { .. }
-        | VoyageView::Reckoning => render_vessel_panel(frame, cols[1], voyage),
+        | VoyageView::Reckoning => render_vessel_panel(frame, cols[1], voyage, colony),
     }
 }
 
@@ -679,7 +678,12 @@ fn line_points(from: (u16, u16), to: (u16, u16)) -> Vec<(i32, i32)> {
 
 // ── The Vessel panel (right column, chart view) ─────────────────────────────
 
-fn render_vessel_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
+fn render_vessel_panel(
+    frame: &mut Frame,
+    area: Rect,
+    voyage: &VoyageState,
+    colony: Option<&crate::vessel::colony::ColonyState>,
+) {
     // Moored at the Tree, the panel becomes the harbor: the gauges retire
     // (they were the crossing), and the rooms open.
     if matches!(voyage.phase, VoyagePhase::Arrived { .. }) {
@@ -696,8 +700,8 @@ fn render_vessel_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
 
     let mut lines: Vec<Line> = Vec::new();
     lines.push(Line::from(""));
-    lines.extend(gauge_lines(voyage, inner.width));
-    // The hull and the table (spec 8): scars eat, rations stretch.
+    lines.extend(gauge_lines(voyage, inner.width, colony));
+    // The hull (spec 8): scars eat into the hold.
     if voyage.hull_wear > 0 {
         lines.push(Line::from(Span::styled(
             format!(
@@ -708,20 +712,8 @@ fn render_vessel_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
             Style::default().fg(Color::LightRed),
         )));
     }
-    if voyage.hard_rations {
-        lines.push(Line::from(Span::styled(
-            "Rations    Bare Bones \u{2014} the hold stretches, hope pays daily",
-            Style::default().fg(Color::Yellow),
-        )));
-    }
     lines.push(Line::from(""));
     lines.extend(phase_lines(voyage));
-    if voyage.can_press() {
-        lines.push(Line::from(Span::styled(
-            "[P] Press the helm \u{2014} \u{2212}2 hope, the leg shortens",
-            Style::default().fg(GOLD),
-        )));
-    }
     // The sky over this leg, and the night ahead (spec 5).
     for wx in voyage.weather_on_leg() {
         lines.push(Line::from(Span::styled(
@@ -784,7 +776,11 @@ fn render_vessel_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState) {
     frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
 }
 
-fn gauge_lines(voyage: &VoyageState, width: u16) -> Vec<Line<'static>> {
+fn gauge_lines(
+    voyage: &VoyageState,
+    width: u16,
+    colony: Option<&crate::vessel::colony::ColonyState>,
+) -> Vec<Line<'static>> {
     let bar_width = (width.saturating_sub(20)).clamp(10, 20) as usize;
     let cap = voyage.provisions_cap.max(1.0);
     let filled = ((voyage.provisions / cap) * bar_width as f64).round() as usize;
@@ -797,37 +793,13 @@ fn gauge_lines(voyage: &VoyageState, width: u16) -> Vec<Line<'static>> {
     } else {
         Color::Green
     };
-    vec![
+    let mut lines = vec![
         Line::from(vec![
             Span::styled("Provisions ", Style::default().fg(Color::Gray)),
             Span::styled(bar, Style::default().fg(prov_color)),
             Span::styled(
                 format!(" {}", voyage.provisions_display()),
                 Style::default().fg(prov_color),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("Hope       ", Style::default().fg(Color::Gray)),
-            Span::styled(
-                hope_label(voyage.hope).to_string(),
-                Style::default()
-                    .fg(VESSEL_VIOLET)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                {
-                    let arrow = crate::vessel::souls::wind_arrow(voyage.hope, voyage.long_silence);
-                    if arrow.is_empty() {
-                        String::new()
-                    } else {
-                        format!(" {arrow}")
-                    }
-                },
-                Style::default().fg(if voyage.hope >= 8 {
-                    Color::Green
-                } else {
-                    Color::LightRed
-                }),
             ),
         ]),
         Line::from(vec![
@@ -841,7 +813,38 @@ fn gauge_lines(voyage: &VoyageState, width: u16) -> Vec<Line<'static>> {
                 Style::default().fg(Color::Gray),
             ),
         ]),
-    ]
+    ];
+    // Ferry runs carry a counted hold toward the Tree (the maiden voyage
+    // carries the named cast instead, so `passengers` is 0 and this hides).
+    if voyage.passengers > 0 {
+        lines.push(Line::from(vec![
+            Span::styled("Carrying   ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                format!("{} souls", with_commas(u64::from(voyage.passengers))),
+                Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                " \u{2014} bound for the Tree",
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]));
+        // Pair the hold with what the old world still holds. `souls_remaining`
+        // still counts the in-transit hold until it lands, so subtract it to
+        // show who is truly still ashore behind us.
+        if let Some(c) = colony {
+            let still_waiting = c
+                .souls_remaining
+                .saturating_sub(u64::from(voyage.passengers));
+            lines.push(Line::from(Span::styled(
+                format!(
+                    "           {} still wait in the old world",
+                    with_commas(still_waiting)
+                ),
+                Style::default().fg(Color::DarkGray),
+            )));
+        }
+    }
+    lines
 }
 
 fn phase_lines(voyage: &VoyageState) -> Vec<Line<'static>> {
@@ -1101,7 +1104,7 @@ fn render_trim_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, select
     frame.render_widget(block, area);
 
     let mut lines: Vec<Line> = vec![Line::from("")];
-    let selected = selected.min(Trim::ALL.len()); // last row: hard rations
+    let selected = selected.min(Trim::ALL.len() - 1);
     for (i, trim) in Trim::ALL.iter().enumerate() {
         let is_selected = i == selected;
         let is_current = *trim == voyage.trim;
@@ -1128,45 +1131,6 @@ fn render_trim_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, select
         )));
         lines.push(Line::from(""));
     }
-    // Rations — Oregon Trail's other dial (spec 10): Filling by default,
-    // Bare Bones stretches the hold and the people pay in hope.
-    {
-        let is_selected = selected == Trim::ALL.len();
-        let marker = if is_selected { "\u{25b8} " } else { "  " };
-        let name_style = if voyage.hard_rations {
-            Style::default().fg(GOLD).add_modifier(Modifier::BOLD)
-        } else if is_selected {
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::White)
-        };
-        lines.push(Line::from(vec![
-            Span::styled(format!("{marker}Rations \u{2014} "), name_style),
-            Span::styled(
-                if voyage.hard_rations {
-                    "Bare Bones"
-                } else {
-                    "Filling"
-                }
-                .to_string(),
-                name_style,
-            ),
-        ]));
-        lines.push(Line::from(Span::styled(
-            if voyage.hard_rations {
-                "    the hold burns a quarter slower \u{00b7} hope \u{2212}1 each day".to_string()
-            } else if voyage.hope < crate::vessel::voyage::HOPE_SPEND_FLOOR {
-                "    Bare Bones would ask hope you don't have to spare".to_string()
-            } else {
-                "    the crew eats their fill \u{2014} Bare Bones stretches it, at a cost"
-                    .to_string()
-            },
-            Style::default().fg(Color::Gray),
-        )));
-        lines.push(Line::from(""));
-    }
     lines.push(Line::from(Span::styled(
         "\u{2191}\u{2193} choose  \u{00b7}  [Enter] set  \u{00b7}  [Esc] back",
         Style::default().fg(Color::DarkGray),
@@ -1185,14 +1149,14 @@ fn trim_effect_line(voyage: &VoyageState, trim: Trim) -> String {
     {
         let r = route::road(road);
         let remaining = (f64::from(r.base_days) - progress_days).max(0.0);
-        // Wind and stations compose in — the panel shows what would
-        // actually happen, not the trim's raw dial.
+        // Stations compose in — the panel shows what would actually
+        // happen, not the trim's raw dial.
         let hours = (remaining * voyage.time_mult_with(trim) * 24.0).round() as u64;
         let provisions = (remaining * f64::from(r.base_provisions) / f64::from(r.base_days)
             * voyage.provisions_mult_with(trim))
         .round() as u64;
         let extra = match trim {
-            Trim::Mourn => " \u{00b7} hope rises daily",
+            Trim::Mourn => " \u{00b7} the thriftiest hold",
             Trim::Quiet => " \u{00b7} hears the dark",
             Trim::Run => " \u{00b7} scars the hull",
             Trim::Cruise => "",
@@ -1206,7 +1170,7 @@ fn trim_effect_line(voyage: &VoyageState, trim: Trim) -> String {
             Trim::Run => "fastest \u{2014} the hold empties and she scars".to_string(),
             Trim::Cruise => "the honest middle; never wrong, never best".to_string(),
             Trim::Quiet => "slower, sparing \u{2014} quiet enough to hear the dark".to_string(),
-            Trim::Mourn => "slowest \u{2014} the crew mends and hope climbs".to_string(),
+            Trim::Mourn => "slowest \u{2014} the thriftiest hold there is".to_string(),
         }
     }
 }
@@ -1353,8 +1317,6 @@ fn render_souls_panel(frame: &mut Frame, area: Rect, voyage: &VoyageState, selec
                 "story told".to_string()
             } else if s.station.is_some() {
                 "arc paused (on post)".to_string()
-            } else if voyage.long_silence {
-                "arc paused (the Long Silence)".to_string()
             } else {
                 let need = ARC_BEAT_REST_DAYS * MINUTES_PER_DAY;
                 let done_days = s.rest_minutes as f64 / MINUTES_PER_DAY as f64;
@@ -1581,25 +1543,25 @@ fn weather_hint(wx: &crate::vessel::weather::WeatherObj, voyage: &VoyageState) -
                 if wx.with_bearing {
                     "riding it; the miles come cheap".to_string()
                 } else {
-                    "running against it; the hold pays".to_string()
+                    "driving against it; the hold pays".to_string()
                 }
             } else if wx.with_bearing {
-                "a following set \u{2014} Run would ride it".to_string()
+                "a following set \u{2014} Grueling would ride it".to_string()
             } else {
                 "set against the road".to_string()
             }
         }
         WeatherKind::SilenceBank => {
             if voyage.trim == Trim::Quiet {
-                "running Quiet through it; listening".to_string()
+                "at Easy through it; listening".to_string()
             } else {
-                "hope frays inside \u{2014} Quiet nullifies it".to_string()
+                "sail it at Easy to hear what it hides".to_string()
             }
         }
         WeatherKind::Squall => match voyage.trim {
-            Trim::Run => "running it doubles the tax".to_string(),
+            Trim::Run => "driving it doubles the tax".to_string(),
             Trim::Quiet | Trim::Mourn => "sheltered through; half tax".to_string(),
-            Trim::Cruise => "taxing the hold \u{2014} shelter at Quiet/Mourn".to_string(),
+            Trim::Cruise => "taxing the hold \u{2014} shelter at Easy/Restful".to_string(),
         },
     }
 }
@@ -1989,6 +1951,40 @@ fn render_record(frame: &mut Frame, area: Rect, voyage: &VoyageState, scroll: u1
 
 // ── The Reckoning (spec 9: the numbers pane) ────────────────────────────────
 
+/// One yard's header line: `  [K] Name Lv N — role`, name violet, role gray.
+fn yard_header(lines: &mut Vec<Line<'static>>, key: &str, level: u32, role: &str) {
+    let name = match key {
+        "D" => "Drive",
+        "C" => "Shipwright",
+        _ => "Ward",
+    };
+    lines.push(Line::from(vec![
+        Span::styled(
+            format!("  [{key}] {name} Lv {level}"),
+            Style::default()
+                .fg(VESSEL_VIOLET)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("  \u{2014} {role}"),
+            Style::default().fg(Color::Gray),
+        ),
+    ]));
+}
+
+/// One yard's effect line: `        <now → next · effect>   ·  N Salvage`,
+/// gold when affordable now, dim (with "not yet") when not.
+fn yard_effect(lines: &mut Vec<Line<'static>>, detail: String, cost: u64, afford: bool) {
+    lines.push(Line::from(Span::styled(
+        format!(
+            "        {detail}    {} Salvage{}",
+            with_commas(cost),
+            if afford { "" } else { "  (not yet)" }
+        ),
+        Style::default().fg(if afford { GOLD } else { Color::DarkGray }),
+    )));
+}
+
 fn render_reckoning(
     frame: &mut Frame,
     area: Rect,
@@ -2065,63 +2061,110 @@ fn render_reckoning(
             Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
         ),
     ]));
-    // The Drive yard.
+    // A crossing like the last one — the horizon every projection uses.
+    let pdays = if c.days_last_crossing == 0 {
+        10
+    } else {
+        c.days_last_crossing
+    };
+    // The baseline: what a crossing costs and carries as she stands now. The
+    // dark eats per *day*; the per-crossing figure is that rate summed over a
+    // crossing like the last (~pdays days).
+    lines.push(Line::from(Span::styled(
+        format!(
+            "  As she stands: carries {} home  \u{00b7}  the dark takes {:.3}%/day of the {} \
+             still waiting (~{} over a crossing)",
+            with_commas(u64::from(c.expedition_size())),
+            c.dark_daily_rate() * 100.0,
+            with_commas(c.souls_remaining),
+            with_commas(c.dark_toll_projected()),
+        ),
+        Style::default().fg(Color::DarkGray),
+    )));
+    lines.push(Line::from(""));
+
+    // ── [D] Drive — the engine ──────────────────────────────────────────────
     let drive_afford = c.salvage >= c.drive_cost();
-    lines.push(Line::from(vec![
-        Span::styled(
-            format!("  [D] Drive \u{2014} Lv {}", c.drive_level),
-            Style::default()
-                .fg(VESSEL_VIOLET)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            {
-                use crate::vessel::colony::{DRIVE_DECAY, DRIVE_FLOOR};
-                let next_mult = DRIVE_DECAY
-                    .powi((c.drive_level + 1) as i32)
-                    .max(DRIVE_FLOOR);
-                format!(
-                    "  sails {:.2}\u{00d7} her old self \u{2192} next Lv {:.2}\u{00d7}",
-                    c.drive_speed_factor(),
-                    1.0 / next_mult
-                )
-            },
-            Style::default().fg(Color::Gray),
-        ),
-    ]));
-    lines.push(Line::from(Span::styled(
-        format!(
-            "      costs {} Salvage{}",
-            with_commas(c.drive_cost()),
-            if drive_afford { "" } else { "  (not yet)" }
-        ),
-        Style::default().fg(if drive_afford { GOLD } else { Color::DarkGray }),
-    )));
-    // The Shipwright.
-    let cap_afford = c.salvage >= c.cap_cost();
-    lines.push(Line::from(vec![
-        Span::styled(
-            format!("  [C] Shipwright \u{2014} Lv {}", c.cap_level),
-            Style::default()
-                .fg(VESSEL_VIOLET)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
+    yard_header(
+        &mut lines,
+        "D",
+        c.drive_level,
+        "the engine: how fast she crosses",
+    );
+    let drive_detail = {
+        use crate::vessel::colony::{DRIVE_DECAY, DRIVE_FLOOR};
+        let cur = c.drive_time_mult();
+        let next = DRIVE_DECAY
+            .powi((c.drive_level + 1) as i32)
+            .max(DRIVE_FLOOR);
+        if (cur - next).abs() < 1e-9 {
             format!(
-                "  hold carries {}",
-                with_commas(u64::from(c.expedition_size()))
-            ),
-            Style::default().fg(Color::Gray),
-        ),
-    ]));
-    lines.push(Line::from(Span::styled(
+                "{:.1}\u{00d7} speed  \u{00b7}  already at her limit",
+                c.drive_speed_factor()
+            )
+        } else {
+            let shorter = ((1.0 - next / cur) * 100.0).round() as i64;
+            format!(
+                "{:.1}\u{00d7} \u{2192} {:.1}\u{00d7} speed  \u{00b7}  ~{}% shorter, fewer days lost",
+                c.drive_speed_factor(),
+                1.0 / next,
+                shorter
+            )
+        }
+    };
+    yard_effect(&mut lines, drive_detail, c.drive_cost(), drive_afford);
+    // ── [C] Shipwright — the hold ───────────────────────────────────────────
+    let cap_afford = c.salvage >= c.cap_cost();
+    yard_header(
+        &mut lines,
+        "C",
+        c.cap_level,
+        "the hold: how many souls she carries",
+    );
+    let cap_detail = {
+        use crate::vessel::colony::{BASE_CAPACITY, CAP_GROWTH};
+        let hold_now = c.expedition_size();
+        let base_now = (f64::from(BASE_CAPACITY) * CAP_GROWTH.powi(c.cap_level as i32)).round();
+        let districts = f64::from(hold_now) - base_now;
+        let hold_next = ((f64::from(BASE_CAPACITY) * CAP_GROWTH.powi((c.cap_level + 1) as i32))
+            + districts)
+            .round() as u64;
+        let delta = hold_next.saturating_sub(u64::from(hold_now));
         format!(
-            "      costs {} Salvage{}",
-            with_commas(c.cap_cost()),
-            if cap_afford { "" } else { "  (not yet)" }
-        ),
-        Style::default().fg(if cap_afford { GOLD } else { Color::DarkGray }),
-    )));
+            "{} \u{2192} {} aboard  \u{00b7}  +{} carried home",
+            with_commas(u64::from(hold_now)),
+            with_commas(hold_next),
+            with_commas(delta)
+        )
+    };
+    yard_effect(&mut lines, cap_detail, c.cap_cost(), cap_afford);
+
+    // ── [W] Ward — the lantern ──────────────────────────────────────────────
+    let ward_afford = c.salvage >= c.ward_cost();
+    yard_header(
+        &mut lines,
+        "W",
+        c.ward_level,
+        "the lantern: how deep the dark cuts each day",
+    );
+    let ward_detail = {
+        use crate::vessel::colony::{DARK_TAKES_PER_DAY, WARD_DECAY, WARD_TOLL_FLOOR};
+        let next_mult = WARD_DECAY
+            .powi((c.ward_level + 1) as i32)
+            .max(WARD_TOLL_FLOOR);
+        let next_rate = DARK_TAKES_PER_DAY * next_mult;
+        let now_toll = c.dark_toll_projected();
+        let next_toll = (c.souls_remaining as f64 * (1.0 - (1.0 - next_rate).powf(pdays as f64)))
+            .round() as u64;
+        let spared = now_toll.saturating_sub(next_toll);
+        format!(
+            "{:.3}%/day \u{2192} {:.3}%/day  \u{00b7}  ~{} fewer lost over a crossing",
+            c.dark_daily_rate() * 100.0,
+            next_rate * 100.0,
+            with_commas(spared)
+        )
+    };
+    yard_effect(&mut lines, ward_detail, c.ward_cost(), ward_afford);
     lines.push(Line::from(Span::styled(
         format!(
             "  {} crossings made \u{00b7} {} carried at most in one",
@@ -2215,7 +2258,13 @@ fn with_commas(n: u64) -> String {
 
 // ── Strip layout (S/M) ──────────────────────────────────────────────────────
 
-fn render_strip(frame: &mut Frame, area: Rect, voyage: &VoyageState, _ui: &VoyageUiState) {
+fn render_strip(
+    frame: &mut Frame,
+    area: Rect,
+    voyage: &VoyageState,
+    _ui: &VoyageUiState,
+    colony: Option<&crate::vessel::colony::ColonyState>,
+) {
     let block = Block::default()
         .title(" \u{2726} The Crossing ")
         .borders(Borders::ALL)
@@ -2237,7 +2286,7 @@ fn render_strip(frame: &mut Frame, area: Rect, voyage: &VoyageState, _ui: &Voyag
     lines.push(Line::from(""));
     lines.extend(phase_lines(voyage));
     lines.push(Line::from(""));
-    lines.extend(gauge_lines(voyage, inner.width));
+    lines.extend(gauge_lines(voyage, inner.width, colony));
     lines.push(Line::from(""));
     for key_line in footer_keys(voyage) {
         lines.push(key_line);

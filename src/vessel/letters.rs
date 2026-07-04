@@ -14,28 +14,23 @@
 
 use super::souls::SoulId;
 
-/// The parcel tucked into every letter: small on purpose — letters are a
-/// hope economy, not a second pantry.
+/// The parcel tucked into every letter: small on purpose — letters are word
+/// from home, not a second pantry.
 pub const LETTER_PARCEL_PROVISIONS: f64 = 5.0;
-/// The night the mail does not come. Priced once, and honestly.
-pub const MAIL_FAILS_HOPE_COST: u8 = 2;
 
 /// One authored letter.
 #[derive(Debug, Clone, Copy)]
 pub struct LetterDef {
     pub sender: &'static str,
     pub text: &'static str,
-    /// 0 or 1 (the Last Letter pays 2). Authored, never rolled.
-    pub hope: u8,
     /// A postscript that only reads when its soul is aboard.
     pub postscript: Option<(SoulId, &'static str)>,
 }
 
-const fn letter(sender: &'static str, text: &'static str, hope: u8) -> LetterDef {
+const fn letter(sender: &'static str, text: &'static str) -> LetterDef {
     LetterDef {
         sender,
         text,
-        hope,
         postscript: None,
     }
 }
@@ -48,13 +43,11 @@ pub const LETTERS: [LetterDef; 12] = [
         "The rooms stand. I have kept your bunk made, which the committee \
          calls sentimental and I call readiness. The hearth draws well. \
          Everything you built is doing what you built it to do.",
-        1,
     ),
     LetterDef {
         sender: "the Deep guild",
         text: "Layer 30 holds. Dues collected, ale drunk, nobody dead who \
                didn't sign for it. The lift you paid for runs sweet.",
-        hope: 0,
         postscript: Some((
             SoulId(0),
             "P.S. Tell Torvald his chair is still his chair. We voted.",
@@ -65,14 +58,12 @@ pub const LETTERS: [LetterDef; 12] = [
         "Big run of silverback this month. We salted more than we can eat, \
          so some of it is in this box. The sea here still behaves, mostly, \
          which we take as your doing somehow.",
-        0,
     ),
     LetterDef {
         sender: "the Loom-tenders",
         text: "The Loom hums your patterns without being asked, the way a \
                house settles in the shape of the family that left it. We \
                send the surplus. It wants sending; we can tell.",
-        hope: 1,
         postscript: None,
     },
     LetterDef {
@@ -80,7 +71,6 @@ pub const LETTERS: [LetterDef; 12] = [
         text: "We drew your ship. Aldi made the sails too big and will not \
                be told. The teacher says the void is very large and we say \
                so is a whale and nobody is scared of THOSE anymore.",
-        hope: 1,
         postscript: Some((
             SoulId(2),
             "P.S. Is Runa's skiff lonely? We visit it. It has a new pair \
@@ -92,28 +82,24 @@ pub const LETTERS: [LetterDef; 12] = [
         "A fracture zone dimmed last week — the far one, past the salt \
          flats. The committee logged it as weather. I am telling you \
          because you would want the truth logged somewhere too.",
-        0,
     ),
     letter(
         "the Deep guild",
         "Quieter month. Two crews retired, no new signings. The deep is \
          still the deep, but it listens more than it used to, if that \
          makes sense. Probably doesn't. Dues enclosed in salt cod.",
-        0,
     ),
     letter(
         "the fisher-fleets",
         "The northern lanes went still — no fish, no weather, just still. \
          We fish south now and don't discuss it at table. Box is lighter \
          this month. Sorry. Catch what you can out there.",
-        0,
     ),
     LetterDef {
         sender: "the Loom-tenders",
         text: "Three shuttles stopped. Not broken — finished, is the word \
                we've settled on. The patterns they carried are with you \
                now, we think. The Loom hums lower. It is not unhappy.",
-        hope: 1,
         postscript: None,
     },
     letter(
@@ -121,14 +107,12 @@ pub const LETTERS: [LetterDef; 12] = [
         "School moved into the Haven because the nights got long. We like \
          it. The warden lets us light one lantern each. Aldi asked if you \
          can see them from the void. Can you? Write back.",
-        1,
     ),
     letter(
         "the Haven's new warden",
         "Half the harbor came up the hill this winter. We hold. I want the \
          record to show the design margins were generous and the builder \
          thought of us before we knew to think of ourselves.",
-        0,
     ),
     letter(
         "the Loom-tenders",
@@ -136,7 +120,6 @@ pub const LETTERS: [LetterDef; 12] = [
          like a singer after the song. We wove the spool into blankets and \
          put the children in them. Whatever you are sailing toward, the \
          weave says you are nearly there. Trust the weave. We always did.",
-        1,
     ),
 ];
 
@@ -149,7 +132,6 @@ pub const LAST_LETTER: LetterDef = LetterDef {
            everything in it: the harbor is lit, the blankets are warm, and \
            nobody here is sorry you went. Carry us the rest of the way. \
            You have carried us this far.",
-    hope: 2,
     postscript: None,
 };
 
@@ -177,12 +159,8 @@ mod tests {
         assert_eq!(LETTERS.len(), 12);
         for l in &LETTERS {
             assert!(!l.sender.is_empty() && !l.text.is_empty());
-            assert!(l.hope <= 1, "ordinary letters pay at most one hope");
         }
-        assert_eq!(LAST_LETTER.hope, 2);
-        // Roughly every third letter lifts hope.
-        let lifting = LETTERS.iter().filter(|l| l.hope > 0).count();
-        assert!((3..=6).contains(&lifting), "got {lifting}");
+        assert!(!LAST_LETTER.text.is_empty());
     }
 
     #[test]

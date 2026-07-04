@@ -57,11 +57,28 @@ pub const DRIVE_COST_GROWTH: f64 = 1.5;
 pub const CAP_COST_BASE: f64 = 5.0;
 pub const CAP_COST_GROWTH: f64 = 1.42;
 
-/// The share of the still-waiting world the dark takes each crossing —
-/// a visible per-crossing toll, not a slow drip. Small, but it makes pure
-/// speed a trap: a Drive-only build runs many short crossings and the dark
-/// bites on every one, saving fewer souls than a balanced hand.
-pub const DARK_TAKES_EACH_CROSSING: f64 = 0.011;
+/// The share of the still-waiting world the dark takes **each day** the
+/// crossing is underway. The dark is always eating; a long crossing lets it
+/// eat longer. This makes every day cost souls, so *speed saves lives* —
+/// Drive (fewer days per crossing) and the Ward (a gentler dark) both cut the
+/// toll, and the slow maiden voyage is the costliest crossing there is.
+pub const DARK_TAKES_PER_DAY: f64 = 0.0006;
+
+/// The Ward yard — the third Salvage track (speed / capacity / **attrition**).
+/// Each level multiplies the dark's per-crossing toll by `WARD_DECAY`,
+/// compounding down toward `WARD_TOLL_FLOOR` (never to zero — the dark always
+/// keeps a little). It buys down the very toll that makes crossing-count
+/// matter, so it is the souls-first hand's answer to a long era. A punchy
+/// per-level cut (each level takes ~28% off the toll) so the choice reads.
+pub const WARD_DECAY: f64 = 0.72;
+/// The most the Ward can ever blunt the toll, as a fraction of its base rate
+/// (0.12 = at most an 88% cut). A residual bite always remains.
+pub const WARD_TOLL_FLOOR: f64 = 0.12;
+/// The Ward's price ladder: level `L` costs `5 × 1.45^L` Salvage — priced
+/// between Drive and the Shipwright, an accessible trade against carrying
+/// more or sailing faster.
+pub const WARD_COST_BASE: f64 = 5.0;
+pub const WARD_COST_GROWTH: f64 = 1.45;
 
 /// The colony's districts, unlocked in order by population. Pure growth —
 /// every one lands eventually; the choices live on the water.
@@ -166,6 +183,14 @@ pub struct ColonyState {
     /// Bought with Salvage.
     #[serde(default)]
     pub cap_level: u32,
+    /// The Ward yard's level: each one multiplies the dark's per-day toll
+    /// by `WARD_DECAY`, down to `WARD_TOLL_FLOOR`. Bought with Salvage.
+    #[serde(default)]
+    pub ward_level: u32,
+    /// Sea-days the last crossing took — lets the Reckoning project the dark's
+    /// per-day rate into a concrete per-crossing figure.
+    #[serde(default)]
+    pub days_last_crossing: u64,
     /// Salvage in hand — the yards' currency, earned on every landfall and
     /// spent on Drive or hold.
     #[serde(default)]
@@ -192,6 +217,8 @@ impl ColonyState {
             souls_remaining: INITIAL_SOULS,
             drive_level: 0,
             cap_level: 0,
+            ward_level: 0,
+            days_last_crossing: 0,
             salvage: STARTING_SALVAGE,
             crossings_completed: 0,
             records: CrossingRecords::default(),
@@ -282,17 +309,60 @@ impl ColonyState {
         true
     }
 
+    /// The Ward's toll multiplier (≤ 1.0): every level blunts the dark by
+    /// `WARD_DECAY`, compounding down to `WARD_TOLL_FLOOR`. Level 0 is 1.0 —
+    /// the full toll, until you spend Salvage warding it.
+    pub fn ward_toll_mult(&self) -> f64 {
+        WARD_DECAY.powi(self.ward_level as i32).max(WARD_TOLL_FLOOR)
+    }
+
+    /// The dark's effective **per-day** rate after the Ward, as a fraction of
+    /// the still-waiting world — the number the Reckoning shows as a percentage.
+    pub fn dark_daily_rate(&self) -> f64 {
+        DARK_TAKES_PER_DAY * self.ward_toll_mult()
+    }
+
+    /// Salvage the Ward charges to reach the next level.
+    pub fn ward_cost(&self) -> u64 {
+        (WARD_COST_BASE * WARD_COST_GROWTH.powi(self.ward_level as i32)).round() as u64
+    }
+
+    /// Spend Salvage to raise the Ward one level. Returns false if short.
+    pub fn buy_ward(&mut self) -> bool {
+        let cost = self.ward_cost();
+        if self.salvage < cost {
+            return false;
+        }
+        self.salvage -= cost;
+        self.ward_level += 1;
+        true
+    }
+
     /// Salvage a crossing yields at landfall: a flat base plus a share of the
     /// souls it carried — a fuller hold funds faster upgrades.
     pub fn salvage_income(carried: u64) -> u64 {
         SALVAGE_AT_LANDFALL + carried / SOULS_PER_SALVAGE
     }
 
-    /// Souls the dark takes this crossing: a fixed share of whoever is
-    /// still waiting. A big, visible bite while the world is full; a small
-    /// one once it has emptied — so late crossings are yours to finish.
-    pub fn dark_toll(&self) -> u64 {
-        (self.souls_remaining as f64 * DARK_TAKES_EACH_CROSSING).round() as u64
+    /// Souls the dark takes over a crossing of `days` sea-days: it eats a
+    /// `dark_daily_rate()` share of the still-waiting world every day, so a
+    /// long crossing compounds into a larger bite. A big share while the world
+    /// is full; a small one once it has emptied — late crossings are yours.
+    pub fn dark_toll_for_days(&self, days: u64) -> u64 {
+        let frac = 1.0 - (1.0 - self.dark_daily_rate()).powf(days as f64);
+        (self.souls_remaining as f64 * frac).round() as u64
+    }
+
+    /// The dark's bite over a crossing like the last one — for the Reckoning's
+    /// concrete "≈ N a crossing" projection (defaults to a nominal crossing
+    /// before the first landfall records a real day count).
+    pub fn dark_toll_projected(&self) -> u64 {
+        let days = if self.days_last_crossing == 0 {
+            10
+        } else {
+            self.days_last_crossing
+        };
+        self.dark_toll_for_days(days)
     }
 
     /// The order a port goes dark — deterministic per (era_seed, port), so
@@ -348,8 +418,10 @@ impl ColonyState {
         // The crossing pays out in Salvage for the yards.
         self.salvage += Self::salvage_income(carried);
 
-        // The dark took its share of whoever was still waiting.
-        let toll = self.dark_toll().min(self.souls_remaining);
+        // The dark took its share of whoever was still waiting — a day at a
+        // time, so a long crossing costs more than a short one.
+        self.days_last_crossing = days;
+        let toll = self.dark_toll_for_days(days).min(self.souls_remaining);
         self.souls_remaining -= toll;
 
         self.crossings_completed += 1;
@@ -483,6 +555,56 @@ mod tests {
         );
         // The pool fell by more than the 600 carried — the dark took some.
         assert!(c.souls_remaining < INITIAL_SOULS - 600);
+    }
+
+    #[test]
+    fn the_ward_buys_the_dark_toll_down_toward_a_floor() {
+        let mut c = ColonyState::found("t".into());
+        c.souls_remaining = 10_000;
+        let base_toll = c.dark_toll_for_days(10);
+        assert!(base_toll > 0, "the dark bites at Ward 0");
+
+        // Each level blunts the toll, compounding.
+        c.ward_level = 1;
+        assert!(
+            (c.ward_toll_mult() - WARD_DECAY).abs() < 1e-9,
+            "one level = one decay step"
+        );
+        assert!(
+            c.dark_toll_for_days(10) < base_toll,
+            "a warded toll is smaller"
+        );
+
+        // A longer crossing costs more than a short one.
+        assert!(
+            c.dark_toll_for_days(20) > c.dark_toll_for_days(5),
+            "more days at sea, more souls to the dark"
+        );
+
+        // It floors — the dark never fully stops.
+        c.ward_level = 100;
+        assert!(
+            (c.ward_toll_mult() - WARD_TOLL_FLOOR).abs() < 1e-9,
+            "the Ward can only blunt, never negate"
+        );
+        assert!(
+            c.dark_toll_for_days(10) > 0,
+            "a residual bite always remains"
+        );
+    }
+
+    #[test]
+    fn the_ward_yard_spends_salvage_like_the_others() {
+        let mut c = ColonyState::found("t".into());
+        let start = c.salvage;
+        let cost0 = c.ward_cost();
+        assert!(c.buy_ward(), "the founding grant buys the first Ward level");
+        assert_eq!(c.ward_level, 1);
+        assert_eq!(c.salvage, start - cost0);
+        assert!(c.ward_cost() > cost0, "the ladder steepens");
+        c.salvage = 0;
+        assert!(!c.buy_ward(), "no Salvage, no upgrade");
+        assert_eq!(c.ward_level, 1, "a refused buy changes nothing");
     }
 
     #[test]

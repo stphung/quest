@@ -16,11 +16,6 @@ use serde::{Deserialize, Serialize};
 pub const CREW: usize = 7;
 /// Rest days a ready arc beat costs before it fires.
 pub const ARC_BEAT_REST_DAYS: u64 = 2;
-/// Hope cost of losing a soul (authored scenes only, spec 4).
-#[allow(dead_code)] // Consumed by `mark_lost`, spec 4's loss API.
-pub const LOSS_HOPE_COST: u8 = 3;
-/// Hope cost of a farewell (stepping ashore to free a seat).
-pub const FAREWELL_HOPE_COST: u8 = 1;
 
 /// The three standing posts — one per system the ship runs on:
 /// time (Helm), provisions (Tender), nights (Watch, spec 5).
@@ -62,34 +57,6 @@ pub fn tender_provisions_mult(staffed: bool, affine: bool) -> f64 {
     }
 }
 
-/// Hope is the wind — its one mechanical effect. Bands compose into leg
-/// time exactly like trim. At ashen (0) the ship is in the Long Silence.
-pub fn wind_time_mult(hope: u8, long_silence: bool) -> f64 {
-    if long_silence {
-        return 1.40;
-    }
-    match hope {
-        8..=u8::MAX => 0.90,
-        5..=7 => 1.00,
-        3..=4 => 1.10,
-        1..=2 => 1.25,
-        0 => 1.40,
-    }
-}
-
-/// The wind as the panel shows it: an arrow, never a multiplier.
-pub fn wind_arrow(hope: u8, long_silence: bool) -> &'static str {
-    if long_silence || hope == 0 {
-        "\u{2193}\u{2193}" // ↓↓ the Long Silence
-    } else if hope >= 8 {
-        "\u{2191}" // ↑
-    } else if hope >= 5 {
-        ""
-    } else {
-        "\u{2193}" // ↓
-    }
-}
-
 /// Stable soul identifier (index into [`SOULS`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SoulId(pub u8);
@@ -109,10 +76,10 @@ pub enum ArcTrigger {
     VisitWaypoint(WaypointId),
 }
 
-/// What a fired beat pays. Small, and always into existing systems.
+/// What a fired beat pays — a rumor the soul shares (or nothing but the
+/// beat itself, which still fires as a log moment).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ArcPayout {
-    pub hope: u8,
     /// A rumor the soul shares (granted if not already known).
     pub rumor: Option<RumorId>,
 }
@@ -154,14 +121,13 @@ const fn beat(
     trigger: ArcTrigger,
     title: &'static str,
     text: &'static str,
-    hope: u8,
     rumor: Option<RumorId>,
 ) -> ArcBeat {
     ArcBeat {
         trigger,
         title,
         text,
-        payout: ArcPayout { hope, rumor },
+        payout: ArcPayout { rumor },
     }
 }
 
@@ -184,7 +150,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Torvald takes the wheel",
                 "He holds the wheel like an argument he has already won. \
                  \"Point her anywhere. I've come back from worse.\"",
-                1,
                 None,
             ),
             beat(
@@ -192,7 +157,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Torvald names the currents",
                 "\"The Deep had rivers too. You learn them or you feed them.\" \
                  He marks three currents on the chart from memory.",
-                1,
                 None,
             ),
             beat(
@@ -200,7 +164,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Torvald goes quiet",
                 "The dark outside is the dark he retired from. He stands at \
                  the rail all night and thanks nobody for asking.",
-                0,
                 Some(RumorId(6)),
             ),
             beat(
@@ -208,7 +171,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Torvald, unclenched",
                 "In the root-light he finally sits down. \"Huh,\" he says. \
                  \"So there was a bottom to get to after all.\"",
-                2,
                 None,
             ),
         ],
@@ -242,7 +204,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Eir takes inventory",
                 "She counts the hold twice and labels everything, including \
                  the crew. \"You. Morale. Stand there.\"",
-                1,
                 None,
             ),
             beat(
@@ -250,7 +211,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Eir and the shipwrights",
                 "She argues with the yard about the hull for an hour and comes \
                  back satisfied. \"They knew their business. I checked.\"",
-                1,
                 None,
             ),
             beat(
@@ -258,7 +218,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Eir rations the warmth",
                 "Blankets appear where they are needed before anyone asks. \
                  The Haven trained her to hear a cold room through a wall.",
-                1,
                 None,
             ),
             beat(
@@ -266,7 +225,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Eir plants something",
                 "She has been carrying seeds the whole way. Of course she has. \
                  \"A house argues with the sea. A garden just wins.\"",
-                2,
                 None,
             ),
         ],
@@ -302,7 +260,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Runa reads the water",
                 "She trails a hand-line off the stern within the hour. \"Not \
                  for the fish,\" she says. \"For the news.\"",
-                1,
                 None,
             ),
             beat(
@@ -310,7 +267,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Runa and the lights",
                 "She knows the keepers' knock. Every lantern on this water has \
                  sold her bait or bought her catch.",
-                1,
                 Some(RumorId(0)),
             ),
             beat(
@@ -318,7 +274,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Runa fishes the dark",
                 "The line goes down and down and comes back wet with \
                  something that isn't water. She grins. \"Still news.\"",
-                1,
                 None,
             ),
             beat(
@@ -326,7 +281,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Runa's last catch",
                 "She catches one glowing root-fish, looks at it a long time, \
                  and lets it go. \"Season's closed,\" she says, content.",
-                2,
                 None,
             ),
         ],
@@ -358,7 +312,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Maren douses her lamp",
                 "She is the last thing aboard; the lightship goes dark behind \
                  her. \"There's nobody left to warn,\" she says. \"Except us.\"",
-                1,
                 None,
             ),
             beat(
@@ -366,7 +319,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Maren lights what she finds",
                 "Wherever there is a lantern, she fills and trims and lights \
                  it, whether or not anyone will ever pass again.",
-                1,
                 None,
             ),
             beat(
@@ -374,7 +326,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Maren against the dark",
                 "In the starless reach she hangs her old lamp at the bow. \
                  It is nothing against the deep. She keeps it lit anyway.",
-                1,
                 None,
             ),
             beat(
@@ -382,7 +333,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Maren's promise, kept",
                 "\"The Tree is lit,\" she says, off-hand, as if reporting a \
                  lighthouse back in service. Then she cries, briefly, on duty.",
-                2,
                 None,
             ),
         ],
@@ -414,7 +364,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Sefa boards singing",
                 "She comes over the rail mid-verse, as though the ship were \
                  simply the next line of the lament.",
-                1,
                 None,
             ),
             beat(
@@ -422,7 +371,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Sefa sings for the reef",
                 "At the white reef she sings the office for the unburied. \
                  The Warden, whatever it is, keeps its distance all night.",
-                1,
                 Some(RumorId(2)),
             ),
             beat(
@@ -430,7 +378,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Sefa and the silence",
                 "\"Silence is just a song that lost its nerve.\" She hums \
                  into the dark until the dark hums back.",
-                1,
                 None,
             ),
             beat(
@@ -438,7 +385,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Sefa's evening office",
                 "She teaches the whole crew the office, voice by voice. The \
                  parishes are drowned; the parish is here.",
-                2,
                 None,
             ),
         ],
@@ -470,7 +416,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Ysolt finds the creak",
                 "Within a day she has found and fixed a creak the crew had \
                  stopped hearing years ago. The ship sounds younger.",
-                1,
                 None,
             ),
             beat(
@@ -478,7 +423,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Ysolt makes the rounds",
                 "At rest she mends quietly: a seam, a sleeve, an argument \
                  between two of the crew. Same joinery, mostly.",
-                1,
                 None,
             ),
             beat(
@@ -486,7 +430,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Ysolt shores the hull",
                 "\"The deep leans on a hull. You brace it before it asks.\" \
                  She spends two days below and comes up certain.",
-                1,
                 None,
             ),
             beat(
@@ -494,7 +437,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Ysolt signs her work",
                 "She carves her maker's mark inside the hull, where only the \
                  ship can see it. \"Done,\" she says. \"She'll outlive us.\"",
-                2,
                 None,
             ),
         ],
@@ -527,7 +469,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Cormac corrects the chart",
                 "He looks at your chart for a long minute, then adds two \
                  hazards and crosses out one island. \"Never existed.\"",
-                1,
                 None,
             ),
             beat(
@@ -535,7 +476,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Cormac flies blind",
                 "\"Down here the road is a feeling in the keel.\" He steers \
                  an hour with his eyes shut and gains back half a day.",
-                1,
                 None,
             ),
             beat(
@@ -543,7 +483,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Cormac calls in a debt",
                 "At the way-station a stranger owes him. The debt is paid in \
                  quiet news of the roads ahead.",
-                1,
                 Some(RumorId(5)),
             ),
             beat(
@@ -551,7 +490,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Cormac, charted",
                 "He draws the route you actually sailed, signs it, and pins \
                  it up. \"There. Now it's a road. Now it exists.\"",
-                2,
                 None,
             ),
         ],
@@ -584,7 +522,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Wren wakes fully",
                 "He surfaces from years of sleep like a diver, slow and \
                  careful. \"How long — no. Doesn't matter. We're going up.\"",
-                1,
                 None,
             ),
             beat(
@@ -592,7 +529,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Wren learns to rest",
                 "He is afraid to sleep and won't say so. At the hearth he \
                  finally lets himself, and wakes up laughing at nothing.",
-                1,
                 None,
             ),
             beat(
@@ -600,7 +536,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Wren at the gate",
                 "At Deepgate he stares into the rift a long time. \"The deep \
                  dreamed this door,\" he says. \"I remember dreaming it too.\"",
-                1,
                 None,
             ),
             beat(
@@ -608,7 +543,6 @@ pub const SOULS: [SoulDef; 8] = [
                 "Wren, awake",
                 "In the root-light he stops flinching at sleep. \"If I dream \
                  now,\" he says, \"I'll dream of somewhere I've actually been.\"",
-                2,
                 None,
             ),
         ],
@@ -695,7 +629,6 @@ mod tests {
                 "{}'s resolution should land in Chapter IV",
                 s.name
             );
-            assert_eq!(s.arc[3].payout.hope, 2, "resolutions pay hope +2");
         }
     }
 
@@ -724,19 +657,5 @@ mod tests {
                 assert!(!line.is_empty());
             }
         }
-    }
-
-    #[test]
-    fn wind_bands_cover_the_scale() {
-        assert_eq!(wind_time_mult(10, false), 0.90);
-        assert_eq!(wind_time_mult(7, false), 1.00);
-        assert_eq!(wind_time_mult(4, false), 1.10);
-        assert_eq!(wind_time_mult(2, false), 1.25);
-        assert_eq!(wind_time_mult(0, false), 1.40);
-        assert_eq!(wind_time_mult(9, true), 1.40, "silence overrides the band");
-        assert_eq!(wind_arrow(9, false), "\u{2191}");
-        assert_eq!(wind_arrow(6, false), "");
-        assert_eq!(wind_arrow(3, false), "\u{2193}");
-        assert_eq!(wind_arrow(5, true), "\u{2193}\u{2193}");
     }
 }

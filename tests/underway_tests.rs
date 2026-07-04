@@ -143,15 +143,16 @@ fn quiet_trim_hears_a_silence_bank_once() {
     v.tick(t0() + real_duration_for_game_minutes((hour * 60 + 120) as i64));
     assert!(!v.heard_banks.is_empty(), "Quiet heard the bank");
     assert!(v.rumors.len() > rumors_before, "and it paid in knowledge");
-    // Un-Quiet, the same bank frays hope instead.
+    // Un-Easy, the same bank is not heard — no rumor — and the helm holds
+    // it alone, straining the wheel-hand once.
     let mut w = traveling_on(seed, road, hour * 60);
     w.set_trim(Trim::Cruise);
-    w.hope = 7;
+    w.set_station(SoulId(0), Some(Station::Helm));
+    let rumors_before = w.rumors.len();
     w.tick(t0() + real_duration_for_game_minutes((hour * 60 + 30 * 60) as i64));
-    assert!(
-        w.silence_minutes > 0 || w.hope < 7,
-        "the silence pressed in"
-    );
+    assert!(w.heard_banks.is_empty(), "un-Easy did not hear the bank");
+    assert_eq!(w.rumors.len(), rumors_before, "and learned nothing from it");
+    assert!(!w.strained_banks.is_empty(), "the helm strained holding it");
 }
 
 #[test]
@@ -196,7 +197,6 @@ fn offline_equivalence_holds_with_the_whole_underway_layer() {
 
     assert_eq!(live.phase, offline.phase);
     assert_eq!(live.provisions.to_bits(), offline.provisions.to_bits());
-    assert_eq!(live.hope, offline.hope);
     assert_eq!(live.log, offline.log);
     assert_eq!(live.rumors, offline.rumors);
     assert_eq!(live.heard_banks, offline.heard_banks);
@@ -207,7 +207,7 @@ fn offline_equivalence_holds_with_the_whole_underway_layer() {
 fn the_covenant_extends_to_travel() {
     // Weather, nights, silence, drift — 90 days of it, unattended. No
     // sequence of offline world ever injures, removes, or advances-to-loss
-    // a soul; the worst is priced provisions/hope.
+    // a soul; the worst is priced provisions.
     let mut v = started(23);
     v.provisions = 8.0; // guarantee drifts along the way
     let roster_before: Vec<_> = v.souls.iter().map(|s| (s.soul, s.status)).collect();

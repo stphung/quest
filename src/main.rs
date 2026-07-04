@@ -820,6 +820,16 @@ fn main() -> io::Result<()> {
                                                     }
                                                 }
                                             }
+                                            VoyageInputResult::BuyWard => {
+                                                // Spend Salvage in the Ward yard;
+                                                // buys down the dark's per-crossing toll.
+                                                if let Some(col) = &mut colony {
+                                                    if col.buy_ward() && !debug_mode {
+                                                        let _ =
+                                                            vessel::persistence::save_colony(col);
+                                                    }
+                                                }
+                                            }
                                             VoyageInputResult::Handled
                                             | VoyageInputResult::Ignored => {}
                                         }

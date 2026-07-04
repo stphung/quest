@@ -338,11 +338,12 @@ fn an_era_ferries_most_of_the_world_across_a_ramping_run_of_crossings() {
 
 #[test]
 fn skilled_play_saves_far_more_souls_than_reckless_play() {
-    // The design intent, as a gate: because the dark takes a toll every
-    // crossing, leaning into the hold (the souls-first line) saves most of the
-    // world, while chasing pure speed runs dozens of near-empty crossings and
-    // the dark bleeds it white. The margin is meant to be *wide* — skill is
-    // rewarded, not marginal.
+    // The design intent, as a gate: because the dark takes a toll every day a
+    // crossing is underway, the souls-first line (a big hold that empties the
+    // world fast, kept quick with just enough Drive) saves most of it — while
+    // chasing pure speed and never widening the hold runs a hundred near-empty
+    // crossings, so the world stays full and a full world loses the most each
+    // day. The margin is meant to be wide — skill is rewarded, not marginal.
     let (_, _, _, souls_first, _) = run_era_with(cap_lean_spend);
     let (_, _, _, reckless, _) = run_era_with(drive_only_spend);
     eprintln!("souls-first {souls_first} vs reckless {reckless}");
@@ -351,11 +352,11 @@ fn skilled_play_saves_far_more_souls_than_reckless_play() {
         "the souls-first line carries most of the world home ({souls_first})"
     );
     assert!(
-        reckless <= 68_000,
-        "the reckless drive-only line bleeds the world to the dark ({reckless})"
+        reckless <= 74_000,
+        "the reckless drive-only line leaves the most to the dark ({reckless})"
     );
     assert!(
-        souls_first >= reckless + 18_000,
+        souls_first >= reckless + 15_000,
         "skilled play saves far more — a wide margin ({souls_first} vs {reckless})"
     );
 }
@@ -427,5 +428,4 @@ fn the_ferry_loop_is_offline_equivalent() {
     offline.tick(horizon);
     assert_eq!(live.phase, offline.phase);
     assert_eq!(live.provisions.to_bits(), offline.provisions.to_bits());
-    assert_eq!(live.hope, offline.hope);
 }

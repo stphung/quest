@@ -20,8 +20,6 @@ pub enum ColorKey {
     ArrivedBy(RoadId),
     TrimIs(Trim),
     KnowsRumor(RumorId),
-    HopeAtLeast(u8),
-    HopeBelow(u8),
     /// The leg that brought you here included a drift.
     Drifted,
 }
@@ -30,7 +28,6 @@ pub enum ColorKey {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ScenePayout {
     pub provisions: u16,
-    pub hope: i8,
     pub rumor: Option<RumorId>,
     /// Keepsakes have no mechanics: mementos for the manifest (spec 7).
     pub keepsake: Option<&'static str>,
@@ -39,16 +36,6 @@ pub struct ScenePayout {
 const fn pay(provisions: u16) -> ScenePayout {
     ScenePayout {
         provisions,
-        hope: 0,
-        rumor: None,
-        keepsake: None,
-    }
-}
-
-const fn pay_hope(provisions: u16, hope: i8) -> ScenePayout {
-    ScenePayout {
-        provisions,
-        hope,
         rumor: None,
         keepsake: None,
     }
@@ -113,11 +100,7 @@ pub const SCENES: [SceneDef; 38] = [
              across it. The last entry is you. The hold is filled to the \
              chalk line without a word about payment.",
         ],
-        colors: &[(
-            ColorKey::HopeAtLeast(8),
-            "Someone on the pier starts a song, and the crew — quietly, so \
-             as not to argue with it — sings the harbor out of sight.",
-        )],
+        colors: &[],
         payout: pay(0), // launches full; the pier gave everything already
     },
     // W1 — The Lightship Vigil
@@ -138,7 +121,6 @@ pub const SCENES: [SceneDef; 38] = [
         )],
         payout: ScenePayout {
             provisions: 12,
-            hope: 0,
             rumor: None,
             keepsake: Some("a spare wick from the last lightship"),
         },
@@ -245,7 +227,6 @@ pub const SCENES: [SceneDef; 38] = [
         colors: &[],
         payout: ScenePayout {
             provisions: 18,
-            hope: 0,
             rumor: None,
             keepsake: Some("a jar of salt-orchard preserve"),
         },
@@ -270,12 +251,8 @@ pub const SCENES: [SceneDef; 38] = [
              Roads. The Vessel pauses at the line like a swimmer at the \
              cold end of the pool, and then goes.",
         ],
-        colors: &[(
-            ColorKey::HopeBelow(5),
-            "Nobody says 'we could still turn around.' The not-saying takes \
-             most of the evening.",
-        )],
-        payout: pay_hope(16, 1),
+        colors: &[],
+        payout: pay(16),
     },
     // W11 — First Drift
     SceneDef {
@@ -296,14 +273,9 @@ pub const SCENES: [SceneDef; 38] = [
             "Stores are cheap. Gossip is free and worth exactly that, \
              except when it isn't.",
         ],
-        colors: &[(
-            ColorKey::HopeAtLeast(8),
-            "The crew wins the ring-toss so many times the barker retires \
-             the prize shelf and joins them for a drink instead.",
-        )],
+        colors: &[],
         payout: ScenePayout {
             provisions: 25,
-            hope: 0,
             rumor: None,
             keepsake: Some("a fair ribbon, unfaded"),
         },
@@ -330,7 +302,7 @@ pub const SCENES: [SceneDef; 38] = [
              mends your seams; the kitchen mends the rest.",
         ],
         colors: &[],
-        payout: pay_hope(18, 1),
+        payout: pay(18),
     },
     // W15 — The Hungry Narrows
     SceneDef {
@@ -374,12 +346,8 @@ pub const SCENES: [SceneDef; 38] = [
              every crossing after. The crew reads for hours and adds their \
              own.",
         ],
-        colors: &[(
-            ColorKey::HopeBelow(5),
-            "One letter, water-stained, says only: 'It is further than they \
-             told us and it is worth it.' It gets passed around all night.",
-        )],
-        payout: pay_hope(22, 1),
+        colors: &[],
+        payout: pay(22),
     },
     // W19 — The Crossroads Light
     SceneDef {
@@ -401,7 +369,6 @@ pub const SCENES: [SceneDef; 38] = [
         colors: &[],
         payout: ScenePayout {
             provisions: 18,
-            hope: 0,
             rumor: None,
             keepsake: Some("a knot of whale-road baleen"),
         },
@@ -526,7 +493,6 @@ pub const SCENES: [SceneDef; 38] = [
         ],
         payout: ScenePayout {
             provisions: 22,
-            hope: 1,
             rumor: None,
             keepsake: Some("an ember-hold coal that never quite cools"),
         },
@@ -552,7 +518,7 @@ pub const SCENES: [SceneDef; 38] = [
              slow congregations. The deep, being gentle — once, on \
              purpose, for you."],
         colors: &[],
-        payout: pay_hope(18, 1),
+        payout: pay(18),
     },
     // W32 — Deepgate
     SceneDef {
@@ -563,7 +529,7 @@ pub const SCENES: [SceneDef; 38] = [
              you go with something that might be a bow.",
         ],
         colors: &[],
-        payout: pay_hope(18, 1),
+        payout: pay(18),
     },
     // W33 — First Light
     SceneDef {
@@ -572,12 +538,8 @@ pub const SCENES: [SceneDef; 38] = [
              water gone clear as air, and the crew — every soul, unasked, \
              off-watch or not — comes up on deck to watch it happen.",
         ],
-        colors: &[(
-            ColorKey::HopeBelow(5),
-            "Somewhere in the light, the weight of the dark crossing slides \
-             off the ship like water. Not all of it. Enough.",
-        )],
-        payout: pay_hope(20, 1),
+        colors: &[],
+        payout: pay(20),
     },
     // W34 — The Root Shallows
     SceneDef {
@@ -598,7 +560,6 @@ pub const SCENES: [SceneDef; 38] = [
         colors: &[],
         payout: ScenePayout {
             provisions: 18,
-            hope: 1,
             rumor: None,
             keepsake: Some("a bloom-field flower, pressed and still faintly warm"),
         },
@@ -626,7 +587,7 @@ pub const SCENES: [SceneDef; 38] = [
              a bell. The crossing is over. The arrival has just begun.",
         ],
         colors: &[],
-        payout: pay_hope(0, 2),
+        payout: pay(0),
     },
 ];
 
@@ -694,7 +655,6 @@ mod tests {
                 );
             }
             assert!(payout.provisions <= 30, "{} over-provisions", w.name);
-            assert!(payout.hope.abs() <= 2, "{} moves hope too hard", w.name);
         }
     }
 
