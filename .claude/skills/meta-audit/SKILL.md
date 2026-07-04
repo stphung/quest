@@ -34,12 +34,12 @@ evaluate yet."
 Collect every finding across the loaded runs (cap at the 20 most recent if there are
 more — note in the final report how many were skipped and why).
 
-For each finding, spawn one fresh agent given **only** its `location` and `claim` —
-never its logged `correct_value`. Task: independently derive what the correct value
+For each finding, spawn one fresh **Explore** agent given **only** its `location` and `claim` —
+never its logged `correct_value`. If `location` names multiple files, the agent should verify the claim against all of them. Task: independently derive what the correct value
 actually was **as of that finding's `commit_sha`**, reading source read-only via
-`git show <commit_sha>:<path>` (never `git checkout` — this must never mutate the shared
-working tree). The agent reports its own independently-derived value plus the source
-location it based that on.
+`git show <commit_sha>:<path>` only. Never run `git checkout`, `git switch`, `git reset`,
+`git stash`, or edit any file — nothing in this phase may change what's in the working tree.
+The agent reports its own independently-derived value plus the source location it based that on.
 
 Diff the agent's answer against the logged `correct_value`. A mismatch is a confirmed
 inaccuracy in the original audit — record it as `{finding, original_correct_value,
