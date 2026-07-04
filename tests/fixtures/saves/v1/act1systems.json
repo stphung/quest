@@ -1,0 +1,556 @@
+{
+  "version": 2,
+  "character_id": "00000000-0000-0000-0000-000000000004",
+  "character_name": "Act1Systems",
+  "character_level": 80,
+  "character_xp": 0,
+  "attributes": {
+    "values": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+    ]
+  },
+  "prestige_rank": 25,
+  "total_prestige_count": 32,
+  "last_save_time": 1783198801,
+  "play_time_seconds": 1440000,
+  "combat_state": {
+    "current_enemy": null,
+    "player_current_hp": 850,
+    "player_max_hp": 850,
+    "player_attack_timer": 0.0,
+    "enemy_attack_timer": 0.0,
+    "regen_timer": 0.0,
+    "is_regenerating": false
+  },
+  "equipment": {
+    "weapon": {
+      "slot": "Weapon",
+      "rarity": "Legendary",
+      "ilvl": 110,
+      "tier": 4,
+      "base_name": "Axe of Haste",
+      "display_name": "Axe of Haste",
+      "attributes": {
+        "str": 0,
+        "dex": 0,
+        "con": 18,
+        "int": 0,
+        "wis": 0,
+        "cha": 0
+      },
+      "affixes": [
+        {
+          "affix_type": "AttackSpeed",
+          "value": 7.0
+        },
+        {
+          "affix_type": "DamageReduction",
+          "value": 25.0
+        },
+        {
+          "affix_type": "DamageReduction",
+          "value": 18.0
+        },
+        {
+          "affix_type": "AttackSpeed",
+          "value": 8.0
+        },
+        {
+          "affix_type": "CritChance",
+          "value": 19.0
+        }
+      ],
+      "god_item_id": null
+    },
+    "armor": {
+      "slot": "Armor",
+      "rarity": "Epic",
+      "ilvl": 110,
+      "tier": 3,
+      "base_name": "Scale Mail of Carnage",
+      "display_name": "Scale Mail of Carnage",
+      "attributes": {
+        "str": 11,
+        "dex": 0,
+        "con": 0,
+        "int": 0,
+        "wis": 0,
+        "cha": 0
+      },
+      "affixes": [
+        {
+          "affix_type": "CritMultiplier",
+          "value": 0.66
+        },
+        {
+          "affix_type": "DamageReduction",
+          "value": 13.0
+        },
+        {
+          "affix_type": "DamageReflection",
+          "value": 15.0
+        }
+      ],
+      "god_item_id": null
+    },
+    "helmet": {
+      "slot": "Helmet",
+      "rarity": "Epic",
+      "ilvl": 110,
+      "tier": 2,
+      "base_name": "Thorned Coif",
+      "display_name": "Thorned Coif",
+      "attributes": {
+        "str": 7,
+        "dex": 0,
+        "con": 9,
+        "int": 0,
+        "wis": 9,
+        "cha": 0
+      },
+      "affixes": [
+        {
+          "affix_type": "DamageReflection",
+          "value": 12.0
+        },
+        {
+          "affix_type": "AttackSpeed",
+          "value": 4.0
+        },
+        {
+          "affix_type": "CritMultiplier",
+          "value": 0.42
+        }
+      ],
+      "god_item_id": null
+    },
+    "gloves": {
+      "slot": "Gloves",
+      "rarity": "Epic",
+      "ilvl": 110,
+      "tier": 0,
+      "base_name": "Gauntlets of Precision",
+      "display_name": "Gauntlets of Precision",
+      "attributes": {
+        "str": 7,
+        "dex": 0,
+        "con": 0,
+        "int": 0,
+        "wis": 7,
+        "cha": 7
+      },
+      "affixes": [
+        {
+          "affix_type": "CritChance",
+          "value": 8.0
+        },
+        {
+          "affix_type": "XPGain",
+          "value": 9.0
+        },
+        {
+          "affix_type": "HPBonus",
+          "value": 80.0
+        },
+        {
+          "affix_type": "DamageReflection",
+          "value": 8.0
+        }
+      ],
+      "god_item_id": null
+    },
+    "boots": {
+      "slot": "Boots",
+      "rarity": "Epic",
+      "ilvl": 110,
+      "tier": 0,
+      "base_name": "Boots of Haste",
+      "display_name": "Boots of Haste",
+      "attributes": {
+        "str": 7,
+        "dex": 12,
+        "con": 0,
+        "int": 0,
+        "wis": 0,
+        "cha": 0
+      },
+      "affixes": [
+        {
+          "affix_type": "AttackSpeed",
+          "value": 3.0
+        },
+        {
+          "affix_type": "DamageReduction",
+          "value": 7.0
+        },
+        {
+          "affix_type": "CritChance",
+          "value": 7.0
+        },
+        {
+          "affix_type": "AttackSpeed",
+          "value": 3.0
+        }
+      ],
+      "god_item_id": null
+    },
+    "amulet": {
+      "slot": "Amulet",
+      "rarity": "Epic",
+      "ilvl": 110,
+      "tier": 0,
+      "base_name": "Thorned Talisman",
+      "display_name": "Thorned Talisman",
+      "attributes": {
+        "str": 5,
+        "dex": 0,
+        "con": 7,
+        "int": 5,
+        "wis": 0,
+        "cha": 0
+      },
+      "affixes": [
+        {
+          "affix_type": "DamageReflection",
+          "value": 10.0
+        },
+        {
+          "affix_type": "CritChance",
+          "value": 7.0
+        },
+        {
+          "affix_type": "HPRegen",
+          "value": 7.0
+        },
+        {
+          "affix_type": "DamageReflection",
+          "value": 8.0
+        }
+      ],
+      "god_item_id": null
+    },
+    "ring": {
+      "slot": "Ring",
+      "rarity": "Mythic",
+      "ilvl": 100,
+      "tier": 9,
+      "base_name": "Megingjord",
+      "display_name": "Megingjord",
+      "attributes": {
+        "str": 40,
+        "dex": 0,
+        "con": 20,
+        "int": 0,
+        "wis": 0,
+        "cha": 0
+      },
+      "affixes": [
+        {
+          "affix_type": "XPGain",
+          "value": 40.0
+        }
+      ],
+      "god_item_id": "Megingjord"
+    }
+  },
+  "active_dungeon": {
+    "size": "Small",
+    "grid": [
+      [
+        {
+          "room_type": "Entrance",
+          "state": "Cleared",
+          "position": [
+            0,
+            0
+          ],
+          "connections": [
+            false,
+            true,
+            false,
+            false
+          ]
+        },
+        {
+          "room_type": "Combat",
+          "state": "Current",
+          "position": [
+            1,
+            0
+          ],
+          "connections": [
+            false,
+            true,
+            false,
+            true
+          ]
+        },
+        {
+          "room_type": "Treasure",
+          "state": "Revealed",
+          "position": [
+            2,
+            0
+          ],
+          "connections": [
+            false,
+            false,
+            false,
+            true
+          ]
+        },
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    ],
+    "player_position": [
+      1,
+      0
+    ],
+    "entrance_position": [
+      0,
+      0
+    ],
+    "boss_position": [
+      2,
+      0
+    ],
+    "has_key": false,
+    "move_timer": 0.0,
+    "collected_items": [],
+    "xp_earned": 1200,
+    "rooms_cleared": 1,
+    "current_room_cleared": false,
+    "zone_id": 11
+  },
+  "fishing": {
+    "rank": 1,
+    "total_fish_caught": 0,
+    "fish_toward_next_rank": 0,
+    "legendary_catches": 0
+  },
+  "zone_progression": {
+    "current_zone_id": 11,
+    "current_subzone_id": 1,
+    "defeated_bosses": [
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        7,
+        1
+      ],
+      [
+        7,
+        2
+      ],
+      [
+        7,
+        3
+      ],
+      [
+        7,
+        4
+      ],
+      [
+        8,
+        1
+      ],
+      [
+        8,
+        2
+      ],
+      [
+        8,
+        3
+      ],
+      [
+        8,
+        4
+      ],
+      [
+        9,
+        1
+      ],
+      [
+        9,
+        2
+      ],
+      [
+        9,
+        3
+      ],
+      [
+        9,
+        4
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        10,
+        2
+      ],
+      [
+        10,
+        3
+      ],
+      [
+        10,
+        4
+      ]
+    ],
+    "unlocked_zones": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ],
+    "kills_in_subzone": 0,
+    "fighting_boss": false,
+    "has_stormbreaker": true
+  },
+  "stormglass": 25000,
+  "stormglass_discovered": true,
+  "storm_sigils": {
+    "slots_unlocked": 3,
+    "sigils": [
+      {
+        "effect": "XpPercent",
+        "value": 15.0,
+        "grade": "A"
+      },
+      {
+        "effect": "DamagePercent",
+        "value": 8.0,
+        "grade": "C"
+      },
+      null,
+      null,
+      null
+    ]
+  },
+  "ascension_level": 3,
+  "vessel_signal_discovered": false,
+  "vessel_launched": false,
+  "vessel_arrived": false,
+  "last_crossing_complete": false
+}

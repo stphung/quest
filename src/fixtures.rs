@@ -147,6 +147,102 @@ pub fn engage_enemy(state: &mut GameState) {
     state.combat_state.is_regenerating = false;
 }
 
+/// A deterministic 3-room dungeon run: entrance cleared, player mid-fight in
+/// the middle room, treasure room revealed ahead. Hand-built rather than
+/// generated (`generate_dungeon` rolls its maze from a thread RNG), so it's
+/// reproducible in tests.
+pub fn dungeon_in_progress(zone_id: u32) -> crate::dungeon::Dungeon {
+    use crate::dungeon::{Dungeon, DungeonSize, Room, RoomState, RoomType, DIR_LEFT, DIR_RIGHT};
+
+    let mut dungeon = Dungeon::new(DungeonSize::Small);
+    dungeon.zone_id = zone_id;
+    dungeon.entrance_position = (0, 0);
+    dungeon.boss_position = (2, 0);
+    dungeon.player_position = (1, 0);
+    dungeon.rooms_cleared = 1;
+    dungeon.current_room_cleared = false;
+    dungeon.xp_earned = 1200;
+
+    let mut entrance = Room::new(RoomType::Entrance, (0, 0));
+    entrance.state = RoomState::Cleared;
+    entrance.connections[DIR_RIGHT] = true;
+    dungeon.grid[0][0] = Some(entrance);
+
+    let mut combat = Room::new(RoomType::Combat, (1, 0));
+    combat.state = RoomState::Current;
+    combat.connections[DIR_LEFT] = true;
+    combat.connections[DIR_RIGHT] = true;
+    dungeon.grid[0][1] = Some(combat);
+
+    let mut treasure = Room::new(RoomType::Treasure, (2, 0));
+    treasure.state = RoomState::Revealed;
+    treasure.connections[DIR_LEFT] = true;
+    dungeon.grid[0][2] = Some(treasure);
+
+    dungeon
+}
+
+/// Unlocks 3 Storm Sigil slots with two etched sigils (one XP, one damage),
+/// leaving the third slot empty so both filled and empty slots render.
+pub fn unlock_storm_sigils(state: &mut GameState) {
+    use crate::stormglass::sigils::{Sigil, SigilEffectType, SigilGrade, StormSigils};
+
+    let mut sigils = StormSigils::new();
+    sigils.slots_unlocked = 3;
+    sigils.sigils[0] = Some(Sigil {
+        effect: SigilEffectType::XpPercent,
+        value: 15.0,
+        grade: SigilGrade::A,
+    });
+    sigils.sigils[1] = Some(Sigil {
+        effect: SigilEffectType::DamagePercent,
+        value: 8.0,
+        grade: SigilGrade::C,
+    });
+    state.storm_sigils = sigils;
+}
+
+/// Equips the given god item into its defined slot, replacing whatever was
+/// there.
+pub fn equip_god_item(state: &mut GameState, id: crate::god_items::GodItemId) {
+    use crate::god_items::{
+        asprika_definition, megingjord_definition, sleipnir_definition, GodItemId,
+    };
+
+    let definition = match id {
+        GodItemId::Asprika => asprika_definition(),
+        GodItemId::Sleipnir => sleipnir_definition(),
+        GodItemId::Megingjord => megingjord_definition(),
+    };
+    let slot = definition.slot;
+    state.equipment.set(slot, Some(definition.to_item()));
+}
+
+/// An in-progress fishing session: one fish already landed, mid-reel on a
+/// second, with the persistent rank/catch totals bumped to match.
+pub fn active_fishing_session(state: &mut GameState) {
+    use crate::fishing::{CaughtFish, FishRarity, FishingPhase, FishingSession, FishingState};
+
+    state.fishing = FishingState {
+        rank: 22,
+        total_fish_caught: 8_000,
+        fish_toward_next_rank: 40,
+        ..Default::default()
+    };
+    state.active_fishing = Some(FishingSession {
+        spot_name: "Storm Reef".to_string(),
+        total_fish: 6,
+        fish_caught: vec![CaughtFish {
+            name: "Perch".to_string(),
+            rarity: FishRarity::Common,
+            xp_reward: 10,
+        }],
+        items_found: vec![],
+        ticks_remaining: 12,
+        phase: FishingPhase::Reeling,
+    });
+}
+
 /// One freshly started instance of every challenge minigame, keyed by a
 /// short snake_case name. Games whose setup rolls randomness (mine layouts,
 /// puzzles, spawn positions) draw from the caller's RNG, so a seeded RNG

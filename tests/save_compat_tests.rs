@@ -87,6 +87,34 @@ fn character_corpus_loads() {
     assert!(boss.zone_progression.should_spawn_boss());
 }
 
+/// An endgame character carrying an in-progress dungeon, etched Storm
+/// Sigils, and an equipped god item — none of which any other corpus file
+/// exercises.
+#[test]
+fn act1_systems_corpus_loads() {
+    let manager = CharacterManager::with_dir(corpus_dir()).unwrap();
+    let state = manager.load_character("act1systems.json").unwrap();
+
+    let dungeon = state.active_dungeon.as_ref().expect("dungeon in progress");
+    assert_eq!(dungeon.player_position, (1, 0));
+    assert_eq!(dungeon.rooms_cleared, 1);
+    assert!(!dungeon.current_room_cleared);
+
+    assert_eq!(state.storm_sigils.slots_unlocked, 3);
+    assert_eq!(state.storm_sigils.etched_count(), 2);
+
+    let ring = state
+        .equipment
+        .ring
+        .as_ref()
+        .expect("Megingjord equipped in the ring slot");
+    assert_eq!(
+        ring.god_item_id,
+        Some(quest::god_items::GodItemId::Megingjord)
+    );
+    assert_eq!(ring.rarity, Rarity::Mythic);
+}
+
 /// Character saves survive a load → save → load cycle without losing data.
 #[test]
 fn character_corpus_round_trips() {
@@ -94,7 +122,13 @@ fn character_corpus_round_trips() {
     let tmp = tempfile::tempdir().unwrap();
     let scratch = CharacterManager::with_dir(tmp.path().to_path_buf()).unwrap();
 
-    for name in ["fresh.json", "midgame.json", "endgame.json", "boss.json"] {
+    for name in [
+        "fresh.json",
+        "midgame.json",
+        "endgame.json",
+        "boss.json",
+        "act1systems.json",
+    ] {
         let original = manager.load_character(name).unwrap();
         scratch.save_character(&original).unwrap();
         let reloaded = scratch.load_character(name).unwrap();
@@ -254,6 +288,16 @@ fn regenerate_save_corpus() {
         state.character_id = format!("00000000-0000-0000-0000-00000000000{i}");
         manager.save_character(state).unwrap();
     }
+
+    // Endgame character with an in-progress dungeon, etched Storm Sigils,
+    // and an equipped god item layered on — the combination of Act 1
+    // systems that have no other save-compat coverage.
+    let mut act1_systems = fixtures::endgame("Act1Systems", CREATED_AT, &mut rng);
+    act1_systems.character_id = "00000000-0000-0000-0000-000000000004".to_string();
+    act1_systems.active_dungeon = Some(fixtures::dungeon_in_progress(11));
+    fixtures::unlock_storm_sigils(&mut act1_systems);
+    fixtures::equip_god_item(&mut act1_systems, quest::god_items::GodItemId::Megingjord);
+    manager.save_character(&act1_systems).unwrap();
 
     // Account-level saves. Serializing via Value sorts map keys, keeping
     // the committed files diff-stable across regenerations.
