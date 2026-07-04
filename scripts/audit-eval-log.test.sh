@@ -69,6 +69,23 @@ else
 fi
 rm -rf "$TMPDIR"
 
+# --- Test 4b: partial skill name is rejected (word boundary bug fix) ---
+run_test "partial skill name (missing -audit suffix) is rejected"
+TMPDIR=$(mktemp -d)
+export META_AUDIT_HISTORY_DIR="$TMPDIR"
+echo '{"type":"run"}' > "$TMPDIR/entry.json"
+if "$LOG_SCRIPT" wiki "$TMPDIR/entry.json" 2>/dev/null; then
+  fail "expected non-zero exit for partial skill name 'wiki' (not 'wiki-audit')"
+else
+  pass "exits non-zero for partial skill name 'wiki'"
+fi
+if [ ! -f "$TMPDIR/wiki.jsonl" ]; then
+  pass "does not create wiki.jsonl for partial skill name"
+else
+  fail "should not have created wiki.jsonl log file for partial skill name"
+fi
+rm -rf "$TMPDIR"
+
 # --- Test 5: missing arguments is rejected ---
 run_test "missing arguments is rejected"
 if "$LOG_SCRIPT" wiki-audit 2>/dev/null; then

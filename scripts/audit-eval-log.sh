@@ -9,8 +9,6 @@
 # Set META_AUDIT_HISTORY_DIR to override the log directory (used by tests).
 set -euo pipefail
 
-VALID_SKILLS="perf-audit test-audit doc-audit wiki-audit dependency-audit"
-
 if ! command -v jq &> /dev/null; then
   echo "Error: jq is required but not installed." >&2
   exit 1
@@ -24,10 +22,13 @@ if [ -z "$SKILL_NAME" ] || [ -z "$JSON_FILE" ]; then
   exit 1
 fi
 
-if ! echo "$VALID_SKILLS" | grep -qw "$SKILL_NAME"; then
-  echo "Error: unknown skill '$SKILL_NAME'. Must be one of: $VALID_SKILLS" >&2
-  exit 1
-fi
+case "$SKILL_NAME" in
+  perf-audit|test-audit|doc-audit|wiki-audit|dependency-audit) ;;
+  *)
+    echo "Error: unknown skill '$SKILL_NAME'. Must be one of: perf-audit test-audit doc-audit wiki-audit dependency-audit" >&2
+    exit 1
+    ;;
+esac
 
 if [ ! -f "$JSON_FILE" ]; then
   echo "Error: file not found: $JSON_FILE" >&2
