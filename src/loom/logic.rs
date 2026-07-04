@@ -2263,4 +2263,238 @@ mod shuttle_tests {
             "Shuttle rate tracker should record production"
         );
     }
+
+    // ── upgrade_shuttle error paths ───────────────────────────────────────────
+
+    #[test]
+    fn test_upgrade_shuttle_invalid_index() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        let result = upgrade_shuttle(&mut loom, 0, 7);
+        assert_eq!(result, Err(ShuttleUpgradeError::InvalidIndex));
+    }
+
+    #[test]
+    fn test_upgrade_shuttle_under_construction() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        setup_patterns(&mut loom, 8);
+        for node in loom.persistent.nodes.iter_mut() {
+            node.unlocked = true;
+        }
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
+        let _ = build_shuttle(
+            &mut loom,
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        // Freshly built shuttle stays under_construction (not cleared here).
+        assert!(loom.persistent.shuttles[0].under_construction);
+
+        let result = upgrade_shuttle(&mut loom, 0, 7);
+        assert_eq!(result, Err(ShuttleUpgradeError::UnderConstruction));
+    }
+
+    #[test]
+    fn test_upgrade_shuttle_insufficient_buffer() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        setup_patterns(&mut loom, 8);
+        for node in loom.persistent.nodes.iter_mut() {
+            node.unlocked = true;
+        }
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
+        let _ = build_shuttle(
+            &mut loom,
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        loom.persistent.shuttles[0].under_construction = false;
+        // Cost for level 1 -> 2 is 100 * 1^1.2 = 100; leave buffer well short.
+        loom.persistent.shuttles[0].buffer = 10.0;
+
+        let result = upgrade_shuttle(&mut loom, 0, 7);
+        assert_eq!(
+            result,
+            Err(ShuttleUpgradeError::InsufficientBuffer {
+                needed: 100.0,
+                have: 10.0,
+            })
+        );
+    }
+
+    // ── build_shuttle InvalidSource ────────────────────────────────────────────
+
+    #[test]
+    fn test_build_shuttle_fails_invalid_source() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        setup_patterns(&mut loom, 1);
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
+
+        // Shuttle(5) doesn't exist yet -> invalid source reference.
+        let result = build_shuttle(
+            &mut loom,
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            vec![LoomNodeRef::Shuttle(5)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        assert_eq!(result, Err(ShuttleError::InvalidSource));
+    }
+
+    // ── demolish_shuttle out-of-bounds no-op ──────────────────────────────────
+
+    #[test]
+    fn test_demolish_shuttle_out_of_bounds_is_noop() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        loom.persistent.shuttles.push(Shuttle::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+            vec![],
+            vec![],
+        ));
+        demolish_shuttle(&mut loom, 99);
+        assert_eq!(
+            loom.persistent.shuttles.len(),
+            1,
+            "out-of-bounds demolish should not remove anything"
+        );
+    }
+
+    // ── eligible_sources_for_tier ──────────────────────────────────────────────
+
+    #[test]
+    fn test_eligible_sources_for_tier_includes_matching_extractors() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].unlocked = true;
+
+        let sources = eligible_sources_for_tier(&loom, 1, Resource::Ember);
+        assert!(sources.contains(&LoomNodeRef::Extractor(NodeId::EmberSpindle)));
+    }
+
+    #[test]
+    fn test_eligible_sources_for_tier_includes_lower_tier_shuttles() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        setup_patterns(&mut loom, 8);
+        for node in loom.persistent.nodes.iter_mut() {
+            node.unlocked = true;
+        }
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
+        let _ = build_shuttle(
+            &mut loom,
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        );
+        // Shuttle 0 is tier 1, output ForgedLight. It should be an eligible
+        // source for a tier-2 recipe needing ForgedLight, but not for tier 1.
+        let sources_t2 = eligible_sources_for_tier(&loom, 2, Resource::ForgedLight);
+        assert!(sources_t2.contains(&LoomNodeRef::Shuttle(0)));
+
+        let sources_t1 = eligible_sources_for_tier(&loom, 1, Resource::ForgedLight);
+        assert!(
+            !sources_t1.contains(&LoomNodeRef::Shuttle(0)),
+            "tier 1 shuttle should not be a valid source for another tier-1 consumer"
+        );
+    }
+
+    // ── available_resource ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_available_resource_sums_extractor_and_shuttle_buffers() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        setup_patterns(&mut loom, 1);
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 40.0;
+
+        let mut r = Shuttle::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::Ember, // same output as extractor's native resource for this test
+            1.0,
+            1,
+            vec![],
+            vec![],
+        );
+        r.under_construction = false;
+        r.buffer = 15.0;
+        loom.persistent.shuttles.push(r);
+
+        let total = available_resource(&loom, Resource::Ember);
+        assert!(
+            (total - 55.0).abs() < 0.001,
+            "expected 55.0 (40 extractor + 15 shuttle), got {}",
+            total
+        );
+    }
+
+    #[test]
+    fn test_available_resource_excludes_under_construction_shuttle() {
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+
+        let mut r = Shuttle::new(
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            Resource::ForgedLight,
+            1.0,
+            1,
+            vec![],
+            vec![],
+        );
+        r.under_construction = true;
+        r.buffer = 99.0;
+        loom.persistent.shuttles.push(r);
+
+        let total = available_resource(&loom, Resource::ForgedLight);
+        assert_eq!(
+            total, 0.0,
+            "under-construction shuttle buffer should not count"
+        );
+    }
+
+    // ── shuttle_build_cost / tier_intake_cap / shuttle_construction_secs defaults ──
+
+    #[test]
+    fn test_shuttle_build_cost_all_tiers() {
+        assert_eq!(shuttle_build_cost(1), 250.0);
+        assert_eq!(shuttle_build_cost(2), 150.0);
+        assert_eq!(shuttle_build_cost(3), 100.0);
+        assert_eq!(
+            shuttle_build_cost(99),
+            100.0,
+            "unknown tier falls back to T3+ cost"
+        );
+    }
+
+    #[test]
+    fn test_tier_intake_cap_default_arm() {
+        assert_eq!(tier_intake_cap(0), 20.0);
+        assert_eq!(tier_intake_cap(99), 20.0);
+    }
+
+    #[test]
+    fn test_shuttle_construction_secs_default_arm() {
+        assert_eq!(shuttle_construction_secs(0), 7200.0);
+        assert_eq!(shuttle_construction_secs(99), 7200.0);
+    }
 }

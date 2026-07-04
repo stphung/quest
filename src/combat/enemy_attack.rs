@@ -297,4 +297,48 @@ mod tests {
         assert!(!state.zone_progression.fighting_boss);
         assert!(state.combat_state.current_enemy.is_none());
     }
+
+    #[test]
+    fn resolve_enemy_attack_reflection_kills_enemy_and_starts_regen() {
+        // The enemy attacks, taking lethal reflected damage from its own hit
+        // (not from the player's attack) — exercises the death path reached
+        // via `handle_enemy_death` from inside the reflection check.
+        let mut rng = ChaCha8Rng::seed_from_u64(6);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        state.combat_state.current_enemy = Some(Enemy::new("Fragile".to_string(), 1, 50));
+        let mut derived = default_derived(&state);
+        derived.damage_reflection_percent = 100.0;
+
+        let events = resolve_enemy_attack(
+            &mut rng,
+            &mut state,
+            &CombatBonuses::default(),
+            &mut achievements,
+            &derived,
+            11,
+            30,
+        );
+
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, CombatEvent::DamageReflected { .. })),
+            "Reflection should have triggered"
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, CombatEvent::EnemyDied { .. })),
+            "Enemy should die from its own reflected damage"
+        );
+        assert!(
+            state.combat_state.current_enemy.is_none(),
+            "Dead enemy should be removed"
+        );
+        assert!(
+            state.combat_state.is_regenerating,
+            "Killing the enemy via reflection should start player HP regen"
+        );
+    }
 }

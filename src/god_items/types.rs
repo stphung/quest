@@ -316,6 +316,23 @@ pub fn equipped_god_item_fishing_reduction_percent(equipment: &crate::items::Equ
 mod tests {
     use super::*;
 
+    /// A plain (non-god) item for exercising the "equipped item present but
+    /// `god_item_id` is None" fallthrough branch in the query helpers below.
+    fn mundane_item(slot: crate::items::EquipmentSlot) -> crate::items::types::Item {
+        use crate::items::types::{AttributeBonuses, Rarity};
+        crate::items::types::Item {
+            slot,
+            rarity: Rarity::Rare,
+            ilvl: 10,
+            tier: 1,
+            base_name: "Sword".to_string(),
+            display_name: "Sword".to_string(),
+            attributes: AttributeBonuses::new(),
+            affixes: vec![],
+            god_item_id: None,
+        }
+    }
+
     #[test]
     fn test_asprika_definition_is_mythic_armor() {
         let def = asprika_definition();
@@ -504,6 +521,28 @@ mod tests {
     }
 
     #[test]
+    fn test_equipped_god_item_dr_zero_with_mundane_item_equipped() {
+        // A non-god item is equipped (god_item_id is None), so the loop body
+        // runs but the `if let Some(id)` guard fails.
+        let mut equipment = crate::items::Equipment::new();
+        equipment.set(
+            crate::items::EquipmentSlot::Armor,
+            Some(mundane_item(crate::items::EquipmentSlot::Armor)),
+        );
+        assert!((equipped_god_item_dr(&equipment)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_equipped_god_item_dr_zero_with_non_matching_god_item() {
+        // Sleipnir's passive is Windborne, not DivineBulwark, so the DR
+        // query should fall through to 0.0 rather than matching.
+        let mut equipment = crate::items::Equipment::new();
+        let sleipnir = sleipnir_definition().to_item();
+        equipment.set(crate::items::EquipmentSlot::Boots, Some(sleipnir));
+        assert!((equipped_god_item_dr(&equipment)).abs() < f64::EPSILON);
+    }
+
+    #[test]
     fn test_equipped_god_item_attack_speed_with_sleipnir() {
         let mut equipment = crate::items::Equipment::new();
         let sleipnir = sleipnir_definition().to_item();
@@ -514,6 +553,25 @@ mod tests {
     #[test]
     fn test_equipped_god_item_attack_speed_without_god_item() {
         let equipment = crate::items::Equipment::new();
+        assert!((equipped_god_item_attack_speed_percent(&equipment)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_equipped_god_item_attack_speed_zero_with_mundane_item_equipped() {
+        let mut equipment = crate::items::Equipment::new();
+        equipment.set(
+            crate::items::EquipmentSlot::Boots,
+            Some(mundane_item(crate::items::EquipmentSlot::Boots)),
+        );
+        assert!((equipped_god_item_attack_speed_percent(&equipment)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_equipped_god_item_attack_speed_zero_with_non_matching_god_item() {
+        // Asprika's passive is DivineBulwark, not Windborne.
+        let mut equipment = crate::items::Equipment::new();
+        let asprika = asprika_definition().to_item();
+        equipment.set(crate::items::EquipmentSlot::Armor, Some(asprika));
         assert!((equipped_god_item_attack_speed_percent(&equipment)).abs() < f64::EPSILON);
     }
 
@@ -532,6 +590,25 @@ mod tests {
     }
 
     #[test]
+    fn test_equipped_god_item_damage_zero_with_mundane_item_equipped() {
+        let mut equipment = crate::items::Equipment::new();
+        equipment.set(
+            crate::items::EquipmentSlot::Ring,
+            Some(mundane_item(crate::items::EquipmentSlot::Ring)),
+        );
+        assert!((equipped_god_item_damage_percent(&equipment)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_equipped_god_item_damage_zero_with_non_matching_god_item() {
+        // Asprika's passive is DivineBulwark, not GiantsMight.
+        let mut equipment = crate::items::Equipment::new();
+        let asprika = asprika_definition().to_item();
+        equipment.set(crate::items::EquipmentSlot::Armor, Some(asprika));
+        assert!((equipped_god_item_damage_percent(&equipment)).abs() < f64::EPSILON);
+    }
+
+    #[test]
     fn test_equipped_god_item_regen_reduction_with_sleipnir() {
         let mut equipment = crate::items::Equipment::new();
         let sleipnir = sleipnir_definition().to_item();
@@ -539,6 +616,27 @@ mod tests {
         assert!(
             (equipped_god_item_regen_reduction_percent(&equipment) - 50.0).abs() < f64::EPSILON
         );
+    }
+
+    #[test]
+    fn test_equipped_god_item_regen_reduction_zero_with_mundane_item_equipped() {
+        let mut equipment = crate::items::Equipment::new();
+        equipment.set(
+            crate::items::EquipmentSlot::Boots,
+            Some(mundane_item(crate::items::EquipmentSlot::Boots)),
+        );
+        assert!((equipped_god_item_regen_reduction_percent(&equipment)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_equipped_god_item_regen_reduction_zero_when_bonuses_empty() {
+        // Asprika is equipped but has no non-combat bonuses (empty `bonuses`
+        // vec), so the inner search loop runs zero iterations and falls
+        // through to the 0.0 default.
+        let mut equipment = crate::items::Equipment::new();
+        let asprika = asprika_definition().to_item();
+        equipment.set(crate::items::EquipmentSlot::Armor, Some(asprika));
+        assert!((equipped_god_item_regen_reduction_percent(&equipment)).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -556,6 +654,25 @@ mod tests {
     }
 
     #[test]
+    fn test_equipped_god_item_dungeon_speed_zero_with_mundane_item_equipped() {
+        let mut equipment = crate::items::Equipment::new();
+        equipment.set(
+            crate::items::EquipmentSlot::Ring,
+            Some(mundane_item(crate::items::EquipmentSlot::Ring)),
+        );
+        assert!((equipped_god_item_dungeon_speed_percent(&equipment)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_equipped_god_item_dungeon_speed_zero_when_bonuses_empty() {
+        // Megingjord has no non-combat bonuses.
+        let mut equipment = crate::items::Equipment::new();
+        let megingjord = megingjord_definition().to_item();
+        equipment.set(crate::items::EquipmentSlot::Ring, Some(megingjord));
+        assert!((equipped_god_item_dungeon_speed_percent(&equipment)).abs() < f64::EPSILON);
+    }
+
+    #[test]
     fn test_equipped_god_item_fishing_reduction_with_sleipnir() {
         let mut equipment = crate::items::Equipment::new();
         let sleipnir = sleipnir_definition().to_item();
@@ -563,6 +680,25 @@ mod tests {
         assert!(
             (equipped_god_item_fishing_reduction_percent(&equipment) - 50.0).abs() < f64::EPSILON
         );
+    }
+
+    #[test]
+    fn test_equipped_god_item_fishing_reduction_zero_with_mundane_item_equipped() {
+        let mut equipment = crate::items::Equipment::new();
+        equipment.set(
+            crate::items::EquipmentSlot::Armor,
+            Some(mundane_item(crate::items::EquipmentSlot::Armor)),
+        );
+        assert!((equipped_god_item_fishing_reduction_percent(&equipment)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_equipped_god_item_fishing_reduction_zero_when_bonuses_empty() {
+        // Asprika has no non-combat bonuses.
+        let mut equipment = crate::items::Equipment::new();
+        let asprika = asprika_definition().to_item();
+        equipment.set(crate::items::EquipmentSlot::Armor, Some(asprika));
+        assert!((equipped_god_item_fishing_reduction_percent(&equipment)).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -593,6 +729,22 @@ mod tests {
     #[test]
     fn test_cached_bonuses_compute_empty_equipment() {
         let equipment = crate::items::Equipment::new();
+        let bonuses = CachedGodItemBonuses::compute(&equipment);
+        assert_eq!(bonuses.damage_reduction_percent, 0.0);
+        assert_eq!(bonuses.attack_speed_percent, 0.0);
+        assert_eq!(bonuses.damage_percent, 0.0);
+    }
+
+    #[test]
+    fn test_cached_bonuses_compute_ignores_non_god_items() {
+        // A regular (non-god) item is equipped: `item.god_item_id` is None,
+        // so the equipped-item loop runs but skips it entirely.
+        let mut equipment = crate::items::Equipment::new();
+        equipment.set(
+            crate::items::EquipmentSlot::Weapon,
+            Some(mundane_item(crate::items::EquipmentSlot::Weapon)),
+        );
+
         let bonuses = CachedGodItemBonuses::compute(&equipment);
         assert_eq!(bonuses.damage_reduction_percent, 0.0);
         assert_eq!(bonuses.attack_speed_percent, 0.0);
