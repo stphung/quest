@@ -8,12 +8,25 @@
 
 ## Top 5, ranked
 
-### 1. The 90%-line coverage gate measures the wrong thing (High)
-`cargo llvm-cov --lib` in both `ci.yml` and `ci-checks.sh` only instruments code exercised by inline `#[cfg(test)]` blocks in `src/` — it never runs the 94 files under `tests/`, which is the *larger* half of the suite (roughly 3,000 integration tests vs. 2,400 inline unit tests). The regex exclusion list (`deep/discovery`, `enhancement/logic`, `stormglass/{earning,spending,types}`, etc.) was almost certainly added when those files showed low `--lib`-only coverage — but every one of them is in fact thoroughly covered by integration tests in `tests/`. The 90% bar is therefore not "10% of game logic is genuinely untested"; it's "10% of game logic isn't tested by the narrow slice of tests this command can see." Two consequences:
-- The exclusion list looks like a real gap but mostly isn't — wasted signal.
-- Any *new* untested branch dropped into one of the excluded files will never trip the gate, because the whole file is ignored, not just the genuinely-hard-to-test lines (e.g. I/O error paths in `deep/persistence.rs`, `enhancement/persistence.rs`, which *are* legitimately hard to unit test).
+### 1. The 90%-line coverage gate measures the wrong thing (High) — confirmed by actually running it
 
-**Fix:** switch the coverage invocation to include integration tests (`--tests` or workspace-wide) so the number reflects reality, then re-derive the exclusion list from files that are still uncovered under the wider net. Separately, add a small test asserting `ci.yml`'s and `ci-checks.sh`'s coverage-ignore regexes stay identical — they've already drifted once (documented in CLAUDE.md) and nothing currently prevents it from recurring.
+Measured directly (`cargo-llvm-cov`, installed fresh for this check):
+
+| Invocation | Line coverage |
+|---|---|
+| `--lib` only, current CI exclusion regex (what CI actually runs) | **90.57%** |
+| Full run (adds `tests/`'s ~3,000 integration tests + bin-crate inline tests), same exclusion regex | **81.44%** |
+| Full run, zero exclusions | **65.23%** |
+
+The 9-point drop between the first two rows isn't only "`tests/` doesn't run under `--lib`" — it's structural. `input/`, `main_helpers/`, and `tick_events` are declared with `mod` **only in `src/main.rs`**, never in `src/lib.rs` (confirmed via `grep '^mod \|^pub mod '` on both files). `tests/` integration tests link against the `quest` *library* crate, so they cannot reach those modules under any coverage invocation — not a measurement-command problem, a crate-boundary problem. Their real coverage can only come from inline `#[cfg(test)]` blocks inside the binary crate itself, and per-file numbers show that's thin: `main_helpers/input_routing.rs` and `main_helpers/persistence.rs` are a literal **0.00%**, as are `input/soulforge_input.rs`, `input/stormglass_input.rs`, and `input/minigame_input.rs`; `input/haven_input.rs` sits at 5.68%. (`main.rs` itself is 0.00% too, which is expected and fine — it's a thin entry point.)
+
+The exclusion-list claim checks out with real numbers, though it's more nuanced than "all excluded files are secretly fine": re-running coverage with the exclusion regex removed, of the 6 currently-excluded files, `enhancement/logic.rs` (100%), `stormglass/earning.rs` (100%), `stormglass/types.rs` (97.27%), `deep/discovery.rs` (86.84%), and `stormglass/spending.rs` (76.19%) are genuinely well-tested and should not be blanket-excluded from the gate. Only `deep/persistence.rs` (28.57%) and `enhancement/persistence.rs` (9.52%) are the legitimately-hard-to-test I/O glue the exclusion list was presumably meant for.
+
+**Fix, in two independent parts:**
+1. For files reachable from `lib.rs` (the 6 currently excluded, and any future ones): drop `enhancement/logic.rs`, `stormglass/{earning,spending,types}.rs`, and `deep/discovery.rs` from the ignore regex — they're already covered and the gate should be watching them. Keep `deep/persistence.rs` and `enhancement/persistence.rs` excluded, or better, narrow the exclusion to their specific I/O-error branches.
+2. For `input/`, `main_helpers/`, `tick_events` (bin-only, structurally unreachable by `tests/`): these need their own explicit coverage measurement — either move testable logic into `lib.rs`-reachable modules (the input-replay harness pattern already does this for some handlers, e.g. `time_vault_input.rs` at 95.30% and `harness.rs` at 85.35% show it works when done), or add a second, separate coverage gate scoped to the binary crate so these files stop being invisible to CI rather than lumping them into the same 90% number as the library.
+
+Separately, add a small test asserting `ci.yml`'s and `ci-checks.sh`'s coverage-ignore regexes stay identical — they've already drifted once (documented in CLAUDE.md) and nothing currently prevents it from recurring.
 
 ### 2. Two live production bugs surfaced during the audit (High)
 Not testing-strategy gaps in the abstract — real bugs, found because the review went looking for untested clock/ordering-sensitive code:
