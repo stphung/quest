@@ -67,16 +67,17 @@ pub const DARK_TAKES_EACH_CROSSING: f64 = 0.011;
 /// Each level multiplies the dark's per-crossing toll by `WARD_DECAY`,
 /// compounding down toward `WARD_TOLL_FLOOR` (never to zero — the dark always
 /// keeps a little). It buys down the very toll that makes crossing-count
-/// matter, so it is the souls-first hand's answer to a long era.
-pub const WARD_DECAY: f64 = 0.80;
+/// matter, so it is the souls-first hand's answer to a long era. A punchy
+/// per-level cut (each level takes ~28% off the toll) so the choice reads.
+pub const WARD_DECAY: f64 = 0.72;
 /// The most the Ward can ever blunt the toll, as a fraction of its base rate
-/// (0.15 = at most an 85% cut). A residual bite always remains.
-pub const WARD_TOLL_FLOOR: f64 = 0.15;
-/// The Ward's price ladder: level `L` costs `6 × 1.6^L` Salvage — a steeper
-/// climb than Drive or the Shipwright, so warding the dark is a real trade
-/// against carrying more or sailing faster.
-pub const WARD_COST_BASE: f64 = 6.0;
-pub const WARD_COST_GROWTH: f64 = 1.6;
+/// (0.12 = at most an 88% cut). A residual bite always remains.
+pub const WARD_TOLL_FLOOR: f64 = 0.12;
+/// The Ward's price ladder: level `L` costs `5 × 1.45^L` Salvage — priced
+/// between Drive and the Shipwright, an accessible trade against carrying
+/// more or sailing faster.
+pub const WARD_COST_BASE: f64 = 5.0;
+pub const WARD_COST_GROWTH: f64 = 1.45;
 
 /// The colony's districts, unlocked in order by population. Pure growth —
 /// every one lands eventually; the choices live on the water.

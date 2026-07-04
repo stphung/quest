@@ -166,8 +166,8 @@ The tension is speed-vs-salvation, and it is meant to be a **wide** margin: beca
 | `DRIVE_COST_BASE` / `DRIVE_COST_GROWTH` | 4 / 1.5 | Drive level L costs `4×1.5^L` Salvage |
 | `CAP_COST_BASE` / `CAP_COST_GROWTH` | 5 / 1.42 | Shipwright level L costs `5×1.42^L` Salvage |
 | `DARK_TAKES_EACH_CROSSING` | 0.011 | Base fraction of the still-waiting world lost each crossing — the toll the Ward buys down |
-| `WARD_DECAY` / `WARD_TOLL_FLOOR` | 0.80 / 0.15 | Toll ×0.80 per Ward level, floored at 0.15× base (≥85% cut max, never zero) |
-| `WARD_COST_BASE` / `WARD_COST_GROWTH` | 6 / 1.6 | Ward level L costs `6×1.6^L` Salvage — steeper than Drive/Shipwright |
+| `WARD_DECAY` / `WARD_TOLL_FLOOR` | 0.72 / 0.12 | Toll ×0.72 per Ward level (~28% off), floored at 0.12× base (≤88% cut, never zero) |
+| `WARD_COST_BASE` / `WARD_COST_GROWTH` | 5 / 1.45 | Ward level L costs `5×1.45^L` Salvage — between Drive and Shipwright |
 | districts | Quay 500 … Charthouse 66,000 | Founded by population (= souls delivered); each adds a standing hold bonus |
 
 Buying is player-driven (`buy_drive`/`buy_capacity`/`buy_ward`, wired through `VoyageInputResult::BuyDrive`/`BuyCapacity`/`BuyWard` → `main.rs` → the colony); there is no in-game auto-invest (the balanced line lives only in the tests/sim as a policy helper).

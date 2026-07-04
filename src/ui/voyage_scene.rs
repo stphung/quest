@@ -2101,10 +2101,14 @@ fn render_reckoning(
                 let next_mult = WARD_DECAY
                     .powi((c.ward_level + 1) as i32)
                     .max(WARD_TOLL_FLOOR);
+                let now_toll = c.dark_toll();
+                let next_toll = (c.souls_remaining as f64 * DARK_TAKES_EACH_CROSSING * next_mult)
+                    .round() as u64;
                 format!(
-                    "  the dark takes {:.1}% \u{2192} next Lv {:.1}%",
-                    c.dark_toll_rate() * 100.0,
-                    DARK_TAKES_EACH_CROSSING * next_mult * 100.0
+                    "  the dark takes {} next crossing \u{2192} Lv {}: {}",
+                    with_commas(now_toll),
+                    c.ward_level + 1,
+                    with_commas(next_toll)
                 )
             },
             Style::default().fg(Color::Gray),
