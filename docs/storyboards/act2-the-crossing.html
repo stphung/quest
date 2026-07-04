@@ -1,0 +1,1147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Act II · The Crossing — Quest Storyboard</title>
+<style>
+  :root {
+    /* Light theme = "the harbor left behind" — warm parchment, the letters-from-home register */
+    --void:      #f1e9da;
+    --void-2:    #e9dfcb;
+    --panel:     #f7f1e6;
+    --ink:       #241d2e;
+    --muted:     #6b6180;
+    --faint:     #8a8099;
+    --line:      rgba(60, 40, 80, 0.16);
+    --line-soft: rgba(60, 40, 80, 0.08);
+    --lantern:   #b26414;
+    --lantern-2: #c98a3a;
+    --violet:    #6a55c0;
+    --violet-2:  #8570d8;
+    --bloom:     #9c3a58;
+    --good:      #4f7a3a;
+    --warn:      #b26414;
+    --crit:      #9c3a58;
+    --hero-fade: rgba(241,233,218,0);
+    --hero-solid: #f1e9da;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --void:      #0a0910;
+      --void-2:    #12101d;
+      --panel:     #16132340;
+      --ink:       #ece7f6;
+      --muted:     #9a92b5;
+      --faint:     #6f688a;
+      --line:      rgba(178, 168, 220, 0.15);
+      --line-soft: rgba(178, 168, 220, 0.07);
+      --lantern:   #edb26a;
+      --lantern-2: #f4cf9e;
+      --violet:    #9887e6;
+      --violet-2:  #b3a6f0;
+      --bloom:     #f6d9e0;
+      --good:      #86c072;
+      --warn:      #edb26a;
+      --crit:      #e79ab0;
+      --hero-fade: rgba(10,9,16,0);
+      --hero-solid: #0a0910;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --void:      #0a0910;
+    --void-2:    #12101d;
+    --panel:     #16132340;
+    --ink:       #ece7f6;
+    --muted:     #9a92b5;
+    --faint:     #6f688a;
+    --line:      rgba(178, 168, 220, 0.15);
+    --line-soft: rgba(178, 168, 220, 0.07);
+    --lantern:   #edb26a;
+    --lantern-2: #f4cf9e;
+    --violet:    #9887e6;
+    --violet-2:  #b3a6f0;
+    --bloom:     #f6d9e0;
+    --good:      #86c072;
+    --warn:      #edb26a;
+    --crit:      #e79ab0;
+    --hero-fade: rgba(10,9,16,0);
+    --hero-solid: #0a0910;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --void:      #f1e9da;
+    --void-2:    #e9dfcb;
+    --panel:     #f7f1e6;
+    --ink:       #241d2e;
+    --muted:     #6b6180;
+    --faint:     #8a8099;
+    --line:      rgba(60, 40, 80, 0.16);
+    --line-soft: rgba(60, 40, 80, 0.08);
+    --lantern:   #b26414;
+    --lantern-2: #c98a3a;
+    --violet:    #6a55c0;
+    --violet-2:  #8570d8;
+    --bloom:     #9c3a58;
+    --good:      #4f7a3a;
+    --warn:      #b26414;
+    --crit:      #9c3a58;
+    --hero-fade: rgba(241,233,218,0);
+    --hero-solid: #f1e9da;
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+  body {
+    margin: 0;
+    background: var(--void);
+    color: var(--ink);
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    font-size: 18px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  .mono, .label, .stat, .gauge, .const-table, .const-table *, .node-k, .chip, .pill, .voyage-index a {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+
+  /* ---- Fixed progress reader ---- */
+  .reader {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: transparent;
+    z-index: 60;
+    pointer-events: none;
+  }
+  .reader > i {
+    display: block;
+    height: 100%;
+    width: var(--p, 0%);
+    background: linear-gradient(90deg, var(--violet), var(--lantern));
+    box-shadow: 0 0 12px var(--lantern);
+  }
+
+  .theme-toggle {
+    position: fixed;
+    top: 16px; right: 16px;
+    z-index: 61;
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: color-mix(in srgb, var(--void-2) 82%, transparent);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 7px 14px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: color .2s, border-color .2s;
+  }
+  .theme-toggle:hover { color: var(--lantern); border-color: var(--lantern); }
+  .theme-toggle:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
+
+  /* ---- Layout shell ---- */
+  .wrap {
+    position: relative;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 24px 120px;
+  }
+
+  /* ---- The voyage line: a luminous thread down the page ---- */
+  .voyage-line {
+    position: absolute;
+    top: 0; bottom: 0;
+    left: 22px;
+    width: 2px;
+    background: var(--line);
+    z-index: 0;
+  }
+  .voyage-line > i {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: var(--p, 0%);
+    background: linear-gradient(180deg, var(--lantern), var(--violet));
+    box-shadow: 0 0 10px color-mix(in srgb, var(--lantern) 60%, transparent);
+  }
+  @media (max-width: 820px) { .voyage-line { display: none; } }
+
+  section { position: relative; z-index: 1; }
+
+  /* Chapter node on the voyage line */
+  .with-node { padding-left: 52px; }
+  @media (max-width: 820px) { .with-node { padding-left: 0; } }
+  .with-node::before {
+    content: "";
+    position: absolute;
+    left: -37px; top: 10px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--void);
+    border: 2px solid var(--violet);
+    box-shadow: 0 0 0 4px var(--void), 0 0 14px color-mix(in srgb, var(--violet) 70%, transparent);
+    z-index: 2;
+  }
+  @media (max-width: 820px) { .with-node::before { display: none; } }
+
+  /* ---- Hero ---- */
+  .hero {
+    position: relative;
+    min-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 96px 0 72px;
+    z-index: 1;
+  }
+  #void-canvas {
+    position: absolute;
+    inset: -10% -50vw auto -50vw;
+    width: 200vw;
+    height: 120%;
+    z-index: 0;
+    opacity: 0.9;
+    pointer-events: none;
+    -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+  }
+  .hero > * { position: relative; z-index: 1; }
+
+  .eyebrow {
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    letter-spacing: 0.42em;
+    text-transform: uppercase;
+    color: var(--lantern);
+    margin: 0 0 26px;
+  }
+  .hero h1 {
+    font-size: clamp(3rem, 10vw, 6.6rem);
+    line-height: 0.94;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    margin: 0;
+    text-wrap: balance;
+    font-style: italic;
+  }
+  .hero h1 .plain { font-style: normal; letter-spacing: -0.01em; }
+  .hero .dek {
+    max-width: 34ch;
+    font-size: clamp(1.15rem, 2.4vw, 1.5rem);
+    color: var(--muted);
+    margin: 30px 0 0;
+    line-height: 1.5;
+  }
+  .hero .whisper {
+    margin-top: 40px;
+    font-style: italic;
+    color: var(--violet-2);
+    font-size: 1.05rem;
+    min-height: 1.6em;
+  }
+  .hero .whisper::before { content: "“"; }
+  .hero .whisper::after  { content: "”"; }
+
+  .darkbadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 8px 16px;
+    margin-top: 52px;
+    align-self: flex-start;
+  }
+  .darkbadge b { color: var(--crit); font-weight: 600; }
+  .darkbadge .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--crit);
+    box-shadow: 0 0 8px var(--crit);
+  }
+
+  /* ---- Section scaffolding ---- */
+  section.block { padding: 60px 0; border-top: 1px solid var(--line-soft); }
+  section.block:first-of-type { border-top: none; }
+
+  .kicker {
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: var(--violet-2);
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin: 0 0 6px;
+  }
+  .kicker .ord {
+    color: var(--faint);
+    font-size: 11px;
+  }
+  h2 {
+    font-size: clamp(1.9rem, 4.5vw, 3rem);
+    font-weight: 500;
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    margin: 0 0 20px;
+    text-wrap: balance;
+  }
+  h2 .roman { color: var(--lantern); font-style: italic; }
+  .lede {
+    font-size: 1.22rem;
+    color: var(--ink);
+    max-width: 62ch;
+    margin: 0 0 28px;
+  }
+  p { max-width: 64ch; color: var(--muted); }
+  p strong, li strong { color: var(--ink); font-weight: 600; }
+  em.term { font-style: italic; color: var(--violet-2); }
+
+  a { color: var(--lantern); }
+
+  /* ---- Gate: the four requirements ---- */
+  .gate-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin: 8px 0 30px;
+  }
+  .gate-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .gate-card .req {
+    font-family: ui-monospace, monospace;
+    font-size: 1.9rem;
+    color: var(--lantern);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .gate-card .req-l {
+    display: block;
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 10px;
+  }
+  .burn {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--lantern) 14%, transparent), transparent);
+    border: 1px solid color-mix(in srgb, var(--lantern) 32%, var(--line));
+    border-radius: 14px;
+    padding: 22px 24px;
+  }
+  .burn .big {
+    font-family: ui-monospace, monospace;
+    font-size: 2.4rem;
+    color: var(--lantern);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .burn p { margin: 0; max-width: 42ch; }
+
+  /* ---- Chapters / route ---- */
+  .chapters {
+    display: grid;
+    gap: 14px;
+    margin-top: 12px;
+  }
+  .chapter {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    gap: 22px;
+    align-items: start;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px 24px;
+    transition: border-color .3s, transform .3s;
+  }
+  .chapter:hover { border-color: color-mix(in srgb, var(--violet) 45%, var(--line)); }
+  .chapter .cnum {
+    font-family: ui-monospace, monospace;
+    font-size: 2rem;
+    color: var(--violet);
+    line-height: 1;
+    padding-top: 2px;
+  }
+  .chapter h3 {
+    margin: 0 0 6px;
+    font-size: 1.4rem;
+    font-weight: 500;
+  }
+  .chapter .waypoints {
+    color: var(--muted);
+    font-size: 0.98rem;
+    margin: 8px 0 0;
+  }
+  .chapter .waypoints span { color: var(--violet-2); }
+
+  .route-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 24px 0 0;
+  }
+  .chip {
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 13px;
+    background: var(--void-2);
+  }
+  .chip b { color: var(--lantern); font-weight: 600; }
+
+  /* ---- Trim dial ---- */
+  .trim-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+  }
+  .trim {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px;
+    background: var(--panel);
+  }
+  .trim h4 {
+    margin: 0 0 4px;
+    font-size: 1.2rem;
+    font-weight: 500;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  .trim h4 .spd {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin-left: auto;
+  }
+  .trim p { margin: 6px 0 0; font-size: 0.96rem; }
+  .trim.def { border-color: color-mix(in srgb, var(--lantern) 40%, var(--line)); }
+  .trim.def h4 { color: var(--lantern); }
+
+  /* ---- Gauges ---- */
+  .gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
+  @media (max-width: 640px) { .gauges { grid-template-columns: 1fr; } }
+  .gauge {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px;
+    background: var(--panel);
+  }
+  .gauge .g-name {
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex; justify-content: space-between;
+  }
+  .gauge .g-val { color: var(--lantern); }
+  .meter {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--void-2);
+    margin: 14px 0 16px;
+    overflow: hidden;
+    border: 1px solid var(--line-soft);
+  }
+  .meter > i { display: block; height: 100%; border-radius: 4px; }
+  .meter.provisions > i { width: 100%; background: linear-gradient(90deg, var(--lantern), var(--lantern-2)); }
+  .meter.hope > i { width: 70%; background: linear-gradient(90deg, var(--violet), var(--violet-2)); }
+  .gauge p { margin: 0; font-size: 0.96rem; font-family: "Iowan Old Style", Palatino, Georgia, serif; }
+  .silence {
+    margin-top: 18px;
+    border-left: 2px solid var(--crit);
+    padding: 4px 0 4px 16px;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  /* ---- Souls roster ---- */
+  .crew {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+  }
+  .soul {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 18px;
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .soul .s-name { font-size: 1.2rem; }
+  .soul .s-post {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .post-helm   { color: var(--lantern); }
+  .post-tender { color: var(--good); }
+  .post-watch  { color: var(--violet-2); }
+  .post-none   { color: var(--faint); }
+  .crew-note {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+  }
+  .crew-note .cn {
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .crew-note .cn b { color: var(--ink); }
+  .crew-note .cn.cov { border-color: color-mix(in srgb, var(--bloom) 40%, var(--line)); }
+  .crew-note .cn.cov b { color: var(--bloom); }
+
+  /* ---- Refit doors ---- */
+  .doors { display: grid; gap: 14px; margin-top: 14px; }
+  .door-pair {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 0;
+    align-items: stretch;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  @media (max-width: 640px) { .door-pair { grid-template-columns: 1fr; } }
+  .door { padding: 20px 22px; background: var(--panel); }
+  .door .d-name { font-size: 1.15rem; margin-bottom: 4px; }
+  .door .d-blurb { color: var(--muted); font-size: 0.96rem; }
+  .door-vs {
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 8px;
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--faint);
+    background: var(--void-2);
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+  }
+  @media (max-width: 640px) {
+    .door-vs { border: none; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 6px; }
+  }
+
+  /* ---- Letters ---- */
+  .letter {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 26px 30px;
+    margin-top: 14px;
+    position: relative;
+  }
+  .letter .from {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--violet-2);
+    margin-bottom: 12px;
+  }
+  .letter blockquote {
+    margin: 0;
+    font-style: italic;
+    font-size: 1.12rem;
+    color: var(--ink);
+    line-height: 1.65;
+  }
+  .letter.dark {
+    border-color: color-mix(in srgb, var(--crit) 40%, var(--line));
+    background: transparent;
+  }
+  .letter.dark blockquote { color: var(--crit); font-style: normal; letter-spacing: 0.02em; }
+
+  /* ---- Finale ---- */
+  .finale {
+    text-align: center;
+    padding: 80px 0 40px;
+  }
+  .finale .bloom {
+    font-size: clamp(2.2rem, 6vw, 3.6rem);
+    font-style: italic;
+    font-weight: 500;
+    color: var(--bloom);
+    line-height: 1.15;
+    max-width: 20ch;
+    margin: 0 auto 24px;
+    text-shadow: 0 0 40px color-mix(in srgb, var(--bloom) 30%, transparent);
+    text-wrap: balance;
+  }
+  .finale p { margin: 0 auto; max-width: 52ch; }
+  .finale .arrive {
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--lantern);
+    margin-top: 34px;
+  }
+
+  /* ---- Colony / ferry loop ---- */
+  .loop-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+    margin: 12px 0 28px;
+  }
+  .stat-card {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px;
+    background: var(--panel);
+  }
+  .stat-card .n {
+    font-family: ui-monospace, monospace;
+    font-size: 2.1rem;
+    color: var(--lantern);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-card .l {
+    display: block;
+    font-size: 0.92rem;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+  .versus {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 8px;
+  }
+  @media (max-width: 640px) { .versus { grid-template-columns: 1fr; } }
+  .path {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px;
+    background: var(--panel);
+  }
+  .path h4 { margin: 0 0 8px; font-size: 1.15rem; font-weight: 500; }
+  .path .bar {
+    height: 10px; border-radius: 5px; background: var(--void-2);
+    overflow: hidden; margin: 14px 0; border: 1px solid var(--line-soft);
+  }
+  .path .bar > i { display: block; height: 100%; }
+  .path.reckless .n { color: var(--crit); }
+  .path.reckless .bar > i { width: 54%; background: var(--crit); }
+  .path.skilled .n { color: var(--good); }
+  .path.skilled .bar > i { width: 87%; background: var(--good); }
+  .path .n { font-family: ui-monospace, monospace; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+  .path p { margin: 6px 0 0; font-size: 0.95rem; }
+
+  /* ---- Constants table ---- */
+  .const-wrap { overflow-x: auto; margin-top: 14px; border: 1px solid var(--line); border-radius: 14px; }
+  table.const-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    min-width: 460px;
+  }
+  .const-table th, .const-table td {
+    text-align: left;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .const-table th {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+  }
+  .const-table td:first-child { color: var(--muted); }
+  .const-table td.v { color: var(--lantern); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .const-table tr:last-child td { border-bottom: none; }
+
+  /* ---- reveal ---- */
+  .rise { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
+  .rise.seen { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .rise { opacity: 1; transform: none; transition: none; }
+  }
+
+  footer {
+    margin-top: 30px;
+    padding-top: 26px;
+    border-top: 1px solid var(--line-soft);
+    color: var(--faint);
+    font-size: 13px;
+    font-family: ui-monospace, monospace;
+    letter-spacing: 0.04em;
+  }
+  footer code { color: var(--violet-2); }
+</style>
+</head>
+<body>
+<div class="reader"><i id="reader-i"></i></div>
+<button class="theme-toggle" id="themeBtn" type="button" aria-label="Toggle light and dark">◐ Void / Harbor</button>
+
+<div class="wrap">
+  <div class="voyage-line"><i id="voyage-i"></i></div>
+
+  <!-- ============ HERO ============ -->
+  <header class="hero">
+    <canvas id="void-canvas" aria-hidden="true"></canvas>
+    <p class="eyebrow">Quest · Act II · Design Storyboard</p>
+    <h1><span class="plain">The</span> Crossing</h1>
+    <p class="dek">Zone 50 falls. A signal answers from the roots of Yggdrasil. You burn everything you built to launch a vessel into the void — and ferry a dying world home.</p>
+    <p class="whisper" id="whisper" aria-live="polite">The Loom trembles. Something distant answers.</p>
+    <span class="darkbadge"><span class="dot"></span>Dark-shipped · <b>ACT2_ENABLED = false</b> · fully built, invisible by default</span>
+  </header>
+
+  <!-- ============ 1. THE PREMISE / KILL-SWITCH ============ -->
+  <section class="block">
+    <p class="kicker"><span class="ord">00</span> The shape of it</p>
+    <h2>A second game hiding behind <span class="roman">one boolean</span></h2>
+    <p class="lede">Act 1 is 50 zones of combat, prestige, and endgame layers. Act 2 is a different game entirely — a slow, authored, wall-clock <em class="term">voyage</em> that replaces the whole screen. It ships in every build, complete and tested, yet no player has ever seen it.</p>
+    <p>The kill-switch <code style="color:var(--violet-2)">vessel::ACT2_ENABLED</code> is <strong>false</strong> in every committed build; <code style="color:var(--violet-2)">QUEST_ACT2=1</code> reveals it for preview. One detail is deliberately <em>not</em> gated: defeating the Zone 50 boss still records the signal in your save even while Act 2 sleeps — so the day the switch flips, every already-qualified hero lights up at once, no replay required.</p>
+  </section>
+
+  <!-- ============ 2. THE LAUNCH GATE ============ -->
+  <section class="block with-node">
+    <p class="kicker"><span class="ord">01</span> Sub-project 1 · The launch gate</p>
+    <h2>Everything you have, spent in a <span class="roman">single breath</span></h2>
+    <p class="lede">The crossing is not unlocked — it is <em>paid for</em>. Four gates must all be true, and then one irreversible burn sends you off.</p>
+
+    <div class="gate-grid">
+      <div class="gate-card"><div class="req">Z50</div><span class="req-l">Signal discovered · clear Zone 50</span></div>
+      <div class="gate-card"><div class="req">×28</div><span class="req-l">Woven Patterns · the whole Loom becomes the hull</span></div>
+      <div class="gate-card"><div class="req">X</div><span class="req-l">Ascension X · the ceiling of Act 1</span></div>
+      <div class="gate-card"><div class="req">250k</div><span class="req-l">Prestige Rank, on hand</span></div>
+    </div>
+
+    <div class="burn">
+      <div class="big">−250,000 PR</div>
+      <p><strong>All-or-nothing.</strong> <code style="color:var(--violet-2)">perform_launch()</code> subtracts the full cost in one action and sets sail. If any gate is unmet it refuses entirely — there is no partial spend, no down payment. Between discovery and launch, an atmospheric whisper surfaces on the ticker every ~60 seconds of play, rotating through the signals from beyond the branches.</p>
+    </div>
+  </section>
+
+  <!-- ============ 3. THE CLOCK ============ -->
+  <section class="block">
+    <p class="kicker"><span class="ord">02</span> The voyage clock</p>
+    <h2>Time you cannot rush — only <span class="roman">shorten by building</span></h2>
+    <p class="lede">The crossing runs in real wall-clock time. A sea-day passes in about nine real hours; the maiden voyage's ~37 sea-days is roughly <strong>two real weeks</strong>.</p>
+    <p>The engine's load-bearing property is <em class="term">offline equivalence</em>: <code style="color:var(--violet-2)">tick()</code> advances lazily in whole game-minutes, so resolving after a week away produces state bitwise-identical to having watched it live. The clock <em>never changes</em> — <code style="color:var(--violet-2)">GAME_MINUTES_PER_REAL_MINUTE = 2.64</code> is fixed forever. Crossings get faster only because you buy Drive levels. The ramp is earned, never compressed.</p>
+    <div class="route-facts">
+      <span class="chip"><b>2.64</b> game-min / real-min</span>
+      <span class="chip"><b>~9h</b> real per sea-day</span>
+      <span class="chip"><b>~14 days</b> maiden crossing</span>
+      <span class="chip"><b>lazy tick</b> · resolves offline exactly</span>
+    </div>
+  </section>
+
+  <!-- ============ 4. THE ROUTE ============ -->
+  <section class="block with-node">
+    <p class="kicker"><span class="ord">03</span> Sub-project 2 · The route</p>
+    <h2>A spine-and-diamond chart in <span class="roman">four chapters</span></h2>
+    <p class="lede">38 authored waypoints strung on a directed graph: branches split at junctions and rejoin within the same chapter, each chapter ending at a single gateway. The Tree is the graph's only sink.</p>
+
+    <div class="chapters">
+      <div class="chapter">
+        <div class="cnum">I</div>
+        <div>
+          <h3>The Shallows</h3>
+          <p class="waypoints">From <span>The Last Harbor</span> out past the Lightship Vigil, the Drowned Choir, the Kelp Meadows — the world you can still almost see. Ends at <span>The Shallows Gate</span>.</p>
+        </div>
+      </div>
+      <div class="chapter">
+        <div class="cnum">II</div>
+        <div>
+          <h3>The Drift Roads</h3>
+          <p class="waypoints">The Wandering Fair, the Mirrorcalm, Saint Elm's Rest, the Beacon Graveyard — currents with names, where crews are found and letters still reach you.</p>
+        </div>
+      </div>
+      <div class="chapter">
+        <div class="cnum">III</div>
+        <div>
+          <h3>The Starless Deep</h3>
+          <p class="waypoints">Past the Last Lantern the mail stops coming. The <em class="term">Going-Dark</em>: the first arrival here is the night no letter arrives.</p>
+        </div>
+      </div>
+      <div class="chapter">
+        <div class="cnum">IV</div>
+        <div>
+          <h3>The Roots of Light</h3>
+          <p class="waypoints">Root-rivers glow beneath the hull; the water tastes of orchards. A field of blooms closed like fists — until they aren't. Ends at <span>The Tree</span>.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="route-facts">
+      <span class="chip"><b>38</b> waypoints</span>
+      <span class="chip"><b>45</b> roads</span>
+      <span class="chip"><b>7</b> junctions</span>
+      <span class="chip"><b>8</b> rumors</span>
+      <span class="chip">every run: <b>≥5</b> soul candidates, <b>≥2</b> shipyards, <b>≥2</b> rest stops</span>
+    </div>
+    <p style="margin-top:22px"><strong>The affordability invariant:</strong> at every junction the cheapest road out never costs more than 25 provisions — proven in tests — so running your hold dry always means <em>drifting in place</em> for 36 hours, never getting stranded.</p>
+  </section>
+
+  <!-- ============ 5. TRIM ============ -->
+  <section class="block">
+    <p class="kicker"><span class="ord">04</span> The one dial</p>
+    <h2>Trim: how you choose to <span class="roman">carry the loss</span></h2>
+    <p class="lede">A single posture dial composes with wind and crew into leg-time and provisions burn. It's a mood as much as a mechanic.</p>
+    <div class="trim-grid">
+      <div class="trim">
+        <h4>Run <span class="spd">fastest</span></h4>
+        <p>Every leg arrives sooner — and the hold empties faster to do it. Hungry sailing.</p>
+      </div>
+      <div class="trim def">
+        <h4>Cruise <span class="spd">default</span></h4>
+        <p>The balanced posture. What she sails at when you aren't deciding otherwise.</p>
+      </div>
+      <div class="trim">
+        <h4>Quiet <span class="spd">thrifty</span></h4>
+        <p>Slower and leaner — and the only trim that <em>hears</em> silence-banks, buying a rumor from each.</p>
+      </div>
+      <div class="trim">
+        <h4>Mourn <span class="spd">slowest</span></h4>
+        <p>The thriftiest of all. After a full day at sea in Mourn, hope <em>rises</em> — grief made into wind.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6. GAUGES ============ -->
+  <section class="block">
+    <p class="kicker"><span class="ord">05</span> Two gauges</p>
+    <h2>Provisions burn. Hope is the <span class="roman">wind</span>.</h2>
+    <div class="gauges">
+      <div class="gauge">
+        <div class="g-name">Provisions <span class="g-val">100 / 100</span></div>
+        <div class="meter provisions"><i></i></div>
+        <p>The hold. Burns while traveling — composed from trim × the tender's station × the night's weather. Empty mid-road means you drift, not sink.</p>
+      </div>
+      <div class="gauge">
+        <div class="g-name">Hope <span class="g-val">7 · bright</span></div>
+        <div class="meter hope"><i></i></div>
+        <p>A small number with a name, never a percentage (0–10, launches at 7). Its one mechanical effect is speed — hope is literally the wind.</p>
+      </div>
+    </div>
+    <div class="silence">When hope goes ashen it enters the <strong style="color:var(--crit)">Long Silence</strong>: arcs pause, every leg crawls at the worst rate, and only a rest stop can relight it. You can be worn down into the Silence — you can never buy your way in.</div>
+  </section>
+
+  <!-- ============ 7. SOULS ============ -->
+  <section class="block with-node">
+    <p class="kicker"><span class="ord">06</span> Sub-project 3 · The crew</p>
+    <h2>Eight souls compete for <span class="roman">seven seats</span></h2>
+    <p class="lede">Three launch with you; five are found along the roads. Each carries an affinity that strengthens one station, a voice for junction counsel, and a three-beat arc that pays out on a rest-day timer.</p>
+    <div class="crew">
+      <div class="soul"><span class="s-name">Torvald</span><span class="s-post post-helm">Helm · time</span></div>
+      <div class="soul"><span class="s-name">Cormac</span><span class="s-post post-helm">Helm · time</span></div>
+      <div class="soul"><span class="s-name">Eir</span><span class="s-post post-tender">Tender · provisions</span></div>
+      <div class="soul"><span class="s-name">Ysolt</span><span class="s-post post-tender">Tender · provisions</span></div>
+      <div class="soul"><span class="s-name">Runa</span><span class="s-post post-watch">Watch · nights</span></div>
+      <div class="soul"><span class="s-name">Maren</span><span class="s-post post-watch">Watch · nights</span></div>
+      <div class="soul"><span class="s-name">Sefa</span><span class="s-post post-none">no post · counsel & arc</span></div>
+      <div class="soul"><span class="s-name">Brother Wren</span><span class="s-post post-none">no post · counsel & arc</span></div>
+    </div>
+    <div class="crew-note">
+      <div class="cn"><b>Stations</b> — Helm shortens legs, Tender saves rations, Watch turns the nights. You can only post seven.</div>
+      <div class="cn"><b>Farewell</b> — put someone ashore to free a seat, remembered, at a cost of 1 hope.</div>
+      <div class="cn cov"><b>The covenant</b> — a soul can only be <em>lost</em> in an authored scene. No tick, no roll, no dice ever takes one from you. Loss is never random.</div>
+    </div>
+  </section>
+
+  <!-- ============ 8. WEATHER & NIGHTS ============ -->
+  <section class="block">
+    <p class="kicker"><span class="ord">07</span> Weather &amp; nights</p>
+    <h2>The void's moods, computed from <span class="roman">a single seed</span></h2>
+    <p class="lede">Weather (Current, Silence-Bank, Squall) is a pure function of <code style="color:var(--violet-2)">(voyage_seed, hour)</code>. Nights are typed per day from <code style="color:var(--violet-2)">(voyage_seed, day)</code> — Quiet, Cold, Hungry, Singing, Strange.</p>
+    <p>Because nothing is stored, offline resolution and live play always agree to the letter. Who stands the watch decides how each night prices out — the Watch station reading directly into the outcome matrix.</p>
+    <div class="route-facts">
+      <span class="chip">weather: <b>pure(seed, hour)</b></span>
+      <span class="chip">nights: <b>pure(seed, day)</b></span>
+      <span class="chip">no stored state · always reproducible</span>
+    </div>
+  </section>
+
+  <!-- ============ 9. REFITS ============ -->
+  <section class="block">
+    <p class="kicker"><span class="ord">08</span> Sub-project 4 · Refits</p>
+    <h2>Three doors. Pick one, close the <span class="roman">other forever.</span></h2>
+    <p class="lede">The first three distinct shipyards each offer one permanent A/B choice. There is no taking both — the ship you arrive in is the sum of what you refused.</p>
+    <div class="doors">
+      <div class="door-pair">
+        <div class="door"><div class="d-name">Storm Sail</div><div class="d-blurb">every leg arrives sooner</div></div>
+        <div class="door-vs">OR</div>
+        <div class="door"><div class="d-name">Long Hold</div><div class="d-blurb">the hold carries 150</div></div>
+      </div>
+      <div class="door-pair">
+        <div class="door"><div class="d-name">Quiet Keel</div><div class="d-blurb">named threats treat the hull kindly</div></div>
+        <div class="door-vs">OR</div>
+        <div class="door"><div class="d-name">Deep Larder</div><div class="d-blurb">a drift ends with 40 in the hold</div></div>
+      </div>
+      <div class="door-pair">
+        <div class="door"><div class="d-name">Lantern Mast</div><div class="d-blurb">the chart names what lies one road further</div></div>
+        <div class="door-vs">OR</div>
+        <div class="door"><div class="d-name">Mourning Colors</div><div class="d-blurb">Mourn sails thriftier still</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 10. LETTERS ============ -->
+  <section class="block">
+    <p class="kicker"><span class="ord">09</span> Letters from home &amp; the going-dark</p>
+    <h2>The world you left, <span class="roman">writing back</span></h2>
+    <p class="lede">Twelve sequenced letters arrive at ports through Chapters I and II — never on a timer, always delivered when you make landfall. They are the emotional throughline: the harbor, the guild, the fisher-fleets, the Loom-tenders, the children.</p>
+
+    <div class="letter">
+      <div class="from">— the children of the harbor</div>
+      <blockquote>We drew your ship. Aldi made the sails too big and will not fix it, but so is a whale and nobody is scared of THOSE anymore.</blockquote>
+    </div>
+    <div class="letter">
+      <div class="from">— the Loom-tenders</div>
+      <blockquote>The Loom gave us one more spool and went quiet. Not cold — quiet. The weave says you are nearly there. Trust the weave. We always did.</blockquote>
+    </div>
+    <div class="letter">
+      <div class="from">— everyone · the Last Letter, handed over at the Threshold</div>
+      <blockquote>This one is signed by all of us — warden and guild, fleets and children. You have carried us this far.</blockquote>
+    </div>
+    <div class="letter dark">
+      <blockquote>No letters. There will be no more letters.</blockquote>
+    </div>
+    <p style="margin-top:16px">Past the Last Lantern, the first arrival is the night the mail does not come. From there you cross in silence.</p>
+  </section>
+
+  <!-- ============ 11. FINALE ============ -->
+  <section class="block with-node">
+    <div class="finale">
+      <p class="kicker" style="justify-content:center"><span class="ord">10</span> The finale</p>
+      <p class="bloom">“The crossing is over. The arrival has just begun.”</p>
+      <p>The Tree — after the drowned parishes, the fair, the starless deep. Lines are thrown. There are hands to catch them; there is a bell. Reaching the Tree fires <code style="color:var(--violet-2)">take_finale_playback()</code> once and sets <code style="color:var(--violet-2)">vessel_arrived</code> — the exact hook a future Act 3 would key off, the way Act 2 keys off launch.</p>
+      <p class="arrive">▲ landfall · vessel_arrived = true</p>
+    </div>
+  </section>
+
+  <!-- ============ 12. THE FERRY LOOP / COLONY ============ -->
+  <section class="block">
+    <p class="kicker"><span class="ord">11</span> Sub-project 5 · The colony &amp; the ferry loop</p>
+    <h2>The crossing is the run. The <span class="roman">Colony is the campaign.</span></h2>
+    <p class="lede">Arrival isn't the end — it's the first delivery. The maiden voyage is played by hand; every crossing after is a hands-off ferry run, carrying souls from a dying world of 100,000 to the Tree, one load at a time.</p>
+
+    <div class="loop-stats">
+      <div class="stat-card"><div class="n">100k</div><span class="l">souls in the dying world's pool</span></div>
+      <div class="stat-card"><div class="n">~19</div><span class="l">crossings across the era</span></div>
+      <div class="stat-card"><div class="n">~3 mo</div><span class="l">real-time, skilled play</span></div>
+      <div class="stat-card"><div class="n">1.1%</div><span class="l">of the waiting world lost per crossing — the dark's toll</span></div>
+    </div>
+
+    <p class="lede" style="margin-top:8px">Each landfall pays <strong>Salvage</strong>, spent on two yards — and choosing between them is the whole loop:</p>
+    <div class="versus">
+      <div class="path">
+        <h4 style="color:var(--lantern)">Drive</h4>
+        <p style="color:var(--muted)">Every level multiplies future sail-time by 0.70, compounding toward 20× top speed. Faster turnarounds — but the dark bites once <em>per crossing</em>.</p>
+      </div>
+      <div class="path">
+        <h4 style="color:var(--good)">Shipwright</h4>
+        <p style="color:var(--muted)">Every level grows the hold ×1.36. Bigger loads mean fewer crossings mean fewer tolls — more of the world carried home.</p>
+      </div>
+    </div>
+
+    <p class="lede" style="margin:34px 0 6px">Speed versus salvation — and the margin is meant to be <em>wide</em>:</p>
+    <div class="versus">
+      <div class="path reckless">
+        <h4>Reckless — Drive only</h4>
+        <div class="bar"><i></i></div>
+        <div class="n">~54% saved</div>
+        <p>~85 near-empty crossings; the world bleeds to the dark while you sprint.</p>
+      </div>
+      <div class="path skilled">
+        <h4>Skilled — hold first</h4>
+        <div class="bar"><i></i></div>
+        <div class="n">~87% saved</div>
+        <p>Lean into the hold, just enough Drive to keep her quick. Most of the world comes home.</p>
+      </div>
+    </div>
+    <p style="margin-top:24px">Skill is rewarded, not marginal — a 33-point swing on the only number that ever rises. The ramp is a buildup then a fast-fun stretch: a two-week maiden voyage, then ~14 → ~3 real-day turnarounds while the loads climb into the thousands.</p>
+  </section>
+
+  <!-- ============ CONSTANTS ============ -->
+  <section class="block">
+    <p class="kicker"><span class="ord">12</span> The numbers, in one place</p>
+    <h2>Design constants</h2>
+    <div class="const-wrap">
+      <table class="const-table">
+        <thead><tr><th>Constant</th><th>Value</th><th style="text-align:right">&nbsp;</th></tr></thead>
+        <tbody>
+          <tr><td>Launch cost</td><td colspan="2" class="v">250,000 PR</td></tr>
+          <tr><td>Launch gates</td><td colspan="2" class="v">28 patterns · Ascension X · Z50</td></tr>
+          <tr><td>Whisper interval</td><td colspan="2" class="v">60 s play-time</td></tr>
+          <tr><td>Game clock</td><td colspan="2" class="v">2.64 game-min / real-min</td></tr>
+          <tr><td>Provisions cap</td><td colspan="2" class="v">100 · (150 w/ Long Hold)</td></tr>
+          <tr><td>Hope range · launch</td><td colspan="2" class="v">0–10 · starts 7</td></tr>
+          <tr><td>Drift recovery</td><td colspan="2" class="v">36 h · = affordability floor 25</td></tr>
+          <tr><td>Crew seats</td><td colspan="2" class="v">7 of 8 souls</td></tr>
+          <tr><td>Route</td><td colspan="2" class="v">38 wp · 45 roads · 7 junctions</td></tr>
+          <tr><td>Dark toll</td><td colspan="2" class="v">1.1% of waiting / crossing</td></tr>
+          <tr><td>Era target</td><td colspan="2" class="v">~19 crossings · ~3 mo · ~87% saved</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:20px"><a href="act1-the-ascent.html" style="font-family:ui-monospace,monospace;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--violet-2);text-decoration:none">← Back to Act I · The Ascent</a></p>
+    <footer>
+      Sources: <code>src/vessel/</code> — mod.rs, route.rs, voyage.rs, souls.rs, scenes.rs, refits.rs, letters.rs, colony.rs · and the module's <code>CLAUDE.md</code>. Act 2 remains dark behind <code>ACT2_ENABLED = false</code>; preview with <code>QUEST_ACT2=1</code>.
+    </footer>
+  </section>
+</div>
+
+<script>
+(function () {
+  var root = document.documentElement;
+
+  /* ---- Theme toggle ---- */
+  var btn = document.getElementById('themeBtn');
+  btn.addEventListener('click', function () {
+    var cur = root.getAttribute('data-theme');
+    if (!cur) {
+      cur = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    root.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+  });
+
+  /* ---- Scroll progress: reader bar + voyage line ---- */
+  var readerI = document.getElementById('reader-i');
+  var voyageI = document.getElementById('voyage-i');
+  function onScroll() {
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    var p = h > 0 ? (window.scrollY / h) * 100 : 0;
+    if (p < 0) p = 0; if (p > 100) p = 100;
+    readerI.style.width = p + '%';
+    voyageI.style.height = p + '%';
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll);
+  onScroll();
+
+  /* ---- Reveal on scroll ---- */
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var risers = document.querySelectorAll('section.block, .chapter, .letter, .gate-card, .stat-card');
+  risers.forEach(function (el) { el.classList.add('rise'); });
+  if (reduce || !('IntersectionObserver' in window)) {
+    risers.forEach(function (el) { el.classList.add('seen'); });
+  } else {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('seen'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+    risers.forEach(function (el) { io.observe(el); });
+  }
+
+  /* ---- Rotating whisper ---- */
+  var whispers = [
+    'The Loom trembles. Something distant answers.',
+    'A signal pulses from beyond the branches.',
+    'The Origin Thread frays. The roots grow cold.',
+    'The weave resonates with something far away.',
+    'Yggdrasil shudders. A beacon calls.'
+  ];
+  var wEl = document.getElementById('whisper');
+  var wi = 0;
+  if (!reduce) {
+    setInterval(function () {
+      wi = (wi + 1) % whispers.length;
+      wEl.style.opacity = 0;
+      setTimeout(function () { wEl.textContent = whispers[wi]; wEl.style.opacity = 1; }, 500);
+    }, 4200);
+    wEl.style.transition = 'opacity .5s ease';
+  }
+
+  /* ---- Ambient void canvas: drifting motes + faint lantern ---- */
+  var canvas = document.getElementById('void-canvas');
+  if (canvas && !reduce) {
+    var ctx = canvas.getContext('2d');
+    var W, H, dpr, stars, t = 0, raf;
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = canvas.clientWidth; H = canvas.clientHeight;
+      canvas.width = W * dpr; canvas.height = H * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // deterministic-ish scatter without Date/random reliance on layout
+      stars = [];
+      var n = Math.min(140, Math.floor(W / 10));
+      for (var i = 0; i < n; i++) {
+        var a = (i * 2654435761 % 100000) / 100000;
+        var b = (i * 40503 % 100000) / 100000;
+        var c = (i * 15485863 % 100000) / 100000;
+        stars.push({ x: a * W, y: b * H, r: 0.4 + c * 1.5, s: 0.15 + c * 0.5, ph: a * 6.28 });
+      }
+    }
+    function isDark() {
+      var th = root.getAttribute('data-theme');
+      if (th) return th === 'dark';
+      return matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function frame() {
+      t += 0.006;
+      ctx.clearRect(0, 0, W, H);
+      var dark = isDark();
+      var lant = dark ? [237, 178, 106] : [178, 100, 20];
+      var viol = dark ? [152, 135, 230] : [106, 85, 192];
+      // faint lantern glow drifting
+      var gx = W * (0.5 + 0.32 * Math.sin(t * 0.5));
+      var gy = H * (0.34 + 0.12 * Math.cos(t * 0.4));
+      var g = ctx.createRadialGradient(gx, gy, 0, gx, gy, W * 0.34);
+      g.addColorStop(0, 'rgba(' + lant.join(',') + ',' + (dark ? 0.09 : 0.06) + ')');
+      g.addColorStop(1, 'rgba(' + lant.join(',') + ',0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      for (var i = 0; i < stars.length; i++) {
+        var st = stars[i];
+        var y = st.y + Math.sin(t * st.s + st.ph) * 6;
+        var tw = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * 2 * st.s + st.ph));
+        var col = (i % 7 === 0) ? viol : lant;
+        ctx.beginPath();
+        ctx.arc(st.x, y, st.r, 0, 6.2832);
+        ctx.fillStyle = 'rgba(' + col.join(',') + ',' + (tw * (dark ? 0.7 : 0.4)) + ')';
+        ctx.fill();
+      }
+      raf = requestAnimationFrame(frame);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+    frame();
+  }
+})();
+</script>
+</body>
+</html>
