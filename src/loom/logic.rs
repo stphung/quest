@@ -905,6 +905,21 @@ mod tests {
     }
 
     #[test]
+    fn test_wr_pr_multiplier() {
+        assert_eq!(wr_pr_multiplier(0.0), 1.0);
+        assert!((wr_pr_multiplier(50.0) - 1.5).abs() < 1e-9);
+        assert!((wr_pr_multiplier(131.0) - 2.31).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_select_archetype_sets_archetype() {
+        let mut loom = LoomState::new();
+        assert_eq!(loom.persistent.archetype, None);
+        select_archetype(&mut loom, LoomArchetype::ReachWide);
+        assert_eq!(loom.persistent.archetype, Some(LoomArchetype::ReachWide));
+    }
+
+    #[test]
     fn test_initialize_loom_unlocks_only_ember_spindle() {
         let mut loom = LoomState::new();
         initialize_loom(&mut loom);
@@ -2348,6 +2363,48 @@ mod shuttle_tests {
             vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
         );
         assert_eq!(result, Err(ShuttleError::InvalidSource));
+    }
+
+    #[test]
+    fn test_build_shuttle_draws_cost_from_shuttle_buffer() {
+        // T2 recipe (ForgedLight, Memory, Form) -> EmberEcho: input_a (ForgedLight)
+        // is a shuttle-output resource, not an extractor's native resource, so the
+        // build cost must be deducted from the T1 shuttle's own buffer.
+        let mut loom = LoomState::new();
+        initialize_loom(&mut loom);
+        setup_patterns(&mut loom, 8);
+        for node in loom.persistent.nodes.iter_mut() {
+            node.unlocked = true;
+        }
+        loom.persistent.nodes[NodeId::EmberSpindle.index()].buffer = 500.0;
+
+        let t1_idx = build_shuttle(
+            &mut loom,
+            Resource::Ember,
+            Resource::VoidEssence,
+            NodeNature::Heat,
+            vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            vec![LoomNodeRef::Extractor(NodeId::VoidCondenser)],
+        )
+        .unwrap();
+        loom.persistent.shuttles[t1_idx].under_construction = false;
+        loom.persistent.shuttles[t1_idx].buffer = 500.0;
+
+        let result = build_shuttle(
+            &mut loom,
+            Resource::ForgedLight,
+            Resource::Memory,
+            NodeNature::Form,
+            vec![LoomNodeRef::Shuttle(t1_idx)],
+            vec![LoomNodeRef::Extractor(NodeId::MemoryArchive)],
+        );
+        assert!(result.is_ok(), "T2 build should succeed: {:?}", result);
+        // Cost for T2 (150) should have been drawn from the T1 shuttle's own buffer.
+        assert!(
+            (loom.persistent.shuttles[t1_idx].buffer - 350.0).abs() < 0.001,
+            "expected 350.0 remaining in T1 shuttle buffer, got {}",
+            loom.persistent.shuttles[t1_idx].buffer
+        );
     }
 
     // ── demolish_shuttle out-of-bounds no-op ──────────────────────────────────

@@ -309,4 +309,13 @@ mod tests {
             crate::loom::types::LOOM_SAVE_VERSION
         );
     }
+
+    #[test]
+    fn test_loom_save_path_ends_with_loom_json() {
+        // Doesn't touch QUEST_DIR itself (no env var mutation), so it's safe to
+        // run alongside other tests that do. Whatever directory get_quest_dir()
+        // resolves to, the joined path must end with "loom.json".
+        let path = loom_save_path().unwrap();
+        assert_eq!(path.file_name().and_then(|f| f.to_str()), Some("loom.json"));
+    }
 }

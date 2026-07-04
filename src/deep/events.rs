@@ -2353,4 +2353,55 @@ mod tests {
             assert!(!boss.title.is_empty());
         }
     }
+
+    // ── resolve_event: chain-tag propagation on risky success ─────────────────
+
+    #[test]
+    fn test_resolve_event_risky_success_with_chain_applies_success_tag() {
+        // FORK_IN_PATH's risky choice has unlocks_bonus_event = true and the
+        // template's risk_success_tag is ExploredSidePath — a successful roll
+        // must carry that tag through as the chain tag.
+        let mut saw_success = false;
+        for seed in 0u64..200 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut event = template_to_check_in_event(&FORK_IN_PATH, 1, Utc::now(), &[]);
+            let risky_index = event.choices.iter().position(|c| c.is_risky).unwrap();
+            let res = resolve_event(&mut event, Some(risky_index), &[], &mut rng).unwrap();
+            if !res.may_injure {
+                saw_success = true;
+                assert_eq!(
+                    res.chain_tag,
+                    Some(EventTag::ExploredSidePath),
+                    "successful chaining risky choice should carry the template's risk_success_tag"
+                );
+            }
+        }
+        assert!(saw_success, "expected at least one success in 200 seeds");
+    }
+
+    #[test]
+    fn test_resolve_event_risky_failure_applies_failure_tag_fallback() {
+        // TOXIC VENT's risky choice does not chain (unlocks_bonus_event = false),
+        // but the template's risk_failure_tag (TookRisk) is applied via the
+        // fallback `.or(...)` in resolve_event whenever the choice isn't
+        // auto-resolved — including, notably, on a successful roll (the
+        // fallback isn't gated on the risky outcome, only on was_auto_resolved).
+        // This test pins down that current behavior for regression coverage.
+        let mut saw_success = false;
+        let mut saw_failure = false;
+        for seed in 0u64..200 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut event = template_to_check_in_event(&POISON_GAS_VENT, 1, Utc::now(), &[]);
+            let risky_index = event.choices.iter().position(|c| c.is_risky).unwrap();
+            let res = resolve_event(&mut event, Some(risky_index), &[], &mut rng).unwrap();
+            assert_eq!(res.chain_tag, Some(EventTag::TookRisk));
+            if res.may_injure {
+                saw_failure = true;
+            } else {
+                saw_success = true;
+            }
+        }
+        assert!(saw_success, "expected at least one success in 200 seeds");
+        assert!(saw_failure, "expected at least one failure in 200 seeds");
+    }
 }
