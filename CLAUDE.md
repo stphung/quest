@@ -12,6 +12,17 @@ make check             # Run all CI checks locally
 make fmt               # Auto-fix formatting
 ```
 
+## Spec-Driven Development (OpenSpec)
+
+Development is **spec-driven** via [OpenSpec](https://github.com/Fission-AI/OpenSpec). The `openspec/specs/` directory is a reverse-engineered, code-grounded baseline (20 capabilities, 197 requirements) that documents *what the game currently does* — see [openspec/README.md](openspec/README.md) for the capability index and the known code-vs-docs discrepancy log.
+
+**Start non-trivial work from a spec, not from code:**
+1. `/opsx:propose "<idea>"` — scaffold a change (proposal + design + tasks + delta specs) under `openspec/changes/`, grounded in the affected capability spec(s).
+2. `/opsx:apply` — implement the change's tasks, then verify with the targeted commands in "How to Verify Your Change" below and finish with `make check`.
+3. `/opsx:sync` or `/opsx:archive` — fold the delta specs back into `openspec/specs/` so the baseline stays true.
+
+Use `/opsx:explore` for read-only investigation before proposing. Requirements carry exact balance numbers — keep them in sync with "Key Constants" below. When a spec and the code disagree, that is a bug in one of them; reconcile deliberately.
+
 ## Development Workflow
 
 **Use git worktrees for feature work.** Create isolated worktrees for branches instead of switching branches in the main workspace.
