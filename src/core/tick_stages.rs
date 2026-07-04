@@ -3284,6 +3284,82 @@ mod tests {
     }
 
     #[test]
+    fn tick_deep_missions_breakthrough_at_non_fracture_layer_skips_region_lookup_body() {
+        use crate::deep::{
+            MercArchetype, MercQuality, MercStatus, Mercenary, Mission, MissionStatus, MissionType,
+        };
+        use chrono::{Duration, Utc};
+
+        // Layer 1 doesn't map to any FractureRegion (regions start at layer 3),
+        // so `FractureRegion::from_layer(1)` returns `None` and the whole
+        // `if let Some(region) = ...` body must be skipped entirely.
+        let mut succeeded = false;
+        for seed in 0u64..20 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let state = GameState::new("Hero".to_string(), 0);
+            let mut deep = crate::deep::DeepState::new();
+            deep.persistent.discovered = true;
+
+            let merc = Mercenary {
+                id: 1,
+                name: "Bruiser".to_string(),
+                archetype: MercArchetype::Vanguard,
+                power: 999_999,
+                resilience: 999_999,
+                expertise: 0,
+                level: 1,
+                missions_completed: 0,
+                quality: MercQuality::Common,
+                status: MercStatus::OnMission(1),
+            };
+            deep.prestige.roster.insert(merc.id, merc);
+
+            let now = Utc::now();
+            let mission = Mission {
+                id: 1,
+                mission_type: MissionType::Breakthrough,
+                layer: 1,
+                squad: vec![1],
+                started_at: now - Duration::hours(4),
+                ends_at: now - Duration::seconds(5),
+                events: Vec::new(),
+                pending_event_index: 0,
+                status: MissionStatus::Active,
+                result: None,
+                is_first_orders: false,
+            };
+            deep.prestige.active_missions.push(mission);
+
+            let mut achievements = Achievements::default();
+            let mut result = TickResult::default();
+
+            tick_deep_missions(
+                &state,
+                &mut deep,
+                &mut achievements,
+                false,
+                &mut result,
+                &mut rng,
+            );
+
+            if achievements
+                .take_newly_unlocked()
+                .contains(&AchievementId::FirstBreakthrough)
+            {
+                assert!(deep.persistent.pending_fracture_region_unlock.is_none());
+                assert_eq!(deep.persistent.fracture_zone_cap, 11);
+                succeeded = true;
+                break;
+            }
+        }
+
+        assert!(
+            succeeded,
+            "An overpowered Breakthrough mission at layer 1 should succeed within 20 seeds"
+        );
+    }
+
+    #[test]
     fn tick_deep_missions_weak_squad_yields_partial_and_failure_outcomes_with_casualties() {
         use crate::deep::{
             MercArchetype, MercQuality, MercStatus, Mercenary, Mission, MissionStatus, MissionType,
@@ -3527,6 +3603,42 @@ mod tests {
         assert!(result.loom_changed);
         assert!(loom.persistent.wr_pr_last_granted_at > now_ts - 1000);
         assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::WovenRealityPRGranted { .. })));
+    }
+
+    #[test]
+    fn tick_loom_wr_pr_conversion_skips_grant_when_no_production_rate() {
+        let mut deep = crate::deep::DeepState::new();
+        deep.persistent.discovered = true;
+        deep.persistent.gateway_opened = true;
+
+        let mut loom = crate::loom::LoomState::new();
+        crate::loom::complete_discovery(&mut loom);
+        loom.persistent.patterns = vec![crate::loom::WovenPattern {
+            index: 0,
+            name: "Already Done".to_string(),
+            requirements: vec![],
+            completed: true,
+            flavor: String::new(),
+            eternal: false,
+        }];
+        // No Woven Reality production has ever been recorded, so `wr_to_pr_per_hour`
+        // resolves to 0 and the grant body (`if pr_per_hour > 0`) must be skipped.
+        let now_ts = chrono::Utc::now().timestamp();
+        loom.persistent.wr_pr_last_granted_at = now_ts - 1000;
+        loom.last_tick_at = Some(chrono::Utc::now() - chrono::Duration::milliseconds(100));
+
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let prestige_before = state.prestige_rank;
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        tick_loom(&deep, &mut loom, &mut state, &mut achievements, &mut result);
+
+        assert_eq!(state.prestige_rank, prestige_before);
+        assert!(!result
             .events
             .iter()
             .any(|e| matches!(e, TickEvent::WovenRealityPRGranted { .. })));

@@ -3241,7 +3241,94 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_tick_all_missions_skips_missions_not_active_or_event_pending() {
+        // Defensive guard: a mission whose status is neither Active nor
+        // EventPending (e.g. already Completed, which shouldn't normally sit in
+        // `active_missions`, but the loop guards against it anyway) must be
+        // skipped entirely rather than resolved a second time.
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let mut prestige = DeepPrestige::new();
+        let now = Utc::now();
+
+        let stale_completed = Mission {
+            id: 1,
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            squad: vec![],
+            started_at: now - Duration::hours(2),
+            ends_at: now - Duration::hours(1),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Completed,
+            result: Some(MissionResult {
+                outcome: MissionOutcome::Success,
+                marks_earned: 5,
+                xp_earned: 0,
+                item_ilvl: None,
+                injured_mercs: vec![],
+                lost_mercs: vec![],
+                merc_level_ups: vec![],
+                danger_bonus_xp: false,
+            }),
+            is_first_orders: false,
+        };
+        prestige.active_missions.push(stale_completed);
+
+        let summary = tick_all_missions(&mut prestige, &mut persistent, now, &mut rng);
+
+        assert_eq!(summary.missions_completed, 0);
+        assert_eq!(
+            prestige.active_missions.len(),
+            1,
+            "the already-completed mission should be left untouched, not re-resolved"
+        );
+        assert!(prestige.pending_results.is_empty());
+    }
+
     // ── offline resolution ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_offline_resolution_skips_missions_not_active_or_event_pending() {
+        // Mirrors `tick_all_missions`'s defensive guard: a stray Completed-status
+        // mission sitting in `active_missions` must be left untouched by offline
+        // resolution rather than resolved a second time.
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let mut prestige = DeepPrestige::new();
+        let now = Utc::now();
+
+        let stale_completed = Mission {
+            id: 1,
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            squad: vec![],
+            started_at: now - Duration::hours(2),
+            ends_at: now - Duration::hours(1),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Completed,
+            result: Some(MissionResult {
+                outcome: MissionOutcome::Success,
+                marks_earned: 5,
+                xp_earned: 0,
+                item_ilvl: None,
+                injured_mercs: vec![],
+                lost_mercs: vec![],
+                merc_level_ups: vec![],
+                danger_bonus_xp: false,
+            }),
+            is_first_orders: false,
+        };
+        prestige.active_missions.push(stale_completed);
+
+        let summary = resolve_offline_missions(&mut prestige, &mut persistent, &mut rng);
+
+        assert_eq!(summary.missions_resolved, 0);
+        assert_eq!(prestige.active_missions.len(), 1);
+        assert!(prestige.pending_results.is_empty());
+    }
 
     #[test]
     fn test_offline_resolution_resolves_elapsed_missions() {
@@ -5262,6 +5349,50 @@ mod tests {
         assert!(pool
             .iter()
             .any(|m| m.mission_type == MissionType::Breakthrough));
+    }
+
+    #[test]
+    fn test_replenish_mission_pool_underfill_loop_runs_and_exits_via_no_unique_mission_break() {
+        // A single-layer window only ever yields 4 unique staple missions
+        // (Breakthrough/SupplyRun/Recon/Expedition — no Construction on an
+        // uncleared layer). Requesting a guild-rank-5 target count (7) leaves
+        // the pool short, forcing the `while pool.len() < count` fallback loop
+        // to actually execute (every prior test's window/count combination left
+        // the pool already at or above its target, skipping this loop entirely).
+        let mut rng = seeded_rng();
+        let persistent = DeepPersistent::new();
+        let mut pool = vec![make_available_mission(MissionType::SupplyRun, 1)];
+
+        let _ = replenish_mission_pool(&mut pool, &persistent, &[], 7, &mut rng);
+
+        // No Construction candidate exists anywhere in the window (layer 1 is
+        // uncleared), and every unique (layer, type) combination is already
+        // present after the mandatory per-layer staple pass, so the pool stays
+        // short of the requested count — this is expected, not a bug in the
+        // test: the point is exercising the loop's "give up" path.
+        assert!(pool.len() < 7);
+        assert!(!pool
+            .iter()
+            .any(|m| matches!(m.mission_type, MissionType::Construction(_))));
+    }
+
+    #[test]
+    fn test_ensure_emergency_supply_run_pushes_fallback_when_pool_is_empty() {
+        let mut rng = seeded_rng();
+        let persistent = DeepPersistent::new();
+        let mut prestige = DeepPrestige::new();
+        prestige.warband_marks = 0;
+        prestige.available_missions = vec![];
+
+        let changed = ensure_emergency_supply_run(&mut prestige, &persistent, &mut rng);
+
+        assert!(changed);
+        assert_eq!(prestige.available_missions.len(), 1);
+        assert_eq!(
+            prestige.available_missions[0].mission_type,
+            MissionType::SupplyRun
+        );
+        assert_eq!(prestige.available_missions[0].marks_cost, 0);
     }
 
     #[test]
