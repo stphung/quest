@@ -79,6 +79,8 @@ assert!(!h.haven_ui.showing);
 
 **Add coverage** for any input change by extending `replay_tests.rs` — cover the discovery gate, the modal-interception order (higher-priority overlays must swallow keys first), and Enter-only vs any-key dismissal.
 
+**Assert the `InputResult`, not just the state.** Consequential presses return a variant that `main_helpers/input_routing.rs` turns into a save (`NeedsSave*`) or a save-with-git-commit (`NeedsSave*WithEvent(SaveEvent)`). A wrong variant persists nothing — silent data loss with no other tripwire — so pin the returned variant alongside the state change (e.g. prestige returns `NeedsSaveWithEvent(SaveEvent::PrestigeRank(n))`, title selection returns `NeedsSave`). The `InputResult: PartialEq` derive makes this an `assert_eq!`.
+
 ## Integration Points
 
 - **Imports from**: `challenges/` (menu processing, all 14 minigame input handlers), `character/prestige` (can_prestige, perform_prestige), `haven/` (try_build_room, can_forge_stormbreaker), `enhancement/` (roll_enhancement, costs), `deep/` (mission management, guild rank), `stormglass/` (sigils, spending), `achievements/` (browser, titles, sync), `ascension/` (ascend), `zones/` (sync_account_zone_unlocks), `loom/` (Loom of Worlds state), `vessel/` (functions: `can_launch`, `perform_launch`; types: `route`, `voyage::*`, `SceneModal`, `VoyageUiState`, `VoyageView`), `utils/debug_menu` (DebugMenu), `history/` (SaveEvent)

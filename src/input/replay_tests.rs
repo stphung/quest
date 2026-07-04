@@ -10,8 +10,16 @@
 
 use super::harness::InputHarness;
 use super::{GameOverlay, InputResult};
+use crate::achievements::AchievementId;
 use crate::core::offline::OfflineReport;
 use crate::fixtures;
+use crate::haven::HavenRoomId;
+use crate::history::SaveEvent;
+use crate::items::{EquipmentSlot, Rarity};
+use crate::ui::achievement_browser_scene::AchievementBrowserState;
+use crate::ui::title_browser_scene::TitleBrowserState;
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
 use ratatui::crossterm::event::KeyCode;
 
 /// A harness on a fresh hero with the Haven discovered, so the `[H]` hotkey is
@@ -167,5 +175,175 @@ fn render_shows_the_base_game_screen() {
     assert!(
         frame.contains("Hero"),
         "rendered frame should show the hero's name; got:\n{frame}"
+    );
+}
+
+// -- InputResult → persistence contract -----------------------------------
+//
+// Every consequential key press returns a specific `InputResult` variant that
+// `main_helpers::input_routing` turns into a save (and, for `*WithEvent`, a git
+// history commit). A wrong variant means the action *appears* to work but never
+// persists — silent data loss with no other tripwire. These tests pin that
+// contract: they assert both the returned variant and the state mutation.
+
+#[test]
+fn prestige_confirm_prestiges_and_signals_a_save_with_event() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.state.character_level = 999; // eligible for the next prestige tier
+    h.overlay = GameOverlay::PrestigeConfirm;
+
+    // The confirm key is 'y' (NOT Enter), and with no Vault built this takes the
+    // direct-prestige path.
+    let result = h.char('y');
+
+    assert_eq!(
+        result,
+        InputResult::NeedsSaveWithEvent(SaveEvent::PrestigeRank(1)),
+        "prestige must signal a save-with-git-event carrying the new rank"
+    );
+    assert_eq!(h.state.prestige_rank, 1, "prestige rank should increment");
+    assert_eq!(h.state.character_level, 1, "prestige resets the character");
+    assert!(h.overlay_is_none(), "the confirm dialog should close");
+}
+
+#[test]
+fn prestige_confirm_cancel_keys_leave_state_untouched() {
+    for cancel in [KeyCode::Esc, KeyCode::Char('n'), KeyCode::Char('N')] {
+        let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+        h.state.character_level = 999;
+        h.overlay = GameOverlay::PrestigeConfirm;
+
+        let result = h.press(cancel);
+
+        assert_eq!(result, InputResult::Continue, "cancel is a no-op result");
+        assert_eq!(
+            h.state.prestige_rank, 0,
+            "cancel must not prestige ({cancel:?})"
+        );
+        assert!(h.overlay_is_none(), "cancel closes the dialog ({cancel:?})");
+    }
+}
+
+#[test]
+fn prestige_confirm_ignores_non_action_keys() {
+    // Enter reads as "confirm" in many dialogs, but this one acts only on
+    // y / n / Esc — a stray Enter must not prestige and must leave the dialog up.
+    for stray in [KeyCode::Enter, KeyCode::Char('x'), KeyCode::Char(' ')] {
+        let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+        h.state.character_level = 999;
+        h.overlay = GameOverlay::PrestigeConfirm;
+
+        let result = h.press(stray);
+
+        assert_eq!(result, InputResult::Continue);
+        assert_eq!(h.state.prestige_rank, 0, "{stray:?} must not prestige");
+        assert!(
+            matches!(h.overlay, GameOverlay::PrestigeConfirm),
+            "{stray:?} should leave the confirm dialog open"
+        );
+    }
+}
+
+#[test]
+fn vault_prestige_preserves_selected_item_and_signals_save() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.state.character_level = 999;
+    // A Vault at tier 3 preserves up to 5 items (VaultSlots values [1, 3, 5, 0]
+    // by tier). `haven_built` puts the Vault at an invalid tier 4 → 0 slots, so
+    // build it explicitly here.
+    h.haven.discovered = true;
+    h.haven.rooms.insert(HavenRoomId::Vault, 3);
+
+    // Equip a full set so there is something to preserve — and something to wipe.
+    let mut rng = ChaCha8Rng::seed_from_u64(1);
+    fixtures::equip_all(&mut h.state, Rarity::Rare, Rarity::Rare, 50, &mut rng);
+    assert!(h.state.equipment.get(EquipmentSlot::Weapon).is_some());
+
+    h.overlay = GameOverlay::VaultSelection {
+        selected_index: 0, // Weapon
+        selected_slots: Vec::new(),
+        confirm_pending: false,
+    };
+
+    // Select the weapon, then confirm. The confirm is one or two Enters
+    // depending on Vault capacity (immediate at max, else a second Enter
+    // confirms), so drive both and assert on the outcome + recorded save signal.
+    h.press(KeyCode::Char(' ')); // toggle-select the weapon slot
+    h.press(KeyCode::Enter);
+    h.press(KeyCode::Enter);
+
+    assert_eq!(
+        h.state.prestige_rank, 1,
+        "vault prestige should increment rank"
+    );
+    assert!(
+        h.overlay_is_none(),
+        "the Vault overlay should close after prestige"
+    );
+    assert!(
+        h.state.equipment.get(EquipmentSlot::Weapon).is_some(),
+        "the Vault-selected weapon must survive prestige"
+    );
+    assert!(
+        h.state.equipment.get(EquipmentSlot::Armor).is_none(),
+        "unselected gear must be wiped by prestige"
+    );
+    assert!(
+        h.results()
+            .contains(&InputResult::NeedsSaveWithEvent(SaveEvent::PrestigeRank(1))),
+        "the vault prestige must signal a save-with-event; got {:?}",
+        h.results()
+    );
+}
+
+#[test]
+fn selecting_a_title_signals_a_save() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.achievements.unlock(AchievementId::Level100, None); // grants a selectable title
+
+    let mut title_browser = TitleBrowserState::new();
+    title_browser.showing = true; // the title sub-browser has priority
+    h.overlay = GameOverlay::Achievements {
+        browser: AchievementBrowserState::new(),
+        title_browser,
+    };
+
+    let result = h.press(KeyCode::Enter);
+
+    assert_eq!(
+        result,
+        InputResult::NeedsSave,
+        "choosing a title must signal a save"
+    );
+    assert_eq!(
+        h.achievements.selected_title,
+        Some(AchievementId::Level100),
+        "the chosen title should be recorded on the account"
+    );
+}
+
+#[test]
+fn clearing_a_title_signals_a_save() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.achievements.unlock(AchievementId::Level100, None);
+    h.achievements.selected_title = Some(AchievementId::Level100);
+
+    let mut title_browser = TitleBrowserState::new();
+    title_browser.showing = true;
+    h.overlay = GameOverlay::Achievements {
+        browser: AchievementBrowserState::new(),
+        title_browser,
+    };
+
+    let result = h.press(KeyCode::Backspace);
+
+    assert_eq!(
+        result,
+        InputResult::NeedsSave,
+        "clearing a title must signal a save"
+    );
+    assert_eq!(
+        h.achievements.selected_title, None,
+        "the title should be cleared"
     );
 }
