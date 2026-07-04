@@ -16,6 +16,7 @@ Git-based save versioning system. Every meaningful game event creates a git comm
 - **`SaveEvent`**: Describes why a commit was made. 21 variants covering milestone progression (LevelUp, PrestigeRank, ZoneBossDefeated, ZoneUnlocked, DungeonCompleted, FishingRankUp, StormLeviathanCaught, AchievementUnlocked), state-changing actions (HavenRoomBuilt, HavenRoomUpgraded, SoulforgeEnhanced, SoulforgeFailed, ChallengeWon, GodItemForged, CharacterCreated, CharacterDeleted, EquipmentUpgrade, StormSigilActivated), ChronoSurge, and manual/auto saves (ManualSave, AutoSave). Each variant produces a human-readable `description()` and a full `commit_message()` with encoded metadata suffix.
 - **`CommitInfo`**: Metadata extracted from a single history commit -- short SHA (`id`), full `message`, Unix `timestamp`, and parsed snapshot fields (`level`, `prestige`, `zone`, `playtime`).
 - **`TimelineInfo`**: Summary of a git branch -- `name`, `is_active` flag, and optional `head_commit`.
+- **`CommitMetadata`**: Snapshot metadata (`level`, `prestige`, `zone_id`, `subzone_id`, `play_time_seconds`, `character_name`) bundled and passed alongside a `SaveEvent` to `HistoryRepo::commit()`.
 - **`HistoryRepo`**: Wrapper around `git2::Repository` providing high-level save versioning operations.
 - **`HistoryError`**: Error enum with variants: `Git`, `NothingToCommit`, `BranchNotFound`, `CommitNotFound`, `InvalidBranchName`, `BranchAlreadyExists`.
 - **`CloudConfig`**: Persisted cloud configuration (token, username, repo URL) stored in `~/.quest/.cloud.json` (git-ignored).
@@ -69,7 +70,7 @@ Uses `ureq` for GitHub API calls and `git2` for remote operations. Cloud operati
 
 ## Key Constants
 
-- Commit signature: `"Quest" <quest@localhost>`
+- Commit signature: `"Quest" <quest@localhost>` (normal saves, `git.rs`); the cloud-squash path in `cloud.rs` that scrubs `.cloud.json` out of history uses `"Quest" <quest@game>` instead
 - Default cloud repo name: `"quest-saves"`
 - Git remote name: `"cloud"`
 - GitHub API timeout: 15 seconds

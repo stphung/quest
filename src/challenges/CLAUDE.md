@@ -280,7 +280,7 @@ ChallengeReward {
 }
 ```
 
-All challenges award Stormglass currency. Higher difficulties give more Stormglass (e.g., Novice 300-1000, Master 4000-10000). If the player has not yet discovered Stormglass, the reward falls back to XP.
+All challenges award Stormglass currency. Higher difficulties give more Stormglass (e.g., Novice 300-1000, Master 4000-12500). If the player has not yet discovered Stormglass, the reward falls back to XP.
 
 ## Discovery Weights
 
