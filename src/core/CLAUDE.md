@@ -57,6 +57,7 @@ pub struct GameState {
     pub vessel_launched: bool,             // Act 2: true after player confirms launch and burns 250,000 PR
     pub vessel_arrived: bool,              // Act 2: true once the Vessel reaches the Tree (crossing complete)
     pub last_crossing_complete: bool,      // Act 2: souls carried out of the dark on the last crossing
+    pub vessel_transition_played: bool,    // Act 2: true once the 5-beat launch transition has played through
 
     // Transient (serde(skip), reset on load)
     pub active_fishing: Option<FishingSession>,

@@ -618,3 +618,27 @@ fn snapshot_voyage_watch_panel() {
         })
     });
 }
+
+#[test]
+fn snapshot_launch_transition_first_beat() {
+    assert_overlay_snapshot("launch_transition_beat1_xl_160x45", || {
+        render_overlay(|f| {
+            let area = f.area();
+            super::vessel_scene::render_launch_transition(f, area, 1);
+        })
+    });
+}
+
+#[test]
+fn snapshot_launch_transition_final_beat() {
+    assert_overlay_snapshot("launch_transition_beat5_xl_160x45", || {
+        render_overlay(|f| {
+            let area = f.area();
+            super::vessel_scene::render_launch_transition(
+                f,
+                area,
+                crate::vessel::transition::BEAT_COUNT,
+            );
+        })
+    });
+}

@@ -59,6 +59,22 @@ pub enum ColorKey {
 }
 ```
 
+> **Doc-alignment note (2026-07-04):** `HopeAtLeast`/`HopeBelow` never
+> shipped — Hope was retired entirely (commit d39ad67) before this variant
+> would have been used. Current `ColorKey` (`scenes.rs:18-23`) is
+> `SoulAboard/ArrivedBy/TrimIs/KnowsRumor/Drifted` — no chapter or hope
+> variants. Likewise every `hope: i8` payout field and every `hope ±N`
+> beat described below (the payout table, the Ossuary Warden, the Silence
+> itself, `mark_lost`) no longer prices anything — those beats are either
+> free now or (Silence-bank specifically) replaced by a strain hit on the
+> Helm soul, per the underway spec's alignment note. One refit is also now
+> a no-op: **Lantern Mast** (row 3 below) has a name and blurb (`refits.rs`)
+> but nothing reads it — unlike its siblings, it isn't wired into any
+> gameplay effect. And **Mourning Colors**' stated "×0.80 provisions" was
+> written against Mourn's old 0.90 base; Mourn's shipped base is already
+> 0.80 post-Hope-retirement (`voyage.rs`), with the refit stacking it
+> further to 0.70 — the number below no longer matches either value.
+
 Rules that keep this writable and honest:
 
 - **Determinism**: color lines are pure state functions — same save, same

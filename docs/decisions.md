@@ -343,6 +343,8 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 
 **Expected outcome**: players should read the ferry era's flatness as a deliberate tonal shift (from active pilgrimage to a passive victory lap) rather than as the game running out of ideas. Next refresh's retrospective: if playtesting surfaces the ferry era as boring rather than restful, revisit — this decision assumes the rising numbers (souls delivered, districts, hold size) carry enough of their own momentum without new nouns.
 
+**Superseded the same day**: see "Act 2: World Milestones" below. The designer asked for actual construction work rather than a second round of decisions, so this was revisited and built after all.
+
 ## Act 2 Launch Transition: Keep the Single Screen
 
 **Why now**: spec 4 (`2026-03-27-vessel-mode-transition-design.md`) designed a 5-beat cinematic transition for the launch moment (Zone 50 kill → burn → Voyage begins); only a single static confirmation screen shipped.
@@ -352,3 +354,23 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 **Decision**: Keep the single screen. It's a one-time, ~30-second moment in an act that is still dark-shipped, and the existing anticipation instruments (ticker whispers, the fuel bar) already do the emotional work leading up to it. Low payoff-per-effort relative to the other open items in the act.
 
 **Expected outcome**: no measurable balance impact — this is a pure feel/ceremony question. Next refresh's retrospective: revisit if Act 2 approaches being flipped on for real (`ACT2_ENABLED = true`), since a launch-day audience will experience this moment once, for real, in a way sim runs and dossier refreshes don't capture.
+
+**Superseded the same day**: see "Act 2: The 5-Beat Launch Transition" below. The designer asked for actual construction work rather than a second round of decisions, so this was revisited and built after all.
+
+## Act 2: World Milestones — a Second Discovery Axis for the Ferry Era
+
+**Why now**: immediately after "Act 2 Discovery Drought" was resolved as "accept as intentional," the designer clarified they wanted actual implementation work, not another round of settled decisions. Revisited the same question with a concrete build instead.
+
+**What shipped**: `WorldMilestone` (`src/vessel/colony.rs`) — five milestones (10%/25%/50%/75%/90% of `INITIAL_SOULS` gone from the dying world, delivered or lost to the dark) that fire an authored log moment each, exactly once, in order. Deliberately the *other side* of the race from districts: districts mark the colony's growth (population, a rising number), milestones mark the old world's decline (a falling one). Both are pure functions of state — nothing is stored as "already fired"; `deliver_crossing()` diffs before/after and now returns a `CrossingDelivery { new_districts, new_world_milestones }` struct instead of a bare `Vec<District>`.
+
+**Why this counts as a genuinely new noun, not districts twice**: because a milestone is keyed to `souls_remaining` rather than population, it lands on a different crossing depending on spend policy — a Ward-heavy line and a Shipwright-heavy line pass "half gone" at different points in the era, whereas district thresholds are pinned to the same population regardless of strategy. Verified with a dedicated integration test asserting all five milestones fire exactly once, in order, spread across a full era run.
+
+**Expected outcome**: the ferry era's discovery-cadence rubric score should move up from its "front-load then flatline" 3/5 — re-scored to 4/5 this session, held below 5 because both new-noun axes are still text-only log moments rather than new mechanical levers. Next refresh's retrospective: check whether real (non-sim) play experiences these as a meaningful second thread of "what's new" or as indistinguishable from district log spam.
+
+## Act 2: The 5-Beat Launch Transition
+
+**Why now**: same designer clarification as World Milestones above — revisited "keep the single screen" with an actual build.
+
+**What shipped**: `src/vessel/transition.rs` (new) — spec 4's five beats (Farewell/Unweaving/Construction/Launch/Void) as a full-screen, Enter-advanced sequence, static text per beat (per the original spec's own allowance — no character-scatter animation was added), rendered by `ui::vessel_scene::render_launch_transition()`. Gated by a new persistent `GameState::vessel_transition_played` flag; `main.rs`'s `'game_loop` shows the transition instead of the Voyage until it completes, then falls through to normal Voyage init. An interrupted transition (game closed mid-sequence) simply restarts at beat 1 next launch — the beat counter itself is transient, only "has this ever completed" is durable. One small addition beyond the original spec: a `"N / 5 — <heading>"` marker in the corner so a fixed-length sequence reads as a sequence, not an indefinite loading screen.
+
+**Expected outcome**: no balance impact (pure ceremony), but should raise the act's biggest single moment (Zone 50 kill → burn → Voyage begins) from a bare confirmation screen to a fitting sendoff for everything the burn represents. Next refresh's retrospective: revisit once Act 2 is previewed in a real session (`QUEST_ACT2=1`) rather than only via snapshot tests — a one-time cutscene lands differently played than read as a frame dump.

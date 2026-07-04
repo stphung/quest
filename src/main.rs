@@ -541,6 +541,8 @@ fn main() -> io::Result<()> {
                     let mut voyage: Option<vessel::voyage::VoyageState> = None;
                     let mut colony: Option<vessel::colony::ColonyState> = None;
                     let mut voyage_ui = vessel::VoyageUiState::default();
+                    let mut launch_transition =
+                        vessel::transition::LaunchTransitionState::default();
 
                     'game_loop: loop {
                         // ── Act 2: The Crossing ─────────────────────────────
@@ -549,6 +551,46 @@ fn main() -> io::Result<()> {
                         // untouched beneath it; spec 6 (the Going-Dark) owns
                         // their eventual wind-down.
                         if state.vessel_launched && vessel::act2_enabled() {
+                            // The 5-beat launch transition (spec 4) plays once,
+                            // between the burn and the first Voyage frame. It
+                            // owns the screen and blocks all other input.
+                            if !state.vessel_transition_played {
+                                terminal.draw(|frame| {
+                                    ui::vessel_scene::render_launch_transition(
+                                        frame,
+                                        frame.area(),
+                                        launch_transition.beat,
+                                    );
+                                })?;
+                                if event::poll(Duration::from_millis(100))? {
+                                    match event::read()? {
+                                        Event::Resize(_, _) => terminal.clear()?,
+                                        Event::Key(key_event)
+                                            if key_event.kind == KeyEventKind::Press
+                                                && key_event.code
+                                                    == ratatui::crossterm::event::KeyCode::Enter =>
+                                        {
+                                            if launch_transition.advance() {
+                                                state.vessel_transition_played = true;
+                                                if !debug_mode {
+                                                    save_files(
+                                                        &character_manager,
+                                                        &state,
+                                                        &global_achievements,
+                                                        &haven,
+                                                        &enhancement,
+                                                        &deep_state,
+                                                        &loom_state,
+                                                    );
+                                                }
+                                                terminal.clear()?;
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                continue;
+                            }
                             if voyage.is_none() {
                                 voyage = Some(
                                     vessel::persistence::load_voyage(&state.character_id)
@@ -675,7 +717,7 @@ fn main() -> io::Result<()> {
                                 } else {
                                     v.passengers
                                 };
-                                let new_districts =
+                                let delivery =
                                     col.deliver_crossing(delivered, days, days * 10, days);
                                 voyage_ui.moments.push_back(vessel::SceneModal {
                                     title: "Landfall".to_string(),
@@ -686,10 +728,20 @@ fn main() -> io::Result<()> {
                                         col.souls_delivered, col.souls_remaining
                                     ),
                                 });
-                                for d in new_districts {
+                                for d in delivery.new_districts {
                                     voyage_ui.moments.push_back(vessel::SceneModal {
                                         title: format!("The colony raises {}", d.name()),
                                         body: format!("From here on, {}.", d.bonus()),
+                                    });
+                                }
+                                // World milestones (spec 9's "entropy" side of
+                                // the race) — the ferry era's one mid-era
+                                // discovery beat, distinct from district
+                                // growth: the old world's own decline.
+                                for m in delivery.new_world_milestones {
+                                    voyage_ui.moments.push_back(vessel::SceneModal {
+                                        title: m.title().to_string(),
+                                        body: m.body().to_string(),
                                     });
                                 }
                                 if col.era_over() {

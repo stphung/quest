@@ -1,6 +1,58 @@
 # Act 2: The Pilgrimage of Souls — Design Dossier
 
-> Last refreshed: 2026-07-04 @ d39ad67 | Sources: `src/vessel/`, `src/vessel/CLAUDE.md`, `docs/superpowers/specs/` (10 vessel specs, follow-up note in spec 9), `tests/ferryman_tests.rs`, voyage_simulator + ferryman `strategy_sweep` runs, played via `QUEST_ACT2=1` fixtures
+> Last refreshed: 2026-07-04 (post-build) | Sources: `src/vessel/`, `src/vessel/CLAUDE.md`, `docs/superpowers/specs/` (all 15 vessel specs, fully doc-aligned this session), `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
+
+## Since you last looked (this session's build, same day as the previous refresh)
+
+All three open questions from the last refresh were resolved by the
+designer (keep Ward's long line as intended, accept the discovery drought,
+keep the single-screen launch confirmation) — logged in `docs/decisions.md`.
+The designer then asked for actual construction work, not just more
+decisions, so this pass built three things and did a full spec-tree
+alignment:
+
+- **Fixed the Drive/Ward floor dangling-purchase edge.** `buy_drive()`/
+  `buy_ward()` (`colony.rs`) now refuse a purchase via new
+  `drive_maxed()`/`ward_maxed()` checks once further Salvage would buy zero
+  gain; the Reckoning UI hides the cost line entirely for a maxed yard
+  instead of showing an unaffordable price. Two new colony tests; one
+  snapshot re-blessed (`voyage_reckoning_xl_160x45`).
+- **Built the 5-beat launch transition** (`src/vessel/transition.rs`, new)
+  — spec 4's Farewell/Unweaving/Construction/Launch/Void sequence, static
+  full-screen text per beat (per the spec's own allowance), rendered by
+  `ui::vessel_scene::render_launch_transition()`, gated by a new persistent
+  `GameState::vessel_transition_played` flag, wired into `main.rs` right
+  before the Voyage takes the screen. Two new overlay snapshots, two unit
+  tests in `transition.rs`.
+- **Added world milestones** (`WorldMilestone` in `colony.rs`) — a second,
+  genuinely new mid-era discovery axis for the ferry era: not the colony's
+  growth (districts, already covered) but the *dying world's* decline (10%
+  / 25% / 50% / 75% / 90% of `INITIAL_SOULS` gone), firing an authored log
+  moment each. `deliver_crossing()` now returns a `CrossingDelivery {
+  new_districts, new_world_milestones }` instead of a bare `Vec<District>`.
+  Because it's keyed to how much of the *old* world is gone rather than how
+  large the colony has grown, a milestone lands on a different crossing
+  depending on spend policy (Ward-heavy vs. Shipwright-heavy) — a genuinely
+  new noun, not districts on a second axis. Four new tests (two unit, two
+  integration) confirm all five fire exactly once, in order, spread across
+  the era.
+- **Full spec-tree alignment**: all 15 `docs/superpowers/specs/` vessel
+  docs read against current source and annotated with "Doc-alignment note"
+  call-outs — the Hope retirement (touched nearly every spec), the
+  abandoned combat/crew/rooms-stats specs (confirmed nothing shipped, not
+  just "superseded"), the mode-transition spec's abandoned
+  continuous-distance shell vs. its now-built 5-beat transition, and a
+  scatter of smaller numeric drift (road count, district thresholds,
+  era-length estimates, a dead Lantern Mast refit, a stale Mourning Colors
+  number). `src/vessel/CLAUDE.md` also picked up two small pre-existing
+  drift items found along the way: a stale "two yard tracks" phrase (now
+  three) and an inaccurate claim about which persistence path is load-bearing
+  (`character/persistence.rs`, not `core/game_state_serde.rs`'s
+  `FlatGameState`, which is dead code from an earlier migration).
+- All of the above verified: `cargo test` (full suite, 0 failures),
+  `cargo clippy --all-targets -- -D warnings` (clean), `cargo fmt --check`
+  (clean), `cargo run --release --bin simulator -- --check-progression`
+  (passed), `cargo test --release --test ferryman_tests` (passed).
 
 ## Since you last looked (delta from the 2026-07-04 @ 4ce9a57 refresh, same day)
 
@@ -107,15 +159,18 @@ Launch gate (`src/vessel/mod.rs`): `LAUNCH_PR_COST` 250,000 (`mod.rs:116`),
 `LAUNCH_REQUIRED_PATTERNS` 28 (`:119`), `LAUNCH_REQUIRED_ASCENSION` X (`:122`),
 `WHISPER_INTERVAL_SECONDS` 60 (`:125`). Gate at `mod.rs:147-149`, burn `:158`.
 
-Voyage (`src/vessel/voyage.rs`): `GAME_MINUTES_PER_REAL_MINUTE` 2.64 (`:81`),
-`PROVISIONS_CAP` 100 (`:33`, 150 with Long Hold `:35`), `DRIFT_RECOVERY_PROVISIONS`
-25 (`:40`) / `DRIFT_RECOVERY_HOURS` 36 (`:41`) — also the affordability floor
-asserted at `route.rs:1384-1391`, so a dry hold always means drifting, never
-stranding. `HOLD_STATION_GRACE_DAYS` 3 (`:43`), `PORT_CALL_GAME_MINUTES` 360
-(`:63`). **Hope's constants (`HOPE_MAX`, `LAUNCH_HOPE`, `HOPE_FLOOR_STEADY`,
-`HOPE_SPEND_FLOOR`, `PRESS_*`, `HARD_RATIONS_BURN_MULT`) are gone** — Mourn
-Pace (was "Restful" trim) is now identified purely by being the thriftiest
-hold burn (0.80×), not by pressing hope.
+Voyage (`src/vessel/voyage.rs`): `GAME_MINUTES_PER_REAL_MINUTE` 2.64 (`:64`),
+`PROVISIONS_CAP` 100 (`:31`, `LONG_HOLD_PROVISIONS_CAP` 150 `:33`),
+`DRIFT_RECOVERY_PROVISIONS` 25 (`:38`) / `DRIFT_RECOVERY_HOURS` 36 (`:39`) —
+also the affordability floor asserted at `route.rs:1384-1391`, so a dry
+hold always means drifting, never stranding. `PORT_CALL_GAME_MINUTES` 360
+(`:47`). **Hope's constants (`HOPE_MAX`, `LAUNCH_HOPE`, `HOPE_FLOOR_STEADY`,
+`HOPE_SPEND_FLOOR`, `PRESS_*`, `HARD_RATIONS_BURN_MULT`, and
+`HOLD_STATION_GRACE_DAYS`) are all gone** — Mourn Pace (was "Restful" trim)
+is now identified purely by being the thriftiest hold burn (0.80×), not by
+pressing hope, and holding station indefinitely no longer has any soft
+pressure attached to it (a small, low-priority drift the mode-transition/
+route-waypoints specs also flag).
 
 Route (`src/vessel/route.rs`): 38 waypoints (`:194`), 45 roads (`:620`), 8
 rumors (`:1143`), 4 chapters (`:27`), 7 junctions 2/2/2/1 (`:1373-1380`);
@@ -139,7 +194,15 @@ compounds per day underway via `dark_toll_for_days()` at `:351`) replaces the
 old flat per-crossing toll; `WARD_DECAY` 0.72 / `WARD_TOLL_FLOOR` 0.12
 (`:73,:76`) — the Ward buys the daily rate down to a floor that's never zero.
 Six districts found at pop. 500 → 66,000 (`:92-99`), each adding +110…+320
-expedition size (`:105-113`) — unchanged by this commit.
+expedition size (`:105-113`). **New this session**: five `WorldMilestone`
+thresholds (10/25/50/75/90% of `INITIAL_SOULS` gone) fire an authored log
+moment each, exactly once — the era's second discovery axis, keyed to the
+old world's decline rather than the colony's growth, so it lands on a
+different crossing depending on spend policy.
+
+Launch transition (`src/vessel/transition.rs`, new this session):
+`BEAT_COUNT` 5 (Farewell/Unweaving/Construction/Launch/Void), gated by the
+new persistent `GameState::vessel_transition_played`.
 
 Derived numbers players feel: maiden voyage ≈ two real weeks; ferry-run floor
 ≈ 3 real days; max hold ≈ 4,500+ souls; era ≈ 3–5 real months depending on
@@ -173,13 +236,11 @@ Act 1 (everything)          Act 2 (the passage)
   purchases (Drive/Shipwright) plus one inert gauge (Hope) that never
   affected anything a player could feel. This is a meaningfully tighter
   system than the two-yard version the dossier last described.
-- **Dangling edge, unresolved**: at the Drive floor (level ~9+, where
-  `drive_time_mult()` hits `DRIVE_FLOOR`), the Reckoning still offers the
-  next Drive level at full escalating price for zero speed gain
-  (`colony.rs:36-39` floor vs. the yard's unbounded cost curve; the UI does
-  detect this and labels it "already at her limit" in the detail line —
-  `voyage_scene.rs:2100-2104` — but does not prevent or discourage the
-  purchase itself). Small, queued.
+- **Resolved 2026-07-04**: the Drive/Ward floor dangling-purchase edge is
+  fixed. `buy_drive()`/`buy_ward()` (`colony.rs`) now refuse a purchase
+  once `drive_maxed()`/`ward_maxed()` is true, and the Reckoning hides the
+  cost line entirely for a maxed yard instead of showing an unaffordable
+  price. Covered by two new colony tests.
 - **Doc drift introduced by this commit**: spec 9
   (`2026-07-03-vessel-ferryman-design.md`) still describes the two-yard,
   Hope-bearing design as current; the three-yard Ward/no-Hope system that
@@ -235,13 +296,13 @@ strategy-sweep evidence above [+ played session — see below]:*
 
 | # | Heuristic | Score | Evidence |
 |---|---|---|---|
-| 1 | Visible next goal | 4/5 | Unchanged this refresh: gate checklist + fuel bar pre-launch; next-beat timers, watch forecast, district thresholds in-voyage. Still missing an era-level projection ("~N crossings left at this rate"). |
-| 2 | Wall → reset → power | **5/5 (was 4)** | The ferry loop is still a true earned ramp (37→8 days, 180→4,500+ hold). The prior gap — "no resistance mid-era, the dark's toll is invisible pressure" — is fixed: the toll is now a per-day, always-visible, always-engaged number on the Reckoning screen, and it materially diverges by policy (70.5% vs 94.3%). Resistance is now legible. |
-| 3 | Discovery cadence | 3/5 | Unchanged: maiden voyage drips new nouns constantly; post-maiden era still only reveals 6 district thresholds as new nouns. The Ward is a new *lever*, not a new *reveal* — it's present from crossing 1, so it doesn't add to the drought. Front-loaded, then flat, still. |
+| 1 | Visible next goal | 4/5 | Gate checklist + fuel bar pre-launch; next-beat timers, watch forecast, district thresholds in-voyage. Still missing an era-level projection ("~N crossings left at this rate") — that gap is unrelated to this session's builds, carried forward. |
+| 2 | Wall → reset → power | 5/5 | The ferry loop is a true earned ramp (37→8 days, 180→4,500+ hold). The dark's toll is a per-day, always-visible, always-engaged number on the Reckoning screen, materially diverging by policy (70.5% vs 94.3%). Resistance is legible. |
+| 3 | Discovery cadence | **4/5 (was 3)** | World milestones (this session) genuinely fix the flagged gap: the ferry era now reveals *two* independent axes of new content — districts (colony growth) and world milestones (old-world decline) — and because milestones key off `souls_remaining` rather than population, they land on different crossings for different spend policies, so the sequence of "what's new" isn't identical run to run. Held at 4 rather than 5 because both axes are still text-only log moments, not new mechanical levers, and the maiden voyage's much richer discovery density (weather, nights, souls, rumors, refits, letters) isn't matched in kind. |
 | 4 | Cross-system braiding | 3/5 | Unchanged: launch gate braids all of Act 1 into the burn (excellent); voyage itself remains a deliberate island. Confirmed intentional, not re-litigated. |
 | 5 | Decision density | 3/5 | Maiden voyage unchanged. Ferry runs: still one choice per ~3 real days, but the choice got richer — three options instead of two, each with a live before→after delta shown, not just a level-up button. Density is the same; the *quality* of that single decision improved, which the 1-5 scale doesn't capture well — noted here rather than inflating the score. |
 | 6 | Anticipation instruments | 5/5 | Unchanged, still the act's strongest suit. |
-| 7 | Stakes and texture | **4/5 (was 3)** | Stakes are less soft: the old "Hope pinned at max, nearly no stakes" is gone along with Hope itself, replaced by a toll that's always live and always differentiates skilled from careless play. What's still missing: the toll is a number, not a scene — nobody the player has met is ever named as lost to the dark (that stays authored-only, per the `mark_lost()` covenant, and is a deliberate boundary, not a gap). |
+| 7 | Stakes and texture | 4/5 | Stakes are less soft: Hope's "pinned at max, nearly no stakes" problem is gone, replaced by a toll that's always live and always differentiates skilled from careless play. The launch transition (this session) also adds a beat of ceremony to the act's single biggest moment that was previously a bare confirmation screen — a small texture win at the *start* of the act, distinct from the ferry-era stakes question. What's still missing: the toll and the milestones are numbers/log lines, not scenes — nobody the player has met is ever named as lost to the dark (that stays authored-only, per the `mark_lost()` covenant, and is a deliberate boundary, not a gap). |
 
 **Where Act 2 deliberately breaks Act 1's patterns** (confirm, don't "fix"):
 wall-clock instead of ticks; no failure states; no RNG in outcomes; the
@@ -257,20 +318,21 @@ outcomes once resolved):
    retroactively in `docs/decisions.md` this refresh since it was never
    logged when shipped.
 2. ~~Post-maiden discovery drought — accept, add per-crossing beats, or new
-   mid-era noun?~~ **Resolved 2026-07-04**: accept as intentional. The
-   maiden voyage is deliberately the decision-dense, discovery-rich half of
-   the act; the ferry era is a hands-off victory-lap glide with a rising
-   number, matching the "earned ramp, then fast-fun stretch" framing already
-   in spec 9. No new mid-era noun planned.
+   mid-era noun?~~ **Resolved 2026-07-04, then revisited same day**: first
+   answered "accept as intentional, no new noun planned" — then the
+   designer asked for actual construction work rather than another round of
+   decisions, so world milestones (`WorldMilestone` in `colony.rs`) were
+   built after all: a second discovery axis (the old world's decline, not
+   the colony's growth) that a spend-policy choice actually moves around in
+   the era. See `docs/decisions.md` for both entries, in order.
 3. ~~Era length 24 vs intended ~19 crossings — retune or re-state intent?~~
    **Resolved**: intent re-stated as a range (~19–24, test gate 15–30)
    rather than constants pulled to hit one number.
 4. ~~Launch transition is one static screen where spec 4 designed 5 beats —
-   build or keep?~~ **Resolved 2026-07-04**: keep the single screen. It's a
-   one-time ~30-second moment in an act that's still dark-shipped, and the
-   existing anticipation instruments (whispers, fuel bar) already carry the
-   emotional weight leading up to it — low payoff-per-effort versus
-   everything else still open.
+   build or keep?~~ **Resolved 2026-07-04, then revisited same day**: first
+   answered "keep the single screen" (low payoff-per-effort) — then built
+   after all under the same later build directive as #2 above. See
+   `src/vessel/transition.rs` and `docs/decisions.md`'s two entries.
 5. ~~The Ward-lean policy is the highest-souls-saved line (94.3%) but runs
    ~32 crossings / ~5 months — beyond the era's own stated "~3 months" and
    the test's 15–30 band. Intended branch, or nudge Ward's cost curve?~~
@@ -281,22 +343,33 @@ outcomes once resolved):
    stays wide and legible.
 
 No open design questions remain from this refresh. All five were resolved
-2026-07-04 (see `docs/decisions.md`); the next refresh should re-check the
-decision retrospective on questions 2/4/5 above once there's evidence of
-how the ferry era plays for a real session rather than only the sim.
+2026-07-04 (two of them — #2 and #4 — resolved twice: once by direct
+designer answer, then revisited under an explicit "build it" directive the
+same session); see `docs/decisions.md` for the full sequence. The next
+refresh should re-check the decision retrospective on #3/#5 (era length)
+once there's evidence of how the ferry era plays for a real session rather
+than only the sim, and on #2/#4 (discovery beat, launch transition) once
+there's played evidence of how the newly-built content actually lands.
 
 Held for a later round (not yet asked, unchanged):
 - Should Records/keepsakes surface anywhere outside the arrived harbor
   (e.g. title screen), given the era ends and the files remain?
-- Drive-floor yard offer (zero-gain purchase at full price) — small fix,
-  queued, not yet done.
 - No player-facing wiki page exists for Act 2 (correct while dark-shipped;
   becomes a launch-checklist item).
-- Spec 9's pacing section (and its 2026-07-04 follow-up note) still
-  describes a two-yard, Hope-bearing design; the shipped three-yard system
-  exists only in code comments. Low priority while dark-shipped, but the
-  drift will compound with every further Act 2 change if the spec doc is
-  never brought current.
+
+**Resolved 2026-07-04 (full spec-alignment pass)**: every one of the 15
+`docs/superpowers/specs/` vessel docs was audited against shipped source
+and annotated with "Doc-alignment note" call-outs wherever stale — the
+Hope retirement (present in nearly all of them), the abandoned
+combat/crew/rooms-stats specs (confirmed nothing shipped, not just
+"superseded"), the mode-transition spec's continuous-distance shell
+(confirmed abandoned) vs. its 5-beat launch transition (built this round —
+see below), and a scatter of smaller numeric drift (road count, district
+thresholds, era-length estimates). The spec tree is now internally
+consistent with `src/vessel/CLAUDE.md` as ground truth; future Act 2
+changes should keep appending "Doc-alignment note" or "Follow-up" blocks
+to the relevant spec rather than editing history, matching the pattern
+this pass established.
 
 Factual drift found and fixed this refresh: `src/vessel/CLAUDE.md`'s "Known
 Invariants" section described a `game_state.rs` 100k/250k PR doc-comment

@@ -15,6 +15,7 @@ pub mod refits;
 pub mod route;
 pub mod scenes;
 pub mod souls;
+pub mod transition;
 pub mod voyage;
 pub mod weather;
 

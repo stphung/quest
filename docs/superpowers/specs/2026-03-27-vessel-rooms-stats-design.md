@@ -4,6 +4,12 @@
 > of Souls* — see the rewritten parent spec and
 > [2026-07-02-act2-voyage-experience-exploration.md](2026-07-02-act2-voyage-experience-exploration.md).
 > Replaced by waypoint Refits (spec 5: The Vessel Underway). Ship XP/levels, the room grid, and the Reactor power budget are cut. Kept for salvage, not for implementation.
+>
+> **Confirmed abandoned (2026-07-04 doc-alignment pass):** nothing in this
+> spec shipped — `src/vessel/mod.rs`'s module list has no `rooms`/`components`/
+> `stats` file, and no Room/Component/Reactor types exist anywhere in
+> `src/vessel/`. The only surviving word "room(s)" in the codebase is flavor
+> prose describing the harbor, never a system.
 
 **Parent spec:** `docs/superpowers/specs/2026-03-27-the-vessel-design.md`
 **Sub-project:** 3 of 7

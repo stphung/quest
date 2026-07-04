@@ -45,6 +45,19 @@ floors below 10 provisions at least once and still completes with 0
 drifts — tense, not punished. An unstaffed or inattentive one drifts ~1–2
 times, as today.
 
+> **Doc-alignment note (2026-07-04):** this section's fix — giving Hope
+> spends (Press the helm, Hard rations) so the gauge would finally engage —
+> **did not hold**: balance-sim evidence later showed Hope still pinned at
+> its maximum under every attentive strategy even with these sinks in
+> place, and commit d39ad67 retired Hope entirely rather than add a third
+> sink. Press the helm (`[P]`), Hard rations, and every `hope`-gated
+> mechanic in this section are gone — see
+> `docs/superpowers/specs/2026-07-03-vessel-ferryman-design.md`'s Ward
+> follow-up and `docs/decisions.md` ("Act 2 Ferryman Era: Retiring Hope")
+> for what replaced this diagnosis's fix. Sections 3–4 below (strain, hull
+> wear/scars) are unaffected and shipped as designed
+> (`HULL_WEAR_MAX`/`WEAR_BURN_PER_SCAR` in `voyage.rs`).
+
 ## 2. Hope becomes a wallet
 
 Hope's sources stand; it gains **sinks** — real purchases at check-in

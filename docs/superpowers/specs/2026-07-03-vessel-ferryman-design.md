@@ -78,8 +78,19 @@ wholesale, and the correspondence brightens as the old one darkened.
 
 ## The Race (entropy vs. capacity)
 
+> **Doc-alignment note (2026-07-04):** this section and the two below it
+> ("The Engine: Resonance", "The Colony") describe the *original* design for
+> this sub-project. Both were superseded by the two follow-ups appended at
+> the bottom of this file — first by the two-yard Drive/Shipwright rewrite
+> (2026-07-04, "the two yards"), then by the shipped three-yard Ward
+> redesign (commit d39ad67, addendum below, "the third yard"). Read the
+> follow-ups as the authoritative design; the numbers below (Resonance,
+> `souls_remaining` ~3,000, the original district table) are historical
+> record only. `src/vessel/CLAUDE.md` is ground truth for what's shipped.
+
 - **`souls_remaining`** — the dying world's finite pool (initial value
-  ~3,000; tuned by probe). Visible from the first Reckoning.
+  ~3,000; tuned by probe — **shipped as `INITIAL_SOULS = 100,000`**,
+  `colony.rs:21`). Visible from the first Reckoning.
 - **The dimming** — on a deterministic schedule (seeded, per real day),
   harbors on the chart *go out*: a dimmed port has no souls waiting, and
   its glyph dims on the chart. Over the ferry era the player literally
@@ -318,3 +329,21 @@ The ramp is now a **choice**, and it is earned by the ship getting faster, not b
 - **The decision is real, and the margin is wide** (`DARK_TAKES_EACH_CROSSING` 0.0045 → **0.011** — the toll that makes crossing-count matter for souls saved). Reckless Drive-only runs ~85 near-empty crossings and bleeds the world to the dark (**~54% saved**); a souls-first line (lean into the hold, just enough Drive to stay quick) carries most of it home (**~87% saved**) — skill is rewarded, not marginal. Tuned to **~19 crossings, ~3 real months, ~87% saved with skilled play**.
 - **Ferry runs are fully hands-off** (required for the crossing to complete autonomously in Drive-scaled time): crossing 2+ auto-navigates junctions (first road), skips refit doors, launches itself from the pier, and the passenger load no longer deepens the provisions burn (no one meters rations on a ferry run). The maiden voyage is unchanged — decision-rich, navigated by the ferryman.
 - **Superseded constants**: `EXPEDITION_AT_LAUNCH`, `EXPEDITION_PER_1000_DELIVERED`, `FASTEST_CROSSING_TIME_MULT`, `DRIVE_FOR_HALF_SPEEDUP`, and the cumulative `drive` field are gone; `BASE_CAPACITY`, `CAP_GROWTH`, `DRIVE_DECAY`, `DRIVE_FLOOR`, `SALVAGE_*`, `DRIVE_COST_*`, `CAP_COST_*`, and the `drive_level`/`cap_level`/`salvage` fields replace them.
+
+> **Doc-alignment note (2026-07-04):** everything above this point in the
+> "two yards" follow-up was itself superseded the same day by commit
+> d39ad67 — see the next follow-up below. `DARK_TAKES_EACH_CROSSING` no
+> longer exists (replaced by a per-day rate); the "~19 crossings, ~87%
+> saved" figure is now a range, not a single target; and the Reckoning has
+> three purchases, not two.
+
+## Follow-up (2026-07-04, later the same day): the third yard — Ward, and per-day attrition
+
+Shipped in commit d39ad67 ("Act 2: retire Hope into a three-yard Reckoning"). Two changes, both aimed at the same problem: the Hope gauge above (see the retired sections earlier in this file, and every `hope`-referencing passage in specs 3, 5, 6, and 8) never engaged in play — balance-sim evidence showed it pinned at its maximum under every attentive strategy. Rather than tune a gauge nobody was reading, this redesign retires it and gives its job to a yard the player actually buys.
+
+- **Hope is retired, full stop.** `HOPE_MAX`, `LAUNCH_HOPE`, `HOPE_FLOOR_STEADY`, `HOPE_SPEND_FLOOR`, `PRESS_*` (Press-the-helm), `HARD_RATIONS_BURN_MULT` — all removed from `voyage.rs`. Every "hope +N" / "hope −N" beat described elsewhere in the spec tree (letters, arcs, night outcomes, district bonuses, refits) no longer prices anything; those beats now either cost nothing or were replaced by a different mechanic (the Silence-bank's hope-drain became a strain hit on the Helm soul — see spec 5's underway doc for the current version).
+- **A third yard: Ward** (`ward_level`, `colony.rs`). Costs `WARD_COST_BASE (5) × WARD_COST_GROWTH (1.45)^L` Salvage — priced between Drive and Shipwright. Each level multiplies the dark's toll rate by `WARD_DECAY` (0.72), compounding down to `WARD_TOLL_FLOOR` (0.12× base — the dark's bite is never fully closed, just dampened).
+- **The toll changed shape**: from a flat per-crossing tax (`DARK_TAKES_EACH_CROSSING`, retired) to a **per-day rate** (`DARK_TAKES_PER_DAY = 0.0006`, compounding over the crossing's length via `dark_toll_for_days()`). This is the mechanically load-bearing change: now *all three* yards answer to the same pressure — Drive (fewer days per crossing) and Shipwright (fewer crossings to empty the world) both cut the total days the world spends waiting, on top of Ward directly softening the daily bite.
+- **The Reckoning is now a three-way comparison** (`[D]`/`[C]`/`[W]`), each purchase shown with a live before→after number (e.g. Ward: "0.060%/day → 0.043%/day · ~83 fewer lost over a crossing") rather than just a level-up button.
+- **Re-tuned, and re-stated as a range rather than a single target.** Verified via `ferryman_tests::strategy_sweep` (2026-07-04): a balanced spend saves ~88% across ~19–24 crossings / ~3 real months; the two naive traps (Drive-only, Shipwright-only) land at ~70–74%; leaning hard on Ward pushes to ~94% saved but stretches the era to ~30+ crossings / ~5 real months. All three are treated as valid skilled lines (see `docs/decisions.md`, "Act 2 Ward Pacing") — the era's stated length is now "~3–5 real months" depending on how the player spends, not a single number to hit.
+- **Fixed (2026-07-04)**: at the Drive/Ward floors, `buy_drive()`/`buy_ward()` (`colony.rs`) now refuse the purchase outright via `drive_maxed()`/`ward_maxed()` — previously the yard let a player escalate Salvage into a level that bought zero further gain; the Reckoning UI now hides the cost line entirely once maxed instead of showing an unaffordable price.

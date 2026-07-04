@@ -64,7 +64,7 @@ as an automatic choice.
 - Sizes for v1: **~24 waypoints on any taken path**, **~38 authored
   waypoints total** (untaken branches are real content, authored but
   possibly never seen), **7 junctions** (2 / 2 / 2 / 1 by chapter),
-  **~46 roads**.
+  **~46 roads** (shipped as exactly **45**, `route.rs:620`).
 - **Content parity** (from No Right Path): every maximal route passes
   ≥ 5 soul-candidate scenes, ≥ 2 shipyards, ≥ 2 rest stops. CI asserts
   this by walking all routes.
@@ -101,7 +101,10 @@ HoldingStation at waypoint 24 ──▶ Arrived (finale sequence, spec 7)
 - **Arrivals wait**: `HoldingStation.scene_state == Waiting` blocks
   departure; nothing else advances the route. Soft pressure: after 3 full
   days holding, hope decays 1/day (never below "steady" — the eager-souls
-  rule, resolving the parent spec's open question).
+  rule, resolving the parent spec's open question). **Stale (2026-07-04)**:
+  Hope was retired entirely (commit d39ad67), and `HOLD_STATION_GRACE_DAYS`
+  was removed along with it (`CLAUDE.md`'s retired-constants note) — there
+  is currently no soft pressure at all for holding station indefinitely.
 - **Drift**: entering Drifting fires a log entry; recovery is
   `DRIFT_RECOVERY_HOURS = 36` of wall-clock, then a recovery scene
   (authored per chapter, spec 4) plays on next open; resume with

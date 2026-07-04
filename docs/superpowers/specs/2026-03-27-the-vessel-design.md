@@ -200,6 +200,23 @@ bottom the ship falls into the Long Silence (arcs pause, legs crawl) until
 a rest stop breaks it. Hope is the caravan answer to Act 1's power curve:
 the number that measures *how the people are doing*.
 
+> **Doc-alignment note (2026-07-04):** this is the act's founding thesis doc
+> and reads mostly true today — Souls, Provisions, letters, the arrival —
+> but several concrete details below have since changed. **Hope was retired
+> entirely** (commit d39ad67; see `docs/superpowers/specs/2026-07-03-vessel-ferryman-design.md`'s
+> two Follow-up sections for the full story) — every passage below
+> describing Hope as "the second of two gauges," the Long Silence, or hope
+> as wind/currency is now historical, not current design. What replaced it:
+> speed comes from Trim (player-facing **Pace**, per the 2026-07-03 naming
+> pass) and station bonuses only; the equivalent "how are the people doing"
+> pressure lives in the Colony era's Ward yard (post-maiden-voyage only —
+> see `src/vessel/colony.rs`), not in the crossing itself. Also stale:
+> **refits** shipped as **6** (3 A/B pairs), not ~3 (`refits.rs`); the
+> **route** is a 38-waypoint, 45-road, 8-rumor branching DAG (`route.rs`),
+> not a single 24-stop line — "waypoint 24" below describes one maximal
+> traversal, not the authored total. `src/vessel/CLAUDE.md` is ground truth
+> for current constants and shape.
+
 ### The Vessel Underway
 
 ### Resource Model — two gauges, nothing else

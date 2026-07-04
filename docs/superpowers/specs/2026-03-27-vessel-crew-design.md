@@ -4,6 +4,15 @@
 > of Souls* — see the rewritten parent spec and
 > [2026-07-02-act2-voyage-experience-exploration.md](2026-07-02-act2-voyage-experience-exploration.md).
 > Rewritten as The Souls (spec 3): arcs, hope, and memorial replace stat multipliers. Capacity, injury, and offline-protection bones survive. Kept for salvage, not for implementation.
+>
+> **Confirmed abandoned (2026-07-04 doc-alignment pass):** nothing in this
+> spec shipped — no Specialty/ShipTrait/RoomTrait system, no skill levels,
+> no `[C]` crew screen, no `crew.rs`. What shipped instead (`src/vessel/souls.rs`)
+> is 8 authored named souls competing for 7 fixed berths across 3 stations
+> (Helm/Tender/Watch) — structurally unrelated to this doc's design. Note
+> also: "hope" in this note's own superseded-by text is itself now stale —
+> Hope was retired entirely (commit d39ad67); memorial/loss (`mark_lost()`)
+> survives, arcs survive, hope does not.
 
 **Parent spec:** `docs/superpowers/specs/2026-03-27-the-vessel-design.md`
 **Sub-project:** 5 of 7

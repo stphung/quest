@@ -81,6 +81,69 @@ pub fn render_vessel_discovery_modal(frame: &mut Frame, area: Rect, _ctx: &Layou
     frame.render_widget(text, inner);
 }
 
+/// The 5-beat launch transition (spec 4): a full-screen, Enter-advanced
+/// sequence played once between the launch burn and the first Voyage frame.
+/// Unlike the other Vessel screens this has no border — the transition is a
+/// sequence of full-screen renders, not an overlay over the game beneath it.
+pub fn render_launch_transition(frame: &mut Frame, area: Rect, beat: u8) {
+    use crate::vessel::transition::{self, BEAT_COUNT};
+
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        ratatui::widgets::Block::default().style(Style::default().bg(Color::Black)),
+        area,
+    );
+
+    let content = transition::beat(beat);
+    // Beats darken/fragment/build/brighten in sequence — the fiction of the
+    // old UI unweaving into the new one, without needing real animation.
+    let color = match beat {
+        1 => Color::DarkGray,
+        2 => VESSEL_VIOLET_DIM,
+        3 => VESSEL_VIOLET,
+        4 => GOLD,
+        _ => Color::White,
+    };
+
+    let mut lines: Vec<Line> = Vec::new();
+    let content_height = content.lines.len() as u16 + 4;
+    for _ in 0..area.height.saturating_sub(content_height) / 2 {
+        lines.push(Line::from(""));
+    }
+    for text in content.lines {
+        lines.push(Line::from(Span::styled(
+            (*text).to_string(),
+            Style::default().fg(color),
+        )));
+    }
+    lines.push(Line::from(""));
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "[Enter]",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let text = Paragraph::new(lines).alignment(ratatui::layout::Alignment::Center);
+    frame.render_widget(text, area);
+
+    // A small "N / 5" marker in the corner — the only chrome on an
+    // otherwise bare screen, so the player knows a sequence is playing.
+    let marker = format!(" {beat} / {BEAT_COUNT} \u{2014} {} ", content.heading);
+    let marker_width = marker.len() as u16;
+    if area.width > marker_width {
+        let marker_area = Rect::new(
+            area.x + area.width - marker_width - 1,
+            area.y,
+            marker_width,
+            1,
+        );
+        frame.render_widget(
+            Paragraph::new(Span::styled(marker, Style::default().fg(Color::DarkGray))),
+            marker_area,
+        );
+    }
+}
+
 /// Full-screen construction overlay opened with [V].
 pub fn render_vessel_overlay(
     frame: &mut Frame,

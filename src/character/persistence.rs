@@ -41,6 +41,7 @@ impl CharacterManager {
             vessel_launched: state.vessel_launched,
             vessel_arrived: state.vessel_arrived,
             last_crossing_complete: state.last_crossing_complete,
+            vessel_transition_played: state.vessel_transition_played,
         };
 
         let json = serde_json::to_string_pretty(&save_data)
@@ -106,6 +107,7 @@ impl CharacterManager {
             vessel_launched: save_data.vessel_launched,
             vessel_arrived: save_data.vessel_arrived,
             last_crossing_complete: save_data.last_crossing_complete,
+            vessel_transition_played: save_data.vessel_transition_played,
             vessel_last_whisper_at: 0,
             chrono_surge_active: false,
             debug_force_overcharge: false,

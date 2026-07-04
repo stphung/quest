@@ -78,6 +78,12 @@ Nothing ticks. Provisions and hope gauges are retired from the panel
 (the crossing is over; the gauges were the crossing). Time-at-the-Tree
 is not measured. This screen is deliberately a museum, not a lobby.
 
+> **Doc-alignment note (2026-07-04):** "hope" above described a
+> per-arrival retirement; as of commit d39ad67, Hope is retired from the
+> game entirely, not just from this panel — there is no hope gauge left to
+> retire anywhere in the Voyage. The framing above is now redundant with
+> the broader retirement rather than wrong.
+
 ## The Manifest
 
 One scrollable panel, a ship's document in four parts:
