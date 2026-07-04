@@ -157,4 +157,27 @@ mod tests {
         assert_eq!(item.ilvl, ilvl_for_zone(3));
         assert!(state.active_dungeon.is_none());
     }
+
+    #[test]
+    fn collect_dungeon_item_without_active_dungeon_does_not_panic() {
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.active_dungeon = None;
+
+        let item =
+            crate::items::generate_item(crate::items::EquipmentSlot::Weapon, Rarity::Common, 10);
+
+        // Should be a no-op, not panic.
+        collect_dungeon_item(&mut state, item);
+        assert!(state.active_dungeon.is_none());
+    }
+
+    #[test]
+    fn add_dungeon_xp_without_active_dungeon_does_not_panic() {
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.active_dungeon = None;
+
+        // Should be a no-op, not panic.
+        add_dungeon_xp(&mut state, 500);
+        assert!(state.active_dungeon.is_none());
+    }
 }

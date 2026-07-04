@@ -747,4 +747,374 @@ mod tests {
         }
         assert!((tracker.rate_per_hour()).abs() < 1e-9);
     }
+
+    #[test]
+    fn test_rate_tracker_default_matches_new() {
+        let tracker = RateTracker::default();
+        assert!((tracker.rate_per_hour()).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_node_id_name_all_variants() {
+        assert_eq!(NodeId::EmberSpindle.name(), "Ember Spindle");
+        assert_eq!(NodeId::ReflectionLens.name(), "Reflection Lens");
+        assert_eq!(NodeId::VoidCondenser.name(), "Void Condenser");
+        assert_eq!(NodeId::MemoryArchive.name(), "Memory Archive");
+        assert_eq!(NodeId::SilenceWell.name(), "Silence Well");
+        assert_eq!(NodeId::ResonanceForge.name(), "Resonance Forge");
+    }
+
+    #[test]
+    fn test_node_id_index_all_variants() {
+        assert_eq!(NodeId::EmberSpindle.index(), 0);
+        assert_eq!(NodeId::ReflectionLens.index(), 1);
+        assert_eq!(NodeId::VoidCondenser.index(), 2);
+        assert_eq!(NodeId::MemoryArchive.index(), 3);
+        assert_eq!(NodeId::SilenceWell.index(), 4);
+        assert_eq!(NodeId::ResonanceForge.index(), 5);
+    }
+
+    #[test]
+    fn test_node_id_nature_all_variants() {
+        assert_eq!(NodeId::EmberSpindle.nature(), NodeNature::Heat);
+        assert_eq!(NodeId::ReflectionLens.nature(), NodeNature::Form);
+        assert_eq!(NodeId::VoidCondenser.nature(), NodeNature::Void);
+        assert_eq!(NodeId::MemoryArchive.nature(), NodeNature::Pattern);
+        assert_eq!(NodeId::SilenceWell.nature(), NodeNature::Stillness);
+        assert_eq!(NodeId::ResonanceForge.nature(), NodeNature::Vibration);
+    }
+
+    #[test]
+    fn test_node_id_all_constant_has_six_unique_entries() {
+        use std::collections::HashSet;
+        let set: HashSet<NodeId> = NodeId::ALL.iter().copied().collect();
+        assert_eq!(set.len(), 6);
+    }
+
+    #[test]
+    fn test_loom_archetype_variants_are_distinct() {
+        assert_ne!(LoomArchetype::BurnBright, LoomArchetype::ReachWide);
+        assert_ne!(LoomArchetype::ReachWide, LoomArchetype::RunDeep);
+        assert_eq!(LoomArchetype::BurnBright, LoomArchetype::BurnBright);
+    }
+
+    #[test]
+    fn test_loom_archetype_serde_round_trip() {
+        for archetype in [
+            LoomArchetype::BurnBright,
+            LoomArchetype::ReachWide,
+            LoomArchetype::RunDeep,
+        ] {
+            let json = serde_json::to_string(&archetype).unwrap();
+            let loaded: LoomArchetype = serde_json::from_str(&json).unwrap();
+            assert_eq!(loaded, archetype);
+        }
+    }
+
+    #[test]
+    fn test_loom_node_new_defaults() {
+        let node = LoomNode::new(NodeId::SilenceWell);
+        assert_eq!(node.id, NodeId::SilenceWell);
+        assert_eq!(node.level, 1);
+        assert!(!node.unlocked);
+        assert!((node.buffer - 0.0).abs() < 1e-9);
+        assert!((node.buffer_capacity - 250.0).abs() < 1e-9);
+        assert!((node.base_rate - 25.0).abs() < 1e-9);
+        assert!(!node.stalled);
+        assert!((node.unlock_progress - 0.0).abs() < 1e-9);
+        assert!(!node.upgrading);
+        assert!((node.upgrade_remaining_secs - 0.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_loom_node_deserialize_applies_defaults() {
+        // Only `id` is required; every other field should fall back to its
+        // #[serde(default = "...")] function.
+        let json = r#"{"id":"EmberSpindle"}"#;
+        let node: LoomNode = serde_json::from_str(json).unwrap();
+        assert_eq!(node.id, NodeId::EmberSpindle);
+        assert_eq!(node.level, 1);
+        assert!((node.buffer_capacity - 250.0).abs() < 1e-9);
+        assert!((node.base_rate - 25.0).abs() < 1e-9);
+        assert!(!node.unlocked);
+        assert!(!node.stalled);
+    }
+
+    #[test]
+    fn test_shuttle_deserialize_applies_defaults() {
+        // Omit tier, amount, buffer_capacity, level, sources — all have
+        // #[serde(default = "...")] or #[serde(default)] fallbacks.
+        let json = r#"{
+            "input_a": "Ember",
+            "input_b": "VoidEssence",
+            "nature": "Heat",
+            "output": "ForgedLight"
+        }"#;
+        let shuttle: Shuttle = serde_json::from_str(json).unwrap();
+        assert_eq!(shuttle.tier, 1);
+        assert!((shuttle.amount - 1.0).abs() < 1e-9);
+        assert!((shuttle.buffer_capacity - 250.0).abs() < 1e-9);
+        assert_eq!(shuttle.level, 1);
+        assert!(shuttle.sources_a.is_empty());
+        assert!(shuttle.sources_b.is_empty());
+        assert!(!shuttle.under_construction);
+        assert!((shuttle.construction_secs_remaining - 0.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_shuttle_construction_secs_remaining_alias() {
+        // Legacy save field name should still deserialize via `alias`.
+        let json = r#"{
+            "input_a": "Ember",
+            "input_b": "VoidEssence",
+            "nature": "Heat",
+            "output": "ForgedLight",
+            "construction_ticks_remaining": 42.0
+        }"#;
+        let shuttle: Shuttle = serde_json::from_str(json).unwrap();
+        assert!((shuttle.construction_secs_remaining - 42.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_pattern_requirement_amount_alias() {
+        let json = r#"{
+            "resource": "Ember",
+            "rate_per_hour": 12.5
+        }"#;
+        let req: PatternRequirement = serde_json::from_str(json).unwrap();
+        assert!((req.amount - 12.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_codex_entry_fields() {
+        let entry = CodexEntry {
+            inputs: vec![Resource::Ember, Resource::VoidEssence],
+            node_nature: NodeNature::Heat,
+            output: Resource::ForgedLight,
+            output_amount: 2.0,
+            discovered: true,
+        };
+        assert_eq!(entry.inputs.len(), 2);
+        assert_eq!(entry.node_nature, NodeNature::Heat);
+        assert_eq!(entry.output, Resource::ForgedLight);
+        assert!((entry.output_amount - 2.0).abs() < 1e-9);
+        assert!(entry.discovered);
+    }
+
+    #[test]
+    fn test_woven_pattern_count_excludes_eternal() {
+        let mut state = LoomState::new();
+        state.persistent.patterns.push(WovenPattern {
+            index: 0,
+            name: "Regular".to_string(),
+            requirements: vec![],
+            completed: false,
+            flavor: String::new(),
+            eternal: false,
+        });
+        state.persistent.patterns.push(WovenPattern {
+            index: 1,
+            name: "Eternal".to_string(),
+            requirements: vec![],
+            completed: false,
+            flavor: String::new(),
+            eternal: true,
+        });
+        assert_eq!(state.persistent.woven_pattern_count(), 1);
+    }
+
+    #[test]
+    fn test_completed_pattern_count_excludes_eternal_even_when_completed() {
+        let mut state = LoomState::new();
+        state.persistent.patterns.push(WovenPattern {
+            index: 0,
+            name: "Eternal".to_string(),
+            requirements: vec![],
+            completed: true,
+            flavor: String::new(),
+            eternal: true,
+        });
+        assert_eq!(state.persistent.completed_pattern_count(), 0);
+    }
+
+    #[test]
+    fn test_max_shuttles_curve_boundaries() {
+        let cases: [(usize, usize); 10] = [
+            (0, 0),
+            (1, 1),
+            (3, 1),
+            (4, 2),
+            (7, 2),
+            (8, 3),
+            (11, 3),
+            (12, 4),
+            (14, 4),
+            (15, MAX_SHUTTLES),
+        ];
+        for (completed, expected_slots) in cases {
+            let mut state = LoomState::new();
+            for i in 0..completed {
+                state.persistent.patterns.push(WovenPattern {
+                    index: i as u32,
+                    name: format!("P{}", i),
+                    requirements: vec![],
+                    completed: true,
+                    flavor: String::new(),
+                    eternal: false,
+                });
+            }
+            assert_eq!(
+                state.persistent.max_shuttles(),
+                expected_slots,
+                "completed={} expected slots={}",
+                completed,
+                expected_slots
+            );
+        }
+    }
+
+    #[test]
+    fn test_max_shuttles_never_exceeds_cap_at_high_counts() {
+        let mut state = LoomState::new();
+        for i in 0..50 {
+            state.persistent.patterns.push(WovenPattern {
+                index: i,
+                name: format!("P{}", i),
+                requirements: vec![],
+                completed: true,
+                flavor: String::new(),
+                eternal: false,
+            });
+        }
+        assert_eq!(state.persistent.max_shuttles(), MAX_SHUTTLES);
+    }
+
+    #[test]
+    fn test_loom_persistent_default_trait() {
+        let persistent = LoomPersistent::default();
+        assert_eq!(persistent.version, LOOM_SAVE_VERSION);
+        assert!(!persistent.discovered);
+        assert!(persistent.archetype.is_none());
+        assert_eq!(persistent.nodes.len(), 6);
+        assert!(persistent.shuttles.is_empty());
+    }
+
+    #[test]
+    fn test_loom_state_default_trait() {
+        let state = LoomState::default();
+        assert!(!state.persistent.discovered);
+        assert!((state.time_warp - 1.0).abs() < 1e-9);
+        assert!(!state.graph_dirty);
+        assert!(state.last_tick_at.is_none());
+    }
+
+    #[test]
+    fn test_loom_state_transient_fields_not_serialized() {
+        let mut state = LoomState::new();
+        state.time_warp = 5.0;
+        state.graph_dirty = true;
+        state
+            .rate_trackers
+            .insert(Resource::Ember, RateTracker::new());
+
+        let json = serde_json::to_string(&state).unwrap();
+        let loaded: LoomState = serde_json::from_str(&json).unwrap();
+
+        // Transient fields reset to their defaults on load, regardless of
+        // what was set before serialization.
+        assert!((loaded.time_warp - 1.0).abs() < 1e-9);
+        assert!(!loaded.graph_dirty);
+        assert!(loaded.rate_trackers.is_empty());
+        assert!(loaded.last_tick_at.is_none());
+        // Persistent data survives the round trip.
+        assert_eq!(loaded.persistent.nodes.len(), state.persistent.nodes.len());
+    }
+
+    #[test]
+    fn test_loom_ui_state_new_and_default() {
+        let ui = LoomUiState::new();
+        assert!(!ui.open);
+        assert!(ui.selected_graph_node.is_none());
+        assert!(ui.particle_phases.is_empty());
+        assert_eq!(ui.throbber_frame, 0);
+        assert!(ui.build.is_none());
+        assert!(ui.loom_graph.is_none());
+        assert!(ui.loom_layout.is_none());
+        assert!(!ui.graph_dirty);
+        assert!(!ui.demolish_pending);
+
+        let default_ui = LoomUiState::default();
+        assert!(!default_ui.open);
+    }
+
+    #[test]
+    fn test_loom_ui_state_open_method() {
+        let mut ui = LoomUiState::new();
+        assert!(!ui.open);
+        ui.open();
+        assert!(ui.open);
+    }
+
+    #[test]
+    fn test_build_step_variants_construct() {
+        let recipe = BuildStep::SelectRecipe { cursor: 0 };
+        let sources_a = BuildStep::SelectSourcesA {
+            cursor: 1,
+            toggle: vec![true, false],
+        };
+        let sources_b = BuildStep::SelectSourcesB {
+            cursor: 2,
+            toggle: vec![false],
+        };
+        let confirm = BuildStep::Confirm;
+        let blocked = BuildStep::Blocked {
+            message: "need more patterns".to_string(),
+        };
+
+        // Exercise Debug + Clone derives on every variant.
+        for step in [
+            recipe.clone(),
+            sources_a.clone(),
+            sources_b.clone(),
+            confirm.clone(),
+            blocked.clone(),
+        ] {
+            assert!(!format!("{:?}", step).is_empty());
+        }
+
+        match blocked {
+            BuildStep::Blocked { message } => assert_eq!(message, "need more patterns"),
+            _ => panic!("expected Blocked variant"),
+        }
+    }
+
+    #[test]
+    fn test_build_state_construction() {
+        let build = BuildState {
+            step: BuildStep::Confirm,
+            tier: 2,
+            recipe_index: 3,
+            available_recipes: vec![0, 1, 2],
+            eligible_sources_a: vec![LoomNodeRef::Extractor(NodeId::EmberSpindle)],
+            eligible_sources_b: vec![LoomNodeRef::Shuttle(0)],
+            selected_sources_a: vec![],
+            selected_sources_b: vec![],
+        };
+        assert_eq!(build.tier, 2);
+        assert_eq!(build.available_recipes.len(), 3);
+        assert!(matches!(build.step, BuildStep::Confirm));
+    }
+
+    #[test]
+    fn test_resource_and_nodenature_hash_and_eq() {
+        use std::collections::HashSet;
+        let mut resources = HashSet::new();
+        resources.insert(Resource::Ember);
+        resources.insert(Resource::Ember);
+        resources.insert(Resource::WovenReality);
+        assert_eq!(resources.len(), 2);
+
+        assert_eq!(NodeNature::Heat, NodeNature::Heat);
+        assert_ne!(NodeNature::Heat, NodeNature::Void);
+    }
 }

@@ -280,6 +280,70 @@ mod tests {
     }
 
     #[test]
+    fn resolve_combat_retreat_falls_back_to_meadow_name_for_unknown_zone() {
+        // Defensive fallback: if defeated_bosses somehow references a zone_id
+        // with no zone data, the zone_name should fall back to "Meadow"
+        // rather than panicking (get_zone() returns None for unknown ids).
+        let mut state = state_with_enemy("Dire Wolf");
+        state.zone_progression.defeated_bosses.insert((9999, 1));
+
+        let events = resolve_combat_retreat(&mut state, true);
+
+        assert!(matches!(
+            events.as_slice(),
+            [CombatEvent::CombatRetreat { zone_name }] if zone_name == "Meadow"
+        ));
+        assert_eq!(state.zone_progression.current_zone_id, 9999);
+    }
+
+    #[test]
+    fn resolve_boss_enrage_falls_back_to_boss_name_without_current_enemy() {
+        // Defensive fallback: resolve_boss_enrage is only called by
+        // update_combat while current_enemy is Some, but it shouldn't panic
+        // if called with no enemy present — enemy_name should fall back to
+        // "Boss".
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.combat_state.current_enemy = None;
+        let achievements = Achievements::default();
+
+        let events = resolve_boss_enrage(&mut state, &achievements);
+
+        assert!(matches!(
+            events.as_slice(),
+            [CombatEvent::BossEnrage {
+                weapon_blocked: false,
+                enemy_name
+            }] if enemy_name == "Boss"
+        ));
+    }
+
+    #[test]
+    fn update_combat_neither_timer_ready_produces_no_attack_events() {
+        // Both timers start below their intervals; a small delta_time tick
+        // should just accumulate time without any attack resolving.
+        let mut rng = ChaCha8Rng::seed_from_u64(11);
+        let mut state = state_with_enemy("Dire Wolf");
+        state.combat_state.player_attack_timer = 0.0;
+        state.combat_state.enemy_attack_timer = 0.0;
+
+        let events = update_combat(
+            &mut rng,
+            &mut state,
+            0.1,
+            &CombatBonuses::default(),
+            &mut Achievements::default(),
+            &DerivedStats::default(),
+            11,
+            30,
+        );
+
+        assert!(events.is_empty());
+        assert!((state.combat_state.player_attack_timer - 0.1).abs() < f64::EPSILON);
+        assert!((state.combat_state.enemy_attack_timer - 0.1).abs() < f64::EPSILON);
+        assert!(state.combat_state.current_enemy.is_some());
+    }
+
+    #[test]
     fn resolve_combat_retreat_abandons_active_dungeon() {
         let mut state = state_with_enemy("Boss Gorehowl");
         state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(10, 0, 1));

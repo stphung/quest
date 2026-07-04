@@ -2711,4 +2711,563 @@ mod tests {
             );
         }
     }
+
+    // ── DebugCategory::label() ──────────────────────────────────────────
+
+    #[test]
+    fn test_debug_category_labels() {
+        assert_eq!(DebugCategory::Challenges.label(), "Challenges");
+        assert_eq!(DebugCategory::World.label(), "World");
+        assert_eq!(DebugCategory::Resources.label(), "Resources");
+        assert_eq!(DebugCategory::Items.label(), "Items");
+        assert_eq!(DebugCategory::Deep.label(), "The Deep");
+        assert_eq!(DebugCategory::Zones.label(), "Zones");
+        assert_eq!(DebugCategory::Character.label(), "Character");
+        assert_eq!(DebugCategory::Soulforge.label(), "Soulforge");
+        assert_eq!(DebugCategory::Loom.label(), "Loom");
+        assert_eq!(DebugCategory::Borders.label(), "Borders");
+    }
+
+    // ── label_for_category_index / option_count_for_category ───────────
+
+    #[test]
+    fn test_label_for_category_index_non_borders() {
+        assert_eq!(
+            label_for_category_index(DebugCategory::Challenges, 0),
+            DebugAction::TriggerChessChallenge.label()
+        );
+    }
+
+    #[test]
+    fn test_label_for_category_index_out_of_bounds_returns_unknown_option() {
+        assert_eq!(
+            label_for_category_index(DebugCategory::Challenges, 9999),
+            "Unknown option"
+        );
+    }
+
+    #[test]
+    fn test_label_for_category_index_borders_out_of_bounds_returns_unknown_border() {
+        assert_eq!(
+            label_for_category_index(DebugCategory::Borders, 9999),
+            "Unknown border"
+        );
+    }
+
+    #[test]
+    fn test_option_count_for_category_matches_every_category() {
+        assert_eq!(
+            option_count_for_category(DebugCategory::Challenges),
+            CHALLENGE_ACTIONS.len()
+        );
+        assert_eq!(
+            option_count_for_category(DebugCategory::World),
+            WORLD_ACTIONS.len()
+        );
+        assert_eq!(
+            option_count_for_category(DebugCategory::Resources),
+            RESOURCE_ACTIONS.len()
+        );
+        assert_eq!(
+            option_count_for_category(DebugCategory::Items),
+            ITEM_ACTIONS.len()
+        );
+        assert_eq!(
+            option_count_for_category(DebugCategory::Deep),
+            DEEP_ACTIONS.len()
+        );
+        assert_eq!(
+            option_count_for_category(DebugCategory::Soulforge),
+            SOULFORGE_ACTIONS.len()
+        );
+        assert_eq!(
+            option_count_for_category(DebugCategory::Loom),
+            LOOM_ACTIONS.len()
+        );
+        assert_eq!(
+            option_count_for_category(DebugCategory::Borders),
+            SELECTABLE_UI_BORDER_STYLES.len()
+        );
+    }
+
+    // ── DebugMenu::selected_border_style ────────────────────────────────
+
+    #[test]
+    fn test_selected_border_style_in_borders_category() {
+        let mut menu = DebugMenu::new();
+        menu.open();
+        for _ in 0..9 {
+            menu.navigate_next_category();
+        }
+        assert_eq!(menu.current_category(), DebugCategory::Borders);
+        assert_eq!(
+            menu.selected_border_style(),
+            SELECTABLE_UI_BORDER_STYLES.first().copied()
+        );
+    }
+
+    #[test]
+    fn test_selected_border_style_outside_borders_category_is_none() {
+        let mut menu = DebugMenu::new();
+        menu.open();
+        assert_eq!(menu.current_category(), DebugCategory::Challenges);
+        assert_eq!(menu.selected_border_style(), None);
+    }
+
+    // ── DebugMenu::trigger_selected fallback branches ───────────────────
+
+    #[test]
+    fn test_trigger_selected_border_out_of_range_index_falls_back() {
+        let mut menu = DebugMenu::new();
+        menu.open();
+        for _ in 0..9 {
+            menu.navigate_next_category();
+        }
+        assert_eq!(menu.current_category(), DebugCategory::Borders);
+        menu.selected_index = SELECTABLE_UI_BORDER_STYLES.len() + 5;
+
+        let (
+            mut state,
+            mut haven,
+            mut enhancement,
+            mut deep,
+            mut achievements,
+            mut loom,
+            mut loom_ui,
+        ) = make_test_fixtures();
+        let msg = menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+            &mut loom,
+            &mut loom_ui,
+        );
+        assert_eq!(msg, "Border preview updated.");
+    }
+
+    #[test]
+    fn test_trigger_selected_unknown_option_out_of_range_index() {
+        let mut menu = DebugMenu::new();
+        menu.open(); // Challenges category
+        menu.selected_index = CHALLENGE_ACTIONS.len() + 5;
+
+        let (
+            mut state,
+            mut haven,
+            mut enhancement,
+            mut deep,
+            mut achievements,
+            mut loom,
+            mut loom_ui,
+        ) = make_test_fixtures();
+        let msg = menu.trigger_selected(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+            &mut loom,
+            &mut loom_ui,
+        );
+        assert_eq!(msg, "Unknown option");
+    }
+
+    // ── Previously-untested challenge triggers ──────────────────────────
+
+    #[test]
+    fn test_trigger_sudoku_challenge() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let msg = trigger_sudoku_challenge(&mut state);
+        assert_eq!(msg, "Sigil Matrix challenge added!");
+        assert!(state.challenge_menu.has_challenge(&ChallengeType::Sudoku));
+
+        let msg2 = trigger_sudoku_challenge(&mut state);
+        assert_eq!(msg2, "Sigil Matrix challenge already pending!");
+    }
+
+    #[test]
+    fn test_trigger_shard_fusion_challenge() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let msg = trigger_shard_fusion_challenge(&mut state);
+        assert_eq!(msg, "Shard Fusion challenge added!");
+        assert!(state
+            .challenge_menu
+            .has_challenge(&ChallengeType::ShardFusion));
+
+        let msg2 = trigger_shard_fusion_challenge(&mut state);
+        assert_eq!(msg2, "Shard Fusion challenge already pending!");
+    }
+
+    #[test]
+    fn test_trigger_runic_lights_challenge() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let msg = trigger_runic_lights_challenge(&mut state);
+        assert_eq!(msg, "Runic Lights challenge added!");
+        assert!(state
+            .challenge_menu
+            .has_challenge(&ChallengeType::RunicLights));
+
+        let msg2 = trigger_runic_lights_challenge(&mut state);
+        assert_eq!(msg2, "Runic Lights challenge already pending!");
+    }
+
+    #[test]
+    fn test_trigger_vault_warden_challenge() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let msg = trigger_vault_warden_challenge(&mut state);
+        assert_eq!(msg, "Vault Warden challenge added!");
+        assert!(state
+            .challenge_menu
+            .has_challenge(&ChallengeType::VaultWarden));
+
+        let msg2 = trigger_vault_warden_challenge(&mut state);
+        assert_eq!(msg2, "Vault Warden challenge already pending!");
+    }
+
+    // ── Resources category ──────────────────────────────────────────────
+
+    #[test]
+    fn test_trigger_grant_stormglass() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        assert_eq!(state.stormglass, 0);
+        let msg = trigger_grant_stormglass(&mut state);
+        assert_eq!(msg, "Granted 1000 Stormglass!");
+        assert_eq!(state.stormglass, 1000);
+        assert!(state.stormglass_discovered);
+    }
+
+    #[test]
+    fn test_trigger_discover_stormglass() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        assert!(!state.stormglass_discovered);
+        let msg = trigger_discover_stormglass(&mut state);
+        assert_eq!(msg, "Stormglass discovered!");
+        assert!(state.stormglass_discovered);
+
+        let msg2 = trigger_discover_stormglass(&mut state);
+        assert_eq!(msg2, "Stormglass already discovered!");
+    }
+
+    #[test]
+    fn test_trigger_grant_100k_stormglass() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let msg = trigger_grant_100k_stormglass(&mut state);
+        assert_eq!(msg, "Granted 100,000 Stormglass!");
+        assert_eq!(state.stormglass, 100_000);
+        assert!(state.stormglass_discovered);
+    }
+
+    #[test]
+    fn test_trigger_etch_random_sigils() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let msg = trigger_etch_random_sigils(&mut state);
+        assert_eq!(msg, "All 5 sigil slots unlocked and etched!");
+        assert_eq!(
+            state.storm_sigils.slots_unlocked,
+            crate::stormglass::sigils::MAX_SIGIL_SLOTS as u8
+        );
+        for slot in &state.storm_sigils.sigils {
+            assert!(slot.is_some());
+        }
+    }
+
+    #[test]
+    fn test_trigger_etch_s_plus_sigil_unlocks_slot_if_none() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        assert_eq!(state.storm_sigils.slots_unlocked, 0);
+        let msg = trigger_etch_s_plus_sigil(&mut state);
+        assert_eq!(msg, "S+ Sigil of Fury etched in slot 1!");
+        assert_eq!(state.storm_sigils.slots_unlocked, 1);
+        assert!(state.storm_sigils.sigils[0].is_some());
+    }
+
+    #[test]
+    fn test_trigger_etch_s_plus_sigil_keeps_existing_slot_count() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        state.storm_sigils.slots_unlocked = 3;
+        trigger_etch_s_plus_sigil(&mut state);
+        assert_eq!(state.storm_sigils.slots_unlocked, 3);
+    }
+
+    #[test]
+    fn test_trigger_force_overcharge() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        assert!(!state.debug_force_overcharge);
+        let msg = trigger_force_overcharge(&mut state);
+        assert_eq!(msg, "Next Chrono Surge will be Overcharged!");
+        assert!(state.debug_force_overcharge);
+    }
+
+    // ── Deep category: discovery/refresh/completion ─────────────────────
+
+    #[test]
+    fn test_trigger_deep_discovery() {
+        let mut deep = DeepState::new();
+        assert!(!deep.persistent.discovered);
+        let msg = trigger_deep_discovery(&mut deep, 0);
+        assert_eq!(msg, "The Deep discovered!");
+        assert!(deep.persistent.discovered);
+
+        let msg2 = trigger_deep_discovery(&mut deep, 0);
+        assert_eq!(msg2, "The Deep already discovered!");
+    }
+
+    #[test]
+    fn test_trigger_deep_grant_marks_requires_discovery() {
+        let mut deep = DeepState::new();
+        let msg = trigger_deep_grant_marks(&mut deep);
+        assert_eq!(msg, "Discover The Deep first!");
+    }
+
+    #[test]
+    fn test_trigger_deep_refresh_mission_pool_success() {
+        let mut deep = DeepState::new();
+        let mut rng = rand::rng();
+        crate::deep::complete_discovery(&mut deep, &mut rng);
+        let msg = trigger_deep_refresh_mission_pool(&mut deep);
+        assert_eq!(msg, "Deep mission pool refreshed!");
+        assert!(deep.prestige.pool_refreshed_at.is_some());
+    }
+
+    #[test]
+    fn test_trigger_deep_refresh_recruit_pool_requires_discovery() {
+        let mut deep = DeepState::new();
+        let msg = trigger_deep_refresh_recruit_pool(&mut deep);
+        assert_eq!(msg, "Discover The Deep first!");
+    }
+
+    #[test]
+    fn test_trigger_deep_refresh_recruit_pool_success() {
+        let mut deep = DeepState::new();
+        let mut rng = rand::rng();
+        crate::deep::complete_discovery(&mut deep, &mut rng);
+        let msg = trigger_deep_refresh_recruit_pool(&mut deep);
+        assert_eq!(msg, "Deep recruit pool refreshed!");
+        assert!(!deep.prestige.recruit_pool.candidates.is_empty());
+    }
+
+    #[test]
+    fn test_trigger_deep_clear_frontier_layer_requires_discovery() {
+        let mut deep = DeepState::new();
+        let msg = trigger_deep_clear_frontier_layer(&mut deep);
+        assert_eq!(msg, "Discover The Deep first!");
+    }
+
+    #[test]
+    fn test_trigger_deep_complete_active_missions_requires_discovery() {
+        let mut deep = DeepState::new();
+        let msg = trigger_deep_complete_active_missions(&mut deep);
+        assert_eq!(msg, "Discover The Deep first!");
+    }
+
+    #[test]
+    fn test_trigger_deep_complete_active_missions_no_active() {
+        let mut deep = DeepState::new();
+        let mut rng = rand::rng();
+        crate::deep::complete_discovery(&mut deep, &mut rng);
+        deep.prestige.active_missions.clear();
+        let msg = trigger_deep_complete_active_missions(&mut deep);
+        assert_eq!(msg, "No active Deep missions.");
+    }
+
+    #[test]
+    fn test_trigger_deep_complete_active_missions_completes() {
+        let mut deep = DeepState::new();
+        let mut rng = rand::rng();
+        crate::deep::complete_discovery(&mut deep, &mut rng);
+        deep.prestige.active_missions.clear();
+        assert!(!deep.prestige.available_missions.is_empty());
+        let available = deep.prestige.available_missions[0].clone();
+        let now = Utc::now();
+        let mission = crate::deep::start_mission(
+            &available,
+            &[],
+            &mut deep.prestige,
+            &mut deep.persistent,
+            false,
+            now,
+            &mut rng,
+        );
+        deep.prestige.active_missions.push(mission);
+
+        let msg = trigger_deep_complete_active_missions(&mut deep);
+        assert_eq!(msg, "Completed active Deep missions!");
+        assert!(deep.prestige.active_missions.is_empty());
+    }
+
+    // ── Zones category edge cases ───────────────────────────────────────
+
+    #[test]
+    fn test_trigger_travel_to_zone_invalid_id() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
+        let msg = trigger_travel_to_zone(&mut state, &enhancement, &mut deep, 999);
+        assert_eq!(msg, "Invalid zone ID!");
+        assert_eq!(state.zone_progression.current_zone_id, 1);
+    }
+
+    #[test]
+    fn test_trigger_travel_to_zone_11_bumps_prestige_to_20() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
+        assert_eq!(state.prestige_rank, 0);
+
+        let msg = trigger_travel_to_zone(&mut state, &enhancement, &mut deep, 11);
+        assert_eq!(msg, "Traveled to The Expanse (Zone 11)");
+        // Zone 11's own prestige_requirement (25) exceeds the Zone-11-specific
+        // minimum-of-20 floor, so the higher requirement wins.
+        assert_eq!(state.prestige_rank, 25);
+    }
+
+    // ── Soulforge category ───────────────────────────────────────────────
+
+    #[test]
+    fn test_trigger_set_enhancement_all_levels() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let mut enhancement = EnhancementProgress::new();
+        for lvl in 0..=10u8 {
+            let msg = trigger_set_enhancement(&mut state, &mut enhancement, lvl);
+            assert_eq!(msg, format!("Set all enhancement to +{lvl}!"));
+            assert!(enhancement.levels.iter().all(|&l| l == lvl));
+            assert!(enhancement.discovered);
+        }
+    }
+
+    #[test]
+    fn test_trigger_set_enhancement_clamps_above_10() {
+        let mut state = GameState::new("Test".to_string(), 0);
+        let mut enhancement = EnhancementProgress::new();
+        let msg = trigger_set_enhancement(&mut state, &mut enhancement, 250);
+        assert_eq!(msg, "Set all enhancement to +10!");
+        assert!(enhancement.levels.iter().all(|&l| l == 10));
+    }
+
+    // ── Loom category: pattern milestones and eternal pattern guard ────
+
+    #[test]
+    fn test_loom_complete_pattern_milestones() {
+        let mut loom = LoomState::new();
+        crate::loom::complete_discovery(&mut loom);
+        let mut state = GameState::new("Test".to_string(), 0);
+        let mut haven = Haven::new();
+        let mut enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
+        let mut achievements = crate::achievements::Achievements::default();
+        let mut loom_ui = LoomUiState::new();
+
+        for i in 1..=28 {
+            let msg = DebugAction::LoomCompletePattern.run(
+                &mut state,
+                &mut haven,
+                &mut enhancement,
+                &mut deep,
+                &mut achievements,
+                &mut loom,
+                &mut loom_ui,
+            );
+            match i {
+                4 => assert_eq!(msg, "Pattern milestone: Thread Wilds"),
+                8 => assert_eq!(msg, "Pattern milestone: Woven Frontier"),
+                16 => assert_eq!(msg, "Pattern milestone: Unraveling"),
+                22 => assert_eq!(msg, "Pattern milestone: Grand Design"),
+                28 => assert_eq!(msg, "Pattern milestone: Final Weave"),
+                _ => assert_eq!(msg, "Current pattern completed.", "at i={i}"),
+            }
+        }
+        assert_eq!(loom.persistent.completed_pattern_count(), 28);
+    }
+
+    #[test]
+    fn test_loom_complete_pattern_on_eternal_returns_cannot_complete() {
+        let mut loom = LoomState::new();
+        crate::loom::complete_discovery(&mut loom);
+        let last_idx = loom.persistent.patterns.len() - 1;
+        loom.persistent.active_pattern = last_idx;
+        assert!(loom.persistent.patterns[last_idx].eternal);
+
+        let mut state = GameState::new("Test".to_string(), 0);
+        let mut haven = Haven::new();
+        let mut enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
+        let mut achievements = crate::achievements::Achievements::default();
+        let mut loom_ui = LoomUiState::new();
+
+        let msg = DebugAction::LoomCompletePattern.run(
+            &mut state,
+            &mut haven,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+            &mut loom,
+            &mut loom_ui,
+        );
+        assert_eq!(msg, "Cannot complete eternal pattern.");
+    }
+
+    // ── Comprehensive sweep ──────────────────────────────────────────────
+    //
+    // Every DebugAction variant appears in exactly one of the per-category
+    // const arrays (CHALLENGE_ACTIONS..LOOM_ACTIONS); together they enumerate
+    // the entire enum. Running `.label()` and `.run(...)` for every one of
+    // them, twice, exercises the full `label()`/`run()` dispatch matches and
+    // gives most trigger_* helpers both their "first time" and "already
+    // done"/idempotent-guard branches, without hand-writing a test per action.
+    #[test]
+    fn test_all_debug_actions_sweep_label_and_run() {
+        let (
+            mut state,
+            mut haven,
+            mut enhancement,
+            mut deep,
+            mut achievements,
+            mut loom,
+            mut loom_ui,
+        ) = make_test_fixtures();
+        // High prestige so zone/character/travel actions run their full body
+        // instead of bailing out on a prestige gate.
+        state.prestige_rank = 300;
+        state.recalculate_prestige_bonuses();
+
+        let mut all_actions: Vec<DebugAction> = Vec::new();
+        for cat in DEBUG_CATEGORIES {
+            all_actions.extend(actions_for_category(*cat).iter().copied());
+        }
+        // Sanity check: every DebugAction variant lives in one of the const
+        // arrays above (Borders has none, hence not 10 categories worth).
+        assert!(all_actions.len() > 100, "{}", all_actions.len());
+
+        // Pass 1: mostly exercises "first time" branches (discover, add
+        // challenge, forge, etc).
+        for action in all_actions.iter().copied() {
+            let _ = action.label();
+            let _ = action.run(
+                &mut state,
+                &mut haven,
+                &mut enhancement,
+                &mut deep,
+                &mut achievements,
+                &mut loom,
+                &mut loom_ui,
+            );
+        }
+
+        // Pass 2: mostly exercises "already done"/idempotent-guard branches,
+        // since pass 1 already discovered/added/forged everything pass 2
+        // revisits.
+        for action in all_actions.iter().copied() {
+            let _ = action.run(
+                &mut state,
+                &mut haven,
+                &mut enhancement,
+                &mut deep,
+                &mut achievements,
+                &mut loom,
+                &mut loom_ui,
+            );
+        }
+    }
 }

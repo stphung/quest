@@ -395,4 +395,160 @@ mod tests {
         assert!(s.contains("W: -"));
         assert!(s.contains("R: -"));
     }
+
+    #[test]
+    fn test_equipment_one_liner_with_items() {
+        use crate::items::{generate_item_with_rng, EquipmentSlot, Rarity};
+        use rand::SeedableRng;
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+
+        let mut equip = crate::items::Equipment::new();
+        equip.set(
+            EquipmentSlot::Weapon,
+            Some(generate_item_with_rng(
+                EquipmentSlot::Weapon,
+                Rarity::Legendary,
+                10,
+                &mut rng,
+            )),
+        );
+        equip.set(
+            EquipmentSlot::Ring,
+            Some(generate_item_with_rng(
+                EquipmentSlot::Ring,
+                Rarity::Common,
+                10,
+                &mut rng,
+            )),
+        );
+
+        let s = equipment_one_liner(&equip);
+        assert!(s.contains("W:Legendary"), "got: {s}");
+        assert!(s.contains("R:Common"), "got: {s}");
+        // Slots left unequipped still render as "-"
+        assert!(s.contains("A: -"));
+        assert!(s.contains("H: -"));
+        assert!(s.contains("G: -"));
+        assert!(s.contains("B: -"));
+        assert!(s.contains("Am: -"));
+    }
+
+    #[test]
+    fn test_generate_bug_report_end_to_end() {
+        let state = GameState::new("EndToEnd".to_string(), 0);
+        let haven = Haven::default();
+        let enhancement = EnhancementProgress::new();
+        let achievements = Achievements::default();
+
+        let report = generate_bug_report(&state, &haven, &enhancement, &achievements);
+        assert!(report.summary.contains("EndToEnd"));
+        assert!(report.clipboard_content.contains("Character Save"));
+        assert!(report.clipboard_content.contains("```json"));
+    }
+
+    #[test]
+    fn test_summary_haven_discovered_with_built_rooms() {
+        use crate::haven::HavenRoomId;
+
+        let state = GameState::new("Rooma".to_string(), 0);
+        let mut haven = Haven {
+            discovered: true,
+            ..Default::default()
+        };
+        // Build two rooms (tier > 0) among the room set; leave others at 0.
+        let rooms: Vec<HavenRoomId> = haven.rooms.keys().copied().collect();
+        for (i, room) in rooms.into_iter().enumerate() {
+            haven.rooms.insert(room, if i < 2 { 1 } else { 0 });
+        }
+        let enhancement = EnhancementProgress::new();
+        let achievements = Achievements::default();
+
+        let summary = build_summary(&state, &haven, &enhancement, &achievements);
+        assert!(
+            summary.contains("Haven: Yes (2 rooms)"),
+            "got summary: {summary}"
+        );
+    }
+
+    #[test]
+    fn test_summary_soulforge_discovered_with_max_level() {
+        let state = GameState::new("Forgey".to_string(), 0);
+        let haven = Haven::default();
+        let mut enhancement = EnhancementProgress::new();
+        enhancement.discovered = true;
+        enhancement.highest_level_reached = 7;
+        let achievements = Achievements::default();
+
+        let summary = build_summary(&state, &haven, &enhancement, &achievements);
+        assert!(
+            summary.contains("Soulforge: Yes (max +7)"),
+            "got summary: {summary}"
+        );
+    }
+
+    #[test]
+    fn test_summary_unknown_zone_falls_back() {
+        let mut state = GameState::new("Lost".to_string(), 0);
+        // Zone 0 does not exist (zones are 1-indexed) -> get_zone returns None.
+        state.zone_progression.current_zone_id = 0;
+        let haven = Haven::default();
+        let enhancement = EnhancementProgress::new();
+        let achievements = Achievements::default();
+
+        let summary = build_summary(&state, &haven, &enhancement, &achievements);
+        assert!(summary.contains("Zone: Unknown"), "got summary: {summary}");
+    }
+
+    #[test]
+    fn test_summary_reflects_kills_and_play_time() {
+        let mut state = GameState::new("Timer".to_string(), 0);
+        state.play_time_seconds = 7384; // 2h 3m
+        let haven = Haven::default();
+        let enhancement = EnhancementProgress::new();
+        let achievements = Achievements {
+            total_kills: 12345,
+            ..Default::default()
+        };
+
+        let summary = build_summary(&state, &haven, &enhancement, &achievements);
+        assert!(summary.contains("Kills: 12345"), "got summary: {summary}");
+        assert!(
+            summary.contains("Play Time: 2h 3m"),
+            "got summary: {summary}"
+        );
+    }
+
+    #[test]
+    fn test_open_browser_returns_result_without_panicking() {
+        // No real browser/display is available in a CI sandbox, so this
+        // exercises the spawn-and-report-failure path deterministically:
+        // the call must not panic, and it always yields a Result either way.
+        let result = open_browser("https://example.com/does-not-open");
+        match result {
+            Ok(()) | Err(_) => {}
+        }
+    }
+
+    #[test]
+    fn test_copy_to_clipboard_returns_result_without_panicking() {
+        // No clipboard utility (xclip/pbcopy/clip) is available in a CI
+        // sandbox, so this exercises the spawn-failure path deterministically.
+        // A machine with a clipboard tool installed would additionally cover
+        // the stdin-write success path, which is legitimately untestable here.
+        let result = copy_to_clipboard("bug report contents");
+        match result {
+            Ok(()) | Err(_) => {}
+        }
+    }
+
+    #[test]
+    fn test_build_issue_url_escapes_summary_content() {
+        let summary = "Line1\nLine2 with spaces & symbols=?";
+        let url = build_issue_url(summary);
+        assert!(url.starts_with("https://github.com/stphung/quest/issues/new?title="));
+        assert!(url.contains("&body="));
+        // Raw newline/space/ampersand must not leak into the query string.
+        assert!(!url.contains('\n'));
+        assert!(!url.contains(' '));
+    }
 }

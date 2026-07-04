@@ -176,4 +176,44 @@ mod tests {
         let result = process_rename_input(&mut screen, RenameInput::Submit, &manager, &character);
         assert_eq!(result, RenameResult::Continue);
     }
+
+    #[test]
+    fn test_rename_submit_valid_name_renames_successfully() {
+        let mut screen = CharacterRenameScreen::new();
+        let (manager, _dir) = temp_manager();
+        let character = create_test_character(); // name "TestHero", filename "testhero.json"
+
+        // Save a matching character file so rename has something to operate on.
+        let state = crate::core::game_state::GameState::new(character.character_name.clone(), 0);
+        manager.save_character(&state).unwrap();
+
+        for c in "NewName".chars() {
+            process_rename_input(&mut screen, RenameInput::Char(c), &manager, &character);
+        }
+
+        let result = process_rename_input(&mut screen, RenameInput::Submit, &manager, &character);
+
+        assert_eq!(result, RenameResult::Renamed);
+        assert!(!manager.quest_dir.join("testhero.json").exists());
+        assert!(manager.quest_dir.join("newname.json").exists());
+    }
+
+    #[test]
+    fn test_rename_submit_missing_file_returns_rename_failed() {
+        let mut screen = CharacterRenameScreen::new();
+        let (manager, _dir) = temp_manager();
+        let character = create_test_character(); // filename never saved to disk
+
+        for c in "NewName".chars() {
+            process_rename_input(&mut screen, RenameInput::Char(c), &manager, &character);
+        }
+
+        let result = process_rename_input(&mut screen, RenameInput::Submit, &manager, &character);
+
+        match result {
+            RenameResult::RenameFailed(msg) => assert!(msg.contains("Rename failed")),
+            other => panic!("expected RenameFailed, got {:?}", other),
+        }
+        assert!(screen.validation_error.is_some());
+    }
 }

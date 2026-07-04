@@ -496,4 +496,38 @@ mod tests {
         complete_discovery(&mut loom);
         assert_eq!(loom.persistent.active_pattern, 0);
     }
+
+    // ── pattern_chapter ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_pattern_chapter_awakening_range() {
+        for i in 0..=7 {
+            assert_eq!(pattern_chapter(i), "Chapter I: The Awakening");
+        }
+    }
+
+    #[test]
+    fn test_pattern_chapter_deepening_range() {
+        for i in 8..=15 {
+            assert_eq!(pattern_chapter(i), "Chapter II: The Deepening");
+        }
+    }
+
+    #[test]
+    fn test_pattern_chapter_unraveling_range() {
+        for i in 16..=27 {
+            assert_eq!(pattern_chapter(i), "Chapter III: The Unraveling");
+        }
+    }
+
+    #[test]
+    fn test_pattern_chapter_eternal_weave() {
+        assert_eq!(pattern_chapter(28), "The Eternal Weave");
+    }
+
+    #[test]
+    fn test_pattern_chapter_out_of_range_returns_empty() {
+        assert_eq!(pattern_chapter(29), "");
+        assert_eq!(pattern_chapter(1000), "");
+    }
 }

@@ -570,4 +570,99 @@ mod tests {
         let equipment = crate::items::Equipment::new();
         assert!((equipped_god_item_fishing_reduction_percent(&equipment)).abs() < f64::EPSILON);
     }
+
+    #[test]
+    fn test_equipped_god_item_regen_reduction_without_god_item() {
+        let equipment = crate::items::Equipment::new();
+        assert!((equipped_god_item_regen_reduction_percent(&equipment)).abs() < f64::EPSILON);
+    }
+
+    // CachedGodItemBonuses::compute() tests
+
+    #[test]
+    fn test_cached_bonuses_default_is_all_zero() {
+        let bonuses = CachedGodItemBonuses::default();
+        assert_eq!(bonuses.damage_reduction_percent, 0.0);
+        assert_eq!(bonuses.attack_speed_percent, 0.0);
+        assert_eq!(bonuses.damage_percent, 0.0);
+        assert_eq!(bonuses.regen_reduction_percent, 0.0);
+        assert_eq!(bonuses.dungeon_speed_percent, 0.0);
+        assert_eq!(bonuses.fishing_reduction_percent, 0.0);
+    }
+
+    #[test]
+    fn test_cached_bonuses_compute_empty_equipment() {
+        let equipment = crate::items::Equipment::new();
+        let bonuses = CachedGodItemBonuses::compute(&equipment);
+        assert_eq!(bonuses.damage_reduction_percent, 0.0);
+        assert_eq!(bonuses.attack_speed_percent, 0.0);
+        assert_eq!(bonuses.damage_percent, 0.0);
+    }
+
+    #[test]
+    fn test_cached_bonuses_compute_with_asprika_sets_dr() {
+        let mut equipment = crate::items::Equipment::new();
+        equipment.set(
+            crate::items::EquipmentSlot::Armor,
+            Some(asprika_definition().to_item()),
+        );
+        let bonuses = CachedGodItemBonuses::compute(&equipment);
+        assert!((bonuses.damage_reduction_percent - 30.0).abs() < f64::EPSILON);
+        // Asprika has no non-combat bonuses.
+        assert_eq!(bonuses.regen_reduction_percent, 0.0);
+        assert_eq!(bonuses.dungeon_speed_percent, 0.0);
+        assert_eq!(bonuses.fishing_reduction_percent, 0.0);
+    }
+
+    #[test]
+    fn test_cached_bonuses_compute_with_sleipnir_sets_all_bonuses() {
+        let mut equipment = crate::items::Equipment::new();
+        equipment.set(
+            crate::items::EquipmentSlot::Boots,
+            Some(sleipnir_definition().to_item()),
+        );
+        let bonuses = CachedGodItemBonuses::compute(&equipment);
+        assert!((bonuses.attack_speed_percent - 100.0).abs() < f64::EPSILON);
+        assert!((bonuses.regen_reduction_percent - 50.0).abs() < f64::EPSILON);
+        assert!((bonuses.dungeon_speed_percent - 50.0).abs() < f64::EPSILON);
+        assert!((bonuses.fishing_reduction_percent - 50.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_cached_bonuses_compute_with_megingjord_sets_damage() {
+        let mut equipment = crate::items::Equipment::new();
+        equipment.set(
+            crate::items::EquipmentSlot::Ring,
+            Some(megingjord_definition().to_item()),
+        );
+        let bonuses = CachedGodItemBonuses::compute(&equipment);
+        assert!((bonuses.damage_percent - 150.0).abs() < f64::EPSILON);
+        assert_eq!(bonuses.damage_reduction_percent, 0.0);
+        assert_eq!(bonuses.attack_speed_percent, 0.0);
+    }
+
+    #[test]
+    fn test_cached_bonuses_compute_with_all_three_god_items_equipped() {
+        let mut equipment = crate::items::Equipment::new();
+        equipment.set(
+            crate::items::EquipmentSlot::Armor,
+            Some(asprika_definition().to_item()),
+        );
+        equipment.set(
+            crate::items::EquipmentSlot::Boots,
+            Some(sleipnir_definition().to_item()),
+        );
+        equipment.set(
+            crate::items::EquipmentSlot::Ring,
+            Some(megingjord_definition().to_item()),
+        );
+
+        let bonuses = CachedGodItemBonuses::compute(&equipment);
+        assert!((bonuses.damage_reduction_percent - 30.0).abs() < f64::EPSILON);
+        assert!((bonuses.attack_speed_percent - 100.0).abs() < f64::EPSILON);
+        assert!((bonuses.damage_percent - 150.0).abs() < f64::EPSILON);
+        assert!((bonuses.regen_reduction_percent - 50.0).abs() < f64::EPSILON);
+        assert!((bonuses.dungeon_speed_percent - 50.0).abs() < f64::EPSILON);
+        assert!((bonuses.fishing_reduction_percent - 50.0).abs() < f64::EPSILON);
+    }
 }

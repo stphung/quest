@@ -709,6 +709,38 @@ mod tests {
     }
 
     #[test]
+    fn test_sigil_effect_format_value_all_variants() {
+        // Every effect type's format_value match arm should produce a
+        // non-empty, correctly-signed label without panicking.
+        for effect in SigilEffectType::ALL {
+            let formatted = effect.format_value(9.9);
+            if effect == SigilEffectType::RegenDelayPercent {
+                assert!(
+                    formatted.starts_with('-'),
+                    "{:?} should format with a minus sign, got {}",
+                    effect,
+                    formatted
+                );
+            } else {
+                assert!(
+                    formatted.starts_with('+'),
+                    "{:?} should format with a plus sign, got {}",
+                    effect,
+                    formatted
+                );
+            }
+            assert!(formatted.contains("9.9"));
+        }
+    }
+
+    #[test]
+    fn test_sigil_effect_type_icons_non_empty() {
+        for effect in SigilEffectType::ALL {
+            assert!(!effect.icon().is_empty(), "{:?} has empty icon", effect);
+        }
+    }
+
+    #[test]
     fn test_sigil_effect_format_range() {
         assert_eq!(SigilEffectType::XpPercent.format_range(), "5-25%");
         assert_eq!(SigilEffectType::DamagePercent.format_range(), "3-15%");
@@ -863,6 +895,18 @@ mod tests {
     fn test_daily_sigil_pool_returns_correct_size() {
         let pool = daily_sigil_pool_for_day(739000);
         assert_eq!(pool.len(), DAILY_POOL_SIZE);
+    }
+
+    #[test]
+    fn test_daily_sigil_pool_today_returns_valid_pool() {
+        // Exercises the real-clock wrapper `daily_sigil_pool()`.
+        let pool = daily_sigil_pool();
+        assert_eq!(pool.len(), DAILY_POOL_SIZE);
+        for i in 0..pool.len() {
+            for j in (i + 1)..pool.len() {
+                assert_ne!(pool[i], pool[j], "Today's pool has duplicates: {:?}", pool);
+            }
+        }
     }
 
     #[test]

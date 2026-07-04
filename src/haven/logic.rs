@@ -555,6 +555,100 @@ mod tests {
         assert!(haven.next_tier(HavenRoomId::StormForge).is_none());
     }
 
+    // =========================================================================
+    // Stormbreaker Forging Gate Tests
+    // =========================================================================
+
+    #[test]
+    fn test_can_forge_stormbreaker_requires_both_leviathan_and_prestige() {
+        use crate::achievements::{AchievementId, Achievements};
+
+        let mut achievements = Achievements::default();
+        // Neither condition met.
+        let (has_lev, has_prestige, can_forge) = can_forge_stormbreaker(&achievements, 0);
+        assert!(!has_lev);
+        assert!(!has_prestige);
+        assert!(!can_forge);
+
+        // Only prestige met.
+        let (has_lev, has_prestige, can_forge) =
+            can_forge_stormbreaker(&achievements, STORMBREAKER_PRESTIGE_REQUIREMENT);
+        assert!(!has_lev);
+        assert!(has_prestige);
+        assert!(!can_forge);
+
+        // Only leviathan met.
+        achievements.unlock(AchievementId::StormLeviathan, None);
+        let (has_lev, has_prestige, can_forge) = can_forge_stormbreaker(&achievements, 0);
+        assert!(has_lev);
+        assert!(!has_prestige);
+        assert!(!can_forge);
+
+        // Both met.
+        let (has_lev, has_prestige, can_forge) =
+            can_forge_stormbreaker(&achievements, STORMBREAKER_PRESTIGE_REQUIREMENT);
+        assert!(has_lev);
+        assert!(has_prestige);
+        assert!(can_forge);
+    }
+
+    #[test]
+    fn test_can_forge_stormbreaker_prestige_below_requirement() {
+        use crate::achievements::{AchievementId, Achievements};
+
+        let mut achievements = Achievements::default();
+        achievements.unlock(AchievementId::StormLeviathan, None);
+        let (has_lev, has_prestige, can_forge) =
+            can_forge_stormbreaker(&achievements, STORMBREAKER_PRESTIGE_REQUIREMENT - 1);
+        assert!(has_lev);
+        assert!(!has_prestige);
+        assert!(!can_forge);
+    }
+
+    // =========================================================================
+    // Persistence Tests
+    // =========================================================================
+
+    /// QUEST_DIR is a process-global env var, so the path/missing-file/
+    /// round-trip cases share one test to keep set/restore ordering
+    /// deterministic (same convention as `core::paths` tests).
+    #[test]
+    fn test_haven_persistence_via_quest_dir() {
+        let saved = std::env::var(crate::core::paths::QUEST_DIR_ENV).ok();
+
+        // 1. haven_save_path() reflects the QUEST_DIR override.
+        let dir = format!("/tmp/quest-haven-test-{}", std::process::id());
+        std::env::set_var(crate::core::paths::QUEST_DIR_ENV, &dir);
+        let _ = fs::remove_dir_all(&dir);
+        let path = haven_save_path().unwrap();
+        assert_eq!(path, PathBuf::from(&dir).join("haven.json"));
+
+        // 2. load_haven() returns a fresh default when the file is missing.
+        let haven = load_haven();
+        assert!(!haven.discovered);
+        assert_eq!(haven.room_tier(HavenRoomId::Hearthstone), 0);
+
+        // 3. save_haven() + load_haven() round-trips built rooms/discovery.
+        fs::create_dir_all(&dir).unwrap();
+        let mut haven = Haven::new();
+        haven.build_room(HavenRoomId::Hearthstone);
+        haven.build_room(HavenRoomId::Armory);
+        haven.discovered = true;
+
+        save_haven(&haven).expect("save_haven should succeed");
+        let loaded = load_haven();
+
+        assert!(loaded.discovered);
+        assert_eq!(loaded.room_tier(HavenRoomId::Hearthstone), 1);
+        assert_eq!(loaded.room_tier(HavenRoomId::Armory), 1);
+
+        let _ = fs::remove_dir_all(&dir);
+        match saved {
+            Some(v) => std::env::set_var(crate::core::paths::QUEST_DIR_ENV, v),
+            None => std::env::remove_var(crate::core::paths::QUEST_DIR_ENV),
+        }
+    }
+
     // Helper function to build full tree to both capstones (WarRoom and Vault)
     fn build_full_tree_to_capstones(haven: &mut Haven) {
         // Root

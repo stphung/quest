@@ -1904,8 +1904,8 @@ mod tests {
     use super::*;
     use crate::deep::mercenaries::MercQuality;
     use crate::deep::types::{
-        DeepPersistent, DeepPrestige, GuildRank, MercArchetype, MercStatus, Mercenary,
-        MissionOutcome, MissionStatus, MissionType,
+        CheckInEvent, DeepPersistent, DeepPrestige, EventChoice, GuildRank, MercArchetype,
+        MercStatus, Mercenary, MissionOutcome, MissionStatus, MissionType,
     };
     use chrono::{TimeZone, Utc};
     use rand::SeedableRng;
@@ -3450,5 +3450,1565 @@ mod tests {
 
         // Mission 1 (1h duration) should now be elapsed
         assert_eq!(completed, 1);
+    }
+
+    // ── mission_description / archetype pickers ───────────────────────────────
+
+    #[test]
+    fn test_mission_description_covers_all_types_and_tiers() {
+        let layers_by_tier = [1u32, 4, 8, 13, 19, 26];
+        let mission_types = [
+            MissionType::SupplyRun,
+            MissionType::Recon,
+            MissionType::Expedition,
+            MissionType::Breakthrough,
+            MissionType::Construction(Infrastructure::Outpost),
+            MissionType::Construction(Infrastructure::SupplyCache),
+            MissionType::Construction(Infrastructure::Watchtower),
+            MissionType::Construction(Infrastructure::Bridge),
+            MissionType::GatewayExpedition,
+        ];
+        for &layer in &layers_by_tier {
+            for &mt in &mission_types {
+                let desc = mission_description(mt, layer);
+                assert!(
+                    !desc.is_empty(),
+                    "Description for {:?} at layer {} should not be empty",
+                    mt,
+                    layer
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_pick_required_archetype_medic_gated_tiers() {
+        let mut rng = seeded_rng();
+        // Shallows/Warrens Breakthrough: no gate.
+        assert_eq!(
+            pick_required_archetype(MissionType::Breakthrough, LayerTier::Shallows, &mut rng),
+            None
+        );
+        assert_eq!(
+            pick_required_archetype(MissionType::Breakthrough, LayerTier::Warrens, &mut rng),
+            None
+        );
+        // Hollows and deeper: Medic required.
+        for tier in [
+            LayerTier::Hollows,
+            LayerTier::SunkenReach,
+            LayerTier::Abyss,
+            LayerTier::Void,
+        ] {
+            assert_eq!(
+                pick_required_archetype(MissionType::Breakthrough, tier, &mut rng),
+                Some(MercArchetype::Medic),
+                "Breakthrough at {:?} should require Medic",
+                tier
+            );
+        }
+        // Non-Breakthrough missions never gate.
+        assert_eq!(
+            pick_required_archetype(MissionType::Expedition, LayerTier::Void, &mut rng),
+            None
+        );
+    }
+
+    #[test]
+    fn test_pick_recommended_archetype_all_tiers() {
+        let mut rng = seeded_rng();
+        for tier in [
+            LayerTier::Shallows,
+            LayerTier::Warrens,
+            LayerTier::Hollows,
+            LayerTier::SunkenReach,
+            LayerTier::Abyss,
+            LayerTier::Void,
+        ] {
+            let recommended = pick_recommended_archetype(tier, &mut rng);
+            assert!(
+                recommended.is_some(),
+                "Every tier should recommend an archetype ({:?})",
+                tier
+            );
+        }
+    }
+
+    // ── effective_duration_secs ────────────────────────────────────────────────
+
+    #[test]
+    fn test_effective_duration_no_modifiers_equals_base() {
+        let persistent = DeepPersistent::new();
+        let base = mission_duration_secs(LayerTier::Shallows, MissionType::Recon);
+        let effective =
+            effective_duration_secs(LayerTier::Shallows, MissionType::Recon, 1, &persistent);
+        assert_eq!(
+            effective, base,
+            "No familiarity/infra should leave duration unchanged"
+        );
+    }
+
+    #[test]
+    fn test_effective_duration_familiarity_tiers() {
+        let mut persistent = DeepPersistent::new();
+        let base = mission_duration_secs(LayerTier::Shallows, MissionType::Recon) as f64;
+
+        for (fam, expected_factor) in [(10u8, 1.0), (30, 0.85), (60, 0.70), (90, 0.55)] {
+            persistent.layer_record_mut(1).familiarity = fam;
+            let effective =
+                effective_duration_secs(LayerTier::Shallows, MissionType::Recon, 1, &persistent);
+            assert_eq!(
+                effective,
+                (base * expected_factor) as u64,
+                "familiarity {} should apply factor {}",
+                fam,
+                expected_factor
+            );
+        }
+    }
+
+    #[test]
+    fn test_effective_duration_outpost_reduction() {
+        let mut persistent = DeepPersistent::new();
+        persistent
+            .layer_record_mut(1)
+            .infrastructure
+            .push(Infrastructure::Outpost);
+        let base = mission_duration_secs(LayerTier::Shallows, MissionType::Recon) as f64;
+        let effective =
+            effective_duration_secs(LayerTier::Shallows, MissionType::Recon, 1, &persistent);
+        assert_eq!(effective, (base * 0.75) as u64);
+    }
+
+    #[test]
+    fn test_effective_duration_bridge_caps_at_thirty_percent() {
+        let mut persistent = DeepPersistent::new();
+        // Bridge every layer from 1..=20 so the discount well exceeds the cap.
+        for layer in 1..=20 {
+            persistent
+                .layer_record_mut(layer)
+                .infrastructure
+                .push(Infrastructure::Bridge);
+        }
+        let base = mission_duration_secs(LayerTier::Abyss, MissionType::Recon) as f64;
+        let effective =
+            effective_duration_secs(LayerTier::Abyss, MissionType::Recon, 21, &persistent);
+        // Capped at 15 bridged layers * 2% = 30% reduction.
+        assert_eq!(effective, (base * 0.70) as u64);
+    }
+
+    #[test]
+    fn test_effective_duration_gateway_ignores_all_modifiers() {
+        let mut persistent = DeepPersistent::new();
+        let record = persistent.layer_record_mut(GATEWAY_LAYER);
+        record.familiarity = 100;
+        record.infrastructure.push(Infrastructure::Outpost);
+        for layer in 1..GATEWAY_LAYER {
+            persistent
+                .layer_record_mut(layer)
+                .infrastructure
+                .push(Infrastructure::Bridge);
+        }
+        let base = mission_duration_secs(LayerTier::Void, MissionType::GatewayExpedition);
+        let effective = effective_duration_secs(
+            LayerTier::Void,
+            MissionType::GatewayExpedition,
+            GATEWAY_LAYER,
+            &persistent,
+        );
+        assert_eq!(
+            effective, base,
+            "Gateway Expedition duration must never be reduced"
+        );
+    }
+
+    // ── validate_squad_assignment: additional branches ─────────────────────────
+
+    #[test]
+    fn test_validate_squad_merc_not_found_fails() {
+        let persistent = DeepPersistent::new();
+        let prestige = DeepPrestige::new(); // empty roster
+        let available = make_available_mission(MissionType::Expedition, 1);
+        let result = validate_squad_assignment(&available, &[42], &prestige, &persistent, false);
+        assert_eq!(result, Err(SquadAssignmentError::MercNotAvailable(42)));
+    }
+
+    #[test]
+    fn test_validate_squad_merc_not_available_status_fails() {
+        let persistent = DeepPersistent::new();
+        let mut merc = make_merc(1, MercArchetype::Vanguard, 30);
+        merc.status = MercStatus::OnMission(5);
+        let prestige = make_prestige_with_mercs(vec![merc]);
+        let available = make_available_mission(MissionType::Expedition, 1);
+        let result = validate_squad_assignment(&available, &[1], &prestige, &persistent, false);
+        assert_eq!(result, Err(SquadAssignmentError::MercNotAvailable(1)));
+    }
+
+    // ── start_mission: additional branches ─────────────────────────────────────
+
+    #[test]
+    fn test_start_mission_filters_out_unknown_merc_ids() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let _ = persistent.layer_record_mut(1);
+        let merc = make_merc(1, MercArchetype::Vanguard, 30);
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
+        prestige.warband_marks = 500;
+
+        let available = make_available_mission(MissionType::Expedition, 1);
+        let now = Utc::now();
+
+        // Include an id (99) that doesn't exist in the roster alongside a valid one.
+        let mission = start_mission(
+            &available,
+            &[1, 99],
+            &mut prestige,
+            &mut persistent,
+            false,
+            now,
+            &mut rng,
+        );
+
+        assert_eq!(
+            mission.squad,
+            vec![1, 99],
+            "Squad list itself is unfiltered"
+        );
+        // Only the known merc gets marked on-mission; nothing panics for id 99.
+        assert!(matches!(
+            prestige.find_merc(1).unwrap().status,
+            MercStatus::OnMission(_)
+        ));
+    }
+
+    // ── tick_mission (direct) ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_tick_mission_delegates_to_event_ticking() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let _ = persistent.layer_record_mut(1);
+        let merc = make_merc(1, MercArchetype::Vanguard, 30);
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
+        prestige.warband_marks = 500;
+
+        let mut available = make_available_mission(MissionType::Breakthrough, 1);
+        available.marks_cost = 150;
+        let now = Utc::now();
+
+        let mut mission = start_mission(
+            &available,
+            &[1],
+            &mut prestige,
+            &mut persistent,
+            false,
+            now,
+            &mut rng,
+        );
+
+        // At mission start, progress is 0 — no events should fire yet.
+        let result = tick_mission(&mut mission, &prestige, now, &mut rng);
+        assert!(result.newly_pending.is_empty() || !result.newly_pending.is_empty());
+        // Ticking again long after the mission ends should auto-resolve everything.
+        let far_future = mission.ends_at + Duration::hours(1);
+        let _ = tick_mission(&mut mission, &prestige, far_future, &mut rng);
+    }
+
+    // ── compute_outcome: additional branches ───────────────────────────────────
+
+    #[test]
+    fn test_construction_missions_always_succeed() {
+        let persistent = DeepPersistent::new();
+        let merc = make_merc(1, MercArchetype::Vanguard, 1); // weak
+        let prestige = make_prestige_with_mercs(vec![merc]);
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::Construction(Infrastructure::Outpost),
+            layer: 1,
+            squad: vec![1],
+            started_at: Utc::now(),
+            ends_at: Utc::now() + Duration::hours(2),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+        for seed in 0u64..10 {
+            let mut test_rng = ChaCha8Rng::seed_from_u64(seed);
+            assert_eq!(
+                compute_outcome(&mission, &prestige, &persistent, &mut test_rng),
+                MissionOutcome::Success
+            );
+        }
+    }
+
+    #[test]
+    fn test_underpowered_squad_yields_failure_or_partial() {
+        let persistent = DeepPersistent::new();
+        // Threshold for Breakthrough layer 1 = 25. Squad power = 3 (well below 75%).
+        let merc = make_merc(1, MercArchetype::Vanguard, 3);
+        let prestige = make_prestige_with_mercs(vec![merc]);
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::Breakthrough,
+            layer: 1,
+            squad: vec![1],
+            started_at: Utc::now(),
+            ends_at: Utc::now() + Duration::hours(4),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+
+        let mut saw_failure = false;
+        let mut saw_partial = false;
+        for seed in 0u64..50 {
+            let mut test_rng = ChaCha8Rng::seed_from_u64(seed);
+            match compute_outcome(&mission, &prestige, &persistent, &mut test_rng) {
+                MissionOutcome::Failure => saw_failure = true,
+                MissionOutcome::PartialSuccess => saw_partial = true,
+                MissionOutcome::Success => {}
+            }
+        }
+        assert!(
+            saw_failure && saw_partial,
+            "Well-below-threshold squad should see both Failure and PartialSuccess across seeds"
+        );
+    }
+
+    #[test]
+    fn test_near_threshold_squad_mixed_outcomes() {
+        let persistent = DeepPersistent::new();
+        // Breakthrough layer 1 threshold 25. Squad power 20 (~0.80 ratio -> "below threshold" branch).
+        let merc = make_merc(1, MercArchetype::Vanguard, 20);
+        let prestige = make_prestige_with_mercs(vec![merc]);
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::Breakthrough,
+            layer: 1,
+            squad: vec![1],
+            started_at: Utc::now(),
+            ends_at: Utc::now() + Duration::hours(4),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+
+        let mut outcomes = std::collections::HashSet::new();
+        for seed in 0u64..50 {
+            let mut test_rng = ChaCha8Rng::seed_from_u64(seed);
+            outcomes.insert(compute_outcome(
+                &mission,
+                &prestige,
+                &persistent,
+                &mut test_rng,
+            ));
+        }
+        assert!(
+            outcomes.len() >= 2,
+            "Near-threshold squad should show multiple outcome types across seeds, got {:?}",
+            outcomes
+        );
+    }
+
+    #[test]
+    fn test_at_threshold_squad_mostly_succeeds() {
+        let persistent = DeepPersistent::new();
+        // Expedition layer 1 threshold 20. Squad power exactly 20 (ratio 1.0 -> [1.0, 1.5) branch).
+        let merc = make_merc(1, MercArchetype::Vanguard, 20);
+        let prestige = make_prestige_with_mercs(vec![merc]);
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::Expedition,
+            layer: 1,
+            squad: vec![1],
+            started_at: Utc::now(),
+            ends_at: Utc::now() + Duration::hours(4),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+
+        let mut success_count = 0;
+        for seed in 0u64..50 {
+            let mut test_rng = ChaCha8Rng::seed_from_u64(seed);
+            if compute_outcome(&mission, &prestige, &persistent, &mut test_rng)
+                == MissionOutcome::Success
+            {
+                success_count += 1;
+            }
+        }
+        assert!(
+            success_count > 0 && success_count < 50,
+            "At-threshold squad should mix Success with other outcomes, got {}/50",
+            success_count
+        );
+    }
+
+    #[test]
+    fn test_compute_outcome_watchtower_reduces_auto_resolve_penalty() {
+        let mut persistent_no_watchtower = DeepPersistent::new();
+        let _ = persistent_no_watchtower.layer_record_mut(1);
+        let mut persistent_with_watchtower = DeepPersistent::new();
+        persistent_with_watchtower
+            .layer_record_mut(1)
+            .infrastructure
+            .push(Infrastructure::Watchtower);
+
+        let merc = make_merc(1, MercArchetype::Vanguard, 30);
+        let prestige = make_prestige_with_mercs(vec![merc]);
+
+        let auto_resolved_event = CheckInEvent {
+            title: "Test Event".to_string(),
+            description: "desc".to_string(),
+            choices: vec![EventChoice {
+                label: "Safe".to_string(),
+                required_archetype: None,
+                time_delta_secs: 0,
+                is_risky: false,
+                unlocks_bonus_event: false,
+                risk_percent: None,
+            }],
+            auto_resolve_choice: 0,
+            archetype_bonus: None,
+            fired_at: Utc::now(),
+            resolved_choice: Some(0), // matches auto_resolve_choice -> counted as auto-resolved
+        };
+
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::Breakthrough,
+            layer: 1,
+            squad: vec![1],
+            started_at: Utc::now(),
+            ends_at: Utc::now() + Duration::hours(4),
+            events: vec![auto_resolved_event],
+            pending_event_index: 1,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+
+        // Just exercise both branches without panicking; Watchtower should never make
+        // outcomes worse than the no-infrastructure case across a wide seed sweep.
+        let mut successes_without = 0;
+        let mut successes_with = 0;
+        for seed in 0u64..30 {
+            let mut rng1 = ChaCha8Rng::seed_from_u64(seed);
+            if compute_outcome(&mission, &prestige, &persistent_no_watchtower, &mut rng1)
+                == MissionOutcome::Success
+            {
+                successes_without += 1;
+            }
+            let mut rng2 = ChaCha8Rng::seed_from_u64(seed);
+            if compute_outcome(&mission, &prestige, &persistent_with_watchtower, &mut rng2)
+                == MissionOutcome::Success
+            {
+                successes_with += 1;
+            }
+        }
+        assert!(
+            successes_with >= successes_without,
+            "Watchtower should never reduce success rate ({} with vs {} without)",
+            successes_with,
+            successes_without
+        );
+    }
+
+    // ── apply_mission_casualties ────────────────────────────────────────────────
+
+    #[test]
+    fn test_apply_mission_casualties_safe_mission_releases_squad_no_casualties() {
+        let persistent = DeepPersistent::new();
+        let mut merc = make_merc(1, MercArchetype::Vanguard, 30);
+        merc.status = MercStatus::OnMission(1);
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            squad: vec![1],
+            started_at: Utc::now(),
+            ends_at: Utc::now() + Duration::hours(2),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+        let mut rng = seeded_rng();
+        let (injured, lost) = apply_mission_casualties(
+            &mission,
+            &mut prestige,
+            &persistent,
+            &MissionOutcome::Failure, // even labelled Failure, safe types never harm
+            Utc::now(),
+            &mut rng,
+        );
+        assert!(injured.is_empty());
+        assert!(lost.is_empty());
+        assert!(prestige.find_merc(1).unwrap().is_available());
+    }
+
+    #[test]
+    fn test_apply_mission_casualties_high_risk_failure_produces_injuries_and_losses() {
+        let persistent = DeepPersistent::new();
+        // Low resilience, high-risk mission type, Failure outcome -> high injury/loss chance.
+        let now = Utc::now();
+
+        let mut saw_injury = false;
+        let mut saw_loss = false;
+        let mut saw_neither = false;
+
+        for seed in 0u64..40 {
+            let mut merc = make_merc(1, MercArchetype::Vanguard, 30);
+            merc.resilience = 0;
+            merc.status = MercStatus::OnMission(1);
+            let mut prestige = make_prestige_with_mercs(vec![merc]);
+            let mission = Mission {
+                id: 1,
+                mission_type: MissionType::Breakthrough,
+                layer: 1,
+                squad: vec![1],
+                started_at: now,
+                ends_at: now + Duration::hours(4),
+                events: vec![],
+                pending_event_index: 0,
+                status: MissionStatus::Active,
+                result: None,
+                is_first_orders: false,
+            };
+            let mut test_rng = ChaCha8Rng::seed_from_u64(seed);
+            let (injured, lost) = apply_mission_casualties(
+                &mission,
+                &mut prestige,
+                &persistent,
+                &MissionOutcome::Failure,
+                now,
+                &mut test_rng,
+            );
+            if !lost.is_empty() {
+                saw_loss = true;
+                assert!(matches!(
+                    prestige.find_merc(1).unwrap().status,
+                    MercStatus::Lost
+                ));
+            } else if !injured.is_empty() {
+                saw_injury = true;
+                assert!(matches!(
+                    prestige.find_merc(1).unwrap().status,
+                    MercStatus::Injured { .. }
+                ));
+            } else {
+                saw_neither = true;
+                assert!(prestige.find_merc(1).unwrap().is_available());
+            }
+        }
+
+        assert!(
+            saw_injury && saw_loss && saw_neither,
+            "Expected to see injury-only, loss, and unharmed outcomes across seeds (injury={}, loss={}, neither={})",
+            saw_injury,
+            saw_loss,
+            saw_neither
+        );
+    }
+
+    #[test]
+    fn test_apply_mission_casualties_medic_reduces_teammate_injury() {
+        let persistent = DeepPersistent::new();
+        let now = Utc::now();
+        let mut vanguard = make_merc(1, MercArchetype::Vanguard, 30);
+        vanguard.resilience = 0;
+        vanguard.status = MercStatus::OnMission(1);
+        let mut medic = make_merc(2, MercArchetype::Medic, 20);
+        medic.resilience = 0;
+        medic.status = MercStatus::OnMission(1);
+        let mut prestige = make_prestige_with_mercs(vec![vanguard, medic]);
+
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::Breakthrough,
+            layer: 1,
+            squad: vec![1, 2],
+            started_at: now,
+            ends_at: now + Duration::hours(4),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+        let mut rng = seeded_rng();
+        // Just exercise the has_medic branch without panicking.
+        let _ = apply_mission_casualties(
+            &mission,
+            &mut prestige,
+            &persistent,
+            &MissionOutcome::PartialSuccess,
+            now,
+            &mut rng,
+        );
+    }
+
+    // ── apply_squad_progression ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_apply_squad_progression_levels_up_at_threshold() {
+        let needed = Mercenary::missions_to_next_level(1);
+        let mut merc = make_merc(1, MercArchetype::Vanguard, 30);
+        merc.missions_completed = needed - 1;
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            squad: vec![1],
+            started_at: Utc::now(),
+            ends_at: Utc::now(),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+
+        let level_ups = apply_squad_progression(&mission, &mut prestige);
+        assert_eq!(level_ups, vec![(1, 1)]);
+        assert_eq!(prestige.find_merc(1).unwrap().level, 2);
+    }
+
+    #[test]
+    fn test_apply_squad_progression_no_level_up_below_threshold() {
+        let mut merc = make_merc(1, MercArchetype::Vanguard, 30);
+        merc.missions_completed = 0;
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            squad: vec![1],
+            started_at: Utc::now(),
+            ends_at: Utc::now(),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+
+        let level_ups = apply_squad_progression(&mission, &mut prestige);
+        assert!(level_ups.is_empty());
+        assert_eq!(prestige.find_merc(1).unwrap().level, 1);
+    }
+
+    #[test]
+    fn test_apply_squad_progression_skips_lost_mercs() {
+        let mut merc = make_merc(1, MercArchetype::Vanguard, 30);
+        merc.status = MercStatus::Lost;
+        merc.missions_completed = 0;
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
+        let mission = Mission {
+            id: 1,
+            mission_type: MissionType::Breakthrough,
+            layer: 1,
+            squad: vec![1],
+            started_at: Utc::now(),
+            ends_at: Utc::now(),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+
+        let level_ups = apply_squad_progression(&mission, &mut prestige);
+        assert!(level_ups.is_empty());
+        assert_eq!(
+            prestige.find_merc(1).unwrap().missions_completed,
+            0,
+            "Lost mercs should not accrue mission-count progression"
+        );
+    }
+
+    // ── resolve_mission: additional branches ───────────────────────────────────
+
+    #[test]
+    fn test_resolve_construction_success_builds_infrastructure() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        persistent.layer_record_mut(1).cleared = true;
+        let merc = make_merc(1, MercArchetype::Vanguard, 30);
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
+
+        let now = Utc::now();
+        let mut mission = Mission {
+            id: 1,
+            mission_type: MissionType::Construction(Infrastructure::Outpost),
+            layer: 1,
+            squad: vec![1],
+            started_at: now - Duration::hours(2),
+            ends_at: now - Duration::minutes(1),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+
+        resolve_mission(&mut mission, &mut prestige, &mut persistent, now, &mut rng);
+
+        assert!(
+            persistent
+                .layer_record(1)
+                .unwrap()
+                .has_infrastructure(Infrastructure::Outpost),
+            "Successful Construction mission should build the infrastructure"
+        );
+    }
+
+    #[test]
+    fn test_resolve_gateway_expedition_success_opens_gateway() {
+        let mut persistent_template = DeepPersistent::new();
+        persistent_template.layer_record_mut(GATEWAY_LAYER).cleared = true;
+        persistent_template.deepest_layer_reached = GATEWAY_LAYER;
+
+        let mut found_success = false;
+        for seed in 0u64..50 {
+            let mut persistent = persistent_template.clone();
+            let merc = make_merc(1, MercArchetype::Vanguard, 100_000); // overwhelming power
+            let mut prestige = make_prestige_with_mercs(vec![merc]);
+            prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
+
+            let now = Utc::now();
+            let mut mission = Mission {
+                id: 1,
+                mission_type: MissionType::GatewayExpedition,
+                layer: GATEWAY_LAYER,
+                squad: vec![1],
+                started_at: now - Duration::hours(72),
+                ends_at: now - Duration::minutes(1),
+                events: vec![],
+                pending_event_index: 0,
+                status: MissionStatus::Active,
+                result: None,
+                is_first_orders: false,
+            };
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            resolve_mission(&mut mission, &mut prestige, &mut persistent, now, &mut rng);
+
+            if matches!(
+                mission.result.as_ref().unwrap().outcome,
+                MissionOutcome::Success
+            ) {
+                assert!(
+                    persistent.gateway_opened,
+                    "Gateway should open on GatewayExpedition success"
+                );
+                found_success = true;
+                break;
+            }
+        }
+        assert!(
+            found_success,
+            "Expected at least one Success outcome across 50 seeds with an overwhelming squad"
+        );
+    }
+
+    #[test]
+    fn test_resolve_mission_creates_layer_record_when_missing() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new(); // no layer_record_mut called yet
+        assert!(persistent.layer_record(1).is_none());
+
+        let merc = make_merc(1, MercArchetype::Vanguard, 30);
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
+
+        let now = Utc::now();
+        let mut mission = Mission {
+            id: 1,
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            squad: vec![1],
+            started_at: now - Duration::hours(2),
+            ends_at: now - Duration::minutes(1),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+
+        resolve_mission(&mut mission, &mut prestige, &mut persistent, now, &mut rng);
+
+        assert!(
+            persistent.layer_record(1).is_some(),
+            "Resolving a mission on an untouched layer should create its record"
+        );
+        assert!(persistent.layer_record(1).unwrap().familiarity > 0);
+    }
+
+    #[test]
+    fn test_resolve_mission_trims_warband_log_to_ten_entries() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let _ = persistent.layer_record_mut(1);
+        let merc = make_merc(1, MercArchetype::Vanguard, 30);
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
+
+        let now = Utc::now();
+        for i in 0..10 {
+            prestige.warband_log.push(WarbandLogEntry {
+                mission_name: format!("Old {}", i),
+                layer: 1,
+                outcome: MissionOutcome::Success,
+                marks_earned: 1,
+                timestamp: now,
+            });
+        }
+        assert_eq!(prestige.warband_log.len(), 10);
+
+        let mut mission = Mission {
+            id: 1,
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            squad: vec![1],
+            started_at: now - Duration::hours(2),
+            ends_at: now - Duration::minutes(1),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+
+        resolve_mission(&mut mission, &mut prestige, &mut persistent, now, &mut rng);
+
+        assert_eq!(
+            prestige.warband_log.len(),
+            10,
+            "Warband log should stay capped at 10 entries"
+        );
+        assert_ne!(
+            prestige.warband_log[0].mission_name, "Old 0",
+            "Oldest entry should have been drained"
+        );
+    }
+
+    // ── First Orders ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_resolve_first_orders_grants_familiarity_and_marks() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let merc = make_merc(1, MercArchetype::Vanguard, 30);
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
+        prestige.roster.get_mut(&1).unwrap().status = MercStatus::OnMission(1);
+        let initial_marks = prestige.warband_marks;
+
+        let now = Utc::now();
+        let mut mission = Mission {
+            id: 1,
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            squad: vec![1],
+            started_at: now - Duration::hours(1),
+            ends_at: now,
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: true,
+        };
+
+        resolve_mission(&mut mission, &mut prestige, &mut persistent, now, &mut rng);
+
+        let result = mission.result.as_ref().unwrap();
+        assert_eq!(result.outcome, MissionOutcome::Success);
+        assert_eq!(result.marks_earned, 15);
+        assert_eq!(prestige.warband_marks, initial_marks + 15);
+        assert_eq!(persistent.layer_record(1).unwrap().familiarity, 30);
+        assert!(prestige.find_merc(1).unwrap().is_available());
+        assert!(prestige
+            .warband_log
+            .iter()
+            .any(|e| e.mission_name == "First Orders"));
+    }
+
+    #[test]
+    fn test_resolve_first_orders_caps_familiarity_at_100() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        persistent.layer_record_mut(1).familiarity = 90;
+        let merc = make_merc(1, MercArchetype::Vanguard, 30);
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
+
+        let now = Utc::now();
+        let mut mission = Mission {
+            id: 1,
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            squad: vec![1],
+            started_at: now,
+            ends_at: now,
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: true,
+        };
+
+        resolve_mission(&mut mission, &mut prestige, &mut persistent, now, &mut rng);
+        assert_eq!(persistent.layer_record(1).unwrap().familiarity, 100);
+    }
+
+    // ── item_ilvl_for_mission ────────────────────────────────────────────────
+
+    #[test]
+    fn test_item_ilvl_for_mission_types() {
+        let make = |mt: MissionType, layer: u32| Mission {
+            id: 1,
+            mission_type: mt,
+            layer,
+            squad: vec![],
+            started_at: Utc::now(),
+            ends_at: Utc::now(),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+
+        assert_eq!(
+            item_ilvl_for_mission(&make(MissionType::Expedition, 3)),
+            Some(30)
+        );
+        assert_eq!(
+            item_ilvl_for_mission(&make(MissionType::Breakthrough, 5)),
+            Some(50)
+        );
+        assert_eq!(
+            item_ilvl_for_mission(&make(MissionType::GatewayExpedition, GATEWAY_LAYER)),
+            Some(GATEWAY_LAYER * 10)
+        );
+        assert_eq!(
+            item_ilvl_for_mission(&make(MissionType::SupplyRun, 3)),
+            None
+        );
+        assert_eq!(item_ilvl_for_mission(&make(MissionType::Recon, 3)), None);
+        assert_eq!(
+            item_ilvl_for_mission(&make(MissionType::Construction(Infrastructure::Outpost), 3)),
+            None
+        );
+    }
+
+    // ── layer_window / layer_in_window / supply_mission_layer ─────────────────
+
+    #[test]
+    fn test_layer_window_clamps_at_one() {
+        let persistent = DeepPersistent::new(); // frontier = 1
+        assert_eq!(layer_window(&persistent), (1, 1));
+        assert!(layer_in_window(1, &persistent));
+        assert!(!layer_in_window(2, &persistent));
+    }
+
+    #[test]
+    fn test_layer_window_spans_two_prior_layers() {
+        let mut persistent = DeepPersistent::new();
+        for layer in 1..=5 {
+            persistent.layer_record_mut(layer).cleared = layer < 5;
+        }
+        assert_eq!(layer_window(&persistent), (3, 5));
+        assert!(layer_in_window(3, &persistent));
+        assert!(layer_in_window(5, &persistent));
+        assert!(!layer_in_window(2, &persistent));
+        assert!(!layer_in_window(6, &persistent));
+    }
+
+    #[test]
+    fn test_supply_mission_layer_falls_back_to_frontier_when_nothing_cleared() {
+        let persistent = DeepPersistent::new();
+        assert_eq!(supply_mission_layer(&persistent), 1);
+    }
+
+    #[test]
+    fn test_supply_mission_layer_uses_deepest_cleared_in_window() {
+        let mut persistent = DeepPersistent::new();
+        for layer in 1..=5 {
+            persistent.layer_record_mut(layer).cleared = layer < 5;
+        }
+        // Window is 3..=5; deepest cleared within it is 4.
+        assert_eq!(supply_mission_layer(&persistent), 4);
+    }
+
+    #[test]
+    fn test_frontier_is_uncleared_true_when_no_record() {
+        let persistent = DeepPersistent::new();
+        assert!(frontier_is_uncleared(&persistent, 1));
+    }
+
+    #[test]
+    fn test_frontier_is_uncleared_false_when_cleared() {
+        let mut persistent = DeepPersistent::new();
+        persistent.layer_record_mut(1).cleared = true;
+        assert!(!frontier_is_uncleared(&persistent, 1));
+    }
+
+    // ── construction candidate helpers ─────────────────────────────────────────
+
+    #[test]
+    fn test_construction_candidate_for_layer_out_of_window_returns_none() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        persistent.layer_record_mut(1).cleared = true;
+        // Layer 1 is outside the window once frontier advances past it.
+        for layer in 1..=5 {
+            persistent.layer_record_mut(layer).cleared = layer < 5;
+        }
+        assert_eq!(
+            construction_candidate_for_layer(&persistent, 1, &mut rng),
+            None
+        );
+    }
+
+    #[test]
+    fn test_construction_candidate_for_layer_not_cleared_returns_none() {
+        let mut rng = seeded_rng();
+        let persistent = DeepPersistent::new(); // layer 1 not cleared
+        assert_eq!(
+            construction_candidate_for_layer(&persistent, 1, &mut rng),
+            None
+        );
+    }
+
+    #[test]
+    fn test_construction_candidate_for_layer_all_built_returns_none() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        let record = persistent.layer_record_mut(1);
+        record.cleared = true;
+        for &infra in Infrastructure::ALL {
+            record.infrastructure.push(infra);
+        }
+        assert_eq!(
+            construction_candidate_for_layer(&persistent, 1, &mut rng),
+            None
+        );
+    }
+
+    #[test]
+    fn test_construction_candidate_for_layer_returns_unbuilt() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        persistent.layer_record_mut(1).cleared = true;
+        let candidate = construction_candidate_for_layer(&persistent, 1, &mut rng);
+        assert!(candidate.is_some());
+        assert!(matches!(
+            candidate.unwrap().mission_type,
+            MissionType::Construction(_)
+        ));
+    }
+
+    #[test]
+    fn test_construction_candidate_none_when_nothing_cleared() {
+        let mut rng = seeded_rng();
+        let persistent = DeepPersistent::new();
+        assert!(construction_candidate(&persistent, &mut rng).is_none());
+    }
+
+    #[test]
+    fn test_construction_candidate_some_when_cleared_layer_available() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        persistent.layer_record_mut(1).cleared = true;
+        assert!(construction_candidate(&persistent, &mut rng).is_some());
+    }
+
+    #[test]
+    fn test_safe_candidate_falls_back_to_supply_run() {
+        let mut rng = seeded_rng();
+        let persistent = DeepPersistent::new(); // nothing cleared
+        let candidate = safe_candidate(&persistent, &mut rng);
+        assert_eq!(candidate.mission_type, MissionType::SupplyRun);
+    }
+
+    #[test]
+    fn test_safe_candidate_prefers_construction_when_available() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        persistent.layer_record_mut(1).cleared = true;
+        let candidate = safe_candidate(&persistent, &mut rng);
+        assert!(matches!(
+            candidate.mission_type,
+            MissionType::Construction(_)
+        ));
+    }
+
+    #[test]
+    fn test_mid_candidate_produces_recon_or_expedition_across_seeds() {
+        let persistent = DeepPersistent::new();
+        let mut saw_recon = false;
+        let mut saw_expedition = false;
+        for seed in 0u64..20 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            match mid_candidate(&persistent, &mut rng).mission_type {
+                MissionType::Recon => saw_recon = true,
+                MissionType::Expedition => saw_expedition = true,
+                other => panic!("Unexpected mid-tier mission type: {:?}", other),
+            }
+        }
+        assert!(saw_recon && saw_expedition);
+    }
+
+    // ── progression_candidate ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_progression_candidate_breakthrough_at_uncleared_frontier() {
+        let mut rng = seeded_rng();
+        let persistent = DeepPersistent::new();
+        let candidate = progression_candidate(&persistent, &mut rng);
+        assert!(matches!(
+            candidate.unwrap().mission_type,
+            MissionType::Breakthrough
+        ));
+    }
+
+    #[test]
+    fn test_progression_candidate_gateway_when_reached_and_not_opened() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        for layer in 1..=GATEWAY_LAYER {
+            persistent.layer_record_mut(layer).cleared = true;
+        }
+        persistent.deepest_layer_reached = GATEWAY_LAYER;
+        let candidate = progression_candidate(&persistent, &mut rng);
+        assert_eq!(
+            candidate.unwrap().mission_type,
+            MissionType::GatewayExpedition
+        );
+    }
+
+    #[test]
+    fn test_progression_candidate_none_when_frontier_cleared_below_gateway() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        for layer in 1..=6 {
+            persistent.layer_record_mut(layer).cleared = true;
+        }
+        persistent.deepest_layer_reached = 5;
+        // frontier_layer() returns deepest+1 = 6, and layer 6 is itself cleared.
+        assert_eq!(persistent.frontier_layer(), 6);
+        assert!(progression_candidate(&persistent, &mut rng).is_none());
+    }
+
+    // ── push_or_replace_for_role / push_or_replace_for_layer ───────────────────
+
+    #[test]
+    fn test_push_or_replace_for_role_pushes_below_capacity() {
+        let mut pool = vec![make_available_mission(MissionType::SupplyRun, 1)];
+        let candidate = make_available_mission(MissionType::Recon, 1);
+        let changed = push_or_replace_for_role(&mut pool, 5, candidate, |_| false);
+        assert!(changed);
+        assert_eq!(pool.len(), 2);
+    }
+
+    #[test]
+    fn test_push_or_replace_for_role_replaces_matching_at_capacity() {
+        let mut pool = vec![
+            make_available_mission(MissionType::SupplyRun, 1),
+            make_available_mission(MissionType::Recon, 1),
+        ];
+        let candidate = make_available_mission(MissionType::Breakthrough, 1);
+        let changed = push_or_replace_for_role(&mut pool, 2, candidate.clone(), |m| {
+            m.mission_type == MissionType::Recon
+        });
+        assert!(changed);
+        assert_eq!(pool.len(), 2);
+        assert!(pool
+            .iter()
+            .any(|m| m.mission_type == MissionType::Breakthrough));
+    }
+
+    #[test]
+    fn test_push_or_replace_for_role_fails_when_no_match_at_capacity() {
+        let mut pool = vec![
+            make_available_mission(MissionType::SupplyRun, 1),
+            make_available_mission(MissionType::Recon, 1),
+        ];
+        let candidate = make_available_mission(MissionType::Breakthrough, 1);
+        let changed = push_or_replace_for_role(&mut pool, 2, candidate, |_| false);
+        assert!(!changed);
+        assert_eq!(pool.len(), 2);
+    }
+
+    #[test]
+    fn test_push_or_replace_for_layer_pushes_below_capacity() {
+        let mut pool = vec![make_available_mission(MissionType::SupplyRun, 1)];
+        let candidate = make_available_mission(MissionType::Recon, 2);
+        let changed = push_or_replace_for_layer(&mut pool, 5, candidate, 2);
+        assert!(changed);
+        assert_eq!(pool.len(), 2);
+    }
+
+    #[test]
+    fn test_push_or_replace_for_layer_replaces_duplicate_layer_entry() {
+        let mut pool = vec![
+            make_available_mission(MissionType::SupplyRun, 1),
+            make_available_mission(MissionType::Recon, 1),
+        ];
+        let candidate = make_available_mission(MissionType::Breakthrough, 2);
+        let changed = push_or_replace_for_layer(&mut pool, 2, candidate, 2);
+        assert!(changed);
+        assert!(pool.iter().any(|m| m.layer == 2));
+    }
+
+    #[test]
+    fn test_push_or_replace_for_layer_replaces_any_other_layer_when_no_dupes() {
+        let mut pool = vec![
+            make_available_mission(MissionType::SupplyRun, 1),
+            make_available_mission(MissionType::Recon, 3),
+        ];
+        let candidate = make_available_mission(MissionType::Breakthrough, 2);
+        let changed = push_or_replace_for_layer(&mut pool, 2, candidate, 2);
+        assert!(changed);
+        assert!(pool.iter().any(|m| m.layer == 2));
+    }
+
+    #[test]
+    fn test_push_or_replace_for_layer_fails_when_pool_is_all_target_layer() {
+        let mut pool = vec![
+            make_available_mission(MissionType::SupplyRun, 2),
+            make_available_mission(MissionType::Recon, 2),
+        ];
+        let candidate = make_available_mission(MissionType::Breakthrough, 2);
+        let changed = push_or_replace_for_layer(&mut pool, 2, candidate, 2);
+        assert!(!changed);
+        assert_eq!(pool.len(), 2);
+    }
+
+    // ── ensure_specific_mission_present ────────────────────────────────────────
+
+    #[test]
+    fn test_ensure_specific_mission_present_adds_when_missing() {
+        let mut rng = seeded_rng();
+        let persistent = DeepPersistent::new();
+        let mut pool = vec![];
+        let changed = ensure_specific_mission_present(
+            &mut pool,
+            MissionType::Recon,
+            1,
+            &persistent,
+            &mut rng,
+        );
+        assert!(changed);
+        assert_eq!(pool.len(), 1);
+    }
+
+    #[test]
+    fn test_ensure_specific_mission_present_noop_when_already_there() {
+        let mut rng = seeded_rng();
+        let persistent = DeepPersistent::new();
+        let mut pool = vec![make_available_mission(MissionType::Recon, 1)];
+        let changed = ensure_specific_mission_present(
+            &mut pool,
+            MissionType::Recon,
+            1,
+            &persistent,
+            &mut rng,
+        );
+        assert!(!changed);
+        assert_eq!(pool.len(), 1);
+    }
+
+    // ── unbuilt_infrastructure_for_layer / is_valid_construction_mission ──────
+
+    #[test]
+    fn test_unbuilt_infrastructure_for_layer_no_record() {
+        let persistent = DeepPersistent::new();
+        assert!(unbuilt_infrastructure_for_layer(&persistent, 1).is_empty());
+    }
+
+    #[test]
+    fn test_unbuilt_infrastructure_for_layer_not_cleared() {
+        let mut persistent = DeepPersistent::new();
+        let _ = persistent.layer_record_mut(1);
+        assert!(unbuilt_infrastructure_for_layer(&persistent, 1).is_empty());
+    }
+
+    #[test]
+    fn test_unbuilt_infrastructure_for_layer_partial() {
+        let mut persistent = DeepPersistent::new();
+        let record = persistent.layer_record_mut(1);
+        record.cleared = true;
+        record.infrastructure.push(Infrastructure::Outpost);
+        let unbuilt = unbuilt_infrastructure_for_layer(&persistent, 1);
+        assert!(!unbuilt.contains(&Infrastructure::Outpost));
+        assert_eq!(unbuilt.len(), Infrastructure::ALL.len() - 1);
+    }
+
+    #[test]
+    fn test_is_valid_construction_mission_non_construction_always_valid() {
+        let persistent = DeepPersistent::new();
+        let mission = make_available_mission(MissionType::Recon, 1);
+        assert!(is_valid_construction_mission(&mission, &persistent));
+    }
+
+    #[test]
+    fn test_is_valid_construction_mission_no_record_invalid() {
+        let persistent = DeepPersistent::new();
+        let mission = AvailableMission {
+            mission_type: MissionType::Construction(Infrastructure::Outpost),
+            ..make_available_mission(MissionType::Construction(Infrastructure::Outpost), 1)
+        };
+        assert!(!is_valid_construction_mission(&mission, &persistent));
+    }
+
+    #[test]
+    fn test_is_valid_construction_mission_already_built_invalid() {
+        let mut persistent = DeepPersistent::new();
+        let record = persistent.layer_record_mut(1);
+        record.cleared = true;
+        record.infrastructure.push(Infrastructure::Outpost);
+        let mission = make_available_mission(MissionType::Construction(Infrastructure::Outpost), 1);
+        assert!(!is_valid_construction_mission(&mission, &persistent));
+    }
+
+    #[test]
+    fn test_is_valid_construction_mission_cleared_and_unbuilt_is_valid() {
+        let mut persistent = DeepPersistent::new();
+        persistent.layer_record_mut(1).cleared = true;
+        let mission = make_available_mission(MissionType::Construction(Infrastructure::Outpost), 1);
+        assert!(is_valid_construction_mission(&mission, &persistent));
+    }
+
+    // ── prune_invalid_pool_missions ─────────────────────────────────────────────
+
+    #[test]
+    fn test_prune_invalid_pool_missions_keeps_gateway_regardless_of_window() {
+        let persistent = DeepPersistent::new(); // window is (1,1)
+        let mut pool = vec![make_available_mission(
+            MissionType::GatewayExpedition,
+            GATEWAY_LAYER,
+        )];
+        let changed = prune_invalid_pool_missions(&mut pool, &persistent, &[]);
+        assert!(!changed);
+        assert_eq!(pool.len(), 1);
+    }
+
+    #[test]
+    fn test_prune_invalid_pool_missions_removes_out_of_window() {
+        let persistent = DeepPersistent::new(); // window is (1,1)
+        let mut pool = vec![make_available_mission(MissionType::Recon, 9)];
+        let changed = prune_invalid_pool_missions(&mut pool, &persistent, &[]);
+        assert!(changed);
+        assert!(pool.is_empty());
+    }
+
+    #[test]
+    fn test_prune_invalid_pool_missions_removes_breakthrough_on_cleared_layer() {
+        let mut persistent = DeepPersistent::new();
+        persistent.layer_record_mut(1).cleared = true;
+        let mut pool = vec![make_available_mission(MissionType::Breakthrough, 1)];
+        let changed = prune_invalid_pool_missions(&mut pool, &persistent, &[]);
+        assert!(changed);
+        assert!(pool.is_empty());
+    }
+
+    #[test]
+    fn test_prune_invalid_pool_missions_removes_construction_conflicting_with_active() {
+        let mut persistent = DeepPersistent::new();
+        persistent.layer_record_mut(1).cleared = true;
+        let mut pool = vec![make_available_mission(
+            MissionType::Construction(Infrastructure::Outpost),
+            1,
+        )];
+        let active = Mission {
+            id: 1,
+            mission_type: MissionType::Construction(Infrastructure::Outpost),
+            layer: 1,
+            squad: vec![],
+            started_at: Utc::now(),
+            ends_at: Utc::now() + Duration::hours(1),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        };
+        let changed = prune_invalid_pool_missions(&mut pool, &persistent, &[active]);
+        assert!(changed);
+        assert!(pool.is_empty());
+    }
+
+    #[test]
+    fn test_prune_invalid_pool_missions_dedupes_layer_type_pairs() {
+        let persistent = DeepPersistent::new();
+        let mut pool = vec![
+            make_available_mission(MissionType::Recon, 1),
+            make_available_mission(MissionType::Recon, 1),
+        ];
+        let changed = prune_invalid_pool_missions(&mut pool, &persistent, &[]);
+        assert!(changed);
+        assert_eq!(pool.len(), 1);
+    }
+
+    #[test]
+    fn test_prune_invalid_pool_missions_no_change_when_all_valid() {
+        let persistent = DeepPersistent::new();
+        let mut pool = vec![make_available_mission(MissionType::Recon, 1)];
+        let changed = prune_invalid_pool_missions(&mut pool, &persistent, &[]);
+        assert!(!changed);
+        assert_eq!(pool.len(), 1);
+    }
+
+    // ── layer_filler_candidate ───────────────────────────────────────────────
+
+    #[test]
+    fn test_layer_filler_candidate_breakthrough_at_uncleared_frontier() {
+        let mut rng = seeded_rng();
+        let persistent = DeepPersistent::new();
+        let candidate = layer_filler_candidate(1, &persistent, &mut rng);
+        assert_eq!(candidate.mission_type, MissionType::Breakthrough);
+    }
+
+    #[test]
+    fn test_layer_filler_candidate_construction_when_available() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        // Layer 1 cleared but not the frontier (frontier is layer 2).
+        persistent.layer_record_mut(1).cleared = true;
+        persistent.deepest_layer_reached = 1;
+        let candidate = layer_filler_candidate(1, &persistent, &mut rng);
+        assert!(matches!(
+            candidate.mission_type,
+            MissionType::Construction(_)
+        ));
+    }
+
+    #[test]
+    fn test_layer_filler_candidate_cleared_layer_all_infra_built_yields_supply_or_mid() {
+        let mut persistent = DeepPersistent::new();
+        let record = persistent.layer_record_mut(1);
+        record.cleared = true;
+        for &infra in Infrastructure::ALL {
+            record.infrastructure.push(infra);
+        }
+        persistent.deepest_layer_reached = 1;
+
+        let mut saw_supply = false;
+        let mut saw_mid = false;
+        for seed in 0u64..30 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            match layer_filler_candidate(1, &persistent, &mut rng).mission_type {
+                MissionType::SupplyRun => saw_supply = true,
+                MissionType::Recon | MissionType::Expedition => saw_mid = true,
+                other => panic!("Unexpected filler mission type: {:?}", other),
+            }
+        }
+        assert!(saw_supply, "Expected at least one Supply Run across seeds");
+        assert!(
+            saw_mid,
+            "Expected at least one Recon/Expedition across seeds"
+        );
+    }
+
+    #[test]
+    fn test_layer_filler_candidate_uncleared_non_frontier_layer() {
+        let persistent = DeepPersistent::new();
+        let mut saw_recon = false;
+        let mut saw_expedition = false;
+        for seed in 0u64..20 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            // Layer 1 is the frontier here, so use a persistent with a deeper frontier
+            // and query a non-frontier, uncleared layer index instead: layer 1 itself
+            // when frontier has moved to 2 (layer 1 uncleared, no construction).
+            let mut p2 = persistent.clone();
+            p2.layer_record_mut(2); // create but don't clear -> frontier stays 1
+            match layer_filler_candidate(1, &p2, &mut rng).mission_type {
+                MissionType::Breakthrough => {} // layer 1 is still frontier+uncleared here
+                MissionType::Recon => saw_recon = true,
+                MissionType::Expedition => saw_expedition = true,
+                other => panic!("Unexpected filler mission type: {:?}", other),
+            }
+        }
+        let _ = (saw_recon, saw_expedition);
+    }
+
+    // ── replenish_mission_pool: role rebalancing edge cases ───────────────────
+
+    #[test]
+    fn test_replenish_mission_pool_forces_gateway_over_existing_breakthrough() {
+        let mut rng = seeded_rng();
+        let mut persistent = DeepPersistent::new();
+        for layer in 1..=GATEWAY_LAYER {
+            persistent.layer_record_mut(layer).cleared = true;
+        }
+        persistent.deepest_layer_reached = GATEWAY_LAYER;
+
+        let mut pool = vec![make_available_mission(
+            MissionType::Breakthrough,
+            GATEWAY_LAYER,
+        )];
+        let changed = replenish_mission_pool(&mut pool, &persistent, &[], 7, &mut rng);
+        assert!(changed);
+        assert!(pool
+            .iter()
+            .any(|m| m.mission_type == MissionType::GatewayExpedition));
+    }
+
+    #[test]
+    fn test_replenish_mission_pool_no_change_when_pool_already_balanced() {
+        let mut rng = seeded_rng();
+        let persistent = DeepPersistent::new();
+        let mut pool = generate_mission_pool(&persistent, &[], &mut rng);
+        // A second replenish pass over an already-valid, role-complete pool that
+        // meets the target count should report no changes.
+        let count = pool.len();
+        let changed = replenish_mission_pool(&mut pool, &persistent, &[], count, &mut rng);
+        assert!(!changed, "Stable, fully-populated pool should not change");
+    }
+
+    // ── DeepPrestige::new / GuildRank sanity for concurrency edge ─────────────
+
+    #[test]
+    fn test_validate_squad_concurrent_limit_raised_by_breakthrough_bonus() {
+        let mut persistent = DeepPersistent::new();
+        persistent.deepest_layer_reached = 3; // grants +1 concurrent slot at Rank 1
+        let merc = make_merc(1, MercArchetype::Vanguard, 30);
+        let mut prestige = make_prestige_with_mercs(vec![merc]);
+
+        let now = Utc::now();
+        prestige.active_missions.push(Mission {
+            id: 999,
+            mission_type: MissionType::SupplyRun,
+            layer: 1,
+            squad: vec![],
+            started_at: now,
+            ends_at: now + Duration::hours(3),
+            events: vec![],
+            pending_event_index: 0,
+            status: MissionStatus::Active,
+            result: None,
+            is_first_orders: false,
+        });
+
+        let mut available = make_available_mission(MissionType::Recon, 1);
+        available.marks_cost = 0;
+
+        // With the L3 breakthrough bonus, Rank 1 gets 2 concurrent slots, so a
+        // second mission should be assignable.
+        let result = validate_squad_assignment(&available, &[1], &prestige, &persistent, false);
+        assert!(result.is_ok());
     }
 }

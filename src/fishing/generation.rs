@@ -680,6 +680,57 @@ mod tests {
     }
 
     #[test]
+    fn test_generate_fish_with_rank_catch_miss_signalled_with_lure_bonus() {
+        // With 10 encounters complete and a positive lure_catch_bonus, a failed
+        // catch roll should surface as CatchMiss (not None).
+        let mut rng = create_test_rng();
+
+        let mut missed = false;
+        for _ in 0..1000 {
+            let (fish, result) =
+                generate_fish_with_rank(FishRarity::Legendary, 40, 10, 0.0, 0.05, &mut rng);
+            match result {
+                LeviathanResult::CatchMiss => {
+                    assert_eq!(fish.rarity, FishRarity::Legendary);
+                    missed = true;
+                    break;
+                }
+                LeviathanResult::Caught => continue,
+                _ => panic!("Unexpected result at 10 encounters: {:?}", result),
+            }
+        }
+        assert!(
+            missed,
+            "Should signal CatchMiss at least once with a positive lure bonus"
+        );
+    }
+
+    #[test]
+    fn test_generate_fish_with_rank_catch_after_10_no_lure_bonus_is_none_on_miss() {
+        // Without a lure bonus, a failed catch roll at 10 encounters should be
+        // signalled as None (not CatchMiss).
+        let mut rng = create_test_rng();
+
+        let mut saw_miss = false;
+        for _ in 0..1000 {
+            let (_, result) =
+                generate_fish_with_rank(FishRarity::Legendary, 40, 10, 0.0, 0.0, &mut rng);
+            match result {
+                LeviathanResult::None => {
+                    saw_miss = true;
+                    break;
+                }
+                LeviathanResult::Caught => continue,
+                other => panic!("Unexpected result with no lure bonus: {:?}", other),
+            }
+        }
+        assert!(
+            saw_miss,
+            "Should see a plain miss (None) without lure bonus"
+        );
+    }
+
+    #[test]
     fn test_is_storm_leviathan() {
         let leviathan = CaughtFish {
             name: STORM_LEVIATHAN.to_string(),

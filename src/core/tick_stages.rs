@@ -1414,4 +1414,1615 @@ mod tests {
         ));
         assert!(achievements.take_newly_unlocked().is_empty());
     }
+
+    // ── process_dungeon_events ──────────────────────────────────────────────
+
+    #[test]
+    fn process_dungeon_events_noop_without_active_dungeon() {
+        let mut rng = ChaCha8Rng::seed_from_u64(1);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        process_dungeon_events(&mut state, 0.1, &haven_bonuses, &mut result, &mut rng);
+
+        assert!(result.events.is_empty());
+    }
+
+    #[test]
+    fn process_dungeon_events_treasure_room_entry_drops_item_and_salvages_stormglass() {
+        use crate::dungeon::types::{Dungeon, DungeonSize, Room, RoomState, RoomType, DIR_RIGHT};
+        use crate::items::generation::generate_item_with_rng;
+        use crate::items::types::EquipmentSlot;
+
+        let mut rng = ChaCha8Rng::seed_from_u64(99);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.prestige_rank = 20; // >= STORMGLASS_MIN_PRESTIGE_RANK
+        state.zone_progression.current_zone_id = 5;
+
+        // Pre-equip Mythic gear in every slot so the treasure item can never be
+        // auto-equipped, forcing the Stormglass salvage branch deterministically
+        // (auto_equip_if_better always refuses to replace a Mythic item).
+        for slot in [
+            EquipmentSlot::Weapon,
+            EquipmentSlot::Armor,
+            EquipmentSlot::Helmet,
+            EquipmentSlot::Gloves,
+            EquipmentSlot::Boots,
+            EquipmentSlot::Amulet,
+            EquipmentSlot::Ring,
+        ] {
+            let guard = generate_item_with_rng(slot, Rarity::Mythic, 999, &mut rng);
+            state.equipment.set(slot, Some(guard));
+        }
+
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+        dungeon.entrance_position = (0, 0);
+        dungeon.boss_position = (4, 4);
+        dungeon.player_position = (0, 0);
+        dungeon.current_room_cleared = true;
+        dungeon.move_timer = 10.0; // already well past ROOM_MOVE_INTERVAL
+
+        let mut entrance = Room::new(RoomType::Entrance, (0, 0));
+        entrance.state = RoomState::Current;
+        entrance.connections[DIR_RIGHT] = true;
+        dungeon.grid[0][0] = Some(entrance);
+
+        let mut treasure = Room::new(RoomType::Treasure, (1, 0));
+        treasure.state = RoomState::Revealed;
+        dungeon.grid[0][1] = Some(treasure);
+
+        state.active_dungeon = Some(dungeon);
+
+        let haven_bonuses = Haven::new().compute_bonuses();
+        let mut result = TickResult::default();
+
+        process_dungeon_events(&mut state, 0.1, &haven_bonuses, &mut result, &mut rng);
+
+        assert!(result.events.iter().any(|e| matches!(
+            e,
+            TickEvent::DungeonRoomEntered {
+                room_type: RoomType::Treasure,
+                ..
+            }
+        )));
+        assert!(result.events.iter().any(|e| matches!(
+            e,
+            TickEvent::DungeonTreasureFound {
+                equipped: false,
+                ..
+            }
+        )));
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::StormglassDiscovered)));
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::StormglassSalvaged { .. })));
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::StormglassDungeonCache { .. })));
+        assert!(state.stormglass_discovered);
+        assert!(state.stormglass > 0);
+    }
+
+    // ── process_fishing_tick ─────────────────────────────────────────────────
+
+    #[test]
+    fn process_fishing_tick_returns_false_without_active_fishing() {
+        let mut rng = ChaCha8Rng::seed_from_u64(2);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut tick_counter = 0u32;
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        let handled = process_fishing_tick(
+            &mut state,
+            &mut tick_counter,
+            0.1,
+            &haven_bonuses,
+            &mut achievements,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(!handled);
+        assert_eq!(tick_counter, 0);
+    }
+
+    #[test]
+    fn process_fishing_tick_casting_phase_emits_message_and_advances_to_waiting() {
+        let mut rng = ChaCha8Rng::seed_from_u64(3);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.active_fishing = Some(crate::fishing::FishingSession {
+            spot_name: "Test Cove".to_string(),
+            total_fish: 5,
+            fish_caught: Vec::new(),
+            items_found: Vec::new(),
+            ticks_remaining: 1,
+            phase: crate::fishing::FishingPhase::Casting,
+        });
+        let mut tick_counter = 0u32;
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        let handled = process_fishing_tick(
+            &mut state,
+            &mut tick_counter,
+            0.1,
+            &haven_bonuses,
+            &mut achievements,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(handled);
+        assert_eq!(tick_counter, 1);
+        assert!(matches!(
+            state.active_fishing.as_ref().unwrap().phase,
+            crate::fishing::FishingPhase::Waiting
+        ));
+        assert!(result.events.iter().any(
+            |e| matches!(e, TickEvent::FishingMessage { message } if message.contains("waiting for a bite"))
+        ));
+    }
+
+    #[test]
+    fn process_fishing_tick_waiting_phase_emits_message_and_advances_to_reeling() {
+        let mut rng = ChaCha8Rng::seed_from_u64(4);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.active_fishing = Some(crate::fishing::FishingSession {
+            spot_name: "Test Cove".to_string(),
+            total_fish: 5,
+            fish_caught: Vec::new(),
+            items_found: Vec::new(),
+            ticks_remaining: 1,
+            phase: crate::fishing::FishingPhase::Waiting,
+        });
+        let mut tick_counter = 0u32;
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        process_fishing_tick(
+            &mut state,
+            &mut tick_counter,
+            0.1,
+            &haven_bonuses,
+            &mut achievements,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(matches!(
+            state.active_fishing.as_ref().unwrap().phase,
+            crate::fishing::FishingPhase::Reeling
+        ));
+        assert!(result.events.iter().any(
+            |e| matches!(e, TickEvent::FishingMessage { message } if message.contains("Got a bite"))
+        ));
+    }
+
+    #[test]
+    fn process_fishing_tick_reeling_catches_fish_and_updates_play_time() {
+        let mut rng = ChaCha8Rng::seed_from_u64(5);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.active_fishing = Some(crate::fishing::FishingSession {
+            spot_name: "Test Cove".to_string(),
+            total_fish: 100,
+            fish_caught: Vec::new(),
+            items_found: Vec::new(),
+            ticks_remaining: 1,
+            phase: crate::fishing::FishingPhase::Reeling,
+        });
+        let mut tick_counter = TICKS_PER_SECOND - 1;
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+        let play_time_before = state.play_time_seconds;
+
+        let handled = process_fishing_tick(
+            &mut state,
+            &mut tick_counter,
+            0.1,
+            &haven_bonuses,
+            &mut achievements,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(handled);
+        assert_eq!(tick_counter, 0);
+        assert_eq!(state.play_time_seconds, play_time_before + 1);
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::FishCaught { .. })));
+    }
+
+    #[test]
+    fn process_fishing_tick_rank_up_fires_achievement_and_event() {
+        let mut rng = ChaCha8Rng::seed_from_u64(11);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.fishing.rank = 1;
+        state.fishing.fish_toward_next_rank =
+            crate::fishing::types::FishingState::fish_required_for_rank(1) - 1;
+        state.active_fishing = Some(crate::fishing::FishingSession {
+            spot_name: "Rank Cove".to_string(),
+            total_fish: 10,
+            fish_caught: Vec::new(),
+            items_found: Vec::new(),
+            ticks_remaining: 1,
+            phase: crate::fishing::FishingPhase::Reeling,
+        });
+        let mut tick_counter = 0u32;
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        process_fishing_tick(
+            &mut state,
+            &mut tick_counter,
+            0.1,
+            &haven_bonuses,
+            &mut achievements,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert_eq!(state.fishing.rank, 2);
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::FishingRankUp { .. })));
+    }
+
+    #[test]
+    fn process_fishing_tick_storm_leviathan_caught_sets_flag_and_achievement() {
+        let mut rng = ChaCha8Rng::seed_from_u64(2024);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.fishing.rank = 40;
+        state.fishing.leviathan_encounters = 10;
+        let mut tick_counter = 0u32;
+        let mut achievements = Achievements::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        let mut caught = false;
+        for _ in 0..5000 {
+            state.active_fishing = Some(crate::fishing::FishingSession {
+                spot_name: "Storm Cove".to_string(),
+                total_fish: 1_000_000,
+                fish_caught: Vec::new(),
+                items_found: Vec::new(),
+                ticks_remaining: 1,
+                phase: crate::fishing::FishingPhase::Reeling,
+            });
+            let mut result = TickResult::default();
+            process_fishing_tick(
+                &mut state,
+                &mut tick_counter,
+                0.1,
+                &haven_bonuses,
+                &mut achievements,
+                false,
+                &mut result,
+                &mut rng,
+            );
+            if result
+                .events
+                .iter()
+                .any(|e| matches!(e, TickEvent::StormLeviathanCaught))
+            {
+                caught = true;
+                break;
+            }
+        }
+
+        assert!(
+            caught,
+            "Storm Leviathan should be caught within 5000 attempts"
+        );
+        assert!(state.fishing.leviathan_caught);
+        assert!(achievements
+            .take_newly_unlocked()
+            .contains(&AchievementId::StormLeviathan));
+    }
+
+    #[test]
+    fn process_fishing_tick_can_find_item_while_catching() {
+        let mut rng = ChaCha8Rng::seed_from_u64(55);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut tick_counter = 0u32;
+        let mut achievements = Achievements::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        let mut found_item = false;
+        for _ in 0..3000 {
+            state.active_fishing = Some(crate::fishing::FishingSession {
+                spot_name: "Item Cove".to_string(),
+                total_fish: 1_000_000,
+                fish_caught: Vec::new(),
+                items_found: Vec::new(),
+                ticks_remaining: 1,
+                phase: crate::fishing::FishingPhase::Reeling,
+            });
+            let mut result = TickResult::default();
+            process_fishing_tick(
+                &mut state,
+                &mut tick_counter,
+                0.1,
+                &haven_bonuses,
+                &mut achievements,
+                false,
+                &mut result,
+                &mut rng,
+            );
+            if result
+                .events
+                .iter()
+                .any(|e| matches!(e, TickEvent::FishingItemFound { .. }))
+            {
+                found_item = true;
+                break;
+            }
+        }
+
+        assert!(
+            found_item,
+            "Should find a fishing item within 3000 attempts"
+        );
+    }
+
+    // ── process_combat_events ────────────────────────────────────────────────
+
+    #[test]
+    fn process_combat_events_enemy_died_awards_xp_and_processes_drops() {
+        let mut rng = ChaCha8Rng::seed_from_u64(31);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut deep = crate::deep::DeepState::new();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        state.combat_state.current_enemy = Some(Enemy::new("Rat".to_string(), 10, 2));
+        let kills_before = state.session_kills;
+
+        process_combat_events(
+            &mut state,
+            vec![CombatEvent::EnemyDied { xp_gained: 250 }],
+            &haven_bonuses,
+            &mut achievements,
+            &mut deep,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert_eq!(state.session_kills, kills_before + 1);
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::EnemyDefeated { xp_gained: 250, .. })));
+    }
+
+    #[test]
+    fn process_combat_events_enemy_died_in_dungeon_tracks_xp_and_clears_room() {
+        let mut rng = ChaCha8Rng::seed_from_u64(32);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut deep = crate::deep::DeepState::new();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        state.combat_state.current_enemy = Some(Enemy::new("Rat".to_string(), 10, 2));
+        let mut dungeon = crate::dungeon::generation::generate_dungeon(10, 0, 1);
+        dungeon.xp_earned = 0;
+        dungeon.current_room_cleared = false;
+        state.active_dungeon = Some(dungeon);
+
+        process_combat_events(
+            &mut state,
+            vec![CombatEvent::EnemyDied { xp_gained: 300 }],
+            &haven_bonuses,
+            &mut achievements,
+            &mut deep,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        let dungeon = state.active_dungeon.as_ref().unwrap();
+        assert_eq!(dungeon.xp_earned, 300);
+        assert!(dungeon.current_room_cleared);
+    }
+
+    #[test]
+    fn process_combat_events_elite_defeated_grants_key_in_dungeon() {
+        let mut rng = ChaCha8Rng::seed_from_u64(33);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut deep = crate::deep::DeepState::new();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        state.combat_state.current_enemy = Some(Enemy::new("Guardian".to_string(), 100, 20));
+        state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(10, 0, 1));
+
+        process_combat_events(
+            &mut state,
+            vec![CombatEvent::EliteDefeated { xp_gained: 400 }],
+            &haven_bonuses,
+            &mut achievements,
+            &mut deep,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(state.active_dungeon.as_ref().unwrap().has_key);
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::DungeonKeyFound)));
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::DungeonEliteDefeated { xp_gained: 400, .. })));
+    }
+
+    #[test]
+    fn process_combat_events_boss_defeated_in_dungeon_awards_bonus_xp_and_clears_dungeon() {
+        let mut rng = ChaCha8Rng::seed_from_u64(41);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut deep = crate::deep::DeepState::new();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        state.combat_state.current_enemy = Some(Enemy::new("Dungeon Boss".to_string(), 500, 50));
+        let mut dungeon = crate::dungeon::generation::generate_dungeon(10, 0, 1);
+        dungeon.xp_earned = 1000;
+        state.active_dungeon = Some(dungeon);
+
+        process_combat_events(
+            &mut state,
+            vec![CombatEvent::BossDefeated { xp_gained: 500 }],
+            &haven_bonuses,
+            &mut achievements,
+            &mut deep,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(state.active_dungeon.is_none());
+        assert!(result.events.iter().any(|e| matches!(
+            e,
+            TickEvent::DungeonBossDefeated {
+                xp_gained: 500,
+                total_xp,
+                ..
+            } if *total_xp > 2000
+        )));
+    }
+
+    #[test]
+    fn process_combat_events_boss_defeated_outside_dungeon_has_no_bonus_xp() {
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut deep = crate::deep::DeepState::new();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        state.combat_state.current_enemy = Some(Enemy::new("Field Boss".to_string(), 500, 50));
+
+        process_combat_events(
+            &mut state,
+            vec![CombatEvent::BossDefeated { xp_gained: 777 }],
+            &haven_bonuses,
+            &mut achievements,
+            &mut deep,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(result.events.iter().any(|e| matches!(
+            e,
+            TickEvent::DungeonBossDefeated {
+                xp_gained: 777,
+                bonus_xp: 0,
+                total_xp: 777,
+                items_collected: 0,
+                ..
+            }
+        )));
+    }
+
+    #[test]
+    fn process_combat_events_subzone_boss_weapon_required_skips_event_but_still_awards_xp() {
+        let mut rng = ChaCha8Rng::seed_from_u64(51);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut deep = crate::deep::DeepState::new();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        process_combat_events(
+            &mut state,
+            vec![CombatEvent::SubzoneBossDefeated {
+                xp_gained: 300,
+                result: BossDefeatResult::WeaponRequired {
+                    weapon_name: "Stormbreaker",
+                },
+            }],
+            &haven_bonuses,
+            &mut achievements,
+            &mut deep,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(!result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::SubzoneBossDefeated { .. })));
+        assert_eq!(state.session_kills, 1);
+    }
+
+    #[test]
+    fn process_combat_events_expanse_cycle_triggers_deep_discovery() {
+        let mut rng = ChaCha8Rng::seed_from_u64(61);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.prestige_rank = 20; // >= DEEP_MIN_PRESTIGE_RANK
+        let mut achievements = Achievements::default();
+        let mut deep = crate::deep::DeepState::new();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        assert!(!deep.persistent.discovered);
+
+        process_combat_events(
+            &mut state,
+            vec![CombatEvent::SubzoneBossDefeated {
+                xp_gained: 300,
+                result: BossDefeatResult::ExpanseCycle,
+            }],
+            &haven_bonuses,
+            &mut achievements,
+            &mut deep,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(deep.persistent.discovered);
+        assert!(result.deep_changed);
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::DeepDiscovered)));
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::SubzoneBossDefeated { .. })));
+        assert!(achievements
+            .take_newly_unlocked()
+            .contains(&AchievementId::TheDeepDiscovered));
+    }
+
+    #[test]
+    fn process_combat_events_z50_loom_zone_cycle_triggers_vessel_signal_discovery() {
+        let mut rng = ChaCha8Rng::seed_from_u64(71);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut deep = crate::deep::DeepState::new();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        assert!(!state.vessel_signal_discovered);
+
+        process_combat_events(
+            &mut state,
+            vec![CombatEvent::SubzoneBossDefeated {
+                xp_gained: 300,
+                result: BossDefeatResult::LoomZoneCycle { zone_id: 50 },
+            }],
+            &haven_bonuses,
+            &mut achievements,
+            &mut deep,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(state.vessel_signal_discovered);
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::VesselSignalDiscovered)));
+    }
+
+    // ── process_item_drop ────────────────────────────────────────────────────
+
+    #[test]
+    fn process_item_drop_boss_drop_salvages_when_not_equipped() {
+        use crate::items::generation::generate_item_with_rng;
+        use crate::items::types::EquipmentSlot;
+
+        let mut rng = ChaCha8Rng::seed_from_u64(81);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.prestige_rank = 20;
+        state.zone_progression.current_zone_id = 3;
+        state.zone_progression.fighting_boss = true;
+
+        for slot in [
+            EquipmentSlot::Weapon,
+            EquipmentSlot::Armor,
+            EquipmentSlot::Helmet,
+            EquipmentSlot::Gloves,
+            EquipmentSlot::Boots,
+            EquipmentSlot::Amulet,
+            EquipmentSlot::Ring,
+        ] {
+            let guard = generate_item_with_rng(slot, Rarity::Mythic, 999, &mut rng);
+            state.equipment.set(slot, Some(guard));
+        }
+
+        let haven_bonuses = Haven::new().compute_bonuses();
+        let mut result = TickResult::default();
+
+        process_item_drop(&mut state, &haven_bonuses, &mut result);
+
+        assert!(result.events.iter().any(|e| matches!(
+            e,
+            TickEvent::ItemDropped {
+                equipped: false,
+                from_boss: true,
+                ..
+            }
+        )));
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::StormglassDiscovered)));
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::StormglassSalvaged { .. })));
+        assert!(state.stormglass_discovered);
+        assert!(state.stormglass > 0);
+    }
+
+    #[test]
+    fn process_item_drop_boss_drop_equipped_skips_salvage_even_when_stormglass_active() {
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.prestige_rank = 20;
+        state.zone_progression.current_zone_id = 10;
+        state.zone_progression.fighting_boss = true;
+
+        let haven_bonuses = Haven::new().compute_bonuses();
+        let mut result = TickResult::default();
+
+        process_item_drop(&mut state, &haven_bonuses, &mut result);
+
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::ItemDropped { equipped: true, .. })));
+        assert!(!result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::StormglassSalvaged { .. })));
+    }
+
+    #[test]
+    fn process_item_drop_boss_drop_without_stormglass_access_never_salvages() {
+        use crate::items::generation::generate_item_with_rng;
+        use crate::items::types::EquipmentSlot;
+
+        let mut rng = ChaCha8Rng::seed_from_u64(82);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.zone_progression.current_zone_id = 10;
+        state.zone_progression.fighting_boss = true;
+        // prestige_rank stays 0 (< STORMGLASS_MIN_PRESTIGE_RANK) and stormglass undiscovered.
+
+        for slot in [
+            EquipmentSlot::Weapon,
+            EquipmentSlot::Armor,
+            EquipmentSlot::Helmet,
+            EquipmentSlot::Gloves,
+            EquipmentSlot::Boots,
+            EquipmentSlot::Amulet,
+            EquipmentSlot::Ring,
+        ] {
+            let guard = generate_item_with_rng(slot, Rarity::Mythic, 999, &mut rng);
+            state.equipment.set(slot, Some(guard));
+        }
+
+        let haven_bonuses = Haven::new().compute_bonuses();
+        let mut result = TickResult::default();
+
+        process_item_drop(&mut state, &haven_bonuses, &mut result);
+
+        assert!(result.events.iter().any(|e| matches!(
+            e,
+            TickEvent::ItemDropped {
+                equipped: false,
+                ..
+            }
+        )));
+        assert!(!result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::StormglassSalvaged { .. })));
+        assert!(!state.stormglass_discovered);
+    }
+
+    #[test]
+    fn process_item_drop_mob_drop_eventually_fires_item_dropped_event() {
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.prestige_rank = 50; // maxes the item drop chance
+        state.zone_progression.current_zone_id = 3;
+        state.zone_progression.fighting_boss = false;
+
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        let mut dropped = false;
+        for _ in 0..500 {
+            let mut result = TickResult::default();
+            process_item_drop(&mut state, &haven_bonuses, &mut result);
+            if result.events.iter().any(|e| {
+                matches!(
+                    e,
+                    TickEvent::ItemDropped {
+                        from_boss: false,
+                        ..
+                    }
+                )
+            }) {
+                dropped = true;
+                break;
+            }
+        }
+
+        assert!(
+            dropped,
+            "Mob should eventually drop an item at max drop chance"
+        );
+    }
+
+    // ── process_discoveries ──────────────────────────────────────────────────
+
+    #[test]
+    fn process_discoveries_dungeon_discovery_populates_active_dungeon() {
+        let mut rng = ChaCha8Rng::seed_from_u64(101);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut discovered = false;
+
+        for _ in 0..5000 {
+            state.active_dungeon = None;
+            let mut result = TickResult::default();
+            process_discoveries(&mut state, &mut rng, &mut result);
+            if result
+                .events
+                .iter()
+                .any(|e| matches!(e, TickEvent::DungeonDiscovered { .. }))
+            {
+                discovered = true;
+                break;
+            }
+        }
+
+        assert!(
+            discovered,
+            "Dungeon should be discovered within 5000 attempts"
+        );
+        assert!(state.active_dungeon.is_some());
+    }
+
+    #[test]
+    fn process_discoveries_fishing_discovery_populates_active_fishing() {
+        let mut rng = ChaCha8Rng::seed_from_u64(111);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut discovered = false;
+
+        for _ in 0..2000 {
+            state.active_dungeon = None;
+            state.active_fishing = None;
+            let mut result = TickResult::default();
+            process_discoveries(&mut state, &mut rng, &mut result);
+            if result
+                .events
+                .iter()
+                .any(|e| matches!(e, TickEvent::FishingSpotDiscovered { .. }))
+            {
+                discovered = true;
+                break;
+            }
+        }
+
+        assert!(
+            discovered,
+            "Fishing spot should be discovered within 2000 attempts"
+        );
+    }
+
+    // ── process_zone_achievements ────────────────────────────────────────────
+
+    #[test]
+    fn process_zone_achievements_handles_all_boss_defeat_variants() {
+        let mut achievements = Achievements::default();
+
+        process_zone_achievements(
+            &BossDefeatResult::ZoneComplete {
+                old_zone: "Meadow",
+                old_zone_id: 2,
+                new_zone_id: 3,
+            },
+            &mut achievements,
+            "Hero",
+        );
+        assert!(achievements
+            .take_newly_unlocked()
+            .contains(&AchievementId::Zone2Complete));
+
+        process_zone_achievements(
+            &BossDefeatResult::ZoneCompleteButGated {
+                zone_name: "Wilds",
+                old_zone_id: 4,
+                required_prestige: 2,
+            },
+            &mut achievements,
+            "Hero",
+        );
+        assert!(achievements
+            .take_newly_unlocked()
+            .contains(&AchievementId::Zone4Complete));
+
+        process_zone_achievements(&BossDefeatResult::StormsEnd, &mut achievements, "Hero");
+        assert!(achievements
+            .take_newly_unlocked()
+            .contains(&AchievementId::Zone10Complete));
+
+        process_zone_achievements(&BossDefeatResult::ExpanseCycle, &mut achievements, "Hero");
+        assert!(achievements
+            .take_newly_unlocked()
+            .contains(&AchievementId::BeyondInfinity));
+
+        process_zone_achievements(
+            &BossDefeatResult::FractureCycle { zone_id: 13 },
+            &mut achievements,
+            "Hero",
+        );
+        assert!(achievements
+            .take_newly_unlocked()
+            .contains(&AchievementId::FractureZone13));
+
+        process_zone_achievements(
+            &BossDefeatResult::LoomZoneCycle { zone_id: 35 },
+            &mut achievements,
+            "Hero",
+        );
+        // Zone 35 has no individual achievement mapping (table tops out at 30) —
+        // should not panic, and should not unlock anything.
+        assert!(achievements.take_newly_unlocked().is_empty());
+
+        process_zone_achievements(
+            &BossDefeatResult::FrontierBackoff {
+                zone_id: 20,
+                blocked_zone_id: 21,
+            },
+            &mut achievements,
+            "Hero",
+        );
+        assert!(achievements
+            .take_newly_unlocked()
+            .contains(&AchievementId::FractureZone20));
+
+        process_zone_achievements(
+            &BossDefeatResult::SubzoneComplete { new_subzone_id: 2 },
+            &mut achievements,
+            "Hero",
+        );
+        assert!(achievements.take_newly_unlocked().is_empty());
+
+        process_zone_achievements(
+            &BossDefeatResult::WeaponRequired {
+                weapon_name: "Stormbreaker",
+            },
+            &mut achievements,
+            "Hero",
+        );
+        assert!(achievements.take_newly_unlocked().is_empty());
+    }
+
+    // ── track_passive_prestige_gain ──────────────────────────────────────────
+
+    #[test]
+    fn track_passive_prestige_gain_fires_achievement_when_rank_increases() {
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.prestige_rank = 5;
+        let mut achievements = Achievements::default();
+
+        track_passive_prestige_gain(&state, &mut achievements, 5);
+        assert!(achievements.take_newly_unlocked().is_empty());
+
+        track_passive_prestige_gain(&state, &mut achievements, 3);
+        assert!(!achievements.take_newly_unlocked().is_empty());
+    }
+
+    // ── tick_vessel_whispers ─────────────────────────────────────────────────
+
+    #[test]
+    fn tick_vessel_whispers_noop_when_signal_not_discovered() {
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut result = TickResult::default();
+
+        tick_vessel_whispers(&mut state, &mut result);
+
+        assert!(result.events.is_empty());
+    }
+
+    #[test]
+    fn tick_vessel_whispers_noop_when_vessel_already_launched() {
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.vessel_signal_discovered = true;
+        state.vessel_launched = true;
+        state.play_time_seconds = 10_000;
+        let mut result = TickResult::default();
+
+        tick_vessel_whispers(&mut state, &mut result);
+
+        assert!(result.events.is_empty());
+    }
+
+    #[test]
+    fn tick_vessel_whispers_emits_after_interval_elapses() {
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.vessel_signal_discovered = true;
+        state.vessel_last_whisper_at = 0;
+        state.play_time_seconds = crate::vessel::WHISPER_INTERVAL_SECONDS;
+        let mut result = TickResult::default();
+
+        tick_vessel_whispers(&mut state, &mut result);
+
+        assert_eq!(state.vessel_last_whisper_at, state.play_time_seconds);
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::VesselWhisper { .. })));
+    }
+
+    #[test]
+    fn tick_vessel_whispers_does_not_fire_before_interval() {
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.vessel_signal_discovered = true;
+        state.vessel_last_whisper_at = 0;
+        state.play_time_seconds = crate::vessel::WHISPER_INTERVAL_SECONDS - 1;
+        let mut result = TickResult::default();
+
+        tick_vessel_whispers(&mut state, &mut result);
+
+        assert!(result.events.is_empty());
+    }
+
+    // ── tick_challenge_ai ────────────────────────────────────────────────────
+
+    #[test]
+    fn tick_challenge_ai_noop_without_active_minigame() {
+        let mut rng = ChaCha8Rng::seed_from_u64(121);
+        let mut state = GameState::new("Hero".to_string(), 0);
+
+        tick_challenge_ai(&mut state, &mut rng);
+
+        assert!(state.active_minigame.is_none());
+    }
+
+    #[test]
+    fn tick_challenge_ai_dispatches_to_each_minigame_variant() {
+        use crate::challenges::{
+            ChessDifficulty, ChessGame, GoDifficulty, GoGame, GomokuDifficulty, GomokuGame,
+            MorrisDifficulty, MorrisGame, ShardFusionDifficulty, ShardFusionGame,
+        };
+
+        let mut rng = ChaCha8Rng::seed_from_u64(122);
+        let mut state = GameState::new("Hero".to_string(), 0);
+
+        state.active_minigame = Some(ActiveMinigame::Chess(Box::new(ChessGame::new(
+            ChessDifficulty::Novice,
+        ))));
+        tick_challenge_ai(&mut state, &mut rng);
+
+        state.active_minigame = Some(ActiveMinigame::Morris(MorrisGame::new(
+            MorrisDifficulty::Novice,
+        )));
+        tick_challenge_ai(&mut state, &mut rng);
+
+        state.active_minigame = Some(ActiveMinigame::Gomoku(GomokuGame::new(
+            GomokuDifficulty::Novice,
+        )));
+        tick_challenge_ai(&mut state, &mut rng);
+
+        state.active_minigame = Some(ActiveMinigame::Go(GoGame::new(GoDifficulty::Novice)));
+        tick_challenge_ai(&mut state, &mut rng);
+
+        state.active_minigame = Some(ActiveMinigame::ShardFusion(ShardFusionGame::new(
+            ShardFusionDifficulty::Novice,
+        )));
+        tick_challenge_ai(&mut state, &mut rng);
+
+        // Reaching here without panicking exercises every dispatch arm.
+    }
+
+    // ── tick_challenge_discovery ─────────────────────────────────────────────
+
+    #[test]
+    fn tick_challenge_discovery_skips_during_chrono_surge() {
+        let mut rng = ChaCha8Rng::seed_from_u64(131);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.chrono_surge_active = true;
+        state.prestige_rank = 5;
+        let haven_bonuses = Haven::new().compute_bonuses();
+        let mut result = TickResult::default();
+
+        tick_challenge_discovery(&mut state, &haven_bonuses, &mut rng, &mut result);
+
+        assert!(result.events.is_empty());
+    }
+
+    #[test]
+    fn tick_challenge_discovery_eventually_discovers_a_challenge() {
+        let mut rng = ChaCha8Rng::seed_from_u64(132);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.prestige_rank = 5;
+        let haven_bonuses = Haven::new().compute_bonuses();
+
+        let mut discovered = false;
+        for _ in 0..3_000_000 {
+            let mut result = TickResult::default();
+            tick_challenge_discovery(&mut state, &haven_bonuses, &mut rng, &mut result);
+            if result
+                .events
+                .iter()
+                .any(|e| matches!(e, TickEvent::ChallengeDiscovered { .. }))
+            {
+                discovered = true;
+                break;
+            }
+        }
+
+        assert!(
+            discovered,
+            "A challenge should be discovered within 3,000,000 ticks"
+        );
+    }
+
+    // ── sync_derived_stats ───────────────────────────────────────────────────
+
+    #[test]
+    fn sync_derived_stats_applies_prestige_ascension_and_sigil_hp_bonuses() {
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.derived_stats_dirty = true;
+        state.prestige_rank = 20;
+        state.ascension_level = 3;
+        let enhancement = crate::enhancement::EnhancementProgress::new();
+        let sigil_bonuses = SigilBonuses {
+            max_hp_percent: 50.0,
+            ..Default::default()
+        };
+
+        sync_derived_stats(&mut state, &enhancement, &sigil_bonuses);
+
+        assert!(!state.derived_stats_dirty);
+        assert!(state.combat_state.player_max_hp > state.cached_derived_stats.max_hp);
+    }
+
+    #[test]
+    fn sync_derived_stats_skips_recalculation_and_bonus_branches_when_clean() {
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.derived_stats_dirty = false;
+        let expected = state.cached_derived_stats.max_hp;
+        let enhancement = crate::enhancement::EnhancementProgress::new();
+        let sigil_bonuses = SigilBonuses::default();
+
+        sync_derived_stats(&mut state, &enhancement, &sigil_bonuses);
+
+        assert_eq!(state.combat_state.player_max_hp, expected);
+    }
+
+    // ── compute_merged_bonuses ───────────────────────────────────────────────
+
+    #[test]
+    fn compute_merged_bonuses_recomputes_and_caches_when_dirty() {
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.bonuses_dirty = true;
+        let haven = Haven::new();
+
+        let (haven_bonuses, sigil_bonuses) = compute_merged_bonuses(&haven, &mut state);
+
+        assert!(!state.bonuses_dirty);
+        assert_eq!(
+            state.cached_haven_bonuses.drop_rate_percent,
+            haven_bonuses.drop_rate_percent
+        );
+        assert_eq!(
+            state.cached_sigil_bonuses.xp_percent,
+            sigil_bonuses.xp_percent
+        );
+    }
+
+    #[test]
+    fn compute_merged_bonuses_returns_cached_values_when_not_dirty() {
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.bonuses_dirty = false;
+        state.cached_haven_bonuses.drop_rate_percent = 42.0;
+        let haven = Haven::new();
+
+        let (haven_bonuses, _sigil_bonuses) = compute_merged_bonuses(&haven, &mut state);
+
+        assert_eq!(haven_bonuses.drop_rate_percent, 42.0);
+    }
+
+    // ── run_combat ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn run_combat_computes_power_rating_and_processes_events() {
+        let mut rng = ChaCha8Rng::seed_from_u64(141);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.derived_stats_dirty = true;
+        let enhancement = crate::enhancement::EnhancementProgress::new();
+        sync_derived_stats(&mut state, &enhancement, &SigilBonuses::default());
+        crate::core::game_logic::spawn_enemy_if_needed(&mut state);
+        state.combat_state.player_current_hp = state.combat_state.player_max_hp;
+
+        let mut achievements = Achievements::default();
+        let mut deep = crate::deep::DeepState::new();
+        let loom = crate::loom::LoomState::new();
+        let mut result = TickResult::default();
+        let haven_bonuses = Haven::new().compute_bonuses();
+        let sigil_bonuses = SigilBonuses::default();
+
+        run_combat(
+            &mut state,
+            1.6, // exceeds ATTACK_INTERVAL_SECONDS, guaranteeing at least one swing
+            &haven_bonuses,
+            &sigil_bonuses,
+            &mut achievements,
+            &mut deep,
+            &loom,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(state.cached_power_rating > 0.0);
+    }
+
+    // ── update_play_time ─────────────────────────────────────────────────────
+
+    #[test]
+    fn update_play_time_increments_seconds_and_records_xp_sample() {
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.combat_seconds_this_tick = true;
+        state.xp_this_second = 500;
+        let mut tick_counter = TICKS_PER_SECOND - 1;
+        let play_before = state.play_time_seconds;
+
+        update_play_time(&mut state, &mut tick_counter);
+
+        assert_eq!(tick_counter, 0);
+        assert_eq!(state.play_time_seconds, play_before + 1);
+        assert_eq!(state.xp_rate_samples.back(), Some(&500));
+        assert!(!state.combat_seconds_this_tick);
+        assert_eq!(state.xp_this_second, 0);
+    }
+
+    #[test]
+    fn update_play_time_does_not_increment_before_full_second() {
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut tick_counter = 0u32;
+        let play_before = state.play_time_seconds;
+
+        update_play_time(&mut state, &mut tick_counter);
+
+        assert_eq!(tick_counter, 1);
+        assert_eq!(state.play_time_seconds, play_before);
+    }
+
+    #[test]
+    fn update_play_time_evicts_oldest_xp_sample_when_window_full() {
+        let mut state = GameState::new("Hero".to_string(), 0);
+        for _ in 0..crate::core::constants::XP_RATE_WINDOW_SECONDS {
+            state.xp_rate_samples.push_back(0);
+        }
+        state.combat_seconds_this_tick = true;
+        state.xp_this_second = 10;
+        let mut tick_counter = TICKS_PER_SECOND - 1;
+
+        update_play_time(&mut state, &mut tick_counter);
+
+        assert_eq!(
+            state.xp_rate_samples.len(),
+            crate::core::constants::XP_RATE_WINDOW_SECONDS
+        );
+        assert_eq!(state.xp_rate_samples.back(), Some(&10));
+    }
+
+    // ── tick_haven_discovery / tick_soulforge_discovery ─────────────────────
+
+    #[test]
+    fn tick_haven_discovery_discovers_at_extreme_prestige() {
+        let mut rng = ChaCha8Rng::seed_from_u64(151);
+        let state = {
+            let mut s = GameState::new("Hero".to_string(), 0);
+            s.prestige_rank = 500_000; // pushes the (uncapped) discovery chance past 1.0
+            s
+        };
+        let mut haven = Haven::new();
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        tick_haven_discovery(
+            &state,
+            &mut haven,
+            &mut achievements,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(haven.discovered);
+        assert!(result.haven_changed);
+        assert!(result.achievements_changed);
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::HavenDiscovered)));
+    }
+
+    #[test]
+    fn tick_haven_discovery_debug_mode_suppresses_achievement_flag() {
+        let mut rng = ChaCha8Rng::seed_from_u64(152);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.prestige_rank = 500_000;
+        let mut haven = Haven::new();
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        tick_haven_discovery(
+            &state,
+            &mut haven,
+            &mut achievements,
+            true,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(haven.discovered);
+        assert!(!result.achievements_changed);
+    }
+
+    #[test]
+    fn tick_haven_discovery_skips_when_dungeon_active() {
+        let mut rng = ChaCha8Rng::seed_from_u64(153);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.prestige_rank = 500_000;
+        state.active_dungeon = Some(crate::dungeon::generation::generate_dungeon(1, 0, 1));
+        let mut haven = Haven::new();
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        tick_haven_discovery(
+            &state,
+            &mut haven,
+            &mut achievements,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(!haven.discovered);
+    }
+
+    #[test]
+    fn tick_soulforge_discovery_discovers_at_extreme_prestige() {
+        let mut rng = ChaCha8Rng::seed_from_u64(161);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.prestige_rank = 500_000;
+        let mut enhancement = crate::enhancement::EnhancementProgress::new();
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        tick_soulforge_discovery(
+            &state,
+            &mut enhancement,
+            &mut achievements,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(enhancement.discovered);
+        assert!(result.enhancement_changed);
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::SoulforgeDiscovered)));
+    }
+
+    #[test]
+    fn tick_soulforge_discovery_skips_when_fishing_active() {
+        let mut rng = ChaCha8Rng::seed_from_u64(162);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.prestige_rank = 500_000;
+        state.active_fishing = Some(crate::fishing::FishingSession {
+            spot_name: "Cove".to_string(),
+            total_fish: 5,
+            fish_caught: Vec::new(),
+            items_found: Vec::new(),
+            ticks_remaining: 1,
+            phase: crate::fishing::FishingPhase::Casting,
+        });
+        let mut enhancement = crate::enhancement::EnhancementProgress::new();
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        tick_soulforge_discovery(
+            &state,
+            &mut enhancement,
+            &mut achievements,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(!enhancement.discovered);
+    }
+
+    // ── tick_deep_missions ───────────────────────────────────────────────────
+
+    #[test]
+    fn tick_deep_missions_noop_before_discovery() {
+        let mut rng = ChaCha8Rng::seed_from_u64(171);
+        let state = GameState::new("Hero".to_string(), 0);
+        let mut deep = crate::deep::DeepState::new();
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        tick_deep_missions(
+            &state,
+            &mut deep,
+            &mut achievements,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(!result.deep_changed);
+        assert!(result.events.is_empty());
+    }
+
+    #[test]
+    fn tick_deep_missions_refreshes_pool_once_discovered() {
+        let mut rng = ChaCha8Rng::seed_from_u64(172);
+        let state = GameState::new("Hero".to_string(), 0);
+        let mut deep = crate::deep::DeepState::new();
+        deep.persistent.discovered = true;
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        tick_deep_missions(
+            &state,
+            &mut deep,
+            &mut achievements,
+            false,
+            &mut result,
+            &mut rng,
+        );
+
+        assert!(result.deep_changed);
+        assert!(!deep.prestige.available_missions.is_empty());
+    }
+
+    #[test]
+    fn tick_deep_missions_breakthrough_success_unlocks_fracture_region() {
+        use crate::deep::{
+            MercArchetype, MercQuality, MercStatus, Mercenary, Mission, MissionStatus, MissionType,
+        };
+        use chrono::{Duration, Utc};
+
+        let mut succeeded = false;
+        for seed in 0u64..20 {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let state = GameState::new("Hero".to_string(), 0);
+            let mut deep = crate::deep::DeepState::new();
+            deep.persistent.discovered = true;
+
+            let merc = Mercenary {
+                id: 1,
+                name: "Bruiser".to_string(),
+                archetype: MercArchetype::Vanguard,
+                power: 999_999,
+                resilience: 999_999,
+                expertise: 0,
+                level: 1,
+                missions_completed: 0,
+                quality: MercQuality::Common,
+                status: MercStatus::OnMission(1),
+            };
+            deep.prestige.roster.insert(merc.id, merc);
+
+            let now = Utc::now();
+            let mission = Mission {
+                id: 1,
+                mission_type: MissionType::Breakthrough,
+                layer: 3,
+                squad: vec![1],
+                started_at: now - Duration::hours(4),
+                ends_at: now - Duration::seconds(5),
+                events: Vec::new(),
+                pending_event_index: 0,
+                status: MissionStatus::Active,
+                result: None,
+                is_first_orders: false,
+            };
+            deep.prestige.active_missions.push(mission);
+
+            let mut achievements = Achievements::default();
+            let mut result = TickResult::default();
+
+            tick_deep_missions(
+                &state,
+                &mut deep,
+                &mut achievements,
+                false,
+                &mut result,
+                &mut rng,
+            );
+
+            if deep.persistent.pending_fracture_region_unlock.is_some() {
+                assert!(result.deep_changed);
+                assert_eq!(deep.persistent.fracture_zone_cap, 14);
+                assert!(result
+                    .events
+                    .iter()
+                    .any(|e| matches!(e, TickEvent::DeepMissionComplete { .. })));
+                assert!(achievements
+                    .take_newly_unlocked()
+                    .contains(&AchievementId::FirstBreakthrough));
+                succeeded = true;
+                break;
+            }
+        }
+
+        assert!(
+            succeeded,
+            "An overpowered Breakthrough mission should succeed and unlock a fracture region within 20 seeds"
+        );
+    }
+
+    // ── tick_loom ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn tick_loom_noop_before_gateway_opens() {
+        let deep = crate::deep::DeepState::new();
+        let mut loom = crate::loom::LoomState::new();
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        tick_loom(&deep, &mut loom, &mut state, &mut achievements, &mut result);
+
+        assert!(!loom.persistent.discovered);
+        assert!(result.events.is_empty());
+    }
+
+    #[test]
+    fn tick_loom_discovers_when_gateway_opens() {
+        let mut deep = crate::deep::DeepState::new();
+        deep.persistent.discovered = true;
+        deep.persistent.gateway_opened = true;
+        let mut loom = crate::loom::LoomState::new();
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        tick_loom(&deep, &mut loom, &mut state, &mut achievements, &mut result);
+
+        assert!(loom.persistent.discovered);
+        assert!(result.loom_changed);
+        assert!(result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::LoomDiscovered)));
+    }
+
+    #[test]
+    fn tick_loom_skips_ticking_during_chrono_surge() {
+        let mut deep = crate::deep::DeepState::new();
+        deep.persistent.discovered = true;
+        deep.persistent.gateway_opened = true;
+        let mut loom = crate::loom::LoomState::new();
+        crate::loom::complete_discovery(&mut loom);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        state.chrono_surge_active = true;
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        tick_loom(&deep, &mut loom, &mut state, &mut achievements, &mut result);
+
+        assert!(loom.last_tick_at.is_none());
+    }
+
+    #[test]
+    fn tick_loom_ticks_base_production_after_discovery() {
+        let mut deep = crate::deep::DeepState::new();
+        deep.persistent.discovered = true;
+        deep.persistent.gateway_opened = true;
+        let mut loom = crate::loom::LoomState::new();
+        crate::loom::complete_discovery(&mut loom);
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        tick_loom(&deep, &mut loom, &mut state, &mut achievements, &mut result);
+        assert!(loom.last_tick_at.is_some());
+
+        // A second tick exercises the "previous tick exists" wall-clock delta branch.
+        tick_loom(&deep, &mut loom, &mut state, &mut achievements, &mut result);
+        assert!(loom.last_tick_at.is_some());
+    }
+
+    #[test]
+    fn tick_loom_completes_pattern_and_initializes_wr_pr_conversion() {
+        let mut deep = crate::deep::DeepState::new();
+        deep.persistent.discovered = true;
+        deep.persistent.gateway_opened = true;
+
+        let mut loom = crate::loom::LoomState::new();
+        crate::loom::complete_discovery(&mut loom);
+        loom.persistent.active_pattern = 0;
+        loom.persistent.patterns = vec![crate::loom::WovenPattern {
+            index: 0,
+            name: "Test Pattern".to_string(),
+            requirements: vec![crate::loom::PatternRequirement {
+                resource: crate::loom::Resource::Ember,
+                required_rate: 0.0,
+                sustain_duration_secs: 0.01,
+                sustained_secs: 0.0,
+                completed: false,
+                amount: 0.0,
+                accumulated: 0.0,
+            }],
+            completed: false,
+            flavor: String::new(),
+            eternal: false,
+        }];
+        // Force a real wall-clock delta so the sustain timer clearly exceeds the
+        // tiny requirement duration on the very next tick.
+        loom.last_tick_at = Some(chrono::Utc::now() - chrono::Duration::seconds(1));
+
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let mut achievements = Achievements::default();
+        let mut result = TickResult::default();
+
+        tick_loom(&deep, &mut loom, &mut state, &mut achievements, &mut result);
+
+        assert!(loom.persistent.patterns[0].completed);
+        assert!(result.loom_changed);
+        assert_ne!(loom.persistent.wr_pr_last_granted_at, 0);
+    }
 }

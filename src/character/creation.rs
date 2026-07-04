@@ -182,4 +182,41 @@ mod tests {
 
         assert_eq!(result, CreationResult::Continue);
     }
+
+    #[test]
+    fn test_creation_submit_valid_name_creates_character() {
+        let mut screen = CharacterCreationScreen::new();
+        let (manager, _dir) = temp_manager();
+
+        for c in "Hero".chars() {
+            process_creation_input(&mut screen, CreationInput::Char(c), &manager, false);
+        }
+
+        let result = process_creation_input(&mut screen, CreationInput::Submit, &manager, false);
+
+        assert_eq!(result, CreationResult::Created);
+        assert!(manager.quest_dir.join("hero.json").exists());
+    }
+
+    #[test]
+    fn test_creation_submit_save_failure_returns_save_failed() {
+        let mut screen = CharacterCreationScreen::new();
+        let (manager, _dir) = temp_manager();
+
+        // Put a directory where the character's save file would go, so
+        // `fs::write` inside save_character() fails with an I/O error.
+        std::fs::create_dir(manager.quest_dir.join("hero.json")).unwrap();
+
+        for c in "Hero".chars() {
+            process_creation_input(&mut screen, CreationInput::Char(c), &manager, false);
+        }
+
+        let result = process_creation_input(&mut screen, CreationInput::Submit, &manager, false);
+
+        match result {
+            CreationResult::SaveFailed(msg) => assert!(msg.contains("Save failed")),
+            other => panic!("expected SaveFailed, got {:?}", other),
+        }
+        assert!(screen.validation_error.is_some());
+    }
 }

@@ -160,6 +160,7 @@ mod tests {
         state.persistent.nodes[2].buffer_capacity = f64::NAN;
         state.persistent.nodes[3].unlock_progress = f64::NAN;
         state.persistent.nodes[4].upgrade_remaining_secs = f64::INFINITY;
+        state.persistent.nodes[5].base_rate = f64::NAN;
 
         sanitize_on_load(&mut state);
 
@@ -168,6 +169,7 @@ mod tests {
         assert!(state.persistent.nodes[2].buffer_capacity.is_finite());
         assert_eq!(state.persistent.nodes[3].unlock_progress, 0.0);
         assert_eq!(state.persistent.nodes[4].upgrade_remaining_secs, 0.0);
+        assert_eq!(state.persistent.nodes[5].base_rate, 25.0);
     }
 
     #[test]
@@ -187,6 +189,7 @@ mod tests {
         shuttle.amount = f64::NAN;
         shuttle.construction_secs_remaining = f64::INFINITY;
         shuttle.buffer = f64::NAN;
+        shuttle.buffer_capacity = f64::NAN;
         state.persistent.shuttles.push(shuttle);
 
         sanitize_on_load(&mut state);
@@ -197,6 +200,7 @@ mod tests {
             0.0
         );
         assert_eq!(state.persistent.shuttles[0].buffer, 0.0);
+        assert_eq!(state.persistent.shuttles[0].buffer_capacity, 100.0);
     }
 
     #[test]
@@ -206,12 +210,14 @@ mod tests {
 
         state.persistent.patterns[0].requirements[0].sustained_secs = f64::NAN;
         state.persistent.patterns[0].requirements[0].required_rate = f64::INFINITY;
+        state.persistent.patterns[0].requirements[0].sustain_duration_secs = f64::NAN;
 
         sanitize_on_load(&mut state);
 
         let req = &state.persistent.patterns[0].requirements[0];
         assert_eq!(req.sustained_secs, 0.0);
         assert_eq!(req.required_rate, 0.0);
+        assert_eq!(req.sustain_duration_secs, 0.0);
     }
 
     #[test]

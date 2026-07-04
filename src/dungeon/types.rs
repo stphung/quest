@@ -668,4 +668,66 @@ mod tests {
             DungeonSize::Legendary
         );
     }
+
+    #[test]
+    fn test_room_type_narration_non_empty_for_all_types() {
+        let types = [
+            RoomType::Entrance,
+            RoomType::Combat,
+            RoomType::Treasure,
+            RoomType::Elite,
+            RoomType::Boss,
+        ];
+        for rt in types {
+            let lines = rt.narration();
+            assert!(!lines.is_empty(), "{:?} should have narration lines", rt);
+            for line in lines {
+                assert!(
+                    !line.is_empty(),
+                    "{:?} should not have empty narration lines",
+                    rt
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_room_type_narration_differs_by_type() {
+        // Sanity check that each room type has its own distinct narration pool
+        // (not accidentally sharing the same slice).
+        assert_ne!(RoomType::Entrance.narration(), RoomType::Combat.narration());
+        assert_ne!(RoomType::Boss.narration(), RoomType::Elite.narration());
+    }
+
+    #[test]
+    fn test_dungeon_size_roll_from_progression_stays_near_expected_tier() {
+        // roll_from_progression uses internal thread RNG with a +/-1 variance.
+        // At level 50 / prestige 0 (expected tier = Medium = 1), the roll should
+        // only ever produce Small, Medium, or Large across many trials.
+        for _ in 0..200 {
+            let size = DungeonSize::roll_from_progression(50, 0);
+            assert!(
+                matches!(
+                    size,
+                    DungeonSize::Small | DungeonSize::Medium | DungeonSize::Large
+                ),
+                "Unexpected size {:?} rolled for level 50/prestige 0",
+                size
+            );
+        }
+    }
+
+    #[test]
+    fn test_dungeon_size_roll_from_progression_clamps_at_zero() {
+        // At the very lowest tier (level 0, prestige 0), a -1 variation roll
+        // should clamp to tier 0 (Small) instead of underflowing.
+        for _ in 0..200 {
+            let size = DungeonSize::roll_from_progression(0, 0);
+            assert!(
+                matches!(size, DungeonSize::Small | DungeonSize::Medium),
+                "Unexpected size {:?} rolled at the lowest progression tier",
+                size
+            );
+        }
+    }
 }

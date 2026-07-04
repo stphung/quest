@@ -706,4 +706,134 @@ mod tests {
             }
         }
     }
+
+    // =========================================================================
+    // PRIVATE HELPER TESTS
+    // =========================================================================
+
+    #[test]
+    fn test_opposite_direction_pairs() {
+        assert_eq!(opposite_direction(DIR_UP), DIR_DOWN);
+        assert_eq!(opposite_direction(DIR_DOWN), DIR_UP);
+        assert_eq!(opposite_direction(DIR_RIGHT), DIR_LEFT);
+        assert_eq!(opposite_direction(DIR_LEFT), DIR_RIGHT);
+    }
+
+    #[test]
+    fn test_distance_squared() {
+        assert_eq!(distance_squared((0, 0), (0, 0)), 0);
+        assert_eq!(distance_squared((0, 0), (3, 4)), 25);
+        assert_eq!(distance_squared((5, 5), (2, 1)), 9 + 16);
+    }
+
+    #[test]
+    fn test_connection_count_no_room_is_zero() {
+        let dungeon = Dungeon::new(DungeonSize::Small);
+        assert_eq!(connection_count(&dungeon, 0, 0), 0);
+    }
+
+    #[test]
+    fn test_connection_count_counts_true_connections() {
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+        let mut room = Room::new(RoomType::Combat, (1, 1));
+        room.connections[DIR_UP] = true;
+        room.connections[DIR_RIGHT] = true;
+        dungeon.grid[1][1] = Some(room);
+        assert_eq!(connection_count(&dungeon, 1, 1), 2);
+    }
+
+    #[test]
+    fn test_find_dead_ends_identifies_single_connection_rooms() {
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+        let mut a = Room::new(RoomType::Combat, (0, 0));
+        a.connections[DIR_RIGHT] = true;
+        let mut b = Room::new(RoomType::Combat, (1, 0));
+        b.connections[DIR_LEFT] = true;
+        dungeon.grid[0][0] = Some(a);
+        dungeon.grid[0][1] = Some(b);
+
+        let dead_ends = find_dead_ends(&dungeon);
+        assert_eq!(dead_ends.len(), 2, "Both rooms have exactly 1 connection");
+        assert!(dead_ends.contains(&(0, 0)));
+        assert!(dead_ends.contains(&(1, 0)));
+    }
+
+    #[test]
+    fn test_reveal_adjacent_rooms_does_not_downgrade_cleared() {
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+        let mut center = Room::new(RoomType::Combat, (1, 1));
+        center.connections[DIR_RIGHT] = true;
+        let mut neighbor = Room::new(RoomType::Combat, (2, 1));
+        neighbor.connections[DIR_LEFT] = true;
+        neighbor.state = RoomState::Cleared;
+        dungeon.grid[1][1] = Some(center);
+        dungeon.grid[1][2] = Some(neighbor);
+
+        reveal_adjacent_rooms(&mut dungeon, 1, 1);
+
+        // Already-cleared neighbor should remain Cleared, not be reset to Revealed.
+        let neighbor = dungeon.get_room(2, 1).unwrap();
+        assert_eq!(neighbor.state, RoomState::Cleared);
+    }
+
+    #[test]
+    fn test_place_special_rooms_handles_grid_with_no_dead_ends() {
+        // Build a 2x2 loop where every room has exactly 2 connections, so
+        // there are no dead ends at all. This forces place_special_rooms
+        // through its fallback paths for entrance/boss/elite placement.
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+
+        let mut r00 = Room::new(RoomType::Combat, (0, 0));
+        r00.connections[DIR_RIGHT] = true;
+        r00.connections[DIR_DOWN] = true;
+
+        let mut r10 = Room::new(RoomType::Combat, (1, 0));
+        r10.connections[DIR_LEFT] = true;
+        r10.connections[DIR_DOWN] = true;
+
+        let mut r01 = Room::new(RoomType::Combat, (0, 1));
+        r01.connections[DIR_UP] = true;
+        r01.connections[DIR_RIGHT] = true;
+
+        let mut r11 = Room::new(RoomType::Combat, (1, 1));
+        r11.connections[DIR_UP] = true;
+        r11.connections[DIR_LEFT] = true;
+
+        dungeon.grid[0][0] = Some(r00);
+        dungeon.grid[0][1] = Some(r10);
+        dungeon.grid[1][0] = Some(r01);
+        dungeon.grid[1][1] = Some(r11);
+
+        // Should not panic despite there being no dead ends to place
+        // entrance/boss/elite in.
+        place_special_rooms(&mut dungeon);
+
+        let mut entrance_count = 0;
+        let mut boss_count = 0;
+        let mut elite_count = 0;
+        for y in 0..2 {
+            for x in 0..2 {
+                if let Some(room) = dungeon.get_room(x, y) {
+                    match room.room_type {
+                        RoomType::Entrance => entrance_count += 1,
+                        RoomType::Boss => boss_count += 1,
+                        RoomType::Elite => elite_count += 1,
+                        _ => {}
+                    }
+                }
+            }
+        }
+        assert_eq!(entrance_count, 1, "Exactly one entrance should be placed");
+        assert_eq!(boss_count, 1, "Exactly one boss should be placed");
+        assert_eq!(elite_count, 1, "Exactly one elite should be placed");
+    }
+
+    #[test]
+    fn test_place_special_rooms_on_empty_grid_does_not_panic() {
+        // No rooms at all — place_special_rooms should return early without
+        // panicking (room_positions.is_empty() branch).
+        let mut dungeon = Dungeon::new(DungeonSize::Small);
+        place_special_rooms(&mut dungeon);
+        assert_eq!(dungeon.room_count(), 0);
+    }
 }

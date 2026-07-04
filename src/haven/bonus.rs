@@ -229,3 +229,254 @@ pub fn haven_discovery_chance(prestige_rank: u32) -> f64 {
     HAVEN_DISCOVERY_BASE_CHANCE
         + (prestige_rank - HAVEN_MIN_PRESTIGE_RANK) as f64 * HAVEN_DISCOVERY_RANK_BONUS
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::constants::HAVEN_MIN_PRESTIGE_RANK;
+
+    #[test]
+    fn test_bonus_value_zero_at_tier_zero() {
+        assert_eq!(HavenRoomId::Armory.bonus_value(0), 0.0);
+    }
+
+    #[test]
+    fn test_bonus_value_zero_above_max_tier() {
+        // Armory maxes at T3, so T4 is out of range.
+        assert_eq!(HavenRoomId::Armory.bonus_value(4), 0.0);
+        // StormForge maxes at T1.
+        assert_eq!(HavenRoomId::StormForge.bonus_value(2), 0.0);
+    }
+
+    #[test]
+    fn test_bonus_value_matches_table_for_each_tier() {
+        assert_eq!(HavenRoomId::Armory.bonus_value(1), 5.0);
+        assert_eq!(HavenRoomId::Armory.bonus_value(2), 10.0);
+        assert_eq!(HavenRoomId::Armory.bonus_value(3), 25.0);
+    }
+
+    #[test]
+    fn test_bonus_types_for_every_room() {
+        assert_eq!(
+            HavenRoomId::Hearthstone.bonus().bonus_type,
+            HavenBonusType::OfflineXpPercent
+        );
+        assert_eq!(
+            HavenRoomId::Armory.bonus().bonus_type,
+            HavenBonusType::DamagePercent
+        );
+        assert_eq!(
+            HavenRoomId::TrainingYard.bonus().bonus_type,
+            HavenBonusType::XpGainPercent
+        );
+        assert_eq!(
+            HavenRoomId::TrophyHall.bonus().bonus_type,
+            HavenBonusType::DropRatePercent
+        );
+        assert_eq!(
+            HavenRoomId::Watchtower.bonus().bonus_type,
+            HavenBonusType::CritChancePercent
+        );
+        assert_eq!(
+            HavenRoomId::AlchemyLab.bonus().bonus_type,
+            HavenBonusType::HpRegenPercent
+        );
+        assert_eq!(
+            HavenRoomId::WarRoom.bonus().bonus_type,
+            HavenBonusType::DoubleStrikeChance
+        );
+        assert_eq!(
+            HavenRoomId::Bedroom.bonus().bonus_type,
+            HavenBonusType::HpRegenDelayReduction
+        );
+        assert_eq!(
+            HavenRoomId::Garden.bonus().bonus_type,
+            HavenBonusType::FishingTimerReduction
+        );
+        assert_eq!(
+            HavenRoomId::Library.bonus().bonus_type,
+            HavenBonusType::ChallengeDiscoveryPercent
+        );
+        assert_eq!(
+            HavenRoomId::FishingDock.bonus().bonus_type,
+            HavenBonusType::DoubleFishChance
+        );
+        assert_eq!(
+            HavenRoomId::Workshop.bonus().bonus_type,
+            HavenBonusType::ItemRarityPercent
+        );
+        assert_eq!(
+            HavenRoomId::Vault.bonus().bonus_type,
+            HavenBonusType::VaultSlots
+        );
+        assert_eq!(
+            HavenRoomId::StormForge.bonus().bonus_type,
+            HavenBonusType::StormForgeAccess
+        );
+    }
+
+    #[test]
+    fn test_format_bonus_empty_at_tier_zero() {
+        assert_eq!(HavenRoomId::Armory.format_bonus(0), "");
+    }
+
+    #[test]
+    fn test_format_bonus_fishing_dock_t4_special_case() {
+        assert_eq!(
+            HavenRoomId::FishingDock.format_bonus(4),
+            "+10 Max Fishing Rank"
+        );
+    }
+
+    #[test]
+    fn test_format_bonus_covers_every_bonus_type() {
+        assert_eq!(HavenRoomId::Armory.format_bonus(1), "+5% DMG");
+        assert_eq!(HavenRoomId::TrainingYard.format_bonus(1), "+5% XP");
+        assert_eq!(HavenRoomId::TrophyHall.format_bonus(1), "+5% Drops");
+        assert_eq!(HavenRoomId::Watchtower.format_bonus(1), "+5% Crit");
+        assert_eq!(HavenRoomId::AlchemyLab.format_bonus(1), "+25% HP Regen");
+        assert_eq!(HavenRoomId::WarRoom.format_bonus(1), "+10% Double Strike");
+        assert_eq!(HavenRoomId::Hearthstone.format_bonus(1), "+25% Offline XP");
+        assert_eq!(HavenRoomId::Library.format_bonus(1), "+20% Discovery");
+        assert_eq!(HavenRoomId::Garden.format_bonus(1), "-10% Fishing Timers");
+        assert_eq!(HavenRoomId::FishingDock.format_bonus(1), "+25% Double Fish");
+        assert_eq!(HavenRoomId::Workshop.format_bonus(1), "+10% Item Rarity");
+        assert_eq!(HavenRoomId::Bedroom.format_bonus(1), "-15% Regen Delay");
+        assert_eq!(
+            HavenRoomId::StormForge.format_bonus(1),
+            "Stormbreaker forging enabled"
+        );
+    }
+
+    #[test]
+    fn test_format_bonus_vault_slots_pluralization() {
+        // T1 = 1 item preserved (singular)
+        assert_eq!(HavenRoomId::Vault.format_bonus(1), "1 item preserved");
+        // T2 = 3 items preserved (plural)
+        assert_eq!(HavenRoomId::Vault.format_bonus(2), "3 items preserved");
+        assert_eq!(HavenRoomId::Vault.format_bonus(3), "5 items preserved");
+    }
+
+    #[test]
+    fn test_get_bonus_zero_when_unbuilt() {
+        let haven = Haven::new();
+        assert_eq!(haven.get_bonus(HavenBonusType::DamagePercent), 0.0);
+    }
+
+    #[test]
+    fn test_get_bonus_sums_matching_rooms() {
+        let mut haven = Haven::new();
+        haven.build_room(HavenRoomId::Hearthstone);
+        haven.build_room(HavenRoomId::Armory);
+        assert_eq!(haven.get_bonus(HavenBonusType::DamagePercent), 5.0);
+    }
+
+    #[test]
+    fn test_compute_bonuses_matches_get_bonus_for_every_type() {
+        let mut haven = Haven::new();
+        haven.build_room(HavenRoomId::Hearthstone);
+        haven.build_room(HavenRoomId::Armory);
+        haven.build_room(HavenRoomId::TrainingYard);
+        haven.build_room(HavenRoomId::TrophyHall);
+        haven.build_room(HavenRoomId::Watchtower);
+
+        let computed = haven.compute_bonuses();
+        assert_eq!(
+            computed.damage_percent,
+            haven.get_bonus(HavenBonusType::DamagePercent)
+        );
+        assert_eq!(
+            computed.xp_gain_percent,
+            haven.get_bonus(HavenBonusType::XpGainPercent)
+        );
+        assert_eq!(
+            computed.drop_rate_percent,
+            haven.get_bonus(HavenBonusType::DropRatePercent)
+        );
+        assert_eq!(
+            computed.crit_chance_percent,
+            haven.get_bonus(HavenBonusType::CritChancePercent)
+        );
+    }
+
+    #[test]
+    fn test_compute_bonuses_defaults_are_zero() {
+        let haven = Haven::new();
+        let bonuses = haven.compute_bonuses();
+        assert_eq!(bonuses.damage_percent, 0.0);
+        assert_eq!(bonuses.xp_gain_percent, 0.0);
+        assert_eq!(bonuses.drop_rate_percent, 0.0);
+        assert_eq!(bonuses.crit_chance_percent, 0.0);
+        assert_eq!(bonuses.hp_regen_percent, 0.0);
+        assert_eq!(bonuses.double_strike_chance, 0.0);
+        assert_eq!(bonuses.offline_xp_percent, 0.0);
+        assert_eq!(bonuses.challenge_discovery_percent, 0.0);
+        assert_eq!(bonuses.fishing_timer_reduction, 0.0);
+        assert_eq!(bonuses.double_fish_chance, 0.0);
+        assert_eq!(bonuses.item_rarity_percent, 0.0);
+        assert_eq!(bonuses.hp_regen_delay_reduction, 0.0);
+        assert_eq!(bonuses.vault_slots, 0);
+        assert_eq!(bonuses.max_fishing_rank_bonus, 0);
+        assert!(!bonuses.has_storm_forge);
+    }
+
+    #[test]
+    fn test_compute_bonuses_fishing_dock_t4_grants_max_rank_bonus() {
+        let mut haven = Haven::new();
+        haven.build_room(HavenRoomId::Hearthstone);
+        haven.build_room(HavenRoomId::Bedroom);
+        haven.build_room(HavenRoomId::Garden);
+        haven.build_room(HavenRoomId::FishingDock); // T1
+        haven.build_room(HavenRoomId::FishingDock); // T2
+        haven.build_room(HavenRoomId::FishingDock); // T3
+        haven.build_room(HavenRoomId::FishingDock); // T4
+
+        let bonuses = haven.compute_bonuses();
+        assert_eq!(bonuses.max_fishing_rank_bonus, 10);
+        // T1-3 double fish chance should be at its max value (100%).
+        assert_eq!(bonuses.double_fish_chance, 100.0);
+    }
+
+    #[test]
+    fn test_compute_bonuses_storm_forge_presence() {
+        let mut haven = Haven::new();
+        assert!(!haven.compute_bonuses().has_storm_forge);
+
+        haven.build_room(HavenRoomId::Hearthstone);
+        haven.build_room(HavenRoomId::Armory);
+        haven.build_room(HavenRoomId::TrainingYard);
+        haven.build_room(HavenRoomId::TrophyHall);
+        haven.build_room(HavenRoomId::Watchtower);
+        haven.build_room(HavenRoomId::AlchemyLab);
+        haven.build_room(HavenRoomId::WarRoom);
+        haven.build_room(HavenRoomId::Bedroom);
+        haven.build_room(HavenRoomId::Garden);
+        haven.build_room(HavenRoomId::Library);
+        haven.build_room(HavenRoomId::FishingDock);
+        haven.build_room(HavenRoomId::Workshop);
+        haven.build_room(HavenRoomId::Vault);
+        haven.build_room(HavenRoomId::StormForge);
+
+        assert!(haven.compute_bonuses().has_storm_forge);
+    }
+
+    #[test]
+    fn test_haven_discovery_chance_zero_below_min_rank() {
+        assert_eq!(haven_discovery_chance(0), 0.0);
+        assert_eq!(haven_discovery_chance(HAVEN_MIN_PRESTIGE_RANK - 1), 0.0);
+    }
+
+    #[test]
+    fn test_haven_discovery_chance_positive_at_min_rank() {
+        use crate::core::constants::HAVEN_DISCOVERY_BASE_CHANCE;
+        let chance = haven_discovery_chance(HAVEN_MIN_PRESTIGE_RANK);
+        assert!((chance - HAVEN_DISCOVERY_BASE_CHANCE).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_haven_discovery_chance_increases_with_rank() {
+        let low = haven_discovery_chance(HAVEN_MIN_PRESTIGE_RANK);
+        let high = haven_discovery_chance(HAVEN_MIN_PRESTIGE_RANK + 10);
+        assert!(high > low);
+    }
+}
