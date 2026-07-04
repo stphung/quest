@@ -2067,15 +2067,17 @@ fn render_reckoning(
     } else {
         c.days_last_crossing
     };
-    // The baseline: what a crossing costs and carries as she stands now.
+    // The baseline: what a crossing costs and carries as she stands now. The
+    // dark eats per *day*; the per-crossing figure is that rate summed over a
+    // crossing like the last (~pdays days).
     lines.push(Line::from(Span::styled(
         format!(
-            "  As she stands: carries {} home  \u{00b7}  the dark takes ~{} a crossing \
-             ({:.3}%/day of the {} still waiting)",
+            "  As she stands: carries {} home  \u{00b7}  the dark takes {:.3}%/day of the {} \
+             still waiting (~{} over a crossing)",
             with_commas(u64::from(c.expedition_size())),
-            with_commas(c.dark_toll_projected()),
             c.dark_daily_rate() * 100.0,
             with_commas(c.souls_remaining),
+            with_commas(c.dark_toll_projected()),
         ),
         Style::default().fg(Color::DarkGray),
     )));
@@ -2156,7 +2158,7 @@ fn render_reckoning(
             .round() as u64;
         let spared = now_toll.saturating_sub(next_toll);
         format!(
-            "{:.3}%/day \u{2192} {:.3}%/day  \u{00b7}  ~{} fewer lost a crossing",
+            "{:.3}%/day \u{2192} {:.3}%/day  \u{00b7}  ~{} fewer lost over a crossing",
             c.dark_daily_rate() * 100.0,
             next_rate * 100.0,
             with_commas(spared)
