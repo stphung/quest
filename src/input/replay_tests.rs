@@ -10,7 +10,8 @@
 
 use super::harness::InputHarness;
 use super::{GameOverlay, InputResult};
-use crate::achievements::AchievementId;
+use crate::achievements::{AchievementCategory, AchievementId};
+use crate::challenges::{create_challenge, ChallengeType};
 use crate::core::offline::OfflineReport;
 use crate::fixtures;
 use crate::haven::HavenRoomId;
@@ -97,6 +98,27 @@ fn leviathan_modal_dismisses_only_on_enter() {
     assert!(
         h.overlay_is_none(),
         "Enter should dismiss the Leviathan modal"
+    );
+}
+
+#[test]
+fn leviathan_catch_miss_modal_dismisses_only_on_enter() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.overlay = GameOverlay::LeviathanCatchMiss {
+        lure_consumed: false,
+    };
+
+    let result = h.char('x');
+    assert_eq!(result, InputResult::Continue);
+    assert!(
+        matches!(h.overlay, GameOverlay::LeviathanCatchMiss { .. }),
+        "non-Enter key should not dismiss the catch-miss modal"
+    );
+
+    h.press(KeyCode::Enter);
+    assert!(
+        h.overlay_is_none(),
+        "Enter should dismiss the catch-miss modal"
     );
 }
 
@@ -345,5 +367,538 @@ fn clearing_a_title_signals_a_save() {
     assert_eq!(
         h.achievements.selected_title, None,
         "the title should be cleared"
+    );
+}
+
+// -- Achievement browser overlay -------------------------------------------
+
+fn achievements_ready() -> InputHarness {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.char('a');
+    h
+}
+
+#[test]
+fn achievements_hotkey_opens_the_browser() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.char('a');
+    assert!(
+        matches!(h.overlay, GameOverlay::Achievements { .. }),
+        "[A] should open the achievement browser"
+    );
+}
+
+#[test]
+fn achievement_browser_cycles_categories_and_closes_on_a_or_esc() {
+    let mut h = achievements_ready();
+    let GameOverlay::Achievements { ref browser, .. } = h.overlay else {
+        panic!("expected the achievement browser overlay to be open");
+    };
+    assert_eq!(browser.selected_category, AchievementCategory::Combat);
+
+    h.press(KeyCode::Right);
+    let GameOverlay::Achievements { ref browser, .. } = h.overlay else {
+        panic!("expected the achievement browser overlay to be open");
+    };
+    assert_eq!(
+        browser.selected_category,
+        AchievementCategory::Level,
+        "[Right] should advance to the next category"
+    );
+
+    h.press(KeyCode::Left);
+    let GameOverlay::Achievements { ref browser, .. } = h.overlay else {
+        panic!("expected the achievement browser overlay to be open");
+    };
+    assert_eq!(
+        browser.selected_category,
+        AchievementCategory::Combat,
+        "[Left] should go back to the previous category"
+    );
+
+    h.char('a'); // 'a' also closes the browser, matching the open hotkey
+    assert!(h.overlay_is_none(), "[A] should close the browser again");
+
+    let mut h = achievements_ready();
+    h.press(KeyCode::Esc);
+    assert!(h.overlay_is_none(), "Esc should also close the browser");
+}
+
+#[test]
+fn achievement_browser_t_opens_the_nested_title_browser() {
+    let mut h = achievements_ready();
+    h.char('t');
+    let GameOverlay::Achievements {
+        ref title_browser, ..
+    } = h.overlay
+    else {
+        panic!("expected the achievement browser overlay to be open");
+    };
+    assert!(
+        title_browser.showing,
+        "[T] should open the nested title browser"
+    );
+}
+
+// -- Bug report / browser-link overlays ------------------------------------
+
+#[test]
+fn bug_report_hotkey_opens_overlay_with_a_summary() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.char('!');
+    match &h.overlay {
+        GameOverlay::BugReport { summary, .. } => {
+            assert!(
+                summary.contains("Hero"),
+                "the bug report summary should mention the hero's name; got:\n{summary}"
+            );
+        }
+        _ => panic!("['!'] should open the BugReport overlay"),
+    }
+}
+
+#[test]
+fn bug_report_overlay_closes_on_esc() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.char('!');
+    assert!(matches!(h.overlay, GameOverlay::BugReport { .. }));
+    h.press(KeyCode::Esc);
+    assert!(
+        h.overlay_is_none(),
+        "Esc should close the bug report overlay"
+    );
+}
+
+#[test]
+fn browser_link_fallback_modal_closes_on_esc_only() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.overlay = GameOverlay::BrowserLink {
+        url: "https://example.com".to_string(),
+    };
+    h.char('x');
+    assert!(
+        !h.overlay_is_none(),
+        "a stray key should not dismiss the browser-link modal"
+    );
+
+    let result = h.press(KeyCode::Esc);
+    assert!(
+        h.overlay_is_none(),
+        "Esc should dismiss the browser-link modal"
+    );
+    assert_eq!(result, InputResult::Continue);
+}
+
+// -- Time Vault hotkey -------------------------------------------------------
+
+#[test]
+fn time_vault_hotkey_signals_open_without_touching_the_overlay() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    let result = h.char('t');
+    assert_eq!(
+        result,
+        InputResult::OpenTimeVault,
+        "[T] should signal main.rs to populate and open the Time Vault"
+    );
+    assert!(
+        h.overlay_is_none(),
+        "the dispatcher itself must not set the TimeVault overlay -- main.rs does, from HistoryRepo"
+    );
+}
+
+// -- Discovery / celebration modal family -----------------------------------
+//
+// HavenDiscovery, SoulforgeDiscovery, StormglassDiscovery, DeepDiscovery,
+// LoomDiscovery, VesselDiscovery, FractureRegionUnlock, and
+// PatternMilestoneUnlock all share `handle_dismiss_overlay`: Enter or Esc
+// dismisses, anything else is swallowed and leaves the modal up.
+
+type OverlayFactory = (&'static str, fn() -> GameOverlay);
+
+#[test]
+fn discovery_and_celebration_modals_dismiss_on_enter_or_esc_only() {
+    let overlays: Vec<OverlayFactory> = vec![
+        ("HavenDiscovery", || GameOverlay::HavenDiscovery),
+        ("SoulforgeDiscovery", || GameOverlay::SoulforgeDiscovery),
+        ("StormglassDiscovery", || GameOverlay::StormglassDiscovery),
+        ("DeepDiscovery", || GameOverlay::DeepDiscovery),
+        ("LoomDiscovery", || GameOverlay::LoomDiscovery),
+        ("VesselDiscovery", || GameOverlay::VesselDiscovery),
+        ("FractureRegionUnlock", || {
+            GameOverlay::FractureRegionUnlock {
+                region: crate::zones::FractureRegion::RedFault,
+            }
+        }),
+        ("PatternMilestoneUnlock", || {
+            GameOverlay::PatternMilestoneUnlock {
+                milestone: crate::loom::PatternMilestone::ThreadWilds,
+            }
+        }),
+    ];
+
+    for (name, make) in overlays {
+        let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+        h.overlay = make();
+        h.char('x');
+        assert!(
+            !h.overlay_is_none(),
+            "{name}: a stray key should not dismiss the modal"
+        );
+
+        let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+        h.overlay = make();
+        h.press(KeyCode::Enter);
+        assert!(
+            h.overlay_is_none(),
+            "{name}: Enter should dismiss the modal"
+        );
+
+        let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+        h.overlay = make();
+        h.press(KeyCode::Esc);
+        assert!(h.overlay_is_none(), "{name}: Esc should dismiss the modal");
+    }
+}
+
+#[test]
+fn achievement_unlocked_modal_dismisses_on_enter_esc_or_space_only() {
+    for code in [KeyCode::Enter, KeyCode::Esc, KeyCode::Char(' ')] {
+        let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+        h.overlay = GameOverlay::AchievementUnlocked {
+            achievements: vec![AchievementId::Level100],
+        };
+        h.press(code);
+        assert!(
+            h.overlay_is_none(),
+            "{code:?} should dismiss the achievement-unlocked modal"
+        );
+    }
+
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.overlay = GameOverlay::AchievementUnlocked {
+        achievements: vec![AchievementId::Level100],
+    };
+    h.char('x');
+    assert!(
+        !h.overlay_is_none(),
+        "a stray key should not dismiss the achievement-unlocked modal"
+    );
+}
+
+// -- Quit confirmation -------------------------------------------------------
+
+#[test]
+fn quit_confirm_enter_quits_other_keys_cancel() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.overlay = GameOverlay::QuitConfirm;
+    let result = h.press(KeyCode::Enter);
+    assert_eq!(result, InputResult::QuitToSelect);
+
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.overlay = GameOverlay::QuitConfirm;
+    let result = h.press(KeyCode::Esc);
+    assert_eq!(result, InputResult::Continue);
+    assert!(
+        h.overlay_is_none(),
+        "canceling quit should close the confirm dialog"
+    );
+}
+
+#[test]
+fn esc_quits_directly_when_no_challenges_are_pending() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    assert!(h.state.challenge_menu.challenges.is_empty());
+    let result = h.press(KeyCode::Esc);
+    assert_eq!(result, InputResult::QuitToSelect);
+}
+
+#[test]
+fn esc_warns_before_quitting_when_challenges_are_pending() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::Rune));
+    let result = h.press(KeyCode::Esc);
+    assert_eq!(
+        result,
+        InputResult::Continue,
+        "Esc with pending challenges should not quit immediately"
+    );
+    assert!(matches!(h.overlay, GameOverlay::QuitConfirm));
+}
+
+// -- Deep / Loom / Ascension hotkeys ----------------------------------------
+
+#[test]
+fn deep_hotkey_is_gated_on_discovery() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.char('d');
+    assert!(!h.deep_ui.open, "The Deep opened without being discovered");
+
+    h.deep_state.persistent.discovered = true;
+    h.char('d');
+    assert!(h.deep_ui.open, "[D] did not open The Deep");
+}
+
+#[test]
+fn loom_hotkey_is_gated_on_discovery() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.char('l');
+    assert!(!h.loom_ui.open, "Loom opened without being discovered");
+
+    h.loom_state.persistent.discovered = true;
+    h.char('l');
+    assert!(h.loom_ui.open, "[L] did not open the Loom of Worlds");
+}
+
+/// A harness eligible for Ascension I: the Deep is discovered, layer 3 is
+/// reached (Ascension I's gate), and enough PR is banked to afford it.
+fn ascension_ready() -> InputHarness {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.deep_state.persistent.discovered = true;
+    h.deep_state.persistent.deepest_layer_reached = 3;
+    h.state.prestige_rank = 35;
+    h
+}
+
+#[test]
+fn ascension_hotkey_is_gated_on_deep_discovery_and_layer_gate() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.char('u');
+    assert!(!matches!(h.overlay, GameOverlay::AscensionConfirm));
+
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.deep_state.persistent.discovered = true; // layer 0 < 3: gate not met
+    h.char('u');
+    assert!(
+        !matches!(h.overlay, GameOverlay::AscensionConfirm),
+        "Ascension should stay gated until the Deep-layer requirement is met"
+    );
+
+    let mut h = ascension_ready();
+    h.char('u');
+    assert!(matches!(h.overlay, GameOverlay::AscensionConfirm));
+}
+
+#[test]
+fn ascension_confirm_ascends_and_signals_a_save_with_event() {
+    let mut h = ascension_ready();
+    h.overlay = GameOverlay::AscensionConfirm;
+
+    let result = h.char('y');
+
+    assert_eq!(
+        h.state.ascension_level, 1,
+        "ascension level should increment"
+    );
+    assert_eq!(
+        h.state.prestige_rank, 0,
+        "Ascension I's 35 PR cost should be deducted"
+    );
+    assert!(h.overlay_is_none());
+    assert!(
+        matches!(
+            result,
+            InputResult::NeedsSaveWithEvent(SaveEvent::AchievementUnlocked(_))
+        ),
+        "ascending must signal a save-with-event; got {result:?}"
+    );
+}
+
+#[test]
+fn ascension_confirm_cancel_keys_leave_state_untouched() {
+    for cancel in [KeyCode::Esc, KeyCode::Char('n'), KeyCode::Char('N')] {
+        let mut h = ascension_ready();
+        h.overlay = GameOverlay::AscensionConfirm;
+
+        let result = h.press(cancel);
+
+        assert_eq!(result, InputResult::Continue);
+        assert_eq!(h.state.ascension_level, 0, "{cancel:?} must not ascend");
+        assert!(h.overlay_is_none(), "{cancel:?} should close the dialog");
+    }
+}
+
+// -- Debug menu ---------------------------------------------------------
+
+#[test]
+fn debug_menu_backtick_toggles_and_navigates_categories() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.debug_mode = true;
+
+    h.char('`');
+    assert!(h.debug_menu.is_open, "backtick should open the debug menu");
+
+    h.press(KeyCode::Tab);
+    assert_eq!(
+        h.debug_menu.selected_category, 1,
+        "Tab should advance to the next category"
+    );
+
+    h.char('`');
+    assert!(
+        !h.debug_menu.is_open,
+        "backtick should close the debug menu again"
+    );
+}
+
+#[test]
+fn debug_menu_is_inert_without_debug_mode() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    assert!(!h.debug_mode);
+    h.char('`');
+    assert!(
+        !h.debug_menu.is_open,
+        "backtick should do nothing outside debug mode"
+    );
+}
+
+#[test]
+fn debug_menu_haven_discovery_action_opens_the_discovery_modal() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.debug_mode = true;
+    h.debug_menu.open();
+    h.debug_menu.selected_category = 1; // World
+    h.debug_menu.selected_index = 2; // Trigger Haven Discovery
+
+    h.press(KeyCode::Enter);
+
+    assert!(
+        matches!(h.overlay, GameOverlay::HavenDiscovery),
+        "triggering the Haven Discovery debug action should open the discovery modal"
+    );
+    assert!(
+        h.haven.discovered,
+        "the debug action should also flip the discovery flag"
+    );
+}
+
+// -- Challenge menu -----------------------------------------------------
+
+#[test]
+fn tab_opens_the_challenge_menu_once_a_challenge_is_pending() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.press(KeyCode::Tab);
+    assert!(
+        !h.state.challenge_menu.is_open,
+        "Tab should do nothing with no challenges pending"
+    );
+
+    h.state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::Rune));
+    h.press(KeyCode::Tab);
+    assert!(
+        h.state.challenge_menu.is_open,
+        "[Tab] should open the challenge menu once a challenge is pending"
+    );
+}
+
+#[test]
+fn challenge_menu_navigates_opens_detail_and_declines() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::Rune));
+    h.state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::Snake));
+    h.state.challenge_menu.open();
+
+    assert_eq!(h.state.challenge_menu.selected_index, 0);
+    h.press(KeyCode::Down);
+    assert_eq!(h.state.challenge_menu.selected_index, 1);
+    h.press(KeyCode::Up);
+    assert_eq!(h.state.challenge_menu.selected_index, 0);
+
+    h.press(KeyCode::Enter); // opens the difficulty-select detail view
+    assert!(h.state.challenge_menu.viewing_detail);
+
+    h.char('d'); // decline from the detail view
+    assert_eq!(
+        h.state.challenge_menu.challenges.len(),
+        1,
+        "declining should remove the selected challenge"
+    );
+    assert!(
+        h.state.challenge_menu.is_open,
+        "one challenge remains, so the menu should stay open"
+    );
+
+    h.press(KeyCode::Esc);
+    assert!(!h.state.challenge_menu.is_open);
+}
+
+#[test]
+fn challenge_menu_accepting_a_challenge_starts_the_minigame() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::Rune));
+    h.state.challenge_menu.open();
+
+    h.press(KeyCode::Enter); // open detail
+    h.press(KeyCode::Enter); // accept at the default difficulty
+
+    assert!(
+        h.state.active_minigame.is_some(),
+        "accepting a challenge should start its minigame"
+    );
+    assert!(
+        !h.state.challenge_menu.is_open,
+        "the menu should close once a challenge is accepted"
+    );
+}
+
+#[test]
+fn active_minigame_intercepts_background_hotkeys() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.state
+        .challenge_menu
+        .add_challenge(create_challenge(&ChallengeType::Rune));
+    h.state.challenge_menu.open();
+    h.press(KeyCode::Enter); // open detail
+    h.press(KeyCode::Enter); // accept -> starts the Rune minigame
+    assert!(h.state.active_minigame.is_some());
+
+    // Haven IS discovered, so [H] would normally open it, but an active
+    // minigame (step 6) must swallow the key before base hotkeys (step 9) see it.
+    h.haven.discovered = true;
+    h.char('h');
+    assert!(
+        !h.haven_ui.showing,
+        "an active minigame must swallow background hotkeys"
+    );
+}
+
+// -- Remaining base-game hotkeys ---------------------------------------
+
+#[test]
+fn wiki_hotkey_opens_browser_or_falls_back_to_a_link_modal() {
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.char('w');
+    assert!(
+        h.overlay_is_none() || matches!(h.overlay, GameOverlay::BrowserLink { .. }),
+        "[W] should either launch the browser (no overlay) or show the BrowserLink fallback"
+    );
+}
+
+#[test]
+fn vessel_hotkey_stays_inert_while_act2_is_dark_shipped() {
+    // Act 2 ships dark (`vessel::ACT2_ENABLED == false`); even a qualified
+    // signal must not surface the `[V]` overlay unless a session opts in via
+    // `QUEST_ACT2=1`. This test asserts the kill-switch itself, so it only
+    // makes sense in the default (Act 2 disabled) configuration.
+    assert!(
+        !crate::vessel::act2_enabled(),
+        "this test assumes Act 2 is dark-shipped in this run"
+    );
+
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.state.vessel_signal_discovered = true;
+    h.char('v');
+    assert!(
+        h.overlay_is_none(),
+        "[V] must stay inert while Act 2 is dark-shipped"
     );
 }
