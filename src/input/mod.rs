@@ -16,6 +16,8 @@ pub mod voyage_input;
 // Headless input-replay harness and its tests — the programmable counterpart
 // to the manual `drive-game` skill. Compiled only for `cargo test`.
 #[cfg(test)]
+mod fuzz_tests;
+#[cfg(test)]
 mod harness;
 #[cfg(test)]
 mod replay_tests;

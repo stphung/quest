@@ -19,6 +19,7 @@ Keyboard input routing for the Game screen, dispatching to overlay handlers, min
 | `voyage_input.rs` | Act 2 "Crossing" screen input (`handle_voyage_input()` / `VoyageInputResult`): intro/scene/moment playback, boarding-ask and refit prompts, chart/junction/trim/souls/watch/farewell/rumors/manifest/keepsake view navigation |
 | `harness.rs` | `#[cfg(test)]`-only headless input-replay harness (`InputHarness`) driving `handle_game_input`; see "Testing" below |
 | `replay_tests.rs` | `#[cfg(test)]`-only replay test suite exercising key input paths via `InputHarness`; see "Testing" below |
+| `fuzz_tests.rs` | `#[cfg(test)]`-only randomized input fuzzing over `InputHarness` — long unscripted key sequences across several discovery states and all 14 minigames, asserting only that dispatch and rendering never panic; see "Testing" below |
 
 ## Key Types
 
@@ -82,6 +83,8 @@ assert!(!h.haven_ui.showing);
 **Add coverage** for any input change by extending `replay_tests.rs` — cover the discovery gate, the modal-interception order (higher-priority overlays must swallow keys first), and Enter-only vs any-key dismissal.
 
 **Assert the `InputResult`, not just the state.** Consequential presses return a variant that `main_helpers/input_routing.rs` turns into a save (`NeedsSave*`) or a save-with-git-commit (`NeedsSave*WithEvent(SaveEvent)`). A wrong variant persists nothing — silent data loss with no other tripwire — so pin the returned variant alongside the state change (e.g. prestige returns `NeedsSaveWithEvent(SaveEvent::PrestigeRank(n))`, title selection returns `NeedsSave`). The `InputResult: PartialEq` derive makes this an `assert_eq!`.
+
+**`fuzz_tests.rs`** complements the scripted replay tests: instead of asserting a specific outcome, it feeds `InputHarness` hundreds of random key presses per seed (weighted toward navigation keys) across a fresh state, a boss encounter, every major system discovered at once, and every one of the 14 minigames, then renders the final frame. The only assertion is "no panic" — this catches index-out-of-bounds and arithmetic-overflow bugs in input paths nobody thought to script, the same value a human mashing keys in `drive-game` provides, but exhaustive and reproducible from a printed seed. `w`/`W`/`!` are excluded from its key pool because they shell out to a real browser/clipboard process (`bug_report::open_browser`/`copy_to_clipboard`) — not safe to fire at random in a hermetic test.
 
 ## Integration Points
 
