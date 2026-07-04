@@ -631,6 +631,42 @@ A soul has exactly one aptitude axis — **affinity** (Helm, Tender, Watch, or n
 
 **System**: vessel (Act 2 souls, stations, arcs).
 
+### Six-Attribute Model: Random +3 per Level, Prestige-Scaled Cap, CHA Amplifies the Prestige Multiplier
+
+Six attributes (STR/DEX/CON/INT/WIS/CHA) each use `modifier = (value - 10) / 2` (integer division, min 0). On level-up the character gains **+3 random points** distributed among non-capped attributes; the cap is `20 + 5 * prestige_rank`. Each attribute drives one lever, including CHA which feeds the prestige multiplier itself:
+
+| Attribute | Effect | Per modifier point |
+|---|---|---|
+| STR | Physical damage | +2 damage (`5 + STR_mod * 2`) |
+| DEX | Defense and crit | +1 defense, +1% crit (`5% + DEX_mod`) |
+| CON | Max HP | +10 HP (`50 + CON_mod * 10`) |
+| INT | Magic damage | +2 damage (`5 + INT_mod * 2`) |
+| WIS | XP gain | +5% XP (`1.0 + WIS_mod * 0.05`) |
+| CHA | Prestige multiplier | `effective = base + CHA_mod * 0.1` |
+
+**Why**: random point allocation keeps builds varied without asking an idle-game player to make per-level micro-decisions, while the prestige-scaled cap creates a "soft ceiling" at each tier (at the P0 cap of 20, characters converge to the same stats past ~level 25) that specifically encourages prestiging. CHA feeding the prestige multiplier gives a sixth attribute a meaningful role in the core loop rather than being dead weight.
+
+**Alternatives considered**: player-directed attribute allocation on level-up (rejected — too much per-level friction for an idle game); a flat (non-prestige-scaled) attribute cap (rejected — removes the soft ceiling that motivates prestige). Note that because random allocation makes attribute distribution unpredictable, downstream systems avoid character-attribute-weighted logic (see "Auto-Equip Uses Intrinsic `power()`" above).
+
+**System**: character / combat (attributes, `character/`).
+
+### XP Curve: 100 × level^1.5, Chosen for Idle Pacing
+
+Levels require `xp_needed = 100 * level^1.5` (`XP_CURVE_BASE = 100.0`, `XP_CURVE_EXPONENT = 1.5`), and kill XP is the only source (`random(200..=400)` per kill). The exponent is treated as a primary tuning lever:
+
+| Exponent | Effect |
+|---|---|
+| 1.3 | Faster leveling, shorter prestige cycles |
+| **1.5** | **Current** — balanced idle pacing |
+| 1.7 | Slower leveling, more grind per prestige |
+| 2.0 | Very slow — hardcore only |
+
+**Why**: a 1.5 power curve keeps early levels quick (hooking new players and giving fast post-prestige cycles) while making high levels a meaningful grind, matching the intended prestige pacing (P1 in 30-60 min, later cycles stretching to days). Sourcing all XP from kills (200-400 per kill) keeps combat the significant driver of progression rather than passive time, which is what lets active play stay ahead of pure idle.
+
+**Alternatives considered**: a lower exponent like 1.3 (faster but trivializes prestige cycles) or higher like 1.7-2.0 (too grindy outside a hardcore mode); passive/tick-based XP as a co-equal source (rejected — would make combat feel unrewarding versus idling). The exponent is flagged as high-impact: changing it ripples through all level timings and prestige pacing.
+
+**System**: core / character (XP economy, `core/constants.rs`).
+
 ### Balance Philosophy: Active Play ~2-3x Idle, Endgame in Weeks Not Hours
 
 The guiding balance targets for the whole economy: meaningful AFK progress, but active decisions (prestige timing, minigames, Haven) should be ~2-3x more efficient than pure idle ("the golden ratio"); no hard walls (progress slows but never stops); and each prestige should feel like a real power boost. The intended pacing:
