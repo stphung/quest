@@ -12,6 +12,7 @@
 //! See `openspec/specs/vessel-act2/spec.md`.
 
 use super::route::{WaypointId, ROUTE_SINK, ROUTE_START, WAYPOINTS};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 /// Souls in the dying world at the first launch. The whole era spends
@@ -79,6 +80,13 @@ pub const WARD_TOLL_FLOOR: f64 = 0.12;
 /// more or sailing faster.
 pub const WARD_COST_BASE: f64 = 5.0;
 pub const WARD_COST_GROWTH: f64 = 1.45;
+
+/// Real hours to fully charge Riftglass at Drive level 0 (the maiden
+/// voyage's first Dock). Higher Drive levels charge proportionally faster
+/// (`ColonyState::riftglass_rate_mult`). A starting value, not yet
+/// simulator-validated against the era's ~3-real-month pacing target — see
+/// `openspec/changes/act2-dock-wormhole-crossing/design.md` Decision 1/4.
+pub const RIFTGLASS_BASE_HOURS_TO_FULL: f64 = 24.0;
 
 /// The colony's districts, unlocked in order by population. Pure growth —
 /// every one lands eventually; the choices live on the water.
@@ -251,6 +259,16 @@ pub struct CrossingDelivery {
     pub new_world_milestones: Vec<WorldMilestone>,
 }
 
+/// The Colony's real-time management phase between crossings: Riftglass
+/// charges purely from elapsed real time since `docked_at`, at a rate the
+/// Drive yard scales (`ColonyState::riftglass_rate_mult`). A pure function
+/// of this one anchor timestamp — no incremental accrual to tick, no drift
+/// on long absences, mirroring `weather.rs`'s pure-function style.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DockState {
+    pub docked_at: DateTime<Utc>,
+}
+
 /// The persistent side of Act 2's loop. Population is exactly
 /// `souls_delivered` — the colony keeps everyone it receives.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -291,6 +309,11 @@ pub struct ColonyState {
     /// The era's seed — one per account, so the dimming order is *this*
     /// world's story (derived from the character id at founding).
     pub era_seed: u64,
+    /// The active Dock phase, if the Colony is between crossings waiting on
+    /// a wormhole jump. `None` once a jump has been committed and the next
+    /// crossing has begun.
+    #[serde(default)]
+    pub dock: Option<DockState>,
 }
 
 impl ColonyState {
@@ -310,6 +333,7 @@ impl ColonyState {
             records: CrossingRecords::default(),
             dimmed_ports: Vec::new(),
             era_seed,
+            dock: None,
         }
     }
 
@@ -377,6 +401,43 @@ impl ColonyState {
     /// A human "×N.N her old self" for the Reckoning.
     pub fn drive_speed_factor(&self) -> f64 {
         1.0 / self.drive_time_mult()
+    }
+
+    /// How much faster than the base rate Riftglass charges — reuses the
+    /// Drive yard's own speed factor verbatim (design.md Decision 3): the
+    /// yard that makes the ship faster also punches the rift faster, no new
+    /// content needed.
+    pub fn riftglass_rate_mult(&self) -> f64 {
+        self.drive_speed_factor()
+    }
+
+    /// Real hours to reach full Riftglass charge at the current Drive level.
+    pub fn riftglass_hours_to_full(&self) -> f64 {
+        RIFTGLASS_BASE_HOURS_TO_FULL / self.riftglass_rate_mult()
+    }
+
+    /// Riftglass charge, 0.0 (just docked) to 1.0 (fully charged, capped —
+    /// no overcharge decay). A pure function of elapsed real time since
+    /// `dock.docked_at`, identical whether queried once after a long
+    /// absence or repeatedly across many short intervals. `0.0` if not
+    /// currently docked.
+    pub fn riftglass_charge(&self, now: DateTime<Utc>) -> f64 {
+        let Some(dock) = &self.dock else {
+            return 0.0;
+        };
+        let elapsed_hours = (now - dock.docked_at).num_seconds() as f64 / 3600.0;
+        (elapsed_hours / self.riftglass_hours_to_full()).clamp(0.0, 1.0)
+    }
+
+    /// Enter the Dock phase — called the moment a crossing's arrival
+    /// delivers to the Colony.
+    pub fn dock(&mut self, now: DateTime<Utc>) {
+        self.dock = Some(DockState { docked_at: now });
+    }
+
+    /// Leave the Dock phase — called when a wormhole jump is committed.
+    pub fn undock(&mut self) {
+        self.dock = None;
     }
 
     /// Salvage the Drive yard charges to reach the next level.
@@ -857,6 +918,87 @@ mod tests {
         assert!(!c.era_over());
         c.deliver_crossing(60, 35, 100, 10); // carries 30, dark takes 0 more
         assert!(c.era_over(), "the last souls carried out ends the era");
+    }
+
+    #[test]
+    fn riftglass_charge_is_zero_when_not_docked() {
+        let c = ColonyState::found("t".into());
+        assert_eq!(c.riftglass_charge(chrono::Utc::now()), 0.0);
+    }
+
+    #[test]
+    fn riftglass_charges_linearly_from_the_dock_anchor() {
+        let mut c = ColonyState::found("t".into());
+        let t0 = chrono::DateTime::parse_from_rfc3339("2026-01-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        c.dock(t0);
+        assert_eq!(c.riftglass_charge(t0), 0.0, "no time has passed yet");
+
+        let half = t0 + chrono::Duration::hours((RIFTGLASS_BASE_HOURS_TO_FULL / 2.0) as i64);
+        assert!(
+            (c.riftglass_charge(half) - 0.5).abs() < 1e-6,
+            "half the base hours ⇒ half charge at Drive 0"
+        );
+
+        let full = t0 + chrono::Duration::hours(RIFTGLASS_BASE_HOURS_TO_FULL as i64);
+        assert!(
+            (c.riftglass_charge(full) - 1.0).abs() < 1e-6,
+            "the base hours ⇒ full charge at Drive 0"
+        );
+
+        let overshot = t0 + chrono::Duration::hours((RIFTGLASS_BASE_HOURS_TO_FULL * 3.0) as i64);
+        assert_eq!(
+            c.riftglass_charge(overshot),
+            1.0,
+            "charge caps at 1.0, never decays past full"
+        );
+    }
+
+    #[test]
+    fn riftglass_charge_is_chunking_invariant() {
+        // Queried once after a long gap, or repeatedly across short gaps,
+        // the charge at any given `now` must be identical — it's a pure
+        // function of the anchor and `now`, nothing is ticked/mutated.
+        let mut c = ColonyState::found("t".into());
+        let t0 = chrono::DateTime::parse_from_rfc3339("2026-01-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        c.dock(t0);
+        let later = t0 + chrono::Duration::hours(10);
+        let long_gap = c.riftglass_charge(later);
+        for hours in 0..10 {
+            let _ = c.riftglass_charge(t0 + chrono::Duration::hours(hours));
+        }
+        let after_many_short_queries = c.riftglass_charge(later);
+        assert_eq!(long_gap, after_many_short_queries);
+    }
+
+    #[test]
+    fn drive_level_speeds_riftglass_accrual() {
+        let mut slow = ColonyState::found("t".into());
+        let mut fast = ColonyState::found("t".into());
+        fast.drive_level = 3;
+        let t0 = chrono::DateTime::parse_from_rfc3339("2026-01-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        slow.dock(t0);
+        fast.dock(t0);
+        let later = t0 + chrono::Duration::hours(6);
+        assert!(
+            fast.riftglass_charge(later) > slow.riftglass_charge(later),
+            "a higher Drive level charges Riftglass faster for the same elapsed time"
+        );
+    }
+
+    #[test]
+    fn dock_and_undock_toggle_the_dock_phase() {
+        let mut c = ColonyState::found("t".into());
+        assert!(c.dock.is_none());
+        c.dock(chrono::Utc::now());
+        assert!(c.dock.is_some());
+        c.undock();
+        assert!(c.dock.is_none());
     }
 
     #[test]

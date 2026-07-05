@@ -129,6 +129,38 @@ mod tests {
     }
 
     #[test]
+    fn colony_roundtrip_preserves_the_dock_state() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("colony.json");
+
+        let mut c = crate::vessel::colony::ColonyState::found("char-1".to_string());
+        c.dock(t0());
+        save_colony_to_path(&c, &path).unwrap();
+        let loaded = load_colony_from_path(&path, "char-1").unwrap();
+
+        assert_eq!(loaded.dock, c.dock);
+        assert_eq!(
+            loaded.riftglass_charge(t0() + chrono::Duration::hours(24)),
+            1.0,
+            "the loaded dock anchor still charges Riftglass correctly"
+        );
+    }
+
+    #[test]
+    fn old_colony_saves_have_no_dock_field() {
+        // A pre-Dock/Wormhole colony.json has no `dock` key at all.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("colony.json");
+        let c = crate::vessel::colony::ColonyState::found("char-1".to_string());
+        let mut json: serde_json::Value = serde_json::to_value(&c).unwrap();
+        json.as_object_mut().unwrap().remove("dock");
+        fs::write(&path, serde_json::to_string(&json).unwrap()).unwrap();
+
+        let loaded = load_colony_from_path(&path, "char-1").unwrap();
+        assert!(loaded.dock.is_none());
+    }
+
+    #[test]
     fn loaded_voyage_keeps_ticking_from_where_it_stood() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("voyage.json");

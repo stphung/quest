@@ -505,6 +505,52 @@ fn snapshot_voyage_reckoning() {
 }
 
 #[test]
+fn snapshot_voyage_dock_just_docked() {
+    // A crossing just delivered; Riftglass hasn't charged at all yet.
+    assert_overlay_snapshot("voyage_dock_just_docked_xl_160x45", || {
+        let voyage = fixtures::voyage_mid_leg(frozen_utc());
+        let mut colony = fixtures::colony_midera();
+        colony.dock(frozen_utc());
+        let ui = crate::vessel::VoyageUiState {
+            view: crate::vessel::VoyageView::Dock {
+                confirm_pending: false,
+            },
+            scene_play: None,
+            scene_modal: None,
+            moments: Default::default(),
+        };
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, Some(&colony));
+        })
+    });
+}
+
+#[test]
+fn snapshot_voyage_dock_jump_confirmation() {
+    // The one-way, no-undo jump commitment's second key press.
+    assert_overlay_snapshot("voyage_dock_confirm_xl_160x45", || {
+        let voyage = fixtures::voyage_mid_leg(frozen_utc());
+        let mut colony = fixtures::colony_midera();
+        colony.dock(frozen_utc());
+        let ui = crate::vessel::VoyageUiState {
+            view: crate::vessel::VoyageView::Dock {
+                confirm_pending: true,
+            },
+            scene_play: None,
+            scene_modal: None,
+            moments: Default::default(),
+        };
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, Some(&colony));
+        })
+    });
+}
+
+#[test]
 fn snapshot_voyage_manifest() {
     assert_overlay_snapshot("voyage_manifest_xl_160x45", || {
         let voyage = arrived_voyage();

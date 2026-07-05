@@ -9,7 +9,8 @@
 use crate::vessel::junction::{current_junction_cards, RoadCard};
 use crate::vessel::route::{self, Feature, WaypointId};
 use crate::vessel::voyage::{
-    SceneState, Trim, VoyagePhase, VoyageState, DRIFT_RECOVERY_HOURS, MINUTES_PER_DAY, RUMOR_PRICE,
+    SceneState, Trim, VoyagePhase, VoyageState, DRIFT_RECOVERY_HOURS, MAX_PARTIAL_CHARGE_HULL_WEAR,
+    MAX_PARTIAL_CHARGE_PROVISIONS_DEFICIT, MINUTES_PER_DAY, RUMOR_PRICE,
 };
 use crate::vessel::{SceneModal, VoyageUiState, VoyageView};
 use ratatui::{
@@ -57,6 +58,7 @@ pub fn render_voyage(
         VoyageView::Keepsake { x, y } => render_keepsake_chart(frame, area, voyage, x, y),
         VoyageView::Record { scroll } => render_record(frame, area, voyage, scroll),
         VoyageView::Reckoning => render_reckoning(frame, area, colony),
+        VoyageView::Dock { confirm_pending } => render_dock(frame, area, colony, confirm_pending),
         _ => match ctx.tier {
             SizeTier::XL | SizeTier::L => render_full(frame, area, voyage, ui, colony),
             _ => render_strip(frame, area, voyage, ui, colony),
@@ -303,7 +305,8 @@ fn render_full(
         VoyageView::Manifest { .. }
         | VoyageView::Keepsake { .. }
         | VoyageView::Record { .. }
-        | VoyageView::Reckoning => render_vessel_panel(frame, cols[1], voyage, colony),
+        | VoyageView::Reckoning
+        | VoyageView::Dock { .. } => render_vessel_panel(frame, cols[1], voyage, colony),
     }
 }
 
@@ -951,7 +954,7 @@ fn phase_lines(voyage: &VoyageState) -> Vec<Line<'static>> {
 
 fn footer_keys(voyage: &VoyageState) -> Vec<Line<'static>> {
     let mut keys = if matches!(voyage.phase, VoyagePhase::Arrived { .. }) {
-        vec!["[N] Sail again", "[M] Manifest", "[K] Chart", "[R] Record"]
+        vec!["[N] Dock", "[M] Manifest", "[K] Chart", "[R] Record"]
     } else {
         vec![
             "[S] Souls",
@@ -2251,6 +2254,126 @@ fn render_reckoning(
     )));
 
     frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+}
+
+/// The Dock — between crossings, waiting on a wormhole jump. Riftglass
+/// charges purely from real time spent here (a Drive-scaled rate); a jump
+/// at full charge is the safe, standard crossing start, a jump committed
+/// early trades Dock time now for a deficit on the crossing to come.
+fn render_dock(
+    frame: &mut Frame,
+    area: Rect,
+    colony: Option<&crate::vessel::colony::ColonyState>,
+    confirm_pending: bool,
+) {
+    frame.render_widget(Clear, area);
+    let block = Block::default()
+        .title(" \u{25c9} The Dock ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(VESSEL_VIOLET));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let Some(c) = colony else {
+        // Reached only if the era ended before a Dock was ever entered —
+        // nothing to show.
+        frame.render_widget(
+            Paragraph::new(vec![Line::from(""), Line::from("Nothing to dock for.")])
+                .alignment(Alignment::Center),
+            inner,
+        );
+        return;
+    };
+
+    let now = super::clock::now_utc();
+    let charge = c.riftglass_charge(now);
+    let pct = (charge * 100.0).round() as u32;
+
+    let mut lines: Vec<Line> = vec![Line::from("")];
+    lines.push(Line::from(Span::styled(
+        "RIFTGLASS",
+        Style::default()
+            .fg(Color::Gray)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(Span::styled(
+        riftglass_bar(charge, inner.width.saturating_sub(4).max(10) as usize),
+        Style::default().fg(GOLD),
+    )));
+    lines.push(Line::from(Span::styled(
+        format!(
+            "{pct}% charged  \u{00b7}  {:.1}\u{00d7} charge rate (the Drive yard's speed, reused)",
+            c.riftglass_rate_mult()
+        ),
+        Style::default().fg(Color::DarkGray),
+    )));
+    lines.push(Line::from(""));
+
+    if charge >= 1.0 {
+        lines.push(Line::from(Span::styled(
+            "Fully charged \u{2014} the wormhole holds steady.",
+            Style::default().fg(Color::White),
+        )));
+        lines.push(Line::from(Span::styled(
+            "A jump now begins the crossing exactly as she stands.",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        lines.push(Line::from(Span::styled(
+            "A jump before full charge is a shorter wait, at a cost:",
+            Style::default().fg(Color::White),
+        )));
+        lines.push(Line::from(Span::styled(
+            format!(
+                "the crossing would start {:.0} provisions short and {} hull scar{} deep.",
+                MAX_PARTIAL_CHARGE_PROVISIONS_DEFICIT * (1.0 - charge),
+                (f64::from(MAX_PARTIAL_CHARGE_HULL_WEAR) * (1.0 - charge)).round() as u8,
+                if (f64::from(MAX_PARTIAL_CHARGE_HULL_WEAR) * (1.0 - charge)).round() as u8 == 1 {
+                    ""
+                } else {
+                    "s"
+                }
+            ),
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
+    lines.push(Line::from(""));
+
+    if confirm_pending {
+        lines.push(Line::from(Span::styled(
+            "Jump through the wormhole? This cannot be undone.",
+            Style::default()
+                .fg(Color::LightRed)
+                .add_modifier(Modifier::BOLD),
+        )));
+        lines.push(Line::from(Span::styled(
+            "[J] / [Enter] confirm  \u{00b7}  any other key backs off",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        lines.push(Line::from(Span::styled(
+            "[J] / [Enter] Jump  \u{00b7}  [L] Reckoning  \u{00b7}  [R] Record  \u{00b7}  [Esc] Chart",
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
+
+    frame.render_widget(
+        Paragraph::new(lines)
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: false }),
+        inner,
+    );
+}
+
+/// A simple `[####------]` bar for the Riftglass charge, sized to the panel.
+fn riftglass_bar(charge: f64, width: usize) -> String {
+    let width = width.max(4);
+    let filled = ((charge.clamp(0.0, 1.0)) * width as f64).round() as usize;
+    format!(
+        "[{}{}]",
+        "#".repeat(filled),
+        "-".repeat(width.saturating_sub(filled))
+    )
 }
 
 /// A big headline number spaced out for weight: 1 , 2 4 7.

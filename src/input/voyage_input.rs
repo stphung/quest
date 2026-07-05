@@ -17,10 +17,12 @@ pub enum VoyageInputResult {
     HandledNeedsSave,
     /// Save and leave the game.
     Quit,
-    /// At the harbor: begin the next ferry crossing (spec 9). The loop
-    /// in main.rs rebuilds the voyage carrying the crew and the colony's
-    /// bonuses; ignored when the era is over.
-    SailAgain,
+    /// At the Dock, jump committed: begin the next ferry crossing (spec 9
+    /// addendum). The loop in main.rs reads the Colony's Riftglass charge,
+    /// undocks, and rebuilds the voyage carrying the crew, the colony's
+    /// bonuses, and any partial-charge penalty; ignored when the era is
+    /// over.
+    Jump,
     /// At the Reckoning: spend Salvage in the Drive yard (spec 9). The loop
     /// in main.rs owns the colony, so it applies the buy and saves.
     BuyDrive,
@@ -193,6 +195,39 @@ pub fn handle_voyage_input(
             }
             VoyageInputResult::Handled
         }
+        VoyageView::Dock { confirm_pending } => match key.code {
+            // A one-way, no-undo commitment: [J]/Enter arms it, a second
+            // press confirms; anything else (including Esc) backs off the
+            // confirmation without leaving the Dock.
+            KeyCode::Char('j') | KeyCode::Char('J') | KeyCode::Enter if confirm_pending => {
+                VoyageInputResult::Jump
+            }
+            KeyCode::Char('j') | KeyCode::Char('J') | KeyCode::Enter => {
+                ui.view = VoyageView::Dock {
+                    confirm_pending: true,
+                };
+                VoyageInputResult::Handled
+            }
+            KeyCode::Esc if confirm_pending => {
+                ui.view = VoyageView::Dock {
+                    confirm_pending: false,
+                };
+                VoyageInputResult::Handled
+            }
+            KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
+                ui.view = VoyageView::Chart;
+                VoyageInputResult::Handled
+            }
+            KeyCode::Char('l') | KeyCode::Char('L') => {
+                ui.view = VoyageView::Reckoning;
+                VoyageInputResult::Handled
+            }
+            KeyCode::Char('r') | KeyCode::Char('R') => {
+                ui.view = VoyageView::Record { scroll: 0 };
+                VoyageInputResult::Handled
+            }
+            _ => VoyageInputResult::Handled,
+        },
     }
 }
 
@@ -474,7 +509,12 @@ fn handle_chart_keys(
             ui.view = VoyageView::Manifest { scroll: 0 };
             VoyageInputResult::Handled
         }
-        KeyCode::Char('n') | KeyCode::Char('N') if voyage.arrived() => VoyageInputResult::SailAgain,
+        KeyCode::Char('n') | KeyCode::Char('N') if voyage.arrived() => {
+            ui.view = VoyageView::Dock {
+                confirm_pending: false,
+            };
+            VoyageInputResult::Handled
+        }
         KeyCode::Char('k') | KeyCode::Char('K') if voyage.arrived() => {
             // Open centered on the Tree; the crossing pans out from there.
             let (x, y) = route::waypoint(route::ROUTE_SINK).chart_pos;
@@ -698,6 +738,86 @@ mod tests {
 
         handle_voyage_input(key(KeyCode::Char('r')), &mut v, &mut ui);
         assert_eq!(ui.view, VoyageView::Record { scroll: 0 });
+        handle_voyage_input(key(KeyCode::Esc), &mut v, &mut ui);
+        assert_eq!(ui.view, VoyageView::Chart);
+    }
+
+    #[test]
+    fn arrival_opens_the_dock_not_an_instant_jump() {
+        let (mut v, mut ui) = fresh();
+        v.phase = VoyagePhase::Arrived { at_min: 0 };
+        let r = handle_voyage_input(key(KeyCode::Char('n')), &mut v, &mut ui);
+        assert_eq!(
+            r,
+            VoyageInputResult::Handled,
+            "N opens the Dock, it doesn't jump immediately"
+        );
+        assert_eq!(
+            ui.view,
+            VoyageView::Dock {
+                confirm_pending: false
+            }
+        );
+    }
+
+    #[test]
+    fn jumping_requires_a_second_confirming_press() {
+        let (mut v, mut ui) = fresh();
+        v.phase = VoyagePhase::Arrived { at_min: 0 };
+        ui.view = VoyageView::Dock {
+            confirm_pending: false,
+        };
+        // First press arms the confirmation, no jump yet.
+        let r = handle_voyage_input(key(KeyCode::Char('j')), &mut v, &mut ui);
+        assert_eq!(r, VoyageInputResult::Handled);
+        assert_eq!(
+            ui.view,
+            VoyageView::Dock {
+                confirm_pending: true
+            }
+        );
+        // Second press confirms.
+        let r = handle_voyage_input(key(KeyCode::Char('j')), &mut v, &mut ui);
+        assert_eq!(r, VoyageInputResult::Jump);
+    }
+
+    #[test]
+    fn any_other_key_backs_off_a_pending_jump_confirmation() {
+        let (mut v, mut ui) = fresh();
+        v.phase = VoyagePhase::Arrived { at_min: 0 };
+        ui.view = VoyageView::Dock {
+            confirm_pending: true,
+        };
+        let r = handle_voyage_input(key(KeyCode::Esc), &mut v, &mut ui);
+        assert_eq!(r, VoyageInputResult::Handled);
+        assert_eq!(
+            ui.view,
+            VoyageView::Dock {
+                confirm_pending: false
+            },
+            "Esc backs off the confirmation without leaving the Dock"
+        );
+    }
+
+    #[test]
+    fn the_dock_reaches_the_reckoning_and_record_and_back_to_chart() {
+        let (mut v, mut ui) = fresh();
+        v.phase = VoyagePhase::Arrived { at_min: 0 };
+        ui.view = VoyageView::Dock {
+            confirm_pending: false,
+        };
+        handle_voyage_input(key(KeyCode::Char('l')), &mut v, &mut ui);
+        assert_eq!(ui.view, VoyageView::Reckoning);
+
+        ui.view = VoyageView::Dock {
+            confirm_pending: false,
+        };
+        handle_voyage_input(key(KeyCode::Char('r')), &mut v, &mut ui);
+        assert_eq!(ui.view, VoyageView::Record { scroll: 0 });
+
+        ui.view = VoyageView::Dock {
+            confirm_pending: false,
+        };
         handle_voyage_input(key(KeyCode::Esc), &mut v, &mut ui);
         assert_eq!(ui.view, VoyageView::Chart);
     }
