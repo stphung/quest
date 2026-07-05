@@ -1,6 +1,6 @@
 # Act 2: The Pilgrimage of Souls — Design Dossier
 
-> Last refreshed: 2026-07-05 @ f91bd1a | Sources: `src/vessel/`, `src/vessel/CLAUDE.md`, `openspec/changes/archive/the-vessel-act2/design.md` (the 15 backported vessel specs, now consolidated into one file), `openspec/specs/vessel-act2/spec.md`, `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
+> Last refreshed: 2026-07-05 @ 04edecd | Sources: `src/vessel/`, `src/main.rs` (vessel wiring), `src/vessel/CLAUDE.md`, `openspec/changes/archive/the-vessel-act2/design.md` (the 15 backported vessel specs, now consolidated into one file), `openspec/specs/vessel-act2/spec.md`, `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
 
 > **Status: living, deep-refreshed across several sessions.** This dossier
 > holds Act 2's cross-system, player-eye synthesis — how the launch gate,
@@ -48,6 +48,19 @@ crossing is underway rather than once at its end — so a slow crossing bleeds
 longer, and for the first time all three yards visibly answer to that one
 pressure.
 
+The design's own name for this loop is **the Ferryman** — `colony.rs`'s own
+module doc files itself under "Act 2's incremental spine (sub-project 9,
+The Ferryman)." It's never printed on screen as a title (no "you are the
+Ferryman" banner anywhere in `src/ui/`), but it's the shape of everything
+from arrival onward: the player becomes the one who keeps going back
+across the dark. The loop ends rather than cycling in place — once
+`souls_remaining` hits zero, the next arrival is **the Last Crossing**:
+`era_over()` refuses any further "Sail Again," a second persistent flag
+(`GameState::last_crossing_complete`, distinct from `vessel_arrived`, which
+was already set at the very first landfall) is raised, and an authored
+scene closes the era ("the old world is empty... the door, at last, is
+ajar").
+
 ## Design Intent
 
 The de-facto design bible is scattered but real (no single consolidated doc):
@@ -78,6 +91,19 @@ The de-facto design bible is scattered but real (no single consolidated doc):
   The authoritative numbers as shipped: **~19–24 crossings (balanced
   spend), up to ~32 leaning on Ward, ~3–5 real months, ~88–94% saved with
   skilled play, C1 ≈ 14–15 real days.**
+- **The Ferryman's "Elevation"** (same file, section
+  `2026-07-03-vessel-ferryman-design.md`): explicitly *amends* Act 2's own
+  anti-goal — "no resettable loop" — rather than breaking it: "the crossing
+  loop *is* Act 2's identity now... it ends (Act 3), it does not cycle in
+  place." Chart knowledge and "doors close" both persist forever across
+  crossings; only weather, provisions, and per-run road closures reset each
+  one. The section's original engine proposal (a "Resonance" multiplier)
+  was retired entirely and rebuilt twice over into the shipped
+  Drive/Shipwright/Ward yards (see the two Follow-up blocks in the same
+  section) — but the *structural* pillar it amends (repeatable crossing →
+  permanent colony → an ending, not a reset) is exactly what's live in
+  `colony.rs` today, including the "Last Crossing" ending the era once
+  `souls_remaining` hits zero (see Interrelations).
 
 Note: specs 1–8 describe single-playthrough duration language ("20–200 days")
 that spec 9 (the Ferryman) superseded; nothing in the tree says so explicitly.
@@ -136,6 +162,16 @@ era's second discovery axis, keyed to the old world's decline rather than the
 colony's growth, so it lands on a different crossing depending on spend
 policy.
 
+**Era end**: once `souls_remaining` reaches 0, `ColonyState::era_over()`
+(`colony.rs:571-572`) returns true; `main.rs:834` then refuses `SailAgain` —
+no further ferry crossings — and the arrival that emptied the world sets a
+second persistent flag, `GameState::last_crossing_complete`
+(`main.rs:746-747`, distinct from `vessel_arrived`) — the design's "Last
+Crossing," which `colony.rs`'s own module doc calls "Act 3's gate" in as
+many words. The flag isn't yet exercised by any Act 3 content, and its
+state transition isn't covered by an automated test beyond the save-compat
+fixture corpus (which only pins its default `false`) — see Open Questions.
+
 ### Launch transition
 `src/vessel/transition.rs`: `BEAT_COUNT` 5 (Farewell/Unweaving/Construction/
 Launch/Void), gated by the persistent `GameState::vessel_transition_played`.
@@ -148,15 +184,26 @@ leaning hard on the Ward).
 ## Interrelations
 
 ```
-Act 1 (everything)          Act 2 (the passage)
+Act 1 (everything)                Act 2: launch → crossing 1 → the Ferryman loop
   Loom 28 patterns  ─┐
-  Ascension X       ─┼─► Launch gate ─► Voyage ─► Colony era
-  250,000 PR (burn) ─┘        │            │          │
-  Zone 50 kill ─► signal ─────┘            │     Salvage ─► Drive/Shipwright/Ward
-                                           │          │
-  Deep/Loom/etc. idle beneath ◄── untouched┘     souls delivered ─► districts
-                                                       │
-                                              vessel_arrived ─► (Act 3 hook)
+  Ascension X       ─┼─► Launch gate ─► Voyage (crossing 1) ─► vessel_arrived
+  250,000 PR (burn) ─┘        │               │             (Act 3 hook #1 —
+  Zone 50 kill ─► signal ─────┘               │              spec-normative)
+                                              ▼                     │
+  Deep/Loom/etc. idle beneath ◄── untouched   Colony founded ◄──────┘
+                                              │
+                          ┌─────────────────► Reckoning: Salvage
+                          │                   ─► Drive / Shipwright / Ward
+                          │                          │
+                    "Sail Again" ◄─── ferry run, hands-off ──┘
+                    (loops until era_over())
+                          │
+              souls delivered ─► districts + world milestones
+              souls_remaining → 0 ─► era_over() blocks "Sail Again"
+                          │
+                          ▼
+              last_crossing_complete (Act 3 hook #2, "the Last Crossing" —
+              named in colony.rs's own doc; absent from the openspec spec)
 ```
 
 - **In**: the launch gate deliberately braids *all* of Act 1 (Loom, Ascension,
@@ -164,9 +211,24 @@ Act 1 (everything)          Act 2 (the passage)
 - **During**: zero mechanical interaction with Act 1 — deliberate ("one-way
   passage"); Act 1 idles untouched beneath. Narrative callbacks only
   (Torvald is the Deep guild's captain).
-- **Out**: `vessel_arrived` is the authored Act 3 hook. Salvage/districts are
-  Act 2-internal currencies; nothing else consumes them (by design, but note:
-  Records and keepsakes have no external surface either).
+- **The ferry loop is the act's second major cross-system braid**, but an
+  internal one: Reckoning spend (Drive/Shipwright/Ward) feeds directly back
+  into how much of `souls_remaining` the next crossing can rescue before
+  `era_over()` ends it — a closed loop with no Act-1-style external inputs,
+  consistent with "During" above. This is the Ferryman design's "Elevation"
+  pillar (see Design Intent) made mechanical.
+- **Out, in two stages, not one**: `vessel_arrived` fires at the very first
+  landfall and is the Act 3 hook `openspec/specs/vessel-act2/spec.md:119`
+  actually documents ("the durable hook a future Act 3 keys off"). But the
+  Ferryman design's own intent — and the shipped code — go one step
+  further: `last_crossing_complete` (`main.rs:746-747`) fires only once
+  `souls_remaining` hits zero and the era's final arrival lands, matching
+  `colony.rs`'s own module doc verbatim ("the next arrival is the Last
+  Crossing: Act 3's gate"). **The openspec capability spec never mentions
+  this second, deeper hook** — a real spec gap, not a dossier error (see
+  Open Questions). Salvage/districts are Act 2-internal currencies; nothing
+  else consumes them (by design, but note: Records and keepsakes have no
+  external surface either).
 - **All three Reckoning purchases point at the same measurable outcome** (%
   of the world saved), a meaningfully tighter system than the earlier
   two-yard-plus-one-inert-gauge (Hope) design — see Refresh History.
@@ -242,8 +304,9 @@ against these same seven heuristics.
 
 ## Open Questions & Decision History
 
-All open questions raised across this dossier's refreshes have been
-resolved (see `docs/decisions.md` for full rationale on each):
+Five of six questions raised across this dossier's refreshes are resolved
+(see `docs/decisions.md` for full rationale on each); one new one (#6)
+surfaces from this pass and is still open:
 
 1. ~~Hope gauge never engages — tune, redesign, or demote?~~ **Resolved**:
    retired entirely, replaced by the Ward yard (commit d39ad67).
@@ -265,6 +328,17 @@ resolved (see `docs/decisions.md` for full rationale on each):
    **Resolved**: keep it as an intended "go slower, save more" branch — era
    length is now stated as "~3–5 real months" depending on spend. Skill/
    patience tradeoff is fine; the margin stays wide and legible.
+6. **`last_crossing_complete` (the Last Crossing / true Act 3 gate) has no
+   openspec coverage — still open, newly surfaced this pass.** It's
+   implemented (`main.rs:746-747,834`, `colony.rs:571-572`) and named
+   outright in `colony.rs`'s own module doc ("the next arrival is the Last
+   Crossing: Act 3's gate"), but `openspec/specs/vessel-act2/spec.md:119`
+   still describes only `vessel_arrived` as "the durable hook a future
+   Act 3 keys off," and `src/vessel/CLAUDE.md` doesn't mention the flag at
+   all. Not urgent while the act stays dark-shipped and Act 3 is
+   undesigned, but whoever eventually designs Act 3 should know the deeper
+   hook exists before assuming `vessel_arrived` is the only one. A
+   documentation sync (spec + CLAUDE.md), not a code change.
 
 Carried forward from prior refreshes (re-verified current, not
 re-litigated): the full 15-doc spec-alignment pass that annotated every
@@ -291,6 +365,27 @@ Held for a later round (not yet asked, unchanged):
 Session-by-session log of what changed at each refresh, most recent first.
 The sections above always describe the *current* state only — read this
 section for how it got there.
+
+### 2026-07-05 — the Ferryman loop and the Last Crossing gate added
+
+A reviewer read the previous restructuring pass and asked whether "the
+Ferryman" idea was represented — it wasn't, in the Interrelations section
+or anywhere else. Checked against source rather than assumed: the ferry
+loop (repeatable crossings, `souls_remaining` racing toward zero) and its
+end-state (`ColonyState::era_over()` blocking `SailAgain`, and a second
+persistent flag, `GameState::last_crossing_complete`, distinct from
+`vessel_arrived`) are fully implemented (`colony.rs:571-572`,
+`main.rs:746-747,834`) and named outright in `colony.rs`'s own module doc
+("sub-project 9, The Ferryman" / "the next arrival is the Last Crossing:
+Act 3's gate") — but were absent from this dossier, from
+`openspec/specs/vessel-act2/spec.md`, and from `src/vessel/CLAUDE.md`
+alike. Added to Player's Experience (naming the Ferryman and the Last
+Crossing), Design Intent (the Ferryman design's "Elevation" pillar
+amendment), Mechanics & Constants (era-end mechanics under Colony),
+Interrelations (the diagram now shows the full loop and both Act 3 hooks),
+and a new open question (#6) flagging that the openspec spec still only
+documents the first hook. This is a content addition, not a correction —
+nothing previously stated was wrong, it was incomplete.
 
 ### 2026-07-05 — path housekeeping only
 
