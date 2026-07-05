@@ -1,6 +1,7 @@
 # Act 2: The Pilgrimage of Souls — Design Dossier
 
-> Last refreshed: 2026-07-05 @ 04edecd | Sources: `src/vessel/`, `src/main.rs` (vessel wiring), `src/vessel/CLAUDE.md`, `openspec/changes/archive/the-vessel-act2/design.md` (the 15 backported vessel specs, now consolidated into one file), `openspec/specs/vessel-act2/spec.md`, `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
+> Last refreshed: 2026-07-05 @ 5358951 (concept-first rewrite, no source
+> changed) | Sources: `src/vessel/`, `src/main.rs` (vessel wiring), `src/vessel/CLAUDE.md`, `openspec/changes/archive/the-vessel-act2/design.md` (the 15 backported vessel specs, now consolidated into one file), `openspec/specs/vessel-act2/spec.md`, `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
 
 > **Status: living, deep-refreshed across several sessions.** This dossier
 > holds Act 2's cross-system, player-eye synthesis — how the launch gate,
@@ -18,23 +19,22 @@
 ## The Player's Experience
 
 Act 2 begins as a rumor inside Act 1. The first Zone 50 final-boss kill sets
-the signal; from then on a whisper crosses the ticker about once a minute and
-a `[V]` overlay shows a four-gate checklist — complete the Loom (28 patterns),
-reach Ascension X, and accumulate 250,000 PR to burn in one all-or-nothing
-action. The player watches a fuel bar fill over weeks. The burn is the act
-break: everything Act 1 accumulated becomes the hull.
+the signal; from then on a whisper crosses the ticker occasionally and a
+`[V]` overlay shows a four-gate checklist — complete the Loom (28
+patterns), reach Ascension X, and accumulate 250,000 PR to burn in one
+all-or-nothing action. The player watches a fuel bar fill over weeks. The
+burn is the act break: everything Act 1 accumulated becomes the hull.
 
-Then the game changes shape entirely. The Voyage runs on the wall clock
-(2.64 game-minutes per real minute; a sea-day ≈ 9 real hours), not the tick
-loop. The **maiden voyage** is the decision-rich crossing: ~26 named ports
-over ~40 sea-days (≈ two real weeks), checking in a few times a day to chart
-courses at junctions (committing closes the other roads for good), set Pace
-(the old "trim" dial), stand the watch, answer recruit asks, choose refit
-doors, read arrival scenes and Letters From Home. Three roads carry a named,
-authored hazard instead of a random encounter — the Ossuary Warden, the
-Silence itself, and the Thorns (the act's only permanent loss) — each
-resolved deterministically by who's standing where and what pace is set,
-never by a die roll. Five other ships share the dark with the player,
+Then the game changes shape entirely. The Voyage runs on a compressed wall
+clock, not the tick loop. The **maiden voyage** is the decision-rich
+crossing — a couple of real weeks of checking in a few times a day to
+chart courses at junctions (committing closes the other roads for good),
+set Pace (the old "trim" dial), stand the watch, answer recruit asks,
+choose refit doors, read arrival scenes and Letters From Home. Three roads
+carry a named, authored hazard instead of a random encounter — the Ossuary
+Warden, the Silence itself, and the Thorns (the act's only permanent loss)
+— each resolved deterministically by who's standing where and what pace is
+set, never by a die roll. Five other ships share the dark with the player,
 each with their own route and one line of character; hailing one (once
 each) trades news for a fragment of their story, and one of the five, the
 Sister Verity, is written to reach the Tree and wait there rather than
@@ -42,19 +42,20 @@ eventually going dark like the other four. Cadence: a decision or scene
 every check-in, a junction every few days, a chapter gateway roughly
 weekly, the Going-Dark once — the night the mail stops.
 
-Arrival opens three quiet rooms (manifest, keepsake chart, record) — and then
-the **Reckoning** reframes the act: 100,000 souls wait in the dying world, the
-ship sails back, and every landfall pays Salvage to spend on **three** yards
-(Drive = speed, Shipwright = hold, Ward = dampens the dark's daily bite).
-Ferry runs (crossing 2+) are fully hands-off — the ship sails herself in
-Drive-scaled time while the player's choice compresses to one three-way pick
-at each Reckoning, each shown with a concrete "you'd go from X to Y" number.
-The era runs ~19–32 crossings depending on how the player spends (see Balance
-Evidence), over roughly 3–5 real months, the ramp going 37 → 8 sea-days while
-loads climb from 7 crew to ~4,500+ souls, the dark now biting **every day** a
-crossing is underway rather than once at its end — so a slow crossing bleeds
-longer, and for the first time all three yards visibly answer to that one
-pressure.
+Arrival opens three quiet rooms (manifest, keepsake chart, record) — and
+then the **Reckoning** reframes the act: a vast number of souls wait in
+the dying world, the ship sails back, and every landfall pays Salvage to
+spend on **three** yards (Drive = speed, Shipwright = hold, Ward = dampens
+the dark's daily bite). Ferry runs (crossing 2+) are fully hands-off — the
+ship sails herself in Drive-scaled time while the player's choice
+compresses to one three-way pick at each Reckoning, each shown with a
+concrete "you'd go from X to Y" number. The era runs a good number of
+crossings depending on how the player spends (see Balance Evidence), over
+a few real months, the pace quickening steadily while loads climb from a
+handful of crew into the thousands of souls — the dark now biting **every
+day** a crossing is underway rather than once at its end, so a slow
+crossing bleeds longer, and for the first time all three yards visibly
+answer to that one pressure.
 
 The design's own name for this loop is **the Ferryman** — `colony.rs`'s own
 module doc files itself under "Act 2's incremental spine (sub-project 9,
@@ -121,123 +122,116 @@ pass, though low priority while the act stays dark-shipped.
 ## Mechanics & Constants
 
 ### Launch gate
-`src/vessel/mod.rs`: `LAUNCH_PR_COST` 250,000 (`mod.rs:116`),
-`LAUNCH_REQUIRED_PATTERNS` 28 (`:119`), `LAUNCH_REQUIRED_ASCENSION` X (`:122`),
-`WHISPER_INTERVAL_SECONDS` 60 (`:125`). Gate at `mod.rs:147-149`, burn `:158`.
+Burns 250,000 Prestige Ranks in one all-or-nothing action once every gate
+clears — the signal discovered at Zone 50, the Loom's 28 patterns
+complete, Ascension X reached (`src/vessel/mod.rs`). A whisper crosses the
+ticker periodically well before the gate is actually reachable, building
+anticipation ahead of the fuel bar itself.
 
 ### Voyage
-`src/vessel/voyage.rs`: `GAME_MINUTES_PER_REAL_MINUTE` 2.64 (`:64`),
-`PROVISIONS_CAP` 100 (`:31`, `LONG_HOLD_PROVISIONS_CAP` 150 `:33`),
-`DRIFT_RECOVERY_PROVISIONS` 25 (`:38`) / `DRIFT_RECOVERY_HOURS` 36 (`:39`) —
-also the affordability floor asserted at `route.rs:1384-1391`, so a dry
-hold always means drifting, never stranding. `PORT_CALL_GAME_MINUTES` 360
-(`:47`). **Hope's constants (`HOPE_MAX`, `LAUNCH_HOPE`, `HOPE_FLOOR_STEADY`,
-`HOPE_SPEND_FLOOR`, `PRESS_*`, `HARD_RATIONS_BURN_MULT`, and
-`HOLD_STATION_GRACE_DAYS`) are all gone** — Mourn Pace (was "Restful" trim)
-is now identified purely by being the thriftiest hold burn (0.80×), not by
-pressing hope, and holding station indefinitely no longer has any soft
-pressure attached to it (a small, low-priority drift the mode-transition/
-route-waypoints specs also flag).
+Runs on a compressed wall clock rather than the tick loop, so the maiden
+voyage plays out over about two real weeks. Provisions are a burnable,
+replenishable gauge with headroom for a longer hold; running dry always
+means drifting in place until recovered, never getting stranded outright —
+an affordability floor the game enforces directly, not just hopes for
+(`src/vessel/voyage.rs`, `route.rs`). Hope — the act's original second
+gauge — is gone entirely; the thriftiest pace is now identified purely by
+being the cheapest provisions burn, not by pressing a second resource, and
+holding station indefinitely carries no soft pressure at all anymore (a
+small, low-priority drift a couple of the archived specs still describe
+otherwise).
 
 ### Route
-`src/vessel/route.rs`: 38 waypoints (`:194`), 45 roads (`:620`), 8
-rumors (`:1143`), 4 chapters (`:27`), 7 junctions 2/2/2/1 (`:1373-1380`);
-spine-and-diamond DAG, single sink = the Tree (`:186`).
+A fixed, one-way route graph shaped like a spine with diamond-shaped
+branches that split and rejoin within a chapter, ending at a single
+destination — the Tree. Junctions offer a small number of roads;
+committing to one closes the others for that crossing, permanently
+(`src/vessel/route.rs`).
 
 ### Souls
-`src/vessel/souls.rs`: 8 authored souls for `CREW` = 7 seats (`:16`) —
-Torvald/Cormac (Helm), Eir/Ysolt (Tender), Runa/Maren (Watch), Sefa and
-Brother Wren unaffined; 3 aboard at launch, 5 found. Arcs advance on
-`ARC_BEAT_REST_DAYS` 2 (`:18`). The old `LOSS_HOPE_COST` /
-`FAREWELL_HOPE_COST` fees are gone with Hope — `farewell()` and `mark_lost()`
-(`voyage.rs:1749,1768`) no longer cost anything; loss stays authored-scenes
-only regardless (`mark_lost()` still has no tick-driven caller).
+A small, fully authored crew competing for a handful of duty stations —
+some already aboard at launch, the rest found along the way
+(`src/vessel/souls.rs`). Each has a slow-advancing arc. The old per-loss
+and per-farewell costs tied to Hope are gone entirely; losing a soul or
+bidding one farewell costs nothing mechanically — loss stays an
+authored-scenes-only event regardless (see the Threats, below).
 
 ### Strain, hull wear & the Threats
-Two linked texture mechanics from "The Price of Passage" that persist
-alongside the Reckoning economy — neither is mentioned by name anywhere
-else in this dossier's Mechanics section, so both are captured here in
-full. **Strain** (`SoulState.strain: u8`, `voyage.rs:221`) accrues on a
-soul from one of three named causes (`StrainCause`, `voyage.rs:246-257`):
-`ThirdWatch` (three nights on watch back to back), `SquallAtRun` (a squall
-crossed while driven hard), `SilenceHelm` (the helm held alone through the
-Silence threat, below) — a strained soul pauses their arc and loses
-station affinity until rested at port. **Hull wear** (`hull_wear: u8`,
-capped at `HULL_WEAR_MAX` 6, `voyage.rs:50`) scars from three causes
-(`WearCause`, `:268-279`): a whole leg run at Grueling pace, a squall taken
-at Grueling pace, or a threat road's price — each scar adds 5%
-(`WEAR_BURN_PER_SCAR` 0.05) to provisions burn, compounding. Every
-shipyard refit door secretly carries a **third option**, `choose_mend()`
-(`:633-641`): forgo both authored refits at that yard forever in exchange
-for zeroing the scars outright — a real, if expensive, escape valve the
-dossier's earlier "3 refit door pairs" framing didn't mention.
+Two linked texture mechanics from "The Price of Passage" persist alongside
+the Reckoning economy, neither mentioned elsewhere in this dossier until
+now. **Strain** accrues on a soul from one of three named causes — several
+nights on watch back to back, a squall crossed while driven hard, or
+holding the helm alone through the Silence threat below — and a strained
+soul pauses their arc and loses station affinity until rested at port
+(`SoulState.strain`, `voyage.rs`). **Hull wear** scars from a parallel set
+of causes — a whole leg run at the hardest pace, a squall taken at that
+pace, or a threat road's price — and each scar compounds the ship's
+provisions burn (`hull_wear`, `WearCause`, `voyage.rs`). Every shipyard
+refit door secretly carries a **third option**, `choose_mend()`: forgo
+both authored refits at that yard forever in exchange for zeroing the
+scars outright — a real, if expensive, escape valve this dossier's earlier
+refit-door framing didn't mention.
 
 Wear's other source, and the game's only place loss lives, is
 **the Threats** — three specific, named roads resolved by a deterministic
-ledger (`threat_ledger()`, `voyage.rs:1168-1230+`), never a die roll:
-**the Ossuary Warden** (road 9, over the reef — Sefa aboard sings safe
-passage for free; a Quiet/Mourn pace pays 15 provisions; anything faster
-pays the same 15 *and* scars the hull), **the Silence itself** (road 29 —
-an unstaffed station or the Quiet Keel refit absorbs it for free; a fully
-staffed ship pays 10 provisions and loses the leg's log entirely), and
-**the Thorns** (road 42 — explicitly commented in source as "the game's
-only loss"; Cormac at the Helm reads it clean, any other configuration
-can cost a soul). Each outcome is fully determined by crew placement,
-pace, and refits chosen beforehand — consistent with the act's "no dice
-anywhere" pillar (see Design Intent) even at its single point of genuine
-risk.
+ledger, never a die roll (`threat_ledger()`, `voyage.rs`): **the Ossuary
+Warden** (over the reef — a specific soul aboard sings safe passage for
+free; a slower pace pays a toll; anything faster pays the same toll *and*
+scars the hull), **the Silence itself** (an unstaffed station or a
+specific refit absorbs it for free; a fully staffed ship pays a toll and
+loses that leg's log entirely), and **the Thorns** (explicitly commented in
+source as "the game's only loss" — one specific soul at the Helm reads it
+clean, any other configuration can cost a soul). Each outcome is fully
+determined by crew placement, pace, and refits chosen beforehand —
+consistent with the act's "no dice anywhere" pillar (see Design Intent)
+even at its single point of genuine risk.
 
 ### The Other Pilgrims
-`src/vessel/pilgrims.rs`: five authored ships sharing the dark with the
-player, "not a simulation" per the module's own doc comment (`:1-8`) — each
-has a name, a one-line character, and a fixed cyclic route script, so their
-fates don't depend on the player's choices at all (deliberately, to keep
-the authoring bounded). The five (`PILGRIMS`, `:29-`): **the Sister
-Verity** (a hospice ship, `dark_after: None` — she alone reaches the Tree
-and is explicitly commented as "a face for Act 3"), **the Grief of Alden**
-(goes dark mid-crossing), **the Wager**, **the Psalm**, and **the Held
-Breath**. Hailing a ship (`hail()`, `voyage.rs:1645`, once per ship) trades
-a line of news for a fragment of their story; pilgrim rumors are the only
-way to learn about roads behind or beside the player's own. The Sister
-Verity is a second, softer Act 3 thread alongside the two hard gate flags
-in Interrelations — a named face already written to be waiting at the
-Tree, not just a boolean.
+Five authored ships share the dark with the player, "not a simulation" per
+the module's own doc comment — each has a name, a one-line character, and
+a fixed route script, so their fates don't depend on the player's choices
+at all, deliberately, to keep the authoring bounded
+(`src/vessel/pilgrims.rs`). Hailing one, once each, trades a line of news
+for a fragment of their story; pilgrim rumors are the only way to learn
+about roads behind or beside the player's own. One of the five, **the
+Sister Verity**, is written to reach the Tree and wait there rather than
+eventually going dark like the other four — a second, softer Act 3 thread
+alongside the two hard gate flags in Interrelations.
 
 ### Colony
-`src/vessel/colony.rs`: `INITIAL_SOULS` 100,000 (`:21`);
-`DRIVE_DECAY` 0.70 → `DRIVE_FLOOR` 0.05 ≈ 20× (`:36,:39`); `BASE_CAPACITY` 180
-× `CAP_GROWTH` 1.36 (`:26,:30`); Salvage = 3 + carried/30 per landfall
-(`:44,:46`); `STARTING_SALVAGE` 40 (`:49`); yard costs Drive `4×1.5^L`
-(`:52-54`... `drive_cost()`), Shipwright `5×1.42^L`, **Ward `5×1.45^L`**
-(between the other two). `DARK_TAKES_PER_DAY` 0.0006 (`:65`,
-compounds per day underway via `dark_toll_for_days()` at `:351`) replaces the
-old flat per-crossing toll; `WARD_DECAY` 0.72 / `WARD_TOLL_FLOOR` 0.12
-(`:73,:76`) — the Ward buys the daily rate down to a floor that's never zero.
-Six districts found at pop. 500 → 66,000 (`:92-99`), each adding +110…+320
-expedition size (`:105-113`). Five `WorldMilestone` thresholds (10/25/50/75/90%
-of `INITIAL_SOULS` gone) fire an authored log moment each, exactly once — the
-era's second discovery axis, keyed to the old world's decline rather than the
-colony's growth, so it lands on a different crossing depending on spend
-policy.
+Once the maiden voyage lands, every arrival pays out **Salvage** to spend
+across three yards — Drive (speed), Shipwright (hold), Ward (softens the
+dark's daily bite) — each priced on its own compounding curve, Ward's cost
+sitting between the other two (`src/vessel/colony.rs`). The dark's toll is
+a per-day rate rather than a flat per-crossing tax, so it compounds over
+however long a crossing takes — meaning Drive and Shipwright both cut the
+toll too, not just Ward; all three yards point at the same outcome for the
+first time. A handful of districts unlock as the colony's population
+grows, each adding standing capacity; a separate, parallel set of world
+milestones fires as the *old* world empties instead — a second discovery
+axis keyed to decline rather than growth, landing on a different crossing
+depending on how the player spends.
 
-**Era end**: once `souls_remaining` reaches 0, `ColonyState::era_over()`
-(`colony.rs:571-572`) returns true; `main.rs:834` then refuses `SailAgain` —
-no further ferry crossings — and the arrival that emptied the world sets a
-second persistent flag, `GameState::last_crossing_complete`
-(`main.rs:746-747`, distinct from `vessel_arrived`) — the design's "Last
-Crossing," which `colony.rs`'s own module doc calls "Act 3's gate" in as
-many words. The flag isn't yet exercised by any Act 3 content, and its
-state transition isn't covered by an automated test beyond the save-compat
-fixture corpus (which only pins its default `false`) — see Open Questions.
+**Era end**: once the old world is fully emptied, `ColonyState::era_over()`
+returns true; the game then refuses any further "Sail Again," and the
+arrival that emptied the world sets a second persistent flag,
+`GameState::last_crossing_complete` (distinct from `vessel_arrived`) — the
+design's "Last Crossing," which `colony.rs`'s own module doc calls "Act 3's
+gate" in as many words. The flag isn't yet exercised by any Act 3 content,
+and its state transition isn't covered by an automated test beyond the
+save-compat fixture corpus — see Open Questions.
 
 ### Launch transition
-`src/vessel/transition.rs`: `BEAT_COUNT` 5 (Farewell/Unweaving/Construction/
-Launch/Void), gated by the persistent `GameState::vessel_transition_played`.
+A five-beat authored sequence (Farewell, Unweaving, Construction, Launch,
+Void) plays once, gated by its own persistent flag, right before the
+Voyage takes the screen (`src/vessel/transition.rs`).
 
 ### Derived numbers players feel
-Maiden voyage ≈ two real weeks; ferry-run floor ≈ 3 real days; max hold ≈
-4,500+ souls; era ≈ 3–5 real months depending on spend policy (longer if
-leaning hard on the Ward).
+The maiden voyage plays out over about two real weeks; ferry runs shrink
+toward just a few real days each as Drive levels climb; the ship's hold
+grows from a handful of crew into the thousands of souls; the whole ferry
+era runs a few real months depending on how the player spends, longer if
+leaning hard on the Ward (see Balance Evidence for the measured range).
 
 ## Interrelations
 
@@ -429,6 +423,20 @@ Session-by-session log of what changed at each refresh, most recent first.
 The sections above always describe the *current* state only — read this
 section for how it got there.
 
+### 2026-07-05 — rewritten concept-first
+
+The dossier had drifted into reading like a second `CLAUDE.md` — every
+mechanic accompanied by its exact formula, cost curve, or percentage
+table. Rewritten per an updated `write-dossier` skill: Mechanics &
+Constants now leads with what each system *is* and how it *relates* to the
+rest of the design, keeping a number only when it's a structural
+identifier already used elsewhere (250,000 PR, 28 patterns, Ascension X),
+the exact magnitude is itself the point (Fracture vs. Loom's stat scaling,
+in the Act 1 dossier), or it feeds Balance Evidence directly — which stays
+fully numeric, unchanged, since measured results are exactly where precise
+figures belong. Player's Experience and a couple of Design Intent bullets
+got the same light trim. No mechanics, balance evidence, or fun-assessment
+content changed — this is a legibility pass, not a factual one.
 ### 2026-07-05 — Strain, hull wear, the Threats, and the Other Pilgrims added
 
 A `/goal` to verify both act dossiers reflect the current design prompted a

@@ -1,6 +1,7 @@
 # Act 1: The Ascent — Design Dossier
 
-> Last refreshed: 2026-07-05 @ 1fce9fc | Sources: `src/core/` (incl.
+> Last refreshed: 2026-07-05 @ 5358951 (concept-first rewrite, no source
+> changed) | Sources: `src/core/` (incl.
 > `power_rating.rs`), `src/combat/`, `src/character/`, `src/zones/`,
 > `src/items/`, `src/enhancement/`, `src/ascension/`, `src/deep/`,
 > `src/loom/`, `src/power_cores/`, `src/god_items/`, `src/haven/`,
@@ -22,61 +23,60 @@
 ## The Player's Experience
 
 A fresh hero starts at Level 1 in Zone 1 ("Meadow"), Subzone 1, and the game
-begins doing its thing without being asked: the 100ms tick loop auto-fights
-whatever's in front of the hero, one kill every ~2s, banking 200-400 XP per
-kill (`src/core/xp.rs:98-107`). Ten kills spawn the subzone boss
-(`KILLS_FOR_BOSS = 10`, `src/zones/progression.rs:98-111`); the boss down,
-the zone frontier pushes forward. There is no failure state that costs
-anything durable — a mob death just retries the same fight (three in a row
-triggers a retreat, `DEATH_LOOP_THRESHOLD`), and a boss death retreats to the
-highest zone with a defeated boss, never punishing progress already banked
-(`src/combat/orchestration.rs:116-200`). The felt shape of the first hour is
-pure ascent: level up, gear drops, numbers go up, the frontier zone advances.
+begins doing its thing without being asked: a fast, steady tick loop
+auto-fights whatever's in front of the hero, banking XP with every kill. A
+run of kills spawns the subzone boss; the boss down, the zone frontier
+pushes forward. There is no failure state that costs anything durable — a
+mob death just retries the same fight until it's won or the player retreats
+after a few losses in a row, and a boss death retreats to the highest zone
+with a defeated boss, never punishing progress already banked. The felt
+shape of the first hour is pure ascent: level up, gear drops, numbers go up,
+the frontier zone advances.
 
-Ten zones in, Zone 10's final boss won't take a hit at all — the game flatly
-refuses damage until the player has forged the **Stormbreaker**
-(`src/zones/gates.rs:14-32`), and that quest reaches sideways into two other
-systems the player has been building in parallel: fish to max rank 40, hunt
-the Storm Leviathan across ten narratively-paced encounters (5%, 3%, 4%,
-5%, 4%, 3%, 2%, 1.5%, 1%, 0.8% — deliberately not a clean monotonic curve,
-`src/fishing/CLAUDE.md:125-129`), then build the Storm Forge capstone in
-Haven (which itself requires both the War Room and Vault branches complete,
-25 PR) before the forge action unlocks. It's the single most cross-system
-demand Act 1 makes of the player before its own halfway point.
+Ten zones in, Zone 10's final boss won't take a hit at all — the game
+flatly refuses damage until the player has forged the **Stormbreaker**, and
+that quest reaches sideways into two other systems the player has been
+building in parallel: fish to the maximum rank, hunt the Storm Leviathan
+across a run of encounters whose odds deliberately rise and fall rather
+than cleanly decreasing (a narrative arc, not a clean probability curve),
+then build the Storm Forge capstone in Haven — which itself requires both
+the War Room and Vault branches complete — before the forge action
+unlocks. It's the single most cross-system demand Act 1 makes of the
+player before its own halfway point.
 
 Past Zone 10 comes **the Expanse** — an infinite eleventh zone that cycles
 forever ("The Endless" / boss "Avatar of Infinity") until the player has
-somewhere else to go. The first Expanse-cycle boss kill at Prestige Rank 15+
-is the deterministic (non-RNG) trigger that unlocks **The Deep**
-(`src/core/tick_stages.rs:489-511`) — mercenary expeditions that run on the
-wall clock, not the tick, so for the first time part of the game keeps
-moving while the terminal is closed. From here the shape of play forks:
-**prestige** resets level/attributes/equipment back to zero in exchange for
-a permanent, ever-climbing multiplier (`1.0 + 0.5 × rank^0.7`,
-`src/character/tiers.rs:64-67`) and unlocks a cascade of gated systems —
-Haven (P10+), Soulforge enhancement (P15+), the Deep (P15+, Expanse-gated),
-Ascension (Deep-layer gated, then pattern-gated), the Loom (pattern +
-Ascension + prestige triple-gated), Fracture zones 12-30 (Deep-layer **and**
-prestige dual-gated), and Loom zones 31-50 (all three axes at once). None of
-these are single unlocks so much as parallel frontiers that keep receding as
-the player invests in them — the Deep's Layers, the Loom's 28 completable
-Woven Patterns (plus a 29th, eternal one that never completes, by design),
-Ascension's ten tiers, Fracture's six regions, Loom-zone's five chapters.
+somewhere else to go. The first Expanse-cycle boss kill past a prestige
+floor is the deterministic (non-RNG) trigger that unlocks **The Deep** —
+mercenary expeditions that run on the wall clock, not the tick, so for the
+first time part of the game keeps moving while the terminal is closed.
+From here the shape of play forks: **prestige** resets level, attributes,
+and equipment back to zero in exchange for a permanent, ever-climbing
+multiplier (see Design Intent) and unlocks a cascade of gated systems —
+Haven, Soulforge enhancement, the Deep, Ascension (Deep-layer gated, then
+pattern-gated), the Loom (pattern + Ascension + prestige triple-gated),
+Fracture zones (Deep-layer **and** prestige dual-gated), and Loom zones
+(all three axes at once). None of these are single unlocks so much as
+parallel frontiers that keep receding as the player invests in them — the
+Deep's Layers, the Loom's completable Woven Patterns (plus one eternal one
+that never completes, by design), Ascension's ten tiers, Fracture's
+regions, Loom-zone's chapters.
 
-Around this all sits the meta-layer: 14 challenge minigames discovered
-passively (~2hr average, Prestige Rank 1+) provide the game's only genuinely
-*active*, skill-based moments against otherwise idle mechanics; 240
-achievements and 64 unlockable titles track a huge surface of milestones;
-the git-backed Time Vault silently snapshots the save at every major beat so
-nothing is ever truly lost. Dungeons (1% per-kill discovery, independent of
-prestige) interleave procedurally-generated side content with a boss-key
+Around this all sits the meta-layer: a wide roster of challenge minigames
+discovered passively provides the game's only genuinely *active*,
+skill-based moments against otherwise idle mechanics; a large slate of
+achievements and unlockable titles track milestones across the whole
+account; the git-backed Time Vault silently snapshots the save at every
+major beat so nothing is ever truly lost. Dungeons, discovered independently
+of prestige, interleave procedurally-generated side content with a boss-key
 gate. By the endgame the "climb" reframes twice more — the Deep is a
 *descent* through numbered Layers, and clearing Zone 50 (Loom's final
 chapter) surfaces a signal from a dying branch of Yggdrasil that becomes Act
-2's launch gate: 28 patterns, Ascension X, and 250,000 PR burned in one
-action. Act 1 never stops being about *more* — more zones, more gear, more
-multipliers stacking on multipliers — right up to the moment it hands the
-player something to burn it all on.
+2's launch gate: the Loom's patterns, Ascension's top tier, and a huge
+one-time burn of Prestige Ranks, spent in a single action. Act 1 never stops
+being about *more* — more zones, more gear, more multipliers stacking on
+multipliers — right up to the moment it hands the player something to burn
+it all on.
 
 ## Design Intent
 
@@ -86,17 +86,18 @@ section reconstructs intent from the decisions actually made:
 
 - **"The golden ratio"** (`docs/decisions.md` "Balance Philosophy: Active
   Play ~2-3x Idle, Endgame in Weeks Not Hours") — the single named principle
-  behind every other number in this section: active decisions (prestige
-  timing, minigames, Haven) should be ~2-3x more efficient than pure idle
+  behind every other pacing decision in this section: active decisions
+  (prestige timing, minigames, Haven) should meaningfully outpace pure idle
   play, no hard walls (progress slows but never stops), and every prestige
   should feel like a genuine power boost. A named milestone-feel table gives
-  it teeth — P1 in 30-60min ("I get it now"), Haven at P10 in 8-12h ("New
-  system!"), Stormbreaker in 2-4 weeks ("Finally!"), the Expanse cycling
-  forever ("One more run") — the same shape the Balance Evidence section
-  below measures against. The same decision also codifies **danger zones**
-  (`TICK_INTERVAL_MS`, `BASE_XP_PER_TICK`, zone/prestige requirements,
-  `MAX_FISHING_RANK` — no edits without simulation) versus safe-to-tune
-  levers (fish weights, enemy names, affix ranges, room types, UI).
+  it teeth, tuned so each early milestone lands within a session and later
+  ones stretch to weeks — "I get it now" at first prestige, "New system!"
+  at Haven, "Finally!" at Stormbreaker, "One more run" once the Expanse
+  cycles forever — the same shape the Balance Evidence section below
+  measures against. The same decision also codifies **danger zones** (the
+  core tick/XP/level constants and every progression gate — no edits
+  without simulation) versus safe-to-tune levers (fish weights, enemy
+  names, affix ranges, room types, UI).
 - **10 zones, not 20.** The original plan was 20 zones across two eras
   ("Planar Journey" at Zones 11-20 with weapon-forging gates per zone). The
   shipped design compresses this to 10 authored zones + the infinite Expanse
@@ -106,18 +107,17 @@ section reconstructs intent from the decisions actually made:
   20", "Zone Progression Design: Competing Proposals"). Fracture (12-30) and
   Loom (31-50) zones were added later as post-prestige frontiers, not part
   of this original two-era plan.
-- **Sub-linear prestige, deliberately.** Three formulas were compared —
-  `1.5^rank` (57.7x by P10, "hyper-exponential, trivializes everything"),
-  `1.2^rank` (still runs away by P30), and the shipped `1 + 0.5×rank^0.7`
-  (asymptotes ~6-7x) — chosen specifically to preserve a "wall → reset →
-  power fantasy" loop at *every* stage rather than letting late prestiges
-  become trivially fast (`docs/decisions.md` "Prestige Multiplier Formula").
-  This is the same heuristic Act 2's dossier scores against — it originates
-  here.
+- **Sub-linear prestige, deliberately.** Several formulas were compared,
+  ranging from one that "trivializes everything" within the first few
+  prestiges to one that "still runs away" further out; the shipped curve
+  was chosen specifically because it asymptotes toward a modest ceiling
+  instead, preserving a "wall → reset → power fantasy" loop at *every*
+  stage rather than letting late prestiges become trivially fast
+  (`docs/decisions.md` "Prestige Multiplier Formula"). This is the same
+  heuristic Act 2's dossier scores against — it originates here.
 - **Equipment wipes completely on prestige** so each cycle is a genuine
-  reset, with the Haven Vault (1/3/5 items at T1/T2/T3) as an earned,
-  bounded exception rather than a default (`docs/decisions.md` "Equipment
-  Reset on Prestige").
+  reset, with the Haven Vault room as an earned, bounded exception rather
+  than a default (`docs/decisions.md` "Equipment Reset on Prestige").
 - **Stormbreaker as a quest chain, not a drop.** A pure-RNG legendary drop
   for a hard progression gate "feels bad (no agency)"; the shipped
   fishing→Haven→forge chain braids three systems together and gives the
@@ -150,289 +150,269 @@ section reconstructs intent from the decisions actually made:
 ## Mechanics & Constants
 
 ### Tick loop & time
-`TICK_INTERVAL_MS = 100` (`src/core/constants.rs:2`), gated in `src/main.rs`
-so the loop only advances on elapsed ≥100ms with a fixed 0.1s delta
-regardless of scheduling drift (`src/main.rs:1405,1456,1486`). Autosave every
-30s (`AUTOSAVE_INTERVAL_SECONDS`, `constants.rs:14`). Update checks jitter
-10-20 real minutes (`main_helpers/update.rs:38-42`) — a stale inline comment
-in `main.rs:1757` still says "~30 minutes."
+A fixed 100ms tick — not a wall-clock delta — drives everything, so play
+speed never drifts with framerate or scheduling hiccups (`src/main.rs`,
+`src/core/constants.rs`). Autosave and the update-checker each run on their
+own independent timers, the latter randomly jittered so clients don't all
+check in at once — an inline comment describing that jitter is stale and
+overstates how long it actually is.
 
 ### Combat pipelines
-Player→enemy damage, in exact order (`src/combat/player_attack.rs:46-73`):
-base damage → ×(1+Giant's-Might%) → ×(1+Haven damage%) → +flat prestige
-damage → ×ascension multiplier → −enemy defense (floor 1) → crit roll (2x)
-→ double-strike roll. Enemy→player defense (`src/combat/enemy_attack.rs:
-36-46`): (base defense + flat prestige defense) × ascension multiplier →
-subtract from enemy damage (floor 1) → Bulwark % DR if active. Attack
-intervals: player 1.5s base, normal mob 2.0s, subzone boss 1.8s, zone boss
-1.5s, dungeon elite 1.6s, dungeon boss 1.4s (`constants.rs:3,8-12`). Death
-handling differs by context: dungeon death exits with no prestige loss and
-full HP; overworld boss death retreats to the *highest zone with a defeated
-boss* (not literally "subzone 1" as root `CLAUDE.md` says — a known
-discrepancy, `openspec/README.md`); overworld mob death retries up to 3
-times before retreating; a 60s boss-enrage timer forces defeat and retreats
-to the *current* zone's subzone 1. A previously undocumented mechanic: fights
-against mobs also auto-retreat after a 30s stalemate (60s in dungeons) with
-no death recorded at all (`MOB_FIGHT_TIMEOUT_SECONDS`/
-`DUNGEON_FIGHT_TIMEOUT_SECONDS`, `src/combat/orchestration.rs:49-62`) — this
-exists in neither `openspec/specs/combat/spec.md` nor root `CLAUDE.md`.
+Player damage builds in a fixed order: a base hit, then percentage bonuses
+(equipment, Haven), then a flat prestige bonus, then the Ascension
+multiplier, then the enemy's defense subtracts, then a crit — and
+occasionally a second, "double-strike" hit — can land on top
+(`src/combat/player_attack.rs`). Incoming damage runs the mirror version on
+the way in (`src/combat/enemy_attack.rs`). Different enemy roles attack at
+different speeds; the player is quicker than any of them, and a dungeon
+boss presses harder and faster than an equivalent overworld one.
 
-**Frontier Backoff**, a second, higher-order safeguard the mob/boss retreat
-rules above create a need for: retreating from a death sends the player
-back into the zone they just cleared, where re-beating that zone's boss
+Death is handled differently depending on where it happens: a dungeon
+death costs nothing and exits cleanly; dying to a mob just retries the same
+fight until it's won or the player retreats after a few losses in a row;
+dying to a boss retreats to the last zone with a defeated boss rather than
+the current one (root `CLAUDE.md` describes this as "resets to subzone 1,"
+which isn't quite what the code does — a known discrepancy). A boss fight
+that drags on too long without resolving forces a loss on an enrage timer.
+A previously undocumented mechanic: a mob fight that stalls out entirely
+auto-retreats on its own, with no death recorded at all — this exists in
+neither the combat spec nor root `CLAUDE.md`.
+
+**Frontier Backoff** is a second-order fix for a problem the retreat rule
+above creates on its own: retreating from a death sends the player back
+into the zone they just cleared, and re-beating that zone's boss
 auto-advances straight back into the zone that killed them — a death loop
-around the death-loop guard itself (`docs/decisions.md`, issue #576).
-`record_death_retreat()` (`src/zones/progression.rs:71-85`) tracks this and
-`frontier_backoff_blocks()` makes boss-defeat advancement cycle the safe
-zone instead of auto-advancing into the recorded death zone, with a
-cooldown that grows on repeated retreats, capped at 8 cycles
-(`FRONTIER_BACKOFF_MAX_CYCLES`, `constants.rs:108`) and clearing on any
-boss kill in the recorded zone or on prestige. Named explicitly in
-`src/zones/CLAUDE.md`, this is the game's answer to the exact hardest edge
-of the climb — the frontier — and it exists specifically because the
-simpler retreat rule alone isn't safe against itself.
+wrapped around the death-loop guard. Frontier Backoff detects the pattern
+and makes boss-defeat advancement cycle the safe zone instead of walking
+straight back into danger, with a cooldown that grows the more it happens
+and clears on the next real win (`src/zones/progression.rs`, named
+explicitly in `src/zones/CLAUDE.md`). It's the game's answer to the single
+hardest edge of the climb — the frontier — existing specifically because
+the simpler rule isn't safe against itself.
 
-**Power Rating**, the single number the game reduces all of the above (and
-every other bonus source) to: `compute_power_rating()`
-(`src/core/power_rating.rs`) folds equipment, enhancement, prestige, Haven,
-god items, sigils, and ascension into one geometric mean, `sqrt(effective
-DPS × effective HP)` — effective DPS re-derives the exact damage pipeline
-above (crit factor, double-strike factor, hits/second), effective HP
-divides max HP by `(1 - damage_reduction%)` so defense is worth more, not
-less, in the aggregate. Cached on `GameState.cached_power_rating` and
-rendered permanently in the stats panel header (`src/ui/stats_panel.rs:
-181`) — this is the closest the game comes to a literal, always-on-screen
-expression of "power in one place" (see Design Intent and Fun Assessment).
-The item-level power *score* used for auto-equip decisions (see Items,
-below) is a related but distinct, narrower mechanism — a common point of
-confusion since both are called "power."
+**Power Rating** is the single number the game reduces all of the above to:
+a geometric mean of effective damage-per-second and effective HP, folding
+in every bonus source at once — equipment, enhancement, prestige, Haven,
+god items, sigils, Ascension (`src/core/power_rating.rs`). It's cached and
+rendered permanently in the stats panel header — the closest thing in the
+game to a literal, always-on-screen expression of "power in one place"
+(see Design Intent and Fun Assessment). The item-level power *score* used
+for auto-equip decisions (see Items, below) is a related but distinct,
+narrower number — a common point of confusion since both get called
+"power."
 
 ### XP & leveling
-XP only from kills, `random(200..400 ticks) × passive_rate ×
-(1+Haven XP%)` (`src/core/xp.rs:98-107`); passive rate = `1.0 × prestige
-multiplier × (1 + WIS_mod×0.05)`. Level curve `xp_for_next_level(level) =
-floor(100 × level^1.5)` (`xp.rs:7-9`). +3 attribute points per level, capped
-at `20 + 5×rank` (`game_state.rs:229-232`). Offline XP: `(elapsed/5.0) ×
-0.25` estimated kills, capped at 7 days (`src/core/offline.rs:33-53`).
+Experience comes only from kills, in a wide-enough random range per kill
+that grinding doesn't feel metronomic, scaled by the character's passive
+rate (the prestige multiplier plus a small Wisdom bonus) and any Haven XP
+bonus (`src/core/xp.rs`). The level curve gets steeper than linear, so
+later levels take meaningfully longer than early ones. Each level grants a
+few attribute points, and the cap on total attributes rises with prestige
+rank rather than staying fixed. Offline time still earns XP, at a reduced
+rate and with a hard cap.
 
 ### Character & prestige
-Six attributes (STR/DEX/CON/INT/WIS/CHA, base 10, mod = `(value-10)/2`)
-each drive a distinct combat lever — STR/INT flat damage, CON flat HP,
-DEX defense+crit, WIS XP%, CHA prestige-mult bonus
-(`src/character/calculation.rs:43-60`). Prestige (`perform_prestige()`,
-`src/character/prestige_actions.rs:24-71`) wipes level, XP, attributes,
-**all 7 equipment slots**, and active dungeon/fishing/minigame state, while
-keeping achievements, Haven, fishing rank, Ascension, Stormglass, the Deep,
-the Loom, and Soulforge enhancement — prestige resets the *character*, not
-the *account*. Multiplier `1.0 + 0.5×rank^0.7` (P1=1.5x, P10≈3.51x, P30≈
-6.41x, `character/tiers.rs:64-67`) applies to XP-gain rate only; separate
-flat-bonus formulas add prestige-scaled damage (`floor(5×rank^0.7)`),
-defense (`floor(3×rank^0.6)`), crit (`min(rank×0.5,15)%`), and HP
-(`floor(15×rank^0.6)`) directly into the combat pipeline
-(`constants.rs:188-195`). Prestige *tier names* (Bronze…Celestial…Eternal at
-rank 20+) are cosmetic and decouple entirely from the ever-climbing
-multiplier — "Eternal" repeats forever from P20 onward even as the game
-expects runs into the tens of thousands of ranks by the Loom-zone endgame.
+Six attributes each drive one distinct combat lever — Strength and
+Intelligence add flat damage, Constitution adds HP, Dexterity adds defense
+and crit, Wisdom adds XP gain, Charisma sweetens the prestige multiplier a
+little further (`src/character/calculation.rs`). Prestige wipes the
+character back to a fresh start — level, XP, attributes, and every
+equipped item — while leaving account-level progress alone: achievements,
+Haven, fishing rank, Ascension, Stormglass, the Deep, the Loom, and
+Soulforge enhancement all survive. It resets the *character*, not the
+*account*.
+
+The prestige multiplier follows the sub-linear curve described in Design
+Intent, applied to XP gain; separate, smaller bonuses tied to prestige rank
+layer flat damage, defense, crit, and HP directly into the combat pipeline
+on top of it (`src/character/tiers.rs`, `constants.rs`). One quirk worth
+knowing: the cosmetic *tier names* attached to prestige rank (Bronze,
+Silver, ... Eternal) stop advancing well before the multiplier does —
+"Eternal" is the name for every rank from the mid-20s onward, even though
+the game's own late-game content expects ranks in the tens of thousands.
 
 ### Zones
-50 authored zones (`ZONE_ENEMY_STATS`, `constants.rs:113-179`). Zones 1-10:
-subzones, boss every 10 kills, prestige-gated in pairs (P0/P5/P10/P15/P20).
-Zone 11, the Expanse, cycles infinitely once unlocked (P25 + `StormsEnd`
-achievement) until Fracture zones open. Fracture zones 12-30: **dual-gated**
-by Deep Layer (3→Z12-14, 7→Z15-17, 12→Z18-20, 18→Z21-23, 25→Z24-26, 30→
-Z27-30) **and** prestige rank (P50/P75/P100/P150/P200/P300 respectively) —
-root `CLAUDE.md` documents only the Deep-layer half of this gate, a known
-discrepancy (`src/zones/access.rs:30-36`). Stat scaling 1.6x/zone from Zone
-11 base (`FRACTURE_ZONE_STAT_MULTIPLIER`). Loom zones 31-50: **triple-gated**
-by completed patterns (4/8/16/22/28), Ascension tier (none/VII/VIII/IX/X),
-and prestige (P2,000/5,000/15,000/30,000/50,000) across five 4-zone chapters
-(`src/zones/access.rs:37-56`). Stat scaling 1.25x/zone from Zone 30 base.
+Fifty authored zones fall into three bands with three different gating
+philosophies. Zones 1 through 10 are the core climb — subzones, a boss
+every so many kills, unlocked a couple at a time as prestige rank rises.
+Zone 11, the Expanse, is an infinite pressure-release valve that cycles
+forever once unlocked, standing between the core climb and everything
+after it. Fracture zones (12-30) are **dual-gated** — a Deep-Layer
+threshold and a separate prestige-rank floor both have to clear before a
+band opens, and root `CLAUDE.md` only documents the Deep-Layer half of
+that gate (a known discrepancy). Loom zones (31-50) go one step further
+and are **triple-gated** — completed Woven Patterns, an Ascension tier, and
+a prestige floor all have to clear together, across five chapters.
+
+Enemies scale noticeably harder per zone in the Fracture band than in the
+Loom band (1.6x per zone against Loom's 1.25x) — the Fracture climb is the
+steeper of the two post-prestige frontiers.
 
 ### Items
-`ilvl = zone_id × 10`. T0-T9 tier roll is independent of rarity (a Common
-can roll T9's 1.00x multiplier just as a Legendary can roll T0's 0.40x) —
-cumulative odds T0 38% down to T9 0.1% (`constants.rs:51-74`). Mob drop rate
-`min(0.15 + rank×0.01, 0.25) × (1+Haven%)`, capped at Epic, never Legendary;
-boss drops are guaranteed and rarity-tabled — normal boss 2% Legendary
-ceiling, Zone 10 final boss 5% (`src/items/drops.rs`). 7 equipment slots.
-Power score = sum of attributes + affix-value×weight (DamagePercent 2.0
-highest, HPBonus 0.5 lowest); auto-equip replaces only on strictly higher
-power, and Mythic (God) items are protected from replacement by a hardcoded
-rarity check rather than a power-formula floor — God-item power scoring is
-itself deferred (tracked as issue #272 per `src/items/CLAUDE.md`).
+Item level tracks the zone it dropped in directly, so it's always readable
+at a glance without doing math. A separate quality roll (tier) is fully
+independent of rarity — a Common item can roll the same top tier a
+Legendary can, and vice versa, so a "lucky" common drop can genuinely rival
+an "unlucky" epic one. Mob drop chance rises slowly with prestige rank and
+caps out well short of a coin flip; only bosses guarantee a drop, and only
+bosses can roll the very rarest tier at all (`src/items/drops.rs`).
+Equipment fills 7 slots. Auto-equip compares a computed power score —
+attributes plus weighted affixes — and only swaps gear on a strict
+improvement; God items are protected from being swapped out by a rarity
+check rather than by that power score, because God-item power scoring
+itself is still an open gap (`src/items/CLAUDE.md`).
 
 ### Enhancement (Soulforge)
-+0 to +10 per slot. Success rates 100% (+1-4), 70/55/40% (+5-7), 30/20/10%
-(+8-10); costs 1 PR (+1-4), 2/3/3 PR (+5-7), 4/4 PR (+8-9), 5 PR (+10)
-(`src/enhancement/types.rs:53-64`). Failure downgrades by 1 level (+5-9) or
-2 (+10), never below +4. Soul Tithe buys a guaranteed success at each of
-+5 through +10 for a price explicitly derived from (and unit-tested against)
-the expected PR cost of gambling that step repeatedly — the pricing math is
-documented directly in the source comment, not just picked round numbers.
-Discovery gates at P15+ with the same formula shape as Haven (see cadence
-table below).
+Equipment enhances from +0 up to a hard cap, one slot at a time. Success
+chance holds at 100% for the early levels, then drops in two more steps as
+the level rises, and a failed roll at the higher levels can downgrade the
+enhancement instead of just doing nothing (`src/enhancement/types.rs`). A
+parallel "Soul Tithe" path buys a guaranteed success at the higher levels
+instead of gambling — priced, by the source comment's own admission,
+directly against the expected cost of gambling that step repeatedly, not a
+round number picked by feel. Discovery gates a little later than Haven's,
+on the same discovery-chance shape.
 
 ### Ascension
-10 tiers. PR cost I-VI `[35,65,120,200,325,500]`, VII-X
-`[1500,4000,8000,15000]`. Multiplier `2^level` for I-VI (2x-64x), `64 ×
-1.5^(level-6)` for VII+ (96x/144x/216x/324x). Gates: I-VI need Deep Layers
-`[3,7,12,18,25,30]`; VII-X need `[8,16,22,28]` completed Woven Patterns.
-The multiplier is recomputed fresh from `state.ascension_level` at three
-separate pipeline stages each tick — player damage, enemy defense, and max
-HP (`combat/player_attack.rs:57`, `combat/enemy_attack.rs:38`,
-`core/tick_stages.rs:800-802`) — a pure function re-evaluated three times
-rather than cached once, cheap but worth knowing if any one call site is
-ever edited in isolation.
+Ten tiers of permanent combat multiplier, paid for in Prestige Ranks. The
+first six tiers gate on Deep-Layer progress and roughly double the
+multiplier each time; the last four re-gate on completed Woven Patterns
+instead and shift to a shallower, slower-compounding curve — Ascension is
+the hinge where Deep-driven power gives way to Loom-driven power. The
+multiplier is recomputed fresh from the character's Ascension level at
+three separate points in the combat pipeline each tick (damage, defense,
+max HP) rather than cached once — cheap, but worth knowing if only one of
+the three call sites is ever touched in isolation.
 
 ### The Deep
-Discovered deterministically (no RNG roll) on the first Expanse-cycle boss
-kill at P15+ (`core/tick_stages.rs:489-511`). Layer tiers: Shallows 1-3,
-Warrens 4-7, Hollows 8-12, Sunken Reach 13-18, Abyss 19-25, Void 26+. Guild
-ranks 1-5 gate roster size and concurrent missions. Missions run on the wall
-clock (`DateTime<Utc>`), not simulated per-tick — only checked for pending
-check-ins; offline time is resolved on load like the core offline-XP system.
-Gateway Expedition (Layer 30 only) is a fixed 72h/259,200s — a stale doc
-comment on the enum variant itself still says "24h"
-(`src/deep/types.rs:224` vs. `:258`). Deep state (roster, missions, marks,
-layer records) **survives prestige** — only a generation counter advances —
-despite a stale `mod.rs` doc table claiming otherwise. Clearing Layer 18
-unconditionally grants Layer 19 at least 25% familiarity as a hardcoded
-tier-transition softener (`src/deep/layers.rs:307-311`).
+The only discovery in the game with **no RNG roll at all** — it unlocks
+deterministically the first time the player clears the Expanse's cycling
+boss past a prestige floor. Layers deepen through named tiers (Shallows
+through Void); guild rank gates roster size and how many missions can run
+at once. Missions run on the wall clock rather than the tick — the game
+only checks for missions that have finished, the same way it resolves
+offline time. Deep state — roster, missions, marks, layer records —
+survives prestige entirely; only a generation counter advances, despite a
+stale doc table elsewhere claiming otherwise. The single longest mission,
+unlocked only at the deepest layer, runs for several real days.
 
 ### Loom
-29 total Woven Patterns: 28 completable + 1 permanent "eternal" pattern
-deliberately excluded from every completion count — a designed-in sink to
-keep the production loop meaningful after the completable content is done,
-not a leftover. Shuttle level caps follow the Ascension tier (1 for tiers
-0-VI, then 3/5/7/10 for VII-X). WR→PR conversion: `PR/hr = WR × (1+WR/100)`
-— self-multiplying, ~1:1 at low rates, rounds to 303 PR/hr at 131 WR/hr (a
-stale inline comment still says 302, `src/loom/logic.rs:822` vs. the test at
-`:895-897`). Activates only once all 28 completable patterns are done. Loom
-zone unlocks are the same triple-gate described above under Zones.
+A production network with 28 completable "Woven Patterns" plus one
+permanent, uncompletable "eternal" pattern — a deliberate design choice to
+keep the network meaningful after the completable content runs out, not a
+leftover. Output converts into Prestige Ranks through a self-multiplying
+formula (the more you're producing, the more each unit is worth), but only
+once every completable pattern is done. Loom zone unlocks share the same
+triple-gate described above under Zones.
 
 ### Power Cores
-Six passive PR generators (2/3/5/8/12/18 PR/day), unlocking at Deep Layers
-3/7/12/18/25/30. Each core accrues via whole fill-cycles
-(`86400 / pr_per_day` seconds per PR) rather than continuous drip, with the
-remainder preserved across grants and an identical offline-catchup path. A
-freshly-unlocked core deliberately grants zero PR immediately — its first
-payout always lands exactly one fill-duration after unlock, live or offline
-alike. 48 PR/day is the emergent sum when all six are unlocked, not an
-enforced clamp anywhere in code (though the openspec requirement's own
-title, "Combined Maximum Passive Output," reads more like a cap than the sum
-it actually describes).
+Six passive Prestige Rank generators, unlocking one per Deep Layer
+milestone, each paying out on its own fixed cycle rather than a continuous
+drip — a freshly-unlocked core deliberately pays nothing until its first
+full cycle completes, live or offline alike. Their combined total is simply
+the sum of whichever cores are unlocked, not an enforced cap, even though
+the normative spec's own requirement title reads more like one.
 
 ### God Items
-Three fixed Mythic-rarity Norse artifacts: **Asprika** (Armor, +40 CON/+20
-WIS, 30% flat damage reduction), **Sleipnir** (Boots, +40 DEX/+20 WIS, 100%
-attack speed plus regen/dungeon/fishing speed bonuses), **Megingjörð**
-(belt lore, but occupies the **Ring** slot — there is no belt slot in the
-item system — +40 STR/+20 CON, 150% damage). All three carry a flat +40%
-XPGain affix. No player-facing acquisition path exists; the only route is a
-debug-menu forge action (`--debug` flag), each guarding against
-re-forging an already-equipped copy.
+Three fixed, top-rarity Norse-themed artifacts, each in a specific
+equipment slot and built around one strong passive — armor that shrugs off
+a flat share of damage, boots that double attack speed, a ring that
+meaningfully boosts damage (`src/god_items/types.rs`). There is
+deliberately no player-facing way to earn one; the only path is a
+debug-menu action. A quirk worth knowing: the item that reads as a belt in
+its own lore actually occupies the Ring slot, since the item system has no
+belt slot at all.
 
 ### Haven
-Account-level (not per-character), 14 rooms across two branches (combat:
-Armory→Training Yard/Trophy Hall→Watchtower/Alchemy Lab→War Room; QoL:
-Bedroom→Garden/Library→Fishing Dock/Workshop→Vault) plus the Storm Forge
-capstone requiring both War Room and Vault, 25 PR. Discovery requires P10+,
-chance `0.000014 + (rank-10)×0.000007` per tick. Bonuses are computed once
-per tick into a `HavenBonuses` struct and threaded through explicit function
-parameters rather than read globally, keeping e.g. `items/drops.rs` free of
-any `haven` import (`src/haven/CLAUDE.md:119-125`). War Room grants Double
-Strike chance (10/20/35%); Fishing Dock grants Double-Fish chance (25/50/
-100%) plus a T4-only +10 max fishing rank; Vault preserves 1/3/5 equipped
-items across prestige. Forging the Stormbreaker itself needs both the
-Storm Forge built **and** the Storm Leviathan achievement **and** a second,
-independent P25 threshold — a triple-lock beyond whatever prestige was
-spent building the tree.
+An account-level (not per-character) home base with two branches — one
+combat-flavored, one quality-of-life — plus a capstone that needs both
+branches finished. Discovery unlocks around mid-prestige, on a chance that
+climbs slowly with rank. Bonuses are computed once per tick and threaded
+explicitly through function parameters rather than read from global state,
+deliberately keeping unrelated modules from ever needing to import Haven
+directly (`src/haven/CLAUDE.md`). Its rooms cover a wide spread — a chance
+at a second hit per swing, better fishing odds and a higher rank cap, and a
+small number of equipped items preserved across prestige. Forging the
+Stormbreaker itself needs the capstone room built *and* the Storm Leviathan
+caught *and* a second, independent prestige floor — a triple-lock beyond
+whatever it cost to build the tree in the first place.
 
 ### Stormglass
-Per-character soft currency from salvaging non-equipped drops, discovered
-at P15+. 12 Storm Sigil types (a stale test comment still says "11"),
-5 slots unlocked for 25k-400k Stormglass, daily rotation reseeded from the
-UTC calendar date (midnight rollover, not local time) via a fixed hash of
-the day number. Chrono Surge buys 15min-8h of accelerated ticks on a
-`p^1.6` curve (0.85x-3.40x). Storm Lure adds a modest odds bonus to Storm
-Leviathan encounters — **not** a guarantee, despite two independent stale
-docs (`src/stormglass/CLAUDE.md:30` and `openspec/specs/stormglass/spec.md:
-55`) claiming otherwise; the fishing module's own spec describes it
-correctly.
+A per-character soft currency earned by salvaging drops instead of
+equipping them, unlocked a little later than Haven. It funds a small set of
+equippable "Sigils" that rotate daily on a fixed, seeded schedule (keyed to
+the real calendar date, not local time) and a consumable that temporarily
+accelerates the tick rate. A separate item nudges the odds of a rare
+fishing encounter upward — it is **not** a guarantee, despite two
+independently-drifted docs (one of them the normative spec) claiming
+otherwise; the fishing module's own spec has it right.
 
 ### Fishing
-Discovered at a flat 5% chance per kill (no prestige gate), suppressed
-while already fishing/dungeoneering. 40 ranks across 8 named tiers
-(Novice→Transcendent), base cap 30 without Haven, 40 with Fishing Dock T4.
-Catch rarity odds shift toward rarer fish every 5 ranks. At max rank,
-Legendary catches trigger the 10-encounter Storm Leviathan hunt described
-above in Player's Experience — catching it enables Stormbreaker forging.
+Discovered on a flat per-kill chance with no prestige gate. Forty ranks
+across eight named tiers, with a base cap that Haven's Fishing Dock room
+raises further. Catch rarity odds shift toward rarer fish as rank climbs.
+At the maximum rank, legendary catches trigger the ten-encounter Storm
+Leviathan hunt described in Player's Experience — landing it is what
+unlocks Stormbreaker forging.
 
 ### Dungeon
-Discovered at a flat 1% per kill, independent of prestige (suppresses that
-kill's fishing-discovery roll). Procedurally generated via a recursive
-backtracker with a 15% extra-loop-connection chance; exactly one Entrance/
-Elite/Boss room each, Treasure room count scaling 1→8 by dungeon size. The
-Elite guardian's defeat grants a boss key exactly once; the explorer routes
-around the boss room until the key is held. Live enemy multipliers are Elite
-2.2x HP/1.5x damage/1.6x defense, Boss 3.5x/1.8x/2.0x — a separate,
-`#[allow(dead_code)]`-marked helper returning a different (1.5/2.0) pair has
-no live callers and is exercised only by its own now-vestigial unit tests.
+Discovered on its own flat per-kill chance, independent of prestige, and
+mutually exclusive with that same kill's fishing-discovery roll. Layouts
+are procedurally generated with the occasional extra loop for variety;
+exactly one entrance, one elite, and one boss room each, plus a scaling
+number of treasure rooms by dungeon size. Beating the elite grants a boss
+key exactly once, and the explorer routes around the boss room until it's
+held. Elite and boss enemies both hit noticeably harder than a standard
+encounter — a separate, unused helper function defines a different, weaker
+pair of multipliers that no live code path actually calls.
 
 ### Achievements, Challenges, Time Vault
-240 achievements across 9 categories, point tiers 5-500, 19 prestige
-milestones (a stale CLAUDE.md comment enumerating "18" milestones omits
-rank 100's "Eternal" entry from its own count), 64 unlockable titles (a
-stale archived design doc and its own tasks file both still say "29" — two
-independently-drifted sources agreeing with each other, not one typo).
-14 challenge minigames (Chess, Go, Gomoku, Nine Men's Morris, Minesweeper,
-Rune Deciphering, Snake, Flappy Bird-style, Jezzball-style, Sigil Surge,
-Sigil Matrix/Sudoku, Shard Fusion, Runic Lights, Vault Warden), each with
-Novice/Apprentice/Journeyman/Master tiers and the two-step Esc forfeit
-pattern. Current discovery weights (Rune 30, Minesweeper 28, Snake 22,
-Flappy/Sigil Surge/Shard Fusion/Runic Lights 20 each, Jezzball/Sudoku/Vault
-Warden 18 each, Gomoku 15, Morris 12, Chess 8, Go 7) supersede the original
-6-game table `docs/decisions.md` documents in detail — but the doc has no
-entry at all for the 4 newest games' weights, a real gap in the decision
-log. AI: minimax via the `chess-engine` crate for Chess, minimax+alpha-beta
-for Morris/Gomoku, MCTS for Go (branching factor too high for a reliable
-eval function). Discovery requires P1+, ~2hr average. The git-backed Time
-Vault snapshots on every major milestone (zone/dungeon/Leviathan/
-achievement/prestige/minigame-win/Haven-build/Soulforge-result/Chrono-Surge)
-but never on the 30s autosave; no auto-prune, and even a restored-over
-snapshot survives in git's own reflog beneath the app's UI.
+Achievements span many categories and point tiers, with prestige-rank and
+level milestones layered on top, plus a large set of unlockable titles — a
+couple of stale figures survive in older docs for both the title count and
+the milestone count (see `openspec/README.md`'s discrepancy log). Fourteen
+challenge minigames — from classic board games (Chess, Go, Gomoku, Nine
+Men's Morris) to original puzzle and action games — each with four
+difficulty tiers (Novice through Master) and the same two-step-Esc forfeit
+pattern throughout. Discovery weights favor the more accessible games
+heavily; Chess and Go are the rarest by design. Each game uses whatever AI
+approach actually fits it — minimax-family search for the classic board
+games, Monte Carlo tree search for Go specifically, since its branching
+factor defeats a simple evaluation function. The git-backed Time Vault
+snapshots the save at every major milestone (never on the routine
+autosave), never auto-prunes, and even a restored-over snapshot is still
+recoverable underneath the game's own UI.
 
 ### Persistence
-JSON saves via `QUEST_DIR` (env var, else `~/.quest`). Character files fail
-loudly on parse error (surfaced as "corrupted" in the character list);
-**account-level files fail silently** — Haven, achievements, Deep, Loom,
-and enhancement state each load via an `unwrap_or_default()` one-liner that
-wipes the entire system back to defaults on any parse error, with zero
-error surfaced to the player. This is explicitly flagged as a load-bearing
-hazard in the regression test's own header comment
-(`tests/save_compat_tests.rs:8-13`), which is the only thing standing
-between a serde change and a silent account wipe.
+Saves are plain JSON, resolved through an overridable directory. Character
+files fail loudly on a parse error, surfacing as a visibly "corrupted"
+entry rather than silently vanishing. **Account-level files do the
+opposite** — Haven, achievements, the Deep, the Loom, and enhancement state
+each fall back to an empty default on any parse error, with nothing
+surfaced to the player. This is called out explicitly as a load-bearing
+hazard in the regression test that guards it — the only thing standing
+between a serde change and a silent, invisible account wipe.
 
 ### Discovery cadence, compared
-| System | Gate | Mechanism |
-|---|---|---|
-| Haven | P10+ | `0.000014 + (rank-10)×0.000007`/tick, RNG |
-| Soulforge | P15+ | same shape as Haven, shifted floor, RNG |
-| Challenges | P1+ | flat `0.000014`/tick × (1+Haven%), RNG |
-| Fishing | none | flat 5% per kill, RNG |
-| Dungeon | none | flat 1% per kill, RNG |
-| The Deep | P15+ | **no RNG** — hard-triggered on first Expanse-cycle boss kill |
+| System | How it unlocks |
+|---|---|
+| Haven | rank-gated, per-tick chance |
+| Soulforge | same shape as Haven, unlocks a bit later |
+| Challenges | flat per-tick chance, boosted by Haven |
+| Fishing | flat chance per kill, no prestige gate |
+| Dungeon | flat chance per kill, no prestige gate |
+| The Deep | no roll — a deterministic trigger |
 
-The `0.000014`/`0.000007` literals are independently declared, numerically
-identical constants in three unrelated modules (Haven, Soulforge,
-Challenges) with no shared name tying them together — a future balance pass
-touching "the" discovery rate has to know to find all three (four, counting
-the Deep's different mechanism) by hand.
+Interestingly, Haven's, Soulforge's, and Challenges' base rates are the
+exact same literal value, independently declared in three unrelated places
+in the source rather than one shared constant — a future balance pass
+touching "the" discovery rate would need to know to find all three by
+hand.
 
 ## Interrelations
 
 ```
-Combat (kills, 100ms tick) ──► XP/Level ──► Attribute points
+Combat (kills, tick loop) ──► XP/Level ──► Attribute points
         │                                        │
         ├─► Item drops ──► Equip/score ──► combat power
         │                                        │
@@ -441,9 +421,9 @@ Combat (kills, 100ms tick) ──► XP/Level ──► Attribute points
         ┌───────────┼──────────────────────────────────────┐
         ▼           ▼              ▼              ▼        ▼
       Haven     Soulforge      Stormglass     Challenges  Fishing
-     (P10+)      (P15+)      (P15+, salvage)   (P1+)    (5%/kill)
+   (rank-gated) (rank-gated) (rank-gated, salvage) (rank-gated) (per kill)
         │           │                                       │
-        │           │                              Storm Leviathan (r40)
+        │           │                              Storm Leviathan (max rank)
         │           └── PR spend ◄── Ascension ◄── Deep patterns ──┐
         │                              │  (Deep layer + pattern    │
         │                              │   gates)                 │
@@ -451,16 +431,16 @@ Combat (kills, 100ms tick) ──► XP/Level ──► Attribute points
                                                                     │
                                                         Zone 10 boss gate
                                                                     │
-      Zone 11 Expanse (infinite) ──► first cycle-boss kill @P15+ ──► The Deep
+       Zone 11 Expanse (infinite) ──► first cycle-boss kill ──► The Deep
                                                                     │
-                              Deep Layers ──► Fracture zones (12-30, dual-gated)
+                              Deep Layers ──► Fracture zones (dual-gated)
                               Deep Layers ──► Power Cores (passive PR)
                                                                     │
                               Loom patterns ──► Ascension VII-X
-                              Loom patterns ──► Loom zones (31-50, triple-gated)
+                              Loom patterns ──► Loom zones (triple-gated)
                               Loom WR ──► PR (self-multiplying conversion)
                                                                     │
-                Zone 50 clear + 28 patterns + Asc X + 250k PR ──► Vessel launch (Act 2)
+        Zone 50 clear + 28 patterns + Ascension X + 250k PR ──► Vessel launch (Act 2)
 ```
 
 - **The tightest loop**: prestige is the hub every other system either feeds
