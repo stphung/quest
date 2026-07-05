@@ -874,3 +874,191 @@ fn inject_sigils(profile: &StrategyProfile, state: &mut GameState) {
 
     state.stormglass = state.stormglass.saturating_sub(profile.stormglass_cost());
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_str_parses_all_profiles_case_insensitively() {
+        assert!(matches!(
+            StrategyProfile::from_str("Casual"),
+            Some(StrategyProfile::Casual)
+        ));
+        assert!(matches!(
+            StrategyProfile::from_str("OPTIMAL"),
+            Some(StrategyProfile::Optimal)
+        ));
+        assert!(matches!(
+            StrategyProfile::from_str("speedrun"),
+            Some(StrategyProfile::Speedrun)
+        ));
+        assert!(StrategyProfile::from_str("bogus").is_none());
+    }
+
+    #[test]
+    fn name_round_trips_through_from_str() {
+        for profile in [
+            StrategyProfile::Casual,
+            StrategyProfile::Optimal,
+            StrategyProfile::Speedrun,
+        ] {
+            let parsed = StrategyProfile::from_str(profile.name()).unwrap();
+            assert_eq!(parsed.name(), profile.name());
+        }
+    }
+
+    #[test]
+    fn haven_priority_lists_grow_with_strategy_ambition() {
+        assert!(
+            StrategyProfile::Casual.haven_priority().len()
+                < StrategyProfile::Optimal.haven_priority().len()
+        );
+        assert!(
+            StrategyProfile::Optimal.haven_priority().len()
+                < StrategyProfile::Speedrun.haven_priority().len()
+        );
+    }
+
+    #[test]
+    fn tick_thresholds_get_more_aggressive_with_strategy() {
+        // Casual is always the slowest/most conservative; Speedrun the fastest.
+        assert!(
+            StrategyProfile::Casual.challenge_interval_ticks()
+                > StrategyProfile::Speedrun.challenge_interval_ticks()
+        );
+        assert!(
+            StrategyProfile::Casual.prestige_stuck_ticks()
+                > StrategyProfile::Speedrun.prestige_stuck_ticks()
+        );
+        assert!(
+            StrategyProfile::Casual.deep_layer_interval_ticks()
+                > StrategyProfile::Speedrun.deep_layer_interval_ticks()
+        );
+        assert!(
+            StrategyProfile::Casual.enhancement_pr_threshold()
+                > StrategyProfile::Speedrun.enhancement_pr_threshold()
+        );
+        assert!(
+            StrategyProfile::Casual.enhancement_target_level()
+                < StrategyProfile::Speedrun.enhancement_target_level()
+        );
+        assert!(
+            StrategyProfile::Casual.stormglass_threshold()
+                > StrategyProfile::Speedrun.stormglass_threshold()
+        );
+        assert!(
+            StrategyProfile::Casual.stormglass_cost() < StrategyProfile::Speedrun.stormglass_cost()
+        );
+        assert!(
+            StrategyProfile::Casual.deep_max_layer() < StrategyProfile::Speedrun.deep_max_layer()
+        );
+        assert!(
+            StrategyProfile::Casual.deep_pr_threshold()
+                >= StrategyProfile::Speedrun.deep_pr_threshold()
+        );
+        assert!(
+            StrategyProfile::Casual.loom_pr_threshold()
+                > StrategyProfile::Speedrun.loom_pr_threshold()
+        );
+    }
+
+    #[test]
+    fn challenge_reward_scales_with_difficulty() {
+        let (novice_pr, novice_sg) = challenge_reward_for_difficulty(&MinigameDifficulty::Novice);
+        let (master_pr, master_sg) = challenge_reward_for_difficulty(&MinigameDifficulty::Master);
+        assert!(master_pr >= novice_pr);
+        assert!(master_sg > novice_sg);
+    }
+
+    #[test]
+    fn tier_unlock_threshold_matches_documented_gates() {
+        assert_eq!(tier_unlock_threshold(1), 1);
+        assert_eq!(tier_unlock_threshold(2), 8);
+        assert_eq!(tier_unlock_threshold(3), 15);
+        assert_eq!(tier_unlock_threshold(9), 15);
+    }
+
+    #[test]
+    fn is_base_resource_identifies_the_six_base_resources() {
+        assert!(is_base_resource(Resource::Ember));
+        assert!(is_base_resource(Resource::Reflection));
+        assert!(is_base_resource(Resource::VoidEssence));
+        assert!(is_base_resource(Resource::Memory));
+        assert!(is_base_resource(Resource::Silence));
+        assert!(is_base_resource(Resource::Resonance));
+    }
+
+    #[test]
+    fn has_shuttle_producing_and_shuttle_count_start_empty() {
+        let loom = LoomState::new();
+        assert!(!has_shuttle_producing(&loom, Resource::Ember));
+        assert_eq!(shuttle_count_for(&loom, Resource::Ember), 0);
+    }
+
+    #[test]
+    fn injection_state_new_starts_at_zero_with_given_prestige() {
+        let injection = InjectionState::new(15);
+        assert_eq!(injection.starting_prestige, 15);
+        assert_eq!(injection.prestige_count, 0);
+        assert_eq!(injection.max_zone_id, 1);
+        assert!(!injection.deep_started);
+        assert!(!injection.loom_started);
+    }
+
+    #[test]
+    fn inject_outcomes_awards_challenge_win_on_schedule() {
+        let profile = StrategyProfile::Speedrun;
+        let mut state = GameState::new("Sim".to_string(), 0);
+        let mut enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
+        let mut achievements = Achievements::default();
+        let mut loom = LoomState::new();
+        let mut injection = InjectionState::new(0);
+
+        let pr_before = state.prestige_rank;
+        inject_outcomes(
+            &profile,
+            &mut state,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+            &mut loom,
+            &mut injection,
+            profile.challenge_interval_ticks(),
+            false,
+        );
+
+        assert_eq!(
+            injection.last_challenge_tick,
+            profile.challenge_interval_ticks()
+        );
+        assert!(state.prestige_rank >= pr_before);
+    }
+
+    #[test]
+    fn inject_outcomes_auto_prestiges_when_stuck() {
+        let profile = StrategyProfile::Speedrun;
+        let mut state = GameState::new("Sim".to_string(), 0);
+        state.character_level = 50; // meet can_prestige's level gate
+        let mut enhancement = EnhancementProgress::new();
+        let mut deep = DeepState::new();
+        let mut achievements = Achievements::default();
+        let mut loom = LoomState::new();
+        let mut injection = InjectionState::new(0);
+
+        inject_outcomes(
+            &profile,
+            &mut state,
+            &mut enhancement,
+            &mut deep,
+            &mut achievements,
+            &mut loom,
+            &mut injection,
+            profile.prestige_stuck_ticks(),
+            false,
+        );
+
+        assert_eq!(injection.prestige_count, 1);
+    }
+}
