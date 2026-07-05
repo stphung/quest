@@ -1,7 +1,8 @@
 # Act 2: The Pilgrimage of Souls — Design Dossier
 
 > Last refreshed: 2026-07-05 (the "Ignition" animated launch transition
-> shipped, see Refresh History) | Sources: `src/vessel/`, `src/main.rs` (vessel wiring), `src/vessel/CLAUDE.md`, `openspec/changes/archive/the-vessel-act2/design.md` (the 15 backported vessel specs, now consolidated into one file), `openspec/changes/archive/2026-07-05-act2-dock-wormhole-crossing/` (Dock/Wormhole), `openspec/specs/vessel-act2/spec.md`, `src/ui/vessel_transition_fx.rs` (the Ignition transition renderer), `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep`/`dock_time_across_charge_policies` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
+> shipped and Dock/Wormhole's balance evidence corrected against its own
+> shipped validation, see Refresh History) | Sources: `src/vessel/`, `src/main.rs` (vessel wiring), `src/vessel/CLAUDE.md`, `openspec/changes/archive/the-vessel-act2/design.md` (the 15 backported vessel specs, now consolidated into one file), `openspec/changes/archive/2026-07-05-act2-dock-wormhole-crossing/` (Dock/Wormhole, including its `tasks.md` balance validation), `openspec/specs/vessel-act2/spec.md`, `src/ui/vessel_transition_fx.rs` (the Ignition transition renderer), `docs/explorations/2026-07-05-act2-systems-braiding.md` (Dock/Wormhole's originating exploration and the deferred Session 5 braid), `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep`/`dock_time_across_charge_policies` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
 
 > **Status: living, deep-refreshed across several sessions.** This dossier
 > holds Act 2's cross-system, player-eye synthesis — how the launch gate,
@@ -104,9 +105,14 @@ The de-facto design bible is scattered but real (no single consolidated doc
   three-yard Ward/no-Hope system in full — so the current system *is*
   described in the design doc after all, just not in its original body; a
   prior version of this dossier claimed otherwise and was wrong, not stale
-  (see Refresh History, 2026-07-05). The authoritative numbers as shipped:
+  (see Refresh History, 2026-07-05). The authoritative numbers as shipped,
+  dated 2026-07-04, pre-dating Dock/Wormhole later the same day:
   **~19–24 crossings (balanced spend), up to ~32 leaning on Ward, ~3–5 real
-  months, ~88–94% saved with skilled play, C1 ≈ 14–15 real days.**
+  months, ~88–94% saved with skilled play, C1 ≈ 14–15 real days.** Dock/
+  Wormhole's own balance validation moved the measured figures further
+  (balanced now 29 crossings/87.5%, Ward-lean 49/93.9% — see Balance
+  Evidence); this design-doc line was never updated to match, and neither
+  was `src/vessel/CLAUDE.md`'s mirror of it (Open Questions #7).
 - **The Ferryman's "Elevation"**: the design explicitly *amends* Act 2's own
   anti-goal — "no resettable loop" — rather than breaking it: "the crossing
   loop *is* Act 2's identity now... it ends (Act 3), it does not cycle in
@@ -341,9 +347,9 @@ docs' "~94%" claim, which the committed test suite does not itself cover:*
 | Intent (as shipped) | Measured | Verdict |
 |---|---|---|
 | C1 ≈ 14 real days | 15 real days (all policies — Drive level 0 is fixed) | ✓ |
-| ~19–24 crossings, ~3 real months, ~88% saved, skilled | balanced now 29 crossings / 4.0 mo / 87.5%; cap-lean 18 crossings / 3.2 mo / 88.8% | ~ — see watch-item below |
+| ~19–24 crossings, ~3 real months, ~88% saved, skilled | balanced now 29 crossings / 4.0 mo / 87.5% (validated at ship time, see watch-item); cap-lean 18 crossings / 3.2 mo / 88.8% still matches | ~ — stated intent is stale, not the mechanic |
 | Reckless traps ~70–74% | 70.5% (drive-only), 74.2% (cap-only) | ✓ |
-| Leaning on Ward pushes toward ~94%, costlier | 93.9% at 49 crossings / 7.1 mo | ✓ — further than previously measured |
+| Leaning on Ward pushes toward ~94%, costlier | 93.9% at 49 crossings / 7.1 mo | ✓ — already the accepted figure, just not yet in this table |
 | Care beats carelessness, wide margin | 70.5%–93.9% spread across policies | ✓ |
 | No stranding ever | unchanged (the affordability floor still holds) | ✓ |
 | Dock/jump timing tension: patient (full charge) beats rushed (jump at 0%) overall | balanced spend: full charge 29 crossings / 4.0 mo total vs. jump-at-0% 28 crossings / 4.9 mo total, 87.5% vs. 84.5% saved | ✓ — rushing costs more real time and saves fewer souls despite one fewer crossing |
@@ -354,27 +360,25 @@ The dark's daily toll is a **live, checkable number** at every Reckoning,
 and it visibly differs across the strategies above — the gauge that used
 to sit inert now always engages, in the direction the design intends.
 
-**Watch-item, updated this session**: every policy line has drifted
-further from the prior refresh's numbers — most notably balanced play,
-which moved from 24 to 29 crossings (88.1% → 87.5% saved, 3.4 → 4.0
-months) and ward-lean, which moved from 32 to 49 crossings (94.3% → 93.9%
-saved, 4.9 → 7.1 months). `tests/ferryman_tests.rs` was itself extended by
-the Dock/Wormhole change to report sailing-time and docked-time
-separately, and the same commit is the most likely source of this drift —
-but the measured shift is large enough, and the balanced line specifically
-now sits outside the plain-English "~19–24 crossings, ~3 real months"
-intent (though still inside the committed CI gate's 15–30 crossing band
-and its ≥78,000-souls floor — the gate itself passed: 29 crossings, 87,533
-delivered), that this is worth a design look rather than assuming it's
-just measurement noise. Leaning hard into Ward remains the highest-saved
-policy but now stretches the era to over 7 months and 49 crossings — well
-beyond the CI gate's ceiling (the gate only exercises the balanced-spend
-policy, so this doesn't fail CI, but the gap between "balanced" and
-"Ward-lean" has widened further since the last measurement). Whether the
-balanced line's drift warrants retuning the spend curves, restating
-intent a third time, or is itself an artifact of exactly how Dock charge
-timing was modeled in this session's policies is a fresh open question —
-see Open Questions.
+**Watch-item, corrected this session**: every policy line has moved from
+the prior refresh's numbers — most notably balanced play, from 24 to 29
+crossings (88.1% → 87.5% saved, 3.4 → 4.0 months), and Ward-lean, from 32
+to 49 crossings (94.3% → 93.9%, 4.9 → 7.1 months). This is not new drift
+this session uncovered — it's the Dock/Wormhole change's own effect,
+already measured and accepted at the moment that change shipped: its
+archived `tasks.md` (task 6.2) records this exact result ("87.5% → 84.5%
+saved, 3.9 → 4.9 months sailing... the intended risk/reward tension holds.
+No constant adjustment needed"). The gap is that neither the shipped
+change's own doc updates (task 7.1/7.2) nor the dossier's prior refresh
+propagated that validated number into this table or into
+`src/vessel/CLAUDE.md`'s own plain-English era-length line, which still
+reads "~19–24 crossings, ~3 real months, ~88% saved" — a claim that file's
+own commit already knew, from its own balance validation, no longer
+matched its reference policy (29 crossings, 87.5%). The committed CI gate
+itself is unaffected (29 crossings sits inside its 15–30 band, 87,533
+delivered clears its ≥78,000 floor) — this is a documentation-propagation
+gap, not an unvalidated design regression. See Open Questions for the
+`CLAUDE.md` line specifically.
 
 ## Fun Assessment
 
@@ -400,9 +404,9 @@ against these same seven heuristics.
 
 ## Open Questions & Decision History
 
-Five of eight questions raised across this dossier's refreshes are resolved
-(see `docs/decisions.md` for full rationale on each); three are still open
-(#6, carried forward; #7 and #8, new this pass):
+Five of nine questions raised across this dossier's refreshes are resolved
+(see `docs/decisions.md` for full rationale on each); four are still open
+(#6, carried forward; #7, #8, and #9, new this pass):
 
 1. ~~Hope gauge never engages — tune, redesign, or demote?~~ **Resolved**:
    retired entirely, replaced by the Ward yard (commit d39ad67).
@@ -441,19 +445,19 @@ Five of eight questions raised across this dossier's refreshes are resolved
    unshipped) Act 3 direction — nothing here is decided or built, but it's
    a second, independent signal that the spec gap should close before
    anyone starts building against the flag.
-7. **Every measured Ferryman policy has drifted since the prior refresh —
-   new this pass.** Balanced spend moved from 24 to 29 crossings (88.1% →
-   87.5% saved, 3.4 → 4.0 months); Ward-lean moved from 32 to 49 crossings
-   (94.3% → 93.9%, 4.9 → 7.1 months) — see Balance Evidence. The committed
-   CI gate still passes (29 crossings sits inside its 15–30 band), but the
-   balanced line's plain-English intent ("~19–24 crossings, ~3 real
-   months") no longer matches its own reference policy. `tests/
-   ferryman_tests.rs` was extended in the same commit that shipped Dock/
-   Wormhole, so the test harness and the mechanic changed together —
-   whether the drift is a real balance shift from Dock/jump timing, or an
-   artifact of how this session's policies interact with it, hasn't been
-   isolated. Worth a dedicated look before the next balance pass, not
-   urgent while the CI gate itself is green.
+7. **`src/vessel/CLAUDE.md`'s own era-length intent line contradicts its
+   own commit's balance validation — new this pass.** The Dock/Wormhole
+   change's archived `tasks.md` (task 6.2) measured and explicitly accepted
+   balanced spend at 29 crossings / 87.5% saved / 4.0 months ("the intended
+   risk/reward tension holds. No constant adjustment needed") — but that
+   same commit left `src/vessel/CLAUDE.md`'s narrative "How It Works" line
+   reading "~19–24 crossings, ~3 real months, ~88% saved with a balanced
+   spend" unchanged, even though its own validation already knew that
+   figure was stale. This dossier's Balance Evidence table is now caught up
+   to the accepted numbers (see above); `CLAUDE.md`'s prose line is the one
+   place this still needs a documentation-only fix, following the same
+   "re-state the range" precedent as Open Questions #3 and #5. Not urgent
+   while the CI gate (15–30 crossings) is unaffected.
 8. **`src/vessel/CLAUDE.md`'s Launch Transition section is now stale — new
    this pass.** It still reads "no animation... static text screens per
    beat are sufficient" (written when the transition first shipped) and
@@ -462,6 +466,20 @@ Five of eight questions raised across this dossier's refreshes are resolved
    ("Ignition," PR #684) — see Mechanics & Constants and Refresh History.
    A documentation fix to that CLAUDE.md, not a dossier-only correction
    (per this skill's own anti-pattern guidance, not silently fixed here).
+9. **Session 5 of the Dock/Wormhole's own originating exploration — a
+   ship-tier/district mutual-gating "system of systems" braid, complete
+   with veteran souls and a Refinement production chain — remains
+   deliberately unbuilt.** `docs/explorations/2026-07-05-act2-systems-
+   braiding.md` is where the shipped Dock/Wormhole idea (its "Session 6")
+   originated, but that same document's Session 5 sketches a much larger,
+   still-unshipped direction for the Ferryman era's own internal braiding
+   (raw Salvage capping ship tiers, a Refinery district unlocking refined
+   materials, veteran crew ranking up at a station over many crossings) —
+   explicitly scoped out of the Dock/Wormhole change as a Non-Goal, not
+   rejected. Nothing here is decided or built; worth knowing about before
+   proposing further Ferryman-era depth, since it's the designer's own
+   already-considered answer to Fun Assessment heuristic 4's "the voyage
+   remains a deliberate island" note.
 
 Carried forward from prior refreshes (re-verified current, not
 re-litigated): the full 15-doc spec-alignment pass that annotated every
@@ -489,10 +507,13 @@ Session-by-session log of what changed at each refresh, most recent first.
 The sections above always describe the *current* state only — read this
 section for how it got there.
 
-### 2026-07-05 — Ignition transition added; balance evidence re-measured
+### 2026-07-05 — Ignition transition; balance evidence corrected against its own shipped validation; Session 5 exploration surfaced
 
-Diffed the dossier's Sources paths against HEAD and found one shipped,
-unreflected mechanics change plus one measurement gap:
+Diffed the dossier's Sources paths against HEAD. First pass found the
+launch transition and a stale Balance Evidence table; a follow-up pass,
+prompted by a reviewer flagging that the Dock/Wormhole change itself
+deserved a closer read (not just its headline numbers), traced the actual
+root cause and surfaced a real, previously-uncited exploration document:
 
 - **The launch transition shipped its final visual form.** PR #684 rebuilt
   the previously-static 5-beat launch transition (`transition.rs`) as
@@ -501,35 +522,48 @@ unreflected mechanics change plus one measurement gap:
   the ship's authored art now resolves as one aligned block instead of
   drifting line-by-line (a real alignment bug the build's two rejected
   comparison variants surfaced and fixed). Added to Player's Experience and
-  Mechanics & Constants; Fun Assessment heuristic 7's evidence updated to
-  say "now a fully animated set-piece," score unchanged (presentation
-  polish on an already-scored beat, not new mechanical evidence). Flagged
-  as a new Open Question (#8) that `src/vessel/CLAUDE.md`'s Launch
-  Transition section still describes the old static version — a doc-drift
-  spanning a normative doc, logged rather than silently fixed per this
-  skill's own guidance.
-- **Balance Evidence was stale relative to its own cited test.** The prior
-  refresh's Balance Evidence table (24 crossings/88.1% balanced, 32/94.3%
-  Ward-lean) predates `tests/ferryman_tests.rs`'s Dock/Wormhole-era rewrite
-  even though that same refresh's Refresh History section already
-  described running the post-Dock test — the main table itself was never
-  updated to match. Re-ran `strategy_sweep`, `dock_time_across_charge_
-  policies`, the committed CI era gate, and a fresh local (uncommitted)
-  ward-lean policy against current HEAD: every line moved (see Balance
-  Evidence and new Open Question #7) — most notably balanced spend now
-  measures 29 crossings/87.5%/4.0 months, drifting outside the plain-
-  English "~19–24 crossings, ~3 months" intent while still passing the
-  committed CI gate's wider 15–30 band. Also measured, for the first time
-  with concrete numbers, the Dock/jump timing tension the prior refresh's
-  Refresh History only described in prose: patient (full-charge) jumps
-  beat rushed (0%-charge) jumps overall, 4.0 vs. 4.9 months and 87.5% vs.
-  84.5% saved, for the identical balanced-spend policy.
+  Mechanics & Constants; Fun Assessment heuristic 7's evidence updated.
+  Flagged as a new Open Question (#8) that `src/vessel/CLAUDE.md`'s Launch
+  Transition section still describes the old static version.
+- **Balance Evidence's drift is the Dock/Wormhole change's own already-
+  accepted result, not new or unexplained.** The prior refresh's table (24
+  crossings/88.1% balanced, 32/94.3% Ward-lean) predates that change's own
+  `tests/ferryman_tests.rs` rewrite. Re-ran `strategy_sweep`,
+  `dock_time_across_charge_policies`, the committed CI era gate, and a
+  fresh local (uncommitted) ward-lean policy: balanced spend now measures
+  29 crossings/87.5%/4.0 months, Ward-lean 49/93.9%/7.1 months. Tracing
+  this back to the archived `openspec/changes/archive/2026-07-05-act2-
+  dock-wormhole-crossing/tasks.md` (task 6.2) shows these exact figures
+  (87.5%→84.5%, 3.9→4.9 months for the charge-policy comparison) were
+  already measured and explicitly accepted *at the moment Dock/Wormhole
+  shipped* — "the intended risk/reward tension holds. No constant
+  adjustment needed." What was actually missing was propagation: neither
+  that change's own doc tasks (7.1/7.2) nor the dossier's prior refresh
+  carried the validated number into this table or into `src/vessel/
+  CLAUDE.md`'s own "~19–24 crossings, ~3 real months, ~88% saved" line,
+  which the same commit's own validation had already outdated. Reframed
+  from "new drift, worth investigating" to "known and accepted, just
+  never propagated" — Open Question #7 rewritten accordingly, and Design
+  Intent's quoted design-doc figures annotated as pre-dating Dock/
+  Wormhole. The committed CI gate itself was never at risk (29 sits inside
+  its 15–30 band).
+- **Surfaced `docs/explorations/2026-07-05-act2-systems-braiding.md`** (PR
+  #682, not previously cited by this dossier) — the exploration Session
+  6 of which is literally where the shipped Dock/Wormhole idea originated,
+  confirming the mechanism this dossier already described. More
+  importantly, that same document's Session 5 sketches a much larger,
+  still-unshipped "system of systems" direction for the Ferryman era
+  itself (ship tiers and districts mutually gating each other, a
+  Refinement production chain, veteran souls ranking up over many
+  crossings) — explicitly scoped out of the Dock/Wormhole change as a
+  Non-Goal, not rejected. Added as new Open Question #9: a completeness-
+  audit catch (a named, real, load-bearing-for-the-future design direction
+  this dossier hadn't reflected under its own name).
 - **Verified the Act 3 hook gap (Open Question #6) is still open**, and
   noted a second, independent signal for it: a same-day pre-commitment
   exploration doc, `docs/explorations/2026-07-05-act-3-4-story-arc.md`,
   now names `last_crossing_complete` as the entire gate for a concrete (if
-  unshipped) Act 3 direction — nothing decided or built, but worth flagging
-  since it raises the cost of leaving the spec gap open.
+  unshipped) Act 3 direction.
 - Confirmed via `cargo build --release --test ferryman_tests` (clean) and
   the test runs cited above; no source or spec files were edited this pass
   — dossier-only refresh.
@@ -742,6 +776,9 @@ question outright: **d39ad67 "retire Hope into a three-yard Reckoning"**.
 - Implementation docs: `src/vessel/CLAUDE.md`
 - Launch transition animation: `src/ui/vessel_transition_fx.rs`
 - Design rationale: `docs/decisions.md`
+- Dock/Wormhole's originating exploration (Session 6), and the
+  still-unshipped Ferryman-era "system of systems" braid it deferred
+  (Session 5): `docs/explorations/2026-07-05-act2-systems-braiding.md`
 - Forward-looking, unshipped Act 3/4 context:
   `docs/explorations/2026-07-05-act-3-4-story-arc.md`
 - Cross-act framing: [`world-and-narrative.md`](world-and-narrative.md)
