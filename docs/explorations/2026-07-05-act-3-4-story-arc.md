@@ -1,13 +1,15 @@
 # Exploring: the story arc for Act 3 and Act 4
 
-**Status**: pre-commitment exploration. Nothing here is decided; nothing here
-should be implemented. When a direction crystallizes, graduate it into
-`docs/dossiers/world-and-narrative.md` (the "arc across acts" table) and then
-into an `/opsx:propose` change for whatever ships first.
+**Status**: pre-commitment exploration, crystallized through an interactive
+`/opsx:explore` pass (see History at the bottom). Act 3 now has a concrete
+working direction; Act 4 is deliberately still open. Nothing here should be
+implemented — graduate it into `docs/dossiers/world-and-narrative.md` (the
+"arc across acts" table) and then into an `/opsx:propose` change when someone
+is ready to build.
 
-**Prompted by**: `world-and-narrative.md`'s own "Open narrative questions" list
-(Act 3/4 rows are "TBD" / "Not designed"), plus three concrete hooks Act 2
-already built for whoever answers them — `vessel_arrived`,
+**Prompted by**: `world-and-narrative.md`'s own "Open narrative questions"
+list (Act 3/4 rows are "TBD" / "Not designed"), plus three concrete hooks
+Act 2 already built for whoever answers them — `vessel_arrived`,
 `last_crossing_complete`, and the Sister Verity.
 
 ## Where the story actually stands right now
@@ -19,9 +21,7 @@ Nothing here is invented — it's what's already shipped (dark) and waiting:
 - **`last_crossing_complete`** fires only once the old world is fully
   emptied and the Ferryman era ends. `colony.rs`'s own module doc calls this
   one outright: *"the next arrival is the Last Crossing: Act 3's gate."* This
-  is the deep hook, and the one that actually gates a next act, because it's
-  the point where the ferry loop stops being repeatable and the game has
-  nothing left to offer but "what's next."
+  is the deep hook, and the one this exploration keys the whole act off.
 - **The Sister Verity** is a named pilgrim ship, authored to reach the Tree
   and *wait there* rather than going dark like the other four pilgrims. She's
   a face already standing at the harbor, with no scene to spend her on yet.
@@ -30,214 +30,154 @@ Nothing here is invented — it's what's already shipped (dark) and waiting:
   reusable, with an open question attached: does it ever pay off?
 
 So the game already has, sitting unused: an empty gate flag, a person waiting
-at a door, and a silence that's never been broken. That's a lot of loaded gun
-on the mantelpiece for an "undesigned" act.
+at a door, and a silence that's never been broken.
 
-## The pattern so far, and what's left of it
+## The pattern so far, and the unclaimed vector
 
 | Act | Verb | Shape |
 |---|---|---|
 | 1 — Ascent | **Climb** | up 50 zones |
 | (Deep, inside Act 1) | **Descend** | down numbered Layers |
 | 2 — Crossing | **Cross / ferry** | outward, across the dark, repeatable until the well runs dry |
-| 3 | ? | — |
-| 4 | ? | — |
+| 3 — The Rooting | **Root / Graft** | *in* — down into Yggdrasil's roots, decided below |
+| 4 | ? | deliberately still open |
 
-Each act has so far also *deliberately broken* the previous act's design
-pattern rather than extending it (Act 2's Fun Assessment dossier section says
-this outright: "confirm, don't fix"). Act 1 is idle-first, failure-free,
-numbers-only. Act 2 is wall-clock, consequence-bearing, anticipation-first,
-one-way. If Act 3 just extends Act 2's shape (another ferry loop, another
-Reckoning), it repeats a pattern instead of reframing the hero against a
-larger scale the way both prior acts did. The interesting design question
-isn't "what's the next resource to manage" — it's **what's the next verb**,
-and what does *that* act deliberately keep or break.
+Each act so far has also *deliberately broken* the previous act's design
+pattern rather than extending it (Act 2's Fun Assessment dossier section
+says this outright: "confirm, don't fix"). Up, down, and across were spent —
+the unclaimed vector was **in**: every currency name (the Loom *of Worlds*,
+Ascension, the Storm) has been gesturing at Norse cosmology without cashing
+the check. Act 3 is where the Tree stops being a destination on the horizon
+and becomes the place the story happens *inside*.
 
-Up, down, and across are spent. What's left in that geometry?
+## Act 3: The Rooting — the decided direction
 
-```
-        UP (Act 1)
-         │
-         │
-  ACROSS ─●─ ACROSS (Act 2, the dark between branches)
-         │
-         │
-        DOWN (the Deep, inside Act 1)
-```
-
-The unclaimed vector is **in** — not a direction across the map, but into the
-thing the map has been circling since the title screen: Yggdrasil itself.
-Every currency name (the Loom *of Worlds*, Ascension, the Storm) has been
-gesturing at Norse cosmology without cashing the check. Act 3 is where the
-tree stops being a destination on the horizon and becomes the place the
-story happens *inside*.
-
-## Candidate Act 3 verbs
-
-### A. Root — descend into Yggdrasil, arrival becomes threshold, not destination
-
-The Tree isn't the end of the crossing, it's the start of a second one — down
-into its roots, where (per the actual myth) the Norns sit at the Well of
-Urd, spinning fate. This directly answers "what is at the Tree": not a
-place to settle, but a deeper structure to enter. It also gives the Loom's
-name retroactive weight — the Loom of Worlds was never just a resource
-network, it was foreshadowing the actual loom the Norns work at.
+Reached by working through the candidate verbs (Root/Graft, Weave, Tend,
+Search — see Alternatives Considered) and picking Root/Graft, then resolving
+five follow-on questions about how it actually plays. This is now concrete
+enough to design against, not just a vibe:
 
 ```
-        Act 2 ends: colony founded, thousands of souls, old world emptied
-                              │
-                              ▼
-                    vessel_arrived (shallow gate)
-                              │
-                    last_crossing_complete (deep gate) ── Act 3 opens
-                              │
-                              ▼
-              ┌───────────────────────────────┐
-              │   ROOT: descend into the Tree  │
-              │   the colony needs grafting     │
-              │   onto a living branch to live   │
-              └───────────────────────────────┘
+last_crossing_complete fires
+        │
+        ▼
+  Cold open (authored scene): the Letters-Home silence breaks;
+  the Sister Verity's own scene plays
+        │
+        ▼
+  The Grove + Wyrd unlock immediately
+        │
+        ▼
+  (soft ramp — a narrative beat, not a number)
+        │
+        ▼
+  Root Zones open
 ```
 
-- **Verb**: Root / Graft. The colony (Act 2's payoff) isn't a place, it's
-  cargo still in transit — it needs a living branch to take hold on, and Act
-  3 is finding and earning one.
-- **Home base**: yes to the open question — the colony *becomes* Act 3's
-  faction, but its stakes change from "get everyone here" (Act 2) to "make
-  the graft take" (Act 3). Same population, new pressure.
-- **Braid opportunity**: this is the act that could reconnect to Act 1's
-  systems after Act 2 was deliberately an island. A living branch of
-  Yggdrasil could literally *be* a reframed Zone map — new zones grown out of
-  the graft, gated by how much of the colony has taken root, rather than by
-  prestige rank. That would make Act 3 the first act to braid backward into
-  Act 1's climb *and* forward into whatever Act 4 is.
+- **Gate**: `last_crossing_complete` is the whole gate — no additional
+  ceremony beyond the cold-open scene, consistent with it already being
+  named "Act 3's gate" in the code's own doc.
+- **Cold open**: the two dangling threads from Act 2 get spent immediately,
+  before any new system opens — the going-dark silence breaks, and the
+  Verity (authored to reach the Tree and wait) finally gets her scene.
+- **Cadence**: idle-first, like Act 1 — tick-driven, no wall-clock check-in
+  cadence, no new failure states. This is a deliberate contrast with Act 2
+  (which was wall-clock and consequence-bearing) — Act 3 swings back toward
+  Act 1's contract rather than extending Act 2's.
+- **Three combined axes** (Act 1 itself layers zones + production (Loom) +
+  base-building (Haven) rather than picking one, so Act 3 does the same):
+  1. **The Grove** — a wholly new colony-growth system, its own overlay and
+     name (not a Haven branch) — signals Act 3 as genuinely new territory.
+     This is where the rescued colony (Act 2's payoff, thousands of souls)
+     actually takes root in the living branch.
+  2. **Root Zones** — a finite, authored band (mirrors Zones 1-10 and the
+     Loom's 31-50, not an open-ended Expanse-style tail), fought against a
+     purpose-built decay/rot bestiary — new content, not reskinned
+     archetypes, specifically so combat reads as "defending new growth"
+     rather than generic climbing.
+  3. **Wyrd** — a light secondary fate currency (the Norns/Weave idea,
+     folded in as a minor thread rather than made the primary system),
+     spent as a modest permanent lever — a small mini-Ascension scoped to
+     Act 3, giving it a power role like every other endgame currency
+     instead of staying purely cosmetic.
+- **Loom stays completely untouched** — no interaction, its own island,
+  the same relationship Act 2 had to Act 1's systems.
+- **Stakes**: accept the same idle-first, low-mechanical-stakes tradeoff
+  Act 1 makes (which scored 2/5 on "stakes and texture" by design) — Act 3
+  doesn't need to reinvent consequence to be a good idle act; that's Act 2's
+  job, not Act 3's.
 
-### B. Weave — the Norns' Loom, fate as the resource
+## What this resolves against the open narrative questions
 
-A variant of Root that leans harder into "fate" as the currency rather than
-"land." The player doesn't just graft a branch, they sit in on the actual
-weaving of what happens next — to the colony, to the dying world left behind,
-maybe to the other pilgrim ships still out there. This is where the Sister
-Verity earns her scene: she's not just flavor, she's a second thread already
-spun, waiting to be rejoined to the player's.
-
-- **Verb**: Weave / Thread.
-- **Risk**: "fate as a resource" is more abstract than Act 1's tangible zones
-  or Act 2's tangible souls-and-salvage — needs a concrete mechanical hook or
-  it stays a vibe. (Compare: Act 2 avoided this trap by making "passage"
-  concrete — provisions, Salvage, a route graph you can literally see.)
-
-### C. Answer — the silence breaks, contact is the whole act
-
-A smaller, gentler alternative: Act 3 is not a new physical geography at all,
-it's the payoff of "going dark." The Letters Home thread finally gets a
-reply — from the dying world behind, from the four pilgrim ships that went
-dark, or from further up the Tree. The act is entirely about what comes back
-across a silence the player assumed was permanent.
-
-- **Verb**: Answer / Receive.
-- This plays *against* type for an act (Act 1 and 2 both open with the hero
-  going somewhere) — Act 3 could instead be the first act built around
-  something arriving *at* the hero. That's a real tonal option, not just a
-  smaller version of A/B.
-- Best treated as a strong **beat inside** Act 3 (the reply itself, maybe the
-  one that opens or closes the act) rather than the whole act's shape — it
-  resolves one open question cleanly but doesn't answer "what does the
-  player spend hours doing."
-
-**Recommendation for Act 3**: **A (Root/Graft)**, with **C (the silence
-breaking)** as the beat that opens it and **B's Norns framing** folded in as
-color/why rather than the primary resource. Root gives Act 3 a concrete verb,
-a mechanical hook (a branch to grow, gated content to unlock as it takes),
-and a clean answer to three of the five open questions at once (Tree as
-threshold, colony as faction, going-dark payoff as the cold open).
-
-## Candidate Act 4: Ragnarök, played straight
-
-This is less speculative than Act 3 — the whole game's vocabulary (Yggdrasil,
-Asprika/Sleipnir/Megingjörð as *actual* Æsir gear, the Storm, "the endless")
-has been building toward Norse eschatology without saying the word. Act 4 is
-where that becomes text instead of subtext.
-
-The myth itself hands the act a structure almost too neatly:
-
-- **Ragnarök** — the gods' final battle, the world burned by Surtr, ends in
-  the world's death.
-- **Líf and Lífthrasir** — the two who survive, hidden inside Yggdrasil's
-  wood, who reseed humanity in the world that comes after.
-
-That second beat is *already the shape of Act 2's ending* — a colony carried
-inside the Tree, the sole survivors of a dying world. Act 2 re-told this myth
-without naming it. Act 4 could be the act that closes the loop: the colony
-the player has spent two acts protecting turns out to *be* Líf and
-Lífthrasir, and the "final battle" isn't fought to win in the conventional
-sense — it's survived, the way the myth says it's survived, by a branch that
-was rooted (Act 3) deep enough to outlast the fire.
-
-- **Verb**: Burn / Endure. Where Acts 1-3 are all about reaching or building
-  something, Act 4 is about holding a line while something ends around you.
-- **A clean bookend**: if Act 4 ends with reseeding, the honest closing image
-  is a *new* Zone 1 — not literally restarting the save, but the game's own
-  vocabulary (prestige is already "death and return," per
-  `world-and-narrative.md`'s own recurring-motifs list) gets to cash out as
-  fiction instead of just mechanic. The hero's own rebirth cycle across
-  hundreds of prestiges was foreshadowing this the entire time.
-- **Open risk**: Ragnarök "played straight" risks being over-literal fan
-  service if it's not grounded in *this* story's specific stakes (the
-  colony, the Verity, whichever souls were lost on the Thorns in Act 2). The
-  myth should supply structure, not replace the player's actual save-specific
-  history.
-
-## What this does to the open questions
-
-| Question (from `world-and-narrative.md`) | Answer under Root → Ragnarök |
+| Question (from `world-and-narrative.md`) | Answer under The Rooting |
 |---|---|
-| What is at the Tree? | A threshold, not a destination — the roots, the Norns, a branch to graft onto |
-| Does the colony become Act 3's home base/faction? | Yes — same population, reframed stakes (arrival → survival of the graft) |
-| Does "going dark" pay off? | Yes, as Act 3's cold open — the silence breaks before anything else happens |
-| How do Ragnarök beats map onto a final act? | Directly — Act 4 *is* Ragnarök, with the colony as the Líf/Lífthrasir survivors Act 2 already wrote without naming |
-| What's Act 3's verb? | Root / Graft (in, not up/down/across) |
+| What is at the Tree? | A threshold, not a destination — the roots, and a branch (the Grove) to graft the colony onto |
+| Does the colony become Act 3's home base/faction? | Yes — the Grove *is* that base, purpose-built rather than a Haven branch |
+| Does "going dark" pay off? | Yes — the cold open, before any new system unlocks |
+| How do Ragnarök beats map onto a final act? | Not decided — see Act 4, below |
+| What's Act 3's verb? | Root / Graft |
 
-## What Act 3 should deliberately keep or break
+## Act 4: deliberately still open
 
-Following the pattern both prior acts set (each act contrasts, not extends,
-the one before):
+Ragnarök surfaced as a strong candidate during this pass — the game's whole
+vocabulary (Yggdrasil, Æsir gear as actual items, "the endless") has been
+building toward Norse eschatology without naming it, and the colony (souls
+carried inside the World-Tree) already parallels the Líf/Lífthrasir survival
+myth Act 2's ending re-tells without saying so. But this exploration
+explicitly deferred deciding Act 4 — it's a real option worth returning to,
+not a settled one. Revisit once Act 3 has more shape (or has shipped), the
+same way Act 3 itself waited on Act 2 landing first.
 
-- **Keep from Act 2**: authored-only consequence, no dice on anything that
-  matters, "numbers are narrative" (a graft-percentage gate should feel as
-  momentous as 250,000 PR or 28 patterns did).
-- **Break from Act 2**: Act 2 was proudly an island (zero mechanical
-  interaction with Act 1 systems). Act 3 rejoining Act 1's systems (new
-  zones grown from the graft, gated by colony health rather than prestige)
-  would be the first act to braid *backward*, which is itself a new pattern
-  worth calling out as deliberate if it's the direction taken.
-- **Undecided, worth flagging early**: does Act 3 stay idle-first (Act 1's
-  contract) or wall-clock/decision-dense (Act 2's contract)? Root's "graft
-  taking hold" framing could support either — a slow tick-driven growth meter
-  (idle-first) or a check-in cadence like the Voyage (wall-clock). This is
-  probably the single highest-leverage decision left unmade, since it decides
-  whether Act 3 feels more like Act 1 or Act 2 to play.
+## Alternatives considered (and why they lost)
+
+| For | Option | Why it lost |
+|---|---|---|
+| Act 3 verb | **Weave** — Norns' fate-loom as the primary system | Too abstract as a whole-act resource without a concrete hook; folded in as Wyrd, a secondary currency, instead of the primary axis |
+| Act 3 verb | **Tend** — pure colony-management, no mythic framing | Lost to Root/Graft, which keeps the mythic throughline the game's vocabulary has been building |
+| Act 3 verb | **Search** — go find the four pilgrim ships that went dark | Lost to Root/Graft; stays available as flavor/side content rather than the act's spine |
+| Cold-open shape | **Answer** — "the silence breaks" as the whole act, not just its opening beat | Resolves one open question cleanly but doesn't answer what the player spends hours doing; demoted to the cold-open beat inside The Rooting |
+| Cadence | Wall-clock / decision-dense, extending Act 2's contract | Lost to idle-first — Act 3 swings back toward Act 1 rather than extending Act 2 |
+| Growth track | New branch on the existing Haven tree | Lost to a wholly new system (the Grove) — signals new territory over reusing a familiar UI |
+| Loom tie-in | Root Zones/Grove plug directly into the existing Loom (28 patterns) | Lost — Loom stays fully untouched, its own island |
+| Wyrd's role | Pure narrative-only currency, or stockpiled unspent toward Act 4 | Lost to "a modest permanent lever" — gives Wyrd a power role now rather than staying purely cosmetic or deferred |
+| Root Zones shape | Infinite tail, Expanse-style | Lost to a finite, capped band |
+| Ramp trigger | A numeric Grove-population or Wyrd-threshold gate | Lost to a narrative beat — softer, more story-driven than every other unlock in the game |
+| Enemies | Reskinned existing archetypes (cheaper, Loom-zone-style scaling) | Lost to a purpose-built decay/rot bestiary — reinforces the "defending new growth" framing |
 
 ## What this exploration is not
 
 - Not a proposal. No `openspec/changes/` artifact exists for this yet, and
-  none should until a direction here is chosen.
-- Not a numbers pass. No constants, gates, or currencies are specified —
-  that's `/opsx:propose` work once a verb is chosen.
-- Not exhaustive. Other Act 3 verbs are surely possible (a "Tend" verb built
-  entirely around the colony as a management sim; a "Search" verb built
-  around the four pilgrim ships that *did* go dark). Root/Ragnarök is a
-  recommendation grounded in what the game's vocabulary already implies, not
-  the only coherent answer.
+  none should until someone is ready to build it.
+- Not a numbers pass. No constants, gates, or currency values are
+  specified — that's `/opsx:propose` work once building starts.
+- Not final. "Crystallized" here means a concrete, internally-consistent
+  direction emerged from working through the options, not that it's locked —
+  the alternatives above are worth revisiting if playtesting or further
+  design work changes the picture.
 
 ## Suggested next step
 
-If this direction resonates: fold a trimmed version of "Root → Ragnarök"
-into `world-and-narrative.md`'s "arc across acts" table and "Open narrative
-questions" section (replacing "TBD"/open questions with the working
-hypothesis, clearly marked as unshipped intent, the same way Act 2's own
-design doc carried three superseded generations of the Ferryman design
-before any of them shipped). Actual mechanical design — what "graft
-percentage" even is, whether Act 3 is idle or wall-clock, what a Norns/Loom
-tie-in looks like as a system — is `/opsx:propose` work, and should wait
-until someone actively wants to start building Act 3.
+This direction is concrete enough now to fold a trimmed version into
+`world-and-narrative.md`'s "arc across acts" table and "Open narrative
+questions" section (replacing "TBD" with "The Rooting — Root/Graft," clearly
+marked as unshipped intent, the same way Act 2's own design doc carried
+three superseded generations of the Ferryman design before any of them
+shipped). Actual mechanical design — the Grove's specific rooms/upgrades,
+Wyrd's exact bonus, the Root Zones' capstone and enemy roster, the cold-open
+scene's actual text — is `/opsx:propose` work, and should wait until someone
+actively wants to start building Act 3. Act 4 stays open for a future pass.
+
+## History
+
+- **2026-07-05, initial pass**: broad brainstorm across four Act 3 verb
+  candidates and a Ragnarök-flavored Act 4 sketch, written up as an
+  exploration with a recommendation but no decisions made.
+- **2026-07-05, interactive pass**: worked through the direction via a
+  round of forced-choice questions rather than a single write-up —
+  Root/Graft chosen over Weave/Tend/Search; idle-first cadence chosen over
+  wall-clock; the three-axis core loop (Grove/Root Zones/Wyrd) chosen over
+  a single-system approach; Loom left untouched; Wyrd scoped to a modest
+  permanent lever; the Grove made a new system rather than a Haven branch;
+  Root Zones made finite and decay/rot-themed; the ramp into Root Zones
+  made narrative rather than numeric. Act 4 explicitly left undecided.
+  This revision reflects that pass's outcome.
