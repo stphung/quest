@@ -1,10 +1,11 @@
 # Exploring: deepening Act 2 with more of Act 1's systems
 
-**Mode**: `/opsx:explore` | **Status**: corrected direction as of session 5
-— see "Session 5: correction — Act 2 feeding Act 2, not Act 1 feeding Act
-2". Sessions 2-4 below (legacy-as-flavor) answered a related but different
-question and are kept as a parked, optional layer, not the main thread.
-Nothing proposed yet.
+**Mode**: `/opsx:explore` | **Status**: direction solid through session 6 —
+see "Session 5: correction" for the internal system-of-systems braid and
+"Session 6: Dock, Wormhole, Return Crossing" for the concrete loop shape it
+lives in. Sessions 2-4 below (legacy-as-flavor) answered a related but
+different question and are kept as a parked, optional layer, not the main
+thread. Nothing proposed yet.
 **Prompted by**: "I loved how Act 1 was a system of systems that came together
 to get us to Act 2. I'd like to explore other systems and how they could tie
 into deepening Act 2 beyond what it is today."
@@ -499,3 +500,90 @@ additive layer once this braid has a real shape, not as competition for it.
   it caps, and how much does a Refinery need to produce to close the gap)
   is unset — needs an actual pass against the strategy-sweep methodology
   before this could become a proposal.
+
+## Session 6: Dock, Wormhole, Return Crossing — a concrete loop shape
+
+**"I would like to build in an idea where we need time at destination
+refueling to then travel through a one way wormhole to start the next
+voyage. That would give some opportunities for game systems."**
+
+This gives session 5's abstract braid an actual place to live in the game
+loop, and explains structurally why the transit should be one-way rather
+than round-trip: the ship punches through a wormhole *fast* to the far
+side, then sails the *real*, meaningful distance back using all of the
+Voyage's existing machinery (route, phases, pace, weather, threats) — only
+the return leg needs to feel like a journey; the outbound hop is the
+commit moment.
+
+```
+     DOCK (at the Colony)              WORMHOLE                RETURN CROSSING
+     ══════════════════               ══════════               (existing Voyage
+                                                                  machinery, as-is)
+  refuel + build, real time    ──►   one-way, committed,  ──►  sail back through
+  passes, active management           no undo once you           the dark, generate
+                                       jump                       Salvage, face the
+  • repair hull wear /                                           dark's toll, arrive
+    clear soul Strain                                             back at the Colony
+  • found/choose Districts
+  • Refinery converts raw                    │
+    Salvage → materials                      │
+  • spend materials/Salvage                  ▼
+    on Ship tiers                    arrive at the far
+  • rotate/level veteran            side (old world/
+    crew                             frontier)
+       │                                     │
+       └─────────────◄───────────────────────┘
+              (arrival back at Colony reopens Dock)
+```
+
+**Scope, resolved this session**: applies only from the first arrival
+onward (ferry runs 2+). The maiden voyage's outbound leg — the rich,
+decision-dense, one-time crossing with souls, refit doors, threats, and
+letters — is untouched. Dock/Wormhole is specifically the answer to what
+"Sail Again" currently glosses over as hands-off automation; it doesn't
+touch the act's most-tested, most-authored content.
+
+**Riftglass** (placeholder name) — a new resource, distinct from the
+session-5 ship-building materials (Star-Cord/Ironbound Timber/Broadwood),
+that charges the wormhole. It accumulates purely from *time spent docked*,
+the same shape as provisions accumulating from time spent sailing — not a
+recipe, not gated behind a specific district on its own. Districts and Ship
+tiers can modify the *rate* (a district built for it, or a high Drive tier,
+charges the rift faster), which is what makes Dock-phase investment matter
+for pacing rather than Dock time being pure downtime with a wait bar
+attached.
+
+**Resolved this session: charging is a partial-charge tradeoff, not a
+simple wait-until-full gauge.** Leaving on a partial charge should mean a
+genuinely riskier or costlier return crossing, not just "the same crossing,
+started sooner" — candidate shapes for what "riskier" means (none decided,
+first pass at options):
+- Landing off-course — the return crossing starts further back on the
+  route DAG, adding real days.
+- Landing with a provisions deficit, or with hull wear already applied
+  before the first league is sailed.
+- A guaranteed minor threat or worse starting weather roll on arrival.
+
+Full charge lands cleanly at the standard frontier point in full order —
+the safe, patient option; partial charge trades real Dock time now for a
+harder return crossing later. This is the piece meant to directly answer
+the Fun Assessment's flagged weak spot ("ferry runs: one choice per ~3 real
+days") — Dock time stops being a shopping screen and becomes an actual
+management phase with a real timing decision at the end of it.
+
+**Open questions, this session**:
+- Which of the "riskier jump" candidates above (or a combination) actually
+  gets built — needs to stay consistent with "no dice anywhere": whatever
+  a partial charge produces should be a deterministic function of charge
+  level, not a die roll dressed up as risk.
+- Does Riftglass decay if you overcharge and wait past full (a soft
+  pressure not to over-invest in Dock time), or does it simply cap?
+- Should the *rate* modifiers (which Districts/Ship tiers speed up
+  charging) be the same infrastructure as session 5's ship/district
+  mutual-gating braid, or a separate axis layered on top? Likely the
+  former — reusing one braid rather than building two parallel ones — but
+  not yet checked against the numeric shape of that gate.
+- Whether the old-world-decline world-milestones axis should affect
+  wormhole stability/cost as the era progresses (an easier or harder jump
+  as the dying world empties) — an interesting tie between two existing
+  discovery axes, not yet explored.
