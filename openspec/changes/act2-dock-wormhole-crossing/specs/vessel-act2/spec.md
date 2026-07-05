@@ -21,7 +21,7 @@ The system SHALL distinguish the maiden voyage (crossing number 1) from ferry ru
 
 ### Requirement: Colony Ferry Loop Persistence
 
-The system SHALL persist a Colony above individual crossings, tracking souls delivered (a number that only rises) against souls remaining in a dying world of 100,000 initial souls. Each completed crossing SHALL deliver its carried passengers into the Colony, pay out Salvage, and let the dark take a per-day share of whoever still waits — so a slower crossing bleeds the waiting world longer. Salvage SHALL be spent across three yards whose levels persist between crossings: Drive (shortens every future crossing's sail time), Shipwright (grows the hold), and Ward (softens the dark's per-day toll, floored so a residual bite always remains). Voyage state SHALL be saved per character so a different character never inherits a crossing in progress. In addition, immediately after a crossing's delivery the Colony SHALL enter a Dock phase during which a new resource, Riftglass, accrues purely from elapsed real time docked at a rate scaled by the Drive yard's level; the player MAY commit a one-way, no-undo wormhole jump at any time once docked, ending the Dock phase and beginning the next crossing via the existing return-crossing machinery. A jump committed at full Riftglass charge SHALL begin the next crossing exactly as crossings begin today (no penalty); a jump committed at a partial charge SHALL apply a deterministic penalty to the new crossing that increases as the charge decreases, with no randomness involved in determining the penalty's presence or magnitude.
+The system SHALL persist a Colony above individual crossings, tracking souls delivered (a number that only rises) against souls remaining in a dying world of 100,000 initial souls. Each completed crossing SHALL deliver its carried passengers into the Colony, pay out Salvage, and let the dark take a per-day share of whoever still waits — so a slower crossing bleeds the waiting world longer. Salvage SHALL be spent across three yards whose levels persist between crossings: Drive (shortens every future crossing's sail time), Shipwright (grows the hold), and Ward (softens the dark's per-day toll, floored so a residual bite always remains). Voyage state SHALL be saved per character so a different character never inherits a crossing in progress. In addition, immediately after a crossing's delivery the Colony SHALL enter a Dock phase during which a new resource, Riftglass, accrues purely from elapsed real time docked, reaching full charge in `RIFTGLASS_BASE_HOURS_TO_FULL` (24.0) real hours at Drive level 0 and proportionally faster at higher Drive levels (rate multiplier = `1.0 / drive_time_mult()`), capped at 100% with no decay past full; the player MAY commit a one-way, no-undo wormhole jump at any time once docked, ending the Dock phase and beginning the next crossing via the existing return-crossing machinery. A jump committed at full Riftglass charge SHALL begin the next crossing exactly as crossings begin today (no penalty); a jump committed at a partial charge `c` (0.0–1.0) SHALL deduct `MAX_PARTIAL_CHARGE_PROVISIONS_DEFICIT (40.0) × (1.0 - c)` from the new crossing's starting provisions (floored at 0) and set its starting hull wear to `round(MAX_PARTIAL_CHARGE_HULL_WEAR (3) × (1.0 - c))`, with no randomness involved in either deduction.
 
 #### Scenario: A crossing delivers souls and takes a toll
 
@@ -40,23 +40,23 @@ The system SHALL persist a Colony above individual crossings, tracking souls del
 
 #### Scenario: Riftglass accrues from time spent docked
 
-- **WHEN** the Colony has been in the Dock phase for a span of real time
-- **THEN** its Riftglass charge, queried at any later moment, is a pure function of that elapsed real time and the Drive yard's level, identical whether queried once after a long absence or repeatedly across many shorter intervals
+- **WHEN** the Colony has been docked at Drive level 0 for 24 real hours
+- **THEN** its Riftglass charge, queried at that moment, is 100% (full), identical whether queried once after a long absence or repeatedly across many shorter intervals
 
 #### Scenario: Drive level speeds Riftglass accrual
 
 - **WHEN** two Colonies differ only in Drive level and have been docked for the same elapsed real time
-- **THEN** the Colony with the higher Drive level shows a higher (or equal, at the accrual cap) Riftglass charge
+- **THEN** the Colony with the higher Drive level shows a higher (or equal, at the 100% cap) Riftglass charge, scaled by `1.0 / drive_time_mult()`
 
 #### Scenario: Full-charge jump has no penalty
 
-- **WHEN** the player commits a wormhole jump with Riftglass charge at its maximum
-- **THEN** the next crossing begins with the same starting conditions a crossing begins with today — no deficit applied
+- **WHEN** the player commits a wormhole jump with Riftglass charge at 100%
+- **THEN** the next crossing begins with the same starting conditions a crossing begins with today — no provisions deducted, hull wear starts at 0
 
-#### Scenario: Partial-charge jump applies a deterministic penalty
+#### Scenario: Partial-charge jump applies a deterministic provisions and hull-wear penalty
 
-- **WHEN** the player commits a wormhole jump with Riftglass charge below its maximum
-- **THEN** the next crossing begins with a penalty whose presence and magnitude are a deterministic function of the charge level only — never randomized — and a lower charge never yields a smaller penalty than a higher charge
+- **WHEN** the player commits a wormhole jump with Riftglass charge at 0% (an immediate jump with no Dock time)
+- **THEN** the next crossing begins with 40 provisions deducted from its starting hold and hull wear set to 3 (of the 6-point scale), and any charge between 0% and 100% deducts and sets these two values proportionally, with a lower charge never yielding a smaller penalty than a higher charge
 
 ## ADDED Requirements
 

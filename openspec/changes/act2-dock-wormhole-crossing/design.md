@@ -52,11 +52,12 @@ mechanically-distinct district, which is real added scope — see Decision 3.
   proposal.md).
 - Changing what Districts mechanically do, or adding a 7th district, unless
   a later change deliberately extends this one (see Decision 3).
-- Deciding the exact partial-charge risk formula in this document — one
-  open question below is left genuinely open per explicit product direction,
-  with candidates and their implementation cost laid out so a follow-up
-  design pass (or a quick decision before `/opsx:apply`) can resolve it
-  cheaply.
+- Pinning the *final, simulator-validated* magnitude of the partial-charge
+  deficit or `RIFTGLASS_BASE_HOURS_TO_FULL` — this document pins starting
+  values (Decision 4) so implementation isn't blocked, but tasks.md section 7
+  still runs the `voyage_simulator` pass to confirm they don't blow the
+  ferry loop's ~19–24 crossing / ~88% saved / ~3-real-month targets before
+  the numbers are considered final.
 
 ## Decisions
 
@@ -97,13 +98,19 @@ impl ColonyState {
     }
 
     /// 0.0 (just docked) to 1.0 (fully charged), given a Drive-scaled rate.
+    /// Capped at 1.0 (Decision 4) — no decay or benefit from overcharging.
     pub fn riftglass_charge(&self, now: DateTime<Utc>) -> f64 {
         let Some(dock) = &self.dock else { return 0.0 };
         let elapsed_hours = (now - dock.docked_at).num_seconds() as f64 / 3600.0;
-        (elapsed_hours / self.riftglass_hours_to_full()).min(1.0) // see Open Question 2 re: overcharge
+        (elapsed_hours / self.riftglass_hours_to_full()).min(1.0)
     }
 }
 ```
+
+`RIFTGLASS_BASE_HOURS_TO_FULL = 24.0` — about a real day to fully charge at
+Drive level 0 (the maiden voyage's first Dock), per product direction. This
+is a starting value, not a final balance number — see Decision 4's note on
+simulator validation.
 
 **Alternative considered**: model Dock as a new `VoyagePhase::Docked { .. }`
 variant alongside `Traveling`/`Drifting`/`HoldingStation`/`Arrived`. Rejected
@@ -156,7 +163,13 @@ change. Revisit once/if a Districts-differentiation change is proposed
 separately — `riftglass_rate_mult()` is a single function, trivial to extend
 with a district term later without touching its call sites.
 
-### Decision 4: `begin_ferry()` takes a `charge: f64` and applies the (TBD) deficit
+### Decision 4: `begin_ferry()` takes a `charge: f64`; a partial charge pre-applies a provisions/hull-wear deficit
+
+Resolved (product direction): a partial-charge jump costs the next crossing a
+deterministic **provisions deficit and hull-wear penalty**, scaled linearly
+by how far short of full the charge was — candidates (a) off-course routing
+and (c) guaranteed threat/weather (evaluated and rejected below) are not
+built in this change.
 
 ```rust
 pub fn begin_ferry(
@@ -165,13 +178,49 @@ pub fn begin_ferry(
     now: DateTime<Utc>,
     colony: &ColonyState,
     crew: Vec<SoulState>,
-    charge: f64, // 0.0..=1.0 (or higher if overcharge is allowed, see Open Q2)
+    charge: f64, // 0.0..=1.0, capped (Riftglass never overcharges)
 ) -> Self
 ```
 
-The deficit application is isolated to one call inside `begin_ferry()` (e.g.
-`v.apply_partial_charge_penalty(charge)`) so resolving Open Question 1 later
-is a localized change, not a re-plumb.
+Inside `begin_ferry()`, after the normal full-provisions/zero-wear
+construction:
+
+```rust
+let deficit = 1.0 - charge.clamp(0.0, 1.0);
+v.provisions = (v.provisions - MAX_PARTIAL_CHARGE_PROVISIONS_DEFICIT * deficit).max(0.0);
+v.hull_wear = (MAX_PARTIAL_CHARGE_HULL_WEAR as f64 * deficit).round() as u8;
+```
+
+Starting constants (subject to `voyage_simulator` tuning, tasks.md section
+7, before treated as final):
+- `MAX_PARTIAL_CHARGE_PROVISIONS_DEFICIT = 40.0` — at charge 0.0 (an
+  immediate jump with no Dock time at all), the hold starts 40 of its 100
+  cap short, roughly 1.5× the drift-recovery affordability floor
+  (`DRIFT_RECOVERY_PROVISIONS = 25`) — noticeable but not an instant Drift.
+- `MAX_PARTIAL_CHARGE_HULL_WEAR = 3` — at charge 0.0, the crossing starts
+  already halfway up the existing 0..=6 (`HULL_WEAR_MAX`) scar scale, each
+  point adding 5% provisions burn (`WEAR_BURN_PER_SCAR`) — compounds with
+  the provisions deficit rather than being a separate, unrelated cost axis.
+
+At `charge = 1.0`, `deficit = 0.0` and both terms vanish — the crossing
+begins exactly as `begin_ferry()` does today (the "no penalty at full
+charge" scenario in the delta spec).
+
+**Alternatives considered and rejected** (see prior draft's evaluation,
+preserved here for the design record):
+- **Off-course landing / starts further back on the route DAG.** Doesn't
+  map cleanly onto the current code: every ferry crossing already begins at
+  `ROUTE_START` (`begin_ferry()` calls `begin()` first), so there is no
+  "further back" waypoint to place the ship at without authoring new
+  pre-Last-Harbor route content — real new scope this change doesn't take
+  on. The provisions/hull-wear deficit above delivers the same "you left in
+  a hurry and it shows" feeling without needing new route content.
+- **Guaranteed minor threat / worse starting weather.** Weather is a pure
+  function of `(voyage_seed, hour)` (`weather.rs`) with no stored state;
+  biasing it by charge level would compromise a purity property that
+  offline-equivalence elsewhere depends on, and threat ledgers aren't
+  modeled as an on-arrival guaranteed event today. Left as a possible later
+  layer once threat/weather content exists to bias, not part of this change.
 
 ## Risks / Trade-offs
 
@@ -202,57 +251,30 @@ is a localized change, not a re-plumb.
 
 ## Open Questions
 
-1. **Partial-charge risk shape (the proposal's central unresolved
-   question).** Candidates from `docs/explorations/2026-07-05-act2-systems-
-   braiding.md` Session 6, each evaluated for implementation fit against the
-   current code:
-   - **(a) Off-course landing / starts further back on the route DAG.**
-     Doesn't map cleanly: every ferry crossing already begins at
-     `ROUTE_START` (`begin_ferry()` calls `begin()` first), so there is no
-     "further back" waypoint to place the ship at. Implementing this
-     faithfully would mean either extending `route.rs` with pre-Last-Harbor
-     content (real new authored/graph work) or simulating "lost time" as a
-     pre-applied time debt (e.g. `processed_minutes` starts negative or
-     `provisions` starts pre-burned by an amount scaling with the deficit) —
-     which is really candidate (b) wearing candidate (a)'s name. Recommend
-     folding (a) into (b) unless new route content is explicitly wanted.
-   - **(b) Provisions deficit / hull wear pre-applied.** Cheapest to
-     implement: `begin_ferry()` already sets `provisions`/`hull_wear` at
-     construction; scaling a deduction by `(1.0 - charge)` is a few lines
-     with no new content. Directly deterministic, per the "no dice
-     anywhere" pillar.
-   - **(c) Guaranteed minor threat / worse starting weather.** Weather is
-     already a pure function of `(voyage_seed, hour)` (`weather.rs`) with no
-     stored state — "guaranteed worse weather" would mean biasing that pure
-     function by charge level, which is a bigger change to a function
-     whose purity is load-bearing elsewhere (offline-equivalence). Threat
-     ledgers (Ossuary Warden/Silence/Thorns, per the exploration's
-     Challenges row) aren't modeled as an on-arrival guaranteed event in
-     `voyage.rs` today — would need new content, not just a parameter.
-   - **Recommendation (not a decision — user explicitly deferred this):**
-     (b) is the lowest-risk, most legible starting point (a single
-     deterministic deduction, reusing existing `provisions`/`hull_wear`
-     fields, no new route or weather content) and can be layered with (c)
-     later once threat/weather content exists to bias. Resolve before
-     `/opsx:apply` reaches the `begin_ferry()` task, since `tasks.md` needs a
-     concrete formula to implement against.
-2. **Does Riftglass cap at 100% or decay if left overcharged?** Both are
-   expressible as pure functions of elapsed time (see Decision 1's
-   `riftglass_charge()` — a capped version is `.min(1.0)`; a decay-past-full
-   version is a piecewise function of `elapsed_hours` past
-   `riftglass_hours_to_full()`), so this doesn't change the architecture,
-   only the formula body. Leaning toward **cap at 1.0** for the first cut —
-   simpler to reason about and to render as a bar — with decay as a possible
-   follow-up if playtesting shows no reason to ever jump before max.
-3. **Should `riftglass_rate_mult()` anticipate session 5's (unbuilt)
-   ship/district braid?** No — per the standalone-scope decision, it reads
-   only `drive_time_mult()` today (Decision 3). No forward-compatibility
-   shim is added; if session 5 ships later, extending
-   `riftglass_rate_mult()` with a district or ship-tier term is a one-
-   function change.
-4. **Riftglass naming.** "Riftglass" is the exploration doc's placeholder.
-   Keep it unless a better name surfaces during `/opsx:apply` — not worth
-   blocking implementation on.
+All four questions from the prior draft are resolved by product direction;
+kept here as a record of the resolution rather than removed outright:
+
+1. ~~Partial-charge risk shape~~ — **Resolved**: provisions/hull-wear
+   deficit (Decision 4). The route-DAG and guaranteed-threat/weather
+   alternatives were evaluated and explicitly rejected for this change (see
+   Decision 4's "Alternatives considered and rejected").
+2. ~~Does Riftglass cap at 100% or decay if left overcharged?~~ —
+   **Resolved**: caps at 1.0 (Decision 1/4). No decay-past-full mechanic in
+   this change.
+3. ~~Should `riftglass_rate_mult()` anticipate session 5's braid?~~ —
+   **Resolved: no.** Reads only `drive_time_mult()` (Decision 3). No
+   forward-compatibility shim added; extending it later with a district or
+   ship-tier term is a one-function change if session 5 ships.
+4. ~~Riftglass naming~~ — **Resolved: keep "Riftglass."**
+
+**Remaining before this is fully final** (not blocking `/opsx:apply`, but
+tracked so it isn't forgotten): the exact magnitudes —
+`RIFTGLASS_BASE_HOURS_TO_FULL = 24.0`,
+`MAX_PARTIAL_CHARGE_PROVISIONS_DEFICIT = 40.0`, and
+`MAX_PARTIAL_CHARGE_HULL_WEAR = 3` — are starting values chosen for
+plausibility, not simulator-validated. Tasks.md section 7 runs
+`voyage_simulator` against them and adjusts if they push the ferry loop
+outside its tuned ~19–24 crossing / ~88% saved / ~3-real-month envelope.
 
 ## Verification
 
