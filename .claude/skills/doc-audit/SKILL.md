@@ -29,13 +29,13 @@ Scope: `CLAUDE.md`, `docs/*.md` (system-design, core-systems, secondary-systems,
 
 Check: Module navigation table completeness, key constants accuracy, dependency versions, architecture descriptions.
 
-Dossier caveat (`docs/dossiers/*.md`, maintained by the `design-iteration` skill; the
+Dossier caveat (`docs/dossiers/*.md`, living docs refreshed manually; the
 `README.md` there is exempt): only the **Mechanics & Constants** and **Interrelations**
 sections make present-tense claims — cross-reference those against source as usual. The
 **Balance Evidence** and **Fun Assessment** sections are *dated snapshots* of past
 simulator runs and rubric scores; do not flag them for disagreeing with current source.
 A dossier whose `Last refreshed` sha is far behind HEAD while commits have touched its
-system's paths gets one MEDIUM "stale dossier — needs a design-iteration refresh"
+system's paths gets one MEDIUM "stale dossier — needs a manual refresh"
 finding (flag for review, not auto-fixed), not a per-line teardown.
 
 **Agent 2 — Core Engine**
