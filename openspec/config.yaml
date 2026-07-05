@@ -53,7 +53,8 @@ rules:
   design:
     - Name the exact source modules touched and the verification command(s)
       from the root CLAUDE.md "How to Verify Your Change" table.
-    - This is the home for forward design that the behavioral spec can't hold.
+    - >-
+      This is the home for forward design that the behavioral spec can't hold.
       Include, when relevant: Alternatives considered and why rejected; the
       experiential / narrative intent (tone, pacing, what it should feel like);
       a UX sketch; and Risks / open questions. This artifact is the durable
@@ -65,7 +66,7 @@ rules:
   tasks:
     - End with a task to run the relevant targeted verification AND `make check`
       before pushing.
-  spec:
+  specs:
     - Requirements use SHALL/MUST; every requirement has at least one
       WHEN/THEN scenario.
     - Balance numbers are part of the requirement text — keep them exact and in
