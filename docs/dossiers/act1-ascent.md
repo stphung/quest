@@ -1,6 +1,14 @@
 # Act 1: The Ascent — Design Dossier
 
-> Last refreshed: 2026-07-05 @ 2cf51d6 | Sources: `src/core/`, `src/combat/`, `src/character/`, `src/zones/`, `src/items/`, `src/enhancement/`, `src/ascension/`, `src/deep/`, `src/loom/`, `src/power_cores/`, `src/god_items/`, `src/haven/`, `src/stormglass/`, `src/fishing/`, `src/dungeon/`, `src/achievements/`, `src/challenges/`, `src/history/`, all 20 `openspec/specs/` capabilities, `openspec/README.md`'s discrepancy log, `docs/decisions.md`, `docs/storyboards/act1-the-ascent.html`, and simulator runs (`--check-progression`, three-strategy sweeps at a P300 baseline)
+> Last refreshed: 2026-07-05 @ 1fce9fc | Sources: `src/core/` (incl.
+> `power_rating.rs`), `src/combat/`, `src/character/`, `src/zones/`,
+> `src/items/`, `src/enhancement/`, `src/ascension/`, `src/deep/`,
+> `src/loom/`, `src/power_cores/`, `src/god_items/`, `src/haven/`,
+> `src/stormglass/`, `src/fishing/`, `src/dungeon/`, `src/achievements/`,
+> `src/challenges/`, `src/history/`, all 20 `openspec/specs/` capabilities,
+> `openspec/README.md`'s discrepancy log, `docs/decisions.md`,
+> `docs/storyboards/act1-the-ascent.html`, and simulator runs
+> (`--check-progression`, three-strategy sweeps at a P300 baseline)
 
 > **Status: new.** This is the first dossier for Act 1 — the whole 50-zone
 > climb and every system hanging off it. `openspec/specs/` and the per-module
@@ -76,6 +84,19 @@ Act 1's own design record is scattered across `docs/decisions.md` rather
 than one design doc — it predates OpenSpec and the dossier format, so this
 section reconstructs intent from the decisions actually made:
 
+- **"The golden ratio"** (`docs/decisions.md` "Balance Philosophy: Active
+  Play ~2-3x Idle, Endgame in Weeks Not Hours") — the single named principle
+  behind every other number in this section: active decisions (prestige
+  timing, minigames, Haven) should be ~2-3x more efficient than pure idle
+  play, no hard walls (progress slows but never stops), and every prestige
+  should feel like a genuine power boost. A named milestone-feel table gives
+  it teeth — P1 in 30-60min ("I get it now"), Haven at P10 in 8-12h ("New
+  system!"), Stormbreaker in 2-4 weeks ("Finally!"), the Expanse cycling
+  forever ("One more run") — the same shape the Balance Evidence section
+  below measures against. The same decision also codifies **danger zones**
+  (`TICK_INTERVAL_MS`, `BASE_XP_PER_TICK`, zone/prestige requirements,
+  `MAX_FISHING_RANK` — no edits without simulation) versus safe-to-tune
+  levers (fish weights, enemy names, affix ranges, room types, UI).
 - **10 zones, not 20.** The original plan was 20 zones across two eras
   ("Planar Journey" at Zones 11-20 with weapon-forging gates per zone). The
   shipped design compresses this to 10 authored zones + the infinite Expanse
@@ -155,6 +176,36 @@ against mobs also auto-retreat after a 30s stalemate (60s in dungeons) with
 no death recorded at all (`MOB_FIGHT_TIMEOUT_SECONDS`/
 `DUNGEON_FIGHT_TIMEOUT_SECONDS`, `src/combat/orchestration.rs:49-62`) — this
 exists in neither `openspec/specs/combat/spec.md` nor root `CLAUDE.md`.
+
+**Frontier Backoff**, a second, higher-order safeguard the mob/boss retreat
+rules above create a need for: retreating from a death sends the player
+back into the zone they just cleared, where re-beating that zone's boss
+auto-advances straight back into the zone that killed them — a death loop
+around the death-loop guard itself (`docs/decisions.md`, issue #576).
+`record_death_retreat()` (`src/zones/progression.rs:71-85`) tracks this and
+`frontier_backoff_blocks()` makes boss-defeat advancement cycle the safe
+zone instead of auto-advancing into the recorded death zone, with a
+cooldown that grows on repeated retreats, capped at 8 cycles
+(`FRONTIER_BACKOFF_MAX_CYCLES`, `constants.rs:108`) and clearing on any
+boss kill in the recorded zone or on prestige. Named explicitly in
+`src/zones/CLAUDE.md`, this is the game's answer to the exact hardest edge
+of the climb — the frontier — and it exists specifically because the
+simpler retreat rule alone isn't safe against itself.
+
+**Power Rating**, the single number the game reduces all of the above (and
+every other bonus source) to: `compute_power_rating()`
+(`src/core/power_rating.rs`) folds equipment, enhancement, prestige, Haven,
+god items, sigils, and ascension into one geometric mean, `sqrt(effective
+DPS × effective HP)` — effective DPS re-derives the exact damage pipeline
+above (crit factor, double-strike factor, hits/second), effective HP
+divides max HP by `(1 - damage_reduction%)` so defense is worth more, not
+less, in the aggregate. Cached on `GameState.cached_power_rating` and
+rendered permanently in the stats panel header (`src/ui/stats_panel.rs:
+181`) — this is the closest the game comes to a literal, always-on-screen
+expression of "power in one place" (see Design Intent and Fun Assessment).
+The item-level power *score* used for auto-equip decisions (see Items,
+below) is a related but distinct, narrower mechanism — a common point of
+confusion since both are called "power."
 
 ### XP & leveling
 XP only from kills, `random(200..400 ticks) × passive_rate ×

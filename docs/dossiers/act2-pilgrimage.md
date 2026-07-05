@@ -30,8 +30,16 @@ loop. The **maiden voyage** is the decision-rich crossing: ~26 named ports
 over ~40 sea-days (≈ two real weeks), checking in a few times a day to chart
 courses at junctions (committing closes the other roads for good), set Pace
 (the old "trim" dial), stand the watch, answer recruit asks, choose refit
-doors, read arrival scenes and Letters From Home. Cadence: a decision or
-scene every check-in, a junction every few days, a chapter gateway roughly
+doors, read arrival scenes and Letters From Home. Three roads carry a named,
+authored hazard instead of a random encounter — the Ossuary Warden, the
+Silence itself, and the Thorns (the act's only permanent loss) — each
+resolved deterministically by who's standing where and what pace is set,
+never by a die roll. Five other ships share the dark with the player,
+each with their own route and one line of character; hailing one (once
+each) trades news for a fragment of their story, and one of the five, the
+Sister Verity, is written to reach the Tree and wait there rather than
+eventually going dark like the other four. Cadence: a decision or scene
+every check-in, a junction every few days, a chapter gateway roughly
 weekly, the Going-Dark once — the night the mail stops.
 
 Arrival opens three quiet rooms (manifest, keepsake chart, record) — and then
@@ -145,6 +153,56 @@ Brother Wren unaffined; 3 aboard at launch, 5 found. Arcs advance on
 (`voyage.rs:1749,1768`) no longer cost anything; loss stays authored-scenes
 only regardless (`mark_lost()` still has no tick-driven caller).
 
+### Strain, hull wear & the Threats
+Two linked texture mechanics from "The Price of Passage" that persist
+alongside the Reckoning economy — neither is mentioned by name anywhere
+else in this dossier's Mechanics section, so both are captured here in
+full. **Strain** (`SoulState.strain: u8`, `voyage.rs:221`) accrues on a
+soul from one of three named causes (`StrainCause`, `voyage.rs:246-257`):
+`ThirdWatch` (three nights on watch back to back), `SquallAtRun` (a squall
+crossed while driven hard), `SilenceHelm` (the helm held alone through the
+Silence threat, below) — a strained soul pauses their arc and loses
+station affinity until rested at port. **Hull wear** (`hull_wear: u8`,
+capped at `HULL_WEAR_MAX` 6, `voyage.rs:50`) scars from three causes
+(`WearCause`, `:268-279`): a whole leg run at Grueling pace, a squall taken
+at Grueling pace, or a threat road's price — each scar adds 5%
+(`WEAR_BURN_PER_SCAR` 0.05) to provisions burn, compounding. Every
+shipyard refit door secretly carries a **third option**, `choose_mend()`
+(`:633-641`): forgo both authored refits at that yard forever in exchange
+for zeroing the scars outright — a real, if expensive, escape valve the
+dossier's earlier "3 refit door pairs" framing didn't mention.
+
+Wear's other source, and the game's only place loss lives, is
+**the Threats** — three specific, named roads resolved by a deterministic
+ledger (`threat_ledger()`, `voyage.rs:1168-1230+`), never a die roll:
+**the Ossuary Warden** (road 9, over the reef — Sefa aboard sings safe
+passage for free; a Quiet/Mourn pace pays 15 provisions; anything faster
+pays the same 15 *and* scars the hull), **the Silence itself** (road 29 —
+an unstaffed station or the Quiet Keel refit absorbs it for free; a fully
+staffed ship pays 10 provisions and loses the leg's log entirely), and
+**the Thorns** (road 42 — explicitly commented in source as "the game's
+only loss"; Cormac at the Helm reads it clean, any other configuration
+can cost a soul). Each outcome is fully determined by crew placement,
+pace, and refits chosen beforehand — consistent with the act's "no dice
+anywhere" pillar (see Design Intent) even at its single point of genuine
+risk.
+
+### The Other Pilgrims
+`src/vessel/pilgrims.rs`: five authored ships sharing the dark with the
+player, "not a simulation" per the module's own doc comment (`:1-8`) — each
+has a name, a one-line character, and a fixed cyclic route script, so their
+fates don't depend on the player's choices at all (deliberately, to keep
+the authoring bounded). The five (`PILGRIMS`, `:29-`): **the Sister
+Verity** (a hospice ship, `dark_after: None` — she alone reaches the Tree
+and is explicitly commented as "a face for Act 3"), **the Grief of Alden**
+(goes dark mid-crossing), **the Wager**, **the Psalm**, and **the Held
+Breath**. Hailing a ship (`hail()`, `voyage.rs:1645`, once per ship) trades
+a line of news for a fragment of their story; pilgrim rumors are the only
+way to learn about roads behind or beside the player's own. The Sister
+Verity is a second, softer Act 3 thread alongside the two hard gate flags
+in Interrelations — a named face already written to be waiting at the
+Tree, not just a boolean.
+
 ### Colony
 `src/vessel/colony.rs`: `INITIAL_SOULS` 100,000 (`:21`);
 `DRIVE_DECAY` 0.70 → `DRIVE_FLOOR` 0.05 ≈ 20× (`:36,:39`); `BASE_CAPACITY` 180
@@ -229,6 +287,11 @@ Act 1 (everything)                Act 2: launch → crossing 1 → the Ferryman 
   Open Questions). Salvage/districts are Act 2-internal currencies; nothing
   else consumes them (by design, but note: Records and keepsakes have no
   external surface either).
+- **A third, softer Act 3 thread**: alongside the two boolean gates above,
+  the Sister Verity (see Mechanics & Constants > The Other Pilgrims) is a
+  named pilgrim ship authored to reach the Tree and wait there rather than
+  going dark like the other four — a face already staged for whatever
+  Act 3 becomes, independent of either flag.
 - **All three Reckoning purchases point at the same measurable outcome** (%
   of the world saved), a meaningfully tighter system than the earlier
   two-yard-plus-one-inert-gauge (Hope) design — see Refresh History.
@@ -365,6 +428,25 @@ Held for a later round (not yet asked, unchanged):
 Session-by-session log of what changed at each refresh, most recent first.
 The sections above always describe the *current* state only — read this
 section for how it got there.
+
+### 2026-07-05 — Strain, hull wear, the Threats, and the Other Pilgrims added
+
+A `/goal` to verify both act dossiers reflect the current design prompted a
+dedicated completeness audit against the archived design.md, `src/vessel/
+CLAUDE.md`, and `docs/decisions.md` — specifically hunting for other named
+concepts missing the way the Ferryman was. Found three, all still live in
+`src/vessel/voyage.rs` and `src/vessel/pilgrims.rs` and none previously
+mentioned anywhere in this dossier: **Strain & hull wear** (`StrainCause`/
+`WearCause`, the shipyard's hidden third "mend the hull" refit option),
+**the Threats** (three named, ledger-resolved hazard roads — the Ossuary
+Warden, the Silence itself, and the Thorns, "the game's only loss," none
+of them RNG), and **the Other Pilgrims** (five authored ships with fixed
+routes, hailable once each; the Sister Verity is written to reach the Tree
+and wait for Act 3 rather than going dark like the other four). Added to
+Player's Experience, two new Mechanics & Constants subsections, and a new
+Interrelations bullet naming the Verity as a third, narrative Act 3 thread
+alongside the two boolean gate flags. Content addition, not a correction —
+nothing previously stated was wrong.
 
 ### 2026-07-05 — the Ferryman loop and the Last Crossing gate added
 
