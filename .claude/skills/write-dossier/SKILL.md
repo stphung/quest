@@ -28,6 +28,27 @@ curves. Name a specific number only when it earns its place — see
 measured results, so it should be as numeric as the run you performed,
 tables over prose, same as before.
 
+**No inline code references in prose.** Function names, struct/field
+names, and file paths (`compute_power_rating()`, `src/zones/progression.rs`,
+`colony.rs`'s module doc) belong in exactly two places: the header
+`Sources` line and the closing `## Sources` section — both are reference
+lists, so a citation there doesn't interrupt the read. Everywhere else —
+Player's Experience, Design Intent, Mechanics & Constants, Interrelations,
+Fun Assessment — describe the mechanic in plain English and trust the
+Sources list to point a verifier at the right module. The one exception is
+Open Questions: when a specific file or line *is* the actionable substance
+of a finding (a discrepancy a developer needs to go fix), keep it — that
+citation is the deliverable, not decoration.
+
+**Prefer bullets over dense paragraphs.** Whenever a passage would
+otherwise enumerate three or more related things — named systems, causes,
+gates, steps in a sequence — reach for a bullet list instead of stitching
+them into one sentence with em-dashes and semicolons. This applies most to
+Mechanics & Constants: open each subsystem with a one- or two-sentence
+concept summary, then bullet the specific behaviors that summary implies,
+rather than one dense paragraph a reader has to parse in full to extract
+any one fact.
+
 `docs/dossiers/README.md` states the contract dossiers exist under:
 specs (`openspec/specs/`) are the living source of truth for what a system
 *does*; archived changes (`openspec/changes/archive/`) are point-in-time
@@ -63,7 +84,7 @@ comparable set, not N one-off documents.
 3. **Status blockquote** — one paragraph: what this dossier covers, which specs/archives/decisions it complements (not replaces), links to sibling dossiers (an Act dossier links the other Act's dossier and the cross-act dossier), and — for living dossiers only — a pointer to the bottom `Refresh History` section so readers know the sections above are current-state-only.
 4. `## The Player's Experience` — narrative prose. Walk a fresh player through the system/Act as they'd actually encounter it, in order. This is the only section allowed to read like fiction-adjacent prose rather than a reference; still name every mechanic precisely enough that a developer recognizes it.
 5. `## Design Intent` — bullet list reconstructing *why*, not *what*. Pull from `docs/decisions.md` entries, archived `changes/archive/<name>/design.md` or `proposal.md` docs, and module `CLAUDE.md` design-rationale asides. Cite the specific decision-log heading or archived doc section for each bullet, not just "the design doc."
-6. `## Mechanics & Constants` — the conceptual core, not a constants dump. One `###` subsection per subsystem (not one wall of prose — see Anti-Patterns). Lead each subsystem with what it *is* and how it *relates* to the rest of the design; reach for a number only per "When a number belongs in the prose" below. This is the section `doc-audit`/`meta-audit` hold to a factual standard, so whatever claims and numbers *do* appear must stay accurate under future refreshes — accuracy of what's said, not volume of what's cited.
+6. `## Mechanics & Constants` — the conceptual core, not a constants dump. One `###` subsection per subsystem (not one wall of prose — see Anti-Patterns), each opening with a short concept summary and then a bullet list of the specific behaviors that summary implies. Lead with what a subsystem *is* and how it *relates* to the rest of the design; reach for a number only per "When a number belongs in the prose" below, and skip the code citations entirely — no `file.rs:line`, no function or field names — this is prose, not a code review; the header/closing Sources lists are where a verifier looks. This is the section `doc-audit`/`meta-audit` hold to a factual standard, so whatever claims and numbers *do* appear must stay accurate under future refreshes — accuracy of what's said, not volume of what's cited or how it's cited.
 
    **When a number belongs in the prose:**
    - It's a **structural identifier** the rest of the document (or the
@@ -81,14 +102,11 @@ comparable set, not N one-off documents.
 
    Everything else — formula coefficients, full percentage tables, cost
    curves, exhaustive per-tier breakdowns — belongs in `constants.rs` and
-   the module's `CLAUDE.md`, not here. A citation (`file.rs`, no line
-   number needed for a concept-level claim) is enough for a reader who
-   wants to check; reserve a precise `file.rs:line` pin for the numbers
-   that met the bar above.
-7. `## Interrelations` — an ASCII diagram plus bullets: what flows *in* from other Acts/systems, what's mechanically isolated ("during"), what flows *out* (the hooks a future Act/system keys off), and any internal closed loops worth naming. Call out every named hook/flag explicitly (e.g. two different Act-3-hook flags, not just "the Act 3 hook").
+   the module's `CLAUDE.md`, not here.
+7. `## Interrelations` — an ASCII diagram plus bullets: what flows *in* from other Acts/systems, what's mechanically isolated ("during"), what flows *out* (the hooks a future Act/system keys off), and any internal closed loops worth naming. Call out every named hook/flag explicitly (e.g. two different Act-3-hook flags, not just "the Act 3 hook") — by name, not by file path.
 8. `## Balance Evidence` — dated, sourced numbers from an actual run you performed this session (simulator, targeted test, `--check-progression`), not a re-statement of a design doc's aspirational numbers. Tables over prose. Note when thresholds carry intentional headroom.
-9. `## Fun Assessment` — score against the same seven heuristics every dossier uses (below). Dated. Cite concrete evidence per row, not vibes.
-10. `## Open Questions & Decision History` — numbered list. Resolved items get `~~struck-through~~` text + **Resolved**: rationale; genuinely open items stay unstruck and get a one-line reason they're not urgent (or are). Don't silently drop a resolved item on refresh — the history is part of the value.
+9. `## Fun Assessment` — score against the same seven heuristics every dossier uses (below). Dated. Cite concrete evidence per row, not vibes — evidence means what a player would observe or what a measured run showed, not a code reference.
+10. `## Open Questions & Decision History` — numbered list. Resolved items get `~~struck-through~~` text + **Resolved**: rationale; genuinely open items stay unstruck and get a one-line reason they're not urgent (or are). This is the one section where a `file.rs:line` citation belongs in the prose itself, when the finding *is* a specific place in the code. Don't silently drop a resolved item on refresh — the history is part of the value.
 11. `## Refresh History` (living dossiers only — omit entirely on a dossier's first version) — session-by-session log, most recent first, of what changed at each refresh and why. This is what lets sections 4-10 stay current-state-only instead of accumulating "as of the previous session..." caveats inline.
 12. `## Sources` — closing bullet list of every spec, archived change, CLAUDE.md, decisions.md, and test/simulator command cited above.
 
@@ -193,11 +211,12 @@ of change a "did the numbers change" refresh check will miss.
 Treat an audit/research agent's report as a lead, not a fact. Before adding
 anything to the dossier, `grep`/`Read` the cited file:line yourself and
 confirm the constant, function, or comment actually says what's claimed —
-even if the number itself won't appear in the final prose, the concept it
-grounds still needs to be true. This project's dossiers are held to a
-"accurate about what it says" standard by `doc-audit`/`meta-audit`, not a
-"cites everything" standard — an unverified claim that turns out wrong
-undermines that immediately, whether or not it shipped with a citation.
+even though neither the number nor the file/function name will typically
+appear in the final prose, the concept they ground still needs to be true.
+This project's dossiers are held to a "accurate about what it says"
+standard by `doc-audit`/`meta-audit`, not a "cites everything" standard —
+an unverified claim that turns out wrong undermines that immediately,
+whether or not it shipped with a citation.
 
 ### Phase 7 — Cross-link
 
@@ -240,9 +259,18 @@ generic and doesn't enumerate files by name.
   sentence that says what it *means* — see "When a number belongs in the
   prose" above. This is the single most common way a dossier drifts from
   "player-eye synthesis" into "second CLAUDE.md."
+- **Code references sprinkled through prose.** `(src/zones/progression.rs)`
+  after every claim, `compute_power_rating()` mid-sentence, "`colony.rs`'s
+  own module doc says" — these read like a code review, not a design
+  document, and they're redundant with the Sources lists that already
+  point a verifier at the right file. Say what's true; save the citations
+  for the header/closing Sources sections and for Open Questions findings.
 - **One dense prose block for Mechanics & Constants.** Split by subsystem
   with `###` headers — a reader should be able to jump to "Ascension" or
-  "The Deep" without reading everything before it.
+  "The Deep" without reading everything before it. Within a subsystem,
+  the same problem recurs at a smaller scale: a single long paragraph
+  enumerating several named causes, gates, or steps is harder to scan
+  than a short intro sentence plus a bullet list of the same content.
 - **Citing a design doc's intent as if it shipped.** Always state what's
   *live in source today*; when a design doc's numbers were superseded,
   say so and cite the follow-up that superseded them (both dossiers do
