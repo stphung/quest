@@ -39,7 +39,7 @@ at a door, and a silence that's never been broken.
 | 1 — Ascent | **Climb** | up 50 zones |
 | (Deep, inside Act 1) | **Descend** | down numbered Layers |
 | 2 — Crossing | **Cross / ferry** | outward, across the dark, repeatable until the well runs dry |
-| 3 — The Rooting | **Root / Graft** | *in* — down into Yggdrasil's roots, decided below |
+| 3 — The Wellspring | **Root / Graft** | *in* — down into Yggdrasil's roots, decided below |
 | 4 | ? | deliberately still open |
 
 Each act so far has also *deliberately broken* the previous act's design
@@ -50,12 +50,17 @@ Ascension, the Storm) has been gesturing at Norse cosmology without cashing
 the check. Act 3 is where the Tree stops being a destination on the horizon
 and becomes the place the story happens *inside*.
 
-## Act 3: The Rooting — the decided direction
+## Act 3: The Wellspring — the decided direction
 
 Reached by working through the candidate verbs (Root/Graft, Weave, Tend,
 Search — see Alternatives Considered) and picking Root/Graft, then resolving
-five follow-on questions about how it actually plays. This is now concrete
-enough to design against, not just a vibe:
+five follow-on questions about how it actually plays, then a final naming
+pass (see Alternatives Considered) landed on "The Wellspring" over the more
+literal "The Rooting"/"The Grafting" and the moodier "The Quickening" — it
+ties directly to the Norns' Well of Urd at Yggdrasil's roots, which gives
+Wyrd (below) a stronger anchor in the act's own name even though Weave lost
+as the primary verb. This is now concrete enough to design against, not
+just a vibe:
 
 ```
 last_crossing_complete fires
@@ -109,7 +114,7 @@ last_crossing_complete fires
 
 ## What this resolves against the open narrative questions
 
-| Question (from `world-and-narrative.md`) | Answer under The Rooting |
+| Question (from `world-and-narrative.md`) | Answer under The Wellspring |
 |---|---|
 | What is at the Tree? | A threshold, not a destination — the roots, and a branch (the Grove) to graft the colony onto |
 | Does the colony become Act 3's home base/faction? | Yes — the Grove *is* that base, purpose-built rather than a Haven branch |
@@ -135,7 +140,7 @@ same way Act 3 itself waited on Act 2 landing first.
 | Act 3 verb | **Weave** — Norns' fate-loom as the primary system | Too abstract as a whole-act resource without a concrete hook; folded in as Wyrd, a secondary currency, instead of the primary axis |
 | Act 3 verb | **Tend** — pure colony-management, no mythic framing | Lost to Root/Graft, which keeps the mythic throughline the game's vocabulary has been building |
 | Act 3 verb | **Search** — go find the four pilgrim ships that went dark | Lost to Root/Graft; stays available as flavor/side content rather than the act's spine |
-| Cold-open shape | **Answer** — "the silence breaks" as the whole act, not just its opening beat | Resolves one open question cleanly but doesn't answer what the player spends hours doing; demoted to the cold-open beat inside The Rooting |
+| Cold-open shape | **Answer** — "the silence breaks" as the whole act, not just its opening beat | Resolves one open question cleanly but doesn't answer what the player spends hours doing; demoted to the cold-open beat inside The Wellspring |
 | Cadence | Wall-clock / decision-dense, extending Act 2's contract | Lost to idle-first — Act 3 swings back toward Act 1 rather than extending Act 2 |
 | Growth track | New branch on the existing Haven tree | Lost to a wholly new system (the Grove) — signals new territory over reusing a familiar UI |
 | Loom tie-in | Root Zones/Grove plug directly into the existing Loom (28 patterns) | Lost — Loom stays fully untouched, its own island |
@@ -143,6 +148,9 @@ same way Act 3 itself waited on Act 2 landing first.
 | Root Zones shape | Infinite tail, Expanse-style | Lost to a finite, capped band |
 | Ramp trigger | A numeric Grove-population or Wyrd-threshold gate | Lost to a narrative beat — softer, more story-driven than every other unlock in the game |
 | Enemies | Reskinned existing archetypes (cheaper, Loom-zone-style scaling) | Lost to a purpose-built decay/rot bestiary — reinforces the "defending new growth" framing |
+| Act 3 name | **The Rooting** — plain gerund, matches the Ascent/Crossing pattern exactly | Lost to The Wellspring — still fits the pattern, but ties directly to the Norns' Well of Urd rather than staying purely literal about growth |
+| Act 3 name | **The Grafting** — leans into "graft" specifically, more visceral | Lost to The Wellspring for the same reason as The Rooting |
+| Act 3 name | **The Quickening** — moodier, evokes life stirring after Act 2's dying world | Lost to The Wellspring, which anchors the name to a specific mythic location (the Well) rather than a mood |
 
 ## What this exploration is not
 
@@ -159,7 +167,7 @@ same way Act 3 itself waited on Act 2 landing first.
 
 This direction is concrete enough now to fold a trimmed version into
 `world-and-narrative.md`'s "arc across acts" table and "Open narrative
-questions" section (replacing "TBD" with "The Rooting — Root/Graft," clearly
+questions" section (replacing "TBD" with "The Wellspring — Root/Graft," clearly
 marked as unshipped intent, the same way Act 2's own design doc carried
 three superseded generations of the Ferryman design before any of them
 shipped). Actual mechanical design — the Grove's specific rooms/upgrades,
@@ -181,3 +189,9 @@ actively wants to start building Act 3. Act 4 stays open for a future pass.
   Root Zones made finite and decay/rot-themed; the ramp into Root Zones
   made narrative rather than numeric. Act 4 explicitly left undecided.
   This revision reflects that pass's outcome.
+- **2026-07-05, naming pass**: the act itself was still called "The
+  Rooting," working-title-style, throughout the interactive pass above.
+  A dedicated naming round considered it against The Grafting, The
+  Wellspring, and The Quickening; **The Wellspring** won, chosen for
+  tying the act's name to the Norns' Well of Urd rather than staying
+  purely literal about growth. Renamed throughout.
