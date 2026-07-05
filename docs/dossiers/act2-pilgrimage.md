@@ -1,7 +1,7 @@
 # Act 2: The Pilgrimage of Souls — Design Dossier
 
-> Last refreshed: 2026-07-05 (Dock/Wormhole/Riftglass shipped — spec 9
-> addendum, see Refresh History) | Sources: `src/vessel/`, `src/main.rs` (vessel wiring), `src/vessel/CLAUDE.md`, `openspec/changes/archive/the-vessel-act2/design.md` (the 15 backported vessel specs, now consolidated into one file), `openspec/changes/act2-dock-wormhole-crossing/` (Dock/Wormhole), `openspec/specs/vessel-act2/spec.md`, `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep`/`dock_time_across_charge_policies` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
+> Last refreshed: 2026-07-05 (the "Ignition" animated launch transition
+> shipped, see Refresh History) | Sources: `src/vessel/`, `src/main.rs` (vessel wiring), `src/vessel/CLAUDE.md`, `openspec/changes/archive/the-vessel-act2/design.md` (the 15 backported vessel specs, now consolidated into one file), `openspec/changes/archive/2026-07-05-act2-dock-wormhole-crossing/` (Dock/Wormhole), `openspec/specs/vessel-act2/spec.md`, `src/ui/vessel_transition_fx.rs` (the Ignition transition renderer), `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep`/`dock_time_across_charge_policies` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
 
 > **Status: living, deep-refreshed across several sessions.** This dossier
 > holds Act 2's cross-system, player-eye synthesis — how the launch gate,
@@ -23,7 +23,12 @@ the signal; from then on a whisper crosses the ticker occasionally and a
 `[V]` overlay shows a four-gate checklist — complete the Loom (28
 patterns), reach Ascension X, and accumulate 250,000 PR to burn in one
 all-or-nothing action. The player watches a fuel bar fill over weeks. The
-burn is the act break: everything Act 1 accumulated becomes the hull.
+burn is the act break: everything Act 1 accumulated becomes the hull. A
+five-beat cinematic — pulsing glow, expanding sonar rings, a warp-speed
+rush climaxing in a white flash — carries the player from that burn into
+the Void, where the ship's silhouette resolves out of the dark; it is the
+only place in the whole act the screen stops being a UI and becomes pure
+spectacle.
 
 Then the game changes shape entirely. The Voyage runs on a compressed wall
 clock, not the tick loop. The **maiden voyage** is the decision-rich
@@ -233,7 +238,14 @@ save-compat fixture corpus — see Open Questions.
 ### Launch transition
 A five-beat authored sequence (Farewell, Unweaving, Construction, Launch,
 Void) plays once, gated by its own persistent flag, right before the
-Voyage takes the screen.
+Voyage takes the screen. Originally shipped as static per-beat text, it now
+plays as a fully animated set-piece — "Ignition" — the single moment in the
+whole act where the screen stops being a UI and becomes pure spectacle:
+breathing, pulsing text; outward sonar-like rings; the final two beats add
+warp-speed streaks radiating from center that climax in a white flash
+dissolving into the Void, where the ship's authored silhouette resolves out
+of the starfield. Two other visual treatments were built and compared
+side by side before this one was chosen as the shipped version.
 
 ### Derived numbers players feel
 - The maiden voyage plays out over about two real weeks.
@@ -310,27 +322,31 @@ Act 1 (everything)                Act 2: launch → crossing 1 → the Ferryman 
 
 ## Balance Evidence
 
-*2026-07-04, `cargo test --release --test ferryman_tests -- --ignored
---nocapture strategy_sweep`, plus a locally-added "ward-lean" policy
-(blends Ward with Drive/Shipwright, not committed) to check the shipped
+*2026-07-05, re-run this session against current HEAD:
+`cargo test --release --test ferryman_tests -- --ignored --nocapture
+strategy_sweep`, `dock_time_across_charge_policies`, and the committed CI
+gate `an_era_ferries_most_of_the_world_across_a_ramping_run_of_crossings`;
+plus a locally-added "ward-lean" policy (blends Ward with Drive/Shipwright,
+not committed — same approach the prior refresh used) to check the shipped
 docs' "~94%" claim, which the committed test suite does not itself cover:*
 
 | Policy | Crossings | Era length | Souls saved |
 |---|---|---|---|
-| Drive-only (reckless) | 101 | 11.1 mo | 70.5% |
-| Shipwright-only | 15 | 9.1 mo | 74.2% |
-| Balanced (Drive+Shipwright, parity) | 24 | 3.4 mo | 88.1% |
-| Cap-lean / souls-first | 19 | 3.2 mo | 88.7% |
-| Ward-lean (blended with Drive+Shipwright) | 32 | 4.9 mo | 94.3% |
+| Drive-only (reckless) | 101 | 11.4 mo | 70.5% |
+| Shipwright-only | 15 | 9.6 mo | 74.2% |
+| Balanced (Drive+Shipwright, parity) | 29 | 4.0 mo | 87.5% |
+| Cap-lean / souls-first | 18 | 3.2 mo | 88.8% |
+| Ward-lean (blended with Drive+Shipwright) | 49 | 7.1 mo | 93.9% |
 
 | Intent (as shipped) | Measured | Verdict |
 |---|---|---|
 | C1 ≈ 14 real days | 15 real days (all policies — Drive level 0 is fixed) | ✓ |
-| ~19–24 crossings, ~3 real months, ~88% saved, skilled | 19–24 crossings, 3.2–3.4 mo, 88.1–88.7% (balanced/cap-lean) | ✓ |
+| ~19–24 crossings, ~3 real months, ~88% saved, skilled | balanced now 29 crossings / 4.0 mo / 87.5%; cap-lean 18 crossings / 3.2 mo / 88.8% | ~ — see watch-item below |
 | Reckless traps ~70–74% | 70.5% (drive-only), 74.2% (cap-only) | ✓ |
-| Leaning on Ward pushes toward ~94%, costlier | 94.3% at 32 crossings / 4.9 mo | ✓ — but almost double the intended era length |
-| Care beats carelessness, wide margin | 70.5%–94.3% spread across policies | ✓ |
+| Leaning on Ward pushes toward ~94%, costlier | 93.9% at 49 crossings / 7.1 mo | ✓ — further than previously measured |
+| Care beats carelessness, wide margin | 70.5%–93.9% spread across policies | ✓ |
 | No stranding ever | unchanged (the affordability floor still holds) | ✓ |
+| Dock/jump timing tension: patient (full charge) beats rushed (jump at 0%) overall | balanced spend: full charge 29 crossings / 4.0 mo total vs. jump-at-0% 28 crossings / 4.9 mo total, 87.5% vs. 84.5% saved | ✓ — rushing costs more real time and saves fewer souls despite one fewer crossing |
 
 The "hope pinned at max, second gauge never engages" red flag from an
 earlier refresh cannot recur — the mechanism is deleted, not just re-tuned.
@@ -338,14 +354,27 @@ The dark's daily toll is a **live, checkable number** at every Reckoning,
 and it visibly differs across the strategies above — the gauge that used
 to sit inert now always engages, in the direction the design intends.
 
-**Watch-item**: leaning hard into the Ward is now the highest-saved policy
-(94.3%) but stretches the era to ~5 months and 32 crossings — beyond even
-the widened 15–30 test band (the sim run above hit 32, one above the
-gate's ceiling). Not a bug — the era test only exercises the balanced-spend
-policy — but worth flagging: a player who reads "Ward saves the most
-souls" and leans all-in may run a noticeably longer era than the stated
-"~3 real months." Whether that's an acceptable skill/patience tradeoff or
-worth a soft cap was weighed and resolved — see Open Questions.
+**Watch-item, updated this session**: every policy line has drifted
+further from the prior refresh's numbers — most notably balanced play,
+which moved from 24 to 29 crossings (88.1% → 87.5% saved, 3.4 → 4.0
+months) and ward-lean, which moved from 32 to 49 crossings (94.3% → 93.9%
+saved, 4.9 → 7.1 months). `tests/ferryman_tests.rs` was itself extended by
+the Dock/Wormhole change to report sailing-time and docked-time
+separately, and the same commit is the most likely source of this drift —
+but the measured shift is large enough, and the balanced line specifically
+now sits outside the plain-English "~19–24 crossings, ~3 real months"
+intent (though still inside the committed CI gate's 15–30 crossing band
+and its ≥78,000-souls floor — the gate itself passed: 29 crossings, 87,533
+delivered), that this is worth a design look rather than assuming it's
+just measurement noise. Leaning hard into Ward remains the highest-saved
+policy but now stretches the era to over 7 months and 49 crossings — well
+beyond the CI gate's ceiling (the gate only exercises the balanced-spend
+policy, so this doesn't fail CI, but the gap between "balanced" and
+"Ward-lean" has widened further since the last measurement). Whether the
+balanced line's drift warrants retuning the spend curves, restating
+intent a third time, or is itself an artifact of exactly how Dock charge
+timing was modeled in this session's policies is a fresh open question —
+see Open Questions.
 
 ## Fun Assessment
 
@@ -356,12 +385,12 @@ both use (these originate from Act 1's own benchmarks, per
 | # | Heuristic | Score | Evidence |
 |---|---|---|---|
 | 1 | Visible next goal | 4/5 | Gate checklist + fuel bar pre-launch; next-beat timers, watch forecast, district thresholds in-voyage. Still missing an era-level projection ("~N crossings left at this rate"). |
-| 2 | Wall → reset → power | 5/5 | The ferry loop is a true earned ramp (37→8 days, 180→4,500+ hold). The dark's toll is a per-day, always-visible, always-engaged number on the Reckoning screen, materially diverging by policy (70.5% vs 94.3%). Resistance is legible. |
+| 2 | Wall → reset → power | 5/5 | The ferry loop is a true earned ramp (40→8 in-game days per crossing, 180→4,500+ hold). The dark's toll is a per-day, always-visible, always-engaged number on the Reckoning screen, materially diverging by policy (70.5% vs 93.9%). Resistance is legible. |
 | 3 | Discovery cadence | 4/5 | World milestones fix the flagged gap: the ferry era now reveals *two* independent axes of new content — districts (colony growth) and world milestones (old-world decline) — and because milestones key off how much of the old world remains rather than population, they land on different crossings for different spend policies, so the sequence of "what's new" isn't identical run to run. Held at 4 rather than 5 because both axes are still text-only log moments, not new mechanical levers, and the maiden voyage's much richer discovery density (weather, nights, souls, rumors, refits, letters) isn't matched in kind. |
 | 4 | Cross-system braiding | 3/5 | The launch gate braids all of Act 1 into the burn (excellent); the voyage itself remains a deliberate island. Confirmed intentional, not a gap. |
 | 5 | Decision density | 4/5 | Maiden voyage is decision-rich. Ferry runs gained a second dimension (spec 9 addendum, 2026-07-05): arrival now opens a real-time Dock phase where Riftglass charges from a new Drive-scaled clock, and the player chooses *when* to commit the one-way wormhole jump — full charge is safe and patient, an early jump trades Dock time for a deterministic provisions/hull-wear deficit on the crossing to come. That's a genuine timing decision layered on top of the existing three-way yard spend, not just a faster "level-up" button. Held at 4 rather than 5 because Dock time itself is small relative to sailing time (~0.1–0.5 real months added across a whole era) and the jump-timing choice, while real, is a single dial rather than several interacting levers. |
 | 6 | Anticipation instruments | 5/5 | The act's strongest suit — fuel bars, watch forecasts, chapter gateways, Letters From Home, the Going-Dark. |
-| 7 | Stakes and texture | 4/5 | Stakes are no longer soft: Hope's "pinned at max, nearly no stakes" problem is gone, replaced by a toll that's always live and always differentiates skilled from careless play. The launch transition adds a beat of ceremony to the act's single biggest moment that was previously a bare confirmation screen. What's still missing: the toll and the milestones are numbers/log lines, not scenes — nobody the player has met is ever named as lost to the dark (that stays authored-only by design, and is a deliberate boundary, not a gap). |
+| 7 | Stakes and texture | 4/5 | Stakes are no longer soft: Hope's "pinned at max, nearly no stakes" problem is gone, replaced by a toll that's always live and always differentiates skilled from careless play. The launch transition — now a fully animated set-piece ("Ignition"), not just static text — adds a beat of ceremony to the act's single biggest moment that was previously a bare confirmation screen. What's still missing: the toll and the milestones are numbers/log lines, not scenes — nobody the player has met is ever named as lost to the dark (that stays authored-only by design, and is a deliberate boundary, not a gap). |
 
 **Where Act 2 deliberately breaks Act 1's patterns** (confirm, don't "fix"):
 wall-clock instead of ticks; no failure states; no RNG in outcomes; the
@@ -371,9 +400,9 @@ against these same seven heuristics.
 
 ## Open Questions & Decision History
 
-Five of six questions raised across this dossier's refreshes are resolved
-(see `docs/decisions.md` for full rationale on each); one new one (#6)
-surfaces from this pass and is still open:
+Five of eight questions raised across this dossier's refreshes are resolved
+(see `docs/decisions.md` for full rationale on each); three are still open
+(#6, carried forward; #7 and #8, new this pass):
 
 1. ~~Hope gauge never engages — tune, redesign, or demote?~~ **Resolved**:
    retired entirely, replaced by the Ward yard (commit d39ad67).
@@ -396,16 +425,43 @@ surfaces from this pass and is still open:
    length is now stated as "~3–5 real months" depending on spend. Skill/
    patience tradeoff is fine; the margin stays wide and legible.
 6. **`last_crossing_complete` (the Last Crossing / true Act 3 gate) has no
-   openspec coverage — still open, newly surfaced this pass.** It's
-   implemented (`main.rs:746-747,834`, `colony.rs:571-572`) and named
-   outright in `colony.rs`'s own module doc ("the next arrival is the Last
-   Crossing: Act 3's gate"), but `openspec/specs/vessel-act2/spec.md:119`
-   still describes only `vessel_arrived` as "the durable hook a future
-   Act 3 keys off," and `src/vessel/CLAUDE.md` doesn't mention the flag at
-   all. Not urgent while the act stays dark-shipped and Act 3 is
+   openspec coverage — still open, carried forward and re-verified this
+   pass.** It's implemented (`main.rs:746-747,834`, `colony.rs:571-572`)
+   and named outright in `colony.rs`'s own module doc ("the next arrival is
+   the Last Crossing: Act 3's gate"), but `openspec/specs/vessel-act2/
+   spec.md:119` still describes only `vessel_arrived` as "the durable hook
+   a future Act 3 keys off," and `src/vessel/CLAUDE.md` doesn't mention the
+   flag at all. Not urgent while the act stays dark-shipped and Act 3 is
    undesigned, but whoever eventually designs Act 3 should know the deeper
    hook exists before assuming `vessel_arrived` is the only one. A
-   documentation sync (spec + CLAUDE.md), not a code change.
+   documentation sync (spec + CLAUDE.md), not a code change. Slightly more
+   pressing than before: a pre-commitment exploration,
+   `docs/explorations/2026-07-05-act-3-4-story-arc.md`, now names
+   `last_crossing_complete` outright as the entire gate for a concrete (if
+   unshipped) Act 3 direction — nothing here is decided or built, but it's
+   a second, independent signal that the spec gap should close before
+   anyone starts building against the flag.
+7. **Every measured Ferryman policy has drifted since the prior refresh —
+   new this pass.** Balanced spend moved from 24 to 29 crossings (88.1% →
+   87.5% saved, 3.4 → 4.0 months); Ward-lean moved from 32 to 49 crossings
+   (94.3% → 93.9%, 4.9 → 7.1 months) — see Balance Evidence. The committed
+   CI gate still passes (29 crossings sits inside its 15–30 band), but the
+   balanced line's plain-English intent ("~19–24 crossings, ~3 real
+   months") no longer matches its own reference policy. `tests/
+   ferryman_tests.rs` was extended in the same commit that shipped Dock/
+   Wormhole, so the test harness and the mechanic changed together —
+   whether the drift is a real balance shift from Dock/jump timing, or an
+   artifact of how this session's policies interact with it, hasn't been
+   isolated. Worth a dedicated look before the next balance pass, not
+   urgent while the CI gate itself is green.
+8. **`src/vessel/CLAUDE.md`'s Launch Transition section is now stale — new
+   this pass.** It still reads "no animation... static text screens per
+   beat are sufficient" (written when the transition first shipped) and
+   its constants table doesn't mention `ui/vessel_transition_fx.rs` at all,
+   but the transition has since been rebuilt as a fully animated sequence
+   ("Ignition," PR #684) — see Mechanics & Constants and Refresh History.
+   A documentation fix to that CLAUDE.md, not a dossier-only correction
+   (per this skill's own anti-pattern guidance, not silently fixed here).
 
 Carried forward from prior refreshes (re-verified current, not
 re-litigated): the full 15-doc spec-alignment pass that annotated every
@@ -432,6 +488,51 @@ Held for a later round (not yet asked, unchanged):
 Session-by-session log of what changed at each refresh, most recent first.
 The sections above always describe the *current* state only — read this
 section for how it got there.
+
+### 2026-07-05 — Ignition transition added; balance evidence re-measured
+
+Diffed the dossier's Sources paths against HEAD and found one shipped,
+unreflected mechanics change plus one measurement gap:
+
+- **The launch transition shipped its final visual form.** PR #684 rebuilt
+  the previously-static 5-beat launch transition (`transition.rs`) as
+  "Ignition" (`src/ui/vessel_transition_fx.rs`, new): pulsing text, sonar
+  rings, warp-speed streaks climaxing in a white flash into the Void, where
+  the ship's authored art now resolves as one aligned block instead of
+  drifting line-by-line (a real alignment bug the build's two rejected
+  comparison variants surfaced and fixed). Added to Player's Experience and
+  Mechanics & Constants; Fun Assessment heuristic 7's evidence updated to
+  say "now a fully animated set-piece," score unchanged (presentation
+  polish on an already-scored beat, not new mechanical evidence). Flagged
+  as a new Open Question (#8) that `src/vessel/CLAUDE.md`'s Launch
+  Transition section still describes the old static version — a doc-drift
+  spanning a normative doc, logged rather than silently fixed per this
+  skill's own guidance.
+- **Balance Evidence was stale relative to its own cited test.** The prior
+  refresh's Balance Evidence table (24 crossings/88.1% balanced, 32/94.3%
+  Ward-lean) predates `tests/ferryman_tests.rs`'s Dock/Wormhole-era rewrite
+  even though that same refresh's Refresh History section already
+  described running the post-Dock test — the main table itself was never
+  updated to match. Re-ran `strategy_sweep`, `dock_time_across_charge_
+  policies`, the committed CI era gate, and a fresh local (uncommitted)
+  ward-lean policy against current HEAD: every line moved (see Balance
+  Evidence and new Open Question #7) — most notably balanced spend now
+  measures 29 crossings/87.5%/4.0 months, drifting outside the plain-
+  English "~19–24 crossings, ~3 months" intent while still passing the
+  committed CI gate's wider 15–30 band. Also measured, for the first time
+  with concrete numbers, the Dock/jump timing tension the prior refresh's
+  Refresh History only described in prose: patient (full-charge) jumps
+  beat rushed (0%-charge) jumps overall, 4.0 vs. 4.9 months and 87.5% vs.
+  84.5% saved, for the identical balanced-spend policy.
+- **Verified the Act 3 hook gap (Open Question #6) is still open**, and
+  noted a second, independent signal for it: a same-day pre-commitment
+  exploration doc, `docs/explorations/2026-07-05-act-3-4-story-arc.md`,
+  now names `last_crossing_complete` as the entire gate for a concrete (if
+  unshipped) Act 3 direction — nothing decided or built, but worth flagging
+  since it raises the cost of leaving the spec gap open.
+- Confirmed via `cargo build --release --test ferryman_tests` (clean) and
+  the test runs cited above; no source or spec files were edited this pass
+  — dossier-only refresh.
 
 ### 2026-07-05 — Dock/Wormhole/Riftglass shipped (spec 9 addendum)
 
@@ -635,11 +736,17 @@ question outright: **d39ad67 "retire Hope into a three-yard Reckoning"**.
 
 - Act 2 capability spec: `openspec/specs/vessel-act2/spec.md`
 - Backported per-feature design intent: `openspec/changes/archive/
-  the-vessel-act2/design.md` (all 15 original vessel specs, consolidated)
+  the-vessel-act2/design.md` (all 15 original vessel specs, consolidated),
+  `openspec/changes/archive/2026-07-05-act2-dock-wormhole-crossing/`
+  (Dock/Wormhole)
 - Implementation docs: `src/vessel/CLAUDE.md`
+- Launch transition animation: `src/ui/vessel_transition_fx.rs`
 - Design rationale: `docs/decisions.md`
+- Forward-looking, unshipped Act 3/4 context:
+  `docs/explorations/2026-07-05-act-3-4-story-arc.md`
 - Cross-act framing: [`world-and-narrative.md`](world-and-narrative.md)
 - Act 1's mirror dossier: [`act1-ascent.md`](act1-ascent.md)
 - Balance evidence: `cargo test --release --test ferryman_tests --
-  --ignored --nocapture strategy_sweep`, `voyage_simulator`,
-  `overlay_snapshot_tests.rs`
+  --ignored --nocapture strategy_sweep`, `dock_time_across_charge_policies`,
+  `an_era_ferries_most_of_the_world_across_a_ramping_run_of_crossings`,
+  `voyage_simulator`, `overlay_snapshot_tests.rs`
