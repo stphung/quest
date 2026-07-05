@@ -198,3 +198,17 @@ The system SHALL persist a Colony above individual crossings, tracking souls del
 
 - **WHEN** a different character's save is loaded
 - **THEN** it does not pick up another character's in-progress crossing
+
+### Requirement: World Milestones — A Second Discovery Axis
+
+The system SHALL track five milestones keyed to the fraction of the dying world's initial souls that is gone (delivered or lost to the dark) — 10%, 25%, 50%, 75%, and 90% — and fire an authored log moment for each exactly once, in ascending order. Because a milestone is keyed to souls remaining rather than colony population, the crossing on which it fires depends on how the player has spent Salvage across the Drive/Shipwright/Ward yards, giving the ferry era a second discovery axis distinct from district growth.
+
+#### Scenario: A milestone fires once, in ascending order
+
+- **WHEN** souls-remaining crosses below a milestone threshold it has not yet passed
+- **THEN** the corresponding log moment fires exactly once, and no milestone fires out of ascending order
+
+#### Scenario: Milestone timing depends on spend policy
+
+- **WHEN** two playthroughs spend Salvage differently (for example Ward-heavy versus Shipwright-heavy)
+- **THEN** a given milestone can fire on a different crossing number between them, because it is keyed to souls remaining rather than colony population

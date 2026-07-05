@@ -1,6 +1,13 @@
 # Act 2: The Pilgrimage of Souls — Design Dossier
 
-> Last refreshed: 2026-07-04 (post-build) | Sources: `src/vessel/`, `src/vessel/CLAUDE.md`, `docs/superpowers/specs/` (all 15 vessel specs, fully doc-aligned this session), `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
+> Last refreshed: 2026-07-05 | Sources: `src/vessel/`, `src/vessel/CLAUDE.md`, `openspec/specs/vessel-act2/spec.md` (current code-grounded baseline), `openspec/changes/archive/the-vessel-act2/` (historical design rationale, formerly `docs/superpowers/specs/`), `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
+
+## Since you last looked (2026-07-05 refresh — doc reorganization, no gameplay changes)
+
+One commit landed since the last refresh: **974bdbb "Adopt OpenSpec as source of truth."** `git diff --stat 61eccb8..HEAD -- src/vessel/` confirms it touched every vessel file by exactly 2 lines each — doc-comment repoints from `docs/superpowers/specs/...` to `openspec/specs/vessel-act2/spec.md`, no logic changes. Mechanics, Interrelations, Balance Evidence, and the Fun Assessment below are all still current (measured yesterday, nothing since has changed the code).
+
+- **The 15 old vessel spec docs are now archived**, verbatim, at `openspec/changes/archive/the-vessel-act2/` — still readable for historical rationale (e.g. the superseded pacing targets discussed in Design Intent below), just relocated.
+- **Found and fixed one baseline gap**: the new `openspec/specs/vessel-act2/spec.md` — meant to be a reverse-engineered, code-grounded baseline of *current* behavior — was missing a requirement for World Milestones (`WorldMilestone` in `colony.rs`), even though that feature shipped in 61eccb8, before the baseline was generated. Added a "World Milestones — A Second Discovery Axis" requirement to the spec this refresh so the baseline actually matches shipped code. This is a factual/doc-accuracy fix, not a design decision.
 
 ## Since you last looked (this session's build, same day as the previous refresh)
 
@@ -125,33 +132,38 @@ pressure.
 
 ## Design Intent
 
-The de-facto design bible is scattered but real (no single consolidated doc):
+The de-facto design bible now lives in two places: `openspec/specs/vessel-act2/spec.md`
+(current, code-grounded behavior — this refresh added the missing World
+Milestones requirement) and `openspec/changes/archive/the-vessel-act2/design.md`
+(the full historical rationale, backported verbatim from the old
+`docs/superpowers/specs/` dated-doc tree by commit 974bdbb — same content,
+new path, single consolidated file instead of 15):
 
-- **Thesis** (`docs/superpowers/specs/2026-03-27-the-vessel-design.md`):
-  Act 1 is "power in one place"; Act 2 is *passage*. "Act 2's fun is
-  anticipation, choice, people, and consequence — the kinds of fun Act 1
-  never touched… what accumulates while you're away is not numbers. It is
-  *arrival*."
-- **Direction choice** (`…/2026-07-02-act2-voyage-experience-exploration.md`):
-  route/place as spine + souls/loss as heart; each check-in should be "an
-  event with a face on it, not a status glance."
-- **Per-slice intent** in specs 2–8: arrivals are payoff scenes, never tests;
-  no dice anywhere; loss is authored-only; "traveling is not dead time."
-- **Pacing targets, superseded twice over**: spec 9's original body
-  (`…/2026-07-03-vessel-ferryman-design.md:315-319`) still describes a
-  **two-yard, Hope-bearing** Reckoning tuned to ~19 crossings / ~87% saved.
-  A same-file follow-up note (`:310-318`, dated 2026-07-04) updated this to
-  the two-yard Drive/Shipwright design. **Neither describes the shipped
-  three-yard Ward/no-Hope system** — that redesign exists only in code
-  (`colony.rs` doc comments, `CLAUDE.md`) and the commit message, not in a
-  spec doc. The authoritative numbers as shipped: **~19–24 crossings
-  (balanced spend), up to ~32 leaning on Ward, ~3–5 real months, ~88–94%
-  saved with skilled play, C1 ≈ 14–15 real days.**
+- **Thesis** (`design.md:21` area): Act 1 is "power in one place"; Act 2 is
+  *passage*. "Act 2's fun is anticipation, choice, people, and consequence —
+  the kinds of fun Act 1 never touched… what accumulates while you're away is
+  not numbers. It is *arrival*."
+- **Direction choice**: route/place as spine + souls/loss as heart; each
+  check-in should be "an event with a face on it, not a status glance."
+- **Per-slice intent**: arrivals are payoff scenes, never tests; no dice
+  anywhere; loss is authored-only; "traveling is not dead time."
+- **Pacing targets, superseded twice over** (`design.md:2771-2786`): the
+  original Ferryman design still describes a **two-yard, Hope-bearing**
+  Reckoning tuned to ~19 crossings / ~87% saved; a same-doc follow-up note
+  updated this to a two-yard Drive/Shipwright design. **Neither describes the
+  shipped three-yard Ward/no-Hope system** — that redesign is documented only
+  in code (`colony.rs` doc comments, `CLAUDE.md`) and the commit message, not
+  in a spec doc, even after the OpenSpec migration (the openspec baseline
+  captures current mechanics but not this superseded-twice history — that's
+  what the archived design doc is for). The authoritative numbers as shipped:
+  **~19–24 crossings (balanced spend), up to ~32 leaning on Ward, ~3–5 real
+  months, ~88–94% saved with skilled play, C1 ≈ 14–15 real days.**
 
-Note: specs 1–8 describe single-playthrough duration language ("20–200 days")
-that spec 9 (the Ferryman) superseded; nothing in the tree says so explicitly.
-This is now a two-deep case of spec drift (see above) worth a documentation
-pass, though low priority while the act stays dark-shipped.
+Note: earlier design docs describe single-playthrough duration language
+("20–200 days") that the Ferryman redesign superseded; nothing in the
+archived tree says so explicitly. Low priority while the act stays
+dark-shipped — the archive is historical record, not a live doc to keep
+current.
 
 ## Mechanics & Constants
 
@@ -342,14 +354,45 @@ outcomes once resolved):
    deliberate Ward-heavy line). Skill/patience tradeoff is fine; the margin
    stays wide and legible.
 
-No open design questions remain from this refresh. All five were resolved
-2026-07-04 (two of them — #2 and #4 — resolved twice: once by direct
-designer answer, then revisited under an explicit "build it" directive the
-same session); see `docs/decisions.md` for the full sequence. The next
-refresh should re-check the decision retrospective on #3/#5 (era length)
-once there's evidence of how the ferry era plays for a real session rather
-than only the sim, and on #2/#4 (discovery beat, launch transition) once
-there's played evidence of how the newly-built content actually lands.
+All five from the 2026-07-04 refresh were resolved that day (two of them —
+#2 and #4 — resolved twice: once by direct designer answer, then revisited
+under an explicit "build it" directive the same session); see
+`docs/decisions.md` for the full sequence. The next refresh should re-check
+the decision retrospective on #3/#5 (era length) once there's evidence of
+how the ferry era plays for a real session rather than only the sim, and on
+#2/#4 (discovery beat, launch transition) once there's played evidence of
+how the newly-built content actually lands.
+
+New this refresh (2026-07-05), surfaced by re-reading the Fun Assessment
+with fresh eyes rather than by any code change — no gameplay landed between
+refreshes:
+
+6. ~~Ferry-era decision density is flat for the whole 3-5 real-month era —
+   is a single three-way pick per landfall the permanent steady state, or
+   does the back half need a lighter secondary lever?~~ **Resolved
+   2026-07-05**: keep the single lever. Matches Act 2's deliberate departure
+   from Act 1's decision-dense loop; the choice already got richer this era
+   (live before→after deltas, not just a level-up button) — a quality gain
+   the 1-5 rubric doesn't capture. See `docs/decisions.md`.
+7. ~~World milestones are flavor-only (log lines) — should they ever carry
+   a small mechanical payoff, or stay pure texture?~~ **Resolved
+   2026-07-05**: keep flavor-only. One day old with no played evidence yet;
+   matches the "anticipation and arrival, not more numbers" thesis. Revisit
+   once there's played evidence from a real `QUEST_ACT2=1` session. See
+   `docs/decisions.md`.
+
+No open design questions remain from this refresh. Both retrospective
+triggers set above (#6, #7) fire on the same condition as #3/#5/#2/#4: real
+played evidence from a `QUEST_ACT2=1` session, not just sim/snapshot
+evidence — that's now the single biggest lever for the next Act 2 refresh
+to pull.
+
+Held for a later round (not yet asked, unchanged, low priority while
+dark-shipped):
+- Should Records/keepsakes surface anywhere outside the arrived harbor
+  (e.g. title screen), given the era ends and the files remain?
+- No player-facing wiki page exists for Act 2 (correct while dark-shipped;
+  becomes a launch-checklist item).
 
 Held for a later round (not yet asked, unchanged):
 - Should Records/keepsakes surface anywhere outside the arrived harbor

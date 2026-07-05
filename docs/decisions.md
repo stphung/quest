@@ -375,6 +375,31 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 
 **Expected outcome**: no balance impact (pure ceremony), but should raise the act's biggest single moment (Zone 50 kill → burn → Voyage begins) from a bare confirmation screen to a fitting sendoff for everything the burn represents. Next refresh's retrospective: revisit once Act 2 is previewed in a real session (`QUEST_ACT2=1`) rather than only via snapshot tests — a one-time cutscene lands differently played than read as a frame dump.
 
+## Act 2 Ferry-Era Decision Density: Keep the Single Three-Yard Lever
+
+**Why now**: the 2026-07-05 dossier refresh flagged that fun heuristic #5 (decision density) has sat at 3/5 across two refreshes — the ferry era's one Drive/Shipwright/Ward pick per landfall is the same choice shape from crossing 2 through the finale, across an era that can run ~19-32 landfalls / 3-5 real months.
+
+**Options considered**:
+| Option | Effect |
+|---|---|
+| **Keep as one lever (chosen)** | Matches Act 2's stated departure from Act 1 — the ferry era is deliberately hands-off and wall-clock, not another idle clicker |
+| Add a lightweight secondary lever | e.g. an optional named-soul request or weather-driven bonus choice every few landfalls |
+| Give World Milestones a choice payload | Reuse the 5 existing milestone beats to occasionally carry a pick, instead of adding a new system |
+
+**Decision**: Keep the single three-yard Reckoning as the permanent steady state. No new lever. The designer's rationale: the choice already got richer this era (three options with live before→after deltas, not just a level-up button) — a quality improvement the 1-5 rubric scale doesn't capture — and adding a second lever risks diluting the "passage, not power" thesis that distinguishes Act 2 from Act 1's decision-dense loop.
+
+**Expected outcome**: the ferry era should keep reading as a deliberate hands-off victory lap, not as under-featured. Next refresh's retrospective: if real play (once previewed via `QUEST_ACT2=1` in an actual session) surfaces the multi-month single-lever stretch as monotonous rather than restful, revisit — this decision assumes the richer three-way choice and the rising numbers (souls saved, districts, world milestones) carry enough weight on their own.
+
+## Act 2 World Milestones: Keep Flavor-Only, No Mechanical Payoff
+
+**Why now**: the 2026-07-05 dossier refresh flagged that fun heuristic #3 (discovery cadence) is held at 4/5 rather than 5 specifically because both ferry-era discovery axes (districts, World Milestones) are read-only log moments, not new mechanical levers.
+
+**Options considered**: keep milestones as pure flavor text (no gameplay effect); or add a small mechanical payoff (e.g. a one-time Salvage bonus or temporary Ward/Drive buff) on each of the 5 milestones.
+
+**Decision**: Keep flavor-only for now. World Milestones are one day old with no played evidence of how they land; the design thesis holds that Act 2's fun is "anticipation and arrival," not more numbers to manage, and the cheaper option preserves that until there's real signal to act on.
+
+**Expected outcome**: no balance impact. Next refresh's retrospective: revisit once there's played evidence (a real `QUEST_ACT2=1` session reaching several milestones) of whether the pure-flavor moments feel like enough of an event, or whether the ferry era's discovery axis needs actual teeth to clear heuristic #3 to 5/5.
+
 ## Backported Decisions (pre-OpenSpec design docs)
 
 The following decisions were recovered from pre-OpenSpec design docs (combat-balance, balancing guide, The Deep, the Loom, the Vessel launch gate and souls, and several feature specs) that have since been folded into OpenSpec and archived under `openspec/changes/archive/`. They are grouped by system. Where a source doc's numbers later shipped differently, the note says so.
