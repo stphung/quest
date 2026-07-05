@@ -10,7 +10,7 @@ use crate::vessel::junction::{current_junction_cards, RoadCard};
 use crate::vessel::route::{self, Feature, WaypointId};
 use crate::vessel::voyage::{
     SceneState, Trim, VoyagePhase, VoyageState, DRIFT_RECOVERY_HOURS, MAX_PARTIAL_CHARGE_HULL_WEAR,
-    MAX_PARTIAL_CHARGE_PROVISIONS_DEFICIT, MINUTES_PER_DAY, RUMOR_PRICE,
+    MAX_PARTIAL_CHARGE_PROVISIONS_DEFICIT, MINUTES_PER_DAY, PROVISIONS_CAP, RUMOR_PRICE,
 };
 use crate::vessel::{SceneModal, VoyageUiState, VoyageView};
 use ratatui::{
@@ -2319,20 +2319,24 @@ fn render_dock(
             Style::default().fg(Color::DarkGray),
         )));
     } else {
+        use crate::vessel::colony::District;
+        let full_provisions = if c.has_district(District::Granary) {
+            PROVISIONS_CAP + 25.0
+        } else {
+            PROVISIONS_CAP
+        };
+        let deficit = MAX_PARTIAL_CHARGE_PROVISIONS_DEFICIT * (1.0 - charge);
+        let now_provisions = (full_provisions - deficit).max(0.0);
+        let now_wear = (f64::from(MAX_PARTIAL_CHARGE_HULL_WEAR) * (1.0 - charge)).round() as u8;
+        let now_wear_word = if now_wear == 1 { "scar" } else { "scars" };
         lines.push(Line::from(Span::styled(
             "A jump before full charge is a shorter wait, at a cost:",
             Style::default().fg(Color::White),
         )));
         lines.push(Line::from(Span::styled(
             format!(
-                "the crossing would start {:.0} provisions short and {} hull scar{} deep.",
-                MAX_PARTIAL_CHARGE_PROVISIONS_DEFICIT * (1.0 - charge),
-                (f64::from(MAX_PARTIAL_CHARGE_HULL_WEAR) * (1.0 - charge)).round() as u8,
-                if (f64::from(MAX_PARTIAL_CHARGE_HULL_WEAR) * (1.0 - charge)).round() as u8 == 1 {
-                    ""
-                } else {
-                    "s"
-                }
+                "if you jump now: {now_provisions:.0} provisions, {now_wear} hull {now_wear_word}  \u{00b7}  \
+                 at 100% charge: {full_provisions:.0} provisions, 0 hull scars",
             ),
             Style::default().fg(Color::DarkGray),
         )));
