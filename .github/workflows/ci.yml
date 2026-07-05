@@ -26,11 +26,13 @@ jobs:
   clippy:
     name: Clippy
     if: github.event_name == 'pull_request'
-    needs: [fmt]
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -C link-arg=-fuse-ld=mold
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - run: sudo apt-get update -qq && sudo apt-get install -y mold
       - uses: Swatinem/rust-cache@v2
         with:
           key: clippy
@@ -39,11 +41,13 @@ jobs:
   test:
     name: Test
     if: github.event_name == 'pull_request'
-    needs: [fmt]
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -C link-arg=-fuse-ld=mold
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - run: sudo apt-get update -qq && sudo apt-get install -y mold
       - uses: Swatinem/rust-cache@v2
         with:
           key: test
@@ -52,11 +56,13 @@ jobs:
   balance:
     name: Balance
     if: github.event_name == 'pull_request'
-    needs: [fmt]
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -C link-arg=-fuse-ld=mold
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - run: sudo apt-get update -qq && sudo apt-get install -y mold
       - uses: Swatinem/rust-cache@v2
         with:
           key: balance
@@ -65,7 +71,6 @@ jobs:
   audit:
     name: Audit
     if: github.event_name == 'pull_request'
-    needs: [fmt]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -76,13 +81,15 @@ jobs:
   coverage:
     name: Coverage
     if: github.event_name == 'pull_request'
-    needs: [fmt]
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -C link-arg=-fuse-ld=mold
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
+      - run: sudo apt-get update -qq && sudo apt-get install -y mold
       - uses: Swatinem/rust-cache@v2
         with:
           key: coverage
@@ -138,11 +145,16 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
+      - name: Install mold linker
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y mold
+
       - name: Build
         shell: bash
         env:
           BUILD_COMMIT: ${{ github.sha }}
           BUILD_DATE: ${{ github.event.head_commit.timestamp }}
+          RUSTFLAGS: ${{ runner.os == 'Linux' && '-C link-arg=-fuse-ld=mold' || '' }}
         run: |
           # Extract short commit (7 chars)
           export BUILD_COMMIT="${BUILD_COMMIT:0:7}"
