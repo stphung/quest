@@ -1,6 +1,27 @@
 # Act 2: The Pilgrimage of Souls — Design Dossier
 
-> Last refreshed: 2026-07-04 (post-build) | Sources: `src/vessel/`, `src/vessel/CLAUDE.md`, `docs/superpowers/specs/` (all 15 vessel specs, fully doc-aligned this session), `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
+> Last refreshed: 2026-07-05 (housekeeping pass) | Sources: `src/vessel/`, `src/vessel/CLAUDE.md`, `openspec/changes/archive/the-vessel-act2/design.md` (the 15 backported vessel specs, now consolidated into one file), `openspec/specs/vessel-act2/spec.md`, `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
+
+## Since you last looked (2026-07-05, path housekeeping only)
+
+Commit 974bdbb ("Adopt OpenSpec as source of truth; archive the old design
+docs") removed `docs/superpowers/specs/` entirely between this dossier's
+last refresh and today — the 15 vessel specs it cited by path now live
+concatenated (verbatim, each under its own `## <original-filename>.md`
+heading) in `openspec/changes/archive/the-vessel-act2/design.md`, and the
+capability itself is now normatively described in
+`openspec/specs/vessel-act2/spec.md`. No mechanics changed; this pass just
+repoints every stale path below and corrects one claim that no longer holds
+now that the full file is readable in one place: the "Design Intent"
+section below previously said the shipped three-yard Ward/no-Hope system
+"exists only in code... not in a spec doc" — the archived design.md's
+`2026-07-03-vessel-ferryman-design.md` section in fact carries a same-day
+"Follow-up (2026-07-04, later the same day): the third yard — Ward" block
+describing it in full. That block was already there when this dossier was
+last refreshed; the dossier's own claim was simply wrong, not something
+that drifted afterward. Corrected in place below. Nothing else in this
+dossier needed a content change — mechanics, balance evidence, and fun
+assessment all still hold as of HEAD (2cf51d6).
 
 ## Since you last looked (this session's build, same day as the previous refresh)
 
@@ -36,8 +57,10 @@ alignment:
   new noun, not districts on a second axis. Four new tests (two unit, two
   integration) confirm all five fire exactly once, in order, spread across
   the era.
-- **Full spec-tree alignment**: all 15 `docs/superpowers/specs/` vessel
-  docs read against current source and annotated with "Doc-alignment note"
+- **Full spec-tree alignment**: all 15 vessel docs (then under
+  `docs/superpowers/specs/`, now consolidated into
+  `openspec/changes/archive/the-vessel-act2/design.md`) read against current
+  source and annotated with "Doc-alignment note"
   call-outs — the Hope retirement (touched nearly every spec), the
   abandoned combat/crew/rooms-stats specs (confirmed nothing shipped, not
   just "superseded"), the mode-transition spec's abandoned
@@ -127,26 +150,32 @@ pressure.
 
 The de-facto design bible is scattered but real (no single consolidated doc):
 
-- **Thesis** (`docs/superpowers/specs/2026-03-27-the-vessel-design.md`):
-  Act 1 is "power in one place"; Act 2 is *passage*. "Act 2's fun is
-  anticipation, choice, people, and consequence — the kinds of fun Act 1
-  never touched… what accumulates while you're away is not numbers. It is
-  *arrival*."
-- **Direction choice** (`…/2026-07-02-act2-voyage-experience-exploration.md`):
-  route/place as spine + souls/loss as heart; each check-in should be "an
-  event with a face on it, not a status glance."
-- **Per-slice intent** in specs 2–8: arrivals are payoff scenes, never tests;
-  no dice anywhere; loss is authored-only; "traveling is not dead time."
-- **Pacing targets, superseded twice over**: spec 9's original body
-  (`…/2026-07-03-vessel-ferryman-design.md:315-319`) still describes a
-  **two-yard, Hope-bearing** Reckoning tuned to ~19 crossings / ~87% saved.
-  A same-file follow-up note (`:310-318`, dated 2026-07-04) updated this to
-  the two-yard Drive/Shipwright design. **Neither describes the shipped
-  three-yard Ward/no-Hope system** — that redesign exists only in code
-  (`colony.rs` doc comments, `CLAUDE.md`) and the commit message, not in a
-  spec doc. The authoritative numbers as shipped: **~19–24 crossings
-  (balanced spend), up to ~32 leaning on Ward, ~3–5 real months, ~88–94%
-  saved with skilled play, C1 ≈ 14–15 real days.**
+- **Thesis** (`openspec/changes/archive/the-vessel-act2/design.md`, section
+  `2026-03-27-the-vessel-design.md`): Act 1 is "power in one place"; Act 2 is
+  *passage*. "Act 2's fun is anticipation, choice, people, and consequence —
+  the kinds of fun Act 1 never touched… what accumulates while you're away
+  is not numbers. It is *arrival*."
+- **Direction choice** (same file, section
+  `2026-07-02-act2-voyage-experience-exploration.md`): route/place as spine
+  + souls/loss as heart; each check-in should be "an event with a face on
+  it, not a status glance."
+- **Per-slice intent** in the specs-2–8 sections: arrivals are payoff
+  scenes, never tests; no dice anywhere; loss is authored-only; "traveling
+  is not dead time."
+- **Pacing targets, superseded twice over, both generations preserved in
+  the same file**: the `2026-07-03-vessel-ferryman-design.md` section's
+  original body still describes a **two-yard, Hope-bearing** Reckoning
+  tuned to ~19 crossings / ~87% saved. Its own first follow-up block
+  ("the two yards — Drive & Shipwright, earned not compressed") updated
+  this to a two-yard Drive/Shipwright design. **A second follow-up block in
+  the same section** ("the third yard — Ward, and per-day attrition",
+  dated 2026-07-04, same day) documents the shipped three-yard Ward/no-Hope
+  system in full — so this *is* described in a spec doc after all, just not
+  in the section's original body; a prior version of this dossier claimed
+  otherwise and was wrong, not stale (see "Since you last looked" above).
+  The authoritative numbers as shipped: **~19–24 crossings (balanced
+  spend), up to ~32 leaning on Ward, ~3–5 real months, ~88–94% saved with
+  skilled play, C1 ≈ 14–15 real days.**
 
 Note: specs 1–8 describe single-playthrough duration language ("20–200 days")
 that spec 9 (the Ferryman) superseded; nothing in the tree says so explicitly.
@@ -358,7 +387,9 @@ Held for a later round (not yet asked, unchanged):
   becomes a launch-checklist item).
 
 **Resolved 2026-07-04 (full spec-alignment pass)**: every one of the 15
-`docs/superpowers/specs/` vessel docs was audited against shipped source
+vessel docs (then under `docs/superpowers/specs/`, now consolidated into
+`openspec/changes/archive/the-vessel-act2/design.md` by commit 974bdbb) was
+audited against shipped source
 and annotated with "Doc-alignment note" call-outs wherever stale — the
 Hope retirement (present in nearly all of them), the abandoned
 combat/crew/rooms-stats specs (confirmed nothing shipped, not just

@@ -22,7 +22,7 @@ Ascension, the Vessel.
 
 | Act | Shape | Verb | Status |
 |-----|-------|------|--------|
-| **Act 1 — The Ascent** | 50 zones, bosses, the Stormbreaker gate at Z10, the endless **Expanse**, then Fracture (12–30) and Loom (31–50) bands | *Climb* | Shipped |
+| **Act 1 — The Ascent** | 50 zones, bosses, the Stormbreaker gate at Z10, the endless **Expanse**, then Fracture (12–30) and Loom (31–50) bands | *Climb* | Shipped — deep dossier: [`act1-ascent.md`](act1-ascent.md) |
 | **Act 2 — The Crossing** | Clear Z50 → a signal from a dying branch of Yggdrasil; burn 250,000 PR to launch **the Vessel**; the **Voyage** carries souls across the dark toward the Tree; arrival and the colony ferry loop | *Cross / ferry* | Shipped dark (kill-switch) |
 | **Act 3 — ?** | TBD | ? | Not designed |
 | **Act 4 — ?** | TBD | ? | Not designed |
@@ -65,6 +65,7 @@ against a larger scale.
 
 ## Sources
 
+- Act 1 experiential design: [`act1-ascent.md`](act1-ascent.md)
 - Act 2 experiential design: [`act2-pilgrimage.md`](act2-pilgrimage.md)
 - Act 2 mechanics: `openspec/specs/vessel-act2/spec.md`
 - Per-feature design intent: `openspec/changes/archive/` (esp. `the-vessel-act2/`)
