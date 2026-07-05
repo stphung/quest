@@ -1,7 +1,10 @@
 # Exploring: deepening Act 2 with more of Act 1's systems
 
-**Mode**: `/opsx:explore` | **Status**: direction crystallizing (see
-"Where the conversation landed"); nothing proposed yet
+**Mode**: `/opsx:explore` | **Status**: paused mid-thread — direction is
+solid (legacy-as-flavor across a ship-leveling dimension and a
+district-build-out dimension, fed by four read-only Act 1 signals); a few
+concrete details remain open (see "Still open, for a future session" at the
+end). Nothing proposed yet.
 **Prompted by**: "I loved how Act 1 was a system of systems that came together
 to get us to Act 2. I'd like to explore other systems and how they could tie
 into deepening Act 2 beyond what it is today."
@@ -214,7 +217,10 @@ God Items owned (0-3)              ──► Ship: named passive per yard
                                          Asprika→Hold)
 Haven room count/tier              ──► Districts: extra option(s) on offer
 Achievement score/title            ──► Districts: one rare "Founder's"
-                                         district, gated by a high threshold
+                                         district, gated by a specific
+                                         achievement/title (not an
+                                         aggregate score threshold — see
+                                         session 4)
 ```
 
 **Design principle for all four: read-only, not converted.** None of these
@@ -227,10 +233,61 @@ rather than finding them already used up by Act 2's read of them —
 consistent with `world-and-narrative.md`'s open question about whether the
 colony becomes Act 3's home base at all.
 
-**Still open, to flesh out next**: what the ship's actual tiers/named
-variants look like scene-by-scene, what a district's 2-3 passive choices
-actually are (values, not just names), and whether district picks should
-be permanent (mirroring the Voyage's refit-door pattern) or revisable.
+### Concrete sketches (session 4)
+
+A worked example of the Ward yard as named tiers over the same underlying
+cost curve — a skin, not a rebalance:
+
+| Tier | Name | Cost curve | Vignette (fires once, on tier-up) |
+|---|---|---|---|
+| 0 | Patched Hull | starting (or 1 free tier via Soulforge legacy, below) | — |
+| 1 | Warded Hull | today's Ward level 1 (`WARD_DECAY = 0.72`) | "The seams hold. For now." |
+| 2 | Bound Hull | today's level 2 | "Something in the wood remembers being whole." |
+| 3 | Blessed Hull | today's level 3 | "The dark's bite glances, doesn't land." |
+| 4 (cap) | Unbreakable | today's level 4/max | "Nothing left to fear from the crossing itself." |
+
+The Soulforge legacy signal (total enhancement across 7 slots past a
+midpoint threshold, e.g. 35/70) grants exactly one free starting tier —
+launch at "Warded Hull" instead of "Patched Hull" — small and legible,
+doesn't touch the tuned strategy-sweep numbers past that first step.
+
+God Item passives, sketched as small flat modifiers layered on a yard
+(shown as a named badge on the Reckoning row, not a hidden number) rather
+than new tiers of their own:
+
+| Item | Yard | Passive (rough magnitude) |
+|---|---|---|
+| Sleipnir | Drive | −5% days per leg |
+| Megingjörð | Ward | −5% dark toll rate |
+| Asprika | Shipwright (Hold) | +5% hold capacity |
+
+District example (District 2, illustrative names):
+
+```
+District founded ──► choose one:
+  "Warders' Court"  (small Ward efficiency, permanent)
+  "Shipwrights' Yard"  (small Hold efficiency, permanent)
+  "Founder's Hearth"  (only offered if a specific Act 1 title/achievement
+                        is held — not an aggregate score threshold, see
+                        below — unique passive + flavor text naming the
+                        player's own Act 1 legend)
+```
+
+**Founder's Hearth gating, reconsidered**: not an aggregate Achievement
+*score* threshold (too abstract, another buried formula, fails the
+legibility test the four signals were held to). Should instead key off one
+or a small named set of specific existing achievements/titles — e.g. a
+specific top-tier title already granted by the Achievements system — so
+the option's flavor text can name the exact thing the player did, not "you
+scored high enough." **Which specific title(s) qualify is still open** —
+needs a look at what titles the Achievements system actually grants today
+before picking one, rather than inventing a new threshold from scratch.
+
+**Still open, for a future session**: which specific Achievement title(s)
+gate Founder's Hearth, the full Haven-room → district-option mapping,
+whether district picks should be permanent (mirroring the Voyage's
+refit-door pattern) or revisable, and named tiers for Drive/Shipwright to
+match Ward's worked example above.
 
 ## Per-system sketches
 
