@@ -69,20 +69,27 @@ for ((i = 0; i < FRAME_COUNT; i++)); do
     sleep "$INTERVAL"
 done
 
-echo "Rendering frames to PNG..." >&2
+echo "Rendering frames to JPEG..." >&2
 for ((i = 0; i < FRAME_COUNT; i++)); do
     N="$(printf '%04d' "$i")"
     python3 "$SCRIPT_DIR/ansi2html.py" "$WORK/frame_$N.ansi" > "$WORK/frame_$N.html"
     "$CHROMIUM" --headless --disable-gpu --no-sandbox --hide-scrollbars \
         --force-device-scale-factor=2 \
         --window-size="$WIDTH,$HEIGHT" \
-        --screenshot="$WORK/frame_$N.png" \
+        --screenshot="$WORK/frame_$N.jpg" \
         "file://$WORK/frame_$N.html" 2>/dev/null
 done
 
 echo "Encoding video..." >&2
 mkdir -p "$(dirname "$OUT")"
-"$FFMPEG" -y -framerate "$FPS" -i "$WORK/frame_%04d.png" \
+# Frames are piped in via the image2pipe demuxer as MJPEG rather than passed
+# as a frame_%04d.png glob to -i: the Playwright-bundled ffmpeg found in some
+# environments is a minimal build (--disable-everything, --disable-autodetect)
+# with no image2 demuxer and no PNG decoder at all — only image2pipe +
+# mjpeg, since it exists to encode Chromium's own JPEG screencast frames.
+# Screenshotting straight to .jpg and decoding explicitly as mjpeg (autoprobe
+# is compiled out too) works within that same minimal codec set.
+cat "$WORK"/frame_*.jpg | "$FFMPEG" -y -f image2pipe -c:v mjpeg -framerate "$FPS" -i pipe:0 \
     -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2" \
     -pix_fmt yuv420p "$OUT" 2>&1 | tail -5
 

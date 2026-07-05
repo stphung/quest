@@ -77,11 +77,20 @@ pub fn beat(n: u8) -> &'static Beat {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LaunchTransitionState {
     pub beat: u8,
+    /// UI-clock millis (`ui::clock::now_millis()`) when the current beat was
+    /// entered — the caller (main.rs, which owns the UI clock) stamps this on
+    /// creation and every `advance()`. Rendering derives each beat's
+    /// animation phase from `now_millis() - beat_started_ms`, so this struct
+    /// stays decoupled from the UI clock module itself.
+    pub beat_started_ms: u128,
 }
 
 impl Default for LaunchTransitionState {
     fn default() -> Self {
-        Self { beat: 1 }
+        Self {
+            beat: 1,
+            beat_started_ms: 0,
+        }
     }
 }
 
@@ -97,6 +106,21 @@ impl LaunchTransitionState {
             false
         }
     }
+}
+
+/// Which animation treatment `render_launch_transition` uses, selected once
+/// via the `QUEST_TRANSITION_VARIANT` environment variable (1-3, default 1)
+/// for side-by-side comparison during design. Cached like `act2_enabled()` —
+/// changing the env var mid-process has no effect.
+pub fn variant() -> u8 {
+    static VARIANT: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
+    *VARIANT.get_or_init(|| {
+        std::env::var("QUEST_TRANSITION_VARIANT")
+            .ok()
+            .and_then(|v| v.parse::<u8>().ok())
+            .filter(|v| (1..=3).contains(v))
+            .unwrap_or(1)
+    })
 }
 
 #[cfg(test)]

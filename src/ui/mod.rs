@@ -68,6 +68,7 @@ pub mod time_vault_scene;
 pub mod title_browser_scene;
 pub mod vault_warden_scene;
 pub mod vessel_scene;
+mod vessel_transition_fx;
 pub mod voyage_scene;
 mod zone_bg;
 
