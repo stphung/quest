@@ -48,7 +48,12 @@ pub(crate) fn try_fishing_item_drop(
         // Item level based on zone
         let ilvl = ilvl_for_zone(zone_id);
 
-        Some(item_generation::generate_item(slot, item_rarity, ilvl))
+        Some(item_generation::generate_item_with_rng(
+            slot,
+            item_rarity,
+            ilvl,
+            rng,
+        ))
     } else {
         None
     }
