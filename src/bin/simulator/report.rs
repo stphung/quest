@@ -548,3 +548,103 @@ pub fn print_final_equipment(state: &GameState) {
     }
     println!();
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::strategy::StrategyProfile;
+
+    #[test]
+    fn ticks_to_time_formats_seconds_only() {
+        assert_eq!(ticks_to_time(55), "5s");
+        assert_eq!(ticks_to_time(0), "0s");
+    }
+
+    #[test]
+    fn ticks_to_time_formats_minutes_and_seconds() {
+        // 700 ticks = 70s = 1m 10s
+        assert_eq!(ticks_to_time(700), "1m 10s");
+    }
+
+    #[test]
+    fn ticks_to_time_formats_hours_minutes_seconds() {
+        // 36_000 ticks = 3600s = 1h 00m 00s
+        assert_eq!(ticks_to_time(36_000), "1h 00m 00s");
+        // 39_015 ticks = 3901.5s -> 3901s = 1h 05m 01s
+        assert_eq!(ticks_to_time(39_015), "1h 05m 01s");
+    }
+
+    #[test]
+    fn print_tick_events_does_not_panic_on_all_logged_variants() {
+        let result = TickResult {
+            events: vec![
+                TickEvent::PlayerAttack {
+                    damage: 5,
+                    was_crit: true,
+                },
+                TickEvent::EnemyAttack {
+                    damage: 3,
+                    enemy_name: "Wolf".to_string(),
+                },
+                TickEvent::PlayerDied,
+                TickEvent::LeveledUp { new_level: 2 },
+                TickEvent::HavenDiscovered,
+                // Unhandled variant should be silently skipped.
+                TickEvent::DungeonKeyFound,
+            ],
+            ..Default::default()
+        };
+        print_tick_events(42, &result);
+    }
+
+    #[test]
+    fn print_summary_quiet_mode_does_not_panic() {
+        let stats = SimStats::default();
+        let config = SimConfig {
+            quiet: true,
+            ..SimConfig::default()
+        };
+        print_summary(&stats, 1, &config);
+    }
+
+    #[test]
+    fn print_summary_verbose_mode_does_not_panic() {
+        let mut stats = SimStats {
+            total_kills: 10,
+            total_deaths: 1,
+            ..Default::default()
+        };
+        stats.zone_entry_tick.insert((1, 1), 0);
+        stats.zone_entry_tick.insert((2, 1), 100);
+        stats.deaths_per_zone.insert((1, 1), 1);
+        stats.pr_earned = 5;
+        stats.deep_layers_reached = 3;
+        stats.loom_patterns_completed = 2;
+        let config = SimConfig {
+            quiet: false,
+            strategy: Some(StrategyProfile::Optimal),
+            ..SimConfig::default()
+        };
+        print_summary(&stats, 1, &config);
+    }
+
+    #[test]
+    fn print_multi_run_summary_does_not_panic() {
+        let stats = vec![SimStats::default(), SimStats::default()];
+        print_multi_run_summary(&stats);
+    }
+
+    #[test]
+    fn print_profile_does_not_panic() {
+        let mut profile = TickProfile::default();
+        profile.record(1000);
+        let config = SimConfig::default();
+        print_profile(&profile, &config);
+    }
+
+    #[test]
+    fn print_final_equipment_does_not_panic_with_empty_slots() {
+        let state = GameState::new("Sim".to_string(), 0);
+        print_final_equipment(&state);
+    }
+}

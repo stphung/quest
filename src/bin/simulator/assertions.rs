@@ -95,3 +95,84 @@ pub fn run_assertions(stats: &SimStats) -> bool {
 
     all_pass
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn stats_with(zone_tick: u64, level_20_tick: u64, pr_earned: u64, pr_spent: u64) -> SimStats {
+        let mut stats = SimStats::default();
+        stats.zone_entry_tick.insert((2, 1), zone_tick);
+        stats.level_at_tick.insert(20, level_20_tick);
+        stats.total_ticks = 50_000;
+        stats.pr_earned = pr_earned;
+        stats.pr_spent = pr_spent;
+        stats
+    }
+
+    #[test]
+    fn less_or_equal_passes_at_and_under_threshold() {
+        let assertion = Assertion {
+            name: "test",
+            metric: |s| s.total_ticks as f64,
+            op: AssertionOp::LessOrEqual,
+            value: 100.0,
+        };
+        let mut stats = SimStats {
+            total_ticks: 100,
+            ..Default::default()
+        };
+        assert!(assertion.check(&stats));
+        stats.total_ticks = 101;
+        assert!(!assertion.check(&stats));
+    }
+
+    #[test]
+    fn greater_or_equal_passes_at_and_over_threshold() {
+        let assertion = Assertion {
+            name: "test",
+            metric: |s| s.total_kills as f64,
+            op: AssertionOp::GreaterOrEqual,
+            value: 10.0,
+        };
+        let mut stats = SimStats {
+            total_kills: 10,
+            ..Default::default()
+        };
+        assert!(assertion.check(&stats));
+        stats.total_kills = 9;
+        assert!(!assertion.check(&stats));
+    }
+
+    #[test]
+    fn builtin_assertions_has_expected_names() {
+        let assertions = builtin_assertions();
+        assert_eq!(assertions.len(), 3);
+        assert!(assertions.iter().any(|a| a.name.contains("Zone 2")));
+        assert!(assertions.iter().any(|a| a.name.contains("Level 20")));
+        assert!(assertions.iter().any(|a| a.name.contains("PR income")));
+    }
+
+    #[test]
+    fn run_assertions_passes_with_healthy_stats() {
+        let stats = stats_with(1_000, 2_000, 100, 50);
+        assert!(run_assertions(&stats));
+    }
+
+    #[test]
+    fn run_assertions_fails_when_zone_2_unreachable() {
+        let stats = stats_with(u64::MAX, 2_000, 100, 50);
+        assert!(!run_assertions(&stats));
+    }
+
+    #[test]
+    fn run_assertions_pr_check_skips_when_sim_too_short() {
+        // total_ticks < 50_000 with pr_earned/pr_spent both 0 => metric returns
+        // the pass-through 1.0 sentinel regardless of actual PR balance.
+        let mut stats = SimStats::default();
+        stats.zone_entry_tick.insert((2, 1), 100);
+        stats.level_at_tick.insert(20, 100);
+        stats.total_ticks = 1_000;
+        assert!(run_assertions(&stats));
+    }
+}

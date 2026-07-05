@@ -271,3 +271,214 @@ impl SimStats {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quest::items::types::Rarity;
+    use quest::zones::BossDefeatResult;
+
+    fn tick_result(events: Vec<TickEvent>) -> TickResult {
+        TickResult {
+            events,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn record_zone_entry_keeps_earliest_tick() {
+        let mut stats = SimStats::default();
+        stats.record_zone_entry(50, 2, 1);
+        stats.record_zone_entry(10, 2, 1);
+        assert_eq!(stats.zone_entry_tick[&(2, 1)], 50);
+    }
+
+    #[test]
+    fn process_tick_counts_kills_and_xp() {
+        let mut stats = SimStats::default();
+        let state = GameState::new("Sim".to_string(), 0);
+        let result = tick_result(vec![TickEvent::EnemyDefeated {
+            xp_gained: 300,
+            enemy_name: "Rat".to_string(),
+        }]);
+        stats.process_tick(5, &result, &state, (1, 1));
+        assert_eq!(stats.total_ticks, 6);
+        assert_eq!(stats.total_kills, 1);
+        assert_eq!(stats.total_xp_gained, 300);
+    }
+
+    #[test]
+    fn process_tick_tracks_deaths_per_zone() {
+        let mut stats = SimStats::default();
+        let state = GameState::new("Sim".to_string(), 0);
+        let result = tick_result(vec![TickEvent::PlayerDied]);
+        stats.process_tick(1, &result, &state, (3, 2));
+        assert_eq!(stats.total_deaths, 1);
+        assert_eq!(stats.deaths_per_zone[&(3, 2)], 1);
+
+        let result = tick_result(vec![TickEvent::PlayerDiedInDungeon]);
+        stats.process_tick(2, &result, &state, (3, 2));
+        assert_eq!(stats.total_deaths, 2);
+        // Dungeon deaths are not attributed to an overworld zone.
+        assert_eq!(stats.deaths_per_zone[&(3, 2)], 1);
+    }
+
+    #[test]
+    fn process_tick_records_boss_kills_and_frontier_backoffs() {
+        let mut stats = SimStats::default();
+        let state = GameState::new("Sim".to_string(), 0);
+        let result = tick_result(vec![TickEvent::SubzoneBossDefeated {
+            xp_gained: 1000,
+            result: BossDefeatResult::FrontierBackoff {
+                zone_id: 1,
+                blocked_zone_id: 2,
+            },
+        }]);
+        stats.process_tick(3, &result, &state, (1, 1));
+        assert_eq!(stats.total_boss_kills, 1);
+        assert_eq!(stats.total_xp_gained, 1000);
+        assert_eq!(stats.frontier_backoffs, 1);
+        assert_eq!(stats.zone_boss_defeated_tick[&(1, 1)], 3);
+    }
+
+    #[test]
+    fn process_tick_counts_retreats_enrages_and_crits() {
+        let mut stats = SimStats::default();
+        let state = GameState::new("Sim".to_string(), 0);
+        let result = tick_result(vec![
+            TickEvent::CombatRetreat {
+                zone_name: "Z".to_string(),
+            },
+            TickEvent::BossEnrage {
+                message: "enraged".to_string(),
+            },
+            TickEvent::PlayerAttack {
+                damage: 10,
+                was_crit: true,
+            },
+            TickEvent::PlayerAttack {
+                damage: 5,
+                was_crit: false,
+            },
+        ]);
+        stats.process_tick(1, &result, &state, (2, 1));
+        assert_eq!(stats.combat_retreats, 1);
+        assert_eq!(stats.retreats_per_zone[&(2, 1)], 1);
+        assert_eq!(stats.boss_enrages, 1);
+        assert_eq!(stats.enrages_per_zone[&(2, 1)], 1);
+        assert_eq!(stats.total_crits, 1);
+    }
+
+    #[test]
+    fn process_tick_tracks_item_drops_by_rarity_and_flags() {
+        let mut stats = SimStats::default();
+        let state = GameState::new("Sim".to_string(), 0);
+        let result = tick_result(vec![TickEvent::ItemDropped {
+            item_name: "Sword".to_string(),
+            rarity: Rarity::Epic,
+            tier: 5,
+            ilvl: 50,
+            power: 100,
+            equipped: true,
+            slot: "Weapon".to_string(),
+            stats: "+STR".to_string(),
+            from_boss: true,
+        }]);
+        stats.process_tick(1, &result, &state, (1, 1));
+        assert_eq!(stats.items_by_rarity[Rarity::Epic as usize], 1);
+        assert_eq!(stats.items_equipped, 1);
+        assert_eq!(stats.boss_items_dropped, 1);
+    }
+
+    #[test]
+    fn process_tick_tracks_level_ups_dungeons_fishing_and_achievements() {
+        let mut stats = SimStats::default();
+        let state = GameState::new("Sim".to_string(), 0);
+        let result = tick_result(vec![
+            TickEvent::LeveledUp { new_level: 5 },
+            TickEvent::DungeonCompleted {
+                xp_earned: 10,
+                items_collected: 1,
+            },
+            TickEvent::DungeonFailed,
+            TickEvent::DungeonDiscovered {
+                message: "found".to_string(),
+            },
+            TickEvent::FishCaught {
+                fish_name: "Trout".to_string(),
+                rarity: Rarity::Common,
+                message: "caught".to_string(),
+            },
+            TickEvent::FishingRankUp {
+                message: "rank up".to_string(),
+            },
+            TickEvent::AchievementUnlocked {
+                name: "Stormbreaker".to_string(),
+            },
+            TickEvent::HavenDiscovered,
+        ]);
+        stats.process_tick(1, &result, &state, (1, 1));
+        assert_eq!(stats.level_at_tick[&5], 1);
+        assert_eq!(stats.dungeons_completed, 1);
+        assert_eq!(stats.dungeons_failed, 1);
+        assert_eq!(stats.dungeons_discovered, 1);
+        assert_eq!(stats.fish_caught, 1);
+        assert_eq!(stats.fishing_rank_ups, 1);
+        assert_eq!(stats.achievements_unlocked, 1);
+        assert!(stats.haven_discovered);
+    }
+
+    #[test]
+    fn process_tick_sums_dungeon_boss_xp_separately() {
+        let mut stats = SimStats::default();
+        let state = GameState::new("Sim".to_string(), 0);
+        let result = tick_result(vec![TickEvent::DungeonBossDefeated {
+            xp_gained: 100,
+            bonus_xp: 50,
+            total_xp: 150,
+            items_collected: 2,
+            enemy_name: "Elite".to_string(),
+        }]);
+        stats.process_tick(1, &result, &state, (1, 1));
+        assert_eq!(stats.dungeons_completed, 1);
+        assert_eq!(stats.total_xp_gained, 150);
+    }
+
+    #[test]
+    fn finalize_snapshots_final_state() {
+        let mut stats = SimStats::default();
+        let mut state = GameState::new("Sim".to_string(), 0);
+        state.character_level = 42;
+        state.prestige_rank = 7;
+        state.ascension_level = 2;
+        state.stormglass = 999;
+        let deep = quest::deep::DeepState::new();
+        let loom = quest::loom::LoomState::new();
+        stats.finalize(&state, &deep, &loom);
+        assert_eq!(stats.final_level, 42);
+        assert_eq!(stats.final_prestige, 7);
+        assert_eq!(stats.ascension_level, 2);
+        assert_eq!(stats.stormglass_balance, 999);
+        assert_eq!(
+            stats.deep_layers_reached,
+            deep.persistent.deepest_layer_reached
+        );
+        assert_eq!(
+            stats.loom_zone_cap,
+            quest::loom::loom_zone_cap_for_patterns(0)
+        );
+    }
+
+    #[test]
+    fn tick_profile_tracks_min_max_and_average() {
+        let mut profile = TickProfile::default();
+        assert_eq!(profile.avg_us(), 0.0);
+        profile.record(1000);
+        profile.record(3000);
+        profile.record(2000);
+        assert_eq!(profile.tick_count, 3);
+        assert_eq!(profile.min_us(), 1.0);
+        assert_eq!(profile.max_us(), 3.0);
+        assert!((profile.avg_us() - 2.0).abs() < f64::EPSILON);
+    }
+}

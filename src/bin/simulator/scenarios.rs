@@ -296,3 +296,117 @@ pub fn run_progression_check() -> bool {
 
     all_pass
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn first_tick_at_zone_finds_min_among_matching_zones() {
+        let mut stats = SimStats::default();
+        stats.zone_entry_tick.insert((1, 1), 10);
+        stats.zone_entry_tick.insert((2, 1), 500);
+        stats.zone_entry_tick.insert((3, 1), 200);
+        assert_eq!(first_tick_at_zone(&stats, 2), 200.0);
+    }
+
+    #[test]
+    fn first_tick_at_zone_returns_max_when_unreached() {
+        let mut stats = SimStats::default();
+        stats.zone_entry_tick.insert((1, 1), 10);
+        assert_eq!(first_tick_at_zone(&stats, 2), u64::MAX as f64);
+    }
+
+    #[test]
+    fn max_zone_entered_returns_highest_zone_id() {
+        let mut stats = SimStats::default();
+        stats.zone_entry_tick.insert((1, 1), 10);
+        stats.zone_entry_tick.insert((5, 2), 20);
+        stats.zone_entry_tick.insert((3, 1), 30);
+        assert_eq!(max_zone_entered(&stats), 5.0);
+    }
+
+    #[test]
+    fn max_zone_entered_defaults_to_one_when_empty() {
+        let stats = SimStats::default();
+        assert_eq!(max_zone_entered(&stats), 1.0);
+    }
+
+    #[test]
+    fn max_level_reached_prefers_higher_of_map_and_final() {
+        let mut stats = SimStats::default();
+        stats.level_at_tick.insert(10, 100);
+        stats.level_at_tick.insert(25, 200);
+        stats.final_level = 15;
+        assert_eq!(max_level_reached(&stats), 25.0);
+
+        stats.final_level = 40;
+        assert_eq!(max_level_reached(&stats), 40.0);
+    }
+
+    #[test]
+    fn scenarios_defines_three_scenarios_with_expected_names() {
+        let all = scenarios();
+        assert_eq!(all.len(), 3);
+        assert_eq!(all[0].name, "early-game");
+        assert_eq!(all[1].name, "prestige-economy");
+        assert_eq!(all[2].name, "endgame-systems");
+        for scenario in &all {
+            assert!(!scenario.seeds.is_empty());
+            assert!(!(scenario.assertions)().is_empty());
+        }
+    }
+
+    #[test]
+    fn scenario_config_carries_over_fields() {
+        let scenario = &scenarios()[1];
+        let config = scenario.config();
+        assert_eq!(config.ticks, scenario.ticks);
+        assert_eq!(config.prestige, scenario.prestige);
+        assert_eq!(config.stormbreaker, scenario.stormbreaker);
+        assert!(config.quiet);
+        assert!(matches!(config.strategy, Some(StrategyProfile::Optimal)));
+    }
+
+    #[test]
+    fn early_game_assertions_do_not_require_strategy_progress() {
+        let assertions = early_game_assertions();
+        assert!(assertions.iter().any(|a| a.name.contains("Zone 2")));
+        assert!(assertions.iter().any(|a| a.name.contains("boss kills")));
+    }
+
+    #[test]
+    fn endgame_systems_assertions_gate_late_game_systems() {
+        let assertions = endgame_systems_assertions();
+        assert!(assertions.iter().any(|a| a.name.contains("Deep")));
+        assert!(assertions.iter().any(|a| a.name.contains("Loom")));
+        assert!(assertions.iter().any(|a| a.name.contains("Ascension")));
+    }
+
+    #[test]
+    fn run_progression_check_passes_on_a_short_smoke_scenario() {
+        // Exercise the full scenario-runner loop (not the real 30h CI scenarios,
+        // which are covered separately by `cargo run --bin simulator -- --check-progression`)
+        // by running one cheap scenario through the same code path.
+        let scenario = Scenario {
+            name: "smoke",
+            description: "tiny smoke scenario",
+            ticks: 500,
+            seeds: &[1],
+            prestige: 0,
+            strategy: None,
+            stormbreaker: false,
+            assertions: || {
+                vec![Assertion {
+                    name: "ticks recorded",
+                    metric: |s| s.total_ticks as f64,
+                    op: AssertionOp::GreaterOrEqual,
+                    value: 1.0,
+                }]
+            },
+        };
+        let config = scenario.config();
+        let (stats, _, _) = run_simulation(&config, 1);
+        assert!((scenario.assertions)()[0].check(&stats));
+    }
+}
