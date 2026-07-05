@@ -1,7 +1,7 @@
 # Act 2: The Pilgrimage of Souls — Design Dossier
 
-> Last refreshed: 2026-07-05 @ 64803b2 (prose de-cluttered: no inline code
-> references, bulleted structure; no source changed) | Sources: `src/vessel/`, `src/main.rs` (vessel wiring), `src/vessel/CLAUDE.md`, `openspec/changes/archive/the-vessel-act2/design.md` (the 15 backported vessel specs, now consolidated into one file), `openspec/specs/vessel-act2/spec.md`, `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
+> Last refreshed: 2026-07-05 (Dock/Wormhole/Riftglass shipped — spec 9
+> addendum, see Refresh History) | Sources: `src/vessel/`, `src/main.rs` (vessel wiring), `src/vessel/CLAUDE.md`, `openspec/changes/archive/the-vessel-act2/design.md` (the 15 backported vessel specs, now consolidated into one file), `openspec/changes/act2-dock-wormhole-crossing/` (Dock/Wormhole), `openspec/specs/vessel-act2/spec.md`, `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep`/`dock_time_across_charge_policies` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
 
 > **Status: living, deep-refreshed across several sessions.** This dossier
 > holds Act 2's cross-system, player-eye synthesis — how the launch gate,
@@ -46,11 +46,17 @@ Arrival opens three quiet rooms (manifest, keepsake chart, record) — and
 then the **Reckoning** reframes the act: a vast number of souls wait in
 the dying world, the ship sails back, and every landfall pays Salvage to
 spend on **three** yards (Drive = speed, Shipwright = hold, Ward = dampens
-the dark's daily bite). Ferry runs (crossing 2+) are fully hands-off — the
-ship sails herself in Drive-scaled time while the player's choice
-compresses to one three-way pick at each Reckoning, each shown with a
-concrete "you'd go from X to Y" number. The era runs a good number of
-crossings depending on how the player spends (see Balance Evidence), over
+the dark's daily bite). Every arrival — from the maiden voyage's onward —
+now opens a **Dock** phase instead of an instant next crossing (spec 9
+addendum, 2026-07-05): a new resource, Riftglass, charges from a
+Drive-scaled real-time clock, and the player commits a one-way wormhole
+jump whenever they choose — full charge is the safe, patient start; an
+early jump trades Dock time for a deterministic deficit on the crossing to
+come. Once underway, the crossing itself remains fully hands-off — the
+ship sails herself in Drive-scaled time — while the player's choice
+compresses to the three-way yard pick plus the jump-timing call, each
+shown with a concrete "you'd go from X to Y" number. The era runs a good
+number of crossings depending on how the player spends (see Balance Evidence), over
 a few real months, the pace quickening steadily while loads climb from a
 handful of crew into the thousands of souls — the dark now biting **every
 day** a crossing is underway rather than once at its end, so a slow
@@ -64,7 +70,7 @@ player becomes the one who keeps going back across the dark. The loop
 ends rather than cycling in place:
 
 - Once the old world is fully emptied, the next arrival is **the Last
-  Crossing** — no further "Sail Again" is offered.
+  Crossing** — no further Dock/jump is offered.
 - A second, deeper flag is raised at that point, distinct from the one
   set at the very first landfall.
 - An authored scene closes the era ("the old world is empty... the door,
@@ -217,7 +223,7 @@ instead — a second discovery axis keyed to decline rather than growth,
 landing on a different crossing depending on how the player spends.
 
 **Era end**: once the old world is fully emptied, the game refuses any
-further "Sail Again," and the arrival that emptied the world sets a
+further Dock/jump, and the arrival that emptied the world sets a
 second persistent flag, distinct from the one set at the very first
 landfall — the design's "Last Crossing," called "Act 3's gate" in the
 design's own words. The flag isn't yet exercised by any Act 3 content,
@@ -233,6 +239,9 @@ Voyage takes the screen.
 - The maiden voyage plays out over about two real weeks.
 - Ferry runs shrink toward just a few real days each as Drive levels climb.
 - The ship's hold grows from a handful of crew into the thousands of souls.
+- Docking to full Riftglass charge takes about a real day at Drive level 0,
+  faster at higher Drive levels — small next to the crossing itself
+  (adds roughly a few real days across the whole era).
 - The whole ferry era runs a few real months depending on how the player
   spends, longer if leaning hard on the Ward (see Balance Evidence for the
   measured range).
@@ -251,11 +260,13 @@ Act 1 (everything)                Act 2: launch → crossing 1 → the Ferryman 
                           ┌───────────────────► Reckoning: Salvage
                           │                     ─► Drive / Shipwright / Ward
                           │                            │
-                    "Sail Again" ◄─── ferry run, hands-off ──┘
-                    (loops until the old world is emptied)
+                     Dock (Riftglass charges) ◄────────┘
                           │
+                   wormhole jump ─► ferry run, hands-off ──┐
+                   (loops until the old world is emptied)  │
+                          │◄───────────────────────────────┘
               souls delivered ─► districts + world milestones
-              old world emptied ─► "Sail Again" stops being offered
+              old world emptied ─► Dock/jump stops being offered
                           │
                           ▼
               world fully emptied (Act 3 hook #2, "the Last Crossing" —
@@ -348,7 +359,7 @@ both use (these originate from Act 1's own benchmarks, per
 | 2 | Wall → reset → power | 5/5 | The ferry loop is a true earned ramp (37→8 days, 180→4,500+ hold). The dark's toll is a per-day, always-visible, always-engaged number on the Reckoning screen, materially diverging by policy (70.5% vs 94.3%). Resistance is legible. |
 | 3 | Discovery cadence | 4/5 | World milestones fix the flagged gap: the ferry era now reveals *two* independent axes of new content — districts (colony growth) and world milestones (old-world decline) — and because milestones key off how much of the old world remains rather than population, they land on different crossings for different spend policies, so the sequence of "what's new" isn't identical run to run. Held at 4 rather than 5 because both axes are still text-only log moments, not new mechanical levers, and the maiden voyage's much richer discovery density (weather, nights, souls, rumors, refits, letters) isn't matched in kind. |
 | 4 | Cross-system braiding | 3/5 | The launch gate braids all of Act 1 into the burn (excellent); the voyage itself remains a deliberate island. Confirmed intentional, not a gap. |
-| 5 | Decision density | 3/5 | Maiden voyage is decision-rich. Ferry runs: one choice per ~3 real days, but a rich one — three options, each with a live before→after delta shown, not just a level-up button. |
+| 5 | Decision density | 4/5 | Maiden voyage is decision-rich. Ferry runs gained a second dimension (spec 9 addendum, 2026-07-05): arrival now opens a real-time Dock phase where Riftglass charges from a new Drive-scaled clock, and the player chooses *when* to commit the one-way wormhole jump — full charge is safe and patient, an early jump trades Dock time for a deterministic provisions/hull-wear deficit on the crossing to come. That's a genuine timing decision layered on top of the existing three-way yard spend, not just a faster "level-up" button. Held at 4 rather than 5 because Dock time itself is small relative to sailing time (~0.1–0.5 real months added across a whole era) and the jump-timing choice, while real, is a single dial rather than several interacting levers. |
 | 6 | Anticipation instruments | 5/5 | The act's strongest suit — fuel bars, watch forecasts, chapter gateways, Letters From Home, the Going-Dark. |
 | 7 | Stakes and texture | 4/5 | Stakes are no longer soft: Hope's "pinned at max, nearly no stakes" problem is gone, replaced by a toll that's always live and always differentiates skilled from careless play. The launch transition adds a beat of ceremony to the act's single biggest moment that was previously a bare confirmation screen. What's still missing: the toll and the milestones are numbers/log lines, not scenes — nobody the player has met is ever named as lost to the dark (that stays authored-only by design, and is a deliberate boundary, not a gap). |
 
@@ -421,6 +432,30 @@ Held for a later round (not yet asked, unchanged):
 Session-by-session log of what changed at each refresh, most recent first.
 The sections above always describe the *current* state only — read this
 section for how it got there.
+
+### 2026-07-05 — Dock/Wormhole/Riftglass shipped (spec 9 addendum)
+
+Implemented `openspec/changes/act2-dock-wormhole-crossing/`, the
+`docs/explorations/2026-07-05-act2-systems-braiding.md` Session 6 idea:
+arrival no longer auto-starts the next crossing. A real-time Dock phase
+opens instead, charging a new resource (Riftglass, Drive-scaled rate) that
+gates a one-way wormhole jump — full charge is the safe/patient start, a
+partial charge trades Dock time for a deterministic provisions/hull-wear
+deficit on the crossing to come. Updated: the Player's Experience section's
+"Ferry runs are fully hands-off" claim (now qualified — the *crossing* is
+hands-off once underway, but the Dock/jump timing is a new player choice);
+the Interrelations diagram and "Sail Again" terminology throughout (renamed
+to Dock/jump, matching the shipped `VoyageInputResult::Jump`); Fun
+Assessment heuristic 5 (Decision density), raised 3/5 → 4/5. Balance
+evidence: `ferryman_tests::dock_time_across_charge_policies` (run with
+`--ignored --nocapture`) shows Dock time adds only ~0.1–0.5 real months
+across a ~4–11 month era at the shipped `RIFTGLASS_BASE_HOURS_TO_FULL =
+24.0`, and that rushing every jump (0% charge) costs *more* overall
+(worse crossings) than patiently waiting for full charge — the intended
+risk/reward tension holds without further tuning. Historical Refresh
+History entries below that reference the pre-Dock `SailAgain` mechanic are
+left as-written — they're a record of what was true at the time, not
+current-state prose.
 
 ### 2026-07-05 — code references stripped from prose, bulleted for structure
 

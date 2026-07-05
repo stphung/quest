@@ -49,6 +49,15 @@ pub const PORT_CALL_GAME_MINUTES: u64 = 6 * 60;
 /// Scars on the hull: cap, and what each one eats.
 pub const HULL_WEAR_MAX: u8 = 6;
 pub const WEAR_BURN_PER_SCAR: f64 = 0.05;
+
+/// The most a wormhole jump committed at 0% Riftglass charge can dock from
+/// the next crossing's starting provisions (scaled by `1.0 - charge`) — see
+/// `openspec/changes/act2-dock-wormhole-crossing/design.md` Decision 4. A
+/// starting value pending `voyage_simulator` validation, not yet final.
+pub const MAX_PARTIAL_CHARGE_PROVISIONS_DEFICIT: f64 = 40.0;
+/// The most hull wear a 0%-charge jump can pre-apply to the next crossing
+/// (scaled by `1.0 - charge`), out of the `HULL_WEAR_MAX` scale.
+pub const MAX_PARTIAL_CHARGE_HULL_WEAR: u8 = 3;
 /// Extra daily provisions each passenger aboard a ferry run eats (spec 9).
 /// Tiny, because a long era's expeditions run into the thousands of souls —
 /// a steeper draw would leave a full ship unable to make the crossing at
@@ -541,12 +550,19 @@ impl VoyageState {
     /// Colony's districts fold their bonuses into a fresh crossing. The
     /// intro and the authored recruit asks are behind us — passengers, not
     /// pilgrims, ride now.
+    ///
+    /// `charge` (0.0..=1.0) is the Riftglass charge the wormhole jump was
+    /// committed at (Dock/Wormhole, spec 9 addendum): `1.0` (full charge)
+    /// begins the crossing exactly as before; anything less pre-applies a
+    /// deterministic provisions/hull-wear deficit via
+    /// `apply_partial_charge_penalty` (design.md Decision 4).
     pub fn begin_ferry(
         character_id: String,
         voyage_seed: u64,
         now: DateTime<Utc>,
         colony: &crate::vessel::colony::ColonyState,
         crew: Vec<SoulState>,
+        charge: f64,
     ) -> Self {
         use crate::vessel::colony::District;
         let mut v = VoyageState::begin(character_id, voyage_seed, now);
@@ -577,7 +593,22 @@ impl VoyageState {
             v.provisions_cap = PROVISIONS_CAP + 25.0;
             v.provisions = v.provisions_cap;
         }
+        v.apply_partial_charge_penalty(charge);
         v
+    }
+
+    /// A wormhole jump committed at less than full Riftglass charge costs
+    /// the new crossing a deterministic provisions/hull-wear deficit,
+    /// scaled by how far short of full the charge was — no randomness, per
+    /// the "no dice anywhere" pillar. A no-op at `charge >= 1.0`.
+    fn apply_partial_charge_penalty(&mut self, charge: f64) {
+        let deficit = 1.0 - charge.clamp(0.0, 1.0);
+        if deficit <= 0.0 {
+            return;
+        }
+        self.provisions =
+            (self.provisions - MAX_PARTIAL_CHARGE_PROVISIONS_DEFICIT * deficit).max(0.0);
+        self.hull_wear = (f64::from(MAX_PARTIAL_CHARGE_HULL_WEAR) * deficit).round() as u8;
     }
 
     pub fn has_refit(&self, refit: RefitId) -> bool {

@@ -1,6 +1,11 @@
 # Development helpers for Quest
 
-.PHONY: check fmt lint test build audit all clean install setup coverage coverage-html coverage-check
+# Pin to the CLI version the .claude/skills/openspec-*/SKILL.md files were
+# generated against (see each file's `generatedBy` frontmatter) so the
+# `/opsx:*` skills' bare `openspec ...` commands behave predictably.
+OPENSPEC_VERSION := 1.5.0
+
+.PHONY: check fmt lint test build audit all clean install setup openspec-setup coverage coverage-html coverage-check
 
 # Run all PR checks locally (uses same script as CI)
 check:
@@ -61,10 +66,25 @@ coverage-check:
 clean:
 	@cargo clean
 
-# Set up development environment (git hooks, etc.)
-setup:
+# Set up development environment (git hooks, OpenSpec CLI, etc.)
+setup: openspec-setup
 	@git config core.hooksPath scripts/hooks
 	@echo "Git hooks configured. Pre-commit will now run fmt and clippy checks."
+
+# Install the OpenSpec CLI the /opsx:* skills (.claude/skills/openspec-*)
+# and openspec/README.md's workflow depend on. Non-fatal if npm is missing
+# or the install fails — the skills just won't work until it's installed
+# manually (see openspec/README.md).
+openspec-setup:
+	@if command -v openspec >/dev/null 2>&1 && [ "$$(openspec --version 2>/dev/null)" = "$(OPENSPEC_VERSION)" ]; then \
+		echo "OpenSpec CLI $(OPENSPEC_VERSION) already installed."; \
+	elif command -v npm >/dev/null 2>&1; then \
+		npm install -g @fission-ai/openspec@$(OPENSPEC_VERSION) \
+			&& echo "OpenSpec CLI $(OPENSPEC_VERSION) installed." \
+			|| echo "Warning: failed to install the OpenSpec CLI; /opsx:* skills won't work until 'npm install -g @fission-ai/openspec@$(OPENSPEC_VERSION)' succeeds."; \
+	else \
+		echo "Warning: npm not found; skipping OpenSpec CLI install. /opsx:* skills need 'npm install -g @fission-ai/openspec@$(OPENSPEC_VERSION)' run manually."; \
+	fi
 
 # Default target
 all: check

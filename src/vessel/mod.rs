@@ -85,6 +85,13 @@ pub enum VoyageView {
     },
     /// The Reckoning — the colony's numbers pane (spec 9).
     Reckoning,
+    /// The Dock — between crossings, waiting on a wormhole jump; shows the
+    /// Riftglass charge. `confirm_pending` is the one-way commitment's
+    /// second key press (spec 9 addendum) — a jump is never a single
+    /// accidental keystroke.
+    Dock {
+        confirm_pending: bool,
+    },
 }
 
 /// A scene being read: title line + body text.

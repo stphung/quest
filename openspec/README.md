@@ -53,6 +53,16 @@ than silently editing the spec to match a regression.
 | [`persistence`](specs/persistence/spec.md) | 10 | JSON save files, `QUEST_DIR`, run vs account state, backward-compat contract, silent-wipe hazard |
 | [`vessel-act2`](specs/vessel-act2/spec.md) | 12 | Act 2 kill-switch, Zone-50 launch gate (250k PR burn), the Voyage loop |
 
+## Setup
+
+The `/opsx:*` skills (`.claude/skills/openspec-*`) shell out to a bare
+`openspec` command, so the [OpenSpec CLI](https://github.com/Fission-AI/OpenSpec)
+needs to be on `PATH`. `make setup` installs it (`npm install -g
+@fission-ai/openspec@1.5.0` — pinned to the version the skill files were
+generated against, per each `SKILL.md`'s `generatedBy` frontmatter). If npm
+isn't available, install it manually with the same command, or run
+`make openspec-setup` on its own to (re)install just the CLI.
+
 ## Working spec-driven from here
 
 Use the OpenSpec skills (installed under `.claude/`):

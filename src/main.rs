@@ -758,6 +758,13 @@ fn main() -> io::Result<()> {
                                                and the door, at last, is ajar."
                                             .to_string(),
                                     });
+                                } else {
+                                    // Dock/Wormhole (spec 9 addendum): every
+                                    // arrival opens a Dock phase instead of
+                                    // an instant next crossing — Riftglass
+                                    // charges from here until a jump is
+                                    // committed.
+                                    col.dock(Utc::now());
                                 }
                                 voyage_ui.scene_play =
                                     Some(vessel::ScenePlay { playback, index: 0 });
@@ -831,12 +838,21 @@ fn main() -> io::Result<()> {
                                                     let _ = vessel::persistence::save_voyage(v);
                                                 }
                                             }
-                                            VoyageInputResult::SailAgain => {
-                                                // The next ferry run: carry the
-                                                // crew and the colony's bonuses
-                                                // into a fresh crossing (spec 9).
-                                                if let Some(col) = &colony {
+                                            VoyageInputResult::Jump => {
+                                                // The wormhole jump (spec 9
+                                                // addendum): read the
+                                                // Riftglass charge, undock,
+                                                // then carry the crew and the
+                                                // colony's bonuses into a
+                                                // fresh crossing — a partial
+                                                // charge pre-applies a
+                                                // deterministic deficit
+                                                // (design.md Decision 4).
+                                                if let Some(col) = &mut colony {
                                                     if !col.era_over() {
+                                                        let now = Utc::now();
+                                                        let charge = col.riftglass_charge(now);
+                                                        col.undock();
                                                         let crew = v.souls.clone();
                                                         let seed = col.era_seed
                                                             ^ (col.crossings_completed as u64 + 1)
@@ -844,15 +860,20 @@ fn main() -> io::Result<()> {
                                                         *v = vessel::voyage::VoyageState::begin_ferry(
                                                             state.character_id.clone(),
                                                             seed,
-                                                            Utc::now(),
+                                                            now,
                                                             col,
                                                             crew,
+                                                            charge,
                                                         );
                                                         voyage_ui =
                                                             vessel::VoyageUiState::default();
                                                         if !debug_mode {
                                                             let _ =
                                                                 vessel::persistence::save_voyage(v);
+                                                            let _ =
+                                                                vessel::persistence::save_colony(
+                                                                    col,
+                                                                );
                                                         }
                                                         terminal.clear()?;
                                                     }

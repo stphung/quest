@@ -70,12 +70,38 @@ fn strategy_sweep() {
         ("balanced", balanced_spend),
         ("cap-lean (souls-first)", cap_lean_spend),
     ] {
-        let (crossings, first, _last, delivered, total) = run_era_with(spend);
+        let (crossings, first, _last, delivered, total, dock_hours) = run_era_with(spend, 1.0);
         eprintln!(
-            "{name:>24}: {crossings:>3} crossings  {:>4.1} mo  {:>4.1}% saved  (C1 {:.0}d)",
+            "{name:>24}: {crossings:>3} crossings  {:>4.1} mo sailing + {:>4.1} mo docked \
+             = {:>4.1} mo total  {:>4.1}% saved  (C1 {:.0}d)",
             (total as f64 / scale) / 30.0,
+            (dock_hours / 24.0) / 30.0,
+            (total as f64 / scale + dock_hours / 24.0) / 30.0,
             delivered as f64 / 1000.0,
             first as f64 / scale,
+        );
+    }
+}
+
+#[test]
+#[ignore = "tuning sweep — run with --ignored --nocapture"]
+fn dock_time_across_charge_policies() {
+    // Sanity-checks design.md Decision 1/4's starting constants
+    // (RIFTGLASS_BASE_HOURS_TO_FULL = 24.0) against the era's ~3-real-month
+    // target: a balanced spend, jumping at full charge every time (the safe,
+    // patient policy) versus jumping immediately every time (charge 0.0, the
+    // fastest possible policy, worst-case crossings).
+    let scale = quest::vessel::voyage::time_scale();
+    for (name, charge) in [("always full charge", 1.0), ("always jump at 0%", 0.0)] {
+        let (crossings, _first, _last, delivered, total, dock_hours) =
+            run_era_with(balanced_spend, charge);
+        eprintln!(
+            "{name:>20}: {crossings:>3} crossings  {:>4.1} mo sailing + {:>4.1} mo docked \
+             = {:>4.1} mo total  {:>4.1}% saved",
+            (total as f64 / scale) / 30.0,
+            (dock_hours / 24.0) / 30.0,
+            (total as f64 / scale + dock_hours / 24.0) / 30.0,
+            delivered as f64 / 1000.0,
         );
     }
 }
@@ -120,18 +146,21 @@ fn cross(v: &mut VoyageState) -> u64 {
 /// Play a full era: crossing after crossing until the world empties.
 /// Returns (crossings, first-crossing days, last-crossing days, delivered).
 fn run_era() -> (u32, u64, u64, u64) {
-    let (c, f, l, d, _) = run_era_with(balanced_spend);
+    let (c, f, l, d, _, _) = run_era_with(balanced_spend, 1.0);
     (c, f, l, d)
 }
 
-/// Play a full era under an arbitrary spend policy. Returns
-/// (crossings, first-days, last-days, delivered, total-game-days).
-fn run_era_with(spend: fn(&mut ColonyState)) -> (u32, u64, u64, u64, u64) {
+/// Play a full era under an arbitrary spend policy, jumping through the
+/// Dock/Wormhole (spec 9 addendum) at a fixed Riftglass `charge` every
+/// crossing. Returns (crossings, first-days, last-days, delivered,
+/// total-game-days, total-dock-real-hours).
+fn run_era_with(spend: fn(&mut ColonyState), charge: f64) -> (u32, u64, u64, u64, u64, f64) {
     let mut colony = ColonyState::found("era".to_string());
     let mut crew: Vec<quest::vessel::voyage::SoulState> = Vec::new();
     let mut first_days = 0;
     let mut last_days;
     let mut total_days = 0u64;
+    let mut total_dock_hours = 0.0f64;
     let mut guard = 0;
     loop {
         guard += 1;
@@ -146,6 +175,7 @@ fn run_era_with(spend: fn(&mut ColonyState)) -> (u32, u64, u64, u64, u64) {
                 t0(),
                 &colony,
                 crew.clone(),
+                charge,
             )
         };
         v.intro_pending = false;
@@ -186,8 +216,14 @@ fn run_era_with(spend: fn(&mut ColonyState)) -> (u32, u64, u64, u64, u64) {
                 last_days,
                 colony.souls_delivered,
                 total_days,
+                total_dock_hours,
             );
         }
+        // Dock/Wormhole (spec 9 addendum): real time passes reaching
+        // `charge` before the next crossing begins.
+        colony.dock(t0());
+        total_dock_hours += colony.riftglass_hours_to_full() * charge.clamp(0.0, 1.0);
+        colony.undock();
     }
 }
 
@@ -230,7 +266,7 @@ fn a_ferry_run_carries_passengers_and_the_rested_crew() {
     };
     crew[2].strain = 2;
 
-    let v = VoyageState::begin_ferry("ferry".to_string(), 5, t0(), &colony, crew);
+    let v = VoyageState::begin_ferry("ferry".to_string(), 5, t0(), &colony, crew, 1.0);
     assert_eq!(v.crossing_number, 2);
     assert_eq!(
         v.passengers, expected_capacity,
@@ -362,8 +398,8 @@ fn skilled_play_saves_far_more_souls_than_reckless_play() {
     // chasing pure speed and never widening the hold runs a hundred near-empty
     // crossings, so the world stays full and a full world loses the most each
     // day. The margin is meant to be wide — skill is rewarded, not marginal.
-    let (_, _, _, souls_first, _) = run_era_with(cap_lean_spend);
-    let (_, _, _, reckless, _) = run_era_with(drive_only_spend);
+    let (_, _, _, souls_first, _, _) = run_era_with(cap_lean_spend, 1.0);
+    let (_, _, _, reckless, _, _) = run_era_with(drive_only_spend, 1.0);
     eprintln!("souls-first {souls_first} vs reckless {reckless}");
     assert!(
         souls_first >= 82_000,
@@ -423,7 +459,7 @@ fn the_ferry_loop_is_offline_equivalent() {
         v.souls
     };
     let build = || {
-        let mut v = VoyageState::begin_ferry("eq".to_string(), 9, t0(), &colony, crew.clone());
+        let mut v = VoyageState::begin_ferry("eq".to_string(), 9, t0(), &colony, crew.clone(), 1.0);
         v.set_station(SoulId(0), Some(Station::Helm));
         v.play_arrival_scene();
         v.depart(
@@ -446,4 +482,73 @@ fn the_ferry_loop_is_offline_equivalent() {
     offline.tick(horizon);
     assert_eq!(live.phase, offline.phase);
     assert_eq!(live.provisions.to_bits(), offline.provisions.to_bits());
+}
+
+#[test]
+fn a_full_charge_jump_applies_no_penalty() {
+    let colony = ColonyState::found("charge".to_string());
+    let crew = {
+        let mut v = VoyageState::begin("charge".to_string(), 1, t0());
+        v.intro_pending = false;
+        v.souls
+    };
+    let full = VoyageState::begin_ferry("charge".to_string(), 3, t0(), &colony, crew.clone(), 1.0);
+    let baseline =
+        VoyageState::begin_ferry("charge".to_string(), 3, t0(), &colony, crew.clone(), 1.0);
+    assert_eq!(
+        full.provisions, baseline.provisions,
+        "full charge starts with a full hold, same as today"
+    );
+    assert_eq!(full.hull_wear, 0, "full charge starts with no hull wear");
+}
+
+#[test]
+fn a_partial_charge_jump_docks_provisions_and_pre_applies_hull_wear() {
+    let colony = ColonyState::found("charge".to_string());
+    let crew = {
+        let mut v = VoyageState::begin("charge".to_string(), 1, t0());
+        v.intro_pending = false;
+        v.souls
+    };
+    let zero = VoyageState::begin_ferry("charge".to_string(), 3, t0(), &colony, crew.clone(), 0.0);
+    assert_eq!(
+        zero.provisions,
+        quest::vessel::voyage::LAUNCH_PROVISIONS
+            - quest::vessel::voyage::MAX_PARTIAL_CHARGE_PROVISIONS_DEFICIT,
+        "an immediate (0% charge) jump docks the full deficit from a full hold"
+    );
+    assert_eq!(
+        zero.hull_wear,
+        quest::vessel::voyage::MAX_PARTIAL_CHARGE_HULL_WEAR,
+        "an immediate jump pre-applies the full hull-wear penalty"
+    );
+
+    let half = VoyageState::begin_ferry("charge".to_string(), 3, t0(), &colony, crew.clone(), 0.5);
+    assert!(
+        half.provisions > zero.provisions
+            && half.provisions < quest::vessel::voyage::LAUNCH_PROVISIONS,
+        "a half charge docks half the deficit — worse than full, better than zero"
+    );
+    assert!(
+        half.hull_wear <= zero.hull_wear,
+        "a higher charge never yields a worse (or equal at most) hull-wear penalty"
+    );
+}
+
+#[test]
+fn the_partial_charge_penalty_is_deterministic() {
+    let colony = ColonyState::found("charge".to_string());
+    let crew = {
+        let mut v = VoyageState::begin("charge".to_string(), 1, t0());
+        v.intro_pending = false;
+        v.souls
+    };
+    let a = VoyageState::begin_ferry("charge".to_string(), 3, t0(), &colony, crew.clone(), 0.3);
+    let b = VoyageState::begin_ferry("charge".to_string(), 3, t0(), &colony, crew.clone(), 0.3);
+    assert_eq!(
+        a.provisions.to_bits(),
+        b.provisions.to_bits(),
+        "same charge in, same penalty out — no randomness"
+    );
+    assert_eq!(a.hull_wear, b.hull_wear);
 }
