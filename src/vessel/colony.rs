@@ -9,7 +9,7 @@
 //! `ColonyState` lives in `colony.json`, keyed by character id like the
 //! voyage — but it survives every crossing where the voyage is replaced.
 //!
-//! See `docs/superpowers/specs/2026-07-03-vessel-ferryman-design.md`.
+//! See `openspec/specs/vessel-act2/spec.md`.
 
 use super::route::{WaypointId, ROUTE_SINK, ROUTE_START, WAYPOINTS};
 use serde::{Deserialize, Serialize};

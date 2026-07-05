@@ -1,0 +1,200 @@
+# The Vessel — Act 2 Launch Gate & Voyage Specification
+
+## Purpose
+
+Define Act 2 of Quest: after Zone 50 falls, a signal from a dying branch of Yggdrasil is discovered, and burning 250,000 Prestige Ranks in a single all-or-nothing action launches the Vessel into a wall-clock crossing (the Voyage) toward the Tree. The entire feature ships dark behind a compile-time kill-switch with a runtime override, so it is invisible to players by default while remaining fully implemented. This capability owns the kill-switch contract, the launch gate and its prerequisites, the launch transition, and the systemic shape of the Voyage and its persistent ferry loop; it references Prestige Rank, Ascension, Woven Patterns, and Zone 50 clearance only as gates or inputs.
+
+## Requirements
+
+### Requirement: Act 2 Kill-Switch
+
+The system SHALL keep all Act 2 presentation dark by default via a compile-time flag `ACT2_ENABLED` that is `false` in every released build. A runtime check SHALL treat Act 2 as enabled when `ACT2_ENABLED` is `true` OR the environment variable `QUEST_ACT2` equals `1`, and this decision SHALL be read exactly once (cached), so changing the environment variable after the process starts SHALL have no effect. While Act 2 is disabled the system SHALL surface no discovery modal, no ticker whispers, no stats-panel row, no launch hotkey, and no path to the launch burn.
+
+#### Scenario: Dark by default
+
+- **WHEN** the game runs in a released build with `ACT2_ENABLED = false` and `QUEST_ACT2` unset
+- **THEN** the Vessel is fully invisible — no whispers, discovery modal, stats row, hotkey, or launch path appears
+
+#### Scenario: Runtime preview override
+
+- **WHEN** the process starts with the environment variable `QUEST_ACT2=1`
+- **THEN** Act 2 presentation is enabled for that process even though `ACT2_ENABLED` is still `false`
+
+#### Scenario: Override is read once
+
+- **WHEN** `QUEST_ACT2` is changed after the runtime check has already been evaluated once
+- **THEN** the enabled/disabled decision does not change for the remainder of the process
+
+### Requirement: Signal Discovery On Zone 50 Clear
+
+The system SHALL record that the Vessel signal is discovered the first time the player defeats the Zone 50 final boss, and this record SHALL be persistent and survive prestige. This detection SHALL occur unconditionally — independent of the kill-switch — so that already-qualified players light up the instant Act 2 is enabled later; only the presentation of the discovery (log line, ticker, modal, hotkey, stats row) SHALL be gated on Act 2 being enabled.
+
+#### Scenario: First Zone 50 kill records the signal
+
+- **WHEN** the player defeats the Zone 50 final boss for the first time
+- **THEN** the persistent "signal discovered" state is set, regardless of whether Act 2 is enabled
+
+#### Scenario: Detection is not gated by the kill-switch
+
+- **WHEN** the Zone 50 final boss falls while Act 2 is disabled
+- **THEN** the signal is still recorded in the save, but no discovery modal, log line, or ticker entry is shown until Act 2 is enabled
+
+### Requirement: Pre-Launch Whispers
+
+The system SHALL, only while Act 2 is enabled, emit an atmospheric ticker whisper roughly every 60 seconds of accumulated play time once the signal is discovered and until the Vessel is launched. Whispers SHALL rotate deterministically (no RNG) through a fixed list of 5 messages, wrapping by index. No whisper SHALL fire before discovery or after launch.
+
+#### Scenario: Whisper fires on the interval
+
+- **WHEN** Act 2 is enabled, the signal is discovered, the Vessel is not launched, and at least 60 seconds of play time have elapsed since the last whisper
+- **THEN** the next whisper in the rotating sequence is emitted to the ticker
+
+#### Scenario: Whispers stop at launch
+
+- **WHEN** the Vessel has been launched
+- **THEN** no further whispers are emitted regardless of elapsed play time
+
+### Requirement: Launch Gate Prerequisites
+
+The system SHALL permit launching the Vessel only when ALL of the following hold: the signal has been discovered (which implies Zone 50 was cleared), the Vessel is not already launched, the player's Ascension level is at least 10 (Ascension X), the player has completed at least 28 Woven Patterns, and the player currently holds at least 250,000 Prestige Ranks. If any one condition is unmet, launch SHALL be refused.
+
+#### Scenario: All gates met
+
+- **WHEN** the signal is discovered, the Vessel is unlaunched, Ascension level ≥ 10, completed Woven Patterns ≥ 28, and Prestige Rank ≥ 250,000
+- **THEN** the launch is permitted
+
+#### Scenario: A single unmet gate refuses launch
+
+- **WHEN** every gate is met except one — for example Ascension level 9, or 27 completed patterns, or a Prestige Rank of 249,999
+- **THEN** the launch is refused
+
+### Requirement: All-Or-Nothing Launch Burn
+
+The system SHALL, when a launch is performed and every gate is met, subtract exactly 250,000 Prestige Ranks in a single action, recalculate prestige-derived bonuses, mark derived stats dirty, and set the persistent "launched" state. The spend SHALL be all-or-nothing: if any gate is unmet the launch SHALL change nothing (no partial spend), and a second launch after the first SHALL be refused and leave Prestige Rank unchanged.
+
+#### Scenario: Exact burn on success
+
+- **WHEN** a player holding 253,218 Prestige Ranks with all gates met performs the launch
+- **THEN** their Prestige Rank becomes 3,218, prestige bonuses are recalculated, and the Vessel is marked launched
+
+#### Scenario: Below-cost launch spends nothing
+
+- **WHEN** a launch is attempted while holding fewer than 250,000 Prestige Ranks
+- **THEN** no Prestige Ranks are deducted and the Vessel remains unlaunched
+
+#### Scenario: No double launch
+
+- **WHEN** a launch is attempted after the Vessel has already been launched
+- **THEN** the launch is refused and Prestige Rank is unchanged
+
+### Requirement: Launch Transition
+
+The system SHALL, after the launch burn and before the first Voyage frame, play a fixed 5-beat authored narrative sequence (Farewell, Unweaving, Construction, Launch, Void) once, advanced only by Enter with no cancel path. The sequence SHALL always present the same five beats regardless of how the player reached launch. Completion SHALL set a persistent "transition played" record; while launched but not yet transition-played, the system SHALL show the transition instead of the Voyage. An interrupted transition (the game closed mid-sequence) SHALL restart at the first beat on the next run, since only the persistent completion record is durable.
+
+#### Scenario: Transition plays once through five beats
+
+- **WHEN** the Vessel is launched but the transition has not yet played and the player presses Enter through the sequence
+- **THEN** the five beats advance in order, and after the final beat the persistent "transition played" record is set and control passes to the Voyage
+
+#### Scenario: Interruption restarts the beats
+
+- **WHEN** the game is closed during the transition before the final beat is read
+- **THEN** on the next run the transition restarts at the first beat, because the transient beat counter is not saved
+
+### Requirement: Voyage Wall-Clock Simulation And Offline Equivalence
+
+The system SHALL advance the Voyage in simulated wall-clock time, computing elapsed whole game-minutes since launch and stepping the state one game-minute at a time until caught up, so that resolving a long absence in one step produces state bitwise-identical to resolving it in many small steps (offline equivalence / chunking invariance). The production clock SHALL run at 2.64 game-minutes per real-minute (a sea-day of 1,440 game-minutes passing in roughly 9 real hours), making the maiden voyage's ~37 sea-days take roughly two real weeks. A development override environment variable (`QUEST_VOYAGE_TIME_SCALE`) MAY replace the production scale but SHALL NOT change the offline-equivalence property.
+
+#### Scenario: Long gap equals many short ticks
+
+- **WHEN** the Voyage is ticked once after a long real-time absence versus ticked repeatedly across many short intervals covering the same span
+- **THEN** the resulting Voyage state is identical
+
+#### Scenario: Production clock scale
+
+- **WHEN** the Voyage runs at the production time scale
+- **THEN** each game-minute passes at 2.64 game-minutes per real-minute, so a full 1,440-minute sea-day elapses in about 9 real hours
+
+### Requirement: Voyage Route And Phase Progression
+
+The system SHALL move a single ship along a static route graph shaped as a spine with diamond branches that split at junctions and rejoin within the same chapter, ending at a single terminal waypoint (the Tree). The Voyage state SHALL always be in exactly one phase: Traveling a road, Drifting in place (a road's hold ran dry), Holding Station at a waypoint, or Arrived at the Tree. Reaching the terminal waypoint SHALL enter the Arrived phase, and the arrival finale SHALL fire exactly once, setting the persistent "arrived" record — the durable hook a future Act 3 keys off, the way Act 2 keys off "launched".
+
+#### Scenario: The Tree is the only sink
+
+- **WHEN** the ship advances through the route graph
+- **THEN** every maximal path terminates at the single Tree waypoint, and no other waypoint is a dead end
+
+#### Scenario: Arrival fires the finale once
+
+- **WHEN** the ship reaches the Tree and the finale has not yet been shown
+- **THEN** the finale plays, the persistent "arrived" record is set, and a repeat request returns nothing
+
+### Requirement: Pace And Provisions Hold
+
+The system SHALL expose a single pace posture with four settings — Grueling (0.80× leg time, 1.30× provisions burn), Steady (default; 1.00× / 1.00×), Easy (1.20× / 0.90×), and Restful (slowest; 1.40× time, 0.80× burn, the thriftiest hold). The provisions hold SHALL start full at 100 (cap 100, or 150 with the Long Hold refit) and burn while traveling, composed from pace, crew station, and weather. When the hold runs dry the ship SHALL Drift in place, recovering after 36 hours and restoring provisions to 25. At every junction the cheapest outgoing road SHALL cost no more than 25 provisions, so running the hold dry always means drifting in place rather than becoming stuck.
+
+#### Scenario: Pace trades speed for provisions
+
+- **WHEN** the pace is set to Grueling versus Restful
+- **THEN** Grueling covers a road in 0.80× the base time while burning 1.30× provisions, and Restful takes 1.40× the time while burning 0.80×
+
+#### Scenario: Empty hold drifts and recovers
+
+- **WHEN** provisions reach zero mid-road
+- **THEN** the ship enters the Drifting phase and, after 36 hours, recovers with provisions restored to 25 and resumes
+
+#### Scenario: Affordability floor keeps the ship unstuck
+
+- **WHEN** the ship arrives at any junction
+- **THEN** at least one outgoing road costs no more than the 25-provisions drift-recovery amount, so a fresh recovery can always afford to sail on
+
+### Requirement: Crew, Stations, And Refits
+
+The system SHALL support a crew of up to 7 aboard drawn from an authored roster of 8 souls (3 present at launch plus 5 recruited at waypoints), where a recruit ask SHALL block departure until answered. Souls SHALL be assignable to stations (Helm, Tender, Watch) that grant Voyage multipliers, SHALL advance authored arcs on a rest-day timer, and SHALL be farewelled to free a crew seat (remembered, not lost). Permanent loss SHALL occur only through authored scenes, never through any time-driven path. The first 3 distinct shipyards visited SHALL each offer one permanent A/B refit door, and choosing one option SHALL close the other forever.
+
+#### Scenario: Recruit ask blocks departure
+
+- **WHEN** the ship arrives where an unmet soul waits and an ask is pending
+- **THEN** departure is blocked until the ask is accepted or declined
+
+#### Scenario: Refit doors are one-way
+
+- **WHEN** the player picks one option of a shipyard's A/B refit door
+- **THEN** that refit is applied permanently and the alternate option is closed for the rest of the crossing
+
+#### Scenario: Loss is authored-only
+
+- **WHEN** the Voyage advances on its wall-clock timer with no authored loss scene triggered
+- **THEN** no soul is ever marked permanently lost by a time-driven path
+
+### Requirement: Maiden Voyage And Ferry Run Automation
+
+The system SHALL distinguish the maiden voyage (crossing number 1) from ferry runs (crossing number greater than 1). On the maiden voyage, decisions — junctions with more than one road, recruit asks, refit doors, and the pier — SHALL hold the ship until the player acts, while a plain mid-crossing port with no decision SHALL wait 360 game-minutes and then auto-sail. On a ferry run the whole crossing SHALL be hands-off: the ship SHALL auto-navigate junctions (taking the first road), skip refit doors, and launch herself from the pier, so the crossing completes autonomously in Drive-scaled time; on ferry runs the passenger headcount SHALL NOT deepen provisions burn.
+
+#### Scenario: Maiden voyage holds for decisions
+
+- **WHEN** the maiden voyage reaches a junction offering more than one road
+- **THEN** the ship holds station until the player chooses a road
+
+#### Scenario: Ferry run navigates itself
+
+- **WHEN** a ferry run (crossing number > 1) reaches a junction, a refit door, or the pier
+- **THEN** the ship takes the first road / skips the refit / launches herself without waiting, and the crossing completes on its own
+
+### Requirement: Colony Ferry Loop Persistence
+
+The system SHALL persist a Colony above individual crossings, tracking souls delivered (a number that only rises) against souls remaining in a dying world of 100,000 initial souls. Each completed crossing SHALL deliver its carried passengers into the Colony, pay out Salvage, and let the dark take a per-day share of whoever still waits — so a slower crossing bleeds the waiting world longer. Salvage SHALL be spent across three yards whose levels persist between crossings: Drive (shortens every future crossing's sail time), Shipwright (grows the hold), and Ward (softens the dark's per-day toll, floored so a residual bite always remains). Voyage state SHALL be saved per character so a different character never inherits a crossing in progress.
+
+#### Scenario: A crossing delivers souls and takes a toll
+
+- **WHEN** a crossing completes carrying passengers
+- **THEN** the carried souls are added to souls-delivered and removed from souls-remaining, Salvage is paid out, and the dark removes a per-day share of the still-waiting world scaled by the crossing's duration
+
+#### Scenario: Yard levels persist and shape future crossings
+
+- **WHEN** Salvage is spent to raise the Drive, Shipwright, or Ward yard
+- **THEN** the new level persists into subsequent crossings, shortening sail time, widening the hold, or softening the daily toll respectively
+
+#### Scenario: Voyage is keyed to the character
+
+- **WHEN** a different character's save is loaded
+- **THEN** it does not pick up another character's in-progress crossing

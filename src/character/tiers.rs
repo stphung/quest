@@ -60,7 +60,7 @@ fn get_prestige_name(rank: u32) -> &'static str {
 /// - Tapering gains to prevent late-game trivialization
 /// - Cycles get progressively longer, creating the "wall" feeling
 ///
-/// See docs/plans/2026-02-03-prestige-multiplier-rebalance.md for details.
+/// See openspec/specs/character-progression/spec.md for the prestige bonus rules.
 pub fn get_prestige_tier(rank: u32) -> PrestigeTier {
     // Diminishing returns formula: 1 + BASE_FACTOR * rank^EXPONENT
     // P1: 1.5x, P5: 2.5x, P10: 3.5x, P20: 5.1x, P30: 6.4x

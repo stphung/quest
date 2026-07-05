@@ -1,7 +1,7 @@
 //! The Vessel launch-gate UI: discovery modal and construction overlay.
 //!
 //! Sub-project 1 of Act 2 — see
-//! `docs/superpowers/specs/2026-03-27-vessel-launch-gate-design.md`.
+//! `openspec/specs/vessel-act2/spec.md`.
 
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};

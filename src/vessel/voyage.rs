@@ -6,7 +6,7 @@
 //! one call or in many produces bitwise-identical state (the offline
 //! equivalence property).
 //!
-//! See `docs/superpowers/specs/2026-07-03-vessel-route-waypoints-design.md`.
+//! See `openspec/specs/vessel-act2/spec.md`.
 
 use super::letters::{self, LAST_LETTER_EVENT, LETTER_PARCEL_PROVISIONS, MAIL_FAILS_EVENT};
 use super::nights::{self, NightKind, NightOutcome};

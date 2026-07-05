@@ -3,7 +3,7 @@
 //! After the player clears Zone 50, a signal from a living branch of
 //! Yggdrasil is discovered. Launching the Vessel requires holding
 //! 250,000 Prestige Ranks and burning them in a single all-or-nothing
-//! action. See `docs/superpowers/specs/2026-03-27-vessel-launch-gate-design.md`.
+//! action. See `openspec/specs/vessel-act2/spec.md`.
 
 pub mod colony;
 pub mod junction;

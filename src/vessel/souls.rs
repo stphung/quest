@@ -7,7 +7,7 @@
 //! triangle is stations <-> arcs <-> wind; everything else on a soul is
 //! voice.
 //!
-//! See `docs/superpowers/specs/2026-07-03-vessel-souls-design.md`.
+//! See `openspec/specs/vessel-act2/spec.md`.
 
 use super::route::{Chapter, Feature, RoadId, RumorId, WaypointId};
 use serde::{Deserialize, Serialize};

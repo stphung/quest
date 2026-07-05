@@ -17,10 +17,7 @@ exclude:
   - Cargo.lock
   - Makefile
   - build.rs
-  - docs/archive
-  - docs/design
+  - openspec
   - docs/dossiers
-  - docs/plans
   - docs/reviews
   - docs/screenshots
-  - docs/superpowers

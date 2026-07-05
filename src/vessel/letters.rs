@@ -10,7 +10,7 @@
 //! Act 1's runtime fate is design law here: frozen at launch, the letters
 //! its only interface, and the Going-Dark closes even that.
 //!
-//! See `docs/superpowers/specs/2026-07-03-vessel-letters-going-dark-design.md`.
+//! See `openspec/specs/vessel-act2/spec.md`.
 
 use super::souls::SoulId;
 

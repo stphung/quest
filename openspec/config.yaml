@@ -1,0 +1,72 @@
+schema: spec-driven
+
+# Project context shown to AI when creating OpenSpec artifacts.
+context: |
+  Quest is a terminal-based idle RPG written in Rust. The hero auto-battles
+  through 50 zones, gains XP, levels up, explores dungeons, fishes, and
+  prestiges into layered endgame systems (Haven, Soulforge, the Deep, the Loom,
+  Ascension) plus a dark-shipped Act 2 (the Vessel / Voyage).
+
+  Tech stack:
+    - Rust, Ratatui 0.30 + Crossterm TUI, Serde/serde_json persistence.
+    - Rand 0.10 + rand_chacha (seeded RNG for simulators/tests).
+    - 100ms tick game loop (10 ticks/sec) driven from src/main.rs.
+    - Library crate src/lib.rs exposes all game logic for integration tests;
+      the UI module is private (terminal-coupled).
+
+  Repository conventions:
+    - Larger modules each carry their own src/<module>/CLAUDE.md describing
+      implementation patterns, integration points, and extension guides. The
+      root CLAUDE.md holds the authoritative "Key Constants" list and a
+      per-change verification matrix — treat those as the source of truth for
+      numeric balance values.
+    - Feature work happens on isolated git worktrees/branches.
+    - Balance values (drop rates, costs, multipliers, tier curves, unlock
+      gates) ARE requirements — spec them with their concrete numbers.
+
+  Verification gate (`make check` = scripts/ci-checks.sh, mirrored by six CI
+  jobs fmt/clippy/test/balance/audit/coverage):
+    1. cargo fmt --check
+    2. cargo clippy --all-targets -- -D warnings
+    3. cargo test
+    4. cargo run --release --bin simulator -- --check-progression
+    5. cargo audit --deny yanked
+    6. cargo llvm-cov --lib --fail-under-lines 90 (when installed)
+  Targeted verification per area is documented in the root CLAUDE.md
+  "How to Verify Your Change" table (snapshot tests for UI, progression check
+  for balance, save_compat_tests for persistence, etc.).
+
+  Determinism rules: the core tick loop threads a seeded `rng: &mut R`; UI
+  render code reads a freezable ui/clock.rs, never the wall clock. Snapshot
+  tests (insta + ratatui TestBackend) gate every UI change.
+
+  Spec baseline: openspec/specs/ was reverse-engineered from the existing
+  implementation (v1) — it documents current behavior, not aspirations. When a
+  spec and the code disagree, that is a bug in one of them; reconcile
+  deliberately rather than silently editing the spec to match a regression.
+
+# Per-artifact rules.
+rules:
+  proposal:
+    - Ground every change in the affected capability spec(s) under openspec/specs/.
+    - Include a "Non-goals" section and call out balance/progression impact.
+  design:
+    - Name the exact source modules touched and the verification command(s)
+      from the root CLAUDE.md "How to Verify Your Change" table.
+    - This is the home for forward design that the behavioral spec can't hold.
+      Include, when relevant: Alternatives considered and why rejected; the
+      experiential / narrative intent (tone, pacing, what it should feel like);
+      a UX sketch; and Risks / open questions. This artifact is the durable
+      design-rationale record once the change is archived — write it for a
+      future designer, not just the implementer.
+    - For cross-act or cross-system story/world design that outlives this one
+      change, put it in docs/dossiers/ instead (e.g. world-and-narrative.md),
+      and reference it here.
+  tasks:
+    - End with a task to run the relevant targeted verification AND `make check`
+      before pushing.
+  spec:
+    - Requirements use SHALL/MUST; every requirement has at least one
+      WHEN/THEN scenario.
+    - Balance numbers are part of the requirement text — keep them exact and in
+      sync with the root CLAUDE.md "Key Constants" list.
