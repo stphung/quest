@@ -5,7 +5,7 @@ A terminal-based idle RPG written in Rust. Your hero automatically battles throu
 ## Build & Run
 
 ```bash
-make setup             # First time: configure git hooks
+make setup             # First time: configure git hooks, install the OpenSpec CLI
 cargo build            # Build
 cargo run              # Run the game
 make check             # Run all CI checks locally
