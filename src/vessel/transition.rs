@@ -108,21 +108,6 @@ impl LaunchTransitionState {
     }
 }
 
-/// Which animation treatment `render_launch_transition` uses, selected once
-/// via the `QUEST_TRANSITION_VARIANT` environment variable (1-3, default 1)
-/// for side-by-side comparison during design. Cached like `act2_enabled()` —
-/// changing the env var mid-process has no effect.
-pub fn variant() -> u8 {
-    static VARIANT: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
-    *VARIANT.get_or_init(|| {
-        std::env::var("QUEST_TRANSITION_VARIANT")
-            .ok()
-            .and_then(|v| v.parse::<u8>().ok())
-            .filter(|v| (1..=3).contains(v))
-            .unwrap_or(1)
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
