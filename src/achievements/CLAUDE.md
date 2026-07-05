@@ -27,7 +27,7 @@ Enum with 240 variants covering all trackable milestones. Organized by domain:
 
 - **Combat**: `SlayerI`..`SlayerXV` (100 to 1B kills), `BossHunterI`..`BossHunterXV` (1 to 10M bosses)
 - **Level**: `Level10`..`Level100000` (18 milestones)
-- **Prestige**: `FirstPrestige`..`Prestige10000` (P1, P5, P10, P15, P20, P25, P30, P40, P50, P70, P90, P150, P200, P300, P500, P700, P1000, P10000 — 18 milestones)
+- **Prestige**: `FirstPrestige`..`Prestige10000` (P1, P5, P10, P15, P20, P25, P30, P40, P50, P70, P90, P100 (`Eternal`), P150, P200, P300, P500, P700, P1000, P10000 — 19 milestones)
 - **Zones**: `Zone1Complete`..`Zone10Complete`, `TheStormbreaker`, `StormsEnd`, `BeyondInfinity`, `FractureZone12`..`FractureZone30` (19 fracture zone completions)
 - **Ascension**: `AscensionI`..`AscensionX` (10 milestone achievements, one per level I-X)
 - **Power Cores**: `PowerCoreI`..`PowerCoreVI` (6 milestone achievements, unlocked at Deep Layers 3/7/12/18/25/30)
