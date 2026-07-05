@@ -9,8 +9,24 @@ description: Write a new docs/dossiers/*.md design dossier or refresh an existin
 
 A dossier answers one question a capability spec can't: *what is this Act
 or system, how does it interrelate with everything else, is it balanced,
-and is it fun* — written player-eye first, every mechanical claim cited to
-source, every balance claim backed by a real run, not a guess.
+and is it fun* — written player-eye first, concept and relationship before
+arithmetic, every claim verified against source even where the prose
+doesn't show its receipts, and every balance claim backed by a real run,
+not a guess.
+
+**The concept-first rule.** A dossier is not a second copy of
+`constants.rs` or a module's `CLAUDE.md` — those already hold the precise
+numbers, and restating them here is redundant and buries the thing a
+dossier actually exists to explain: what a mechanic *means* and how it
+*relates* to everything else. Describe shape and relationship ("roughly
+doubles each tier," "the same discovery-chance formula as Haven, just
+shifted to a higher floor," "an order of magnitude rarer than the tier
+below it") rather than transcribing formulas, percentage tables, or cost
+curves. Name a specific number only when it earns its place — see
+"When a number belongs in the prose" under Mechanics & Constants below.
+**Balance Evidence is the deliberate exception**: that section reports
+measured results, so it should be as numeric as the run you performed,
+tables over prose, same as before.
 
 `docs/dossiers/README.md` states the contract dossiers exist under:
 specs (`openspec/specs/`) are the living source of truth for what a system
@@ -47,7 +63,28 @@ comparable set, not N one-off documents.
 3. **Status blockquote** — one paragraph: what this dossier covers, which specs/archives/decisions it complements (not replaces), links to sibling dossiers (an Act dossier links the other Act's dossier and the cross-act dossier), and — for living dossiers only — a pointer to the bottom `Refresh History` section so readers know the sections above are current-state-only.
 4. `## The Player's Experience` — narrative prose. Walk a fresh player through the system/Act as they'd actually encounter it, in order. This is the only section allowed to read like fiction-adjacent prose rather than a reference; still name every mechanic precisely enough that a developer recognizes it.
 5. `## Design Intent` — bullet list reconstructing *why*, not *what*. Pull from `docs/decisions.md` entries, archived `changes/archive/<name>/design.md` or `proposal.md` docs, and module `CLAUDE.md` design-rationale asides. Cite the specific decision-log heading or archived doc section for each bullet, not just "the design doc."
-6. `## Mechanics & Constants` — the dense reference core. One `###` subsection per subsystem (not one wall of prose — see Anti-Patterns). Every number, formula, and behavior claim carries a `file.rs:line` citation. This is the section `doc-audit`/`meta-audit` hold to a factual standard, so it must stay accurate under future refreshes.
+6. `## Mechanics & Constants` — the conceptual core, not a constants dump. One `###` subsection per subsystem (not one wall of prose — see Anti-Patterns). Lead each subsystem with what it *is* and how it *relates* to the rest of the design; reach for a number only per "When a number belongs in the prose" below. This is the section `doc-audit`/`meta-audit` hold to a factual standard, so whatever claims and numbers *do* appear must stay accurate under future refreshes — accuracy of what's said, not volume of what's cited.
+
+   **When a number belongs in the prose:**
+   - It's a **structural identifier** the rest of the document (or the
+     player) already refers to by that figure — Zone 50, 250,000 PR,
+     Ascension X, 28 patterns. These are proper nouns in this game, not
+     arithmetic; keep them.
+   - The **exact magnitude is the interesting fact** — a floor that's never
+     zero, an asymmetry between two otherwise-parallel systems, a ratio
+     that surprised you during research. State the number because the
+     number *is* the point being made.
+   - It **directly feeds Balance Evidence** — a threshold the simulator run
+     tests against, a rate the measured results are compared to.
+   - It's needed to **resolve an Open Question or a discrepancy** — a
+     specific wrong-vs-right number is the substance of the finding.
+
+   Everything else — formula coefficients, full percentage tables, cost
+   curves, exhaustive per-tier breakdowns — belongs in `constants.rs` and
+   the module's `CLAUDE.md`, not here. A citation (`file.rs`, no line
+   number needed for a concept-level claim) is enough for a reader who
+   wants to check; reserve a precise `file.rs:line` pin for the numbers
+   that met the bar above.
 7. `## Interrelations` — an ASCII diagram plus bullets: what flows *in* from other Acts/systems, what's mechanically isolated ("during"), what flows *out* (the hooks a future Act/system keys off), and any internal closed loops worth naming. Call out every named hook/flag explicitly (e.g. two different Act-3-hook flags, not just "the Act 3 hook").
 8. `## Balance Evidence` — dated, sourced numbers from an actual run you performed this session (simulator, targeted test, `--check-progression`), not a re-statement of a design doc's aspirational numbers. Tables over prose. Note when thresholds carry intentional headroom.
 9. `## Fun Assessment` — score against the same seven heuristics every dossier uses (below). Dated. Cite concrete evidence per row, not vibes.
@@ -102,6 +139,13 @@ Do not let agents write final dossier prose — they return structured fact
 sheets; you synthesize into one consistent voice. Mixing agent voices into
 the final doc is the most common way a dossier reads like a committee wrote it.
 
+The fact sheets should stay exhaustive and precisely cited — that's the
+raw material you verify against and draw judgment calls from. The
+concept-first rule (above) governs what makes it into the *written
+dossier*, not what the research phase gathers; a fact sheet with every
+constant and file:line is exactly right, a dossier transcribing all of
+them is not.
+
 ### Phase 3 — Balance evidence, run yourself
 
 Build the release simulator (`cargo build --release --bin simulator`) and
@@ -148,10 +192,12 @@ of change a "did the numbers change" refresh check will miss.
 
 Treat an audit/research agent's report as a lead, not a fact. Before adding
 anything to the dossier, `grep`/`Read` the cited file:line yourself and
-confirm the constant, function, or comment actually says what's claimed.
-This project's dossiers are held to a "cited to source" standard by
-`doc-audit`/`meta-audit` — an unverified agent claim that turns out wrong
-undermines that standard immediately.
+confirm the constant, function, or comment actually says what's claimed —
+even if the number itself won't appear in the final prose, the concept it
+grounds still needs to be true. This project's dossiers are held to a
+"accurate about what it says" standard by `doc-audit`/`meta-audit`, not a
+"cites everything" standard — an unverified claim that turns out wrong
+undermines that immediately, whether or not it shipped with a citation.
 
 ### Phase 7 — Cross-link
 
@@ -186,6 +232,14 @@ generic and doesn't enumerate files by name.
 
 ## Anti-Patterns
 
+- **Numeric transcription.** Restating every constant, formula
+  coefficient, and percentage table from `constants.rs`/`CLAUDE.md` is
+  redundant with those sources and buries the concept underneath
+  arithmetic. If a paragraph reads like a copy of a constants file with
+  prose stitched between the numbers, cut the arithmetic and keep the
+  sentence that says what it *means* — see "When a number belongs in the
+  prose" above. This is the single most common way a dossier drifts from
+  "player-eye synthesis" into "second CLAUDE.md."
 - **One dense prose block for Mechanics & Constants.** Split by subsystem
   with `###` headers — a reader should be able to jump to "Ascension" or
   "The Deep" without reading everything before it.
