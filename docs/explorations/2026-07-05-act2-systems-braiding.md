@@ -1,6 +1,7 @@
 # Exploring: deepening Act 2 with more of Act 1's systems
 
-**Mode**: `/opsx:explore` | **Status**: open thread, nothing proposed yet
+**Mode**: `/opsx:explore` | **Status**: direction crystallizing (see
+"Where the conversation landed"); nothing proposed yet
 **Prompted by**: "I loved how Act 1 was a system of systems that came together
 to get us to Act 2. I'd like to explore other systems and how they could tie
 into deepening Act 2 beyond what it is today."
@@ -122,6 +123,82 @@ matter. B: is the more literal answer to "I want that system-of-systems
 feeling to keep going," but it's a considered reversal of the "voyage
 severed from Act 1" pillar, not a free lunch — it needs a deliberate design
 call, not a quiet code change.
+
+## Where the conversation landed (session 2)
+
+Live discussion narrowed the two shapes above considerably. Two clarifying
+answers reframed the whole question:
+
+1. **"I think it's cool if an act has more dimensions than just one loop."**
+   Looking back at the Ferryman era with that lens: it isn't really a system
+   of systems today, it's **one currency, three sinks** —
+
+   ```
+   sail ──► Salvage ──► spend on { Drive | Shipwright | Ward } ──► repeat
+   ```
+
+   Districts and world milestones are discovery axes (things that *unlock*),
+   not systems with their own internal choices. So the honest gap isn't
+   "Act 1 doesn't reach into Act 2" — it's that **Act 2's own recurring era
+   only has one dimension to grow**, where Act 1 had several running in
+   parallel (combat, items, Deep, Loom, Haven, Ascension all leveling
+   independently, occasionally gating each other).
+
+2. **"Continued progress" means a sense that what you did before is carrying
+   over — it doesn't have to come over 1-1 systemwise.** Not an ongoing
+   resource pipe (Shape B, Power Cores literally feeding Salvage forever).
+   Something closer to what the *launch gate itself* already does — Act 1
+   converges once into the burn — but expressed as **flavor and starting
+   conditions** across new dimensions, rather than one lump PR number.
+
+Put together: the fix isn't "reopen Act 1 as an input," it's **give the
+Ferryman era a second and third dimension of its own**, and let a player's
+Act 1 history shape *how those new dimensions start*, not feed them forever.
+
+```
+                    ONE-TIME REFLECTION (not an ongoing feed)
+                    ═══════════════════════════════════════
+
+  Act 1 legacy                          Act 2's two new dimensions
+  ───────────────                       ───────────────────────────
+
+  Soulforge enhancement ─┐
+  God Items owned ───────┼──flavors──►  THE SHIP LEVELS UP
+  Haven tier/rooms ──────┘              (Hold/Ward/Drive become slots with
+                                          their own tiers/mastery, not just
+                                          Salvage sinks — starting tier or
+                                          a named variant reflects what you
+                                          brought to the burn)
+
+  Haven room mix ────────┐
+  Fishing rank ──────────┼──flavors──►  DISTRICTS AS A BUILD TREE
+  God Items owned ───────┘              (each founded district offers 2-3
+                                          named passive choices instead of
+                                          unlocking automatically — which
+                                          options are on offer can reflect
+                                          Act 1 history)
+
+                    Ongoing growth (Salvage buying further levels/choices)
+                    stays 100% Act-2-internal — the "sealed era" pillar for
+                    ongoing mechanics is untouched; only the *opening state*
+                    of these two new dimensions carries a legacy imprint.
+```
+
+Of the candidate new dimensions raised in this session, **the ship leveling
+up** and **districts as a build-out tree** were picked as the ones worth
+fleshing out first (over a refinement chain and per-soul veteran ranks,
+which remain on the table for later). Both are Shape-A-compatible — no
+change to what happens *during* a crossing — and both give the ferry era a
+second and third thing to grow besides the Salvage/3-yards economy.
+
+**Still open, to flesh out next**: what the ship's actual tiers/named
+variants look like, what a district's 2-3 passive choices actually are and
+whether they should be permanent picks (mirroring the Voyage's refit-door
+pattern) or revisable, and exactly which Act 1 signals (Soulforge level?
+God Items owned? Haven room count? something else?) should flavor which
+starting option — probably a short, curated list rather than "every Act 1
+system contributes something," to avoid diluting the idea into another
+generic point-total.
 
 ## Per-system sketches
 
