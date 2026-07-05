@@ -562,8 +562,9 @@ fn test_boss_final_zone_rarity_distribution() {
 
 #[test]
 fn test_boss_drop_ilvl_matches_zone() {
+    let mut rng = ChaCha8Rng::seed_from_u64(33333);
     for zone in 1..=10 {
-        let item = try_drop_from_boss(zone, zone == 10);
+        let item = try_drop_from_boss(zone, zone == 10, &mut rng);
         assert_eq!(
             item.ilvl,
             (zone as u32) * 10,

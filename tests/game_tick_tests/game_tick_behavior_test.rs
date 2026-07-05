@@ -219,13 +219,14 @@ fn test_level_up_triggers_achievement_sync() {
 #[test]
 fn test_mob_kill_can_drop_item() {
     let mut state = create_strong_character("Drop Test");
+    let mut rng = seeded_rng();
 
     let zone_id = state.zone_progression.current_zone_id as usize;
 
     // Try many times since drop rate is 15%
     let mut got_drop = false;
     for _ in 0..100 {
-        if let Some(item) = try_drop_from_mob(&state, zone_id, 0.0, 0.0) {
+        if let Some(item) = try_drop_from_mob(&state, zone_id, 0.0, 0.0, &mut rng) {
             // game_tick calls auto_equip_if_better (line 1316)
             let _equipped = auto_equip_if_better(item, &mut state);
             got_drop = true;
@@ -243,9 +244,10 @@ fn test_mob_kill_can_drop_item() {
 fn test_boss_kill_always_drops_item() {
     let zone_id = 1;
     let is_final_zone = false;
+    let mut rng = seeded_rng();
 
     // Boss drops are guaranteed (game_tick line 1301-1302)
-    let item = try_drop_from_boss(zone_id, is_final_zone);
+    let item = try_drop_from_boss(zone_id, is_final_zone, &mut rng);
 
     assert!(
         !item.display_name.is_empty(),
@@ -259,7 +261,8 @@ fn test_item_drop_auto_equips_if_better() {
 
     // First equip should always succeed (empty slot)
     let zone_id = 1;
-    let item = try_drop_from_boss(zone_id, false);
+    let mut rng = seeded_rng();
+    let item = try_drop_from_boss(zone_id, false, &mut rng);
     let slot = item.slot;
     let equipped = auto_equip_if_better(item, &mut state);
 
@@ -273,12 +276,13 @@ fn test_item_drop_auto_equips_if_better() {
 #[test]
 fn test_mob_drop_adds_to_recent_drops() {
     let mut state = create_strong_character("Recent Drop Test");
+    let mut rng = seeded_rng();
 
     let zone_id = state.zone_progression.current_zone_id as usize;
 
     // Try to get a drop
     for _ in 0..200 {
-        if let Some(item) = try_drop_from_mob(&state, zone_id, 0.0, 0.0) {
+        if let Some(item) = try_drop_from_mob(&state, zone_id, 0.0, 0.0, &mut rng) {
             let item_name = item.display_name.clone();
             let rarity = item.rarity;
             let slot = item.slot_name().to_string();
@@ -998,7 +1002,7 @@ fn test_full_combat_kill_orchestration() {
 
     // Try item drop (game_tick lines 1296-1308)
     let zone_id = state.zone_progression.current_zone_id as usize;
-    if let Some(item) = try_drop_from_mob(&state, zone_id, 0.0, 0.0) {
+    if let Some(item) = try_drop_from_mob(&state, zone_id, 0.0, 0.0, &mut rng) {
         let item_name = item.display_name.clone();
         let rarity = item.rarity;
         let slot = item.slot_name().to_string();

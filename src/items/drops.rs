@@ -1,4 +1,4 @@
-use super::generation::generate_item;
+use super::generation::generate_item_with_rng;
 use super::types::{EquipmentSlot, Item, Rarity};
 use crate::core::constants::*;
 use crate::core::game_state::GameState;
@@ -23,9 +23,8 @@ pub fn try_drop_from_mob(
     zone_id: usize,
     haven_drop_rate_percent: f64,
     haven_rarity_percent: f64,
+    rng: &mut impl Rng,
 ) -> Option<Item> {
-    let mut rng = rand::rng();
-
     // Apply Trophy Hall bonus to drop chance
     let base_chance = drop_chance_for_prestige(game_state.prestige_rank);
     let drop_chance =
@@ -36,31 +35,29 @@ pub fn try_drop_from_mob(
     }
 
     // Roll rarity - capped at Epic for mobs
-    let rarity = roll_rarity_for_mob(game_state.prestige_rank, haven_rarity_percent, &mut rng);
+    let rarity = roll_rarity_for_mob(game_state.prestige_rank, haven_rarity_percent, rng);
 
     // Roll random equipment slot
-    let slot = roll_random_slot(&mut rng);
+    let slot = roll_random_slot(rng);
 
     // Generate item with zone-based ilvl
     let ilvl = ilvl_for_zone(zone_id);
-    Some(generate_item(slot, rarity, ilvl))
+    Some(generate_item_with_rng(slot, rarity, ilvl, rng))
 }
 
 /// Try to drop an item from a boss.
 /// Bosses always drop an item and can drop Legendaries.
 /// Haven bonuses do NOT apply to boss drops (fixed rates).
-pub fn try_drop_from_boss(zone_id: usize, is_final_zone: bool) -> Item {
-    let mut rng = rand::rng();
-
+pub fn try_drop_from_boss(zone_id: usize, is_final_zone: bool, rng: &mut impl Rng) -> Item {
     // Roll rarity with boss drop table
-    let rarity = roll_rarity_for_boss(is_final_zone, &mut rng);
+    let rarity = roll_rarity_for_boss(is_final_zone, rng);
 
     // Roll random equipment slot
-    let slot = roll_random_slot(&mut rng);
+    let slot = roll_random_slot(rng);
 
     // Generate item with zone-based ilvl
     let ilvl = ilvl_for_zone(zone_id);
-    generate_item(slot, rarity, ilvl)
+    generate_item_with_rng(slot, rarity, ilvl, rng)
 }
 
 /// Roll rarity for mob drops - caps at Epic (no legendaries).
@@ -263,16 +260,17 @@ mod tests {
     #[test]
     fn test_try_drop_from_mob_respects_zone_ilvl() {
         let game_state = GameState::new("Test Hero".to_string(), Utc::now().timestamp());
+        let mut rng = ChaCha8Rng::seed_from_u64(300);
 
         // Try to get drops from different zones
         let mut zone1_drops = Vec::new();
         let mut zone10_drops = Vec::new();
 
         for _ in 0..300 {
-            if let Some(item) = try_drop_from_mob(&game_state, 1, 0.0, 0.0) {
+            if let Some(item) = try_drop_from_mob(&game_state, 1, 0.0, 0.0, &mut rng) {
                 zone1_drops.push(item);
             }
-            if let Some(item) = try_drop_from_mob(&game_state, 10, 0.0, 0.0) {
+            if let Some(item) = try_drop_from_mob(&game_state, 10, 0.0, 0.0, &mut rng) {
                 zone10_drops.push(item);
             }
         }
@@ -288,9 +286,10 @@ mod tests {
 
     #[test]
     fn test_try_drop_from_boss_always_drops() {
+        let mut rng = ChaCha8Rng::seed_from_u64(400);
         // Boss drops are guaranteed
         for zone_id in 1..=10 {
-            let item = try_drop_from_boss(zone_id, zone_id == 10);
+            let item = try_drop_from_boss(zone_id, zone_id == 10, &mut rng);
             assert_eq!(item.ilvl, (zone_id as u32) * 10);
             assert!(!item.display_name.is_empty());
         }

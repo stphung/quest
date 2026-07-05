@@ -78,9 +78,10 @@ fn test_drop_chance_never_exceeds_cap() {
 #[test]
 fn test_try_drop_item_frequency_at_prestige_zero() {
     let game_state = GameState::new("Drop Test".to_string(), 0);
+    let mut rng = ChaCha8Rng::seed_from_u64(1);
     let trials = 2000;
     let drops: usize = (0..trials)
-        .filter(|_| try_drop_from_mob(&game_state, 1, 0.0, 0.0).is_some())
+        .filter(|_| try_drop_from_mob(&game_state, 1, 0.0, 0.0, &mut rng).is_some())
         .count();
 
     // Expected: 15% = 300 out of 2000, allow wide margin for randomness
@@ -96,17 +97,18 @@ fn test_try_drop_item_frequency_at_prestige_zero() {
 #[test]
 fn test_try_drop_item_frequency_increases_with_prestige() {
     let trials = 2000;
+    let mut rng = ChaCha8Rng::seed_from_u64(2);
 
     let mut state_p0 = GameState::new("P0".to_string(), 0);
     state_p0.prestige_rank = 0;
     let drops_p0: usize = (0..trials)
-        .filter(|_| try_drop_from_mob(&state_p0, 1, 0.0, 0.0).is_some())
+        .filter(|_| try_drop_from_mob(&state_p0, 1, 0.0, 0.0, &mut rng).is_some())
         .count();
 
     let mut state_p5 = GameState::new("P5".to_string(), 0);
     state_p5.prestige_rank = 5;
     let drops_p5: usize = (0..trials)
-        .filter(|_| try_drop_from_mob(&state_p5, 1, 0.0, 0.0).is_some())
+        .filter(|_| try_drop_from_mob(&state_p5, 1, 0.0, 0.0, &mut rng).is_some())
         .count();
 
     assert!(
@@ -982,12 +984,13 @@ fn test_pipeline_prestige_produces_better_average_power() {
 fn test_try_drop_item_produces_valid_equippable_items() {
     let mut game_state = GameState::new("Drop Equip".to_string(), 0);
     game_state.prestige_rank = 5;
+    let mut rng = ChaCha8Rng::seed_from_u64(3);
 
     let mut items_equipped = 0;
     // Run enough trials to collect some actual drops. At a ~20% drop rate the
     // odds of zero successes in 100 trials are already ~1 in 5 billion.
     for _ in 0..100 {
-        if let Some(item) = try_drop_from_mob(&game_state, 1, 0.0, 0.0) {
+        if let Some(item) = try_drop_from_mob(&game_state, 1, 0.0, 0.0, &mut rng) {
             // Verify basic item validity
             assert!(!item.display_name.is_empty());
             assert!(item.attributes.total() > 0);

@@ -512,12 +512,7 @@ fn test_first_salvage_discovers_stormglass() {
         }
     }
 
-    // If we ran 10k ticks and still haven't gotten an item drop, that's concerning
-    // but not impossible with certain seeds. The first test (above) verifies the mechanic works.
-    // This test is more about the discovery event emission.
-    if state.stormglass_discovered {
-        assert!(state.stormglass > 0);
-    }
+    panic!("StormglassDiscovered was not emitted within 5000 ticks (seed 42)");
 }
 
 #[test]

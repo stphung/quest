@@ -1338,7 +1338,7 @@ fn test_unlocked_count_increments_on_unlock() {
 #[test]
 fn test_unlock_percentage_zero_when_empty() {
     let ach = Achievements::default();
-    assert_eq!(ach.unlock_percentage(), 0.0);
+    assert!((ach.unlock_percentage() - 0.0).abs() < f32::EPSILON);
 }
 
 #[test]

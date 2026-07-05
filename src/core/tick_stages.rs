@@ -380,7 +380,7 @@ pub fn process_combat_events<R: Rng>(
                 }
 
                 // Item drops
-                process_item_drop(state, haven_bonuses, result);
+                process_item_drop(state, haven_bonuses, result, rng);
 
                 // Discovery: dungeon, then fishing
                 process_discoveries(state, rng, result);
@@ -530,23 +530,25 @@ pub fn process_combat_events<R: Rng>(
 }
 
 /// Process item drops after killing a mob/boss in overworld combat.
-pub(super) fn process_item_drop(
+pub(super) fn process_item_drop<R: Rng>(
     state: &mut GameState,
     haven_bonuses: &HavenBonuses,
     result: &mut TickResult,
+    rng: &mut R,
 ) {
     let zone_id = state.zone_progression.current_zone_id as usize;
     let was_boss = state.zone_progression.fighting_boss;
     let is_final_zone = zone_id == FINAL_ZONE_ID as usize;
 
     let dropped_item = if was_boss {
-        Some(try_drop_from_boss(zone_id, is_final_zone))
+        Some(try_drop_from_boss(zone_id, is_final_zone, rng))
     } else {
         try_drop_from_mob(
             state,
             zone_id,
             haven_bonuses.drop_rate_percent,
             haven_bonuses.item_rarity_percent,
+            rng,
         )
     };
 
@@ -2303,7 +2305,7 @@ mod tests {
         let haven_bonuses = Haven::new().compute_bonuses();
         let mut result = TickResult::default();
 
-        process_item_drop(&mut state, &haven_bonuses, &mut result);
+        process_item_drop(&mut state, &haven_bonuses, &mut result, &mut rng);
 
         assert!(result.events.iter().any(|e| matches!(
             e,
@@ -2327,6 +2329,7 @@ mod tests {
 
     #[test]
     fn process_item_drop_boss_drop_equipped_skips_salvage_even_when_stormglass_active() {
+        let mut rng = ChaCha8Rng::seed_from_u64(83);
         let mut state = GameState::new("Hero".to_string(), 0);
         state.prestige_rank = 20;
         state.zone_progression.current_zone_id = 10;
@@ -2335,7 +2338,7 @@ mod tests {
         let haven_bonuses = Haven::new().compute_bonuses();
         let mut result = TickResult::default();
 
-        process_item_drop(&mut state, &haven_bonuses, &mut result);
+        process_item_drop(&mut state, &haven_bonuses, &mut result, &mut rng);
 
         assert!(result
             .events
@@ -2374,7 +2377,7 @@ mod tests {
         let haven_bonuses = Haven::new().compute_bonuses();
         let mut result = TickResult::default();
 
-        process_item_drop(&mut state, &haven_bonuses, &mut result);
+        process_item_drop(&mut state, &haven_bonuses, &mut result, &mut rng);
 
         assert!(result.events.iter().any(|e| matches!(
             e,
@@ -2392,6 +2395,7 @@ mod tests {
 
     #[test]
     fn process_item_drop_mob_drop_eventually_fires_item_dropped_event() {
+        let mut rng = ChaCha8Rng::seed_from_u64(84);
         let mut state = GameState::new("Hero".to_string(), 0);
         state.prestige_rank = 50; // maxes the item drop chance
         state.zone_progression.current_zone_id = 3;
@@ -2399,10 +2403,11 @@ mod tests {
 
         let haven_bonuses = Haven::new().compute_bonuses();
 
+        // Drop chance capped at 25%; 100 tries gives P(never drops) ≈ 3e-13.
         let mut dropped = false;
-        for _ in 0..500 {
+        for _ in 0..100 {
             let mut result = TickResult::default();
-            process_item_drop(&mut state, &haven_bonuses, &mut result);
+            process_item_drop(&mut state, &haven_bonuses, &mut result, &mut rng);
             if result.events.iter().any(|e| {
                 matches!(
                     e,
