@@ -96,7 +96,6 @@ Agent-invocable skills — ask in natural language to trigger them.
 | `dependency-audit` | "audit dependencies", "update deps" | Multi-agent dependency audit: outdated versions, unused deps, security advisories, feature hygiene |
 | `add-challenge` | "add a challenge", "new minigame" | Checklist-driven agent for adding a new challenge minigame across all 15 integration points |
 | `balance-sim` | "run the simulator", "check balance" | Multi-agent balance simulator: runs headless simulator across strategies/seeds, produces prioritized balance report |
-| `design-iteration` | "where are we with Act 2", "is X fun", "design review" | Design-iteration loop: dissects a system into a living dossier (`docs/dossiers/`), gathers balance evidence, audits fun vs Act 1 benchmarks, surfaces design decisions to the designer, logs outcomes to `docs/decisions.md` |
 | `clean-workspace` | "clean up workspace", "reset workspace" | Resets the repo to a fresh-clone-like state: removes stale branches and uncommitted files |
 | `ship` | "ship it", `/ship` | Push branch, create PR with automerge, watch CI until merged, fix failures |
 | `drive-game` | "drive the game", "screenshot the game" | Runs the real game in tmux against `mkstate` fixtures (isolated via `QUEST_DIR`), sends keystrokes, captures PNG screenshots for PR review |

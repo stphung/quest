@@ -1,7 +1,7 @@
 # System Dossiers
 
-Living design-understanding documents, one per game system, maintained by the
-`design-iteration` skill (`.claude/skills/design-iteration/SKILL.md`).
+Living design-understanding documents, one per game system, refreshed
+manually as systems change.
 
 A dossier is the refreshable answer to "what is this system, how does it
 interrelate, how is it balanced, and is it fun" — written player-eye first,
@@ -12,8 +12,8 @@ against what landed since.
 Dossiers' factual sections (Mechanics & Constants, Interrelations) are in
 `doc-audit`'s scope, so stale facts surface in doc audits and get re-verified
 by `meta-audit` transitively. Judgment sections (Balance Evidence, Fun
-Assessment) are dated snapshots checked by design-iteration's own decision
-retrospectives, not by the audits.
+Assessment) are dated snapshots that need a manual refresh, not caught by the
+audits.
 
 Dossiers complement, not replace:
 - `openspec/specs/` — the source of truth for what a system *does* now
@@ -21,6 +21,3 @@ Dossiers complement, not replace:
   (what a system was *meant* to be, with its proposal/design/tasks)
 - `docs/decisions.md` — the log of resolved design decisions
 - `src/<module>/CLAUDE.md` — implementation-eye documentation for developers
-
-To create or refresh one, ask in natural language: "where are we with Act 2",
-"dissect the Deep", "is the Loom fun", "design review of X".

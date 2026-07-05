@@ -18,7 +18,7 @@ shippable change?*
 | What the game **does** now | `openspec/specs/` | Living source of truth |
 | Design + plan **for one change** (approach, alternatives, tone/UX) | that change's `design.md` / `tasks.md` | Preserved in `openspec/changes/archive/` on ship |
 | **Pre-commitment** exploration ("what should Act 3 be?") | [`explorations/`](explorations/) | Disposable; graduates to a change or dossier |
-| **Evolving** per-system / world design | [`dossiers/`](dossiers/) | Living, refreshed by the `design-iteration` skill |
+| **Evolving** per-system / world design | [`dossiers/`](dossiers/) | Living, refreshed manually as systems change |
 | A **resolved decision** + rationale | [`decisions.md`](decisions.md) | Append-only log |
 | Editorial / QA reviews | [`reviews/`](reviews/) | As-written |
 | Storyboards, screenshots | `storyboards/`, `screenshots/` | Assets |
