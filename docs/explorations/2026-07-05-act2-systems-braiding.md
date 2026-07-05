@@ -191,14 +191,46 @@ which remain on the table for later). Both are Shape-A-compatible — no
 change to what happens *during* a crossing — and both give the ferry era a
 second and third thing to grow besides the Salvage/3-yards economy.
 
+### The four legacy signals (session 3)
+
+Filtered against a three-part test — a signal must (1) actually **vary**
+among players who already cleared the same launch gate (anything that's a
+floor everyone shares, like Ascension X or 28/28 patterns, is the gate
+itself, not a legacy signal), (2) be **legible at a glance** (a count, an
+owned/not-owned flag, a title — not a buried formula), and (3) read as
+**something chosen**, not an incidental byproduct of grinding to the gate.
+That test eliminates Ascension level, Loom patterns, prestige rank,
+Stormbreaker ownership, and Zone reached outright (all launch-gate floors),
+and holds Deep-layer-reached and Fishing rank/Storm-Leviathan out of the
+*core* set for now — Deep already has its own narrative thread into Act 2
+(Torvald), and Fishing is real but thin, better as a later light-touch
+flavor option than a load-bearing signal. What survives, each mapped to
+exactly one destination so nothing competes for two slots:
+
+```
+Soulforge total enhancement (0-70) ──► Ship: starting Ward tier
+God Items owned (0-3)              ──► Ship: named passive per yard
+                                         (Sleipnir→Drive, Megingjörð→Ward,
+                                         Asprika→Hold)
+Haven room count/tier              ──► Districts: extra option(s) on offer
+Achievement score/title            ──► Districts: one rare "Founder's"
+                                         district, gated by a high threshold
+```
+
+**Design principle for all four: read-only, not converted.** None of these
+should be *spent* or consumed by Act 2 — Act 2 only ever queries "how much
+Soulforge enhancement does this character have," "which God Items does
+this account own," etc., the same stats exactly as they exist for Act 1's
+own purposes. That keeps the door open for Act 3 (or any future act) to
+independently reference the same untouched stats for its own flavor later,
+rather than finding them already used up by Act 2's read of them —
+consistent with `world-and-narrative.md`'s open question about whether the
+colony becomes Act 3's home base at all.
+
 **Still open, to flesh out next**: what the ship's actual tiers/named
-variants look like, what a district's 2-3 passive choices actually are and
-whether they should be permanent picks (mirroring the Voyage's refit-door
-pattern) or revisable, and exactly which Act 1 signals (Soulforge level?
-God Items owned? Haven room count? something else?) should flavor which
-starting option — probably a short, curated list rather than "every Act 1
-system contributes something," to avoid diluting the idea into another
-generic point-total.
+variants look like scene-by-scene, what a district's 2-3 passive choices
+actually are (values, not just names), and whether district picks should
+be permanent (mirroring the Voyage's refit-door pattern) or revisable.
 
 ## Per-system sketches
 
