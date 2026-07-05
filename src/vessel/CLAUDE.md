@@ -179,7 +179,7 @@ The tension is speed-vs-salvation, a **wide** margin, and now *all three* yards 
 | `WARD_COST_BASE` / `WARD_COST_GROWTH` | 5 / 1.45 | Ward level L costs `5×1.45^L` Salvage — between Drive and Shipwright |
 | districts | Quay 500 … Charthouse 66,000 | Founded by population (= souls delivered); each adds a standing hold bonus |
 | world milestones | 10% / 25% / 50% / 75% / 90% of `INITIAL_SOULS` gone | `WorldMilestone::ALL` — the era's other discovery axis: the *old world's* decline (see below), not the colony's growth |
-| `RIFTGLASS_BASE_HOURS_TO_FULL` | 24.0 | Real hours to fully charge Riftglass at Drive level 0; scaled down by `riftglass_rate_mult()` at higher Drive levels. A `voyage_simulator`/`ferryman_tests` `strategy_sweep`-validated starting value (adds ~0.1–0.5 real months across a ~4–11 month era, negligible against the sailing time) |
+| `RIFTGLASS_BASE_HOURS_TO_FULL` | 24.0 | Real hours to fully charge Riftglass at Drive level 0; scaled down by `riftglass_rate_mult()` at higher Drive levels. A starting value, not yet simulator-validated against the era's ~3-real-month pacing target — see `openspec/changes/act2-dock-wormhole-crossing/design.md` Decision 1/4. (`ferryman_tests`' `strategy_sweep` and `dock_time_across_charge_policies` are `#[ignore]`d manual tuning sweeps, not automated validation) |
 | `MAX_PARTIAL_CHARGE_PROVISIONS_DEFICIT` (`voyage.rs`) | 40.0 | At 0% charge, the next crossing starts this many provisions short of full (scaled by `1.0 - charge`) |
 | `MAX_PARTIAL_CHARGE_HULL_WEAR` (`voyage.rs`) | 3 | At 0% charge, the next crossing starts with this many hull scars pre-applied (of the `HULL_WEAR_MAX = 6` scale, scaled by `1.0 - charge`) |
 
