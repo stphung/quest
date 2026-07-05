@@ -1,10 +1,10 @@
 # Exploring: deepening Act 2 with more of Act 1's systems
 
-**Mode**: `/opsx:explore` | **Status**: paused mid-thread — direction is
-solid (legacy-as-flavor across a ship-leveling dimension and a
-district-build-out dimension, fed by four read-only Act 1 signals); a few
-concrete details remain open (see "Still open, for a future session" at the
-end). Nothing proposed yet.
+**Mode**: `/opsx:explore` | **Status**: corrected direction as of session 5
+— see "Session 5: correction — Act 2 feeding Act 2, not Act 1 feeding Act
+2". Sessions 2-4 below (legacy-as-flavor) answered a related but different
+question and are kept as a parked, optional layer, not the main thread.
+Nothing proposed yet.
 **Prompted by**: "I loved how Act 1 was a system of systems that came together
 to get us to Act 2. I'd like to explore other systems and how they could tie
 into deepening Act 2 beyond what it is today."
@@ -126,6 +126,17 @@ matter. B: is the more literal answer to "I want that system-of-systems
 feeling to keep going," but it's a considered reversal of the "voyage
 severed from Act 1" pillar, not a free lunch — it needs a deliberate design
 call, not a quiet code change.
+
+> **Correction (session 5)**: sessions 2 through 4 below pursued
+> "legacy-as-flavor" — Act 1 stats read-only-flavoring Act 2's new
+> dimensions. That was a misread of the prompt. The actual ask was **Act 2
+> systems feeding Act 2 systems**, self-contained, the way Act 1's systems
+> fed each other — not Act 1 reaching into Act 2 at all, even softly. See
+> "Session 5: correction" at the end of this document for the corrected
+> direction. Sessions 2-4 are kept below, unedited, as a record of the
+> wrong turn and because the two dimensions they named (ship leveling,
+> districts) turned out to still be the right *nouns* — just braided to
+> each other now, not to Act 1.
 
 ## Where the conversation landed (session 2)
 
@@ -370,3 +381,121 @@ Nothing here is decided. If a direction resonates, the natural next steps:
 - **Power Cores / Deep → Salvage bridge** — the highest-payoff, highest-risk
   idea; worth a dedicated `/opsx:explore` session with the designer to
   settle the severance-pillar question before it becomes a proposal.
+
+## Session 5: correction — Act 2 feeding Act 2, not Act 1 feeding Act 2
+
+**"I didn't mean that act 1 systems feed act 2. I meant there are act 2
+systems that feed act 2 similar to act 1."**
+
+Everything above from session 2 onward pursued the wrong shape. The actual
+ask is structural, not thematic: Act 1's braid isn't "Act 1 feeds Act 2,"
+it's that *combat feeds items feeds Soulforge, Deep feeds Power Cores feeds
+PR feeds Ascension, Loom feeds Ascension's top tiers, Haven bonuses touch
+everything* — many systems, entirely internal to Act 1, gating and feeding
+each other, converging only once (the launch burn) as a side effect of all
+that internal activity. Act 2's Ferryman era has no internal braid at all
+today — it's one pipe (crossings → Salvage → three sinks that don't touch
+each other). The fix is to give Act 2 that same internal structure,
+self-contained, using no Act 1 stat as an input.
+
+The two dimensions picked in session 2 — **the ship levels up** and
+**districts as a build-out tree** — are still the right nouns. What was
+missing is a third and fourth piece, and real gating between all of them
+instead of each just being a second/third Salvage sink:
+
+```
+                    ┌──────────────────────────────────────┐
+                    │         THE CORE LOOP (crossings)      │
+                    │   sail ──► raw Salvage + Soul time-    │
+                    │   in-station                            │
+                    └───────────────┬────────────────────────┘
+                                    │
+                 ┌──────────────────┼──────────────────┐
+                 ▼                  ▼                  ▼
+          VETERAN SOULS      RAW SALVAGE          (station time
+          rank up at a       spendable now,        accrues toward
+          station over       as today, on          veteran rank)
+          many crossings     basic yard tiers
+                 │                  │
+                 │                  ▼
+                 │           REFINEMENT
+                 │           (needs a Refinery district built)
+                 │           raw Salvage ──► Star-Cord (Drive) /
+                 │                           Ironbound Timber (Ward) /
+                 │                           Broadwood (Hold)
+                 │                  │
+                 ▼                  ▼
+         unlock a unique    refined materials required for
+         named ship tier    the TOP ship tiers — raw Salvage
+         or district        alone hard-caps mid-tier (mirrors
+         option tied to     Loom feeding Ascension VII-X exactly)
+         that soul's arc            │
+                 │                  ▼
+                 └────────────►  SHIP LEVELS UP  ◄─────────┐
+                                    │                        │
+                                    ▼                        │
+                          faster/safer crossings ────────────┘
+                          (more Salvage + soul-time per
+                          real-week — feeds the whole loop
+                          again, Act 1's "wall → reset →
+                          power" shape)
+
+         Meanwhile: DISTRICTS need both raw Salvage AND a
+         minimum Ship tier to found — and Refineries (one
+         district type) are the only way to unlock refinement
+         at all — so Ship and Districts gate each other in
+         both directions, not just both drink from Salvage.
+```
+
+Four pieces, each doing a distinct job (mirroring Act 1's shape of several
+systems with distinct roles, not several skins on one economy):
+
+1. **The core loop (crossings)** — unchanged from today, produces raw
+   Salvage and (new) soul time-in-station.
+2. **Veteran souls** — crew stationed at Helm/Tender/Watch across *many*
+   crossings (distinct from the maiden voyage's one-time 3-beat arcs)
+   accrue a veteran rank; reaching top rank at a station unlocks a unique
+   named ship tier or district option tied to that soul specifically — a
+   per-character growth axis feeding the shared systems, the way Ascension
+   is per-character but feeds access to shared Deep/Loom content in Act 1.
+3. **Refinement** — a production step, not a system unto itself: raw
+   Salvage becomes one of three named materials (Star-Cord, Ironbound
+   Timber, Broadwood — placeholder names), but only once a Refinery
+   district exists. This is deliberately Loom-shaped (a small conversion
+   chain) rather than Soulforge-shaped (a direct upgrade).
+4. **Ship levels up** and **Districts** — as named in session 2, but now
+   mutually gating: raw Salvage alone caps ship tiers partway (a **hard
+   gate**, confirmed in this session — mirrors Loom→Ascension VII-X
+   exactly rather than being a soft efficiency bonus); districts require a
+   minimum ship tier to found at all (a slower ship can't hold the site);
+   only a Refinery district unlocks the refined materials the top ship
+   tiers require.
+
+**Resolved this session**: the Refinery gate is a hard requirement for top
+ship tiers, not a soft accelerant — the stronger, more Act-1-shaped braid,
+accepted with the tradeoff that it puts more pressure on the tuned
+strategy-sweep balance (see Balance Evidence in `act2-pilgrimage.md`) and
+will need re-validation once numbers exist.
+
+**The session 2-4 "legacy-as-flavor" thread is not discarded, just
+demoted**: God Items as Voyage artifacts, and Achievements/History tracking
+Vessel milestones, are both still perfectly good ideas — they just answer
+"does Act 1 get *recognized* in Act 2," a smaller and separate question
+from "does Act 2 have its own internal engine." Worth revisiting as an
+additive layer once this braid has a real shape, not as competition for it.
+
+**Open questions, this session**:
+- Does Refinement need all three named materials from the start, or does
+  the Refinery unlock them one at a time (its own small progression)?
+- Should veteran-soul rank-up unlock a ship tier, a district option, or
+  either depending on which station the soul held — i.e. does a Helm
+  veteran always feed the ship and a Tender veteran always feed districts,
+  or is it soul-specific and authored per character?
+- The maiden voyage's souls (8 named, 7 berths) are fully authored,
+  one-loss-only content — does "veteran rank" apply to those same 8 souls
+  across the whole ferry era, or does the era need new, ferry-only crew
+  who were never part of the maiden voyage's authored arcs?
+- Numeric shape of the hard gate (how far does raw Salvage get you before
+  it caps, and how much does a Refinery need to produce to close the gap)
+  is unset — needs an actual pass against the strategy-sweep methodology
+  before this could become a proposal.
