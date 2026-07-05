@@ -541,8 +541,10 @@ fn main() -> io::Result<()> {
                     let mut voyage: Option<vessel::voyage::VoyageState> = None;
                     let mut colony: Option<vessel::colony::ColonyState> = None;
                     let mut voyage_ui = vessel::VoyageUiState::default();
-                    let mut launch_transition =
-                        vessel::transition::LaunchTransitionState::default();
+                    let mut launch_transition = vessel::transition::LaunchTransitionState {
+                        beat_started_ms: Utc::now().timestamp_millis() as u128,
+                        ..Default::default()
+                    };
 
                     'game_loop: loop {
                         // ── Act 2: The Crossing ─────────────────────────────
@@ -560,6 +562,7 @@ fn main() -> io::Result<()> {
                                         frame,
                                         frame.area(),
                                         launch_transition.beat,
+                                        launch_transition.beat_started_ms,
                                     );
                                 })?;
                                 if event::poll(Duration::from_millis(100))? {
@@ -571,6 +574,8 @@ fn main() -> io::Result<()> {
                                                     == ratatui::crossterm::event::KeyCode::Enter
                                                 && launch_transition.advance() =>
                                         {
+                                            launch_transition.beat_started_ms =
+                                                Utc::now().timestamp_millis() as u128;
                                             state.vessel_transition_played = true;
                                             if !debug_mode {
                                                 save_files(

@@ -77,11 +77,20 @@ pub fn beat(n: u8) -> &'static Beat {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LaunchTransitionState {
     pub beat: u8,
+    /// UI-clock millis (`ui::clock::now_millis()`) when the current beat was
+    /// entered — the caller (main.rs, which owns the UI clock) stamps this on
+    /// creation and every `advance()`. Rendering derives each beat's
+    /// animation phase from `now_millis() - beat_started_ms`, so this struct
+    /// stays decoupled from the UI clock module itself.
+    pub beat_started_ms: u128,
 }
 
 impl Default for LaunchTransitionState {
     fn default() -> Self {
-        Self { beat: 1 }
+        Self {
+            beat: 1,
+            beat_started_ms: 0,
+        }
     }
 }
 
