@@ -123,10 +123,19 @@ scripts/record.sh quest docs/screenshots/<feature>-transition.webm 4 8
 git add docs/screenshots && git commit -m "docs: add UI screenshots"
 ```
 
-```markdown
-![combat after change](https://raw.githubusercontent.com/stphung/quest/<branch>/docs/screenshots/<feature>-after.png)
+Pin the link to the **commit SHA you just committed**, not the branch name —
+branch-name raw URLs (`.../raw/<branch>/...`) 404 once GitHub deletes the
+head branch after merge, since a branch ref stops existing while the
+content lives on forever in `main`'s history under its commit SHA:
 
-https://github.com/stphung/quest/raw/<branch>/docs/screenshots/<feature>-transition.webm
+```bash
+sha=$(git rev-parse HEAD)
+```
+
+```markdown
+![combat after change](https://raw.githubusercontent.com/stphung/quest/<sha>/docs/screenshots/<feature>-after.png)
+
+https://github.com/stphung/quest/raw/<sha>/docs/screenshots/<feature>-transition.webm
 ```
 
 GitHub renders `.webm`/`.mp4` links as an inline player in PRs/issues for
