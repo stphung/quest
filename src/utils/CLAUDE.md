@@ -16,7 +16,7 @@ Development and operational utilities: compile-time build metadata, self-update 
 
 - **`BUILD_COMMIT`** / **`BUILD_DATE`**: Static string constants embedded at compile time. `BUILD_COMMIT` is 7 chars (short SHA) or "unknown". `BUILD_DATE` is YYYY-MM-DD format.
 - **`UpdateCheck`**: Result of checking for updates -- `UpToDate`, `UpdateAvailable { current_commit, current_date, latest, changelog }`, or `CheckFailed(String)`.
-- **`UpdateInfoStatus`**: Simplified result for in-game display -- `UpdateAvailable(UpdateInfo)`, `UpToDate`, or `CheckFailed(String)`.
+- **`UpdateInfoStatus`**: Simplified result for in-game display -- `UpdateAvailable(UpdateInfo)`, `UpToDate { current_and_previous, current_and_previous_times }` (recent commit history for display), or `CheckFailed(String)`.
 - **`BugReportData`**: Contains a compact `summary` string (displayed in overlay) and `clipboard_content` (full save JSON in collapsible markdown blocks).
 - **`DebugMenu`**: State struct with `is_open`, `selected_category`, `selected_index`. Controlled by backtick toggle, Tab/arrows for navigation, Enter to trigger.
 - **`DebugCategory`**: 10 categories -- Challenges, World, Resources, Items, Deep, Zones, Character, Soulforge, Loom, Borders.

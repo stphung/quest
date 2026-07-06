@@ -87,7 +87,7 @@ Both attribute values and affix values are multiplied by the combined multiplier
 
 ## Generation Rules by Rarity
 
-Base attribute ranges at ilvl 10 (scaled by `ilvl_multiplier × tier_multiplier`), 1-3 random attributes:
+Base attribute ranges at ilvl 10 (scaled by `ilvl_multiplier × tier_multiplier`):
 
 | Rarity    | Base Attr Range | Affixes | At ilvl 10 T9 | At ilvl 100 T9 (4.0x) | At ilvl 100 T0 (1.6x) |
 |-----------|----------------|---------|--------------|----------------------|----------------------|
