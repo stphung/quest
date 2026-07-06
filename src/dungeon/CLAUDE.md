@@ -90,7 +90,7 @@ pub fn generate_dungeon(level: u32, prestige_rank: u32, zone_id: u32) -> Dungeon
 1. **Combat room**: Defeat enemy → room becomes Cleared
 2. **Treasure room**: Auto-clear, generate item drop
 3. **Elite room**: Defeat guardian → get key (`has_key = true`) → room Cleared
-4. **Boss room**: Requires `has_key == true` to enter. Defeat boss → `boss_defeated = true` → dungeon complete
+4. **Boss room**: Requires `has_key == true` to enter. Defeat boss → dungeon cleared (`state.active_dungeon = None`), emits `DungeonEvent::DungeonComplete` → dungeon complete
 
 ### Death Handling
 - Death in dungeon exits the dungeon entirely
