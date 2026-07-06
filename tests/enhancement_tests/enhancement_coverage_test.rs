@@ -459,8 +459,8 @@ fn test_try_discover_soulforge_at_prestige_14_never_discovers() {
 
     // Probability is exactly 0.0 at P14 (below min prestige rank),
     // so this always returns false via an early-return guard clause.
-    // 1,000 iterations is sufficient to verify the guard.
-    for _ in 0..1_000 {
+    // 100 iterations is sufficient to verify the guard.
+    for _ in 0..100 {
         assert!(!try_discover_soulforge(&mut ep, 14, &mut rng));
     }
     assert!(!ep.discovered);

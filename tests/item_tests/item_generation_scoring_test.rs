@@ -14,7 +14,7 @@ use quest::items::drops::{
     drop_chance_for_prestige, ilvl_for_zone, roll_rarity_for_boss, roll_rarity_for_mob,
     try_drop_from_boss,
 };
-use quest::items::generation::{generate_item, tier_multiplier};
+use quest::items::generation::{generate_item, generate_item_with_rng, tier_multiplier};
 use quest::items::scoring::{affix_power_weight, auto_equip_if_better};
 use quest::items::types::{Affix, AffixType, AttributeBonuses, EquipmentSlot, Item, Rarity};
 use quest::GameState;
@@ -318,8 +318,11 @@ fn test_generate_mythic_item_has_display_name() {
 
 #[test]
 fn test_generate_mythic_item_attributes_are_positive() {
-    for _ in 0..20 {
-        let item = generate_item(EquipmentSlot::Ring, Rarity::Mythic, 100);
+    // Guaranteed by the `.max(1)` floor in generate_attributes(); a few
+    // seeded reps are enough to prove the invariant.
+    let mut rng = ChaCha8Rng::seed_from_u64(4003);
+    for _ in 0..3 {
+        let item = generate_item_with_rng(EquipmentSlot::Ring, Rarity::Mythic, 100, &mut rng);
         assert!(
             item.attributes.total() > 0,
             "Mythic item at ilvl 100 should have positive attributes"

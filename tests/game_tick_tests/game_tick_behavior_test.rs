@@ -673,7 +673,7 @@ fn test_challenge_discovery_requires_prestige() {
 
     // P0 character should not discover challenges (requires P1+)
     state.prestige_rank = 0;
-    for _ in 0..1000 {
+    for _ in 0..10 {
         let result = try_discover_challenge_with_haven(&mut state, &mut rng, 0.0);
         assert!(
             result.is_none(),

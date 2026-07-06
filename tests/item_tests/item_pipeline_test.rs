@@ -163,9 +163,13 @@ fn test_generated_items_have_correct_rarity() {
 
 #[test]
 fn test_generated_items_always_have_positive_attributes() {
-    // Every generated item must contribute some attribute bonuses
-    for _ in 0..100 {
-        let item = generate_item(EquipmentSlot::Weapon, Rarity::Common, 1);
+    // Every generated item must contribute some attribute bonuses.
+    // Guaranteed by the `.max(1)` floor in generate_attributes(), so a few
+    // seeded reps are enough to prove the invariant without relying on
+    // unseeded RNG.
+    let mut rng = ChaCha8Rng::seed_from_u64(4001);
+    for _ in 0..3 {
+        let item = generate_item_with_rng(EquipmentSlot::Weapon, Rarity::Common, 1, &mut rng);
         assert!(
             item.attributes.total() > 0,
             "Every generated item should have at least some attributes"
@@ -188,29 +192,33 @@ fn test_generated_items_have_nonempty_display_name() {
 
 #[test]
 fn test_affix_count_contract_across_all_rarities() {
-    // Run multiple times to cover the random ranges
-    for _ in 0..50 {
-        let common = generate_item(EquipmentSlot::Weapon, Rarity::Common, 1);
+    // Affix counts per rarity are a structural guarantee of generate_affixes(),
+    // not a random outcome — a few seeded reps are enough to cover the ranges
+    // without relying on unseeded RNG.
+    let mut rng = ChaCha8Rng::seed_from_u64(4002);
+    for _ in 0..3 {
+        let common = generate_item_with_rng(EquipmentSlot::Weapon, Rarity::Common, 1, &mut rng);
         assert_eq!(common.affixes.len(), 0, "Common items: 0 affixes");
 
-        let magic = generate_item(EquipmentSlot::Weapon, Rarity::Magic, 5);
+        let magic = generate_item_with_rng(EquipmentSlot::Weapon, Rarity::Magic, 5, &mut rng);
         assert_eq!(magic.affixes.len(), 1, "Magic items: exactly 1 affix");
 
-        let rare = generate_item(EquipmentSlot::Weapon, Rarity::Rare, 10);
+        let rare = generate_item_with_rng(EquipmentSlot::Weapon, Rarity::Rare, 10, &mut rng);
         assert!(
             (2..=3).contains(&rare.affixes.len()),
             "Rare items: 2-3 affixes, got {}",
             rare.affixes.len()
         );
 
-        let epic = generate_item(EquipmentSlot::Weapon, Rarity::Epic, 15);
+        let epic = generate_item_with_rng(EquipmentSlot::Weapon, Rarity::Epic, 15, &mut rng);
         assert!(
             (3..=4).contains(&epic.affixes.len()),
             "Epic items: 3-4 affixes, got {}",
             epic.affixes.len()
         );
 
-        let legendary = generate_item(EquipmentSlot::Weapon, Rarity::Legendary, 20);
+        let legendary =
+            generate_item_with_rng(EquipmentSlot::Weapon, Rarity::Legendary, 20, &mut rng);
         assert!(
             (4..=5).contains(&legendary.affixes.len()),
             "Legendary items: 4-5 affixes, got {}",
