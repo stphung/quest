@@ -27,7 +27,7 @@ Scope: `tests/game_tick_tests/`, `tests/combat_tests/`, `tests/character_tests/`
 
 **Agent 2 — Systems**
 
-Scope: `tests/fishing_tests/`, `tests/deep_tests/`, `tests/haven_tests/`, `tests/enhancement_tests/`, `tests/stormglass_tests/`
+Scope: `tests/fishing_tests/`, `tests/deep_tests/`, `tests/haven_tests/`, `tests/enhancement_tests/`, `tests/stormglass_tests/`, `tests/loom_tests/`
 
 **Agent 3 — Items, Achievements & Misc**
 
@@ -92,6 +92,7 @@ Spawn fix agents based on audit findings.
 | Modifying production code to fix tests | Only change test code unless the production code has a genuine bug |
 | Ignoring Monte Carlo tests as "probably fine" | Check margins are generous (2-5x expected range) |
 | Skipping the 10x verification | Flakiness is probabilistic; 1 run proves nothing |
+| Re-flagging the same ~40 brute-force RNG-search loops every run as if new | This category has recurred, unresolved, across every run since 2026-07-02 — fixing it needs seed research or a production-code RNG-injection change, both outside this skill's auto-fix scope. Note it as known, tracked debt rather than re-deriving it from scratch each cycle; only act on it if actually doing that research. |
 
 ## Output
 
