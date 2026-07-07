@@ -19,7 +19,7 @@ folded back into those specs.
 
 The specs in `specs/` were **reverse-engineered from the existing
 implementation** — they document the game as it is actually coded today, not a
-wishlist. Twenty capability specs (197 requirements, 500+ scenarios) were each
+wishlist. Twenty capability specs (208 requirements, 498 scenarios) were each
 produced by reading the relevant `src/<module>/` code, its module `CLAUDE.md`,
 the root `CLAUDE.md` "Key Constants", and the design notes under `docs/`, then
 grounding every number against the source. All twenty pass

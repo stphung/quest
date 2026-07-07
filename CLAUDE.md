@@ -14,7 +14,7 @@ make fmt               # Auto-fix formatting
 
 ## Spec-Driven Development (OpenSpec)
 
-Development is **spec-driven** via [OpenSpec](https://github.com/Fission-AI/OpenSpec). The `openspec/specs/` directory is a reverse-engineered, code-grounded baseline (20 capabilities, 197 requirements) that documents *what the game currently does* — see [openspec/README.md](openspec/README.md) for the capability index and the known code-vs-docs discrepancy log.
+Development is **spec-driven** via [OpenSpec](https://github.com/Fission-AI/OpenSpec). The `openspec/specs/` directory is a reverse-engineered, code-grounded baseline (20 capabilities, 208 requirements) that documents *what the game currently does* — see [openspec/README.md](openspec/README.md) for the capability index and the known code-vs-docs discrepancy log.
 
 **Start non-trivial work from a spec, not from code:**
 1. `/opsx:propose "<idea>"` — scaffold a change (proposal + design + tasks + delta specs) under `openspec/changes/`, grounded in the affected capability spec(s).

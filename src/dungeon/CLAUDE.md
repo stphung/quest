@@ -100,7 +100,7 @@ pub fn generate_dungeon(level: u32, prestige_rank: u32, zone_id: u32) -> Dungeon
 
 ## Integration Points
 
-- **Combat**: Dungeon combat uses the same `combat/logic.rs` system with zone-scaled enemies via `generate_dungeon_enemy(zone_id)`, `generate_dungeon_elite(zone_id)`, `generate_dungeon_boss(zone_id)`
+- **Combat**: Dungeon combat uses the same combat system with zone-scaled enemies via `generate_dungeon_enemy(zone_id)`, `generate_dungeon_elite(zone_id)`, `generate_dungeon_boss(zone_id)` (`combat/enemy_generation.rs`)
 - **Items**: Treasure rooms use `items/drops.rs` for guaranteed drops
 - **UI**: `ui/dungeon_map.rs` renders the top-down minimap; `ui/combat_3d.rs` renders first-person view
 - **Game State**: Active dungeon stored in `GameState.active_dungeon: Option<Dungeon>`

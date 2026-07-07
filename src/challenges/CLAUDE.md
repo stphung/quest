@@ -85,7 +85,7 @@ pub fn tick_game(game: &mut NewGameGame) {
 
 ### `facade.rs`
 
-Defines `tick_challenge_ai_facade()`, a decoupled entry point for ticking active-game AI thinking (mirrors `fishing/facade.rs`'s `tick_fishing_facade()`). Not currently called in production — `tick_stages.rs` Stage 1 duplicates the chess/morris/gomoku/go dispatch logic inline instead of calling the facade.
+Defines `tick_challenge_ai_facade()`, a decoupled entry point for ticking active-game AI thinking (mirrors `fishing/facade.rs`'s `tick_fishing_facade()`). Not currently called in production — `tick_stages.rs` Stage 1 duplicates the chess/morris/gomoku/go dispatch logic inline instead of calling the facade, and also dispatches Shard Fusion (`shard_fusion::tick_shard_fusion`), a case the facade doesn't cover.
 
 ### `impl_apply_game_result!` Macro (`mod.rs`)
 
