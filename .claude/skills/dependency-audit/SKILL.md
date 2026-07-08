@@ -18,6 +18,17 @@ Full dependency health check: outdated versions, unused dependencies, security a
 
 Spawn 2 Explore agents simultaneously.
 
+> **Known pitfall — `Cargo.lock` is gitignored in this repo.** It has never been
+> committed (confirmed via `.gitignore` and empty `git log --all -- Cargo.lock`), so
+> any finding that cites a "locked version" or a resolved dependency-graph edge
+> (e.g. "Cargo.lock:generic-array") reflects the live, on-disk lockfile at run time
+> only — it is not a citable historical artifact and can never be re-derived from git
+> history by a later audit or by `meta-audit`'s `git show <sha>:<path>`
+> re-verification. When logging such a finding, say so explicitly in `correct_value`
+> (e.g. "observed via live `cargo update --dry-run`/`cargo audit` run; Cargo.lock is
+> gitignored, not re-derivable from git history") rather than stating a locked
+> version as if it were a stable, checkable fact.
+
 **Agent 1 — Versions & Security**
 
 Scope: `Cargo.toml`, `Cargo.lock`
@@ -101,6 +112,14 @@ re-verification will check the wrong code state or lose track of provenance:
   (for skills that modify the audited code itself — e.g. perf-audit, test-audit — the
   merge commit contains the *fix*, not the pre-fix state a finding describes). Capture
   this before the branch is deleted.
+- **`correct_value` for `auto_fixed: true` findings**: describe the state *found* at
+  `commit_sha` (the problem — e.g. "uuid pinned at 1.21, 1.22 available"), not the fix
+  that Phase 2 goes on to apply. A past run logged `correct_value` as "Moved tar/flate2
+  into `[target...]`.dependencies]" — but that move happens in a commit *after*
+  `commit_sha` (inside the same PR), so `git show <commit_sha>:Cargo.toml` will never
+  show it and a later `meta-audit` re-verification will wrongly flag the finding as
+  false. If you want to record what the fix ended up being, put it in a separate note,
+  not in `correct_value`.
 - **PR URL**: from `/ship`'s own reported result, once it completes.
 
 1. Build a JSON summary: date (YYYY-MM-DD), the `commit_sha` above, the PR URL, agent
