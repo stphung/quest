@@ -114,7 +114,7 @@ Affix power weights (from `affix_power_weight()`):
 - DamageReflection: 0.8x
 - HPBonus: 0.5x (lowest)
 
-Power score is shown in the equipment panel and scrolling loot ticker. God item power scoring is deferred (#272).
+Power score is shown in the equipment panel and scrolling loot ticker. God items intentionally do not score above T9 legendaries on the power formula — several options (scoring passives as affixes, a flat bonus, hand-set power, buffed stats) were considered and declined; see #272 (closed, not planned).
 
 ## Auto-Equip (`scoring.rs`)
 

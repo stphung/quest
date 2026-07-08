@@ -166,8 +166,8 @@ version on the way in:
   → the Ascension multiplier → the enemy's defense subtracts → a crit,
   and occasionally a second "double-strike" hit, can land on top.
 - Different enemy roles attack at different speeds; the player is quicker
-  than any of them, and a dungeon boss presses harder and faster than an
-  equivalent overworld one.
+  than most of them — the zone boss matches its pace, and the dungeon boss
+  just edges it out.
 
 Death is handled differently depending on where it happens:
 

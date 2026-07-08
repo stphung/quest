@@ -88,15 +88,15 @@ Key methods:
 ### `GuildRank` (`types.rs`)
 Newtype `GuildRank(u8)` with values 1-5. Persists across prestiges.
 
-| Rank | Name | Max Roster | Concurrent Missions | Required Breakthrough |
-|------|------|-----------|---------------------|----------------------|
-| 1 | Freelancers | 5 | 1 | Discovery |
-| 2 | Company | 7 | 2 | Layer 3 |
-| 3 | Battalion | 9 | 2 | Layer 7 |
-| 4 | Legion | 12 | 3 | Layer 13 |
-| 5 | Vanguard | 15 | 4 | Layer 19 |
+| Rank | Name | Max Roster | Concurrent Missions | Required Breakthrough | Upgrade Cost |
+|------|------|-----------|---------------------|----------------------|-------------|
+| 1 | Freelancers | 5 | 1 | Discovery | — |
+| 2 | Company | 7 | 2 | Layer 3 | 200 Marks |
+| 3 | Battalion | 9 | 2 | Layer 7 | 500 Marks |
+| 4 | Legion | 12 | 3 | Layer 13 | 1200 Marks |
+| 5 | Vanguard | 15 | 4 | Layer 19 | 3000 Marks |
 
-Stats are driven from the `GUILD_RANK_STATS` constant array (index 0 = Rank 1). Do not call methods with `GuildRank(0)` — valid range is 1-5.
+Stats are driven from the `GUILD_RANK_STATS` constant array (index 0 = Rank 1). Do not call methods with `GuildRank(0)` — valid range is 1-5. Advancing a rank requires **both** gates: the layer breakthrough cleared *and* the Warband Marks cost paid (`economy.rs::guild_upgrade_cost()`); `try_upgrade_guild_rank()` enforces both atomically.
 
 ### `Mercenary` (`types.rs`)
 Individual merc in the roster. Resets on prestige. `id` is a `u64` assigned via `DeepPersistent::next_merc_id()` and is unique across all generations.
@@ -119,6 +119,25 @@ Five archetypes, each with a distinct `base_stats()` tuple `(power, resilience, 
 | Saboteur | 10 | 8 | 12 | Trap/obstacle specialist |
 
 Archetype availability by guild rank: Rank 1 = Vanguard/Scout/Medic, Rank 2 adds Arcanist, Rank 3+ adds Saboteur.
+
+### Mercenary Promotion (`mercenaries.rs`)
+
+Upgrades an existing merc's quality tier (Common -> Uncommon -> Rare -> Elite; Elite cannot promote further). Gated on three independent checks, all enforced atomically by `promote_mercenary()` / `promote_merc_by_id()`:
+
+| Target Quality | Missions Required (from previous tier) | Guild Rank Required | Marks Cost |
+|-----------------|------------------------------------------|----------------------|------------|
+| Uncommon | 3 | 2 | 160-260 |
+| Rare | 6 | 3 | 260-400 |
+| Elite | 12 | 4 | 400-600 |
+
+Key functions:
+- `promotion_missions_required(from) -> u32` — Missions completed at current tier needed to qualify
+- `promotion_guild_rank_required(to) -> u8` — Guild rank needed to promote to the target tier
+- `promotion_cost(merc_id, to) -> u32` — Deterministic Marks cost within the tier's range (seeded by `merc_id`, rounded to nearest 5)
+- `can_promote(merc, guild_rank, available_marks) -> Result<(MercQuality, u32), PromotionError>` — Validates all three gates, returns target quality + cost on success
+- `promote_mercenary(merc, prestige, guild_rank)` / `promote_merc_by_id(merc_id, prestige, guild_rank)` — Spends Marks and applies the promotion's stat bump
+
+`PromotionError` variants: `AlreadyElite`, `InsufficientMissions { have, need }`, `InsufficientRank { have, need }`, `InsufficientMarks { have, need }`. Reachable from `input/deep_input.rs`.
 
 ### `MercStatus` (`types.rs`)
 ```rust
