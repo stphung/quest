@@ -4,4 +4,5 @@ mod fishing_tests {
     mod fishing_edge_cases_test;
     mod fishing_extended_coverage_test;
     mod fishing_integration_test;
+    mod helpers;
 }

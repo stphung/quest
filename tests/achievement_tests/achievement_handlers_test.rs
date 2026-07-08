@@ -7,30 +7,10 @@
 
 use quest::achievements::types::*;
 use quest::achievements::{AchievementCategory, AchievementId, MinigameDifficulty, MinigameType};
+use quest::haven::types::HavenRoomId;
 use std::collections::HashMap;
 
-// =========================================================================
-// Helper: build haven room tier maps for sync_from_haven tests
-// =========================================================================
-
-use quest::haven::types::HavenRoomId;
-
-/// Build a HashMap with all buildable rooms (excluding StormForge) set to `tier`.
-fn build_haven_tiers(tier: u8) -> HashMap<HavenRoomId, u8> {
-    HavenRoomId::ALL
-        .iter()
-        .filter(|r| **r != HavenRoomId::StormForge)
-        .map(|r| (*r, tier))
-        .collect()
-}
-
-/// Build a HashMap with every room at its max tier.
-fn build_haven_max_tiers() -> HashMap<HavenRoomId, u8> {
-    HavenRoomId::ALL
-        .iter()
-        .map(|r| (*r, r.max_tier()))
-        .collect()
-}
+use super::helpers::{build_haven_max_tiers, build_haven_tiers};
 
 // =========================================================================
 // on_enemy_killed — kill counter and Slayer milestones

@@ -25,7 +25,6 @@ use quest::fishing::{
     check_rank_up_with_max, generate_fish, generate_fishing_session, roll_fish_rarity,
     try_discover_fishing, FishRarity, FishingPhase, FishingState, SPOT_NAMES,
 };
-use quest::GameState;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
@@ -37,9 +36,7 @@ fn rng(seed: u64) -> ChaCha8Rng {
     ChaCha8Rng::seed_from_u64(seed)
 }
 
-fn fresh_state() -> GameState {
-    GameState::new("TestFisher".to_string(), 0)
-}
+use super::helpers::fresh_state;
 
 fn fresh_fishing_state(rank: u32, fish_toward: u32) -> FishingState {
     FishingState {

@@ -19,7 +19,6 @@ use quest::fishing::{
     tick_fishing_with_haven_result, FishRarity, FishingPhase, FishingSession, FishingState,
     HavenFishingBonuses, LeviathanResult, STORM_LEVIATHAN,
 };
-use quest::GameState;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
@@ -27,9 +26,7 @@ fn rng(seed: u64) -> ChaCha8Rng {
     ChaCha8Rng::seed_from_u64(seed)
 }
 
-fn fresh_state() -> GameState {
-    GameState::new("EdgeTester".to_string(), 0)
-}
+use super::helpers::fresh_state;
 
 fn no_haven() -> HavenFishingBonuses {
     HavenFishingBonuses::default()

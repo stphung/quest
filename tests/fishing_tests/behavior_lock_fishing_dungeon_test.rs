@@ -19,7 +19,6 @@ use quest::fishing::{
     tick_fishing_with_haven_result, HavenFishingBonuses,
 };
 use quest::fishing::{FishingPhase, FishingSession};
-use quest::GameState;
 use quest::TICK_INTERVAL_MS;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -32,9 +31,7 @@ fn seeded_rng() -> ChaCha8Rng {
 // Helper Functions
 // =============================================================================
 
-fn create_test_state() -> GameState {
-    GameState::new("BehaviorLock".to_string(), 0)
-}
+use super::helpers::fresh_state as create_test_state;
 
 fn create_seeded_rng(seed: u64) -> ChaCha8Rng {
     ChaCha8Rng::seed_from_u64(seed)

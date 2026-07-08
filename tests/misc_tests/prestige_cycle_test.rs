@@ -46,8 +46,14 @@ fn test_complete_prestige_cycle_first_prestige() {
     }
 
     // Apply any remaining XP to ensure we hit level 10
+    let mut iterations = 0;
     while state.character_level < 10 {
         apply_tick_xp(&mut rng, &mut state, 1000.0);
+        iterations += 1;
+        assert!(
+            iterations < 1000,
+            "Should reach level 10 within 1000 iterations"
+        );
     }
 
     assert!(state.character_level >= 10);
@@ -126,8 +132,14 @@ fn test_multiple_prestige_cycles() {
     let mut state = GameState::new("Multi-Prestige Hero".to_string(), 0);
 
     // First prestige: level 10
+    let mut iterations = 0;
     while state.character_level < 10 {
         apply_tick_xp(&mut rng, &mut state, 10000.0);
+        iterations += 1;
+        assert!(
+            iterations < 1000,
+            "Should reach level 10 within 1000 iterations"
+        );
     }
     assert!(can_prestige(&state));
     perform_prestige(&mut state);
@@ -135,8 +147,14 @@ fn test_multiple_prestige_cycles() {
     assert_eq!(state.get_attribute_cap(), 25);
 
     // Second prestige: level 25
+    let mut iterations = 0;
     while state.character_level < 25 {
         apply_tick_xp(&mut rng, &mut state, 50000.0);
+        iterations += 1;
+        assert!(
+            iterations < 1000,
+            "Should reach level 25 within 1000 iterations"
+        );
     }
     assert!(can_prestige(&state));
     perform_prestige(&mut state);
@@ -145,8 +163,14 @@ fn test_multiple_prestige_cycles() {
     assert_eq!(state.total_prestige_count, 2);
 
     // Third prestige: level 50
+    let mut iterations = 0;
     while state.character_level < 50 {
         apply_tick_xp(&mut rng, &mut state, 200000.0);
+        iterations += 1;
+        assert!(
+            iterations < 1000,
+            "Should reach level 50 within 1000 iterations"
+        );
     }
     assert!(can_prestige(&state));
     perform_prestige(&mut state);
@@ -176,8 +200,14 @@ fn test_prestige_preserves_fishing() {
     state.fishing.legendary_catches = 10;
 
     // Level up and prestige
+    let mut iterations = 0;
     while state.character_level < 10 {
         apply_tick_xp(&mut rng, &mut state, 10000.0);
+        iterations += 1;
+        assert!(
+            iterations < 1000,
+            "Should reach level 10 within 1000 iterations"
+        );
     }
     perform_prestige(&mut state);
 
@@ -197,10 +227,16 @@ fn test_prestige_at_exact_level() {
     let mut state = GameState::new("Precise Hero".to_string(), 0);
 
     // Get to exactly level 10
+    let mut iterations = 0;
     while state.character_level < 10 {
         let needed = xp_for_next_level(state.character_level);
         let remaining = needed - state.character_xp;
         apply_tick_xp(&mut rng, &mut state, remaining as f64);
+        iterations += 1;
+        assert!(
+            iterations < 1000,
+            "Should reach level 10 within 1000 iterations"
+        );
     }
 
     assert_eq!(state.character_level, 10);
@@ -218,8 +254,14 @@ fn test_cannot_prestige_when_ineligible() {
     let mut state = GameState::new("Impatient Hero".to_string(), 0);
 
     // Level to 9 (just below requirement)
+    let mut iterations = 0;
     while state.character_level < 9 {
         apply_tick_xp(&mut rng, &mut state, 10000.0);
+        iterations += 1;
+        assert!(
+            iterations < 1000,
+            "Should reach level 9 within 1000 iterations"
+        );
     }
 
     assert_eq!(state.character_level, 9);
@@ -391,8 +433,14 @@ fn test_prestige_clears_xp_rate_tracking() {
     assert!(state.xp_per_hour().is_some());
 
     // Level up and prestige
+    let mut iterations = 0;
     while state.character_level < 10 {
         apply_tick_xp(&mut rng, &mut state, 10000.0);
+        iterations += 1;
+        assert!(
+            iterations < 1000,
+            "Should reach level 10 within 1000 iterations"
+        );
     }
     perform_prestige(&mut state);
 

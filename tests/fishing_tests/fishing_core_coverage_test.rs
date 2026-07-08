@@ -39,9 +39,7 @@ fn rng(seed: u64) -> ChaCha8Rng {
     ChaCha8Rng::seed_from_u64(seed)
 }
 
-fn fresh_state() -> GameState {
-    GameState::new("TestHero".to_string(), 0)
-}
+use super::helpers::fresh_state;
 
 fn make_session(phase: FishingPhase, ticks: u32, total: u32) -> FishingSession {
     FishingSession {
