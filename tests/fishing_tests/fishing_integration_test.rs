@@ -13,7 +13,6 @@ use quest::fishing::{
     tick_fishing_with_haven, tick_fishing_with_haven_result, try_discover_fishing, FishRarity,
     FishingPhase, FishingSession, FishingState, HavenFishingBonuses, LeviathanResult, SPOT_NAMES,
 };
-use quest::GameState;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
@@ -21,9 +20,7 @@ fn create_test_rng() -> ChaCha8Rng {
     ChaCha8Rng::seed_from_u64(12345)
 }
 
-fn create_test_state() -> GameState {
-    GameState::new("Test Angler".to_string(), 0)
-}
+use super::helpers::fresh_state as create_test_state;
 
 // ============================================================================
 // Complete Fishing Session Tests

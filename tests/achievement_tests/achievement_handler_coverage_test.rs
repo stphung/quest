@@ -19,20 +19,9 @@ use std::collections::HashMap;
 // Helper utilities
 // =========================================================================
 
-fn build_all_rooms_at_tier(tier: u8) -> HashMap<HavenRoomId, u8> {
-    HavenRoomId::ALL
-        .iter()
-        .filter(|r| **r != HavenRoomId::StormForge)
-        .map(|r| (*r, tier))
-        .collect()
-}
-
-fn build_all_rooms_at_max() -> HashMap<HavenRoomId, u8> {
-    HavenRoomId::ALL
-        .iter()
-        .map(|r| (*r, r.max_tier()))
-        .collect()
-}
+use super::helpers::{
+    build_haven_max_tiers as build_all_rooms_at_max, build_haven_tiers as build_all_rooms_at_tier,
+};
 
 // =========================================================================
 // on_deep_discovered
