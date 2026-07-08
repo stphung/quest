@@ -8,7 +8,7 @@ Central game state, game logic, balance constants, and the per-tick orchestratio
 src/core/
 ├── mod.rs           # Public re-exports (GameState, constants, TickEvent, TickResult)
 ├── constants.rs     # All game balance constants (timing, XP, drops, discovery, zones)
-├── discoveries.rs   # Discovery rolls (dungeons, fishing spots, Haven, Soulforge, The Deep)
+├── discoveries.rs   # Dungeon discovery roll (try_discover_dungeon); fishing/Haven/Soulforge/Deep discovery live in their own modules
 ├── enemy_spawning.rs # Enemy generation and spawning logic
 ├── game_logic.rs    # Thin re-export wrapper (most logic extracted to submodules)
 ├── game_state.rs    # GameState struct

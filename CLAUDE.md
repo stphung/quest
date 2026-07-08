@@ -185,7 +185,7 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - **HP regen after kill**: 2.5s
 - **Autosave**: every 30s
 - **Update check**: every 15min +/-5min jitter
-- **XP gain**: Only from defeating enemies (200-400 XP per kill)
+- **XP gain**: Only from defeating enemies (200-400 ticks of passive XP per kill, scaled by prestige multiplier + Haven bonus)
 - **Offline XP**: 25% rate, max 7 days (simulates kills)
 - **Mob item drop rate**: 15% base + 1% per prestige rank (capped at 25%), max rarity Epic
 - **Boss item drops**: Guaranteed, can include Legendary (2% normal boss, 5% Zone 10 final boss)
@@ -216,7 +216,7 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - **Enemy scaling**: Static zone-based stats from `ZONE_ENEMY_STATS` table. Fracture zones scale 1.6x per zone from Zone 11 base. Loom zones scale 1.25x per zone from Zone 30 base
 - **Damage pipeline** (player -> enemy): base -> Giant's Might % -> Haven % -> prestige flat -> ascension mult -> defense -> min 1 -> crit (2x)
 - **Defense pipeline** (enemy -> player): base -> prestige flat -> ascension mult -> Bulwark DR %
-- **Death**: Boss death resets to subzone 1; dungeon death exits dungeon (no prestige loss)
+- **Death**: Boss death retreats to Subzone 1 of the highest zone with a defeated boss (Zone 1 if none), preserving prestige; dungeon death exits dungeon (no prestige loss)
 - **Weapon gates**: Zone 10 final boss requires Stormbreaker
 
 ## Dependencies

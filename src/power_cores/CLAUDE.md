@@ -41,6 +41,7 @@ There is no separate `PowerCoreState` runtime struct. Core-grant timestamps live
 - `get_power_core_def(id) -> Option<&PowerCoreDef>` — Look up core by achievement ID
 - `get_unlocked_cores(achievements) -> Vec<&PowerCoreDef>` — All cores whose achievement is unlocked
 - `fill_duration_secs(pr_per_day) -> i64` — Seconds per cycle: `86400 / pr_per_day`
+- `fill_ratio(elapsed, fill_secs) -> f64` — Current cycle progress as a 0.0-1.0 fraction; used by `ui/stats_prestige.rs` to render the power-core fill progress bar
 
 ### `tick.rs`
 
@@ -69,3 +70,4 @@ Power Cores state is persisted as part of the Deep system. `DeepState.persistent
 - **Core** (`core/tick.rs`): Calls `tick_power_cores()` each tick inside `game_tick_with_context()`
 - **Main Helpers** (`main_helpers/update.rs`): Calls `apply_offline_power_cores()` on character load
 - **Main** (`main.rs`): Saves state on change
+- **UI** (`ui/stats_prestige.rs`): Renders each unlocked core's fill progress bar using `fill_ratio()`

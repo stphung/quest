@@ -54,7 +54,7 @@ Struct whose fields encode the combat flow:
 5. **Critical hits**: Chance from DEX modifier + prestige crit bonus (capped at 15%), deals 2x damage
 6. **Enemy death**: Awards XP, triggers item drop roll, enters Regen state
 7. **Player death**:
-   - In zone: Resets `kills_in_subzone = 0`, preserves prestige
+   - In zone: Retreats to Subzone 1 of the highest zone with a defeated boss (Zone 1 if none), resets `kills_in_subzone = 0`, preserves prestige
    - In dungeon: Exits dungeon, no prestige loss
 
 ## Enemy Generation (Zone-Based Static Scaling)

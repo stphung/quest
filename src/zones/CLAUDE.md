@@ -223,4 +223,4 @@ Twenty zones across five chapters, triple-gated by pattern completion, ascension
 - **Ascension** (`ascension/`): Ascension multiplier provides the combat power to progress through fracture zones
 - **Deep** (`deep/types.rs`): `DeepPersistent.fracture_zone_cap` and `pending_fracture_region_unlock` control zone access
 - **Loom** (`loom/logic.rs`): `loom_zone_cap_for_patterns()` controls Loom Zone 31-50 access based on completed pattern count
-- **UI** (`ui/stats_panel.rs`): Displays current zone/subzone names, kill progress, and POST row for zones 12-30
+- **UI** (`ui/stats_panel.rs`): Displays current zone/subzone names, kill progress via a `Zone {current} / {max}` gauge (colored by era: Green=Expanse, Cyan=fracture Z12-30, Magenta=Loom Z31-50), and a gate-hint row (`zone_gate_hint()`) showing the first unmet prestige/ascension requirement
