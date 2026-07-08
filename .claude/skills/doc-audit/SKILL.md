@@ -3,7 +3,7 @@ name: doc-audit
 description: Multi-agent developer documentation audit — finds stale constants, missing files, and outdated types across CLAUDE.md files, README.md, and docs/. Use when docs are stale, after adding features, or before releases.
 ---
 
-<!-- meta-audit scope-universe: CLAUDE.md docs/*.md docs/dossiers/*.md src/*/CLAUDE.md README.md -->
+<!-- meta-audit scope-universe: CLAUDE.md docs/*.md docs/dossiers/*.md openspec/README.md src/*/CLAUDE.md README.md -->
 
 # Audit Developer Documentation
 
@@ -25,7 +25,7 @@ Spawn 6 Explore agents simultaneously. Each agent cross-references documentation
 
 **Agent 1 — Root & Architecture**
 
-Scope: `CLAUDE.md`, `docs/*.md` (system-design, core-systems, secondary-systems, balancing, challenge-minigames, decisions, infrastructure), `docs/dossiers/*.md`
+Scope: `CLAUDE.md`, `docs/*.md` (currently: `decisions.md`, `README.md` — the old system-design/core-systems/secondary-systems/balancing/challenge-minigames/infrastructure docs were retired in favor of `openspec/specs/` on 2026-07-04, #675), `docs/dossiers/*.md`, `openspec/README.md` (capability/requirement/scenario count claims drift independently from CLAUDE.md's copy of the same numbers — see history)
 
 Check: Module navigation table completeness, key constants accuracy, dependency versions, architecture descriptions.
 
