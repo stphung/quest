@@ -229,7 +229,7 @@ Starts ~1:1 at low rates, scales superlinearly as WR increases:
 - **Input from**: `src/input/loom_input.rs` dispatches keyboard events
 - **Rendered by**: `src/ui/loom_scene.rs` + `src/ui/loom_graph.rs` render GraphView
 - **Persisted to**: `~/.quest/loom.json` via `persistence.rs`
-- **Discovery**: Triggered by pattern completion milestones
+- **Discovery**: Triggered by Deep Gateway Expedition completion at Layer 30 (`core/tick_stages.rs::tick_loom()`, gated on `deep.persistent.gateway_opened`)
 - **Ascension** (`ascension/types.rs`): `ascension_pattern_gate()` checks pattern count for VII-X eligibility; `max_shuttle_level()` gates shuttle upgrades by Ascension tier
 - **Zones** (`zones/`): `loom_zone_cap_for_patterns()` unlocks Loom Zones 31-50 based on completed pattern count
 - **petgraph 0.8**: DAG construction and traversal in `graph.rs`; layout computed in `layout.rs`

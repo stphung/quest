@@ -160,10 +160,10 @@ Progressive 10-encounter hunt, only available at rank 40 on legendary fish catch
 
 ## Integration Points
 
-- **Core** (`core/tick.rs`): Calls `tick_fishing_with_haven_result()` each tick, handles discovery via `try_discover_fishing()`, processes rank-ups and Leviathan events
+- **Core** (`core/tick_stages.rs`): `process_fishing_tick()` calls `tick_fishing_with_haven_result()` each tick; `process_discoveries()` handles discovery via `try_discover_fishing()`, processes rank-ups and Leviathan events
 - **Core** (`core/constants.rs`): `FISHING_DISCOVERY_CHANCE` (0.05), `BASE_MAX_FISHING_RANK` (30), `MAX_FISHING_RANK` (40)
 - **Core** (`core/game_state.rs`): Owns `active_fishing: Option<FishingSession>` and `fishing: FishingState`
-- **Character** (`character/prestige.rs`): Prestige multiplier applied to fish XP rewards
+- **Character** (`character/tiers.rs`, re-exported via `character/prestige.rs`): Prestige multiplier applied to fish XP rewards
 - **Items** (`items/generation.rs`, `items/drops.rs`): Item generation for fishing item drops
 - **Haven** (`haven/types.rs`): Garden (timer reduction), Fishing Dock (double fish, max rank bonus), Storm Forge (Stormbreaker)
 - **Achievements**: Tracks fishing rank milestones, legendary catches, Leviathan catch

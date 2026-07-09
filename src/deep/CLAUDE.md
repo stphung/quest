@@ -98,6 +98,8 @@ Newtype `GuildRank(u8)` with values 1-5. Persists across prestiges.
 
 Stats are driven from the `GUILD_RANK_STATS` constant array (index 0 = Rank 1). Do not call methods with `GuildRank(0)` — valid range is 1-5. Advancing a rank requires **both** gates: the layer breakthrough cleared *and* the Warband Marks cost paid (`economy.rs::guild_upgrade_cost()`); `try_upgrade_guild_rank()` enforces both atomically.
 
+Rank 1 mercs additionally gain +1 concurrent mission slot once Layer 3 is broken through, ahead of the formal Rank 2 requirement (`effective_concurrent_missions()` in `types.rs`, used by `missions.rs`, `input/deep_input.rs`, `ui/deep_scene.rs`, `ui/stats_prestige.rs`, and `bin/deep_simulator.rs`) — the table above shows the raw per-rank value, not this effective adjustment.
+
 ### `Mercenary` (`types.rs`)
 Individual merc in the roster. Resets on prestige. `id` is a `u64` assigned via `DeepPersistent::next_merc_id()` and is unique across all generations.
 
