@@ -654,16 +654,8 @@ pub(super) fn process_zone_achievements(
     character_name: &str,
 ) {
     match defeat_result {
-        BossDefeatResult::ZoneComplete {
-            old_zone_id,
-            old_zone: _,
-            ..
-        }
-        | BossDefeatResult::ZoneCompleteButGated {
-            old_zone_id,
-            zone_name: _,
-            ..
-        } => {
+        BossDefeatResult::ZoneComplete { old_zone_id, .. }
+        | BossDefeatResult::ZoneCompleteButGated { old_zone_id, .. } => {
             achievements.on_zone_fully_cleared(*old_zone_id, Some(character_name));
         }
         BossDefeatResult::StormsEnd => {
