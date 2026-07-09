@@ -407,16 +407,17 @@ fn test_boss_xp_reward_within_range_legendary() {
 
 #[test]
 fn test_boss_xp_reward_scales_with_size() {
+    // Small's XP range (1000-1500) and Epic's (8000-12000) never overlap, so
+    // this holds true by construction — a handful of samples is enough.
     let mut rng = test_rng();
-    // Larger dungeons should give more XP on average
-    let small_avg: u64 = (0..50)
+    let small_avg: u64 = (0..5)
         .map(|_| quest::dungeon::calculate_boss_xp_reward(&mut rng, DungeonSize::Small))
         .sum::<u64>()
-        / 50;
-    let epic_avg: u64 = (0..50)
+        / 5;
+    let epic_avg: u64 = (0..5)
         .map(|_| quest::dungeon::calculate_boss_xp_reward(&mut rng, DungeonSize::Epic))
         .sum::<u64>()
-        / 50;
+        / 5;
     assert!(
         epic_avg > small_avg,
         "Epic avg {} should exceed Small avg {}",

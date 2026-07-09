@@ -1267,18 +1267,20 @@ fn test_roll_recruit_cost_within_quality_range() {
 
 #[test]
 fn test_roll_recruit_cost_elite_averages_more_than_common() {
+    // Common's cost range (50-80) and Elite's (200-300) never overlap, so
+    // this holds true by construction — a handful of samples is enough.
     let mut rng = seeded_rng(1002);
-    let common: u64 = (0..200)
+    let common: u64 = (0..5)
         .map(|_| roll_recruit_cost(MercQuality::Common, &mut rng) as u64)
         .sum();
-    let elite: u64 = (0..200)
+    let elite: u64 = (0..5)
         .map(|_| roll_recruit_cost(MercQuality::Elite, &mut rng) as u64)
         .sum();
     assert!(
         elite > common,
         "Elite average cost should exceed Common ({:.1} vs {:.1})",
-        elite as f64 / 200.0,
-        common as f64 / 200.0
+        elite as f64 / 5.0,
+        common as f64 / 5.0
     );
 }
 

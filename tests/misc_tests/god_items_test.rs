@@ -107,7 +107,7 @@ fn test_equipped_god_item_dr_integration() {
     let mut equipment = Equipment::new();
 
     // No god item — 0% DR
-    assert_eq!(equipped_god_item_dr(&equipment), 0.0);
+    assert!((equipped_god_item_dr(&equipment) - 0.0).abs() < f64::EPSILON);
 
     // Equip Asprika — 30% DR
     let asprika = asprika_definition().to_item();
@@ -137,9 +137,8 @@ fn test_equipped_god_item_dr_zero_with_non_god_items() {
     };
     equipment.set(EquipmentSlot::Armor, Some(normal_item));
 
-    assert_eq!(
-        equipped_god_item_dr(&equipment),
-        0.0,
+    assert!(
+        (equipped_god_item_dr(&equipment) - 0.0).abs() < f64::EPSILON,
         "Non-god items should contribute 0% god item DR"
     );
 }

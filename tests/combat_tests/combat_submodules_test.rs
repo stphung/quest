@@ -15,6 +15,7 @@ use quest::combat::attacks::effective_enemy_attack_interval;
 use quest::combat::events::{CombatBonuses, CombatEvent};
 use quest::combat::logic::update_combat;
 use quest::combat::types::Enemy;
+use quest::core::constants::MOB_FIGHT_TIMEOUT_SECONDS;
 use quest::core::constants::*;
 use quest::core::game_state::GameState;
 use quest::dungeon::generation::generate_dungeon;
@@ -1528,29 +1529,23 @@ fn test_mob_fight_timeout_triggers_retreat() {
     let d = derived(&state);
     let bonuses = default_bonuses();
 
-    // Simulate fight lasting beyond MOB_FIGHT_TIMEOUT_SECONDS (30s)
-    // Each tick = 0.1s, so 301 ticks = 30.1s
-    let mut retreat_triggered = false;
-    for _ in 0..301 {
-        let events = update_combat(
-            &mut rng,
-            &mut state,
-            0.1,
-            &bonuses,
-            &mut achievements,
-            &d,
-            11,
-            30,
-        );
-        for e in &events {
-            if matches!(e, CombatEvent::CombatRetreat { .. }) {
-                retreat_triggered = true;
-            }
-        }
-        if retreat_triggered {
-            break;
-        }
-    }
+    // Jump straight past MOB_FIGHT_TIMEOUT_SECONDS (30s) instead of looping
+    // ticks to accumulate it.
+    state.combat_state.current_fight_elapsed = MOB_FIGHT_TIMEOUT_SECONDS + 0.1;
+
+    let events = update_combat(
+        &mut rng,
+        &mut state,
+        0.1,
+        &bonuses,
+        &mut achievements,
+        &d,
+        11,
+        30,
+    );
+    let retreat_triggered = events
+        .iter()
+        .any(|e| matches!(e, CombatEvent::CombatRetreat { .. }));
 
     assert!(
         retreat_triggered,
@@ -1566,33 +1561,27 @@ fn test_mob_fight_timeout_triggers_retreat() {
 fn test_mob_fight_timeout_does_not_apply_to_bosses() {
     let mut state = state_with_enemy(99999, 1, 0);
     state.zone_progression.fighting_boss = true; // Mark as boss fight
+                                                 // Pre-load elapsed past the mob timeout — should still not trigger it,
+                                                 // since the mob-timeout check is skipped entirely while fighting_boss.
+    state.combat_state.current_fight_elapsed = MOB_FIGHT_TIMEOUT_SECONDS + 1.0;
     let mut rng = seeded_rng();
     let mut achievements = Achievements::default();
     let d = derived(&state);
     let bonuses = default_bonuses();
 
-    // Simulate 30+ seconds — should NOT trigger mob timeout (boss has its own enrage)
-    let mut mob_retreat_triggered = false;
-    for _ in 0..310 {
-        let events = update_combat(
-            &mut rng,
-            &mut state,
-            0.1,
-            &bonuses,
-            &mut achievements,
-            &d,
-            11,
-            30,
-        );
-        for e in &events {
-            if matches!(e, CombatEvent::CombatRetreat { .. }) {
-                mob_retreat_triggered = true;
-            }
-        }
-        if mob_retreat_triggered {
-            break;
-        }
-    }
+    let events = update_combat(
+        &mut rng,
+        &mut state,
+        0.1,
+        &bonuses,
+        &mut achievements,
+        &d,
+        11,
+        30,
+    );
+    let mob_retreat_triggered = events
+        .iter()
+        .any(|e| matches!(e, CombatEvent::CombatRetreat { .. }));
 
     assert!(
         !mob_retreat_triggered,
@@ -1696,31 +1685,26 @@ fn test_retreat_target_is_last_safe_zone() {
     state.zone_progression.unlock_zone(3);
     state.zone_progression.unlock_zone(4);
     state.zone_progression.unlock_zone(5);
+    state.combat_state.current_fight_elapsed = MOB_FIGHT_TIMEOUT_SECONDS + 0.1;
     let mut rng = seeded_rng();
     let mut achievements = Achievements::default();
     let d = derived(&state);
     let bonuses = default_bonuses();
 
-    // Trigger mob fight timeout
+    let events = update_combat(
+        &mut rng,
+        &mut state,
+        0.1,
+        &bonuses,
+        &mut achievements,
+        &d,
+        11,
+        30,
+    );
     let mut retreat_zone_name = String::new();
-    for _ in 0..310 {
-        let events = update_combat(
-            &mut rng,
-            &mut state,
-            0.1,
-            &bonuses,
-            &mut achievements,
-            &d,
-            11,
-            30,
-        );
-        for e in &events {
-            if let CombatEvent::CombatRetreat { zone_name } = e {
-                retreat_zone_name = zone_name.clone();
-            }
-        }
-        if !retreat_zone_name.is_empty() {
-            break;
+    for e in &events {
+        if let CombatEvent::CombatRetreat { zone_name } = e {
+            retreat_zone_name = zone_name.clone();
         }
     }
 
