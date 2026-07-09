@@ -54,7 +54,8 @@ Struct whose fields encode the combat flow:
 5. **Critical hits**: Chance from DEX modifier + prestige crit bonus (capped at 15%), deals 2x damage
 6. **Enemy death**: Awards XP, triggers item drop roll, enters Regen state
 7. **Player death**:
-   - In zone: Retreats to Subzone 1 of the highest zone with a defeated boss (Zone 1 if none), resets `kills_in_subzone = 0`, preserves prestige
+   - In zone, to a **boss**: Retreats immediately to Subzone 1 of the highest zone with a defeated boss (Zone 1 if none), resets `kills_in_subzone = 0`, preserves prestige
+   - In zone, to a **mob**: Resets the enemy's HP and continues the same fight in place; only retreats (same as a boss death) once `consecutive_deaths >= DEATH_LOOP_THRESHOLD` (3)
    - In dungeon: Exits dungeon, no prestige loss
 
 ## Enemy Generation (Zone-Based Static Scaling)
@@ -112,7 +113,7 @@ Zone 11 has dramatically higher stats than Zone 10 (~6.2x HP, ~4.6x DMG, ~4.8x D
 - **Enemy damage pipeline**: enemy.damage --> subtract total defense (defense + prestige flat_defense, then x ascension multiplier) --> min 1 --> Divine Bulwark DR % --> min 1
 - **Defense pipeline**: base defense --> prestige flat defense --> ascension multiplier --> damage reduction %
 - **Ascension multiplier**: Also applied to player max HP in `core/tick.rs` (default 1.0x, up to 64x+ at Ascension VI)
-- **Boss enrage timer**: Bosses enrage after 60 seconds of combat, increasing damage output (instant kill)
+- **Boss enrage timer**: Bosses enrage after 60 seconds of combat, resetting player HP to max and retreating to Subzone 1 of the current zone (no death event, no prestige loss)
 - **Stalemate timeouts**: Non-boss fights auto-retreat to the last safe zone after `MOB_FIGHT_TIMEOUT_SECONDS` (30s); dungeon fights use `DUNGEON_FIGHT_TIMEOUT_SECONDS` (60s, elites/bosses have up to 3.5x HP). Retreating while inside a dungeon abandons it (emits `DungeonRetreat` → `TickEvent::DungeonFailed`, no prestige loss) so the uncleared room cannot respawn its enemy in an endless loop
 
 See "Unified Combat Bonuses" below for the full field-level breakdown of `CombatBonuses`.
@@ -124,7 +125,7 @@ See "Unified Combat Bonuses" below for the full field-level breakdown of `Combat
 - Defeating boss advances to next subzone
 - Death to boss resets `kills_in_subzone = 0` (full 10 kills needed to retry)
 - Zone 10 final boss requires Stormbreaker weapon (checked via `boss_weapon_blocked()` in `zones/gates.rs`)
-- **Boss enrage timer**: After 60 seconds of fighting a boss, it enrages and instantly kills the player. Emits a `BossEnrage` combat event (mapped to `TickEvent::BossEnrage`)
+- **Boss enrage timer**: After 60 seconds of fighting a boss, it enrages: resets player HP to max and retreats to Subzone 1 of the current zone (no `PlayerDied` event, no prestige loss). Emits a `BossEnrage` combat event (mapped to `TickEvent::BossEnrage`)
 
 ## Key Function: `update_combat()`
 

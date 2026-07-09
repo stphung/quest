@@ -38,7 +38,7 @@ Six core RPG attributes stored as `u32` values:
 
 **Modifier formula**: `(value - 10) / 2` (integer division, can be negative for values below 10)
 
-**Attribute caps**: `20 + (5 × prestige_rank)`. Enforced in `attributes.rs`.
+**Attribute caps**: `20 + (5 × prestige_rank)`. Formula in `core/game_state.rs::get_attribute_cap()`, enforced during level-up distribution in `core/xp.rs::distribute_level_up_points()`.
 
 ### `DerivedStats` (`derived_stats.rs`)
 Combat stats calculated from attributes and enhancement levels. Recalculated whenever attributes or enhancements change:

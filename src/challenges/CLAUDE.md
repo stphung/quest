@@ -15,9 +15,11 @@ src/challenges/newgame/
 └── logic.rs    # Game logic, input processing, AI
 ```
 
-Optional additional files for complex AI:
+Optional additional files beyond the standard three:
 - `mcts.rs` - Monte Carlo Tree Search (see Go)
 - `ai.rs` - Minimax/alpha-beta AI (see Morris, Gomoku)
+- `generation.rs` - Board/level generation logic (see Sudoku)
+- `levels.rs` - Level/layout data (see Vault Warden)
 
 ### 2. Required Types (`types.rs`)
 
@@ -309,7 +311,7 @@ Haven's discovery boost room increases the base discovery chance.
 
 ## Achievement Integration
 
-Winning a minigame emits a `MinigameWinInfo` (defined in `mod.rs`) with `game_type` and `difficulty` strings. The achievement system in `src/achievements/` tracks wins per game type and difficulty level. When adding a new challenge, ensure `MinigameWinInfo` values are emitted in `apply_game_result()`.
+Winning a minigame emits a `MinigameWinInfo` (defined in `mod.rs`) with `game_type: MinigameType` and `difficulty: MinigameDifficulty` enums (both defined in `achievements/milestones.rs`). The achievement system in `src/achievements/` tracks wins per game type and difficulty level. When adding a new challenge, ensure `MinigameWinInfo` values are emitted in `apply_game_result()`.
 
 ## Existing Challenges
 

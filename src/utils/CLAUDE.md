@@ -36,7 +36,7 @@ Activated with the `--debug` CLI flag. Press backtick (`) to toggle the overlay.
 | Deep | Discover The Deep, Grant 10k Marks, Refresh Mission/Recruit Pools, Clear Frontier Layer, Complete Active Missions, Unlock Deep Layers (3/7/12/18/25/30) |
 | Zones | Travel to any of 30 zones |
 | Character | Set Prestige (1-5000), Set Level (1-5000), Max All Attributes |
-| Soulforge | Set enhancement level (0–10) for equipped weapon |
+| Soulforge | Set enhancement level (0–10) for all equipment slots |
 | Loom | Trigger Loom discovery, select archetype, unlock nodes, grant resources, complete/advance patterns, build test shuttles |
 | Borders | Cycle through selectable UI border styles |
 
