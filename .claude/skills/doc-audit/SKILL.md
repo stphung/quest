@@ -25,7 +25,7 @@ Spawn 6 Explore agents simultaneously. Each agent cross-references documentation
 
 **Agent 1 — Root & Architecture**
 
-Scope: `CLAUDE.md`, `docs/*.md` (system-design, core-systems, secondary-systems, balancing, challenge-minigames, decisions, infrastructure), `docs/dossiers/*.md`
+Scope: `CLAUDE.md`, `docs/*.md` (README, decisions), `docs/dossiers/*.md`
 
 Check: Module navigation table completeness, key constants accuracy, dependency versions, architecture descriptions.
 
