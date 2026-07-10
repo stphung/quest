@@ -163,5 +163,5 @@ Item rarity matches the fish rarity. Item ilvl is based on the current zone.
 2. Add slot field and accessor in `equipment.rs` `Equipment` struct
 3. Update `equipment.rs` iteration to include the new slot
 4. Add name generation tables for the slot in `names.rs`
-5. Update `ui/stats_panel.rs` to display the new slot
+5. Update `ui/stats_equipment.rs` to display the new slot
 6. Update serialization (Serde handles enum variants automatically)

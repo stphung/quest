@@ -71,7 +71,7 @@ pub fn generate_dungeon(level: u32, prestige_rank: u32, zone_id: u32) -> Dungeon
 
 1. Roll dungeon size from level and prestige rank
 2. Place Entrance at center of grid
-3. Use random walk / branching to carve out connected rooms
+3. Use a randomized depth-first search (recursive backtracker) to carve out connected rooms
 4. Place special rooms deterministically (`place_special_rooms()`): exactly one Boss at the dead end furthest from the entrance, exactly one Elite at a dead end far from the entrance, then `treasure_room_count()` Treasure rooms by size (Small 1, Medium 2, Large 3, Epic 5, Legendary 8) at random positions
 5. Remaining rooms stay Combat (default)
 6. Set connections between adjacent rooms (up/right/down/left booleans)

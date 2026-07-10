@@ -72,7 +72,10 @@ Several Haven bonuses changed from design to implementation:
 
 ## Challenge Discovery Weights
 
-Not all challenges are equally discoverable:
+Not all challenges are equally discoverable. This reflects the original 6-game roster's
+rationale at ship time; 8 more minigames have since been added and weights have been
+retuned. For the current weight table, see `src/challenges/CLAUDE.md` (Discovery
+Weights) or `CHALLENGE_TABLE` in `src/challenges/menu.rs`.
 
 | Challenge | Weight | Rationale |
 |-----------|--------|-----------|
