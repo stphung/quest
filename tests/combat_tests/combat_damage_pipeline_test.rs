@@ -13,73 +13,18 @@
 //! - Enemy attack defense/reflection/death
 //! - Edge cases: zero defense, all god items combined, max prestige
 
+use super::helpers::*;
 use quest::achievements::{AchievementId, Achievements};
 use quest::character::attributes::AttributeType;
 use quest::character::derived_stats::DerivedStats;
 use quest::combat::events::{CombatBonuses, CombatEvent};
 use quest::combat::logic::update_combat;
-use quest::combat::types::Enemy;
 use quest::core::constants::*;
 use quest::core::game_state::GameState;
-use rand::SeedableRng;
 
 // ═══════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════
-
-fn fresh_state() -> GameState {
-    GameState::new("PipelineTest".to_string(), 0)
-}
-
-fn derived(state: &GameState) -> DerivedStats {
-    DerivedStats::calculate_derived_stats(&state.attributes, &state.equipment, &[0; 7])
-}
-
-fn default_bonuses() -> CombatBonuses {
-    CombatBonuses::default()
-}
-
-fn seeded_rng() -> rand_chacha::ChaCha8Rng {
-    rand_chacha::ChaCha8Rng::seed_from_u64(12345)
-}
-
-/// Creates a state with a specific enemy.
-fn state_with_enemy(hp: u64, dmg: u64, def: u64) -> GameState {
-    let mut state = fresh_state();
-    state.combat_state.current_enemy = Some(Enemy::new_with_defense(
-        "Test Enemy".to_string(),
-        hp,
-        dmg,
-        def,
-    ));
-    state
-}
-
-/// Force a single player attack. Sets player timer to threshold, suppresses enemy timer.
-fn force_player_attack(
-    rng: &mut impl rand::Rng,
-    state: &mut GameState,
-    bonuses: &CombatBonuses,
-) -> Vec<CombatEvent> {
-    let d = derived(state);
-    state.combat_state.player_attack_timer = ATTACK_INTERVAL_SECONDS;
-    state.combat_state.enemy_attack_timer = 0.0;
-    let mut achievements = Achievements::default();
-    update_combat(rng, state, 0.0, bonuses, &mut achievements, &d, 11, 30)
-}
-
-/// Force a single enemy attack. Sets enemy timer to threshold, suppresses player timer.
-fn force_enemy_attack(
-    rng: &mut impl rand::Rng,
-    state: &mut GameState,
-    bonuses: &CombatBonuses,
-) -> Vec<CombatEvent> {
-    let d = derived(state);
-    state.combat_state.player_attack_timer = 0.0;
-    state.combat_state.enemy_attack_timer = ENEMY_ATTACK_INTERVAL_SECONDS;
-    let mut achievements = Achievements::default();
-    update_combat(rng, state, 0.0, bonuses, &mut achievements, &d, 11, 30)
-}
 
 /// Force a player attack with explicit achievements (needed for weapon gate checks).
 fn force_player_attack_with_achievements(
@@ -100,7 +45,7 @@ fn force_player_attack_with_achievements(
 
 #[test]
 fn weapon_gate_blocks_attack_on_zone_10_final_boss_without_stormbreaker() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let mut state = state_with_enemy(10000, 100, 0);
     let mut achievements = Achievements::default();
 
@@ -144,7 +89,7 @@ fn weapon_gate_blocks_attack_on_zone_10_final_boss_without_stormbreaker() {
 
 #[test]
 fn weapon_gate_weapon_name_is_stormbreaker() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let mut state = state_with_enemy(10000, 100, 0);
     let mut achievements = Achievements::default();
 
@@ -171,7 +116,7 @@ fn weapon_gate_weapon_name_is_stormbreaker() {
 
 #[test]
 fn weapon_gate_allows_attack_with_stormbreaker_achievement() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let mut state = state_with_enemy(1, 100, 0);
     let mut achievements = Achievements::default();
     achievements.unlock(AchievementId::TheStormbreaker, None);
@@ -212,7 +157,7 @@ fn weapon_gate_allows_attack_with_stormbreaker_achievement() {
 
 #[test]
 fn weapon_gate_does_not_apply_to_intermediate_zone_10_subzones() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     // Zone 10, subzone 2 (not final) — no Stormbreaker needed
     let mut state = state_with_enemy(1, 100, 0);
     let mut achievements = Achievements::default();
@@ -238,7 +183,7 @@ fn weapon_gate_does_not_apply_to_intermediate_zone_10_subzones() {
 
 #[test]
 fn weapon_gate_does_not_apply_when_not_fighting_boss() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let mut state = state_with_enemy(1, 100, 0);
     let mut achievements = Achievements::default();
 
@@ -266,8 +211,8 @@ fn weapon_gate_does_not_apply_when_not_fighting_boss() {
 
 #[test]
 fn giants_might_increases_damage_by_150_percent() {
-    let mut rng_base = seeded_rng();
-    let mut rng_boosted = seeded_rng();
+    let mut rng_base = seeded_rng(12345);
+    let mut rng_boosted = seeded_rng(12345);
 
     // Use a high-defense enemy so crit doesn't mask the difference easily
     // Use exactly 0 defense so math is clean
@@ -311,7 +256,7 @@ fn giants_might_increases_damage_by_150_percent() {
 
 #[test]
 fn giants_might_zero_early_damage_percent_unchanged() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let bonuses = CombatBonuses {
         early_damage_percent: 0.0,
         ..CombatBonuses::default()
@@ -330,8 +275,8 @@ fn giants_might_zero_early_damage_percent_unchanged() {
 
 #[test]
 fn haven_armory_damage_percent_increases_damage() {
-    let mut rng_base = seeded_rng();
-    let mut rng_armory = seeded_rng();
+    let mut rng_base = seeded_rng(12345);
+    let mut rng_armory = seeded_rng(12345);
 
     let base_bonuses = CombatBonuses::default();
     let armory_bonuses = CombatBonuses {
@@ -364,8 +309,8 @@ fn haven_armory_damage_percent_increases_damage() {
 #[test]
 fn giants_might_and_armory_stack_multiplicatively() {
     // Giants Might applies early (to base), Armory applies after, so they stack multiplicatively
-    let mut rng_base = seeded_rng();
-    let mut rng_both = seeded_rng();
+    let mut rng_base = seeded_rng(12345);
+    let mut rng_both = seeded_rng(12345);
 
     let base_bonuses = CombatBonuses::default();
     let combined_bonuses = CombatBonuses {
@@ -402,8 +347,8 @@ fn giants_might_and_armory_stack_multiplicatively() {
 
 #[test]
 fn prestige_flat_damage_adds_after_percent_multipliers() {
-    let mut rng_base = seeded_rng();
-    let mut rng_flat = seeded_rng();
+    let mut rng_base = seeded_rng(12345);
+    let mut rng_flat = seeded_rng(12345);
 
     let base_bonuses = CombatBonuses::default();
     let flat_bonuses = CombatBonuses {
@@ -435,8 +380,8 @@ fn prestige_flat_damage_adds_after_percent_multipliers() {
 
 #[test]
 fn prestige_flat_damage_zero_no_change() {
-    let mut rng_a = seeded_rng();
-    let mut rng_b = seeded_rng();
+    let mut rng_a = seeded_rng(12345);
+    let mut rng_b = seeded_rng(12345);
 
     let bonuses_a = CombatBonuses::default();
     let bonuses_b = CombatBonuses {
@@ -466,7 +411,7 @@ fn prestige_flat_damage_zero_no_change() {
 
 #[test]
 fn enemy_with_high_defense_takes_minimum_1_damage() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
 
     // Enemy has astronomically high defense — player can't possibly exceed it
     let bonuses = CombatBonuses {
@@ -491,7 +436,7 @@ fn enemy_with_high_defense_takes_minimum_1_damage() {
 
 #[test]
 fn zero_defense_enemy_takes_full_damage() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
 
     let bonuses = CombatBonuses {
         flat_damage: 50,
@@ -521,8 +466,8 @@ fn zero_defense_enemy_takes_full_damage() {
 
 #[test]
 fn enemy_defense_reduces_player_damage() {
-    let mut rng_no_def = seeded_rng();
-    let mut rng_with_def = seeded_rng();
+    let mut rng_no_def = seeded_rng(12345);
+    let mut rng_with_def = seeded_rng(12345);
 
     // Same player stats, same RNG — only difference is enemy defense
     let bonuses = CombatBonuses::default();
@@ -559,8 +504,8 @@ fn enemy_defense_reduces_player_damage() {
 
 #[test]
 fn divine_bulwark_reduces_incoming_damage_by_30_percent() {
-    let mut rng_no_dr = seeded_rng();
-    let mut rng_with_dr = seeded_rng();
+    let mut rng_no_dr = seeded_rng(12345);
+    let mut rng_with_dr = seeded_rng(12345);
 
     let no_dr_bonuses = CombatBonuses::default();
     let bulwark_bonuses = CombatBonuses {
@@ -595,7 +540,7 @@ fn divine_bulwark_reduces_incoming_damage_by_30_percent() {
 
 #[test]
 fn divine_bulwark_damage_floors_at_1() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
 
     // Extreme DR — 99% reduction. Even if enemy does 1 damage, result is still 1.
     let bonuses = CombatBonuses {
@@ -616,8 +561,8 @@ fn divine_bulwark_damage_floors_at_1() {
 
 #[test]
 fn zero_divine_bulwark_no_reduction() {
-    let mut rng_base = seeded_rng();
-    let mut rng_zero_dr = seeded_rng();
+    let mut rng_base = seeded_rng(12345);
+    let mut rng_zero_dr = seeded_rng(12345);
 
     let base_bonuses = CombatBonuses::default();
     let zero_dr_bonuses = CombatBonuses {
@@ -652,8 +597,8 @@ fn zero_divine_bulwark_no_reduction() {
 #[test]
 fn crit_doubles_damage() {
     // Use 100% crit chance to guarantee crit, then compare to 0% crit
-    let mut rng_crit = seeded_rng();
-    let mut rng_no_crit = seeded_rng();
+    let mut rng_crit = seeded_rng(12345);
+    let mut rng_no_crit = seeded_rng(12345);
 
     let crit_bonuses = CombatBonuses {
         crit_chance_percent: 100.0, // Guaranteed crit
@@ -708,7 +653,7 @@ fn crit_doubles_damage() {
 
 #[test]
 fn non_crit_attack_has_was_crit_false() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let bonuses = CombatBonuses {
         crit_chance_percent: -100.0, // Force no crit
         ..CombatBonuses::default()
@@ -741,7 +686,7 @@ fn non_crit_attack_has_was_crit_false() {
 
 #[test]
 fn double_strike_produces_two_attack_events() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let bonuses = CombatBonuses {
         double_strike_chance: 100.0, // Guaranteed double strike
         ..CombatBonuses::default()
@@ -763,7 +708,7 @@ fn double_strike_produces_two_attack_events() {
 
 #[test]
 fn double_strike_second_hit_is_not_marked_as_crit() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let bonuses = CombatBonuses {
         double_strike_chance: 100.0, // Guaranteed double strike
         crit_chance_percent: 100.0,  // Guaranteed crit on first hit
@@ -797,7 +742,7 @@ fn double_strike_second_hit_is_not_marked_as_crit() {
 
 #[test]
 fn zero_double_strike_chance_produces_single_attack() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let bonuses = CombatBonuses {
         double_strike_chance: 0.0, // No double strike
         ..CombatBonuses::default()
@@ -819,7 +764,7 @@ fn zero_double_strike_chance_produces_single_attack() {
 
 #[test]
 fn double_strike_stops_if_enemy_dies_on_first_hit() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let bonuses = CombatBonuses {
         double_strike_chance: 100.0, // Guaranteed double strike
         flat_damage: 999_999,        // Massive flat damage to one-shot
@@ -854,8 +799,8 @@ fn double_strike_stops_if_enemy_dies_on_first_hit() {
 
 #[test]
 fn player_defense_reduces_incoming_damage() {
-    let mut rng_no_def = seeded_rng();
-    let mut rng_with_def = seeded_rng();
+    let mut rng_no_def = seeded_rng(12345);
+    let mut rng_with_def = seeded_rng(12345);
 
     let no_def_bonuses = CombatBonuses {
         flat_defense: 0,
@@ -891,7 +836,7 @@ fn player_defense_reduces_incoming_damage() {
 
 #[test]
 fn player_death_resets_hp_to_max() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let bonuses = CombatBonuses::default();
 
     let mut state = state_with_enemy(100_000, 100_000, 0);
@@ -911,7 +856,7 @@ fn player_death_resets_hp_to_max() {
 
 #[test]
 fn player_death_resets_both_timers() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let bonuses = CombatBonuses::default();
 
     let mut state = state_with_enemy(100_000, 100_000, 0);
@@ -940,7 +885,7 @@ fn player_death_resets_both_timers() {
 fn player_death_in_dungeon_exits_dungeon() {
     use quest::dungeon::generation::generate_dungeon;
 
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let bonuses = CombatBonuses::default();
 
     let mut state = state_with_enemy(100_000, 100_000, 0);
@@ -963,7 +908,7 @@ fn player_death_in_dungeon_exits_dungeon() {
 
 #[test]
 fn damage_reflection_deals_damage_to_enemy() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let bonuses = CombatBonuses::default();
 
     // Set up player with 100% reflection via derived stats
@@ -993,7 +938,7 @@ fn damage_reflection_deals_damage_to_enemy() {
 #[test]
 fn max_prestige_flat_damage_bonus() {
     // Simulate max prestige flat_damage — ensure no overflow
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let bonuses = CombatBonuses {
         flat_damage: u64::from(u32::MAX) / 2, // Near-max prestige flat damage
         ..CombatBonuses::default()
@@ -1013,7 +958,7 @@ fn max_prestige_flat_damage_bonus() {
 #[test]
 fn all_god_item_bonuses_combined_no_crash() {
     // Combine all god item bonus types together to ensure no panics
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let bonuses = CombatBonuses {
         early_damage_percent: 150.0,    // Giant's Might (Megingjord)
         damage_reduction_percent: 30.0, // Divine Bulwark (Asprika)
@@ -1042,7 +987,7 @@ fn all_god_item_bonuses_combined_no_crash() {
 
 #[test]
 fn zero_defense_enemy_still_takes_damage() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let bonuses = CombatBonuses::default();
 
     let mut state = state_with_enemy(100_000, 100, 0); // Explicitly zero defense
@@ -1056,7 +1001,7 @@ fn zero_defense_enemy_still_takes_damage() {
 #[test]
 fn high_prestige_combined_bonuses_no_overflow() {
     // Simulate P50 stats — large flat_damage and flat_defense
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
 
     // P50 flat damage: floor(5.0 * 50^0.7) ≈ floor(5.0 * 21.1) ≈ 105
     let flat_damage = (5.0_f64 * 50.0_f64.powf(0.7)).floor() as u64;
@@ -1086,7 +1031,7 @@ fn high_prestige_combined_bonuses_no_overflow() {
 
 #[test]
 fn enemy_killed_triggers_regen_state() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let bonuses = CombatBonuses {
         flat_damage: 999_999,
         ..CombatBonuses::default()
@@ -1112,7 +1057,7 @@ fn enemy_killed_triggers_regen_state() {
 
 #[test]
 fn enemy_killed_resets_consecutive_deaths() {
-    let mut rng = seeded_rng();
+    let mut rng = seeded_rng(12345);
     let bonuses = CombatBonuses {
         flat_damage: 999_999,
         ..CombatBonuses::default()

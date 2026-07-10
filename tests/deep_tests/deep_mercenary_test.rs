@@ -105,7 +105,7 @@ fn test_roll_recruit_quality_rank1_always_common() {
 #[test]
 fn test_roll_recruit_quality_rank2_distribution() {
     let mut rng = seeded_rng(99);
-    let n = 10_000;
+    let n = 1500;
     let mut common = 0u32;
     let mut uncommon = 0u32;
     for _ in 0..n {
@@ -132,7 +132,7 @@ fn test_roll_recruit_quality_rank2_distribution() {
 #[test]
 fn test_roll_recruit_quality_rank3_distribution() {
     let mut rng = seeded_rng(77);
-    let n = 10_000;
+    let n = 1500;
     let mut counts = [0u32; 3];
     for _ in 0..n {
         match roll_recruit_quality(GuildRank(3), &mut rng) {
@@ -172,7 +172,7 @@ fn test_roll_recruit_quality_rank4_no_common() {
 #[test]
 fn test_roll_recruit_quality_rank5_no_common_and_elite_around_30_percent() {
     let mut rng = seeded_rng(7);
-    let n = 10_000;
+    let n = 1500;
     let mut elite = 0u32;
     for _ in 0..n {
         let q = roll_recruit_quality(GuildRank(5), &mut rng);

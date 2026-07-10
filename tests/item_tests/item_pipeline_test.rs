@@ -1099,9 +1099,13 @@ fn test_auto_equip_equal_power_does_not_replace() {
 
 #[test]
 fn test_tier_stored_on_generated_items() {
-    // Items from generate_item() should have a tier in the 0-9 range
-    for _ in 0..50 {
-        let item = generate_item(EquipmentSlot::Weapon, Rarity::Rare, 50);
+    // Items from generate_item() should have a tier in the 0-9 range.
+    // roll_tier() is structurally bounded to 0-9 by construction (P=1, not
+    // probabilistic), so a few seeded reps are enough to prove the invariant
+    // without relying on unseeded RNG.
+    let mut rng = ChaCha8Rng::seed_from_u64(4002);
+    for _ in 0..3 {
+        let item = generate_item_with_rng(EquipmentSlot::Weapon, Rarity::Rare, 50, &mut rng);
         assert!(item.tier <= 9, "Tier should be 0-9, got {}", item.tier);
     }
 }

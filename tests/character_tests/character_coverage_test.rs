@@ -17,9 +17,10 @@ use quest::character::prestige::{
     can_prestige, get_adventurer_rank, get_next_prestige_tier, get_prestige_tier, perform_prestige,
     perform_prestige_with_vault,
 };
-use quest::core::game_state::GameState;
 use quest::items::types::{AttributeBonuses, EquipmentSlot, Item, Rarity};
 use quest::items::Equipment;
+
+use super::helpers::*;
 
 // ── Helper ─────────────────────────────────────────────────────────
 
@@ -38,13 +39,6 @@ fn make_item(slot: EquipmentSlot, cha_bonus: u32) -> Item {
         affixes: vec![],
         god_item_id: None,
     }
-}
-
-fn make_state_at_level(level: u32, prestige_rank: u32) -> GameState {
-    let mut state = GameState::new("Test Hero".to_string(), 0);
-    state.character_level = level;
-    state.prestige_rank = prestige_rank;
-    state
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -231,44 +225,44 @@ fn multiplier_with_equipment_stacks_with_base_cha() {
 
 #[test]
 fn can_prestige_below_required_level() {
-    let state = make_state_at_level(9, 0); // Need level 10
+    let state = state_at(9, 0); // Need level 10
     assert!(!can_prestige(&state));
 }
 
 #[test]
 fn can_prestige_at_required_level() {
-    let state = make_state_at_level(10, 0);
+    let state = state_at(10, 0);
     assert!(can_prestige(&state));
 }
 
 #[test]
 fn can_prestige_above_required_level() {
-    let state = make_state_at_level(50, 0);
+    let state = state_at(50, 0);
     assert!(can_prestige(&state));
 }
 
 #[test]
 fn can_prestige_second_prestige_needs_25() {
-    let state = make_state_at_level(24, 1);
+    let state = state_at(24, 1);
     assert!(!can_prestige(&state));
 
-    let state = make_state_at_level(25, 1);
+    let state = state_at(25, 1);
     assert!(can_prestige(&state));
 }
 
 #[test]
 fn can_prestige_high_rank_needs_high_level() {
     // At rank 19, next tier is rank 20 which requires level 235 (220 + (20-19)*15)
-    let state = make_state_at_level(234, 19);
+    let state = state_at(234, 19);
     assert!(!can_prestige(&state));
 
-    let state = make_state_at_level(235, 19);
+    let state = state_at(235, 19);
     assert!(can_prestige(&state));
 }
 
 #[test]
 fn perform_prestige_resets_level_and_xp() {
-    let mut state = make_state_at_level(10, 0);
+    let mut state = state_at(10, 0);
     state.character_xp = 5000;
     perform_prestige(&mut state);
 
@@ -279,7 +273,7 @@ fn perform_prestige_resets_level_and_xp() {
 
 #[test]
 fn perform_prestige_resets_all_attributes_to_base() {
-    let mut state = make_state_at_level(10, 0);
+    let mut state = state_at(10, 0);
     state.attributes.set(AttributeType::Strength, 20);
     state.attributes.set(AttributeType::Dexterity, 18);
     state.attributes.set(AttributeType::Constitution, 16);
@@ -298,7 +292,7 @@ fn perform_prestige_resets_all_attributes_to_base() {
 
 #[test]
 fn perform_prestige_clears_all_equipment() {
-    let mut state = make_state_at_level(10, 0);
+    let mut state = state_at(10, 0);
     state.equipment.set(
         EquipmentSlot::Weapon,
         Some(make_item(EquipmentSlot::Weapon, 0)),
@@ -319,7 +313,7 @@ fn perform_prestige_clears_all_equipment() {
 #[test]
 fn perform_prestige_clears_dungeon() {
     use quest::dungeon::{Dungeon, DungeonSize};
-    let mut state = make_state_at_level(10, 0);
+    let mut state = state_at(10, 0);
     state.active_dungeon = Some(Dungeon::new(DungeonSize::Small));
 
     perform_prestige(&mut state);
@@ -330,7 +324,7 @@ fn perform_prestige_clears_dungeon() {
 #[test]
 fn perform_prestige_clears_active_fishing() {
     use quest::fishing::{CaughtFish, FishRarity, FishingPhase, FishingSession};
-    let mut state = make_state_at_level(10, 0);
+    let mut state = state_at(10, 0);
     state.active_fishing = Some(FishingSession {
         spot_name: "Lake".to_string(),
         total_fish: 5,
@@ -351,7 +345,7 @@ fn perform_prestige_clears_active_fishing() {
 
 #[test]
 fn perform_prestige_clears_active_minigame() {
-    let mut state = make_state_at_level(10, 0);
+    let mut state = state_at(10, 0);
     // active_minigame is Option<ActiveMinigame>, set it to None is default
     // Just verify it stays None after prestige
     state.active_minigame = None;
@@ -361,7 +355,7 @@ fn perform_prestige_clears_active_minigame() {
 
 #[test]
 fn perform_prestige_resets_combat_state() {
-    let mut state = make_state_at_level(10, 0);
+    let mut state = state_at(10, 0);
     state.combat_state.player_current_hp = 5;
     state.combat_state.is_regenerating = true;
 
@@ -375,7 +369,7 @@ fn perform_prestige_resets_combat_state() {
 
 #[test]
 fn perform_prestige_increments_total_prestige_count() {
-    let mut state = make_state_at_level(10, 0);
+    let mut state = state_at(10, 0);
     perform_prestige(&mut state);
     assert_eq!(state.total_prestige_count, 1);
 
@@ -386,7 +380,7 @@ fn perform_prestige_increments_total_prestige_count() {
 
 #[test]
 fn perform_prestige_clears_xp_rate_tracking() {
-    let mut state = make_state_at_level(10, 0);
+    let mut state = state_at(10, 0);
     state.xp_rate_samples.push_back(1000);
     state.xp_rate_samples.push_back(2000);
     state.xp_this_second = 500;
@@ -399,7 +393,7 @@ fn perform_prestige_clears_xp_rate_tracking() {
 
 #[test]
 fn perform_prestige_does_nothing_when_ineligible() {
-    let mut state = make_state_at_level(5, 0);
+    let mut state = state_at(5, 0);
     let old_rank = state.prestige_rank;
     let old_level = state.character_level;
 
@@ -411,7 +405,7 @@ fn perform_prestige_does_nothing_when_ineligible() {
 
 #[test]
 fn perform_prestige_resets_zone_progression() {
-    let mut state = make_state_at_level(10, 0);
+    let mut state = state_at(10, 0);
     state.zone_progression.current_zone_id = 3;
     state.zone_progression.current_subzone_id = 2;
 
@@ -425,7 +419,7 @@ fn perform_prestige_resets_zone_progression() {
 
 #[test]
 fn vault_prestige_preserves_single_slot() {
-    let mut state = make_state_at_level(10, 0);
+    let mut state = state_at(10, 0);
     let weapon = Item {
         slot: EquipmentSlot::Weapon,
         rarity: Rarity::Legendary,
@@ -462,7 +456,7 @@ fn vault_prestige_preserves_single_slot() {
 
 #[test]
 fn vault_prestige_preserves_multiple_slots() {
-    let mut state = make_state_at_level(10, 0);
+    let mut state = state_at(10, 0);
     state.equipment.set(
         EquipmentSlot::Weapon,
         Some(make_item(EquipmentSlot::Weapon, 0)),
@@ -484,7 +478,7 @@ fn vault_prestige_preserves_multiple_slots() {
 
 #[test]
 fn vault_prestige_preserves_empty_slot_gracefully() {
-    let mut state = make_state_at_level(10, 0);
+    let mut state = state_at(10, 0);
     // No weapon equipped, but requesting to preserve weapon slot
     perform_prestige_with_vault(&mut state, &[EquipmentSlot::Weapon]);
 
@@ -494,7 +488,7 @@ fn vault_prestige_preserves_empty_slot_gracefully() {
 
 #[test]
 fn vault_prestige_no_preserved_slots_clears_all() {
-    let mut state = make_state_at_level(10, 0);
+    let mut state = state_at(10, 0);
     state.equipment.set(
         EquipmentSlot::Weapon,
         Some(make_item(EquipmentSlot::Weapon, 0)),
@@ -508,7 +502,7 @@ fn vault_prestige_no_preserved_slots_clears_all() {
 
 #[test]
 fn vault_prestige_does_nothing_when_ineligible() {
-    let mut state = make_state_at_level(5, 0);
+    let mut state = state_at(5, 0);
     state.equipment.set(
         EquipmentSlot::Weapon,
         Some(make_item(EquipmentSlot::Weapon, 0)),

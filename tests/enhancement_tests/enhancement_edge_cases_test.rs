@@ -580,8 +580,8 @@ fn test_discovery_never_fires_below_p15() {
 
     // Probability is exactly 0.0 at P14 (below SOULFORGE_MIN_PRESTIGE_RANK),
     // so the function always returns false via an early-return check.
-    // 1,000 iterations is sufficient to verify the guard clause.
-    for _ in 0..1_000 {
+    // A handful of iterations is sufficient to verify the guard clause.
+    for _ in 0..10 {
         assert!(
             !try_discover_soulforge(&mut ep, 14, &mut r),
             "should never discover at P14"

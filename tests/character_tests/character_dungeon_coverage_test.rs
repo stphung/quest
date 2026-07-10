@@ -2,6 +2,7 @@
 //! - character/calculation.rs — calculate_derived_stats()
 //! - dungeon/pathfinding.rs — find_path_to, find_next_room
 
+use super::helpers::*;
 use quest::character::attributes::{AttributeType, Attributes};
 use quest::character::DerivedStats;
 use quest::dungeon::types::{
@@ -26,21 +27,6 @@ fn make_equipment() -> Equipment {
 
 fn no_enhancement() -> [u8; 7] {
     [0u8; 7]
-}
-
-/// Creates an item with a single affix.
-fn item_with_affix(slot: EquipmentSlot, affix_type: AffixType, value: f64) -> Item {
-    Item {
-        slot,
-        rarity: Rarity::Rare,
-        ilvl: 50,
-        tier: 5,
-        base_name: "Test".to_string(),
-        display_name: "Test Item".to_string(),
-        attributes: AttributeBonuses::new(),
-        affixes: vec![Affix { affix_type, value }],
-        god_item_id: None,
-    }
 }
 
 /// Creates a Small dungeon grid (5x5) with no rooms placed.
