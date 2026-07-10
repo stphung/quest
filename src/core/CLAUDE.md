@@ -21,7 +21,7 @@ src/core/
 ├── xp.rs            # XP curves, leveling, combat kill XP, distribute_level_up_points
 ├── power_rating.rs  # Character power rating (sqrt of DPS x eHP)
 ├── tick_context.rs  # TickContext struct — bundles all mutable references (state, haven, deep, loom, etc.) for game_tick_with_context()
-├── game_state_serde.rs # FlatGameState intermediate for backward-compatible JSON serialization during sub-struct migration
+├── game_state_serde.rs # FlatGameState intermediate for backward-compatible JSON serialization during sub-struct migration (dead code — unreferenced elsewhere; the real save/load path is `character/manager.rs` + `character/persistence.rs`)
 ├── discovery_facade.rs # DiscoveryInput/DiscoveryResult structs and roll_discoveries_facade() for decoupled discovery rolls
 └── paths.rs             # Centralized save path resolution for ~/.quest/ directory
 ```
@@ -225,7 +225,7 @@ The old `game_tick()` function with individual parameters is `#[deprecated]` —
 - `process_dungeon_events(state, dt, haven, result, rng)` -- Stage 4: dungeon exploration events
 - `process_fishing_tick(state, tick_counter, dt, haven, achievements, debug, result, rng)` -- Stage 5: fishing tick processing
 - `process_combat_events(state, events, haven, achievements, deep, debug_mode, result, rng)` -- Stage 6: combat event mapping + Deep discovery trigger
-- `process_item_drop(state, haven, result)` -- Rolls mob/boss drops, auto-equips, adds to recent drops
+- `process_item_drop(state, haven, result, rng)` -- Rolls mob/boss drops, auto-equips, adds to recent drops
 - `process_discoveries(state, rng, result)` -- Rolls dungeon and fishing spot discovery after kills
 - `process_zone_achievements(defeat_result, achievements, name)` -- Tracks zone completion achievements
 - `collect_achievement_events(achievements, result)` -- Drains unlock queue into TickResult events

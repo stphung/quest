@@ -57,7 +57,7 @@ src/ui/
 ├── deep_events.rs              # Deep check-in event response sub-view
 ├── deep_results.rs             # Deep mission complete modal
 ├── deep_shared.rs              # Shared Deep UI helpers (draw_deep_card, format_hours, truncate_text, render_progress_bar)
-├── debug_menu_scene.rs         # Debug menu overlay with tabbed categories (Challenges, World, Resources, Items, Deep, Borders)
+├── debug_menu_scene.rs         # Debug menu overlay with tabbed categories (Challenges, World, Resources, Items, Deep, Zones, Character, Soulforge, Loom, Borders)
 ├── bug_report_scene.rs         # Bug report overlay with game-state preview and clipboard status
 │
 ├── challenge_menu_scene.rs     # Challenge menu list/detail view
