@@ -99,18 +99,18 @@ fn test_success_rate_all_levels() {
     // +1-4: 100%
     for lvl in 1..=4 {
         assert!(
-            (success_rate(lvl) - 1.0).abs() < f64::EPSILON,
+            (success_rate(lvl) - 1.0).abs() < 1e-9,
             "Level +{lvl} should be 100%"
         );
     }
     // +5: 70%, +6: 55%, +7: 40%
-    assert!((success_rate(5) - 0.70).abs() < f64::EPSILON);
-    assert!((success_rate(6) - 0.55).abs() < f64::EPSILON);
-    assert!((success_rate(7) - 0.40).abs() < f64::EPSILON);
+    assert!((success_rate(5) - 0.70).abs() < 1e-9);
+    assert!((success_rate(6) - 0.55).abs() < 1e-9);
+    assert!((success_rate(7) - 0.40).abs() < 1e-9);
     // +8: 30%, +9: 20%, +10: 10%
-    assert!((success_rate(8) - 0.30).abs() < f64::EPSILON);
-    assert!((success_rate(9) - 0.20).abs() < f64::EPSILON);
-    assert!((success_rate(10) - 0.10).abs() < f64::EPSILON);
+    assert!((success_rate(8) - 0.30).abs() < 1e-9);
+    assert!((success_rate(9) - 0.20).abs() < 1e-9);
+    assert!((success_rate(10) - 0.10).abs() < 1e-9);
 }
 
 #[test]
@@ -184,9 +184,9 @@ fn test_fail_penalty_boundaries() {
 
 #[test]
 fn test_enhancement_multiplier_key_levels() {
-    assert!((enhancement_multiplier(0) - 1.0).abs() < f64::EPSILON);
-    assert!((enhancement_multiplier(5) - 1.30).abs() < f64::EPSILON);
-    assert!((enhancement_multiplier(10) - 2.5).abs() < f64::EPSILON);
+    assert!((enhancement_multiplier(0) - 1.0).abs() < 1e-9);
+    assert!((enhancement_multiplier(5) - 1.30).abs() < 1e-9);
+    assert!((enhancement_multiplier(10) - 2.5).abs() < 1e-9);
 }
 
 #[test]

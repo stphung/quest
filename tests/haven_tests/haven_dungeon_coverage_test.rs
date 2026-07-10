@@ -637,7 +637,7 @@ fn test_is_modal_ready_exactly_at_500ms() {
     let mut achievements = Achievements::default();
     achievements.unlock(AchievementId::SlayerI, Some("Hero".to_string()));
 
-    // Set to exactly 500ms ago
+    // 501ms ago (500ms threshold + 1ms buffer to avoid boundary flake)
     achievements.accumulation_start =
         Some(std::time::Instant::now() - std::time::Duration::from_millis(501));
 

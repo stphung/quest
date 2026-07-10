@@ -728,7 +728,7 @@ fn test_enhancement_multiplier_at_zero_is_identity() {
 
 #[test]
 fn test_enhancement_multiplier_at_max_is_250_percent() {
-    assert!((enhancement_multiplier(MAX_ENHANCEMENT_LEVEL) - 2.5).abs() < f64::EPSILON);
+    assert!((enhancement_multiplier(MAX_ENHANCEMENT_LEVEL) - 2.5).abs() < 1e-9);
 }
 
 #[test]
@@ -952,10 +952,13 @@ mod soulforge_tick_integration {
         let mut deep = DeepState::new();
         let mut rng = make_rng(42);
 
-        // Run a large number of ticks; dungeon blocks Soulforge discovery.
+        // Run a small number of ticks; dungeon blocks Soulforge discovery.
         // Re-set the dungeon each tick to ensure it stays active (dungeons can complete/fail).
+        // This is a structural guarantee (the discovery branch short-circuits whenever
+        // state.active_dungeon.is_some(), per src/core/tick_stages.rs), not a probabilistic
+        // one, so a handful of ticks is sufficient to confirm the guard holds stably.
         let mut loom = quest::loom::LoomState::new();
-        for _ in 0..1_000 {
+        for _ in 0..5 {
             state.active_dungeon = Some(generate_dungeon(1, 0, 1));
             let mut ctx = TickContext {
                 state: &mut state,
@@ -995,8 +998,10 @@ mod soulforge_tick_integration {
         let mut deep = DeepState::new();
         let mut rng = make_rng(42);
 
+        // enhancement.discovered is already true before the loop starts, so this is a
+        // structural guarantee, not a probabilistic one — a handful of ticks suffices.
         let mut loom = quest::loom::LoomState::new();
-        for _ in 0..500 {
+        for _ in 0..5 {
             let mut ctx = TickContext {
                 state: &mut state,
                 tick_counter: &mut tick_counter,

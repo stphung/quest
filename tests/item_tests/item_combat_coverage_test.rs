@@ -660,7 +660,7 @@ fn generate_subzone_boss_has_higher_stats() {
     // Generate many pairs to account for variance
     let mut boss_hp_sum = 0u64;
     let mut mob_hp_sum = 0u64;
-    let samples = 20;
+    let samples = 200;
     for _ in 0..samples {
         let boss = generate_subzone_boss(zone, subzone);
         let mob = generate_zone_enemy(zone, subzone);
@@ -709,7 +709,7 @@ fn generate_dungeon_boss_prefixed() {
 fn generate_dungeon_elite_stronger_than_normal() {
     let mut elite_hp_sum = 0u64;
     let mut normal_hp_sum = 0u64;
-    let samples = 20;
+    let samples = 200;
     for _ in 0..samples {
         elite_hp_sum += generate_dungeon_elite(5).max_hp;
         normal_hp_sum += generate_dungeon_enemy(5).max_hp;
@@ -726,7 +726,7 @@ fn generate_dungeon_elite_stronger_than_normal() {
 fn generate_dungeon_boss_stronger_than_elite() {
     let mut boss_hp_sum = 0u64;
     let mut elite_hp_sum = 0u64;
-    let samples = 20;
+    let samples = 200;
     for _ in 0..samples {
         boss_hp_sum += generate_dungeon_boss(5).max_hp;
         elite_hp_sum += generate_dungeon_elite(5).max_hp;
@@ -776,7 +776,7 @@ fn zone_enemies_scale_with_zone() {
 
     let mut z1_hp = 0u64;
     let mut z5_hp = 0u64;
-    let samples = 20;
+    let samples = 200;
     for _ in 0..samples {
         z1_hp += generate_zone_enemy(zone1, &zone1.subzones[0]).max_hp;
         z5_hp += generate_zone_enemy(zone5, &zone5.subzones[0]).max_hp;

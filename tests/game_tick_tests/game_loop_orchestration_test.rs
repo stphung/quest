@@ -446,48 +446,76 @@ fn test_achievements_changed_flag_triggers_save_in_bridge() {
         }
     }
 
-    if state.character_level >= 10 {
-        assert!(
-            found_change,
-            "achievements_changed should be set when achievement unlocked"
-        );
-    }
+    assert!(
+        state.character_level >= 10,
+        "did not reach level 10 within 10,000 iterations — loop bound too low or logic broken"
+    );
+    assert!(
+        found_change,
+        "achievements_changed should be set when achievement unlocked"
+    );
 }
 
 #[test]
 fn test_debug_mode_suppresses_achievement_save_flag_for_leviathan() {
-    // Behavior: bridge function line 1126 checks !debug_mode
-    // In debug mode, achievement save is suppressed for storm leviathan path
+    // Behavior: process_fishing_tick (core::tick_stages) checks !debug_mode before
+    // setting achievements_changed on the storm leviathan path.
+    //
+    // This calls process_fishing_tick directly rather than the full game_tick
+    // bridge/run_game_tick: driving the whole pipeline for thousands of ticks lets
+    // unrelated combat achievements unlock in the same window (fresh_state() spawns
+    // into combat immediately), which also sets achievements_changed and makes the
+    // leviathan-specific suppression unobservable. Isolating the fishing stage
+    // mirrors process_fishing_tick_storm_leviathan_caught_sets_flag_and_achievement
+    // in core::tick_stages, just with debug_mode flipped to true.
     let mut state = fresh_state();
     state.fishing.rank = 40;
     state.fishing.leviathan_encounters = 10;
-    state.active_fishing = Some(make_fishing_session(FishingPhase::Reeling, 1, 100));
     let mut tc = 0u32;
     let mut ach = Achievements::default();
     let mut rng = seeded_rng(42);
+    let haven_bonuses = Haven::default().compute_bonuses();
 
-    // Run in debug mode
-    let result = run_game_tick(
-        &mut state,
-        &mut tc,
-        &mut Haven::default(),
-        &mut ach,
-        true, // debug_mode
-        &mut rng,
-    );
+    let mut triggered = false;
+    for _ in 0..5_000 {
+        // Reset a fresh Reeling-phase session each iteration so every attempt
+        // rolls a fresh legendary-catch/Leviathan-catch chance (mirrors the
+        // brute-force pattern used by process_fishing_tick_storm_leviathan_caught_sets_flag_and_achievement
+        // in core::tick_stages).
+        state.active_fishing = Some(make_fishing_session(FishingPhase::Reeling, 1, 1_000_000));
 
-    // In debug mode, even if storm leviathan caught, achievements_changed should be false
-    // for the fishing leviathan path specifically (core::tick line 349-351)
-    if result
-        .events
-        .iter()
-        .any(|e| matches!(e, TickEvent::StormLeviathanCaught))
-    {
-        assert!(
-            !result.achievements_changed,
-            "Debug mode should suppress achievement save for leviathan"
+        let mut result = TickResult::default();
+        quest::core::tick_stages::process_fishing_tick(
+            &mut state,
+            &mut tc,
+            0.1,
+            &haven_bonuses,
+            &mut ach,
+            true, // debug_mode
+            &mut result,
+            &mut rng,
         );
+
+        if result
+            .events
+            .iter()
+            .any(|e| matches!(e, TickEvent::StormLeviathanCaught))
+        {
+            // In debug mode, even if storm leviathan caught, achievements_changed should be false
+            // for the fishing leviathan path specifically (core::tick_stages process_fishing_tick)
+            assert!(
+                !result.achievements_changed,
+                "Debug mode should suppress achievement save for leviathan"
+            );
+            triggered = true;
+            break;
+        }
     }
+
+    assert!(
+        triggered,
+        "StormLeviathanCaught never fired within 5000 ticks — test is not exercising the code path"
+    );
 }
 
 // =============================================================================
@@ -790,10 +818,13 @@ fn test_achievement_unlocked_event_message_format() {
             break;
         }
     }
-    // If character reached level 10, should have gotten Level10 achievement
-    if state.character_level >= 10 {
-        assert!(found, "Should produce AchievementUnlocked for Level10");
-    }
+    // Precondition: the loop above must have actually driven the character to
+    // level 10, otherwise the Level10 achievement path was never exercised.
+    assert!(
+        state.character_level >= 10,
+        "did not reach level 10 within 10,000 iterations — loop bound too low or logic broken"
+    );
+    assert!(found, "Should produce AchievementUnlocked for Level10");
 }
 
 // =============================================================================
@@ -840,12 +871,14 @@ fn test_recent_drops_populated_on_item_drop() {
         }
     }
 
-    if got_drop {
-        assert!(
-            !state.recent_drops.is_empty(),
-            "Recent drops should be populated after ItemDropped"
-        );
-    }
+    assert!(
+        got_drop,
+        "ItemDropped never fired within 5000 ticks — test is not exercising the code path"
+    );
+    assert!(
+        !state.recent_drops.is_empty(),
+        "Recent drops should be populated after ItemDropped"
+    );
 }
 
 // =============================================================================
