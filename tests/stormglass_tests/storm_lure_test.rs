@@ -142,8 +142,10 @@ fn test_catch_miss_returned_when_lure_active_and_catch_fails() {
 
 #[test]
 fn test_no_catch_miss_without_lure_bonus() {
-    // With 0.0 lure bonus, catch miss should never occur (returns None instead)
-    for seed in 0..1000 {
+    // With 0.0 lure bonus, catch miss should never occur (returns None instead).
+    // Structurally guaranteed by the `if lure_catch_bonus > 0.0` branch in
+    // generate_fish_with_rank, not a probability roll — 100 seeds is plenty.
+    for seed in 0..100 {
         let mut rng = rng_from(seed);
         let (_, result) =
             generate_fish_with_rank(FishRarity::Legendary, 40, 10, 0.0, 0.0, &mut rng);
