@@ -498,9 +498,9 @@ Each character is stored as its own `~/.quest/{sanitized_name}.json` file — no
 
 **System**: persistence (`character/`, `~/.quest/*.json`).
 
-### Character Titles: Account-Wide, Curated to 29 Achievements, Player-Chosen
+### Character Titles: Account-Wide, Curated to 64 Achievements, Player-Chosen
 
-The selected title is `selected_title: Option<AchievementId>` on the account-wide `Achievements` struct (in `achievements.json`), not per-character. Only a hand-picked set of 29 achievements grant titles (a static `ALL_TITLES` map), the player picks/previews/clears it in a dedicated `[T]` overlay, and it renders as a comma-separated text suffix on the name (`Evaa, Eternal`) independent of the kill-count badge icon. An invalid selection (achievement not unlocked, or not a title) is silently cleared on load; the field is `serde(default)` for pre-feature saves. Titles are shown in the stats panel/compact bar/character-select only, never in the combat scene (which uses badges) or in save filenames.
+The selected title is `selected_title: Option<AchievementId>` on the account-wide `Achievements` struct (in `achievements.json`), not per-character. Only a hand-picked set of 64 achievements grant titles (a static `ALL_TITLES` map), the player picks/previews/clears it in a dedicated `[T]` overlay, and it renders as a comma-separated text suffix on the name (`Evaa, Eternal`) independent of the kill-count badge icon. An invalid selection (achievement not unlocked, or not a title) is silently cleared on load; the field is `serde(default)` for pre-feature saves. Titles are shown in the stats panel/compact bar/character-select only, never in the combat scene (which uses badges) or in save filenames.
 
 **Why**: titles are earned from account-level achievements, so ownership belongs at the account level and carries across characters. Curation keeps titles meaningful and prestige-signalling — only milestones like P100 Eternal, Storm Leviathan, and Master-tier minigames are worth wearing. Players should control which accomplishment they broadcast. Keeping the title decoupled from the badge lets a header show both; keeping filenames keyed on the raw name keeps persistence stable.
 
