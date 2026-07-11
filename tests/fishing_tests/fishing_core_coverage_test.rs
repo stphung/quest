@@ -1086,12 +1086,14 @@ fn test_achievement_events_set_changed_flag_via_game_tick() {
 
     // NOTE: bound kept conservative (not reduced to the ~500-1000 used elsewhere in this
     // file). Empirically this specific achievement-unlock tick is NOT fully seeded-RNG
-    // deterministic: items::drops::try_drop_from_mob/try_drop_from_boss call `rand::rng()`
-    // directly instead of threading the caller's seeded rng, so item-rarity-gated
-    // achievements can fire on a real-OS-random tick. Sampling 15,000 in-process runs of
-    // this exact scenario showed a max first-trigger tick of ~1361 (vs. a stable, always
-    // reproducible ~580 for the analogous seed-42 scenario above). 3500 keeps ~2.5x
-    // headroom over the observed tail instead of the ~1.7x a 1000 bound would give.
+    // deterministic: combat::enemy_generation (generate_enemy_name/calc_zone_enemy_stats/
+    // generate_zone_enemy_name) still calls `rand::rng()` directly instead of threading
+    // the caller's seeded rng (items::drops was fixed for this in #692; enemy_generation
+    // was not), so combat/item-rarity-gated achievements can fire on a real-OS-random
+    // tick. Sampling 15,000 in-process runs of this exact scenario showed a max
+    // first-trigger tick of ~1361 (vs. a stable, always reproducible ~580 for the
+    // analogous seed-42 scenario above). 3500 keeps ~2.5x headroom over the observed
+    // tail instead of the ~1.7x a 1000 bound would give.
     for _ in 0..3500 {
         let result = run_tick(&mut state, &mut tc, &mut haven, &mut ach, false, &mut r);
 
