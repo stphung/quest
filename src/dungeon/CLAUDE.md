@@ -9,7 +9,7 @@ src/dungeon/
 ├── mod.rs         # Public re-exports
 ├── types.rs       # Room, RoomType, RoomState, Dungeon, DungeonSize
 ├── generation.rs  # Procedural dungeon generation with connected rooms
-├── facade.rs      # tick_dungeon_facade() for decoupled dungeon ticking; DungeonInput struct is currently unused (aspirational decomposed interface, not wired in)
+├── facade.rs      # tick_dungeon_facade() + DungeonInput struct — decoupled dungeon-tick facade, currently unused in production (not wired in; mirrors update_dungeon() in logic.rs, which is the real entry point via tick_stages.rs)
 ├── logic.rs       # Room clearing, key system, boss encounters
 ├── pathfinding.rs # BFS-based dungeon navigation, auto-exploration (ROOM_MOVE_INTERVAL 2.5s, ROOM_TRAVEL_INTERVAL 0.8s)
 └── rewards.rs     # Dungeon boss XP rewards, item generation, treasure room handling
