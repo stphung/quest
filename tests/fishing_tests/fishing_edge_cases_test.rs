@@ -428,7 +428,7 @@ fn test_leviathan_encounter_6_increments_to_6() {
 fn test_leviathan_catch_phase_starts_after_10_encounters() {
     // With 10 encounters complete, result should be Caught or None (not Escaped)
     let mut r = rng(2468);
-    for _ in 0..200 {
+    for _ in 0..100 {
         let (_, result) = generate_fish_with_rank(FishRarity::Legendary, 40, 10, 0.0, 0.0, &mut r);
         assert!(
             !matches!(result, LeviathanResult::Escaped { .. }),

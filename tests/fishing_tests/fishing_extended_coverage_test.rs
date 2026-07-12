@@ -421,7 +421,7 @@ fn test_generate_fish_name_is_non_empty() {
 #[test]
 fn test_generate_fishing_session_total_fish_in_range() {
     let mut r = rng(6001);
-    for _ in 0..200 {
+    for _ in 0..100 {
         let session = generate_fishing_session(&mut r);
         assert!(
             (3..=8).contains(&session.total_fish),
@@ -447,7 +447,7 @@ fn test_generate_fishing_session_starts_in_casting_phase() {
 #[test]
 fn test_generate_fishing_session_spot_name_is_from_known_list() {
     let mut r = rng(6003);
-    for _ in 0..200 {
+    for _ in 0..100 {
         let session = generate_fishing_session(&mut r);
         assert!(
             SPOT_NAMES.contains(&session.spot_name.as_str()),

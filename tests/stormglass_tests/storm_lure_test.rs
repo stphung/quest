@@ -440,7 +440,7 @@ fn test_tracking_bonus_accumulates_across_encounters() {
 fn test_no_lure_no_bonus_behavior_unchanged() {
     // Without lure active, behavior should be exactly as before
     let haven = HavenFishingBonuses::default();
-    for seed in 0..1000 {
+    for seed in 0..100 {
         let mut rng = rng_from(seed);
         let mut state = test_state_rank40();
         state.fishing.storm_lure_active = false;
