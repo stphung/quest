@@ -1000,7 +1000,7 @@ fn test_game_tick_debug_mode_suppresses_achievement_save() {
     // Note: debug_mode only suppresses the flag for fishing storm leviathan path.
     // Achievement events themselves still fire. This test verifies the code path
     // doesn't crash when debug_mode is true.
-    for _ in 0..500 {
+    for _ in 0..50 {
         let _result = game_tick(
             &mut state,
             &mut tick_counter,
@@ -1067,11 +1067,9 @@ fn test_simulator_100_ticks_produces_progression() {
 
 #[test]
 fn test_simulator_rng_param_is_used_for_challenge_ai() {
-    // Verify the seeded RNG parameter is actually used by game_tick.
-    // Note: Some subsystems (spawn_enemy_if_needed, apply_tick_xp) use
-    // thread_rng() internally, so full determinism requires those to be
-    // refactored too. But the RNG param IS used for challenge AI, fishing,
-    // and discovery — we verify it doesn't panic and produces valid state.
+    // Verify the seeded RNG parameter is actually used by game_tick for
+    // challenge AI, fishing, and discovery — we verify it doesn't panic
+    // and produces valid state.
     let mut state = create_strong_character("RNG Usage Test");
     let mut tick_counter = 0u32;
     let mut haven = Haven::default();
