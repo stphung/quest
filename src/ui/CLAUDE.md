@@ -125,9 +125,9 @@ Layout dispatch in `draw_ui_with_update()`:
 │   Stats Panel (50%)   │  Combat Scene (50%)  │
 │                       │                      │
 ├───────────────────────┴──────────────────────┤
-│  Inline Combat HUD + Scrolling Ticker (8h)   │
+│  Scrolling Ticker (1 line)                   │
 ├──────────────────────────────────────────────┤
-│  Footer (1 line)                             │
+│  Footer (4 lines / 2 content rows)           │
 └──────────────────────────────────────────────┘
 ```
 

@@ -37,6 +37,7 @@ Enabling Act 2 for real is a one-line flip of `ACT2_ENABLED` to `true` (with a m
 - `vessel_arrived: bool` — persistent; set when the Voyage reaches the Tree (`VoyageState::take_finale_playback()`)
 - `vessel_transition_played: bool` — persistent; set once the 5-beat launch transition (`transition.rs`) has played through to its end. While `vessel_launched && !vessel_transition_played`, `main.rs`'s `'game_loop` shows the transition instead of the Voyage
 - `vessel_last_whisper_at: u64` — transient; play-time seconds when the last ticker whisper fired
+- `last_crossing_complete: bool` — persistent; set when a Voyage crossing completes, consumed to trigger colony-side end-of-era handling
 
 ### `LaunchTransitionState` (`transition.rs`)
 Transient (not serialized — an interrupted transition just restarts at beat 1 next launch, since `vessel_transition_played` is the only durable record) progress through the 5 authored beats (Farewell/Unweaving/Construction/Launch/Void). `advance()` steps `beat` and returns `true` once the final beat's Enter press should complete the transition. Beat content (`beat(n) -> &Beat`) is static — the sequence always plays identically regardless of how the player reached launch.
