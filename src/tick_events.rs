@@ -853,3 +853,61 @@ pub fn apply_tick_events(game_state: &mut GameState, events: &[TickEvent]) -> Ti
         pattern_milestone_reached,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn vessel_events() -> Vec<TickEvent> {
+        vec![
+            TickEvent::VesselSignalDiscovered,
+            TickEvent::VesselWhisper {
+                message: crate::vessel::whisper_message(0),
+            },
+        ]
+    }
+
+    /// While Act 2 is dark-shipped, the vessel events must map to NOTHING —
+    /// no log line, no ticker entry, no discovery flag. (The persistent
+    /// `vessel_signal_discovered` GameState flag is set elsewhere, in
+    /// tick_stages, deliberately unconditionally.)
+    #[test]
+    fn vessel_events_map_to_nothing_while_dark_shipped() {
+        assert!(
+            !crate::vessel::act2_enabled(),
+            "this test assumes Act 2 is dark-shipped in this run"
+        );
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let ticker_before = state.ticker.len();
+
+        let flags = apply_tick_events(&mut state, &vessel_events());
+
+        assert!(!flags.vessel_signal_discovered, "no discovery modal queued");
+        assert_eq!(state.ticker.len(), ticker_before, "no ticker entries");
+    }
+
+    /// Self-skipping flag-ON smoke test: a green no-op in ordinary (dark)
+    /// runs; actually exercised by the dedicated `QUEST_ACT2=1 cargo test
+    /// flag_on` step in CI / scripts/ci-checks.sh, which reruns the built
+    /// test binaries in a fresh process where the OnceLock caches the flag ON.
+    #[test]
+    fn flag_on_vessel_events_map_to_ticker_and_discovery_flag() {
+        if !crate::vessel::act2_enabled() {
+            return;
+        }
+        let mut state = GameState::new("Hero".to_string(), 0);
+        let ticker_before = state.ticker.len();
+
+        let flags = apply_tick_events(&mut state, &vessel_events());
+
+        assert!(
+            flags.vessel_signal_discovered,
+            "the discovery flag surfaces so main.rs can queue the modal"
+        );
+        assert_eq!(
+            state.ticker.len(),
+            ticker_before + 2,
+            "the signal and the whisper each push a ticker entry"
+        );
+    }
+}

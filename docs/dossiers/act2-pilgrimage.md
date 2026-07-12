@@ -43,8 +43,8 @@ Warden, the Silence itself, and the Thorns (the act's only permanent loss)
 set, never by a die roll. Five other ships share the dark with the player,
 each with their own route and one line of character; hailing one (once
 each) trades news for a fragment of their story, and one of the five, the
-Sister Verity, is written to reach the Tree and wait there rather than
-eventually going dark like the other four. Cadence: a decision or scene
+Sister Verity, is written to reach the Tree and wait there (of the five,
+only the Grief of Alden ever goes dark, on her authored day). Cadence: a decision or scene
 every check-in, a junction every few days, a chapter gateway roughly
 weekly, the Going-Dark once — the night the mail stops.
 
@@ -111,8 +111,9 @@ The de-facto design bible is scattered but real (no single consolidated doc
   months, ~88–94% saved with skilled play, C1 ≈ 14–15 real days.** Dock/
   Wormhole's own balance validation moved the measured figures further
   (balanced now 29 crossings/87.5%, Ward-lean 49/93.9% — see Balance
-  Evidence); this design-doc line was never updated to match, and neither
-  was `src/vessel/CLAUDE.md`'s mirror of it (Open Questions #7).
+  Evidence); this design-doc line was never updated to match; `src/vessel/
+  CLAUDE.md`'s mirror of it was fixed 2026-07-12 (Open Questions #7,
+  resolved).
 - **The Ferryman's "Elevation"**: the design explicitly *amends* Act 2's own
   anti-goal — "no resettable loop" — rather than breaking it: "the crossing
   loop *is* Act 2's identity now... it ends (Act 3), it does not cycle in
@@ -211,9 +212,10 @@ so their fates don't depend on the player's choices at all, deliberately,
 to keep the authoring bounded. Hailing one, once each, trades a line of
 news for a fragment of their story; pilgrim rumors are the only way to
 learn about roads behind or beside the player's own. One of the five,
-**the Sister Verity**, is written to reach the Tree and wait there rather
-than eventually going dark like the other four — a second, softer Act 3
-thread alongside the two hard gate flags in Interrelations.
+**the Sister Verity**, is written to reach the Tree and wait there — a
+second, softer Act 3 thread; of the five, only the Grief of Alden is
+authored to go dark (after day 40, "in the middle water"), the other
+three sail on alongside the two hard gate flags in Interrelations.
 
 ### Colony
 Once the maiden voyage lands, every arrival pays out **Salvage** to spend
@@ -308,15 +310,17 @@ Act 1 (everything)                Act 2: launch → crossing 1 → the Ferryman 
   game — go one step further: a second, deeper flag fires only once the
   old world is fully emptied and the era's final arrival lands, matching
   the design's own words verbatim ("the next arrival is the Last Crossing:
-  Act 3's gate"). **The normative spec never mentions this second, deeper
-  hook** — a real spec gap, not a dossier error (see Open Questions).
+  Act 3's gate"). **The normative spec's silence on this
+  second, deeper hook was a real spec gap** — closed 2026-07-12 by the
+  `act2-release-hardening` change ("The Last Crossing Ends The Era"; see
+  Open Questions #6).
   Salvage and districts are Act 2-internal currencies; nothing else
   consumes them (by design, but note: Records and keepsakes have no
   external surface either).
 - **A third, softer Act 3 thread**: alongside the two boolean gates above,
   the Sister Verity (see Mechanics & Constants > The Other Pilgrims) is a
-  named pilgrim ship authored to reach the Tree and wait there rather than
-  going dark like the other four — a face already staged for whatever
+  named pilgrim ship authored to reach the Tree and wait there (only the
+  Grief of Alden ever goes dark) — a face already staged for whatever
   Act 3 becomes, independent of either flag.
 - **All three Reckoning purchases point at the same measurable outcome** (%
   of the world saved), a meaningfully tighter system than the earlier
@@ -404,9 +408,10 @@ against these same seven heuristics.
 
 ## Open Questions & Decision History
 
-Five of nine questions raised across this dossier's refreshes are resolved
-(see `docs/decisions.md` for full rationale on each); four are still open
-(#6, carried forward; #7, #8, and #9, new this pass):
+Eight of nine questions raised across this dossier's refreshes are resolved
+(see `docs/decisions.md` for full rationale on each); one is still open
+(#9). #6–#8 were closed by the `act2-release-hardening` change
+(2026-07-12):
 
 1. ~~Hope gauge never engages — tune, redesign, or demote?~~ **Resolved**:
    retired entirely, replaced by the Ward yard (commit d39ad67).
@@ -428,9 +433,12 @@ Five of nine questions raised across this dossier's refreshes are resolved
    **Resolved**: keep it as an intended "go slower, save more" branch — era
    length is now stated as "~3–5 real months" depending on spend. Skill/
    patience tradeoff is fine; the margin stays wide and legible.
-6. **`last_crossing_complete` (the Last Crossing / true Act 3 gate) has no
-   openspec coverage — still open, carried forward and re-verified this
-   pass.** It's implemented (`main.rs:746-747,834`, `colony.rs:571-572`)
+6. ~~`last_crossing_complete` (the Last Crossing / true Act 3 gate) has no
+   openspec coverage.~~ **Resolved (2026-07-12)**: the
+   `act2-release-hardening` change adds "The Last Crossing Ends The Era"
+   to the vessel-act2 spec (plus a "never docks" carve-out on Dock Phase
+   Entry) and names the flag in `src/vessel/CLAUDE.md`'s GameState-fields
+   list. Original finding, kept for history: it's implemented (`main.rs:746-747,834`, `colony.rs:571-572`)
    and named outright in `colony.rs`'s own module doc ("the next arrival is
    the Last Crossing: Act 3's gate"), but `openspec/specs/vessel-act2/
    spec.md:119` still describes only `vessel_arrived` as "the durable hook
@@ -445,8 +453,12 @@ Five of nine questions raised across this dossier's refreshes are resolved
    unshipped) Act 3 direction — nothing here is decided or built, but it's
    a second, independent signal that the spec gap should close before
    anyone starts building against the flag.
-7. **`src/vessel/CLAUDE.md`'s own era-length intent line contradicts its
-   own commit's balance validation — new this pass.** The Dock/Wormhole
+7. ~~`src/vessel/CLAUDE.md`'s own era-length intent line contradicts its
+   own commit's balance validation.~~ **Resolved (2026-07-12)**: the
+   `act2-release-hardening` change rewrote the prose line to the measured
+   figures (balanced 29 crossings / ~4.0 mo / 87.5%, ward-lean ~57 / ~9 mo
+   / ~93.5%), now CI-asserted by the promoted
+   `strategy_sweep_holds_the_campaign_envelope` gate. Original finding: The Dock/Wormhole
    change's archived `tasks.md` (task 6.2) measured and explicitly accepted
    balanced spend at 29 crossings / 87.5% saved / 4.0 months ("the intended
    risk/reward tension holds. No constant adjustment needed") — but that
@@ -458,8 +470,10 @@ Five of nine questions raised across this dossier's refreshes are resolved
    place this still needs a documentation-only fix, following the same
    "re-state the range" precedent as Open Questions #3 and #5. Not urgent
    while the CI gate (15–30 crossings) is unaffected.
-8. **`src/vessel/CLAUDE.md`'s Launch Transition section is now stale — new
-   this pass.** It still reads "no animation... static text screens per
+8. ~~`src/vessel/CLAUDE.md`'s Launch Transition section is stale.~~
+   **Resolved (2026-07-12)**: rewritten by the `act2-release-hardening`
+   change to describe the animated "Ignition" sequence
+   (`ui/vessel_transition_fx.rs`). Original finding: It still reads "no animation... static text screens per
    beat are sufficient" (written when the transition first shipped) and
    its constants table doesn't mention `ui/vessel_transition_fx.rs` at all,
    but the transition has since been rebuilt as a fully animated sequence
@@ -506,6 +520,23 @@ Held for a later round (not yet asked, unchanged):
 Session-by-session log of what changed at each refresh, most recent first.
 The sections above always describe the *current* state only — read this
 section for how it got there.
+
+### 2026-07-12 — release hardening lands; Open Questions #6–#8 resolved
+
+The `act2-release-hardening` change (release-readiness follow-through, not
+a dossier refresh) closed three of the four open questions: the Last
+Crossing is now specced in `openspec/specs/vessel-act2` (#6), `src/vessel/
+CLAUDE.md`'s era-length prose matches the measured, now-CI-asserted
+figures (#7), and its Launch Transition section describes Ignition (#8).
+The same change promoted the `#[ignore]`d ferryman sweeps into asserted
+balance gates (adding the previously-missing ward-lean policy: measured
+~57 crossings / ~9 mo / ~93.5% saved), wired `voyage_simulator` and a
+`QUEST_ACT2=1` flag-ON test step into CI, added `voyage.json`/
+`colony.json` to the save-compat corpus, and reconciled this dossier's
+"going dark like the other four" pilgrim phrasing to the authored code
+(only the Grief of Alden darkens; the test
+`the_grief_of_alden_goes_dark_and_the_verity_sails_on` pins it). #9 (the
+Session 5 systems braid) remains the one open question.
 
 ### 2026-07-05 — Ignition transition; balance evidence corrected against its own shipped validation; Session 5 exploration surfaced
 
@@ -634,7 +665,7 @@ mentioned anywhere in this dossier: **Strain & hull wear** (`StrainCause`/
 Warden, the Silence itself, and the Thorns, "the game's only loss," none
 of them RNG), and **the Other Pilgrims** (five authored ships with fixed
 routes, hailable once each; the Sister Verity is written to reach the Tree
-and wait for Act 3 rather than going dark like the other four). Added to
+and wait for Act 3; only the Grief of Alden goes dark). Added to
 Player's Experience, two new Mechanics & Constants subsections, and a new
 Interrelations bullet naming the Verity as a third, narrative Act 3 thread
 alongside the two boolean gate flags. Content addition, not a correction —

@@ -83,9 +83,10 @@ pub const WARD_COST_GROWTH: f64 = 1.45;
 
 /// Real hours to fully charge Riftglass at Drive level 0 (the maiden
 /// voyage's first Dock). Higher Drive levels charge proportionally faster
-/// (`ColonyState::riftglass_rate_mult`). A starting value, not yet
-/// simulator-validated against the era's ~3-real-month pacing target — see
-/// `openspec/changes/act2-dock-wormhole-crossing/design.md` Decision 1/4.
+/// (`ColonyState::riftglass_rate_mult`). Validated against the era's
+/// pacing envelope by the asserted sweeps in `tests/ferryman_tests.rs`
+/// (`strategy_sweep_holds_the_campaign_envelope`,
+/// `dock_time_across_charge_policies`).
 pub const RIFTGLASS_BASE_HOURS_TO_FULL: f64 = 24.0;
 
 /// The colony's districts, unlocked in order by population. Pure growth —

@@ -16,7 +16,11 @@ Rules:
   pointed at the new directory) and keep all older generations loading.
 - `v1/loom_legacy_v1.json` is hand-written (pre-version-2 loom save) and is
   never regenerated — it pins the loader's version-reset path.
+- `v1/voyage.json` and `v1/colony.json` (Act 2 account files) joined the
+  corpus on 2026-07-12 — additive coverage of previously-uncovered state in
+  the same v1 format, not a format migration. Generated once by
+  `generate_vessel_corpus_v1_addition`; frozen like everything else.
 
 | Generation | Created | Notes |
 |------------|---------|-------|
-| `v1/` | 2026-07 | Initial corpus: 4 character saves + deep/haven/loom/enhancement/achievements |
+| `v1/` | 2026-07 | Initial corpus: 4 character saves + deep/haven/loom/enhancement/achievements; voyage/colony (Act 2) added 2026-07-12 |

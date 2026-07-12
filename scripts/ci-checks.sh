@@ -30,11 +30,18 @@ cargo test --quiet
 if command -v python3 &> /dev/null; then
     python3 "$(dirname "$0")/ansi2html.py" --self-test
 fi
+# Act 2 flag-ON smoke tests: the flag_on_* tests self-skip while
+# dark-shipped, so this fresh process (OnceLock caches the flag ON) is
+# what actually runs them. Mirrored in .github/workflows/ci.yml (test job).
+QUEST_ACT2=1 cargo test --quiet flag_on
 echo "✅ Tests passed"
 echo ""
 
 echo "🎮 4/5 Running progression check (simulator)..."
 cargo run --release --quiet --bin simulator -- --check-progression
+# Act 2 voyage balance gate: every strategy reaches the Tree inside the
+# pacing envelope. Mirrored in .github/workflows/ci.yml (balance job).
+cargo run --release --quiet --bin voyage_simulator
 echo "✅ Progression check passed"
 echo ""
 

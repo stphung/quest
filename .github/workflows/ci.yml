@@ -52,6 +52,10 @@ jobs:
         with:
           key: test
       - run: cargo test --quiet
+      # Act 2 flag-ON smoke tests: the flag_on_* tests self-skip while
+      # dark-shipped, so this fresh process (OnceLock caches the flag ON)
+      # is what actually runs them. Mirrored in scripts/ci-checks.sh.
+      - run: QUEST_ACT2=1 cargo test --quiet flag_on
 
   balance:
     name: Balance
@@ -67,6 +71,9 @@ jobs:
         with:
           key: balance
       - run: cargo run --release --quiet --bin simulator -- --check-progression
+      # Act 2 voyage balance gate: every strategy reaches the Tree inside
+      # the pacing envelope. Mirrored in scripts/ci-checks.sh step 4.
+      - run: cargo run --release --quiet --bin voyage_simulator
 
   audit:
     name: Audit

@@ -1,0 +1,41 @@
+{
+  "cap_level": 10,
+  "character_id": "corpus-fixture",
+  "crossings_completed": 16,
+  "days_last_crossing": 0,
+  "dimmed_ports": [
+    36,
+    17,
+    27,
+    30,
+    11,
+    5,
+    13,
+    16,
+    20,
+    33,
+    21,
+    32,
+    31,
+    9,
+    14,
+    26,
+    25,
+    35
+  ],
+  "dock": {
+    "docked_at": "2025-06-15T15:06:40.123Z"
+  },
+  "drive_level": 10,
+  "era_seed": 613757747013599593,
+  "records": {
+    "fastest_days": 8,
+    "most_carried": 4526,
+    "total_lightyears": 3200,
+    "total_nights": 260
+  },
+  "salvage": 30,
+  "souls_delivered": 30000,
+  "souls_remaining": 50000,
+  "ward_level": 3
+}
