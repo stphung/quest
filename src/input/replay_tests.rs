@@ -902,3 +902,107 @@ fn vessel_hotkey_stays_inert_while_act2_is_dark_shipped() {
         "[V] must stay inert while Act 2 is dark-shipped"
     );
 }
+
+/// Fully qualify a harness state for the launch burn: signal, Ascension X,
+/// the PR, and all 28 Woven Patterns.
+#[cfg(test)]
+fn qualify_for_launch(h: &mut InputHarness, pr_headroom: u32) {
+    h.state.vessel_signal_discovered = true;
+    h.state.ascension_level = 10;
+    h.state.prestige_rank = crate::vessel::LAUNCH_PR_COST + pr_headroom;
+    crate::loom::initialize_loom(&mut h.loom_state);
+    crate::loom::complete_discovery(&mut h.loom_state);
+    for p in h.loom_state.persistent.patterns.iter_mut().take(28) {
+        p.completed = true;
+    }
+}
+
+#[test]
+fn flag_on_vessel_hotkey_opens_overlay_and_enter_burns_the_launch() {
+    // Self-skipping flag-ON smoke test: a green no-op in ordinary (dark)
+    // runs; actually exercised by the dedicated `QUEST_ACT2=1 cargo test
+    // flag_on` step in CI / scripts/ci-checks.sh, which reruns the built
+    // test binaries in a fresh process where the OnceLock caches the flag ON.
+    if !crate::vessel::act2_enabled() {
+        return;
+    }
+
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.state.vessel_signal_discovered = true;
+    h.char('v');
+    assert!(
+        matches!(
+            h.overlay,
+            GameOverlay::Vessel {
+                confirm_pending: false
+            }
+        ),
+        "[V] opens the Vessel overlay once the signal is discovered"
+    );
+
+    // Unqualified Enter must not arm the confirm; Esc closes.
+    h.press(KeyCode::Enter);
+    assert!(
+        matches!(
+            h.overlay,
+            GameOverlay::Vessel {
+                confirm_pending: false
+            }
+        ),
+        "Enter without the prerequisites must not arm the confirm"
+    );
+    h.press(KeyCode::Esc);
+    assert!(h.overlay_is_none());
+
+    // Fully qualified: the two-step confirm reaches perform_launch, and the
+    // consequential press reports NeedsSave (a wrong variant would silently
+    // skip the save).
+    qualify_for_launch(&mut h, 5);
+    h.char('v');
+    h.press(KeyCode::Enter);
+    assert!(
+        matches!(
+            h.overlay,
+            GameOverlay::Vessel {
+                confirm_pending: true
+            }
+        ),
+        "a qualified Enter arms the confirm"
+    );
+    let result = h.press(KeyCode::Enter);
+    assert!(
+        h.state.vessel_launched,
+        "the confirmed Enter burns the launch"
+    );
+    assert_eq!(
+        h.state.prestige_rank, 5,
+        "exactly LAUNCH_PR_COST is subtracted"
+    );
+    assert_eq!(result, InputResult::NeedsSave);
+}
+
+#[test]
+fn flag_on_esc_disarms_the_launch_confirm_without_closing() {
+    // Self-skipping flag-ON smoke test — see the note on the test above.
+    if !crate::vessel::act2_enabled() {
+        return;
+    }
+
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    qualify_for_launch(&mut h, 0);
+    h.char('v');
+    h.press(KeyCode::Enter);
+    h.press(KeyCode::Esc);
+    assert!(
+        matches!(
+            h.overlay,
+            GameOverlay::Vessel {
+                confirm_pending: false
+            }
+        ),
+        "Esc disarms the confirm but keeps the overlay open"
+    );
+    assert!(!h.state.vessel_launched);
+    h.press(KeyCode::Esc);
+    assert!(h.overlay_is_none(), "a second Esc closes the overlay");
+}

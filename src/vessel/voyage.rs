@@ -29,7 +29,6 @@ use serde::{Deserialize, Serialize};
 pub const MINUTES_PER_DAY: u64 = 24 * 60;
 /// One bar. (150 with the Long Hold refit, a spec-4 shipyard scene.)
 pub const PROVISIONS_CAP: f64 = 100.0;
-#[allow(dead_code)] // The Long Hold refit lands with spec 4's shipyards.
 pub const LONG_HOLD_PROVISIONS_CAP: f64 = 150.0;
 /// The hold is full at launch.
 pub const LAUNCH_PROVISIONS: f64 = 100.0;
@@ -52,8 +51,9 @@ pub const WEAR_BURN_PER_SCAR: f64 = 0.05;
 
 /// The most a wormhole jump committed at 0% Riftglass charge can dock from
 /// the next crossing's starting provisions (scaled by `1.0 - charge`) — see
-/// `openspec/changes/act2-dock-wormhole-crossing/design.md` Decision 4. A
-/// starting value pending `voyage_simulator` validation, not yet final.
+/// `openspec/changes/archive/2026-07-05-act2-dock-wormhole-crossing/design.md`
+/// Decision 4. Validated by the asserted charge-policy sweep in
+/// `tests/ferryman_tests.rs` (`dock_time_across_charge_policies`).
 pub const MAX_PARTIAL_CHARGE_PROVISIONS_DEFICIT: f64 = 40.0;
 /// The most hull wear a 0%-charge jump can pre-apply to the next crossing
 /// (scaled by `1.0 - charge`), out of the `HULL_WEAR_MAX` scale.
@@ -64,12 +64,12 @@ pub const MAX_PARTIAL_CHARGE_HULL_WEAR: u8 = 3;
 /// all. Even a 7,000-soul expedition only lifts the daily burn by ~35%.
 pub const PROVISIONS_PER_PASSENGER: f64 = 0.00005;
 
-/// How fast time at sea passes relative to the real world — a near-1:1 clock
-/// (a day at sea passes in a little under a real day). The pacing is *earned*,
-/// not compressed: the maiden voyage sails its ~37 days in about a real month
-/// (the slowest crossing of the whole era), and the ramp that follows is the
-/// Drive shortening each crossing — not the clock speeding up. Every crossing
-/// runs on this one uniform scale; only the earned Drive level changes.
+/// How fast time at sea passes relative to the real world: a sea-day passes
+/// in ~9.1 real hours, so the maiden voyage sails its ~37 sea-days in about
+/// two real weeks (the slowest crossing of the whole era). The pacing is
+/// *earned*, not compressed: the ramp that follows is the Drive shortening
+/// each crossing — not the clock speeding up. Every crossing runs on this
+/// one uniform scale; only the earned Drive level changes.
 pub const GAME_MINUTES_PER_REAL_MINUTE: f64 = 2.64;
 
 /// Wall-clock multiplier: `QUEST_VOYAGE_TIME_SCALE` (dev/test override; at

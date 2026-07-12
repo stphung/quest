@@ -1,0 +1,164 @@
+{
+  "character_id": "corpus-fixture",
+  "crossing_number": 1,
+  "drifted_this_leg": false,
+  "drive_time_mult": 1.0,
+  "finale_shown": false,
+  "gone_dark": false,
+  "hailed": [],
+  "heard_banks": [],
+  "hull_wear": 0,
+  "intro_pending": false,
+  "keepsakes": [
+    "a spare wick from the last lightship"
+  ],
+  "launched_at": "2025-06-13T00:13:56.487Z",
+  "letter_events": [
+    0,
+    1
+  ],
+  "letters_received": 2,
+  "log": [
+    {
+      "day": 0,
+      "text": "The Last Harbor"
+    },
+    {
+      "day": 0,
+      "text": "A hungry night, unstood. Something small and patient got into the hold and ate like something large and hurried."
+    },
+    {
+      "day": 1,
+      "text": "A letter from the Haven's new warden"
+    },
+    {
+      "day": 1,
+      "text": "The Lightship Vigil"
+    },
+    {
+      "day": 1,
+      "text": "A strange night, unstood. The night keeps whatever it was going to say."
+    },
+    {
+      "day": 2,
+      "text": "A letter from the Deep guild"
+    },
+    {
+      "day": 4,
+      "text": "The Shoal Markets"
+    }
+  ],
+  "night_assignments": [],
+  "passage_events": [],
+  "passengers": 0,
+  "pending_ask": null,
+  "pending_recovery_scene": false,
+  "pending_refit": null,
+  "phase": {
+    "Traveling": {
+      "departed_at_min": 8639,
+      "progress_days": 0.7638888888889014,
+      "road": 2
+    }
+  },
+  "priced_squalls": [],
+  "processed_minutes": 9959,
+  "provisions": 93.58333333333292,
+  "provisions_cap": 100.0,
+  "refit_doors_seen": 0,
+  "refits": [
+    "StormSail"
+  ],
+  "rumor_bought_this_visit": false,
+  "rumors": [
+    {
+      "learned_at": 2,
+      "rumor": 0
+    },
+    {
+      "learned_at": 1,
+      "rumor": 1
+    }
+  ],
+  "soul_events": [
+    {
+      "beat": 0,
+      "soul": 0
+    },
+    {
+      "beat": 0,
+      "soul": 1
+    },
+    {
+      "beat": 0,
+      "soul": 2
+    },
+    {
+      "beat": 0,
+      "soul": 3
+    },
+    {
+      "beat": 1,
+      "soul": 2
+    },
+    {
+      "beat": 1,
+      "soul": 3
+    }
+  ],
+  "souls": [
+    {
+      "arc_beat": 1,
+      "consecutive_watches": 0,
+      "left_at": null,
+      "rest_minutes": 0,
+      "soul": 0,
+      "station": "Helm",
+      "status": "Aboard",
+      "strain": 0
+    },
+    {
+      "arc_beat": 1,
+      "consecutive_watches": 0,
+      "left_at": null,
+      "rest_minutes": 0,
+      "soul": 1,
+      "station": "Tender",
+      "status": "Aboard",
+      "strain": 0
+    },
+    {
+      "arc_beat": 2,
+      "consecutive_watches": 0,
+      "left_at": null,
+      "rest_minutes": 0,
+      "soul": 2,
+      "station": null,
+      "status": "Aboard",
+      "strain": 0
+    },
+    {
+      "arc_beat": 2,
+      "consecutive_watches": 0,
+      "left_at": null,
+      "rest_minutes": 0,
+      "soul": 3,
+      "station": null,
+      "status": "Aboard",
+      "strain": 0
+    }
+  ],
+  "strained_banks": [],
+  "strange_seen_this_leg": false,
+  "trim": "Quiet",
+  "unread_scenes": [],
+  "untaken": [
+    3
+  ],
+  "visited": [
+    0,
+    1,
+    2
+  ],
+  "voyage_seed": 42
+}

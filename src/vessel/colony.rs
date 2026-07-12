@@ -28,7 +28,10 @@ pub const BASE_CAPACITY: u32 = 180;
 
 /// Each Shipwright level multiplies the hold by this — a compounding widen,
 /// so late loads climb into the tens of thousands. Paid for with Salvage.
-pub const CAP_GROWTH: f64 = 1.36;
+/// Tuned (1.36 → 1.46, 2026-07-12) so the balanced campaign completes in
+/// fewer, fuller crossings — ~22 crossings / ~3.1 real months — enforced by
+/// `strategy_sweep_holds_the_campaign_envelope`.
+pub const CAP_GROWTH: f64 = 1.46;
 
 /// Each Drive level multiplies the crossing's sail-time by this (0.70 =
 /// 30% faster per level), compounding down toward the floor. The ramp is
@@ -63,7 +66,10 @@ pub const CAP_COST_GROWTH: f64 = 1.42;
 /// eat longer. This makes every day cost souls, so *speed saves lives* —
 /// Drive (fewer days per crossing) and the Ward (a gentler dark) both cut the
 /// toll, and the slow maiden voyage is the costliest crossing there is.
-pub const DARK_TAKES_PER_DAY: f64 = 0.0006;
+/// Raised (0.0006 → 0.0007, 2026-07-12) alongside `CAP_GROWTH` so the
+/// naive extremes stay traps with the wider holds: drive-only ~67%,
+/// cap-only ~78%, against ~89% for the balanced line.
+pub const DARK_TAKES_PER_DAY: f64 = 0.0007;
 
 /// The Ward yard — the third Salvage track (speed / capacity / **attrition**).
 /// Each level multiplies the dark's per-crossing toll by `WARD_DECAY`,
@@ -83,9 +89,10 @@ pub const WARD_COST_GROWTH: f64 = 1.45;
 
 /// Real hours to fully charge Riftglass at Drive level 0 (the maiden
 /// voyage's first Dock). Higher Drive levels charge proportionally faster
-/// (`ColonyState::riftglass_rate_mult`). A starting value, not yet
-/// simulator-validated against the era's ~3-real-month pacing target — see
-/// `openspec/changes/act2-dock-wormhole-crossing/design.md` Decision 1/4.
+/// (`ColonyState::riftglass_rate_mult`). Validated against the era's
+/// pacing envelope by the asserted sweeps in `tests/ferryman_tests.rs`
+/// (`strategy_sweep_holds_the_campaign_envelope`,
+/// `dock_time_across_charge_policies`).
 pub const RIFTGLASS_BASE_HOURS_TO_FULL: f64 = 24.0;
 
 /// The colony's districts, unlocked in order by population. Pure growth —

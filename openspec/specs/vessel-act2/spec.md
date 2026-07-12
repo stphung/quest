@@ -3,9 +3,7 @@
 ## Purpose
 
 Define Act 2 of Quest: after Zone 50 falls, a signal from a dying branch of Yggdrasil is discovered, and burning 250,000 Prestige Ranks in a single all-or-nothing action launches the Vessel into a wall-clock crossing (the Voyage) toward the Tree. The entire feature ships dark behind a compile-time kill-switch with a runtime override, so it is invisible to players by default while remaining fully implemented. This capability owns the kill-switch contract, the launch gate and its prerequisites, the launch transition, and the systemic shape of the Voyage and its persistent ferry loop; it references Prestige Rank, Ascension, Woven Patterns, and Zone 50 clearance only as gates or inputs.
-
 ## Requirements
-
 ### Requirement: Act 2 Kill-Switch
 
 The system SHALL keep all Act 2 presentation dark by default via a compile-time flag `ACT2_ENABLED` that is `false` in every released build. A runtime check SHALL treat Act 2 as enabled when `ACT2_ENABLED` is `true` OR the environment variable `QUEST_ACT2` equals `1`, and this decision SHALL be read exactly once (cached), so changing the environment variable after the process starts SHALL have no effect. While Act 2 is disabled the system SHALL surface no discovery modal, no ticker whispers, no stats-panel row, no launch hotkey, and no path to the launch burn.
@@ -226,11 +224,11 @@ The system SHALL persist a Colony above individual crossings, tracking souls del
 
 ### Requirement: Dock Phase Entry And Exit
 
-The system SHALL enter the Dock phase the moment any crossing's arrival finale delivers its souls and Salvage to the Colony, and SHALL remain in the Dock phase — during which the existing Reckoning (Drive/Shipwright/Ward purchases) and Record views remain reachable exactly as before — until the player commits a wormhole jump. Only one crossing MAY be in progress and only one Dock phase MAY be active at a time; committing a jump SHALL end the Dock phase and begin the next crossing in the same action.
+The system SHALL enter the Dock phase the moment any crossing's arrival finale delivers its souls and Salvage to the Colony — unless that delivery emptied the world (the Last Crossing, which ends the era with no further Dock phase) — and SHALL remain in the Dock phase — during which the existing Reckoning (Drive/Shipwright/Ward purchases) and Record views remain reachable exactly as before — until the player commits a wormhole jump. Only one crossing MAY be in progress and only one Dock phase MAY be active at a time; committing a jump SHALL end the Dock phase and begin the next crossing in the same action.
 
 #### Scenario: Arrival enters Dock
 
-- **WHEN** a crossing's arrival finale finishes delivering to the Colony
+- **WHEN** a crossing's arrival finale finishes delivering to the Colony and souls remain in the dying world
 - **THEN** the Colony's Dock phase becomes active and the player is shown the Dock view
 
 #### Scenario: Yard purchases remain available while docked
@@ -242,3 +240,61 @@ The system SHALL enter the Dock phase the moment any crossing's arrival finale d
 
 - **WHEN** the player commits a wormhole jump while docked
 - **THEN** the Dock phase ends and the next crossing begins immediately in the same action, with no way to return to the ended Dock phase
+
+#### Scenario: The Last Crossing never docks
+
+- **WHEN** a crossing's delivery empties the world
+- **THEN** the Dock phase is not entered and no jump is offered
+
+### Requirement: The Last Crossing Ends The Era
+
+The system SHALL end the ferry era when the dying world's remaining souls reach zero. The arrival that empties the world SHALL be the Last Crossing: it delivers its souls and Salvage as any crossing does, an authored era-end scene SHALL play once, and the persistent `last_crossing_complete` record SHALL be set on the character — the durable gate a future Act 3 keys off, alongside the `vessel_arrived` record set by the first arrival. After the Last Crossing the Colony SHALL NOT enter the Dock phase and no further wormhole jump SHALL be offered; the arrived-harbor views (Manifest, Keepsake, Record) SHALL remain reachable.
+
+#### Scenario: Emptying the world completes the era
+
+- **WHEN** a crossing's delivery reduces souls-remaining to zero
+- **THEN** the era-end scene plays, `last_crossing_complete` is set and persists across save/load, and the era is over
+
+#### Scenario: No dock after the Last Crossing
+
+- **WHEN** the era is over and the ship stands at the Tree
+- **THEN** no Dock phase is active, a jump request does nothing, and the Manifest, Keepsake, and Record views remain reachable
+
+#### Scenario: The gate defaults closed
+
+- **WHEN** a character save predating the ferry era is loaded
+- **THEN** `last_crossing_complete` deserializes to false
+
+### Requirement: Ferry-Era Balance Envelope
+
+The ferry era's pacing SHALL stay inside coarse, CI-asserted bands (deterministic simulation, headroom deliberately wide so only structural regressions trip them). Under a balanced yard spend with full-charge jumps, an era SHALL complete in 15–30 crossings spanning 2.5–4.5 real months and deliver at least 84% of the world's 100,000 souls. The naive extremes SHALL remain traps: a Drive-only spend SHALL save no more than 74%. A Ward-leaning spend SHALL save at least 90%, trading a longer era for it. Jumping at full Riftglass charge SHALL never save fewer souls than always jumping at 0% charge.
+
+#### Scenario: The balanced line holds the campaign shape
+
+- **WHEN** a full era is simulated with the balanced spend policy and full-charge jumps
+- **THEN** it completes in 15–30 crossings within 2.5–4.5 real months with ≥84% of souls delivered
+
+#### Scenario: Skill is rewarded, not marginal
+
+- **WHEN** full eras are simulated with a Ward-leaning spend and with a Drive-only spend
+- **THEN** the Ward-leaning line delivers ≥90% of souls and the Drive-only line delivers ≤74%
+
+#### Scenario: Patience at the Dock pays
+
+- **WHEN** full eras are simulated jumping always at 100% charge and always at 0% charge
+- **THEN** the full-charge era delivers at least as many souls as the 0%-charge era
+
+### Requirement: Pilgrim Ships Have Authored Fates
+
+The system SHALL show five authored pilgrim ships sailing cyclic scripted routes — their fates authored, not simulated; the player's choices SHALL NOT save or doom them. Exactly one ship, the Grief of Alden, SHALL go dark after her authored day (day 40) and stop appearing; the other four, including the Sister Verity (a face staged for Act 3), SHALL sail on indefinitely. Each ship MAY be hailed at most once per crossing's acquaintance (hailing is once per ship).
+
+#### Scenario: One authored darkening
+
+- **WHEN** the voyage passes the Grief of Alden's authored final day
+- **THEN** she no longer appears on any road, and the other four pilgrim ships still sail their scripts
+
+#### Scenario: Fates are weather, not consequence
+
+- **WHEN** the player makes any in-voyage choice (routes, pace, stations, refits)
+- **THEN** no pilgrim ship's fate changes
+

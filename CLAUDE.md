@@ -14,7 +14,7 @@ make fmt               # Auto-fix formatting
 
 ## Spec-Driven Development (OpenSpec)
 
-Development is **spec-driven** via [OpenSpec](https://github.com/Fission-AI/OpenSpec). The `openspec/specs/` directory is a reverse-engineered, code-grounded baseline (20 capabilities, 208 requirements) that documents *what the game currently does* — see [openspec/README.md](openspec/README.md) for the capability index and the known code-vs-docs discrepancy log.
+Development is **spec-driven** via [OpenSpec](https://github.com/Fission-AI/OpenSpec). The `openspec/specs/` directory is a reverse-engineered, code-grounded baseline (20 capabilities, 211 requirements) that documents *what the game currently does* — see [openspec/README.md](openspec/README.md) for the capability index and the known code-vs-docs discrepancy log.
 
 **Start non-trivial work from a spec, not from code:**
 1. `/opsx:propose "<idea>"` — scaffold a change (proposal + design + tasks + delta specs) under `openspec/changes/`, grounded in the affected capability spec(s).
@@ -39,8 +39,8 @@ make check             # Runs scripts/ci-checks.sh (same as CI)
 This runs all PR quality checks:
 1. Format checking (`cargo fmt --check`)
 2. Clippy linting (`cargo clippy --all-targets -- -D warnings`)
-3. All tests (`cargo test`)
-4. Progression check (`cargo run --release --bin simulator -- --check-progression`)
+3. All tests (`cargo test`, plus the Act 2 flag-ON subset `QUEST_ACT2=1 cargo test flag_on`)
+4. Progression check (`cargo run --release --bin simulator -- --check-progression`, plus the Act 2 voyage gate `cargo run --release --bin voyage_simulator`)
 5. Security audit (`cargo audit --deny yanked`)
 6. Coverage check (`cargo llvm-cov --lib --fail-under-lines 90`) — only when `cargo-llvm-cov` is installed locally
 
@@ -64,7 +64,7 @@ make fmt               # Applies rustfmt to all code
 | Items, drops, generation (`src/items/`) | `cargo test --test item_tests` + `cargo test snapshot` (equipment panel renders names/tiers/colors). Keep `generate_item_with_rng` the single RNG entry point — fixtures depend on seeded generation |
 | `GameState` fields / serde / persistence | `cargo test --test save_compat_tests` — loads the committed save corpus (`tests/fixtures/saves/`) through the real load paths; a failure means existing player saves break (account loaders silently wipe progress on parse failure, so this is the only red flag you get). Fix with `serde(default)`/`alias`/migration, never by editing the corpus. Also `cargo test --test character_tests --test history_tests` |
 | A challenge minigame (`src/challenges/`) | That game's unit tests + `cargo test snapshot_all_minigames`. New minigame? Use the `add-challenge` skill — it covers all 15 integration points |
-| The Vessel / Voyage (`src/vessel/`) | `cargo test --test vessel_launch_gate_test` + `cargo test overlay_snapshot` (voyage scenes) + `cargo run --bin voyage_simulator`. Act 2 is dark by default (`vessel::ACT2_ENABLED = false`) — set `QUEST_ACT2=1` to see it in a real game |
+| The Vessel / Voyage (`src/vessel/`) | `cargo test --test vessel_launch_gate_test --test ferryman_tests --test act2_flag_on_tests` + `QUEST_ACT2=1 cargo test flag_on` + `cargo test overlay_snapshot` (voyage scenes) + `cargo run --bin voyage_simulator`. Act 2 is dark by default (`vessel::ACT2_ENABLED = false`) — set `QUEST_ACT2=1` to see it in a real game |
 | Keyboard input (`src/input/`) | `cargo test input::replay_tests` — the headless input-replay harness (`src/input/harness.rs`) drives `handle_game_input` and asserts on resulting state/frames; extend `replay_tests.rs` for the key path you changed. For a consequential action, assert the returned `InputResult` too (e.g. `NeedsSaveWithEvent(SaveEvent::PrestigeRank(..))`) — a wrong variant silently skips the save. For visual/e2e confirmation, also drive the real game with the `drive-game` skill |
 | Fixtures or the UI clock (`src/fixtures.rs`, `src/ui/clock.rs`) | Full `cargo test` — nearly every snapshot depends on them. If `snapshot_rendering_is_deterministic` fails, you introduced a wall-clock/RNG/ordering leak; fix that, never re-bless around it |
 | Dependencies (`Cargo.toml`) | `cargo audit --deny yanked` (CI runs it even where local sandboxes can't) + the `dependency-audit` skill for a deeper pass |

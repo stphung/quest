@@ -19,7 +19,7 @@ folded back into those specs.
 
 The specs in `specs/` were **reverse-engineered from the existing
 implementation** — they document the game as it is actually coded today, not a
-wishlist. Twenty capability specs (208 requirements, 498 scenarios) were each
+wishlist. Twenty capability specs (211 requirements, 507 scenarios) were each
 produced by reading the relevant `src/<module>/` code, its module `CLAUDE.md`,
 the root `CLAUDE.md` "Key Constants", and the design notes under `docs/`, then
 grounding every number against the source. All twenty pass
@@ -51,7 +51,7 @@ than silently editing the spec to match a regression.
 | [`god-items`](specs/god-items/spec.md) | 7 | Asprika / Sleipnir / Megingjord — fixed God-rarity artifacts, passives, auto-equip protection |
 | [`time-vault`](specs/time-vault/spec.md) | 9 | git-backed save snapshots on milestones, browse/restore/fork/delete, no auto-prune |
 | [`persistence`](specs/persistence/spec.md) | 10 | JSON save files, `QUEST_DIR`, run vs account state, backward-compat contract, silent-wipe hazard |
-| [`vessel-act2`](specs/vessel-act2/spec.md) | 12 | Act 2 kill-switch, Zone-50 launch gate (250k PR burn), the Voyage loop |
+| [`vessel-act2`](specs/vessel-act2/spec.md) | 16 | Act 2 kill-switch, Zone-50 launch gate (250k PR burn), the Voyage loop, the ferry era's balance envelope, the Last Crossing |
 
 ## Setup
 
@@ -118,8 +118,9 @@ candidates (fix the doc, or fix the code if the code is the regression):
   doc), and there are **19** prestige milestones (a comment says 18).
 - **`god-items` — no player-facing acquisition** exists yet; the only path is a
   debug/forge action. "Megingjord" is belt lore but occupies the **Ring** slot.
-- **`vessel-act2` — voyage duration comment stale.** A comment says the maiden
-  crossing takes "~a real month"; the constants work out to **~2 real weeks**.
+- ~~**`vessel-act2` — voyage duration comment stale.**~~ Resolved 2026-07-12
+  (`act2-release-hardening`): the `voyage.rs` time-scale comment now states
+  the ~2-real-week maiden crossing the constants produce.
 - **`time-vault` — "remember picks" is a different feature.** That design doc
   describes the prestige equipment-vault selection memory, **not** the git-backed
   Time Vault.

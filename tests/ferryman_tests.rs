@@ -31,18 +31,41 @@ fn balanced_spend(c: &mut ColonyState) {
     }
 }
 
-#[allow(dead_code)]
 fn drive_only_spend(c: &mut ColonyState) {
     while c.buy_drive() {}
 }
-#[allow(dead_code)]
 fn cap_only_spend(c: &mut ColonyState) {
     while c.buy_capacity() {}
 }
+/// Ward-lean line: soften the dark's daily bite first — keep the Ward a
+/// step ahead of both other yards, then spend like the balanced line. The
+/// documented "deliberate slower branch": more crossings, a longer era,
+/// and the highest share of the world saved.
+fn ward_lean_spend(c: &mut ColonyState) {
+    loop {
+        let bought =
+            if c.ward_level <= c.drive_level.min(c.cap_level) + 1 && c.salvage >= c.ward_cost() {
+                c.buy_ward()
+            } else if c.drive_level <= c.cap_level && c.salvage >= c.drive_cost() {
+                c.buy_drive()
+            } else if c.salvage >= c.cap_cost() {
+                c.buy_capacity()
+            } else if c.salvage >= c.drive_cost() {
+                c.buy_drive()
+            } else if c.salvage >= c.ward_cost() {
+                c.buy_ward()
+            } else {
+                false
+            };
+        if !bought {
+            break;
+        }
+    }
+}
+
 /// Souls-first optimal line: empty the world in the fewest crossings (each
 /// crossing is a dark toll), so lean into the hold — but keep just enough
 /// Drive that the crossings still turn around fast. Two hold levels per Drive.
-#[allow(dead_code)]
 fn cap_lean_spend(c: &mut ColonyState) {
     loop {
         let bought = if c.cap_level <= c.drive_level * 2 && c.salvage >= c.cap_cost() {
@@ -60,50 +83,113 @@ fn cap_lean_spend(c: &mut ColonyState) {
     }
 }
 
+/// The ferry-era balance envelope, asserted (vessel-act2 spec). Once a
+/// manual `#[ignore]`d tuning sweep, now the CI gate that validates the
+/// era's pacing constants (including the Riftglass/Dock magnitudes) against
+/// the campaign's targets. Bands carry wide headroom in the spirit of
+/// `simulator --check-progression` — only structural regressions trip them.
+///
+/// Measured 2026-07-12, post 3-month retune (CAP_GROWTH 1.46, dark 0.0007;
+/// deterministic — seeded sim, pure-function weather):
+///   drive-only:  99 crossings, 11.1 mo, 67.1% saved   (the reckless trap)
+///   cap-only:    10 crossings,  6.3 mo, 78.5% saved   (the other trap: half the souls-gap, twice the era)
+///   balanced:    22 crossings,  3.1 mo, 88.6% saved   (the tuned ~3-month campaign)
+///   cap-lean:    12 crossings,  2.2 mo, 90.1% saved   (souls-first optimal)
+///   ward-lean:   44 crossings,  7.2 mo, 93.2% saved   (deliberate slow branch)
 #[test]
-#[ignore = "tuning sweep — run with --ignored --nocapture"]
-fn strategy_sweep() {
+fn strategy_sweep_holds_the_campaign_envelope() {
     let scale = quest::vessel::voyage::time_scale();
+    let mut months = std::collections::HashMap::new();
+    let mut saved = std::collections::HashMap::new();
+    let mut crossings_by = std::collections::HashMap::new();
     for (name, spend) in [
         ("drive-only", drive_only_spend as fn(&mut ColonyState)),
         ("cap-only", cap_only_spend),
         ("balanced", balanced_spend),
-        ("cap-lean (souls-first)", cap_lean_spend),
+        ("cap-lean", cap_lean_spend),
+        ("ward-lean", ward_lean_spend),
     ] {
         let (crossings, first, _last, delivered, total, dock_hours) = run_era_with(spend, 1.0);
+        let mo = (total as f64 / scale + dock_hours / 24.0) / 30.0;
+        let pct = delivered as f64 / (quest::vessel::colony::INITIAL_SOULS as f64) * 100.0;
         eprintln!(
-            "{name:>24}: {crossings:>3} crossings  {:>4.1} mo sailing + {:>4.1} mo docked \
-             = {:>4.1} mo total  {:>4.1}% saved  (C1 {:.0}d)",
-            (total as f64 / scale) / 30.0,
-            (dock_hours / 24.0) / 30.0,
-            (total as f64 / scale + dock_hours / 24.0) / 30.0,
-            delivered as f64 / 1000.0,
+            "{name:>12}: {crossings:>3} crossings  {mo:>4.1} mo total  {pct:>4.1}% saved  \
+             (C1 {:.0}d)",
             first as f64 / scale,
         );
+        months.insert(name, mo);
+        saved.insert(name, pct);
+        crossings_by.insert(name, crossings);
     }
+
+    // The tuned campaign: a long, felt run of crossings across ~3 months.
+    assert!(
+        (15..=30).contains(&crossings_by["balanced"]),
+        "balanced era is a long, felt run of crossings ({})",
+        crossings_by["balanced"]
+    );
+    assert!(
+        (2.5..=4.5).contains(&months["balanced"]),
+        "balanced era lands on the ~3-month campaign target ({:.1})",
+        months["balanced"]
+    );
+    assert!(
+        saved["balanced"] >= 84.0,
+        "the balanced line carries most of the world ({:.1}%)",
+        saved["balanced"]
+    );
+    // The naive extreme stays a trap — chasing pure speed never widens the
+    // hold, so the world stays full and bleeds the longest.
+    assert!(
+        saved["drive-only"] <= 74.0,
+        "the reckless drive-only line leaves the most to the dark ({:.1}%)",
+        saved["drive-only"]
+    );
+    // The Ward branch is the documented deliberate trade: a longer era for
+    // the highest share of the world saved.
+    assert!(
+        saved["ward-lean"] >= 90.0,
+        "the ward-lean line saves the most ({:.1}%)",
+        saved["ward-lean"]
+    );
+    assert!(
+        months["ward-lean"] > months["balanced"],
+        "the ward-lean line pays for it in era length ({:.1} vs {:.1} mo)",
+        months["ward-lean"],
+        months["balanced"]
+    );
 }
 
+/// The Dock's patience trade, asserted (vessel-act2 spec): jumping at full
+/// Riftglass charge must never save fewer souls than always jumping at 0%.
+/// This is what validates `RIFTGLASS_BASE_HOURS_TO_FULL` and the
+/// partial-charge penalty magnitudes (once flagged "not yet
+/// simulator-validated") against the era's targets.
+///
+/// Measured 2026-07-12, post 3-month retune: full charge 22 crossings /
+/// 3.1 mo / 88.6% saved; always-0% jumps land lower — patience pays.
 #[test]
-#[ignore = "tuning sweep — run with --ignored --nocapture"]
 fn dock_time_across_charge_policies() {
-    // Sanity-checks design.md Decision 1/4's starting constants
-    // (RIFTGLASS_BASE_HOURS_TO_FULL = 24.0) against the era's ~3-real-month
-    // target: a balanced spend, jumping at full charge every time (the safe,
-    // patient policy) versus jumping immediately every time (charge 0.0, the
-    // fastest possible policy, worst-case crossings).
     let scale = quest::vessel::voyage::time_scale();
+    let mut results = Vec::new();
     for (name, charge) in [("always full charge", 1.0), ("always jump at 0%", 0.0)] {
         let (crossings, _first, _last, delivered, total, dock_hours) =
             run_era_with(balanced_spend, charge);
-        eprintln!(
-            "{name:>20}: {crossings:>3} crossings  {:>4.1} mo sailing + {:>4.1} mo docked \
-             = {:>4.1} mo total  {:>4.1}% saved",
-            (total as f64 / scale) / 30.0,
-            (dock_hours / 24.0) / 30.0,
-            (total as f64 / scale + dock_hours / 24.0) / 30.0,
-            delivered as f64 / 1000.0,
-        );
+        let mo = (total as f64 / scale + dock_hours / 24.0) / 30.0;
+        let pct = delivered as f64 / (quest::vessel::colony::INITIAL_SOULS as f64) * 100.0;
+        eprintln!("{name:>20}: {crossings:>3} crossings  {mo:>4.1} mo total  {pct:>4.1}% saved");
+        results.push((delivered, mo));
     }
+    let (full_delivered, full_mo) = results[0];
+    let (rush_delivered, _) = results[1];
+    assert!(
+        full_delivered >= rush_delivered,
+        "patience at the Dock never saves fewer souls ({full_delivered} vs {rush_delivered})"
+    );
+    assert!(
+        (2.5..=4.5).contains(&full_mo),
+        "the patient balanced era still lands in the ~3-month campaign window ({full_mo:.1} mo)"
+    );
 }
 
 /// Sail a whole crossing to the Tree, staffing the crew, and return its
