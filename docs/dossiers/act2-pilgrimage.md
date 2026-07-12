@@ -332,7 +332,28 @@ Act 1 (everything)                Act 2: launch → crossing 1 → the Ferryman 
 
 ## Balance Evidence
 
-*2026-07-05, re-run this session against current HEAD:
+*2026-07-12 (3-month retune, `act2-era-pacing-3mo`): `CAP_GROWTH`
+1.36 → 1.46 and `DARK_TAKES_PER_DAY` 0.0006 → 0.0007 pulled the balanced
+campaign back to the original ~3-month target; the sweeps below are now
+COMMITTED, ASSERTED CI gates (`strategy_sweep_holds_the_campaign_envelope`,
+including a committed ward-lean policy), no longer `#[ignore]`d or local-only.
+Current measured (deterministic):*
+
+| Policy | Crossings | Era length | Souls saved |
+|---|---|---|---|
+| Drive-only (reckless) | 99 | 11.1 mo | 67.1% |
+| Shipwright-only | 10 | 6.3 mo | 78.5% |
+| Balanced (Drive+Shipwright, parity) | 22 | 3.1 mo | 88.6% |
+| Cap-lean / souls-first | 12 | 2.2 mo | 90.1% |
+| Ward-lean (committed policy) | 44 | 7.2 mo | 93.2% |
+
+C1 stays ≈15 real days (voyage clock untouched); patient full-charge
+jumping still beats always-jumping-at-0% on souls saved. Asserted bands:
+balanced 15–30 crossings / 2.5–4.5 mo / ≥84%; drive-only ≤74%; ward-lean
+≥90% and longer than balanced.
+
+*Historical (2026-07-05, pre-retune constants), kept for the record — the
+prior session's re-run against then-HEAD:
 `cargo test --release --test ferryman_tests -- --ignored --nocapture
 strategy_sweep`, `dock_time_across_charge_policies`, and the committed CI
 gate `an_era_ferries_most_of_the_world_across_a_ramping_run_of_crossings`;
@@ -520,6 +541,17 @@ Held for a later round (not yet asked, unchanged):
 Session-by-session log of what changed at each refresh, most recent first.
 The sections above always describe the *current* state only — read this
 section for how it got there.
+
+### 2026-07-12 (later) — the 3-month retune (`act2-era-pacing-3mo`)
+
+Per direction, the balanced campaign was tuned from the accepted-by-docs
+4.0 months back to the original ~3-month target: `CAP_GROWTH` 1.36 → 1.46
+(fewer, fuller crossings — the dominant lever, per measured single-knob
+sensitivity) with `DARK_TAKES_PER_DAY` 0.0006 → 0.0007 compensating so the
+naive extremes stay traps. Landed at balanced 22 crossings / 3.1 mo /
+88.6% saved; ward-lean 44 / 7.2 / 93.2%; drive-only 67.1%. The envelope
+gates tightened to enforce it (2.5–4.5 mo). Balance Evidence table above
+updated; the pre-retune table kept as historical record.
 
 ### 2026-07-12 — release hardening lands; Open Questions #6–#8 resolved
 

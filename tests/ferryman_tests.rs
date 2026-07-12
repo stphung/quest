@@ -89,12 +89,13 @@ fn cap_lean_spend(c: &mut ColonyState) {
 /// the campaign's targets. Bands carry wide headroom in the spirit of
 /// `simulator --check-progression` — only structural regressions trip them.
 ///
-/// Measured 2026-07-12 (deterministic; seeded sim, pure-function weather):
-///   drive-only: 101 crossings, 11.4 mo, 70.5% saved   (the reckless trap)
-///   cap-only:    15 crossings,  9.6 mo, 74.2% saved   (the other trap)
-///   balanced:    29 crossings,  4.0 mo, 87.5% saved   (the tuned campaign)
-///   cap-lean:    18 crossings,  3.2 mo, 88.8% saved   (souls-first optimal)
-///   ward-lean:   57 crossings,  9.0 mo, 93.5% saved   (deliberate slow branch)
+/// Measured 2026-07-12, post 3-month retune (CAP_GROWTH 1.46, dark 0.0007;
+/// deterministic — seeded sim, pure-function weather):
+///   drive-only:  99 crossings, 11.1 mo, 67.1% saved   (the reckless trap)
+///   cap-only:    10 crossings,  6.3 mo, 78.5% saved   (the other trap: half the souls-gap, twice the era)
+///   balanced:    22 crossings,  3.1 mo, 88.6% saved   (the tuned ~3-month campaign)
+///   cap-lean:    12 crossings,  2.2 mo, 90.1% saved   (souls-first optimal)
+///   ward-lean:   44 crossings,  7.2 mo, 93.2% saved   (deliberate slow branch)
 #[test]
 fn strategy_sweep_holds_the_campaign_envelope() {
     let scale = quest::vessel::voyage::time_scale();
@@ -121,19 +122,19 @@ fn strategy_sweep_holds_the_campaign_envelope() {
         crossings_by.insert(name, crossings);
     }
 
-    // The tuned campaign: a long, felt run of crossings across a few months.
+    // The tuned campaign: a long, felt run of crossings across ~3 months.
     assert!(
-        (20..=40).contains(&crossings_by["balanced"]),
+        (15..=30).contains(&crossings_by["balanced"]),
         "balanced era is a long, felt run of crossings ({})",
         crossings_by["balanced"]
     );
     assert!(
-        (3.0..=6.0).contains(&months["balanced"]),
-        "balanced era spans a few real months ({:.1})",
+        (2.5..=4.5).contains(&months["balanced"]),
+        "balanced era lands on the ~3-month campaign target ({:.1})",
         months["balanced"]
     );
     assert!(
-        saved["balanced"] >= 82.0,
+        saved["balanced"] >= 84.0,
         "the balanced line carries most of the world ({:.1}%)",
         saved["balanced"]
     );
@@ -165,8 +166,8 @@ fn strategy_sweep_holds_the_campaign_envelope() {
 /// partial-charge penalty magnitudes (once flagged "not yet
 /// simulator-validated") against the era's targets.
 ///
-/// Measured 2026-07-12: full charge 29 crossings / 4.0 mo / 87.5% saved;
-/// always-0% 28 crossings / 4.9 mo / 84.5% saved.
+/// Measured 2026-07-12, post 3-month retune: full charge 22 crossings /
+/// 3.1 mo / 88.6% saved; always-0% jumps land lower — patience pays.
 #[test]
 fn dock_time_across_charge_policies() {
     let scale = quest::vessel::voyage::time_scale();
@@ -186,8 +187,8 @@ fn dock_time_across_charge_policies() {
         "patience at the Dock never saves fewer souls ({full_delivered} vs {rush_delivered})"
     );
     assert!(
-        (3.0..=6.0).contains(&full_mo),
-        "the patient balanced era still lands in the campaign window ({full_mo:.1} mo)"
+        (2.5..=4.5).contains(&full_mo),
+        "the patient balanced era still lands in the ~3-month campaign window ({full_mo:.1} mo)"
     );
 }
 

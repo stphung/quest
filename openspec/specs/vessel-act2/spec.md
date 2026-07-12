@@ -267,12 +267,12 @@ The system SHALL end the ferry era when the dying world's remaining souls reach 
 
 ### Requirement: Ferry-Era Balance Envelope
 
-The ferry era's pacing SHALL stay inside coarse, CI-asserted bands (deterministic simulation, headroom deliberately wide so only structural regressions trip them). Under a balanced yard spend with full-charge jumps, an era SHALL complete in 20–40 crossings spanning 3–6 real months and deliver at least 82% of the world's 100,000 souls. The naive extremes SHALL remain traps: a Drive-only spend SHALL save no more than 74%. A Ward-leaning spend SHALL save at least 90%, trading a longer era for it. Jumping at full Riftglass charge SHALL never save fewer souls than always jumping at 0% charge.
+The ferry era's pacing SHALL stay inside coarse, CI-asserted bands (deterministic simulation, headroom deliberately wide so only structural regressions trip them). Under a balanced yard spend with full-charge jumps, an era SHALL complete in 15–30 crossings spanning 2.5–4.5 real months and deliver at least 84% of the world's 100,000 souls. The naive extremes SHALL remain traps: a Drive-only spend SHALL save no more than 74%. A Ward-leaning spend SHALL save at least 90%, trading a longer era for it. Jumping at full Riftglass charge SHALL never save fewer souls than always jumping at 0% charge.
 
 #### Scenario: The balanced line holds the campaign shape
 
 - **WHEN** a full era is simulated with the balanced spend policy and full-charge jumps
-- **THEN** it completes in 20–40 crossings within 3–6 real months with ≥82% of souls delivered
+- **THEN** it completes in 15–30 crossings within 2.5–4.5 real months with ≥84% of souls delivered
 
 #### Scenario: Skill is rewarded, not marginal
 
