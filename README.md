@@ -98,7 +98,6 @@ src/
 ├── haven/             # Account-level base building
 ├── achievements/      # Achievement tracking system
 ├── history/           # Git-based save versioning (Time Vault)
-├── vessel/            # Act 2 Vessel/Voyage (dark behind kill-switch)
 ├── main_helpers/      # Orchestration between main.rs and domain modules
 ├── utils/             # Build info, updater, debug menu
 ├── bin/               # Simulator and fixture-generator binaries

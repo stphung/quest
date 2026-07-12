@@ -371,7 +371,7 @@ Zone 11 (The Expanse) is an endgame wall: `(5000, 400, 500, 80, 250, 30)` — ro
 - **combat** (`combat::logic`): `update_combat(rng, state, dt, &bonuses, achievements, derived, fracture_zone_cap, loom_zone_cap)` returns `Vec<CombatEvent>`, `CombatBonuses` unified struct
 - **character** (`character::prestige`): `PrestigeCombatBonuses::from_rank()` — computed each tick for combat bonuses
 - **character** (`character::derived_stats`): `DerivedStats::calculate_derived_stats()`
-- **dungeon** (`dungeon::logic`): `update_dungeon()`, `on_room_enemy_defeated()`, `on_elite_defeated()`, `on_boss_defeated()`, `add_dungeon_xp()`, `calculate_boss_xp_reward()`, `on_treasure_room_entered()`
+- **dungeon** (`dungeon::logic`): `update_dungeon()`, `on_room_enemy_defeated()`, `on_elite_defeated()`, `on_boss_defeated()`; (`dungeon::rewards`): `add_dungeon_xp()`, `calculate_boss_xp_reward()`, `on_treasure_room_entered()`
 - **fishing** (`fishing::logic`): `tick_fishing_with_haven_result()`, `check_rank_up_with_max()`, `get_max_fishing_rank()`, `HavenFishingBonuses` struct
 - **challenges** (`challenges::*::logic`): `process_ai_thinking()` per game type, `try_discover_challenge_with_haven()`
 - **haven** (`haven`): `Haven`, `HavenBonusType`, `try_discover_haven()`

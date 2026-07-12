@@ -327,7 +327,7 @@ Winning a minigame emits a `MinigameWinInfo` (defined in `mod.rs`) with `game_ty
 | Flappy Bird (Skyward Gauntlet) | 50×18 area | N/A (action) | Real-time ~60 FPS, gravity/flap physics, pipe obstacles with gap sizes (7→4 rows), 3 lives, 4 difficulties, requires P1+ |
 | JezzBall (Containment Breach) | 34×22 grid | N/A (action) | Real-time ~60 FPS, ball physics, wall-building to capture area, 3 lives, 2-5 balls (Novice→Master), target 60-84%, 4 difficulties, requires P1+ |
 | Sigil Surge (Runic Shift) | 6×12 grid | N/A (action-puzzle) | Real-time ~60 FPS, panel-matching with 5 rune colors, 3 lives, rising blocks (7000-3000ms interval), chain combos, 4 difficulties, requires P1+ |
-| Sudoku (Sigil Matrix) | 9×9 grid | N/A (puzzle) | Classic Sudoku with 4 difficulties, pencil marks, cursor navigation, requires P1+ |
+| Sudoku (Sigil Matrix) | 9×9 grid | N/A (puzzle) | Classic Sudoku with 4 difficulties, cursor navigation, requires P1+ |
 | Shard Fusion | 4×4 grid | N/A (puzzle) | 2048-style tile merging, target values (256-2048 by difficulty), slide animations, 4 difficulties, requires P1+ |
 | Runic Lights | Variable | N/A (puzzle) | Light-pattern matching puzzle, 4 difficulties, requires P1+ |
 | Vault Warden | Variable | N/A (puzzle) | Vault security puzzle, 4 difficulties, requires P1+ |

@@ -63,6 +63,8 @@ pub struct Dungeon {
 
 Size is determined by `base_tier(level, prestige_rank)` which combines a level component (`level_tier`: 0 for level <25, 1 for 25-74, 2 for 75+) with `prestige_rank / 2`. A 20% variance roll may shift the result up or down by one tier. Higher level and prestige yield larger dungeons.
 
+Maze carving (`generate_maze()`) starts from the center of the grid, but the `Entrance` room itself is placed afterward by `place_special_rooms()` at the dead end furthest from center (falling back to the furthest room if there are no dead ends) — so the entrance ends up far from center, not at it.
+
 ## Generation Algorithm (`generation.rs`)
 
 ```rust
