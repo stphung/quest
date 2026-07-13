@@ -1068,10 +1068,8 @@ fn test_simulator_100_ticks_produces_progression() {
 #[test]
 fn test_simulator_rng_param_is_used_for_challenge_ai() {
     // Verify the seeded RNG parameter is actually used by game_tick.
-    // Note: Some subsystems (spawn_enemy_if_needed, apply_tick_xp) use
-    // thread_rng() internally, so full determinism requires those to be
-    // refactored too. But the RNG param IS used for challenge AI, fishing,
-    // and discovery — we verify it doesn't panic and produces valid state.
+    // The RNG param is threaded through challenge AI, fishing, discovery,
+    // and apply_tick_xp — we verify it doesn't panic and produces valid state.
     let mut state = create_strong_character("RNG Usage Test");
     let mut tick_counter = 0u32;
     let mut haven = Haven::default();
