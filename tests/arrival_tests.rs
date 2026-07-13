@@ -55,6 +55,13 @@ fn the_finale_reads_the_whole_crossing() {
         assert_eq!(play.paragraphs[i], *beat, "beat {i} is W37's");
     }
 
+    // The final chapter's close beat leads the ceremony (release polish).
+    assert_eq!(
+        play.paragraphs[w37.beats.len()],
+        quest::vessel::scenes::chapter_close_beat(quest::vessel::route::Chapter::RootsOfLight),
+        "the Roots of Light close beat follows W37's own beats"
+    );
+
     // The rail: one line per soul aboard, in boarding (roster) order.
     let aboard: Vec<SoulId> = v
         .souls
@@ -63,7 +70,7 @@ fn the_finale_reads_the_whole_crossing() {
         .map(|s| s.soul)
         .collect();
     assert!(aboard.len() >= 3, "the launch trio crossed");
-    let mut cursor = w37.beats.len();
+    let mut cursor = w37.beats.len() + 1;
     for id in &aboard {
         assert_eq!(
             play.paragraphs[cursor],

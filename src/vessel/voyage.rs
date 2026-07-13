@@ -1138,6 +1138,12 @@ impl VoyageState {
                 paragraphs.push(line.to_string());
             }
         }
+        // A chapter's gateway closes its chapter with one authored beat
+        // (the Tree's chapter-close plays inside the finale instead).
+        if route::is_chapter_gateway(waypoint) && waypoint != ROUTE_SINK {
+            paragraphs
+                .push(scenes::chapter_close_beat(route::waypoint(waypoint).chapter).to_string());
+        }
 
         // The road's threat, if it carried one, speaks now — a ledger of
         // prior choices, never a roll.
@@ -1357,6 +1363,8 @@ impl VoyageState {
         self.push_log(title.clone());
 
         let mut paragraphs: Vec<String> = def.beats.iter().map(|b| b.to_string()).collect();
+        // The final chapter's close beat leads the ceremony.
+        paragraphs.push(scenes::chapter_close_beat(route::Chapter::RootsOfLight).to_string());
         // The rail: souls who stepped ashore earlier said their goodbyes
         // in the Log; the rail belongs to the ones who crossed.
         for s in &self.souls {

@@ -978,7 +978,11 @@ fn flag_on_vessel_hotkey_opens_overlay_and_enter_burns_the_launch() {
         h.state.prestige_rank, 5,
         "exactly LAUNCH_PR_COST is subtracted"
     );
-    assert_eq!(result, InputResult::NeedsSave);
+    assert_eq!(
+        result,
+        InputResult::NeedsSaveWithEvent(crate::history::SaveEvent::VesselLaunched),
+        "the burn is a vault moment — a wrong variant would skip the history commit"
+    );
 }
 
 #[test]

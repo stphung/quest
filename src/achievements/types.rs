@@ -323,6 +323,14 @@ pub enum AchievementId {
     LoomPattern16,  // Complete 16 Woven Patterns (unlocks Z39-42)
     LoomPattern22,  // Complete 22 Woven Patterns (unlocks Z43-46)
     LoomPattern28,  // Complete all 28 Woven Patterns (unlocks Z47-50)
+    // The Vessel (Act 2)
+    TheBurn,         // Launch the Vessel (the 250,000 PR burn)
+    TheRootsOfLight, // First arrival at the Tree
+    FerrymanI,       // 1,000 souls delivered (lifetime)
+    FerrymanII,      // 10,000 souls delivered (lifetime)
+    FerrymanIII,     // 50,000 souls delivered (lifetime)
+    TheLastCrossing, // Complete the ferry era (the old world empties)
+    TheCovenantKept, // Complete the era with no crew soul ever lost
     // Power Cores — unlocked at fracture zone unlock layers
     PowerCoreI,   // Deep Layer 3 — Red Fault core
     PowerCoreII,  // Deep Layer 7 — Mirror Scar core
@@ -344,7 +352,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 240;
+    pub const VARIANT_COUNT: usize = 247;
 }
 
 /// Static definition of an achievement.
@@ -564,6 +572,14 @@ pub struct Achievements {
     pub highest_deep_layer: u32,
     #[serde(default)]
     pub highest_guild_rank: u32,
+    /// Lifetime souls carried across on the Vessel (Act 2) — drives the
+    /// Ferryman tiers.
+    #[serde(default)]
+    pub total_souls_delivered: u64,
+    /// Crew souls lost across all crossings (authored scenes are the only
+    /// source) — zero at era end earns The Covenant Kept.
+    #[serde(default)]
+    pub souls_lost_lifetime: u32,
     /// Global border style applied to panel UI.
     #[serde(default)]
     pub ui_border_style: UiBorderStyle,

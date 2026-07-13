@@ -2034,6 +2034,63 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         icon: "\u{1F9F5}",
         points: 500,
     },
+    // ── The Vessel (Act 2) ───────────────────────────────────────────────
+    AchievementDef {
+        id: AchievementId::TheBurn,
+        name: "The Burn",
+        description: "Burn 250,000 Prestige Ranks and launch the Vessel",
+        category: AchievementCategory::Progression,
+        icon: "\u{2726}",
+        points: 50,
+    },
+    AchievementDef {
+        id: AchievementId::TheRootsOfLight,
+        name: "The Roots of Light",
+        description: "Reach the Tree — the first crossing of the dark",
+        category: AchievementCategory::Progression,
+        icon: "\u{2726}",
+        points: 50,
+    },
+    AchievementDef {
+        id: AchievementId::FerrymanI,
+        name: "Ferryman",
+        description: "Carry 1,000 souls out of the dark",
+        category: AchievementCategory::Progression,
+        icon: "\u{2693}",
+        points: 25,
+    },
+    AchievementDef {
+        id: AchievementId::FerrymanII,
+        name: "Ferryman of Thousands",
+        description: "Carry 10,000 souls out of the dark",
+        category: AchievementCategory::Progression,
+        icon: "\u{2693}",
+        points: 50,
+    },
+    AchievementDef {
+        id: AchievementId::FerrymanIII,
+        name: "The Long Ferry",
+        description: "Carry 50,000 souls out of the dark",
+        category: AchievementCategory::Progression,
+        icon: "\u{2693}",
+        points: 100,
+    },
+    AchievementDef {
+        id: AchievementId::TheLastCrossing,
+        name: "The Last Crossing",
+        description: "Empty the old world — every soul that could be carried, carried",
+        category: AchievementCategory::Progression,
+        icon: "\u{2726}",
+        points: 250,
+    },
+    AchievementDef {
+        id: AchievementId::TheCovenantKept,
+        name: "The Covenant Kept",
+        description: "Complete the era without losing a single soul of the crew",
+        category: AchievementCategory::Progression,
+        icon: "\u{263C}",
+        points: 250,
+    },
 ];
 
 /// Get the definition for a specific achievement (O(1) HashMap lookup).
@@ -2370,6 +2427,13 @@ mod tests {
             AchievementId::VaultWardenApprentice,
             AchievementId::VaultWardenJourneyman,
             AchievementId::VaultWardenMaster,
+            AchievementId::TheBurn,
+            AchievementId::TheRootsOfLight,
+            AchievementId::FerrymanI,
+            AchievementId::FerrymanII,
+            AchievementId::FerrymanIII,
+            AchievementId::TheLastCrossing,
+            AchievementId::TheCovenantKept,
         ];
 
         // Sanity-check: the slice above must itself be up-to-date.

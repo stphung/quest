@@ -23,7 +23,7 @@ src/achievements/
 
 ### `AchievementId` (`types.rs`)
 
-Enum with 240 variants covering all trackable milestones. Organized by domain:
+Enum with 247 variants covering all trackable milestones. Organized by domain:
 
 - **Combat**: `SlayerI`..`SlayerXV` (100 to 1B kills), `BossHunterI`..`BossHunterXV` (1 to 10M bosses)
 - **Level**: `Level10`..`Level100000` (18 milestones)
@@ -38,6 +38,7 @@ Enum with 240 variants covering all trackable milestones. Organized by domain:
 - **Haven**: `HavenDiscovered`, `HavenBuilderI`..`HavenBuilderII`, `HavenArchitect`
 - **Deep**: Discovery, first mission, mission count milestones (10/25/50/100), first breakthrough, layer milestones (Layers 5/10/15/20/25), VoidExplorer (Layer 26), guild rank milestones, first merc lost, gateway opened
 - **Loom**: `LoomDiscovered`, `LoomPattern1`..`LoomPattern28` (7 milestones: discovery + pattern completion at 1/4/8/16/22/28 patterns)
+- **Vessel (Act 2)**: `TheBurn` (launch), `TheRootsOfLight` (first arrival), `FerrymanI`..`FerrymanIII` (1k/10k/50k lifetime souls delivered via `total_souls_delivered`), `TheLastCrossing` (era complete), `TheCovenantKept` (era complete with `souls_lost_lifetime == 0`) — all in the Progression category, wired from the launch confirm and the voyage delivery/era-end block
 
 ### `AchievementCategory` (`types.rs`)
 
@@ -45,7 +46,7 @@ Nine categories for browsing: `Combat`, `Level`, `Prestige`, `Progression`, `Cha
 
 ### `AchievementDef` (`data.rs`)
 
-Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 240 achievements total. Note: `VaultWardenJourneyman` is currently set to 15 points (`data.rs`), which doesn't match any tier — the other three Vault Warden achievements follow Trivial/Easy/Medium (5/10/25), so this looks like a data entry slip rather than an intentional off-tier value; left as-is pending a balance decision.
+Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 247 achievements total. Note: `VaultWardenJourneyman` is currently set to 15 points (`data.rs`), which doesn't match any tier — the other three Vault Warden achievements follow Trivial/Easy/Medium (5/10/25), so this looks like a data entry slip rather than an intentional off-tier value; left as-is pending a balance decision.
 
 Achievement score is computed at runtime by summing the point values of all unlocked achievements. The aggregate score is displayed in three locations: the achievement browser title bar (`achievement_browser_scene.rs`), the stats view (`achievement_details.rs`), and the character-select splash screen badge (`main_helpers/update.rs`). The achievement unlock modal and the achievement detail panel show only the single achievement's own point value (`def.points`), not the running total.
 

@@ -336,6 +336,14 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 
 **Expected outcome**: players who read "leaning on Ward saves more souls" and commit to it should feel that tradeoff as a deliberate, wide, legible choice (a slower, more careful era) rather than the era silently overrunning its own promise. Next refresh's retrospective: check whether real playtesting (once Act 2 is previewed via `QUEST_ACT2=1` in an actual session, not just the sim) treats the ~5-month line as a satisfying alternate route or as the era overstaying its welcome.
 
+## Act 2 Ward Pacing, Re-confirmed After the 3-Month Retune (2026-07-13)
+
+**Why now**: the 2026-07-12 era retune (`act2-era-pacing-3mo`: `CAP_GROWTH` 1.36→1.46, `DARK_TAKES_PER_DAY` 0.0006→0.0007) moved every policy line; the ward-lean branch now measures **~44 crossings / ~7.2 real months / ~93.5% saved** (committed, CI-asserted policy in `ferryman_tests::strategy_sweep_holds_the_campaign_envelope`) against the balanced line's ~22 / ~3.1 / ~88.6%. The release-checklist question (#734, 1c-3): accept, retune the Ward price ladder toward the older ~5-month note, or defer.
+
+**Decision** (per direction, 2026-07-13): **accept as-is** — the prior "intended branch" ruling stands at the new numbers. The branch's identity is "go slower, save more," the margin is wide and legible (+4.9 points over balanced for ~2.3× the era length), and the envelope gate pins it (≥90% saved, longer than balanced). No constants changed.
+
+**Expected outcome**: same retrospective hook as the original ruling — once real players run ward-heavy eras post-flip, check whether ~7 months reads as a deliberate pilgrimage or as overstaying; the lever, if ever needed, is `WARD_COST_GROWTH`.
+
 ## Act 2 Discovery Drought: Accepted as Intentional
 
 **Why now**: the dossier has flagged since its first refresh that the ferry era (crossing 2+) reveals only 6 district population thresholds as new nouns across ~19-32 crossings, versus the maiden voyage's constant stream of new weather/nights/souls/rumors/refits/letters.

@@ -3,9 +3,7 @@
 ## Purpose
 
 The achievement system tracks account-level milestones a player reaches while playing any character — combat kills, leveling, prestige, zone and fracture-zone clears, challenges, fishing, dungeons, enhancement, Haven, the Deep, Ascension, Power Cores, and the Loom. Each achievement is a permanent, once-only unlock earned when its condition is met. Unlocking achievements accumulates an achievement score and can grant selectable character titles displayed alongside the hero's name. This capability defines how achievements are unlocked, how progress and milestones are tracked, how scoring works, how titles are earned and shown, and how all of it persists across characters and prestige.
-
 ## Requirements
-
 ### Requirement: Account-Level Persistence Across Characters and Prestige
 
 The system SHALL store all achievement state — unlocked achievements, progress, aggregate counters, the selected title, and the global UI border style — in a single account-level record that is separate from any per-character save. Aggregate counters (total kills, bosses, fish, dungeons, minigame wins, highest prestige rank, highest level, highest fishing rank, zones cleared, Expanse cycles, Deep missions, deepest Deep layer, highest guild rank) SHALL accumulate across every character on the account, and unlocked achievements SHALL never be cleared by prestiging, switching characters, or creating a new character. If the account record is missing or cannot be parsed, the system SHALL start from a fresh empty state rather than failing.
@@ -145,3 +143,23 @@ The system SHALL batch achievements unlocked in close succession into a single n
 
 - **WHEN** the player opens the achievement browser with unviewed unlocks pending
 - **THEN** the pending-notification count is cleared
+
+### Requirement: Vessel Act Milestones
+
+The system SHALL track six account-level Vessel achievements in the Progression category: The Burn (launch the Vessel), The Roots of Light (first arrival at the Tree), Ferryman I/II/III (1,000 / 10,000 / 50,000 lifetime souls delivered, driven by a persisted `total_souls_delivered` aggregate), The Last Crossing (complete the ferry era), and The Covenant Kept (complete the era with no crew soul ever lost, driven by a persisted lifetime lost-souls counter that only authored loss scenes can increment).
+
+#### Scenario: The launch unlocks The Burn
+
+- **WHEN** the player performs the all-or-nothing launch burn
+- **THEN** The Burn unlocks once, account-wide
+
+#### Scenario: Souls tiers follow the lifetime counter
+
+- **WHEN** a crossing's delivery raises lifetime souls delivered across 1,000, 10,000, or 50,000
+- **THEN** the corresponding Ferryman tier unlocks
+
+#### Scenario: The covenant is judged at era end
+
+- **WHEN** the Last Crossing completes
+- **THEN** The Last Crossing unlocks, and The Covenant Kept unlocks only if no crew soul was ever lost across the era
+

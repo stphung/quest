@@ -160,3 +160,67 @@ fn a_week_away_never_harms_the_voyage_beyond_its_prices() {
     let road = route::roads_from(ROUTE_START).next().unwrap();
     assert!(v.depart(road.id).is_ok());
 }
+
+/// Chapter gateways close their chapters (release-polish spec): each
+/// gateway arrival scene ends with its chapter's authored close beat, the
+/// Tree's plays inside the finale, and non-gateway ports get none.
+#[test]
+fn chapter_gateways_close_their_chapters() {
+    use quest::vessel::junction::current_junction_cards;
+    use quest::vessel::route::{self, Chapter, ROUTE_SINK};
+    use quest::vessel::scenes::chapter_close_beat;
+    use quest::vessel::voyage::{real_duration_for_game_minutes, VoyageState};
+
+    let mut v = VoyageState::begin("gates".to_string(), 7, t0());
+    v.intro_pending = false;
+    let mut now = t0();
+    let mut gateway_scenes = 0;
+    let mut guard = 0;
+    while !v.arrived() {
+        guard += 1;
+        assert!(guard < 200_000, "stuck at {:?}", v.phase);
+        if let Some(w) = v.current_waypoint() {
+            if let Some(playback) = v.play_arrival_scene() {
+                let close = chapter_close_beat(route::waypoint(w).chapter);
+                if route::is_chapter_gateway(w) && w != ROUTE_SINK {
+                    gateway_scenes += 1;
+                    assert_eq!(
+                        playback.paragraphs.last().map(String::as_str),
+                        Some(close),
+                        "gateway {w:?} must end on its chapter-close beat"
+                    );
+                } else {
+                    assert!(
+                        !playback.paragraphs.iter().any(|p| p == close),
+                        "non-gateway {w:?} must not play a chapter close"
+                    );
+                }
+            }
+            if v.pending_ask.is_some() && !v.accept_ask() {
+                v.decline_ask();
+            }
+            if v.pending_refit.is_some() {
+                v.choose_refit(true);
+            }
+            let cards = current_junction_cards(&v);
+            if !cards.is_empty() && !v.arrived() {
+                let road = cards.iter().find(|c| c.selectable).unwrap().road.id;
+                v.depart(road).unwrap();
+            }
+        }
+        now += real_duration_for_game_minutes(60);
+        v.tick(now);
+    }
+    assert_eq!(
+        gateway_scenes, 3,
+        "every maximal route passes exactly the three pre-Tree gateways"
+    );
+    let finale = v.take_finale_playback().expect("finale at the Tree");
+    assert!(
+        finale
+            .paragraphs
+            .iter()
+            .any(|p| p == chapter_close_beat(Chapter::RootsOfLight)),
+        "the Tree's chapter close plays inside the finale"
+    );
+}

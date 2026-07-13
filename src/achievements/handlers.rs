@@ -512,6 +512,49 @@ impl Achievements {
 
     /// Called when a Woven Pattern is completed.
     /// `completed_count` is the total number of completed patterns.
+    /// The Vessel launches (Act 2's act break): the 250,000 PR burn.
+    pub fn on_vessel_launched(&mut self, character_name: Option<&str>) {
+        self.unlock_with_name(AchievementId::TheBurn, character_name);
+    }
+
+    /// The first arrival at the Tree.
+    pub fn on_vessel_arrived(&mut self, character_name: Option<&str>) {
+        self.unlock_with_name(AchievementId::TheRootsOfLight, character_name);
+    }
+
+    /// A crossing delivered its souls: raise the lifetime ferry counter
+    /// (the colony's own total is authoritative — pass it, don't add) and
+    /// record any crew lost on that crossing (authored scenes are the only
+    /// source of losses, so this is the covenant's ledger).
+    pub fn on_crossing_delivered(
+        &mut self,
+        lifetime_souls_delivered: u64,
+        crew_lost_this_crossing: u32,
+        character_name: Option<&str>,
+    ) {
+        self.total_souls_delivered = self.total_souls_delivered.max(lifetime_souls_delivered);
+        self.souls_lost_lifetime += crew_lost_this_crossing;
+        const FERRYMAN_MILESTONES: &[(u64, AchievementId)] = &[
+            (1_000, AchievementId::FerrymanI),
+            (10_000, AchievementId::FerrymanII),
+            (50_000, AchievementId::FerrymanIII),
+        ];
+        for &(threshold, id) in FERRYMAN_MILESTONES {
+            if self.total_souls_delivered >= threshold {
+                self.unlock_with_name(id, character_name);
+            }
+        }
+    }
+
+    /// The Last Crossing: the era is over. The covenant is judged here —
+    /// kept only if no crew soul was ever lost across the whole era.
+    pub fn on_last_crossing(&mut self, character_name: Option<&str>) {
+        self.unlock_with_name(AchievementId::TheLastCrossing, character_name);
+        if self.souls_lost_lifetime == 0 {
+            self.unlock_with_name(AchievementId::TheCovenantKept, character_name);
+        }
+    }
+
     pub fn on_loom_pattern_completed(
         &mut self,
         completed_count: usize,
@@ -735,5 +778,63 @@ impl Achievements {
         if completed_patterns > 0 {
             self.on_loom_pattern_completed(completed_patterns, character_name);
         }
+    }
+}
+
+#[cfg(test)]
+mod vessel_tests {
+    use super::super::types::{AchievementId, Achievements};
+
+    #[test]
+    fn the_ferryman_tiers_follow_the_lifetime_counter() {
+        let mut a = Achievements::default();
+        a.on_crossing_delivered(600, 0, None);
+        assert!(!a.is_unlocked(AchievementId::FerrymanI), "600 < 1,000");
+
+        a.on_crossing_delivered(1_200, 0, None);
+        assert!(a.is_unlocked(AchievementId::FerrymanI));
+        assert!(!a.is_unlocked(AchievementId::FerrymanII));
+
+        // The colony's lifetime total is authoritative — passing it again
+        // never double-counts, and crossing 50k unlocks everything below.
+        a.on_crossing_delivered(51_000, 0, None);
+        assert_eq!(a.total_souls_delivered, 51_000);
+        assert!(a.is_unlocked(AchievementId::FerrymanII));
+        assert!(a.is_unlocked(AchievementId::FerrymanIII));
+    }
+
+    #[test]
+    fn the_covenant_is_judged_at_the_last_crossing() {
+        // Kept: no crew soul ever lost.
+        let mut kept = Achievements::default();
+        kept.on_crossing_delivered(88_000, 0, None);
+        kept.on_last_crossing(None);
+        assert!(kept.is_unlocked(AchievementId::TheLastCrossing));
+        assert!(kept.is_unlocked(AchievementId::TheCovenantKept));
+
+        // Broken: one loss on one crossing, remembered at era end.
+        let mut broken = Achievements::default();
+        broken.on_crossing_delivered(400, 1, None);
+        broken.on_crossing_delivered(88_000, 0, None);
+        broken.on_last_crossing(None);
+        assert!(broken.is_unlocked(AchievementId::TheLastCrossing));
+        assert!(
+            !broken.is_unlocked(AchievementId::TheCovenantKept),
+            "a single authored loss breaks the covenant"
+        );
+        assert_eq!(broken.souls_lost_lifetime, 1);
+    }
+
+    #[test]
+    fn launch_and_arrival_unlock_once() {
+        let mut a = Achievements::default();
+        a.on_vessel_launched(Some("Ferry"));
+        a.on_vessel_arrived(Some("Ferry"));
+        assert!(a.is_unlocked(AchievementId::TheBurn));
+        assert!(a.is_unlocked(AchievementId::TheRootsOfLight));
+        let unlocked_before = a.unlocked.len();
+        a.on_vessel_launched(Some("Ferry"));
+        a.on_vessel_arrived(Some("Ferry"));
+        assert_eq!(a.unlocked.len(), unlocked_before, "one-time unlocks");
     }
 }

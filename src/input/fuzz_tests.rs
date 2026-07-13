@@ -253,3 +253,86 @@ fn fuzz_active_minigames_never_panic() {
         failures.join("\n")
     );
 }
+
+// ── Act 2: the Voyage (release-polish net) ────────────────────────────────
+//
+// The Crossing screen has its own dispatcher (`voyage_input`) outside
+// `handle_game_input`, so the Act 1 fuzz above never reaches it. Same
+// contract: hammer random keys across the voyage's key states and assert
+// dispatch + rendering never panic. `Quit` results are ignored (the loop
+// keeps mashing); the frame is rendered after every key like main.rs would.
+#[test]
+fn fuzz_voyage_input_never_panics() {
+    use crate::input::voyage_input::handle_voyage_input;
+    use crate::ui::responsive::LayoutContext;
+    use crate::vessel::{VoyageUiState, VoyageView};
+    use chrono::TimeZone;
+    use ratatui::{backend::TestBackend, Terminal};
+
+    type VoyageBuilder = Box<dyn Fn() -> crate::vessel::voyage::VoyageState>;
+    let now = chrono::Utc.timestamp_millis_opt(1_750_000_000_123).unwrap();
+    let scenarios: Vec<(&str, VoyageBuilder)> = vec![
+        ("mid-leg", Box::new(move || fixtures::voyage_mid_leg(now))),
+        (
+            "junction",
+            Box::new(move || fixtures::voyage_at_first_junction(now)),
+        ),
+        (
+            "arrived",
+            Box::new(move || fixtures::voyage_arrived("fuzz".to_string(), now)),
+        ),
+    ];
+    for (label, build) in &scenarios {
+        for seed in 0..SEEDS_PER_SCENARIO {
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let pool = key_pool();
+            let mut voyage = build();
+            // Era-over colony on the arrived scenario stresses the
+            // dock/reckoning/record post-era branches too.
+            let colony = if *label == "arrived" && seed % 2 == 1 {
+                let mut c = fixtures::colony_era_complete();
+                c.character_id = "fuzz".to_string();
+                Some(c)
+            } else {
+                let mut c = fixtures::colony_midera();
+                c.character_id = "fuzz".to_string();
+                Some(c)
+            };
+            let mut ui = VoyageUiState {
+                view: VoyageView::Chart,
+                scene_play: None,
+                scene_modal: None,
+                moments: Default::default(),
+            };
+            let result = panic::catch_unwind(AssertUnwindSafe(|| {
+                let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+                for _ in 0..KEYS_PER_RUN {
+                    let key = pool[rng.random_range(0..pool.len())];
+                    let _ = handle_voyage_input(
+                        ratatui::crossterm::event::KeyEvent::from(key),
+                        &mut voyage,
+                        &mut ui,
+                    );
+                    terminal
+                        .draw(|f| {
+                            let area = f.area();
+                            let ctx = LayoutContext::from_frame(f);
+                            crate::ui::voyage_scene::render_voyage(
+                                f,
+                                area,
+                                &voyage,
+                                &ui,
+                                &ctx,
+                                colony.as_ref(),
+                            );
+                        })
+                        .unwrap();
+                }
+            }));
+            assert!(
+                result.is_ok(),
+                "voyage fuzz panicked: scenario '{label}', seed {seed} — rerun with this seed"
+            );
+        }
+    }
+}
