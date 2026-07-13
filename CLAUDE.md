@@ -101,6 +101,11 @@ Agent-invocable skills — ask in natural language to trigger them.
 | `ship` | "ship it", `/ship` | Push branch, create PR with automerge, watch CI until merged, fix failures |
 | `drive-game` | "drive the game", "screenshot the game" | Runs the real game in tmux against `mkstate` fixtures (isolated via `QUEST_DIR`), sends keystrokes, captures PNG screenshots for PR review |
 | `meta-audit` | (auto-triggered after 5 runs of a domain audit skill) | Evaluates accuracy/scope coverage of the other audit skills by re-verifying past findings, then improves their SKILL.md files |
+| `opsx:propose` | "propose a change" | Scaffold an OpenSpec change (proposal + design + tasks + delta specs) under `openspec/changes/` |
+| `opsx:apply` | "implement this change" | Implement tasks from an OpenSpec change |
+| `opsx:sync` | "sync specs" | Sync delta specs from a change to main specs |
+| `opsx:archive` | "archive this change" | Finalize and archive a completed OpenSpec change |
+| `opsx:explore` | "let's think through this" | Read-only thinking-partner mode for exploring ideas before proposing a change |
 
 ## Architecture
 

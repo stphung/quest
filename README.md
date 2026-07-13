@@ -94,6 +94,7 @@ src/
 ├── stormglass/        # Currency and Storm Sigils
 ├── power_cores/       # Passive PR generation
 ├── god_items/         # Norse mythology endgame items
+├── vessel/            # Act 2: Vessel launch gate + Voyage engine (dark behind ACT2_ENABLED)
 ├── challenges/        # Challenge minigames
 ├── haven/             # Account-level base building
 ├── achievements/      # Achievement tracking system
