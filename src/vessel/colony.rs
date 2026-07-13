@@ -321,6 +321,11 @@ pub struct ColonyState {
     /// crossing has begun.
     #[serde(default)]
     pub dock: Option<DockState>,
+    /// True once the era-end epilogue has been read. Persisted so an
+    /// interrupted or reloaded era end still receives the scene — once,
+    /// and never twice (mirrors the voyage's `finale_shown`).
+    #[serde(default)]
+    pub era_end_shown: bool,
 }
 
 impl ColonyState {
@@ -341,6 +346,7 @@ impl ColonyState {
             dimmed_ports: Vec::new(),
             era_seed,
             dock: None,
+            era_end_shown: false,
         }
     }
 
@@ -639,6 +645,36 @@ impl ColonyState {
     pub fn era_over(&self) -> bool {
         self.souls_remaining == 0
     }
+
+    /// The era's epilogue, surfaced once: the settled account of the whole
+    /// crossing era, closing on the door in the root-wall standing ajar. A
+    /// pure function of the colony — the same era always reads the same
+    /// epilogue (mirrors `VoyageState::take_finale_playback`, one level up).
+    pub fn take_era_end_playback(&mut self) -> Option<super::voyage::ScenePlayback> {
+        use super::scenes;
+        if !self.era_over() || self.era_end_shown {
+            return None;
+        }
+        self.era_end_shown = true;
+        let taken = INITIAL_SOULS.saturating_sub(self.souls_delivered);
+        Some(super::voyage::ScenePlayback {
+            title: scenes::EPILOGUE_TITLE.to_string(),
+            paragraphs: vec![
+                scenes::EPILOGUE_LANDFALL.to_string(),
+                scenes::epilogue_account_beat(
+                    self.souls_delivered,
+                    taken,
+                    self.crossings_completed,
+                    self.records.total_nights,
+                    self.districts().len(),
+                ),
+                scenes::EPILOGUE_SHIP_AT_REST.to_string(),
+                scenes::EPILOGUE_VERITY.to_string(),
+                scenes::EPILOGUE_DOOR_AJAR.to_string(),
+            ],
+            payout_note: "the era is over".to_string(),
+        })
+    }
 }
 
 /// SplitMix64 — a tiny deterministic mixer (same family as weather's).
@@ -925,6 +961,55 @@ mod tests {
         assert!(!c.era_over());
         c.deliver_crossing(60, 35, 100, 10); // carries 30, dark takes 0 more
         assert!(c.era_over(), "the last souls carried out ends the era");
+    }
+
+    #[test]
+    fn the_epilogue_fires_once_and_only_after_the_era_ends() {
+        let mut c = ColonyState::found("t".into());
+        c.souls_delivered = 88_600;
+        c.souls_remaining = 100;
+        assert!(
+            c.take_era_end_playback().is_none(),
+            "no epilogue while souls still wait"
+        );
+
+        c.souls_remaining = 0;
+        c.crossings_completed = 22;
+        c.records.total_nights = 460;
+        let playback = c.take_era_end_playback().expect("the era end reads once");
+        assert_eq!(playback.title, "The Last Crossing");
+        assert_eq!(playback.paragraphs.len(), 5, "the five epilogue beats");
+        let account = &playback.paragraphs[1];
+        assert!(account.contains("88,600"), "delivered, settled: {account}");
+        assert!(
+            account.contains("11,400"),
+            "taken by the dark = the pool minus delivered: {account}"
+        );
+        assert!(account.contains("22 crossings"), "{account}");
+        assert!(account.contains("460 days"), "{account}");
+        assert!(
+            playback.paragraphs[4].contains("ajar"),
+            "the closing beat leaves the door ajar"
+        );
+        assert_eq!(playback.payout_note, "the era is over");
+
+        assert!(c.era_end_shown);
+        assert!(
+            c.take_era_end_playback().is_none(),
+            "the epilogue never plays twice"
+        );
+    }
+
+    #[test]
+    fn old_colony_saves_have_not_seen_the_epilogue() {
+        let c = ColonyState::found("t".into());
+        let mut json = serde_json::to_value(&c).unwrap();
+        json.as_object_mut().unwrap().remove("era_end_shown");
+        let loaded: ColonyState = serde_json::from_value(json).unwrap();
+        assert!(
+            !loaded.era_end_shown,
+            "a pre-epilogue save loads with the scene still owed"
+        );
     }
 
     #[test]

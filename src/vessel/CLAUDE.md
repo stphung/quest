@@ -19,7 +19,7 @@ The dark-shipped Act 2: after Zone 50 falls, a signal from Yggdrasil is discover
 | `refits.rs` | 3 permanent A/B refit door pairs (6 refits), offered at the first 3 distinct shipyards |
 | `junction.rs` | `RoadCard` — computed display data for a junction's roads (final prices, stops, rumor annotations, soul counsel, affordability) |
 | `persistence.rs` | `voyage.json` save/load, keyed by `character_id` (mirrors the Deep/Loom account-file pattern) |
-| `colony.rs` | `ColonyState` — the ferry loop's persistent spine (`colony.json`): souls delivered/remaining, the three yard tracks (Drive/Shipwright/Ward levels) and their `Salvage` economy, districts, world milestones, dimming order, records, era end, and the Dock phase (`DockState`, Riftglass charge — spec 9 addendum). Survives every crossing where the voyage is replaced |
+| `colony.rs` | `ColonyState` — the ferry loop's persistent spine (`colony.json`): souls delivered/remaining, the three yard tracks (Drive/Shipwright/Ward levels) and their `Salvage` economy, districts, world milestones, dimming order, records, era end and its one-shot epilogue (`era_end_shown`, `take_era_end_playback()`), and the Dock phase (`DockState`, Riftglass charge — spec 9 addendum). Survives every crossing where the voyage is replaced |
 
 ## The Act 2 Kill-Switch
 
@@ -37,7 +37,7 @@ Enabling Act 2 for real is a one-line flip of `ACT2_ENABLED` to `true` (with a m
 - `vessel_arrived: bool` — persistent; set when the Voyage reaches the Tree (`VoyageState::take_finale_playback()`)
 - `vessel_transition_played: bool` — persistent; set once the 5-beat launch transition (`transition.rs`) has played through to its end. While `vessel_launched && !vessel_transition_played`, `main.rs`'s `'game_loop` shows the transition instead of the Voyage
 - `vessel_last_whisper_at: u64` — transient; play-time seconds when the last ticker whisper fired
-- `last_crossing_complete: bool` — persistent; set by the **Last Crossing** (the arrival whose delivery empties the world, `ColonyState::era_over()`): the era-end scene plays once, no Dock phase is entered and no further jump is offered. Act 3's real gate, alongside `vessel_arrived` (specced in `openspec/specs/vessel-act2/spec.md`, "The Last Crossing Ends The Era")
+- `last_crossing_complete: bool` — persistent; set by the **Last Crossing** (the arrival whose delivery empties the world, `ColonyState::era_over()`): the multi-beat era-end epilogue (`ColonyState::take_era_end_playback()`, one-shot via the colony-persisted `era_end_shown`) plays from `main.rs`'s clear-screen drain, no Dock phase is entered and no further jump is offered; the Dock view shows the quiet harbor and the Record keeps the era's settled account. Act 3's real gate, alongside `vessel_arrived` (specced in `openspec/specs/vessel-act2/spec.md`, "The Last Crossing Ends The Era")
 
 ### `LaunchTransitionState` (`transition.rs`)
 Transient (not serialized — an interrupted transition just restarts at beat 1 next launch, since `vessel_transition_played` is the only durable record) progress through the 5 authored beats (Farewell/Unweaving/Construction/Launch/Void). `advance()` steps `beat` and returns `true` once the final beat's Enter press should complete the transition. Beat content (`beat(n) -> &Beat`) is static — the sequence always plays identically regardless of how the player reached launch.

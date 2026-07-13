@@ -542,6 +542,20 @@ Session-by-session log of what changed at each refresh, most recent first.
 The sections above always describe the *current* state only — read this
 section for how it got there.
 
+### 2026-07-13 — the era's ending is authored (`act2-era-epilogue`)
+
+The Last Crossing dead-end is closed: a five-beat, state-conditioned
+epilogue (the settled account — delivered, taken, crossings, days at sea,
+districts — closing on Sister Verity and the door ajar) now plays exactly
+once, colony-persisted (`era_end_shown`), reload-safe, replacing the old
+one-line modal. The post-era Dock renders a quiet harbor instead of a 0%
+charge bar with a no-op jump preview (a real affordance bug, fixed); the
+Record keeps a permanent era block; the Reckoning drops its next-crossing
+projection once the era is over. The Last Crossing spec requirement gained
+its missing automated coverage (one-shot/persistence tests + era-over
+Dock/Record snapshots + a live e2e pass). Held-for-later question
+(era record outside the harbor, e.g. title screen) unchanged.
+
 ### 2026-07-12 (later) — the 3-month retune (`act2-era-pacing-3mo`)
 
 Per direction, the balanced campaign was tuned from the accepted-by-docs
