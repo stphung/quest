@@ -85,7 +85,7 @@ The ultimate Haven room, requiring both capstones (War Room + Vault) to unlock:
 
 Haven bonuses are consumed by other systems via parameter passing:
 
-- **Items** (`items/drops.rs`): `try_drop_from_mob(state, zone_id, drop_bonus, rarity_bonus)` — Trophy Hall and Workshop bonuses (mob drops only, not boss drops)
+- **Items** (`items/drops.rs`): `try_drop_from_mob(state, zone_id, drop_bonus, rarity_bonus, rng)` — Trophy Hall and Workshop bonuses (mob drops only, not boss drops)
 - **Challenges** (`challenges/menu.rs`): Library discovery rate boost
 - **Combat** (`core/tick_stages.rs`): Builds the unified `CombatBonuses` struct each tick, carrying Armory damage%, Watchtower crit%, and War Room double strike% from Haven bonuses; **Combat math** (`core/power_rating.rs`): applies the damage/crit/double-strike calculations
 - **XP** (`core/xp.rs`): `combat_kill_xp()` applies the Training Yard XP multiplier

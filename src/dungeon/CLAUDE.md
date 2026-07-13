@@ -72,11 +72,11 @@ pub fn generate_dungeon(level: u32, prestige_rank: u32, zone_id: u32) -> Dungeon
 ```
 
 1. Roll dungeon size from level and prestige rank
-2. Place Entrance at center of grid
-3. Use a randomized depth-first search (recursive backtracker) to carve out connected rooms
-4. Place special rooms deterministically (`place_special_rooms()`): exactly one Boss at the dead end furthest from the entrance, exactly one Elite at a dead end far from the entrance, then `treasure_room_count()` Treasure rooms by size (Small 1, Medium 2, Large 3, Epic 5, Legendary 8) at random positions
-5. Remaining rooms stay Combat (default)
-6. Set connections between adjacent rooms (up/right/down/left booleans)
+2. Use a randomized depth-first search (recursive backtracker), starting from the grid center, to carve out connected rooms
+3. Place special rooms deterministically (`place_special_rooms()`): exactly one Boss at the dead end furthest from the entrance, exactly one Elite at a dead end far from the entrance, then `treasure_room_count()` Treasure rooms by size (Small 1, Medium 2, Large 3, Epic 5, Legendary 8) at random positions; the `Entrance` itself is placed here too, at the dead end furthest from center (falling back to the furthest room if there are no dead ends)
+4. Remaining rooms stay Combat (default)
+5. Set connections between adjacent rooms (up/right/down/left booleans)
+6. Add extra connections (`add_extra_connections()`): each non-boss room has a `DUNGEON_EXTRA_CONNECTION_CHANCE` (15%) chance to gain an extra right/down connection to an adjacent room, turning the maze's spanning tree into a graph with loops; the boss room is skipped so it stays a dead end
 7. Entrance and adjacent rooms start Revealed; all others Hidden
 8. Store `zone_id` on the Dungeon for enemy scaling
 

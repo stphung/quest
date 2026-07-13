@@ -235,13 +235,21 @@ parallel set of world milestones fires as the *old* world empties
 instead — a second discovery axis keyed to decline rather than growth,
 landing on a different crossing depending on how the player spends.
 
-**Era end**: once the old world is fully emptied, the game refuses any
-further Dock/jump, and the arrival that emptied the world sets a
-second persistent flag, distinct from the one set at the very first
-landfall — the design's "Last Crossing," called "Act 3's gate" in the
-design's own words. The flag isn't yet exercised by any Act 3 content,
-and its state transition isn't covered by an automated test beyond the
-save-compat fixture corpus — see Open Questions.
+**Era end**: once the old world is fully emptied, `ColonyState::era_over()`
+(`souls_remaining == 0`) refuses any further Dock/jump. The arrival that
+empties the world sets `last_crossing_complete`, a second persistent flag
+distinct from `vessel_arrived` (set at first landfall) — the design's
+"Last Crossing," called "Act 3's gate" in the design's own words. That
+same arrival plays a five-beat era-end epilogue exactly once
+(`ColonyState::take_era_end_playback()`, one-shot via the
+colony-persisted `era_end_shown`) from `main.rs`'s clear-screen drain;
+the Dock view afterward renders a dedicated quiet-harbor state instead
+of offering a jump. The flag is now specced
+(`openspec/specs/vessel-act2/spec.md`, "The Last Crossing Ends The Era,"
+closed 2026-07-12 — see Open Questions #6) and the epilogue's
+one-shot/persistence behavior has its own unit tests in `colony.rs`,
+beyond the save-compat fixture corpus. Not yet exercised by any Act 3
+content.
 
 ### Launch transition
 A five-beat authored sequence (Farewell, Unweaving, Construction, Launch,
@@ -290,7 +298,7 @@ Act 1 (everything)                Act 2: launch → crossing 1 → the Ferryman 
                           │
                           ▼
               world fully emptied (Act 3 hook #2, "the Last Crossing" —
-              named in the design's own words; absent from the normative spec)
+              named in the design's own words; specced 2026-07-12)
 ```
 
 - **In**: the launch gate deliberately braids *all* of Act 1 (Loom, Ascension,
