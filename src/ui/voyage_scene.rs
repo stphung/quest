@@ -56,7 +56,7 @@ pub fn render_voyage(
     match ui.view {
         VoyageView::Manifest { scroll } => render_manifest(frame, area, voyage, scroll),
         VoyageView::Keepsake { x, y } => render_keepsake_chart(frame, area, voyage, x, y),
-        VoyageView::Record { scroll } => render_record(frame, area, voyage, scroll),
+        VoyageView::Record { scroll } => render_record(frame, area, voyage, colony, scroll),
         VoyageView::Reckoning => render_reckoning(frame, area, colony),
         VoyageView::Dock { confirm_pending } => render_dock(frame, area, colony, confirm_pending),
         _ => match ctx.tier {
@@ -1869,7 +1869,13 @@ fn render_keepsake_chart(frame: &mut Frame, area: Rect, voyage: &VoyageState, x:
 
 /// The record: the complete Log, oldest first, with the letters bound in
 /// at full length. The act's paper trail, kept.
-fn render_record(frame: &mut Frame, area: Rect, voyage: &VoyageState, scroll: u16) {
+fn render_record(
+    frame: &mut Frame,
+    area: Rect,
+    voyage: &VoyageState,
+    colony: Option<&crate::vessel::colony::ColonyState>,
+    scroll: u16,
+) {
     use crate::vessel::letters::{LAST_LETTER, LETTERS, MAIL_FAILS_LOG};
     use crate::vessel::voyage::SoulStatus;
 
@@ -1882,6 +1888,34 @@ fn render_record(frame: &mut Frame, area: Rect, voyage: &VoyageState, scroll: u1
     frame.render_widget(block, area);
 
     let mut lines: Vec<Line> = vec![Line::from("")];
+
+    // The era's settled account — permanent once the Last Crossing lands.
+    if let Some(c) = colony.filter(|c| c.era_over()) {
+        let taken = crate::vessel::colony::INITIAL_SOULS.saturating_sub(c.souls_delivered);
+        lines.push(Line::from(Span::styled(
+            "The era, closed",
+            Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+        )));
+        lines.push(Line::from(Span::styled(
+            format!(
+                "  {} souls carried across in {} crossings, over {} days at sea.",
+                with_commas(c.souls_delivered),
+                c.crossings_completed,
+                with_commas(c.records.total_nights),
+            ),
+            Style::default().fg(Color::White),
+        )));
+        lines.push(Line::from(Span::styled(
+            format!(
+                "  {} the dark took. {} districts stand. The door in the root-wall is ajar.",
+                with_commas(taken),
+                c.districts().len(),
+            ),
+            Style::default().fg(Color::Gray),
+        )));
+        lines.push(Line::from(""));
+    }
+
     lines.push(Line::from(Span::styled(
         "The crossing, in order",
         Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
@@ -2048,13 +2082,20 @@ fn render_reckoning(
         spaced_number(c.souls_delivered),
         Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
     )));
-    lines.push(Line::from(Span::styled(
-        format!(
-            "{} still wait in the old world",
-            with_commas(c.souls_remaining)
-        ),
-        Style::default().fg(Color::DarkGray),
-    )));
+    if c.era_over() {
+        lines.push(Line::from(Span::styled(
+            "the old world is empty \u{2014} the era is closed",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        lines.push(Line::from(Span::styled(
+            format!(
+                "{} still wait in the old world",
+                with_commas(c.souls_remaining)
+            ),
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
     lines.push(Line::from(""));
 
     // The yards — where Salvage is spent between crossings.
@@ -2078,19 +2119,22 @@ fn render_reckoning(
     };
     // The baseline: what a crossing costs and carries as she stands now. The
     // dark eats per *day*; the per-crossing figure is that rate summed over a
-    // crossing like the last (~pdays days).
-    lines.push(Line::from(Span::styled(
-        format!(
-            "  As she stands: carries {} home  \u{00b7}  the dark takes {:.3}%/day of the {} \
-             still waiting (~{} over a crossing)",
-            with_commas(u64::from(c.expedition_size())),
-            c.dark_daily_rate() * 100.0,
-            with_commas(c.souls_remaining),
-            with_commas(c.dark_toll_projected()),
-        ),
-        Style::default().fg(Color::DarkGray),
-    )));
-    lines.push(Line::from(""));
+    // crossing like the last (~pdays days). After the Last Crossing there is
+    // no next crossing to project — the yards stand as they were built.
+    if !c.era_over() {
+        lines.push(Line::from(Span::styled(
+            format!(
+                "  As she stands: carries {} home  \u{00b7}  the dark takes {:.3}%/day of the {} \
+                 still waiting (~{} over a crossing)",
+                with_commas(u64::from(c.expedition_size())),
+                c.dark_daily_rate() * 100.0,
+                with_commas(c.souls_remaining),
+                with_commas(c.dark_toll_projected()),
+            ),
+            Style::default().fg(Color::DarkGray),
+        )));
+        lines.push(Line::from(""));
+    }
 
     // ── [D] Drive — the engine ──────────────────────────────────────────────
     let drive_maxed = c.drive_maxed();
@@ -2284,6 +2328,47 @@ fn render_dock(
         );
         return;
     };
+
+    if c.era_over() {
+        // The quiet harbor: after the Last Crossing there is no charge to
+        // watch and no jump to offer — rendering either would promise a
+        // crossing that can never come.
+        let lines = vec![
+            Line::from(""),
+            Line::from(Span::styled(
+                "THE QUIET HARBOR",
+                Style::default()
+                    .fg(Color::Gray)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "The rift is quiet. There is no one left to carry.",
+                Style::default().fg(Color::White),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "The Vessel lies at her mooring, hold swept, drive cold.",
+                Style::default().fg(Color::DarkGray),
+            )),
+            Line::from(Span::styled(
+                "Up the quay, the door in the root-wall stands ajar.",
+                Style::default().fg(Color::DarkGray),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "[M]anifest  [K]eepsake  [R]ecord keep the era.",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ];
+        frame.render_widget(
+            Paragraph::new(lines)
+                .alignment(Alignment::Center)
+                .wrap(Wrap { trim: false }),
+            inner,
+        );
+        return;
+    }
 
     let now = super::clock::now_utc();
     let charge = c.riftglass_charge(now);

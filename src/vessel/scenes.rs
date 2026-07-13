@@ -620,6 +620,86 @@ pub const FINALE_LAMP: &str =
      anything about the door. The harbor has rooms; the rooms have doors; \
      one of them, later, is yours.";
 
+// ── The era's epilogue (the Last Crossing, spec: "The Last Crossing Ends
+// The Era") ─────────────────────────────────────────────────────────────
+// Built by `ColonyState::take_era_end_playback` once the old world is
+// empty: fixed beats around one conditioned account, closing on the door
+// in the root-wall — ajar now, and not gone through. The tone is the
+// Reckoning inverted: the numbers the era was spent against, read back
+// one final time as an account settled.
+
+pub const EPILOGUE_TITLE: &str = "The Last Crossing";
+
+/// Opening beat: the gangway comes down for the last time.
+pub const EPILOGUE_LANDFALL: &str =
+    "The last souls come down the gangway and stand a moment on the living \
+     branch, blinking in the lamplight, the way everyone does. Behind them \
+     the water is empty all the way back into the dark. There is no one \
+     left to wait for. For the first time since the burn, the ferryman has \
+     nowhere to be.";
+
+/// The settled account — the era's own numbers, read back once.
+pub fn epilogue_account_beat(
+    delivered: u64,
+    taken: u64,
+    crossings: u32,
+    days_at_sea: u64,
+    districts: usize,
+) -> String {
+    format!(
+        "The Charthouse keeps the whole account now, in one ledger, closed: \
+         {} souls carried across, in {} crossings, over {} days at sea. \
+         {} the dark took, and their names are not in any book \u{2014} \
+         which is why the colony keeps every lamp lit. {} districts stand \
+         where there was bare branch. Population: everyone who made it.",
+        with_commas(delivered),
+        crossings,
+        with_commas(days_at_sea),
+        with_commas(taken),
+        districts
+    )
+}
+
+/// The ship at rest — the quiet the whole era earned.
+pub const EPILOGUE_SHIP_AT_REST: &str =
+    "The Vessel lies at her mooring with her hold swept and her drive \
+     cold, and it is strange to see her still. The Loom that became her \
+     hull has carried a world across the dark and has nothing further to \
+     prove. The yards stand open and unhurried. Somewhere aft, someone is \
+     singing the Psalm's crossing-song, slowly, the way you sing a thing \
+     that is finished.";
+
+/// Sister Verity, waiting where she said she would be.
+pub const EPILOGUE_VERITY: &str =
+    "Sister Verity is not at her mooring. She is up the quay, past the \
+     galley fires and the bell, standing by the door in the root-wall \
+     with her hands folded, as if she had been told a time and arrived \
+     early. \u{201c}All of them, then,\u{201d} she says. It is not a \
+     question. She steps aside.";
+
+/// The closing beat: the finale's door, reprised — ajar now.
+pub const EPILOGUE_DOOR_AJAR: &str =
+    "The door in the root-wall is ajar. The lamp beside it is lit, the \
+     same lamp as always, and through the gap there is a light that is \
+     not lamplight and a sound that might be water, or might be leaves. \
+     Nobody goes through tonight. The harbor is warm, the rooms are full, \
+     and the door will still be ajar in the morning. It waits the way the \
+     signal once waited: patiently, and for you.";
+
+/// Thousands-separated, the incremental idiom (mirrors the UI's own).
+fn with_commas(n: u64) -> String {
+    let s = n.to_string();
+    let bytes = s.as_bytes();
+    let mut out = String::new();
+    for (i, b) in bytes.iter().enumerate() {
+        if i > 0 && (bytes.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(*b as char);
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

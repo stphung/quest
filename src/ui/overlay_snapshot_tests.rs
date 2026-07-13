@@ -588,6 +588,49 @@ fn snapshot_voyage_keepsake_chart() {
 }
 
 #[test]
+fn snapshot_voyage_dock_era_over() {
+    // After the Last Crossing: the quiet harbor — no charge bar, no jump
+    // affordance, the door in the root-wall ajar.
+    assert_overlay_snapshot("voyage_dock_era_over_xl_160x45", || {
+        let voyage = arrived_voyage();
+        let colony = fixtures::colony_era_complete();
+        let ui = crate::vessel::VoyageUiState {
+            view: crate::vessel::VoyageView::Dock {
+                confirm_pending: false,
+            },
+            scene_play: None,
+            scene_modal: None,
+            moments: Default::default(),
+        };
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, Some(&colony));
+        })
+    });
+}
+
+#[test]
+fn snapshot_voyage_record_era_closed() {
+    // The Record with the era's settled account pinned above the log.
+    assert_overlay_snapshot("voyage_record_era_closed_xl_160x45", || {
+        let voyage = arrived_voyage();
+        let colony = fixtures::colony_era_complete();
+        let ui = crate::vessel::VoyageUiState {
+            view: crate::vessel::VoyageView::Record { scroll: 0 },
+            scene_play: None,
+            scene_modal: None,
+            moments: Default::default(),
+        };
+        render_overlay(|f| {
+            let area = f.area();
+            let ctx = LayoutContext::from_frame(f);
+            super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, Some(&colony));
+        })
+    });
+}
+
+#[test]
 fn snapshot_voyage_record() {
     assert_overlay_snapshot("voyage_record_xl_160x45", || {
         let voyage = arrived_voyage();

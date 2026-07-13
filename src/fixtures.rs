@@ -585,6 +585,31 @@ pub fn colony_early() -> crate::vessel::colony::ColonyState {
     c
 }
 
+/// The colony after the Last Crossing: the old world empty, the era's
+/// account settled, the epilogue read — the harbor rooms' permanent
+/// post-era state (quiet-harbor Dock, era block in the Record).
+pub fn colony_era_complete() -> crate::vessel::colony::ColonyState {
+    use crate::vessel::colony::{ColonyState, CrossingRecords};
+    let mut c = ColonyState::found("fixture-voyager".to_string());
+    c.souls_delivered = 88_600;
+    c.souls_remaining = 0;
+    c.drive_level = 14;
+    c.cap_level = 15;
+    c.ward_level = 6;
+    c.salvage = 12;
+    c.crossings_completed = 22;
+    c.days_last_crossing = 3;
+    c.records = CrossingRecords {
+        fastest_days: 2,
+        most_carried: 12_460,
+        total_lightyears: 9_400,
+        total_nights: 460,
+    };
+    c.dimmed_ports = c.dark_ports();
+    c.era_end_shown = true;
+    c
+}
+
 /// A finished crossing, moored at the Tree with the finale already read:
 /// the harbor screen's home state. The roster carries one of everything
 /// the manifest can show — souls ashore, a decline, a farewell, and a

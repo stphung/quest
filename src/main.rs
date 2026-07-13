@@ -749,15 +749,11 @@ fn main() -> io::Result<()> {
                                     });
                                 }
                                 if col.era_over() {
+                                    // The era-end epilogue itself plays from
+                                    // the clear-screen drain below, once the
+                                    // finale and the landfall moments have
+                                    // been read (one-shot, colony-persisted).
                                     state.last_crossing_complete = true;
-                                    voyage_ui.moments.push_back(vessel::SceneModal {
-                                        title: "The last crossing".to_string(),
-                                        body: "The old world is empty. Every soul that \
-                                               could be carried has been carried. Sister \
-                                               Verity waits by the door in the root-wall, \
-                                               and the door, at last, is ajar."
-                                            .to_string(),
-                                    });
                                 } else {
                                     // Dock/Wormhole (spec 9 addendum): every
                                     // arrival opens a Dock phase instead of
@@ -793,6 +789,23 @@ fn main() -> io::Result<()> {
                                 if let Some(playback) = v.take_next_unread_scene() {
                                     voyage_ui.scene_play =
                                         Some(vessel::ScenePlay { playback, index: 0 });
+                                } else if v.arrived() {
+                                    // The era-end epilogue: reads once the
+                                    // screen is otherwise clear — whether in
+                                    // the Last Crossing's own session or on
+                                    // a later load (the one-shot flag lives
+                                    // in colony.json).
+                                    if let Some(playback) =
+                                        colony.as_mut().and_then(|c| c.take_era_end_playback())
+                                    {
+                                        voyage_ui.scene_play =
+                                            Some(vessel::ScenePlay { playback, index: 0 });
+                                        if !debug_mode {
+                                            if let Some(c) = colony.as_ref() {
+                                                let _ = vessel::persistence::save_colony(c);
+                                            }
+                                        }
+                                    }
                                 }
                             }
 
