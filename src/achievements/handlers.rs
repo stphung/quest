@@ -838,3 +838,38 @@ mod vessel_tests {
         assert_eq!(a.unlocked.len(), unlocked_before, "one-time unlocks");
     }
 }
+
+#[cfg(test)]
+mod vessel_visibility_tests {
+    use super::super::data::get_achievements_by_category;
+    use super::super::types::{AchievementCategory, AchievementId, Achievements};
+
+    /// Ruling (2026-07-13, docs/decisions.md): the Act 2 kill-switch gates
+    /// entry into the act, NOT the existence of its milestones — the seven
+    /// Vessel achievements stay listed (locked) while dark, as a teaser.
+    /// This pins the ruling so they aren't "helpfully" re-hidden without a
+    /// decision. They are unearnable while dark: every unlock path lives
+    /// behind act2-gated code.
+    #[test]
+    fn vessel_achievements_stay_visible_while_act2_is_dark() {
+        assert!(
+            !crate::vessel::act2_enabled(),
+            "this test assumes Act 2 is dark-shipped in this run"
+        );
+        let progression = get_achievements_by_category(AchievementCategory::Progression);
+        assert!(
+            progression.iter().any(|a| a.id == AchievementId::TheBurn),
+            "The Burn stays listed (locked) while dark — the teaser ruling"
+        );
+        let a = Achievements::default();
+        assert_eq!(
+            a.total_count(),
+            AchievementId::VARIANT_COUNT,
+            "totals include the Vessel achievements even while dark"
+        );
+        assert!(
+            !a.is_unlocked(AchievementId::TheBurn),
+            "visible is not earnable"
+        );
+    }
+}

@@ -344,6 +344,14 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 
 **Expected outcome**: same retrospective hook as the original ruling — once real players run ward-heavy eras post-flip, check whether ~7 months reads as a deliberate pilgrimage or as overstaying; the lever, if ever needed, is `WARD_COST_GROWTH`.
 
+## Act 2 Achievements: Visible While Dark — the Kill-Switch Gates Entry, Not Existence (2026-07-13)
+
+**Why now**: the release-polish change added seven Vessel achievements; review noticed the browser lists locked achievements by name, so they'd show while Act 2 is dark. First instinct was to hide them behind `act2_enabled()` (implemented, shipped to the PR); direction then ruled the other way.
+
+**Decision** (per direction, 2026-07-13): **the achievements stay visible while dark.** The kill-switch's job is to prevent *entry into Act 2* (no discovery surfaces, no `[V]`, no launch path) — not to erase every trace of the act's existence. Locked rows reading "The Burn — Burn 250,000 Prestige Ranks and launch the Vessel" act as a teaser. They are unearnable while dark since every unlock path lives behind act2-gated code, so counts and percentages stay honest (the hiding commit was reverted; a test now pins visibility-while-dark so it isn't "helpfully" re-hidden without a decision).
+
+**Expected outcome**: pre-flip players see seven locked Progression achievements hinting at something beyond Zone 50. If that reads as a broken promise rather than a teaser once real players notice, the reverted `achievement_visible()` gate is one commit away in history.
+
 ## Act 2 Discovery Drought: Accepted as Intentional
 
 **Why now**: the dossier has flagged since its first refresh that the ferry era (crossing 2+) reveals only 6 district population thresholds as new nouns across ~19-32 crossings, versus the maiden voyage's constant stream of new weather/nights/souls/rumors/refits/letters.
