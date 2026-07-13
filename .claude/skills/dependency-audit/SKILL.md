@@ -59,6 +59,16 @@ Tasks:
 4. Check `[dev-dependencies]` usage — are they all used in tests/benches?
 5. Check for duplicate functionality (two deps doing the same thing)
 
+> **Known pitfall — unverified negative claims.** A `meta-audit` re-verification pass
+> confirmed two past Agent 2 findings that asserted something was *absent* or *not
+> gated to tests* without exhaustively checking: one claimed a dependency was used
+> "pervasively in production" outside `#[cfg(test)]` when every cited call site was
+> actually inside a test module, and another claimed "no test explicitly asserts X"
+> when such a test did exist. Before stating a negative ("not used", "no test covers
+> this", "not gated to tests"), grep for the specific counter-evidence (test module
+> boundaries, the assertion pattern itself) rather than inferring absence from a
+> plausible-sounding hit count.
+
 Produce a ranked report:
 
 | Pattern | Dep | Severity | Notes |
