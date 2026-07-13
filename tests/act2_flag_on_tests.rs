@@ -133,3 +133,22 @@ fn discovery_does_not_refire_with_flag_on() {
         );
     }
 }
+
+/// With the flag on, the Vessel achievements become visible everywhere
+/// the dark-side test (`vessel_visibility_tests` in the lib) asserts
+/// they are hidden.
+#[test]
+fn vessel_achievements_are_visible_with_flag_on() {
+    enable_act2();
+    use quest::achievements::{
+        get_achievements_by_category, AchievementCategory, AchievementId, Achievements,
+    };
+    assert!(
+        get_achievements_by_category(AchievementCategory::Progression)
+            .iter()
+            .any(|a| a.id == AchievementId::TheBurn),
+        "the browser lists The Burn once Act 2 is enabled"
+    );
+    let a = Achievements::default();
+    assert_eq!(a.total_count(), 247, "all seven join the total");
+}

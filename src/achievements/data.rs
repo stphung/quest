@@ -2099,11 +2099,29 @@ pub fn get_achievement_def(id: AchievementId) -> Option<&'static AchievementDef>
 }
 
 /// Get achievements filtered by category (O(1) HashMap lookup).
+/// Whether an achievement may appear in player-facing lists and counts.
+/// The Vessel (Act 2) achievements stay invisible while the act is
+/// dark-shipped — a browser row reading "launch the Vessel" would break
+/// the kill-switch's "fully invisible" promise. Nothing can unlock them
+/// while dark (every unlock path is behind `act2_enabled()`-gated code),
+/// so hiding the defs keeps lists, counts, and percentages consistent.
+pub fn achievement_visible(id: AchievementId) -> bool {
+    use AchievementId::*;
+    match id {
+        TheBurn | TheRootsOfLight | FerrymanI | FerrymanII | FerrymanIII | TheLastCrossing
+        | TheCovenantKept => crate::vessel::act2_enabled(),
+        _ => true,
+    }
+}
+
 pub fn get_achievements_by_category(category: AchievementCategory) -> Vec<&'static AchievementDef> {
     ACHIEVEMENTS_BY_CATEGORY
         .get(&category)
         .cloned()
         .unwrap_or_default()
+        .into_iter()
+        .filter(|a| achievement_visible(a.id))
+        .collect()
 }
 
 #[cfg(test)]

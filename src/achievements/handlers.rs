@@ -838,3 +838,43 @@ mod vessel_tests {
         assert_eq!(a.unlocked.len(), unlocked_before, "one-time unlocks");
     }
 }
+
+#[cfg(test)]
+mod vessel_visibility_tests {
+    use super::super::data::{achievement_visible, get_achievements_by_category, ALL_ACHIEVEMENTS};
+    use super::super::types::{AchievementCategory, AchievementId, Achievements};
+
+    /// While Act 2 is dark-shipped, the Vessel achievements must be
+    /// invisible everywhere a player can look: category lists, totals,
+    /// per-category counts. (The flag-ON counterpart lives in
+    /// `tests/act2_flag_on_tests.rs`.)
+    #[test]
+    fn vessel_achievements_are_hidden_while_act2_is_dark() {
+        assert!(
+            !crate::vessel::act2_enabled(),
+            "this test assumes Act 2 is dark-shipped in this run"
+        );
+        assert!(!achievement_visible(AchievementId::TheBurn));
+        assert!(
+            !get_achievements_by_category(AchievementCategory::Progression)
+                .iter()
+                .any(|a| matches!(
+                    a.id,
+                    AchievementId::TheBurn | AchievementId::TheCovenantKept
+                )),
+            "the browser must not list Vessel achievements while dark"
+        );
+        let a = Achievements::default();
+        assert_eq!(
+            a.total_count(),
+            ALL_ACHIEVEMENTS.len() - 7,
+            "all seven Vessel achievements stay out of the total"
+        );
+        let (_, progression_total) = a.count_by_category(AchievementCategory::Progression);
+        let raw_progression = ALL_ACHIEVEMENTS
+            .iter()
+            .filter(|d| d.category == AchievementCategory::Progression)
+            .count();
+        assert_eq!(progression_total, raw_progression - 7);
+    }
+}

@@ -38,7 +38,7 @@ Enum with 247 variants covering all trackable milestones. Organized by domain:
 - **Haven**: `HavenDiscovered`, `HavenBuilderI`..`HavenBuilderII`, `HavenArchitect`
 - **Deep**: Discovery, first mission, mission count milestones (10/25/50/100), first breakthrough, layer milestones (Layers 5/10/15/20/25), VoidExplorer (Layer 26), guild rank milestones, first merc lost, gateway opened
 - **Loom**: `LoomDiscovered`, `LoomPattern1`..`LoomPattern28` (7 milestones: discovery + pattern completion at 1/4/8/16/22/28 patterns)
-- **Vessel (Act 2)**: `TheBurn` (launch), `TheRootsOfLight` (first arrival), `FerrymanI`..`FerrymanIII` (1k/10k/50k lifetime souls delivered via `total_souls_delivered`), `TheLastCrossing` (era complete), `TheCovenantKept` (era complete with `souls_lost_lifetime == 0`) — all in the Progression category, wired from the launch confirm and the voyage delivery/era-end block
+- **Vessel (Act 2)**: `TheBurn` (launch), `TheRootsOfLight` (first arrival), `FerrymanI`..`FerrymanIII` (1k/10k/50k lifetime souls delivered via `total_souls_delivered`), `TheLastCrossing` (era complete), `TheCovenantKept` (era complete with `souls_lost_lifetime == 0`) — all in the Progression category, wired from the launch confirm and the voyage delivery/era-end block. **Invisible while Act 2 is dark**: `data::achievement_visible(id)` gates them behind `vessel::act2_enabled()`, and `get_achievements_by_category` / `total_count` / `count_by_category` / `max_achievement_score` all route through it — the browser, counts, and percentages show 240 while dark, 247 once enabled (pinned by `vessel_visibility_tests` dark-side and `act2_flag_on_tests` flag-ON)
 
 ### `AchievementCategory` (`types.rs`)
 
