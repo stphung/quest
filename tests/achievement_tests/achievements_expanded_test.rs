@@ -239,12 +239,10 @@ fn test_count_recently_unlocked_by_category_progression() {
 // =========================================================================
 
 #[test]
-fn test_total_count_is_positive_and_matches_visible_count() {
-    // Visible total: VARIANT_COUNT minus the seven dark-shipped Vessel
-    // achievements (see data::achievement_visible).
+fn test_total_count_is_positive_and_matches_variant_count() {
     let ach = Achievements::default();
     assert!(ach.total_count() > 0);
-    assert_eq!(ach.total_count(), AchievementId::VARIANT_COUNT - 7);
+    assert_eq!(ach.total_count(), AchievementId::VARIANT_COUNT);
 }
 
 #[test]

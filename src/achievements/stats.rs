@@ -22,14 +22,10 @@ impl Achievements {
         self.progress.get(&id)
     }
 
-    /// Get the total number of achievements (visible ones — the Vessel's
-    /// stay out of every player-facing count while Act 2 is dark).
+    /// Get the total number of achievements.
     pub fn total_count(&self) -> usize {
-        use super::data::{achievement_visible, ALL_ACHIEVEMENTS};
-        ALL_ACHIEVEMENTS
-            .iter()
-            .filter(|a| achievement_visible(a.id))
-            .count()
+        use super::data::ALL_ACHIEVEMENTS;
+        ALL_ACHIEVEMENTS.len()
     }
 
     /// Get the number of unlocked achievements.
@@ -56,23 +52,18 @@ impl Achievements {
             .sum()
     }
 
-    /// Get the maximum possible achievement score (sum of all visible
-    /// achievements' points).
+    /// Get the maximum possible achievement score (sum of all achievement points).
     pub fn max_achievement_score() -> u32 {
-        use super::data::{achievement_visible, ALL_ACHIEVEMENTS};
-        ALL_ACHIEVEMENTS
-            .iter()
-            .filter(|a| achievement_visible(a.id))
-            .map(|a| a.points)
-            .sum()
+        use super::data::ALL_ACHIEVEMENTS;
+        ALL_ACHIEVEMENTS.iter().map(|a| a.points).sum()
     }
 
-    /// Get count of unlocked/total by category (visible achievements only).
+    /// Get count of unlocked/total by category.
     pub fn count_by_category(&self, category: AchievementCategory) -> (usize, usize) {
-        use super::data::{achievement_visible, ALL_ACHIEVEMENTS};
+        use super::data::ALL_ACHIEVEMENTS;
         ALL_ACHIEVEMENTS
             .iter()
-            .filter(|a| a.category == category && achievement_visible(a.id))
+            .filter(|a| a.category == category)
             .fold((0, 0), |(unlocked, total), a| {
                 (unlocked + self.is_unlocked(a.id) as usize, total + 1)
             })

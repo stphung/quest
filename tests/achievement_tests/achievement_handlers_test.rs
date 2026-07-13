@@ -1291,14 +1291,11 @@ fn test_sync_haven_t3_with_max_tier_rooms() {
 // =========================================================================
 
 #[test]
-fn test_total_count_matches_visible_achievements() {
-    // total_count is the PLAYER-FACING total: while Act 2 is dark-shipped
-    // the seven Vessel achievements are hidden from it (release-polish
-    // visibility rule), so it trails VARIANT_COUNT by exactly seven.
+fn test_total_count_matches_all_achievements() {
     let ach = Achievements::default();
     let count = ach.total_count();
     assert!(count > 0);
-    assert_eq!(count, AchievementId::VARIANT_COUNT - 7);
+    assert_eq!(count, AchievementId::VARIANT_COUNT);
 }
 
 #[test]
