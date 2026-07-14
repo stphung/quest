@@ -15,11 +15,58 @@ pub enum AchievementCategory {
     Deep,
     Loom,
     Stats,
+    // Act II · The Crossing subsections
+    Voyage,
+    Ferry,
+    Era,
+}
+
+/// The game's acts, as the achievement browser sections them: each act
+/// owns an ordered slice of categories (Option A, 2026-07-14).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Act {
+    ActI,
+    ActII,
+}
+
+impl Act {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Act::ActI => "ACT I \u{00b7} The Ascent",
+            Act::ActII => "ACT II \u{00b7} The Crossing",
+        }
+    }
+
+    /// The act's categories, in display order. Every category belongs to
+    /// exactly one act (asserted by `acts_partition_the_categories`).
+    pub fn categories(&self) -> &'static [AchievementCategory] {
+        match self {
+            Act::ActI => &[
+                AchievementCategory::Combat,
+                AchievementCategory::Level,
+                AchievementCategory::Prestige,
+                AchievementCategory::Progression,
+                AchievementCategory::Challenges,
+                AchievementCategory::Exploration,
+                AchievementCategory::Deep,
+                AchievementCategory::Loom,
+                AchievementCategory::Stats,
+            ],
+            Act::ActII => &[
+                AchievementCategory::Voyage,
+                AchievementCategory::Ferry,
+                AchievementCategory::Era,
+            ],
+        }
+    }
 }
 
 impl AchievementCategory {
-    /// All categories in display order.
-    pub const ALL: [AchievementCategory; 9] = [
+    /// All categories in display order (Act I's, then Act II's).
+    /// (Used by the lib and tests; the bin crate navigates per-act via
+    /// `Act::categories()`, so its copy sees these as dead code.)
+    #[allow(dead_code)]
+    pub const ALL: [AchievementCategory; 12] = [
         AchievementCategory::Combat,
         AchievementCategory::Level,
         AchievementCategory::Prestige,
@@ -29,6 +76,9 @@ impl AchievementCategory {
         AchievementCategory::Deep,
         AchievementCategory::Loom,
         AchievementCategory::Stats,
+        AchievementCategory::Voyage,
+        AchievementCategory::Ferry,
+        AchievementCategory::Era,
     ];
 
     /// Display name for the category.
@@ -43,6 +93,20 @@ impl AchievementCategory {
             AchievementCategory::Deep => "The Deep",
             AchievementCategory::Loom => "Loom",
             AchievementCategory::Stats => "Stats",
+            AchievementCategory::Voyage => "The Voyage",
+            AchievementCategory::Ferry => "The Ferry",
+            AchievementCategory::Era => "The Era",
+        }
+    }
+
+    /// The act this category belongs to.
+    #[allow(dead_code)]
+    pub fn act(&self) -> Act {
+        match self {
+            AchievementCategory::Voyage | AchievementCategory::Ferry | AchievementCategory::Era => {
+                Act::ActII
+            }
+            _ => Act::ActI,
         }
     }
 }
@@ -663,6 +727,9 @@ mod tests {
                 AchievementCategory::Deep,
                 AchievementCategory::Loom,
                 AchievementCategory::Stats,
+                AchievementCategory::Voyage,
+                AchievementCategory::Ferry,
+                AchievementCategory::Era,
             ]
         );
     }
@@ -1675,5 +1742,30 @@ mod tests {
         let loaded: Achievements = serde_json::from_str(&json).unwrap();
 
         assert!(loaded.recently_unlocked.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod act_partition_tests {
+    use super::{AchievementCategory, Act};
+
+    #[test]
+    fn acts_partition_the_categories() {
+        let mut seen: Vec<AchievementCategory> = Vec::new();
+        for act in [Act::ActI, Act::ActII] {
+            for c in act.categories() {
+                assert_eq!(c.act(), act, "{c:?} claims a different act");
+                assert!(!seen.contains(c), "{c:?} appears in two acts");
+                seen.push(*c);
+            }
+        }
+        assert_eq!(
+            seen.len(),
+            AchievementCategory::ALL.len(),
+            "every category belongs to exactly one act"
+        );
+        for c in AchievementCategory::ALL {
+            assert!(seen.contains(&c));
+        }
     }
 }

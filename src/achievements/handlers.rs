@@ -856,10 +856,15 @@ mod vessel_visibility_tests {
             !crate::vessel::act2_enabled(),
             "this test assumes Act 2 is dark-shipped in this run"
         );
-        let progression = get_achievements_by_category(AchievementCategory::Progression);
+        let voyage = get_achievements_by_category(AchievementCategory::Voyage);
         assert!(
-            progression.iter().any(|a| a.id == AchievementId::TheBurn),
+            voyage.iter().any(|a| a.id == AchievementId::TheBurn),
             "The Burn stays listed (locked) while dark — the teaser ruling"
+        );
+        let era = get_achievements_by_category(AchievementCategory::Era);
+        assert!(
+            era.iter().any(|a| a.id == AchievementId::TheCovenantKept),
+            "the Era subsection lists its rows while dark"
         );
         let a = Achievements::default();
         assert_eq!(

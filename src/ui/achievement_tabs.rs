@@ -1,6 +1,6 @@
 //! Achievement browser category tab rendering.
 
-use crate::achievements::{AchievementCategory, Achievements};
+use crate::achievements::{AchievementCategory, Achievements, Act};
 use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -25,6 +25,47 @@ fn tab_label(cat: AchievementCategory, achievements: &Achievements) -> String {
     }
 }
 
+/// Build one act's selector label: name + unlocked/total across its
+/// categories.
+fn act_label(act: Act, achievements: &Achievements) -> String {
+    let (unlocked, total) = act
+        .categories()
+        .iter()
+        .map(|c| achievements.count_by_category(*c))
+        .fold((0usize, 0usize), |(au, at), (u, t)| (au + u, at + t));
+    format!(" {} ({}/{}) ", act.name(), unlocked, total)
+}
+
+/// Render the act selector row above the subsection tabs. Act II's label
+/// dims while the act is dark-shipped (its rows stay browsable — the
+/// visible-but-unearnable teaser ruling, docs/decisions.md 2026-07-13).
+pub(super) fn render_act_row(
+    frame: &mut Frame,
+    area: ratatui::layout::Rect,
+    achievements: &Achievements,
+    ui_state: &AchievementBrowserState,
+) {
+    let mut spans: Vec<Span> = Vec::new();
+    for act in [Act::ActI, Act::ActII] {
+        let selected = act == ui_state.selected_act;
+        let dark = act == Act::ActII && !crate::vessel::act2_enabled();
+        let style = if selected {
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD)
+        } else if dark {
+            Style::default().fg(Color::DarkGray)
+        } else {
+            Style::default().fg(Color::Gray)
+        };
+        spans.push(Span::styled(if selected { "\u{25B6}" } else { " " }, style));
+        spans.push(Span::styled(act_label(act, achievements), style));
+        spans.push(Span::raw("  "));
+    }
+    let row = Paragraph::new(Line::from(spans)).alignment(ratatui::layout::Alignment::Center);
+    frame.render_widget(row, area);
+}
+
 /// Render category tabs at the top of the achievement browser.
 /// Scrolls horizontally when tabs exceed available width, keeping the
 /// selected category visible.
@@ -34,7 +75,7 @@ pub(super) fn render_category_tabs(
     achievements: &Achievements,
     ui_state: &AchievementBrowserState,
 ) {
-    let categories = AchievementCategory::ALL;
+    let categories = ui_state.selected_act.categories();
     let available = area.width as usize;
 
     // Build labels and measure widths.

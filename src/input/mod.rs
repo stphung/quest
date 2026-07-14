@@ -123,6 +123,7 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
             }
             KeyCode::Left => browser.prev_category(),
             KeyCode::Right => browser.next_category(),
+            KeyCode::Tab => browser.toggle_act(),
             KeyCode::Up => browser.move_up(),
             KeyCode::Down => {
                 let count = if browser.selected_category == AchievementCategory::Stats {

@@ -4,7 +4,9 @@
 //! with a detail panel showing description and unlock status.
 
 use super::game_common::format_number;
-use crate::achievements::{get_achievement_def, AchievementCategory, AchievementId, Achievements};
+use crate::achievements::{
+    get_achievement_def, AchievementCategory, AchievementId, Achievements, Act,
+};
 use crate::enhancement::EnhancementProgress;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -17,6 +19,7 @@ use ratatui::{
 /// UI state for the achievement browser overlay.
 pub struct AchievementBrowserState {
     pub showing: bool,
+    pub selected_act: Act,
     pub selected_category: AchievementCategory,
     pub selected_index: usize,
 }
@@ -25,6 +28,7 @@ impl AchievementBrowserState {
     pub fn new() -> Self {
         Self {
             showing: false,
+            selected_act: Act::ActI,
             selected_category: AchievementCategory::Combat,
             selected_index: 0,
         }
@@ -39,8 +43,19 @@ impl AchievementBrowserState {
         self.showing = false;
     }
 
+    /// Switch to the other act, landing on its first subsection.
+    pub fn toggle_act(&mut self) {
+        self.selected_act = match self.selected_act {
+            Act::ActI => Act::ActII,
+            Act::ActII => Act::ActI,
+        };
+        self.selected_category = self.selected_act.categories()[0];
+        self.selected_index = 0;
+    }
+
+    /// Cycle subsections within the selected act (wrapping).
     fn cycle_category(&mut self, delta: isize) {
-        let categories = AchievementCategory::ALL;
+        let categories = self.selected_act.categories();
         let current = categories
             .iter()
             .position(|cat| *cat == self.selected_category)
@@ -107,23 +122,25 @@ pub fn render_achievement_browser(
     let inner =
         super::render_themed_block(frame, area, block, Color::Yellow, super::BorderFxContext);
 
-    // Layout: Category tabs at top, list on left, detail on right, help at bottom
+    // Layout: act selector, the act's subsection tabs, list+detail, help
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // Category tabs
+            Constraint::Length(1), // Act selector row
+            Constraint::Length(2), // Subsection tabs
             Constraint::Min(0),    // Content
             Constraint::Length(1), // Help
         ])
         .split(inner);
 
-    super::achievement_tabs::render_category_tabs(frame, chunks[0], achievements, ui_state);
+    super::achievement_tabs::render_act_row(frame, chunks[0], achievements, ui_state);
+    super::achievement_tabs::render_category_tabs(frame, chunks[1], achievements, ui_state);
 
     // Content area: stats view or list+detail
     if ui_state.selected_category == AchievementCategory::Stats {
         super::achievement_details::render_stats_view(
             frame,
-            chunks[1],
+            chunks[2],
             achievements,
             enhancement,
             ui_state.selected_index,
@@ -132,7 +149,7 @@ pub fn render_achievement_browser(
         let content_chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
-            .split(chunks[1]);
+            .split(chunks[2]);
 
         super::achievement_list::render_achievement_list(
             frame,
@@ -148,10 +165,11 @@ pub fn render_achievement_browser(
         );
     }
 
-    let help = Paragraph::new("[</>] Category  [Up/Down] Select  [T] Titles  [Esc] Close")
-        .style(Style::default().fg(Color::DarkGray))
-        .alignment(Alignment::Center);
-    frame.render_widget(help, chunks[2]);
+    let help =
+        Paragraph::new("[Tab] Act  [</>] Section  [Up/Down] Select  [T] Titles  [Esc] Close")
+            .style(Style::default().fg(Color::DarkGray))
+            .alignment(Alignment::Center);
+    frame.render_widget(help, chunks[3]);
 }
 
 /// Render the achievement unlocked celebration modal.
@@ -371,5 +389,78 @@ mod tests {
         assert_eq!(format_number(1000), "1,000");
         assert_eq!(format_number(12847), "12,847");
         assert_eq!(format_number(1000000), "1,000,000");
+    }
+}
+
+#[cfg(test)]
+mod act_row_render_tests {
+    use super::*;
+    use crate::achievements::Act;
+    use ratatui::{backend::TestBackend, Terminal};
+
+    fn render_rows(ui: &AchievementBrowserState) -> Vec<String> {
+        let ach = Achievements::default();
+        let enh = crate::enhancement::EnhancementProgress::default();
+        let mut t = Terminal::new(TestBackend::new(120, 20)).unwrap();
+        t.draw(|f| {
+            let area = f.area();
+            let ctx = crate::ui::responsive::LayoutContext::from_size(area.width, area.height);
+            render_achievement_browser(f, area, &ach, ui, &enh, &ctx);
+        })
+        .unwrap();
+        let buf = t.backend().buffer();
+        (0..20u16)
+            .map(|y| {
+                (0..120u16)
+                    .map(|x| buf[(x, y)].symbol().to_string())
+                    .collect::<Vec<_>>()
+                    .join("")
+            })
+            .collect()
+    }
+
+    /// The act row + act-scoped tabs render, and every content row keeps
+    /// the panel borders vertically aligned (each border column identical
+    /// across rows) — the artifact check for the Option A layout.
+    #[test]
+    fn act_two_layout_renders_aligned() {
+        let mut ui = AchievementBrowserState::new();
+        ui.toggle_act();
+        assert_eq!(ui.selected_act, Act::ActII);
+        let rows = render_rows(&ui);
+        assert!(rows[1].contains("ACT II \u{00b7} The Crossing"));
+        assert!(rows[2].contains("The Voyage"));
+        assert!(rows.iter().any(|r| r.contains("The Burn")));
+        // Border alignment: find the vertical-border columns on the first
+        // list content row and require the same columns on every row of
+        // the panel body.
+        let body: Vec<&String> = rows[4..16]
+            .iter()
+            .filter(|r| !r.contains('\u{250c}') && !r.contains('\u{2514}'))
+            .collect();
+        let border_cols: Vec<usize> = body[0]
+            .chars()
+            .enumerate()
+            .filter(|(_, c)| *c == '\u{2502}')
+            .map(|(i, _)| i)
+            .collect();
+        assert!(
+            border_cols.len() >= 4,
+            "expected panel borders: {:?}",
+            body[0]
+        );
+        for (i, row) in body.iter().enumerate() {
+            let cols: Vec<usize> = row
+                .chars()
+                .enumerate()
+                .filter(|(_, c)| *c == '\u{2502}')
+                .map(|(j, _)| j)
+                .collect();
+            assert_eq!(
+                cols, border_cols,
+                "row {i} borders misaligned:\n{}\nvs\n{}",
+                row, body[0]
+            );
+        }
     }
 }

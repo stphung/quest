@@ -38,11 +38,11 @@ Enum with 247 variants covering all trackable milestones. Organized by domain:
 - **Haven**: `HavenDiscovered`, `HavenBuilderI`..`HavenBuilderII`, `HavenArchitect`
 - **Deep**: Discovery, first mission, mission count milestones (10/25/50/100), first breakthrough, layer milestones (Layers 5/10/15/20/25), VoidExplorer (Layer 26), guild rank milestones, first merc lost, gateway opened
 - **Loom**: `LoomDiscovered`, `LoomPattern1`..`LoomPattern28` (7 milestones: discovery + pattern completion at 1/4/8/16/22/28 patterns)
-- **Vessel (Act 2)**: `TheBurn` (launch), `TheRootsOfLight` (first arrival), `FerrymanI`..`FerrymanIII` (1k/10k/50k lifetime souls delivered via `total_souls_delivered`), `TheLastCrossing` (era complete), `TheCovenantKept` (era complete with `souls_lost_lifetime == 0`) — all in the Progression category, wired from the launch confirm and the voyage delivery/era-end block. **Visible while dark, by ruling (2026-07-13)**: the Act 2 kill-switch gates entry into the act, not the existence of its milestones — the locked rows remain in the browser as a teaser and are unearnable while dark (every unlock path is act2-gated). Pinned by `vessel_visibility_tests`
+- **Vessel (Act 2)**: `TheBurn` (launch), `TheRootsOfLight` (first arrival), `FerrymanI`..`FerrymanIII` (1k/10k/50k lifetime souls delivered via `total_souls_delivered`), `TheLastCrossing` (era complete), `TheCovenantKept` (era complete with `souls_lost_lifetime == 0`) — in Act II's subsections (Voyage/Ferry/Era), wired from the launch confirm and the voyage delivery/era-end block. **Visible while dark, by ruling (2026-07-13)**: the Act 2 kill-switch gates entry into the act, not the existence of its milestones — the locked rows remain in the browser as a teaser and are unearnable while dark (every unlock path is act2-gated). Pinned by `vessel_visibility_tests`
 
 ### `AchievementCategory` (`types.rs`)
 
-Nine categories for browsing: `Combat`, `Level`, `Prestige`, `Progression`, `Challenges`, `Exploration`, `Deep`, `Loom`, `Stats`.
+Twelve categories for browsing, grouped under two acts (`Act` enum, same file): **Act I · The Ascent** — `Combat`, `Level`, `Prestige`, `Progression`, `Challenges`, `Exploration`, `Deep`, `Loom`, `Stats`; **Act II · The Crossing** — `Voyage` ("The Voyage"), `Ferry` ("The Ferry"), `Era` ("The Era"). `Act::categories()` / `AchievementCategory::act()` define the partition (test-pinned). The browser shows an act selector row above the act's own subsection tabs: `[Tab]` toggles act, `</>`/arrows cycle within the act; Act II's label dims while the kill-switch is off (rows stay browsable — the teaser ruling).
 
 ### `AchievementDef` (`data.rs`)
 
