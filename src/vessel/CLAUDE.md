@@ -56,6 +56,7 @@ pub enum VoyageView {
     Chart, Junction { selected }, Trim { selected }, Rumors,
     Souls { selected }, Watch { selected }, Farewell { selected },
     Manifest { scroll }, Keepsake { x, y }, Record { scroll }, // arrived-only, spec 7
+    Reckoning, Dock { confirm_pending },                       // colony numbers + wormhole dock, spec 9
 }
 ```
 
@@ -127,7 +128,7 @@ Once `vessel_launched && vessel_transition_played` (and `act2_enabled()`), `main
 - **`main_helpers/overlay.rs`**: `draw_game_overlays()` renders `GameOverlay::Vessel` via `ui::vessel_scene::render_vessel_overlay()` and `GameOverlay::VesselDiscovery` via `ui::vessel_scene::render_vessel_discovery_modal()`.
 - **`main.rs`**: three wiring points inside/around the `'game_loop`: (1) `tick_flags.vessel_signal_discovered` pushes `GameOverlay::VesselDiscovery` onto the pending-overlay queue; (2) `state.vessel_launched && !state.vessel_transition_played` renders `render_launch_transition()`, advances `LaunchTransitionState` on Enter, and on completion sets `vessel_transition_played`, saves, and `continue`s; (3) once `state.vessel_launched && state.vessel_transition_played && vessel::act2_enabled()`, the loop takes the Voyage branch — ticks it, drains soul/letter/recovery/finale events into `voyage_ui.moments`, renders `ui::voyage_scene::render_voyage()`, and routes keys through `voyage_input` instead of the normal `handle_game_input()` path — then `continue`s, skipping the rest of the Act 1 loop body entirely.
 - **`ui/vessel_scene.rs`**: `render_vessel_discovery_modal()` (one-time celebration), `render_vessel_overlay()` (full-screen construction/launch-confirmation overlay), `render_launch_transition()` (the 5-beat sequence, borderless full-screen).
-- **`ui/voyage_scene.rs`**: `render_voyage()` — the Crossing main screen, dispatching on `VoyageUiState::view` to per-panel renderers (chart, junction, trim, rumors, souls, watch, farewell, manifest, keepsake chart, record); imports `vessel_scene::VESSEL_VIOLET` for consistent theming.
+- **`ui/voyage_scene.rs`**: `render_voyage()` — the Crossing main screen, dispatching on `VoyageUiState::view` to per-panel renderers (chart, junction, trim, rumors, souls, watch, farewell, manifest, keepsake chart, record, reckoning, dock); imports `vessel_scene::VESSEL_VIOLET` for consistent theming.
 - **`ui/stats_panel.rs`**: adds a "Vessel signal" row to the hero panel height when `vessel_signal_discovered && act2_enabled()`.
 - **`input/types.rs`**: `GameOverlay::VesselDiscovery` and `GameOverlay::Vessel { confirm_pending: bool }` variants.
 - **`bin/mkstate.rs`**: fixture flags can set `vessel_signal_discovered` for drive-game / screenshot scenarios.

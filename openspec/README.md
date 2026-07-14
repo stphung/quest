@@ -91,9 +91,6 @@ candidates (fix the doc, or fix the code if the code is the regression):
   retreats to the **highest zone with a defeated boss** (fallback Zone 1) at
   subzone 1. Overworld *mob* death retries the same enemy and only retreats
   after 3 consecutive deaths.
-- **`zones` — Fracture unlock gates.** Root `CLAUDE.md` lists only the Deep-layer
-  cap; the code enforces a **dual gate** (Deep layer **and** prestige P50–P300
-  per band). `src/zones/CLAUDE.md` documents this correctly.
 - **`loom` — pattern count & WR→PR rounding.** There are **29** patterns (28
   completable + 1 eternal); the completed/woven counters exclude the eternal
   one. The `131 WR → 302 PR` doc comment is off by one — the code rounds to

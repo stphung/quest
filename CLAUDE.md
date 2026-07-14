@@ -109,7 +109,7 @@ Agent-invocable skills — ask in natural language to trigger them.
 
 ## Architecture
 
-Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui (with Crossterm backend).
+Entry point: `src/main.rs` — runs a 100ms tick game loop using Ratatui (with Crossterm backend). Its sibling `src/tick_events.rs` (binary-only, not part of the library crate) bridges core `TickEvent`s into UI combat-log entries and visual effects via `apply_tick_events()`.
 
 Larger modules have their own `CLAUDE.md` with implementation patterns, integration points, and extension guides. See the table below.
 
@@ -204,7 +204,7 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 - **Enhancement levels**: 0-10, success rates 100% (+1-4), 70%/55%/40% (+5-7), 30%/20%/10% (+8-10)
 - **Enhancement costs**: 1 PR (+1-4), 2/3/3 PR (+5-7), 4 PR (+8-9), 5 PR (+10)
 - **Fracture zone stat scaling**: 1.6x per zone from Zone 11 base (FRACTURE_ZONE_STAT_MULTIPLIER)
-- **Fracture zone unlock**: Deep Layer 3 -> Z12-14, Layer 7 -> Z15-17, Layer 12 -> Z18-20, Layer 18 -> Z21-23, Layer 25 -> Z24-26, Layer 30 -> Z27-30
+- **Fracture zone unlock** (dual-gated: Deep layer + prestige): Layer 3 + P50 -> Z12-14, Layer 7 + P75 -> Z15-17, Layer 12 + P100 -> Z18-20, Layer 18 + P150 -> Z21-23, Layer 25 + P200 -> Z24-26, Layer 30 + P300 -> Z27-30
 - **Ascension cost**: [35, 65, 120, 200, 325, 500] PR for I-VI; [1500, 4000, 8000, 15000] PR for VII-X
 - **Ascension multiplier**: 2^level for I-VI (2x to 64x); 64 * 1.5^(level-6) for VII+ (96x, 144x, 216x, 324x)
 - **Ascension pattern gates**: VII = 8 patterns, VIII = 16, IX = 22, X = 28 completed Woven Patterns

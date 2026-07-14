@@ -15,7 +15,7 @@ src/core/
 ├── offline.rs       # Offline XP progression (calculate_offline_xp, process_offline_progression)
 ├── recent_drops.rs  # RecentDrop struct, recent drops deque management
 ├── tick.rs          # game_tick_with_context() orchestration — coordinates all stages; game_tick() is deprecated
-├── tick_stages.rs   # Tick processing stages 4-6 and helper functions
+├── tick_stages.rs   # Tick-processing stage functions (stages 0 through 12c) and helper functions
 ├── tick_types.rs    # TickEvent enum (50 variants) and TickResult struct
 ├── ticker.rs        # Scrolling loot ticker (TickerEntry, Ticker, adaptive scroll speed)
 ├── xp.rs            # XP curves, leveling, combat kill XP, distribute_level_up_points
