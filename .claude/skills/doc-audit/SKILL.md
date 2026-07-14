@@ -76,6 +76,7 @@ Each agent searches for:
 | Wrong key binding in README | MEDIUM | README says "Q: Quit" but handler binds Esc | Update to actual handler |
 | Shipped system missing from README | MEDIUM | Feature landed but Features list / Game Systems silent | Add a bullet or section |
 | Dark-shipped feature advertised in README | HIGH | Kill-switched content described as playable | Remove from README (keep in CLAUDE.md) |
+| README tree row for a dark-shipped module | MEDIUM | The `vessel/` row churned across three runs: removed as dark-ship (#728), re-added naming Act 2 content (#736), re-neutralized (#741) | Keep the module's row with a neutral, non-advertising description (e.g. "Feature-flagged module (disabled by default)") — that satisfies both the inventory rule and the dark-ship rule; do not delete the row, and never name the gated content |
 
 Each agent produces a ranked report: file, pattern, severity (HIGH/MEDIUM/LOW), current value vs correct value, whether auto-fixable.
 
