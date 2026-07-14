@@ -112,7 +112,7 @@ pub fn generate_dungeon(level: u32, prestige_rank: u32, zone_id: u32) -> Dungeon
 
 1. Add variant to `RoomType` enum in `types.rs`
 2. Add `icon()` and `cleared_icon()` display characters
-3. Add spawn probability in `generation.rs`
+3. Add placement logic to `place_special_rooms()` in `generation.rs` (room types are placed deterministically — dead-end/distance selection plus a shuffled treasure allotment — not rolled per-room)
 4. Add clearing logic in `logic.rs`
 5. Add rendering in `ui/dungeon_map.rs` (minimap icon + color)
 6. Add combat/reward handling if applicable

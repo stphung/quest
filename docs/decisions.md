@@ -216,7 +216,7 @@ This enables systematic balance validation: "does a P0 character reach Zone 2 in
 - `main.rs` helpers extracted into `main_helpers/` directory (achievements, character_screens, input_routing, offline, overlay, persistence, scene, update)
 - `input.rs` promoted to `input/` directory with submodules (haven_input, minigame_input, prestige_input, soulforge_input, types)
 
-**Why**: The largest files exceeded 1000 LOC (main.rs 1548, character/manager.rs 1396, dungeon/logic.rs 1217, fishing/logic.rs 1047, core/game_logic.rs 1012), making navigation and maintenance difficult. The docs/plans/2026-02-18-large-module-refactoring-design.md design document identified the candidates.
+**Why**: The largest files exceeded 1000 LOC (main.rs 1548, character/manager.rs 1396, dungeon/logic.rs 1217, fishing/logic.rs 1047, core/game_logic.rs 1012), making navigation and maintenance difficult. The docs/plans/2026-02-18-large-module-refactoring-design.md design document (since removed with the rest of the `docs/plans/` tree — see git history / the OpenSpec archive) identified the candidates.
 
 **Pattern**: Move focused logic into sibling files within the same module, keep the original file as a thin orchestrator, and re-export all public symbols from `mod.rs` for backward compatibility. No public API changes.
 
