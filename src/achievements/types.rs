@@ -395,6 +395,17 @@ pub enum AchievementId {
     FerrymanIII,     // 50,000 souls delivered (lifetime)
     TheLastCrossing, // Complete the ferry era (the old world empties)
     TheCovenantKept, // Complete the era with no crew soul ever lost
+    // The Vessel (Act 2) — collection achievements. All verified achievable
+    // against the voyage engine's real mechanics (see the change's design
+    // doc: refits are 3 one-of-two doors, CREW=7 < 8 souls, per-crossing
+    // state resets — the impossible variants were deliberately not shipped).
+    EveryStarAHarbor, // Dock at all 38 waypoints (lifetime union across crossings)
+    CompanyOnTheRoad, // Hail all 5 pilgrim ships (lifetime union across crossings)
+    EarToTheWater,    // Know all 8 rumors at once within a single crossing
+    ThreeDoorsOpened, // Take a refit at all three shipyard doors in one crossing
+    TheFullTable,     // Make landfall with all seven crew berths filled
+    HeavyLading,      // Deliver 2,500+ souls in a single crossing
+    TheSwiftPassage,  // Complete a crossing in under 8 sea-days
     // Power Cores — unlocked at fracture zone unlock layers
     PowerCoreI,   // Deep Layer 3 — Red Fault core
     PowerCoreII,  // Deep Layer 7 — Mirror Scar core
@@ -416,7 +427,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 247;
+    pub const VARIANT_COUNT: usize = 254;
 }
 
 /// Static definition of an achievement.
@@ -644,6 +655,17 @@ pub struct Achievements {
     /// source) — zero at era end earns The Covenant Kept.
     #[serde(default)]
     pub souls_lost_lifetime: u32,
+    /// Union of every waypoint the Vessel has docked at, one bit per
+    /// `WaypointId` (38 authored waypoints; a mask-width guard test pins
+    /// `<= 64`). Per-crossing `visited` resets at each departure — this is
+    /// the persistent union that drives Every Star a Harbor.
+    #[serde(default)]
+    pub waypoints_docked_mask: u64,
+    /// Union of every pilgrim ship hailed, one bit per ship index (5
+    /// authored ships). Per-crossing `hailed` resets — this union drives
+    /// Company on the Road.
+    #[serde(default)]
+    pub pilgrims_hailed_mask: u8,
     /// Global border style applied to panel UI.
     #[serde(default)]
     pub ui_border_style: UiBorderStyle,

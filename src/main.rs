@@ -614,6 +614,25 @@ fn main() -> io::Result<()> {
                             }
                             let v = voyage.as_mut().expect("voyage initialized above");
                             v.tick(Utc::now());
+                            // Collection achievements observe the live
+                            // crossing each frame (idempotent bit math —
+                            // per-crossing sets reset at departure, the
+                            // persistent unions live on Achievements).
+                            {
+                                let visited_mask = v
+                                    .visited
+                                    .iter()
+                                    .fold(0u64, |m, w| m | (1u64 << (w.0 as u64 % 64)));
+                                let hailed_mask =
+                                    v.hailed.iter().fold(0u8, |m, s| m | (1u8 << (s % 8)));
+                                global_achievements.on_voyage_observed(
+                                    visited_mask,
+                                    hailed_mask,
+                                    v.rumors.len(),
+                                    v.refits.len(),
+                                    Some(&state.character_name),
+                                );
+                            }
                             // Arc beats (possibly fired offline) queue as log
                             // moments, shown one at a time.
                             for event in v.take_soul_events() {
@@ -732,6 +751,14 @@ fn main() -> io::Result<()> {
                                 global_achievements.on_crossing_delivered(
                                     col.souls_delivered,
                                     crew_lost,
+                                    Some(&state.character_name),
+                                );
+                                // The single crossing's own records: Heavy
+                                // Lading / The Swift Passage / The Full Table.
+                                global_achievements.on_landfall(
+                                    delivered,
+                                    days,
+                                    v.aboard_count(),
                                     Some(&state.character_name),
                                 );
                                 if first_arrival {

@@ -229,6 +229,10 @@ fn achievements_corpus_loads() {
     assert!(achievements.is_unlocked(quest::achievements::AchievementId::PowerCoreII));
     assert_eq!(achievements.total_kills, 12_345);
     assert_eq!(achievements.highest_prestige_rank, 25);
+    // Fields added after the corpus was written land at their serde
+    // defaults — a pre-Act-2-collections save starts with empty unions.
+    assert_eq!(achievements.waypoints_docked_mask, 0);
+    assert_eq!(achievements.pilgrims_hailed_mask, 0);
 }
 
 /// Serialize→deserialize→serialize is a fixed point for every account

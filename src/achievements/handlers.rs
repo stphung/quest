@@ -555,6 +555,59 @@ impl Achievements {
         }
     }
 
+    /// Per-frame observation of the live crossing (the voyage loop is the
+    /// only caller, so this whole path is Act-2-gated). Idempotent: the
+    /// masks union monotonically and unlocks are one-time. Completion
+    /// targets derive from the authored-content constants so authored
+    /// growth widens a target instead of completing it early.
+    ///
+    /// `visited_mask`/`hailed_mask` are the *current crossing's* sets as
+    /// bitmasks (bit = waypoint id / ship index) — per-crossing state
+    /// resets at each departure, so the persistent union lives here.
+    pub fn on_voyage_observed(
+        &mut self,
+        visited_mask: u64,
+        hailed_mask: u8,
+        rumors_known: usize,
+        refits_taken: usize,
+        character_name: Option<&str>,
+    ) {
+        self.waypoints_docked_mask |= visited_mask;
+        self.pilgrims_hailed_mask |= hailed_mask;
+
+        let all_waypoints = crate::vessel::route::WAYPOINTS.len() as u32;
+        if self.waypoints_docked_mask.count_ones() >= all_waypoints {
+            self.unlock_with_name(AchievementId::EveryStarAHarbor, character_name);
+        }
+        let all_ships = crate::vessel::pilgrims::PILGRIMS.len() as u32;
+        if self.pilgrims_hailed_mask.count_ones() >= all_ships {
+            self.unlock_with_name(AchievementId::CompanyOnTheRoad, character_name);
+        }
+        if rumors_known >= crate::vessel::route::RUMORS.len() {
+            self.unlock_with_name(AchievementId::EarToTheWater, character_name);
+        }
+        if refits_taken >= crate::vessel::refits::REFIT_PAIRS.len() {
+            self.unlock_with_name(AchievementId::ThreeDoorsOpened, character_name);
+        }
+    }
+
+    /// A crossing made landfall: judge its delivery records. Called once
+    /// per delivery alongside `on_crossing_delivered` (kept separate — that
+    /// handler's parameters carry lifetime/covenant semantics, these carry
+    /// the single crossing's). Repeat calls are harmless: unlocks are
+    /// one-time and the comparisons are pure.
+    pub fn on_landfall(&mut self, carried: u32, days: u64, aboard: usize, name: Option<&str>) {
+        if carried >= crate::achievements::data::HEAVY_LADING_SOULS {
+            self.unlock_with_name(AchievementId::HeavyLading, name);
+        }
+        if days <= crate::achievements::data::SWIFT_PASSAGE_DAYS {
+            self.unlock_with_name(AchievementId::TheSwiftPassage, name);
+        }
+        if aboard >= crate::vessel::souls::CREW {
+            self.unlock_with_name(AchievementId::TheFullTable, name);
+        }
+    }
+
     pub fn on_loom_pattern_completed(
         &mut self,
         completed_count: usize,
@@ -837,6 +890,97 @@ mod vessel_tests {
         a.on_vessel_arrived(Some("Ferry"));
         assert_eq!(a.unlocked.len(), unlocked_before, "one-time unlocks");
     }
+
+    #[test]
+    fn the_unions_accumulate_across_crossing_resets() {
+        let mut a = Achievements::default();
+        // Crossing 1 docks the low half of the chart and hails two ships;
+        // the next crossing's state starts empty (per-crossing reset) but
+        // covers the rest. The unions must remember both.
+        let low: u64 = (0..20).fold(0, |m, i| m | (1 << i));
+        let high: u64 = (20..38).fold(0, |m, i| m | (1 << i));
+        a.on_voyage_observed(low, 0b0_0011, 3, 1, None);
+        assert!(!a.is_unlocked(AchievementId::EveryStarAHarbor), "20 < 38");
+        assert!(!a.is_unlocked(AchievementId::CompanyOnTheRoad), "2 < 5");
+
+        a.on_voyage_observed(high, 0b1_1100, 0, 0, None);
+        assert!(a.is_unlocked(AchievementId::EveryStarAHarbor));
+        assert!(a.is_unlocked(AchievementId::CompanyOnTheRoad));
+        assert_eq!(a.waypoints_docked_mask.count_ones(), 38);
+        assert_eq!(a.pilgrims_hailed_mask.count_ones(), 5);
+    }
+
+    #[test]
+    fn re_observing_the_same_frame_changes_nothing() {
+        let mut a = Achievements::default();
+        a.on_voyage_observed(0b1010, 0b1, 8, 3, None);
+        let unlocked = a.unlocked.len();
+        let (wp, ps) = (a.waypoints_docked_mask, a.pilgrims_hailed_mask);
+        for _ in 0..10 {
+            a.on_voyage_observed(0b1010, 0b1, 8, 3, None);
+        }
+        assert_eq!(a.unlocked.len(), unlocked, "idempotent");
+        assert_eq!((a.waypoints_docked_mask, a.pilgrims_hailed_mask), (wp, ps));
+    }
+
+    #[test]
+    fn single_crossing_collections_judge_the_live_crossing() {
+        let mut a = Achievements::default();
+        a.on_voyage_observed(0, 0, 7, 2, None);
+        assert!(!a.is_unlocked(AchievementId::EarToTheWater), "7 < 8");
+        assert!(!a.is_unlocked(AchievementId::ThreeDoorsOpened), "2 < 3");
+
+        a.on_voyage_observed(0, 0, 8, 3, None);
+        assert!(a.is_unlocked(AchievementId::EarToTheWater));
+        assert!(a.is_unlocked(AchievementId::ThreeDoorsOpened));
+
+        // A later crossing's reset state does not revoke them.
+        a.on_voyage_observed(0, 0, 0, 0, None);
+        assert!(a.is_unlocked(AchievementId::EarToTheWater));
+        assert!(a.is_unlocked(AchievementId::ThreeDoorsOpened));
+    }
+
+    #[test]
+    fn landfall_records_judge_the_delivery() {
+        use crate::achievements::data::{HEAVY_LADING_SOULS, SWIFT_PASSAGE_DAYS};
+        let mut a = Achievements::default();
+        // One off each threshold, and a part-filled table: nothing fires.
+        a.on_landfall(HEAVY_LADING_SOULS - 1, SWIFT_PASSAGE_DAYS + 1, 6, None);
+        assert!(!a.is_unlocked(AchievementId::HeavyLading));
+        assert!(!a.is_unlocked(AchievementId::TheSwiftPassage));
+        assert!(!a.is_unlocked(AchievementId::TheFullTable));
+
+        // Exactly at each target (both thresholds are inclusive): all fire.
+        a.on_landfall(
+            HEAVY_LADING_SOULS,
+            SWIFT_PASSAGE_DAYS,
+            crate::vessel::souls::CREW,
+            None,
+        );
+        assert!(a.is_unlocked(AchievementId::HeavyLading));
+        assert!(a.is_unlocked(AchievementId::TheSwiftPassage));
+        assert!(a.is_unlocked(AchievementId::TheFullTable));
+    }
+
+    #[test]
+    fn the_masks_are_wide_enough_for_the_authored_content() {
+        // The persistent unions are fixed-width bitmasks; if the authored
+        // chart or pilgrim fleet ever outgrows them, widen the field (and
+        // this test) rather than letting bits alias.
+        assert!(crate::vessel::route::WAYPOINTS.len() <= 64);
+        assert!(crate::vessel::pilgrims::PILGRIMS.len() <= 8);
+    }
+
+    #[test]
+    fn completion_targets_track_the_authored_content() {
+        // The unlock sites compare against these constants — pin today's
+        // values so a content change is a conscious achievement change too.
+        assert_eq!(crate::vessel::route::WAYPOINTS.len(), 38);
+        assert_eq!(crate::vessel::pilgrims::PILGRIMS.len(), 5);
+        assert_eq!(crate::vessel::route::RUMORS.len(), 8);
+        assert_eq!(crate::vessel::refits::REFIT_PAIRS.len(), 3);
+        assert_eq!(crate::vessel::souls::CREW, 7);
+    }
 }
 
 #[cfg(test)]
@@ -865,6 +1009,24 @@ mod vessel_visibility_tests {
         assert!(
             era.iter().any(|a| a.id == AchievementId::TheCovenantKept),
             "the Era subsection lists its rows while dark"
+        );
+        // The collection achievements follow the same ruling: listed in
+        // their subsections while dark, locked, unearnable.
+        assert!(
+            voyage
+                .iter()
+                .any(|a| a.id == AchievementId::EveryStarAHarbor),
+            "Every Star a Harbor stays listed while dark"
+        );
+        let ferry = get_achievements_by_category(AchievementCategory::Ferry);
+        assert!(
+            ferry.iter().any(|a| a.id == AchievementId::TheFullTable)
+                && ferry.iter().any(|a| a.id == AchievementId::HeavyLading),
+            "the Ferry subsection lists the collection rows while dark"
+        );
+        assert!(
+            era.iter().any(|a| a.id == AchievementId::TheSwiftPassage),
+            "The Swift Passage stays listed while dark"
         );
         let a = Achievements::default();
         assert_eq!(
