@@ -19,7 +19,7 @@ Keyboard input routing for the Game screen, dispatching to overlay handlers, min
 | `voyage_input.rs` | Act 2 "Crossing" screen input (`handle_voyage_input()` / `VoyageInputResult`): intro/scene/moment playback, boarding-ask and refit prompts, chart/junction/trim/souls/watch/farewell/rumors/manifest/keepsake/record/reckoning/dock view navigation. `VoyageInputResult` variants: `Handled`, `HandledNeedsSave`, `Quit`, `Jump` (Dock: commits the next crossing), `BuyDrive`/`BuyCapacity`/`BuyWard` (Reckoning: spend Salvage), `Ignored` |
 | `harness.rs` | `#[cfg(test)]`-only headless input-replay harness (`InputHarness`) driving `handle_game_input`; see "Testing" below |
 | `replay_tests.rs` | `#[cfg(test)]`-only replay test suite exercising key input paths via `InputHarness`; see "Testing" below |
-| `fuzz_tests.rs` | `#[cfg(test)]`-only randomized input fuzzing over `InputHarness` — long unscripted key sequences across several discovery states and all 14 minigames, asserting only that dispatch and rendering never panic; see "Testing" below |
+| `fuzz_tests.rs` | `#[cfg(test)]`-only randomized input fuzzing over `InputHarness` — long unscripted key sequences across several discovery states, all 14 minigames, and (via `handle_voyage_input` directly) Act 2's Crossing screen, asserting only that dispatch and rendering never panic; see "Testing" below |
 
 ## Key Types
 
@@ -88,7 +88,7 @@ assert!(!h.haven_ui.showing);
 
 **`fuzz_tests.rs`** complements the scripted replay tests: instead of asserting a specific outcome, it feeds `InputHarness` hundreds of random key presses per seed (weighted toward navigation keys), then renders the final frame. The only assertion is "no panic" — this catches index-out-of-bounds and arithmetic-overflow bugs in input paths nobody thought to script, the same value a human mashing keys in `drive-game` provides, but exhaustive and reproducible from a printed seed. `w`/`W`/`!` are excluded from its key pool because they shell out to a real browser/clipboard process (`bug_report::open_browser`/`copy_to_clipboard`) — not safe to fire at random in a hermetic test.
 
-Scenarios cover the key states of Act 1 (Act 2/Vessel is a separate, dark-shipped system with its own input module — see `voyage_input.rs`):
+Scenarios cover the key states of Act 1 plus a dedicated Act 2 net (Act 2/Vessel is a separate, dark-shipped system with its own input dispatcher — see `voyage_input.rs`):
 
 | Scenario | What it exercises |
 |----------|-------------------|
@@ -100,6 +100,7 @@ Scenarios cover the key states of Act 1 (Act 2/Vessel is a separate, dark-shippe
 | `scenario_fishing` | An active fishing session underneath the base game, same rationale as dungeon |
 | `scenario_discovered` | Endgame state with Haven/Soulforge/Stormglass/Deep/Loom/Achievements all discovered and populated, so hotkeys open live overlays instead of no-ops — most likely to reach deep overlay navigation code |
 | `fuzz_active_minigames_never_panic` | All 14 challenge minigames, one fresh instance per seed batch |
+| `fuzz_voyage_input_never_panics` | `handle_voyage_input` (not `handle_game_input`) hammered with random keys across mid-leg/junction/arrived voyage scenarios |
 
 ## Integration Points
 
