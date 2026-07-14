@@ -18,6 +18,10 @@ pub enum SaveEvent {
     FishingRankUp(u32),
     StormLeviathanCaught,
     AchievementUnlocked(String),
+    // Act 2 (the Vessel) milestones
+    VesselLaunched,
+    VesselArrived,
+    LastCrossing,
 
     // State-changing actions
     HavenRoomBuilt(String),
@@ -56,6 +60,11 @@ impl SaveEvent {
             SaveEvent::FishingRankUp(rank) => format!("Fishing rank up to {rank}"),
             SaveEvent::StormLeviathanCaught => "Caught the Storm Leviathan".to_string(),
             SaveEvent::AchievementUnlocked(name) => format!("Achievement: {name}"),
+            SaveEvent::VesselLaunched => {
+                "The Vessel launches — 250,000 Prestige Ranks burn".to_string()
+            }
+            SaveEvent::VesselArrived => "The Vessel reaches the Tree".to_string(),
+            SaveEvent::LastCrossing => "The Last Crossing — the old world is empty".to_string(),
             SaveEvent::HavenRoomBuilt(room) => format!("Built {room} in Haven"),
             SaveEvent::HavenRoomUpgraded(room, tier) => format!("Upgraded {room} to T{tier}"),
             SaveEvent::SoulforgeEnhanced(slot, level) => {
@@ -191,4 +200,29 @@ pub struct TimelineInfo {
     pub is_active: bool,
     /// Most recent commit on this branch, if any.
     pub head_commit: Option<CommitInfo>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SaveEvent;
+
+    #[test]
+    fn vessel_save_events_describe_their_moments() {
+        assert_eq!(
+            SaveEvent::VesselLaunched.description(),
+            "The Vessel launches — 250,000 Prestige Ranks burn"
+        );
+        assert_eq!(
+            SaveEvent::VesselArrived.description(),
+            "The Vessel reaches the Tree"
+        );
+        assert_eq!(
+            SaveEvent::LastCrossing.description(),
+            "The Last Crossing — the old world is empty"
+        );
+        // The commit-message suffix machinery composes with them unchanged.
+        let msg = SaveEvent::VesselLaunched.commit_message(80, 250_000, 50, 5, 3_600, "Ferry");
+        assert!(msg.starts_with("The Vessel launches"));
+        assert!(msg.contains("@Ferry"));
+    }
 }

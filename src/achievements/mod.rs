@@ -20,6 +20,6 @@ pub use persistence::{load_achievements, save_achievements};
 #[allow(unused_imports)]
 pub use titles::{get_title_text, get_unlocked_titles};
 pub use types::{
-    AchievementCategory, AchievementId, Achievements, UiBorderStyle, UnlockedAchievement,
+    AchievementCategory, AchievementId, Achievements, Act, UiBorderStyle, UnlockedAchievement,
     SELECTABLE_UI_BORDER_STYLES,
 };

@@ -19,7 +19,7 @@ folded back into those specs.
 
 The specs in `specs/` were **reverse-engineered from the existing
 implementation** — they document the game as it is actually coded today, not a
-wishlist. Twenty capability specs (211 requirements, 507 scenarios) were each
+wishlist. Twenty capability specs (215 requirements, 517 scenarios) were each
 produced by reading the relevant `src/<module>/` code, its module `CLAUDE.md`,
 the root `CLAUDE.md` "Key Constants", and the design notes under `docs/`, then
 grounding every number against the source. All twenty pass
@@ -47,11 +47,11 @@ than silently editing the spec to match a regression.
 | [`dungeon`](specs/dungeon/spec.md) | 10 | Discovery, procedural rooms, auto-exploration, boss-key gate, cadence, safe-exit-on-death |
 | [`haven`](specs/haven/spec.md) | 10 | Account base, chance discovery, two-branch room tree, explicit-parameter bonus injection |
 | [`stormglass`](specs/stormglass/spec.md) | 10 | Soft currency, Storm Sigils, UTC-day sigil rotation, Chrono Surge, Storm Lure |
-| [`achievements`](specs/achievements/spec.md) | 10 | 240 account-level achievements, milestones, scoring, titles |
+| [`achievements`](specs/achievements/spec.md) | 11 | 247 account-level achievements, milestones, scoring, titles |
 | [`god-items`](specs/god-items/spec.md) | 7 | Asprika / Sleipnir / Megingjord — fixed God-rarity artifacts, passives, auto-equip protection |
 | [`time-vault`](specs/time-vault/spec.md) | 9 | git-backed save snapshots on milestones, browse/restore/fork/delete, no auto-prune |
 | [`persistence`](specs/persistence/spec.md) | 10 | JSON save files, `QUEST_DIR`, run vs account state, backward-compat contract, silent-wipe hazard |
-| [`vessel-act2`](specs/vessel-act2/spec.md) | 16 | Act 2 kill-switch, Zone-50 launch gate (250k PR burn), the Voyage loop, the ferry era's balance envelope, the Last Crossing |
+| [`vessel-act2`](specs/vessel-act2/spec.md) | 19 | Act 2 kill-switch, Zone-50 launch gate (250k PR burn), the Voyage loop, the ferry era's balance envelope, the Last Crossing |
 
 ## Setup
 

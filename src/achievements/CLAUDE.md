@@ -23,7 +23,7 @@ src/achievements/
 
 ### `AchievementId` (`types.rs`)
 
-Enum with 240 variants covering all trackable milestones. Organized by domain:
+Enum with 254 variants covering all trackable milestones. Organized by domain:
 
 - **Combat**: `SlayerI`..`SlayerXV` (100 to 1B kills), `BossHunterI`..`BossHunterXV` (1 to 10M bosses)
 - **Level**: `Level10`..`Level100000` (18 milestones)
@@ -38,14 +38,16 @@ Enum with 240 variants covering all trackable milestones. Organized by domain:
 - **Haven**: `HavenDiscovered`, `HavenBuilderI`..`HavenBuilderII`, `HavenArchitect`
 - **Deep**: Discovery, first mission, mission count milestones (10/25/50/100), first breakthrough, layer milestones (Layers 5/10/15/20/25), VoidExplorer (Layer 26), guild rank milestones, first merc lost, gateway opened
 - **Loom**: `LoomDiscovered`, `LoomPattern1`..`LoomPattern28` (7 milestones: discovery + pattern completion at 1/4/8/16/22/28 patterns)
+- **Vessel (Act 2)**: `TheBurn` (launch), `TheRootsOfLight` (first arrival), `FerrymanI`..`FerrymanIII` (1k/10k/50k lifetime souls delivered via `total_souls_delivered`), `TheLastCrossing` (era complete), `TheCovenantKept` (era complete with `souls_lost_lifetime == 0`) — in Act II's subsections (Voyage/Ferry/Era), wired from the launch confirm and the voyage delivery/era-end block. **Visible while dark, by ruling (2026-07-13)**: the Act 2 kill-switch gates entry into the act, not the existence of its milestones — the locked rows remain in the browser as a teaser and are unearnable while dark (every unlock path is act2-gated). Pinned by `vessel_visibility_tests`
+- **Vessel collections (Act 2)**: `EveryStarAHarbor` (all 38 waypoints, lifetime union in `waypoints_docked_mask`, grants Wayfarer), `CompanyOnTheRoad` (all 5 pilgrim ships, `pilgrims_hailed_mask`), `EarToTheWater` (all 8 rumors in one crossing), `ThreeDoorsOpened` (all 3 refit doors in one crossing), `TheFullTable` (landfall with 7 berths filled), `HeavyLading` (`HEAVY_LADING_SOULS` = 2,500+ in one crossing), `TheSwiftPassage` (`SWIFT_PASSAGE_DAYS` = 8 sea-days or fewer). Unlocked by observation, not engine hooks: the voyage loop calls `on_voyage_observed` (per-frame, idempotent bit math over the live crossing's `visited`/`hailed`/`rumors`/`refits`) and `on_landfall` (per-delivery records). Completion targets derive from the authored-content constants (`route::WAYPOINTS`, `pilgrims::PILGRIMS`, `route::RUMORS`, `refits::REFIT_PAIRS`, `souls::CREW`); threshold reachability inside the balance envelope is pinned in `tests/ferryman_tests.rs` (`the_collection_thresholds_stay_inside_the_envelope`). All verified achievable — the tempting variants ("all six refits", "all eight arcs") are structurally impossible and deliberately not shipped (see `openspec/changes/archive/` for the feasibility analysis)
 
 ### `AchievementCategory` (`types.rs`)
 
-Nine categories for browsing: `Combat`, `Level`, `Prestige`, `Progression`, `Challenges`, `Exploration`, `Deep`, `Loom`, `Stats`.
+Twelve categories for browsing, grouped under two acts (`Act` enum, same file): **Act I · The Ascent** — `Combat`, `Level`, `Prestige`, `Progression`, `Challenges`, `Exploration`, `Deep`, `Loom`, `Stats`; **Act II · The Crossing** — `Voyage` ("The Voyage"), `Ferry` ("The Ferry"), `Era` ("The Era"). `Act::categories()` / `AchievementCategory::act()` define the partition (test-pinned). The browser shows an act selector row above the act's own subsection tabs: `[Tab]` toggles act, `</>`/arrows cycle within the act; Act II's label dims while the kill-switch is off (rows stay browsable — the teaser ruling).
 
 ### `AchievementDef` (`data.rs`)
 
-Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 240 achievements total. Note: `VaultWardenJourneyman` is currently set to 15 points (`data.rs`), which doesn't match any tier — the other three Vault Warden achievements follow Trivial/Easy/Medium (5/10/25), so this looks like a data entry slip rather than an intentional off-tier value; left as-is pending a balance decision.
+Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 254 achievements total. Note: `VaultWardenJourneyman` is currently set to 15 points (`data.rs`), which doesn't match any tier — the other three Vault Warden achievements follow Trivial/Easy/Medium (5/10/25), so this looks like a data entry slip rather than an intentional off-tier value; left as-is pending a balance decision.
 
 Achievement score is computed at runtime by summing the point values of all unlocked achievements. The aggregate score is displayed in three locations: the achievement browser title bar (`achievement_browser_scene.rs`), the stats view (`achievement_details.rs`), and the character-select splash screen badge (`main_helpers/update.rs`). The achievement unlock modal and the achievement detail panel show only the single achievement's own point value (`def.points`), not the running total.
 
@@ -55,7 +57,7 @@ Main state struct (serialized to disk). Contains:
 
 - `unlocked: HashMap<AchievementId, UnlockedAchievement>` -- which achievements are unlocked and when
 - `progress: HashMap<AchievementId, AchievementProgress>` -- current/target for multi-stage achievements
-- Aggregate counters: `total_kills`, `total_bosses_defeated`, `total_fish_caught`, `total_dungeons_completed`, `total_minigame_wins`, `highest_prestige_rank`, `highest_level`, `highest_fishing_rank`, `zones_fully_cleared`, `expanse_cycles_completed`, `total_deep_missions_completed`, `highest_deep_layer`, `highest_guild_rank`
+- Aggregate counters: `total_kills`, `total_bosses_defeated`, `total_fish_caught`, `total_dungeons_completed`, `total_minigame_wins`, `highest_prestige_rank`, `highest_level`, `highest_fishing_rank`, `zones_fully_cleared`, `expanse_cycles_completed`, `total_deep_missions_completed`, `highest_deep_layer`, `highest_guild_rank`, `total_souls_delivered`, `souls_lost_lifetime`, `waypoints_docked_mask`, `pilgrims_hailed_mask`
 - `ui_border_style: UiBorderStyle` -- global border style for panel UI
 - `selected_title: Option<AchievementId>` -- currently selected character title (account-wide)
 - Transient fields (`#[serde(skip)]`): `pending_notifications`, `newly_unlocked`, `modal_queue`, `recently_unlocked`, `accumulation_start`
@@ -74,7 +76,7 @@ achievements.on_enemy_killed(is_boss, Some(&state.character_name));
 achievements.on_level_up(new_level, Some(&state.character_name));
 ```
 
-Event handlers: `on_enemy_killed`, `on_level_up`, `on_prestige`, `on_zone_fully_cleared`, `on_storms_end`, `on_dungeon_completed`, `on_minigame_won`, `on_fish_caught`, `on_fishing_rank_up`, `on_storm_leviathan_caught`, `on_haven_discovered`, `on_haven_all_t1`, `on_haven_all_t2`, `on_haven_architect`, `on_soulforge_discovered`, `on_enhancement_upgraded`, `on_deep_discovered`, `on_deep_breakthrough`, `on_deep_guild_rank_up`, `on_deep_mission_complete`, `on_deep_merc_lost`, `on_deep_gateway_opened`, `on_ascended`, `on_loom_discovered`, `on_loom_pattern_completed`.
+Event handlers: `on_enemy_killed`, `on_level_up`, `on_prestige`, `on_zone_fully_cleared`, `on_storms_end`, `on_dungeon_completed`, `on_minigame_won`, `on_fish_caught`, `on_fishing_rank_up`, `on_storm_leviathan_caught`, `on_haven_discovered`, `on_haven_all_t1`, `on_haven_all_t2`, `on_haven_architect`, `on_soulforge_discovered`, `on_enhancement_upgraded`, `on_deep_discovered`, `on_deep_breakthrough`, `on_deep_guild_rank_up`, `on_deep_mission_complete`, `on_deep_merc_lost`, `on_deep_gateway_opened`, `on_ascended`, `on_loom_discovered`, `on_loom_pattern_completed`, and the Vessel set: `on_vessel_launched`, `on_vessel_arrived`, `on_crossing_delivered`, `on_last_crossing`, `on_voyage_observed`, `on_landfall`.
 
 ### Unlock Flow
 
@@ -131,7 +133,7 @@ Additionally, `newly_unlocked` is drained each tick by `collect_achievement_even
 
 Titles are display names earned by unlocking specific achievements. Players can select one title to display after their character name (e.g., "Hero, Godslayer"). Titles are account-wide and persist in `selected_title` on the `Achievements` struct.
 
-- `ALL_TITLES`: const slice of `TitleDef { achievement_id, title_text }` — 64 curated titles across level & prestige, ascension, combat, challenges, exploration (including enhancement/Soulforge titles), fracture zones, and the Deep
+- `ALL_TITLES`: const slice of `TitleDef { achievement_id, title_text }` — 65 curated titles across level & prestige, ascension, combat, challenges, exploration (including enhancement/Soulforge titles), fracture zones, the Deep, and the Vessel (Wayfarer)
 - `get_title_text(id)`: returns the title text for an achievement, if it grants a title
 - `get_unlocked_titles(achievements)`: returns all titles the player has earned, in display order
 - `validate_selected_title(achievements)`: clears `selected_title` if the achievement isn't unlocked or doesn't grant a title (called on load)

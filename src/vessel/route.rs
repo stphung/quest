@@ -1243,12 +1243,10 @@ pub fn cheapest_road_from(id: WaypointId) -> Option<&'static Road> {
 }
 
 /// Chapter gateway waypoints: the single exit point of each chapter.
-/// Chapter-beat scenes (spec 4) hang off these.
-#[allow(dead_code)]
+/// Chapter-close beats (`scenes::chapter_close_beat`) hang off these.
 pub const CHAPTER_GATEWAYS: [WaypointId; 4] =
     [WaypointId(10), WaypointId(22), WaypointId(32), ROUTE_SINK];
 
-#[allow(dead_code)] // Chapter-beat slot for spec 4.
 pub fn is_chapter_gateway(id: WaypointId) -> bool {
     CHAPTER_GATEWAYS.contains(&id)
 }

@@ -884,6 +884,47 @@ fn wiki_hotkey_opens_browser_or_falls_back_to_a_link_modal() {
 }
 
 #[test]
+fn achievement_browser_tab_toggles_act_and_cycling_stays_in_act() {
+    use crate::achievements::Act;
+    fn browser(h: &InputHarness) -> &AchievementBrowserState {
+        match &h.overlay {
+            GameOverlay::Achievements { browser, .. } => browser,
+            _ => panic!("achievement browser not open"),
+        }
+    }
+
+    let mut h = InputHarness::new(fixtures::fresh("Hero", 0));
+    h.char('a');
+    assert_eq!(browser(&h).selected_act, Act::ActI);
+    assert_eq!(browser(&h).selected_category, AchievementCategory::Combat);
+
+    // Cycling left from Combat wraps WITHIN Act I (to Stats), never into
+    // Act II's subsections.
+    h.press(KeyCode::Left);
+    assert_eq!(browser(&h).selected_category, AchievementCategory::Stats);
+    assert_eq!(browser(&h).selected_act, Act::ActI);
+
+    // Tab crosses to Act II, landing on its first subsection.
+    h.press(KeyCode::Tab);
+    assert_eq!(browser(&h).selected_act, Act::ActII);
+    assert_eq!(browser(&h).selected_category, AchievementCategory::Voyage);
+    assert_eq!(browser(&h).selected_index, 0, "list selection resets");
+
+    // Act II cycling wraps within its three subsections.
+    h.press(KeyCode::Right);
+    assert_eq!(browser(&h).selected_category, AchievementCategory::Ferry);
+    h.press(KeyCode::Right);
+    assert_eq!(browser(&h).selected_category, AchievementCategory::Era);
+    h.press(KeyCode::Right);
+    assert_eq!(browser(&h).selected_category, AchievementCategory::Voyage);
+
+    // Tab returns to Act I.
+    h.press(KeyCode::Tab);
+    assert_eq!(browser(&h).selected_act, Act::ActI);
+    assert_eq!(browser(&h).selected_category, AchievementCategory::Combat);
+}
+
+#[test]
 fn vessel_hotkey_stays_inert_while_act2_is_dark_shipped() {
     // Act 2 ships dark (`vessel::ACT2_ENABLED == false`); even a qualified
     // signal must not surface the `[V]` overlay unless a session opts in via
@@ -978,7 +1019,11 @@ fn flag_on_vessel_hotkey_opens_overlay_and_enter_burns_the_launch() {
         h.state.prestige_rank, 5,
         "exactly LAUNCH_PR_COST is subtracted"
     );
-    assert_eq!(result, InputResult::NeedsSave);
+    assert_eq!(
+        result,
+        InputResult::NeedsSaveWithEvent(crate::history::SaveEvent::VesselLaunched),
+        "the burn is a vault moment — a wrong variant would skip the history commit"
+    );
 }
 
 #[test]

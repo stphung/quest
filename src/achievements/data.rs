@@ -2034,7 +2034,141 @@ pub const ALL_ACHIEVEMENTS: &[AchievementDef] = &[
         icon: "\u{1F9F5}",
         points: 500,
     },
+    // ── The Vessel (Act 2) ───────────────────────────────────────────────
+    AchievementDef {
+        id: AchievementId::TheBurn,
+        name: "The Burn",
+        description: "Burn 250,000 Prestige Ranks and launch the Vessel",
+        category: AchievementCategory::Voyage,
+        icon: "\u{2726}",
+        points: 50,
+    },
+    AchievementDef {
+        id: AchievementId::TheRootsOfLight,
+        name: "The Roots of Light",
+        description: "Reach the Tree — the first crossing of the dark",
+        category: AchievementCategory::Voyage,
+        icon: "\u{2726}",
+        points: 50,
+    },
+    AchievementDef {
+        id: AchievementId::FerrymanI,
+        name: "Ferryman",
+        description: "Carry 1,000 souls out of the dark",
+        category: AchievementCategory::Ferry,
+        icon: "\u{2693}",
+        points: 25,
+    },
+    AchievementDef {
+        id: AchievementId::FerrymanII,
+        name: "Ferryman of Thousands",
+        description: "Carry 10,000 souls out of the dark",
+        category: AchievementCategory::Ferry,
+        icon: "\u{2693}",
+        points: 50,
+    },
+    AchievementDef {
+        id: AchievementId::FerrymanIII,
+        name: "The Long Ferry",
+        description: "Carry 50,000 souls out of the dark",
+        category: AchievementCategory::Ferry,
+        icon: "\u{2693}",
+        points: 100,
+    },
+    AchievementDef {
+        id: AchievementId::TheLastCrossing,
+        name: "The Last Crossing",
+        description: "Empty the old world — every soul that could be carried, carried",
+        category: AchievementCategory::Era,
+        icon: "\u{2726}",
+        points: 250,
+    },
+    AchievementDef {
+        id: AchievementId::TheCovenantKept,
+        name: "The Covenant Kept",
+        description: "Complete the era without losing a single soul of the crew",
+        category: AchievementCategory::Era,
+        icon: "\u{263C}",
+        points: 250,
+    },
+    // ── The Vessel (Act 2) — collection achievements ─────────────────────
+    // Completion targets derive from the authored-content constants at the
+    // unlock sites (route::WAYPOINTS, pilgrims::PILGRIMS, route::RUMORS,
+    // refits::REFIT_PAIRS, souls::CREW); the descriptions carry today's
+    // numbers for the player.
+    AchievementDef {
+        id: AchievementId::EveryStarAHarbor,
+        name: "Every Star a Harbor",
+        description: "Dock at all 38 charted waypoints, across any number of crossings",
+        category: AchievementCategory::Voyage,
+        icon: "\u{2727}",
+        points: 100,
+    },
+    AchievementDef {
+        id: AchievementId::CompanyOnTheRoad,
+        name: "Company on the Road",
+        description: "Hail all 5 pilgrim ships, across any number of crossings",
+        category: AchievementCategory::Voyage,
+        icon: "\u{2388}",
+        points: 50,
+    },
+    AchievementDef {
+        id: AchievementId::EarToTheWater,
+        name: "Ear to the Water",
+        description: "Hold all 8 rumors at once on a single crossing",
+        category: AchievementCategory::Voyage,
+        icon: "\u{266A}",
+        points: 50,
+    },
+    AchievementDef {
+        id: AchievementId::ThreeDoorsOpened,
+        name: "Three Doors Opened",
+        description: "Take a refit at all three shipyard doors on one crossing",
+        category: AchievementCategory::Voyage,
+        icon: "\u{2302}",
+        points: 25,
+    },
+    AchievementDef {
+        id: AchievementId::TheFullTable,
+        name: "The Full Table",
+        description: "Make landfall with all seven berths filled",
+        category: AchievementCategory::Ferry,
+        icon: "\u{2693}",
+        points: 50,
+    },
+    AchievementDef {
+        id: AchievementId::HeavyLading,
+        name: "Heavy Lading",
+        description: "Deliver 2,500 souls or more in a single crossing",
+        category: AchievementCategory::Ferry,
+        icon: "\u{2693}",
+        points: 25,
+    },
+    AchievementDef {
+        id: AchievementId::TheSwiftPassage,
+        name: "The Swift Passage",
+        description: "Complete a crossing in 8 sea-days or fewer",
+        category: AchievementCategory::Era,
+        icon: "\u{2604}",
+        points: 25,
+    },
 ];
+
+/// Heavy Lading's single-crossing delivery threshold. Empirical envelope
+/// (RAMPDBG era sweeps, 2026-07-14): Cap Lv7 alone clears it
+/// (`BASE_CAPACITY` 180 × `CAP_GROWTH` 1.46⁷ ≈ 2,554), Lv6 + districts
+/// clears it, while a no-capacity line maxes at 810 (base + all six
+/// districts) and correctly never qualifies. Reachability inside the
+/// balance envelope is pinned in `tests/ferryman_tests.rs`.
+pub const HEAVY_LADING_SOULS: u32 = 2_500;
+
+/// The Swift Passage's sea-day threshold (inclusive: `days <= 8`).
+/// Empirical envelope (era sweeps, 2026-07-14): drive-heavy lines floor at
+/// exactly 8 sea-days once Drive compounds toward its 0.05 floor (port
+/// calls dominate the remainder); ward-lean plateaus at 10, a no-drive
+/// line sits near 40. Pinned alongside Heavy Lading in
+/// `tests/ferryman_tests.rs`.
+pub const SWIFT_PASSAGE_DAYS: u64 = 8;
 
 /// Get the definition for a specific achievement (O(1) HashMap lookup).
 pub fn get_achievement_def(id: AchievementId) -> Option<&'static AchievementDef> {
@@ -2370,6 +2504,20 @@ mod tests {
             AchievementId::VaultWardenApprentice,
             AchievementId::VaultWardenJourneyman,
             AchievementId::VaultWardenMaster,
+            AchievementId::TheBurn,
+            AchievementId::TheRootsOfLight,
+            AchievementId::FerrymanI,
+            AchievementId::FerrymanII,
+            AchievementId::FerrymanIII,
+            AchievementId::TheLastCrossing,
+            AchievementId::TheCovenantKept,
+            AchievementId::EveryStarAHarbor,
+            AchievementId::CompanyOnTheRoad,
+            AchievementId::EarToTheWater,
+            AchievementId::ThreeDoorsOpened,
+            AchievementId::TheFullTable,
+            AchievementId::HeavyLading,
+            AchievementId::TheSwiftPassage,
         ];
 
         // Sanity-check: the slice above must itself be up-to-date.

@@ -61,7 +61,23 @@ pub fn render_voyage(
         VoyageView::Dock { confirm_pending } => render_dock(frame, area, colony, confirm_pending),
         _ => match ctx.tier {
             SizeTier::XL | SizeTier::L => render_full(frame, area, voyage, ui, colony),
-            _ => render_strip(frame, area, voyage, ui, colony),
+            // Small tiers have no side column: an open panel takes the
+            // whole frame (the harbor rooms' pattern), otherwise the strip.
+            // Without this, a 60×24 player charts courses blind — the view
+            // state advances but only the strip ever renders.
+            _ => match ui.view {
+                VoyageView::Junction { selected } => {
+                    render_junction_panel(frame, area, voyage, selected)
+                }
+                VoyageView::Trim { selected } => render_trim_panel(frame, area, voyage, selected),
+                VoyageView::Rumors => render_rumor_panel(frame, area, voyage),
+                VoyageView::Souls { selected } => render_souls_panel(frame, area, voyage, selected),
+                VoyageView::Watch { selected } => render_watch_panel(frame, area, voyage, selected),
+                VoyageView::Farewell { selected } => {
+                    render_farewell_panel(frame, area, voyage, selected)
+                }
+                _ => render_strip(frame, area, voyage, ui, colony),
+            },
         },
     }
 

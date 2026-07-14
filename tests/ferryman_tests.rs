@@ -160,6 +160,97 @@ fn strategy_sweep_holds_the_campaign_envelope() {
     );
 }
 
+/// The collection-achievement thresholds stay earnable inside the balance
+/// envelope (achievements spec, Vessel Act Milestones): a balanced era must
+/// actually set records that clear Heavy Lading and The Swift Passage, and
+/// the capacity formula's Lv7 floor must clear Heavy Lading on its own. A
+/// retune of `CAP_GROWTH` / `DRIVE_DECAY` / port-call time that strands
+/// either achievement fails here instead of shipping unearnable.
+#[test]
+fn the_collection_thresholds_stay_inside_the_envelope() {
+    use quest::achievements::data::{HEAVY_LADING_SOULS, SWIFT_PASSAGE_DAYS};
+    use quest::vessel::colony::{BASE_CAPACITY, CAP_GROWTH};
+
+    let colony = run_era_colony(balanced_spend, 1.0);
+    assert!(
+        colony.records.most_carried >= HEAVY_LADING_SOULS,
+        "a balanced era carries a Heavy Lading load ({} < {})",
+        colony.records.most_carried,
+        HEAVY_LADING_SOULS
+    );
+    assert!(
+        colony.records.fastest_days <= SWIFT_PASSAGE_DAYS,
+        "a balanced era sets a Swift Passage record ({} > {})",
+        colony.records.fastest_days,
+        SWIFT_PASSAGE_DAYS
+    );
+
+    let cap7 = (f64::from(BASE_CAPACITY) * CAP_GROWTH.powi(7)).round() as u32;
+    assert!(
+        cap7 >= HEAVY_LADING_SOULS,
+        "Cap Lv7 alone clears Heavy Lading ({cap7} < {HEAVY_LADING_SOULS})"
+    );
+}
+
+/// End-to-end: the collection observers read a REAL maiden crossing the
+/// way `main.rs` does (mask conversion and all). `cross()` plays the
+/// accept-everyone line — every ask accepted, every refit door taken — so
+/// the crew fills to seven and The Full Table unlocks from genuine voyage
+/// state; the maiden's ~37 sea-days and 7-soul delivery correctly do NOT
+/// clear The Swift Passage or Heavy Lading. (The achievement handlers are
+/// not themselves act2-gated — the gate is the voyage loop that calls
+/// them, which is why this lives beside the era harness, not the flag-on
+/// suite.)
+#[test]
+fn the_collection_observers_read_a_real_crossing() {
+    use quest::achievements::types::AchievementId;
+    use quest::achievements::Achievements;
+
+    let mut v = VoyageState::begin("observe".to_string(), 7, t0());
+    v.intro_pending = false;
+    let days = cross(&mut v);
+
+    let mut a = Achievements::default();
+    // The exact mask math the voyage loop uses.
+    let visited_mask = v
+        .visited
+        .iter()
+        .fold(0u64, |m, w| m | (1u64 << (w.0 as u64 % 64)));
+    let hailed_mask = v.hailed.iter().fold(0u8, |m, s| m | (1u8 << (s % 8)));
+    a.on_voyage_observed(
+        visited_mask,
+        hailed_mask,
+        v.rumors.len(),
+        v.refits.len(),
+        None,
+    );
+
+    assert_eq!(
+        a.waypoints_docked_mask.count_ones() as usize,
+        v.visited.len(),
+        "the union mirrors the crossing's docks exactly"
+    );
+    assert!(
+        (22..=28).contains(&v.visited.len()),
+        "one crossing sees one path's worth of the chart ({})",
+        v.visited.len()
+    );
+    assert!(
+        !a.is_unlocked(AchievementId::EveryStarAHarbor),
+        "a single crossing cannot cover all 38 waypoints"
+    );
+
+    let delivered = v.aboard_count() as u32;
+    a.on_landfall(delivered, days, v.aboard_count(), None);
+    assert_eq!(v.aboard_count(), 7, "accept-everyone fills the table");
+    assert!(a.is_unlocked(AchievementId::TheFullTable));
+    assert!(
+        !a.is_unlocked(AchievementId::TheSwiftPassage),
+        "the maiden voyage ({days} sea-days) is no Swift Passage"
+    );
+    assert!(!a.is_unlocked(AchievementId::HeavyLading));
+}
+
 /// The Dock's patience trade, asserted (vessel-act2 spec): jumping at full
 /// Riftglass charge must never save fewer souls than always jumping at 0%.
 /// This is what validates `RIFTGLASS_BASE_HOURS_TO_FULL` and the
@@ -239,8 +330,23 @@ fn run_era() -> (u32, u64, u64, u64) {
 /// Play a full era under an arbitrary spend policy, jumping through the
 /// Dock/Wormhole (spec 9 addendum) at a fixed Riftglass `charge` every
 /// crossing. Returns (crossings, first-days, last-days, delivered,
-/// total-game-days, total-dock-real-hours).
+/// total-game-days, total-dock-real-hours). For records-level assertions
+/// (`CrossingRecords`), use `run_era_colony`, which shares this loop.
 fn run_era_with(spend: fn(&mut ColonyState), charge: f64) -> (u32, u64, u64, u64, u64, f64) {
+    let (c, f, l, d, t, h, _) = run_era_full(spend, charge);
+    (c, f, l, d, t, h)
+}
+
+/// Play a full era and return the finished colony (records and all).
+fn run_era_colony(spend: fn(&mut ColonyState), charge: f64) -> ColonyState {
+    run_era_full(spend, charge).6
+}
+
+#[allow(clippy::type_complexity)]
+fn run_era_full(
+    spend: fn(&mut ColonyState),
+    charge: f64,
+) -> (u32, u64, u64, u64, u64, f64, ColonyState) {
     let mut colony = ColonyState::found("era".to_string());
     let mut crew: Vec<quest::vessel::voyage::SoulState> = Vec::new();
     let mut first_days = 0;
@@ -303,6 +409,7 @@ fn run_era_with(spend: fn(&mut ColonyState), charge: f64) -> (u32, u64, u64, u64
                 colony.souls_delivered,
                 total_days,
                 total_dock_hours,
+                colony,
             );
         }
         // Dock/Wormhole (spec 9 addendum): real time passes reaching

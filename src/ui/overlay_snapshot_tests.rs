@@ -587,6 +587,98 @@ fn snapshot_voyage_keepsake_chart() {
     });
 }
 
+/// Every voyage panel at the smallest supported terminal (60×24): the
+/// release-polish small-terminal net. A panel that can't fit must degrade
+/// deliberately (compact layout or an explicit notice), never overflow or
+/// panic — these snapshots are what pin that.
+#[test]
+fn snapshot_voyage_panels_small_terminal() {
+    use crate::vessel::{VoyageUiState, VoyageView};
+    let cases: Vec<(&str, VoyageView, bool, bool)> = vec![
+        // (name, view, use_arrived_voyage, docked_colony)
+        (
+            "voyage_junction_m_60x24",
+            VoyageView::Junction { selected: 0 },
+            false,
+            false,
+        ),
+        (
+            "voyage_trim_m_60x24",
+            VoyageView::Trim { selected: 1 },
+            false,
+            false,
+        ),
+        (
+            "voyage_souls_m_60x24",
+            VoyageView::Souls { selected: 0 },
+            false,
+            false,
+        ),
+        (
+            "voyage_watch_m_60x24",
+            VoyageView::Watch { selected: 0 },
+            false,
+            false,
+        ),
+        (
+            "voyage_reckoning_m_60x24",
+            VoyageView::Reckoning,
+            true,
+            false,
+        ),
+        (
+            "voyage_dock_m_60x24",
+            VoyageView::Dock {
+                confirm_pending: false,
+            },
+            true,
+            true,
+        ),
+        (
+            "voyage_manifest_m_60x24",
+            VoyageView::Manifest { scroll: 0 },
+            true,
+            false,
+        ),
+        (
+            "voyage_keepsake_m_60x24",
+            VoyageView::Keepsake { x: 40, y: 40 },
+            true,
+            false,
+        ),
+        (
+            "voyage_record_m_60x24",
+            VoyageView::Record { scroll: 0 },
+            true,
+            false,
+        ),
+    ];
+    for (name, view, arrived, docked) in cases {
+        assert_overlay_snapshot(name, || {
+            let voyage = if arrived {
+                arrived_voyage()
+            } else {
+                fixtures::voyage_at_first_junction(frozen_utc())
+            };
+            let mut colony = fixtures::colony_midera();
+            if docked {
+                colony.dock(frozen_utc());
+            }
+            let ui = VoyageUiState {
+                view,
+                scene_play: None,
+                scene_modal: None,
+                moments: Default::default(),
+            };
+            render_overlay_sized(60, 24, |f| {
+                let area = f.area();
+                let ctx = LayoutContext::from_frame(f);
+                super::voyage_scene::render_voyage(f, area, &voyage, &ui, &ctx, Some(&colony));
+            })
+        });
+    }
+}
+
 #[test]
 fn snapshot_voyage_dock_era_over() {
     // After the Last Crossing: the quiet harbor — no charge bar, no jump

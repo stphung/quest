@@ -614,6 +614,25 @@ fn main() -> io::Result<()> {
                             }
                             let v = voyage.as_mut().expect("voyage initialized above");
                             v.tick(Utc::now());
+                            // Collection achievements observe the live
+                            // crossing each frame (idempotent bit math —
+                            // per-crossing sets reset at departure, the
+                            // persistent unions live on Achievements).
+                            {
+                                let visited_mask = v
+                                    .visited
+                                    .iter()
+                                    .fold(0u64, |m, w| m | (1u64 << (w.0 as u64 % 64)));
+                                let hailed_mask =
+                                    v.hailed.iter().fold(0u8, |m, s| m | (1u8 << (s % 8)));
+                                global_achievements.on_voyage_observed(
+                                    visited_mask,
+                                    hailed_mask,
+                                    v.rumors.len(),
+                                    v.refits.len(),
+                                    Some(&state.character_name),
+                                );
+                            }
                             // Arc beats (possibly fired offline) queue as log
                             // moments, shown one at a time.
                             for event in v.take_soul_events() {
@@ -711,6 +730,7 @@ fn main() -> io::Result<()> {
                             if let Some(playback) = v.take_finale_playback() {
                                 // The first arrival is the record; every
                                 // arrival folds into the colony (spec 9).
+                                let first_arrival = !state.vessel_arrived;
                                 state.vessel_arrived = true;
                                 let col = colony.get_or_insert_with(|| {
                                     vessel::colony::ColonyState::found(state.character_id.clone())
@@ -723,6 +743,28 @@ fn main() -> io::Result<()> {
                                 };
                                 let delivery =
                                     col.deliver_crossing(delivered, days, days * 10, days);
+                                let crew_lost = v
+                                    .souls
+                                    .iter()
+                                    .filter(|s| s.status == vessel::voyage::SoulStatus::Lost)
+                                    .count() as u32;
+                                global_achievements.on_crossing_delivered(
+                                    col.souls_delivered,
+                                    crew_lost,
+                                    Some(&state.character_name),
+                                );
+                                // The single crossing's own records: Heavy
+                                // Lading / The Swift Passage / The Full Table.
+                                global_achievements.on_landfall(
+                                    delivered,
+                                    days,
+                                    v.aboard_count(),
+                                    Some(&state.character_name),
+                                );
+                                if first_arrival {
+                                    global_achievements
+                                        .on_vessel_arrived(Some(&state.character_name));
+                                }
                                 voyage_ui.moments.push_back(vessel::SceneModal {
                                     title: "Landfall".to_string(),
                                     body: format!(
@@ -754,6 +796,8 @@ fn main() -> io::Result<()> {
                                     // finale and the landfall moments have
                                     // been read (one-shot, colony-persisted).
                                     state.last_crossing_complete = true;
+                                    global_achievements
+                                        .on_last_crossing(Some(&state.character_name));
                                 } else {
                                     // Dock/Wormhole (spec 9 addendum): every
                                     // arrival opens a Dock phase instead of
@@ -776,6 +820,41 @@ fn main() -> io::Result<()> {
                                         &deep_state,
                                         &loom_state,
                                     );
+                                    // Act milestones are vault moments: the
+                                    // first arrival and the Last Crossing
+                                    // each commit to history exactly once
+                                    // (this delivery block cannot re-run for
+                                    // an ended era — no crossings follow it).
+                                    if let Some(ref repo) = history_repo {
+                                        if first_arrival {
+                                            main_helpers::persistence::commit_save(
+                                                &state,
+                                                &history::SaveEvent::VesselArrived,
+                                                repo,
+                                            );
+                                        }
+                                        if col.era_over() {
+                                            main_helpers::persistence::commit_save(
+                                                &state,
+                                                &history::SaveEvent::LastCrossing,
+                                                repo,
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                            // Achievements unlocked at sea (launch/arrival/
+                            // ferry tiers) have no Act 1 modal to land in —
+                            // surface them as voyage moments instead.
+                            if global_achievements.is_modal_ready() {
+                                for id in global_achievements.take_modal_queue() {
+                                    if let Some(def) = crate::achievements::get_achievement_def(id)
+                                    {
+                                        voyage_ui.moments.push_back(vessel::SceneModal {
+                                            title: format!("Achievement: {}", def.name),
+                                            body: def.description.to_string(),
+                                        });
+                                    }
                                 }
                             }
                             // Ports the ship made on her own while the
@@ -1045,6 +1124,15 @@ fn main() -> io::Result<()> {
                             terminal.clear()?;
                         }
                         prev_scene_kind = scene_kind;
+
+                        // Achievement browser act/section switches force a
+                        // full repaint too (same desync class: emoji-wide
+                        // cells vs. the diff model — see the state field).
+                        if let input::GameOverlay::Achievements { browser, .. } = &mut overlay {
+                            if browser.take_full_repaint() {
+                                terminal.clear()?;
+                            }
+                        }
 
                         // Check if sigil rolling animation has timed out
                         crate::input::check_sigil_animation_timeout(&mut exchange_ui);

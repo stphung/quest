@@ -550,6 +550,26 @@ Session-by-session log of what changed at each refresh, most recent first.
 The sections above always describe the *current* state only — read this
 section for how it got there.
 
+### 2026-07-13 (later) — release polish: the act joins the meta-game
+
+The `act2-release-polish` change integrated Act 2 with the game's
+meta-systems: seven Vessel achievements (The Burn, The Roots of Light,
+Ferryman I–III at 1k/10k/50k souls, The Last Crossing, The Covenant
+Kept), three Time Vault save events (launch / first arrival / Last
+Crossing), and the four chapter-close gateway beats (`CHAPTER_GATEWAYS`
+finally live). Verification hardening: 60×24 snapshots for all nine
+voyage panels — which caught and fixed a real playability bug (small
+tiers ignored the open panel view; a 60×24 player charted courses
+blind) — a voyage input fuzz net, and a test pinning the Time Vault's
+true restore semantic (the vault rewinds hero AND era together; the
+earlier "rewinds the hero, not the era" assumption was wrong — the
+vault repo is the whole quest dir). Ward pacing re-confirmed as-is at
+the post-retune numbers (~7.2 mo / ~93.5%, see docs/decisions.md); the
+player-facing wiki page deferred by direction. Assessments: veteran
+first boot is a quiet reveal (whispers + stats row + [V], no modal —
+event-driven discovery, working as designed); mid-Ignition quits
+restart at beat 1; long absences resolve cleanly into the Crossing.
+
 ### 2026-07-13 — the era's ending is authored (`act2-era-epilogue`)
 
 The Last Crossing dead-end is closed: a five-beat, state-conditioned

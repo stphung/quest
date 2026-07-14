@@ -15,11 +15,58 @@ pub enum AchievementCategory {
     Deep,
     Loom,
     Stats,
+    // Act II · The Crossing subsections
+    Voyage,
+    Ferry,
+    Era,
+}
+
+/// The game's acts, as the achievement browser sections them: each act
+/// owns an ordered slice of categories (Option A, 2026-07-14).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Act {
+    ActI,
+    ActII,
+}
+
+impl Act {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Act::ActI => "ACT I \u{00b7} The Ascent",
+            Act::ActII => "ACT II \u{00b7} The Crossing",
+        }
+    }
+
+    /// The act's categories, in display order. Every category belongs to
+    /// exactly one act (asserted by `acts_partition_the_categories`).
+    pub fn categories(&self) -> &'static [AchievementCategory] {
+        match self {
+            Act::ActI => &[
+                AchievementCategory::Combat,
+                AchievementCategory::Level,
+                AchievementCategory::Prestige,
+                AchievementCategory::Progression,
+                AchievementCategory::Challenges,
+                AchievementCategory::Exploration,
+                AchievementCategory::Deep,
+                AchievementCategory::Loom,
+                AchievementCategory::Stats,
+            ],
+            Act::ActII => &[
+                AchievementCategory::Voyage,
+                AchievementCategory::Ferry,
+                AchievementCategory::Era,
+            ],
+        }
+    }
 }
 
 impl AchievementCategory {
-    /// All categories in display order.
-    pub const ALL: [AchievementCategory; 9] = [
+    /// All categories in display order (Act I's, then Act II's).
+    /// (Used by the lib and tests; the bin crate navigates per-act via
+    /// `Act::categories()`, so its copy sees these as dead code.)
+    #[allow(dead_code)]
+    pub const ALL: [AchievementCategory; 12] = [
         AchievementCategory::Combat,
         AchievementCategory::Level,
         AchievementCategory::Prestige,
@@ -29,6 +76,9 @@ impl AchievementCategory {
         AchievementCategory::Deep,
         AchievementCategory::Loom,
         AchievementCategory::Stats,
+        AchievementCategory::Voyage,
+        AchievementCategory::Ferry,
+        AchievementCategory::Era,
     ];
 
     /// Display name for the category.
@@ -43,6 +93,20 @@ impl AchievementCategory {
             AchievementCategory::Deep => "The Deep",
             AchievementCategory::Loom => "Loom",
             AchievementCategory::Stats => "Stats",
+            AchievementCategory::Voyage => "The Voyage",
+            AchievementCategory::Ferry => "The Ferry",
+            AchievementCategory::Era => "The Era",
+        }
+    }
+
+    /// The act this category belongs to.
+    #[allow(dead_code)]
+    pub fn act(&self) -> Act {
+        match self {
+            AchievementCategory::Voyage | AchievementCategory::Ferry | AchievementCategory::Era => {
+                Act::ActII
+            }
+            _ => Act::ActI,
         }
     }
 }
@@ -323,6 +387,25 @@ pub enum AchievementId {
     LoomPattern16,  // Complete 16 Woven Patterns (unlocks Z39-42)
     LoomPattern22,  // Complete 22 Woven Patterns (unlocks Z43-46)
     LoomPattern28,  // Complete all 28 Woven Patterns (unlocks Z47-50)
+    // The Vessel (Act 2)
+    TheBurn,         // Launch the Vessel (the 250,000 PR burn)
+    TheRootsOfLight, // First arrival at the Tree
+    FerrymanI,       // 1,000 souls delivered (lifetime)
+    FerrymanII,      // 10,000 souls delivered (lifetime)
+    FerrymanIII,     // 50,000 souls delivered (lifetime)
+    TheLastCrossing, // Complete the ferry era (the old world empties)
+    TheCovenantKept, // Complete the era with no crew soul ever lost
+    // The Vessel (Act 2) — collection achievements. All verified achievable
+    // against the voyage engine's real mechanics (see the change's design
+    // doc: refits are 3 one-of-two doors, CREW=7 < 8 souls, per-crossing
+    // state resets — the impossible variants were deliberately not shipped).
+    EveryStarAHarbor, // Dock at all 38 waypoints (lifetime union across crossings)
+    CompanyOnTheRoad, // Hail all 5 pilgrim ships (lifetime union across crossings)
+    EarToTheWater,    // Know all 8 rumors at once within a single crossing
+    ThreeDoorsOpened, // Take a refit at all three shipyard doors in one crossing
+    TheFullTable,     // Make landfall with all seven crew berths filled
+    HeavyLading,      // Deliver 2,500+ souls in a single crossing
+    TheSwiftPassage,  // Complete a crossing in under 8 sea-days
     // Power Cores — unlocked at fracture zone unlock layers
     PowerCoreI,   // Deep Layer 3 — Red Fault core
     PowerCoreII,  // Deep Layer 7 — Mirror Scar core
@@ -344,7 +427,7 @@ impl AchievementId {
     /// automatically.
     // Used by `achievements::data` tests to verify ALL_ACHIEVEMENTS coverage.
     #[allow(dead_code)]
-    pub const VARIANT_COUNT: usize = 240;
+    pub const VARIANT_COUNT: usize = 254;
 }
 
 /// Static definition of an achievement.
@@ -564,6 +647,25 @@ pub struct Achievements {
     pub highest_deep_layer: u32,
     #[serde(default)]
     pub highest_guild_rank: u32,
+    /// Lifetime souls carried across on the Vessel (Act 2) — drives the
+    /// Ferryman tiers.
+    #[serde(default)]
+    pub total_souls_delivered: u64,
+    /// Crew souls lost across all crossings (authored scenes are the only
+    /// source) — zero at era end earns The Covenant Kept.
+    #[serde(default)]
+    pub souls_lost_lifetime: u32,
+    /// Union of every waypoint the Vessel has docked at, one bit per
+    /// `WaypointId` (38 authored waypoints; a mask-width guard test pins
+    /// `<= 64`). Per-crossing `visited` resets at each departure — this is
+    /// the persistent union that drives Every Star a Harbor.
+    #[serde(default)]
+    pub waypoints_docked_mask: u64,
+    /// Union of every pilgrim ship hailed, one bit per ship index (5
+    /// authored ships). Per-crossing `hailed` resets — this union drives
+    /// Company on the Road.
+    #[serde(default)]
+    pub pilgrims_hailed_mask: u8,
     /// Global border style applied to panel UI.
     #[serde(default)]
     pub ui_border_style: UiBorderStyle,
@@ -647,6 +749,9 @@ mod tests {
                 AchievementCategory::Deep,
                 AchievementCategory::Loom,
                 AchievementCategory::Stats,
+                AchievementCategory::Voyage,
+                AchievementCategory::Ferry,
+                AchievementCategory::Era,
             ]
         );
     }
@@ -1659,5 +1764,30 @@ mod tests {
         let loaded: Achievements = serde_json::from_str(&json).unwrap();
 
         assert!(loaded.recently_unlocked.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod act_partition_tests {
+    use super::{AchievementCategory, Act};
+
+    #[test]
+    fn acts_partition_the_categories() {
+        let mut seen: Vec<AchievementCategory> = Vec::new();
+        for act in [Act::ActI, Act::ActII] {
+            for c in act.categories() {
+                assert_eq!(c.act(), act, "{c:?} claims a different act");
+                assert!(!seen.contains(c), "{c:?} appears in two acts");
+                seen.push(*c);
+            }
+        }
+        assert_eq!(
+            seen.len(),
+            AchievementCategory::ALL.len(),
+            "every category belongs to exactly one act"
+        );
+        for c in AchievementCategory::ALL {
+            assert!(seen.contains(&c));
+        }
     }
 }

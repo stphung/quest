@@ -123,6 +123,7 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
             }
             KeyCode::Left => browser.prev_category(),
             KeyCode::Right => browser.next_category(),
+            KeyCode::Tab => browser.toggle_act(),
             KeyCode::Up => browser.move_up(),
             KeyCode::Down => {
                 let count = if browser.selected_category == AchievementCategory::Stats {
@@ -282,7 +283,7 @@ pub fn handle_game_input(key: KeyEvent, ctx: &mut GameContext<'_>) -> InputResul
 
     // 2.95. The Vessel overlay
     if matches!(overlay, GameOverlay::Vessel { .. }) {
-        return handle_vessel_overlay(key, state, loom_state, overlay);
+        return handle_vessel_overlay(key, state, loom_state, achievements, overlay);
     }
 
     // 3. Vault item selection
@@ -397,6 +398,7 @@ fn handle_vessel_overlay(
     key: KeyEvent,
     state: &mut GameState,
     loom_state: &crate::loom::LoomState,
+    achievements: &mut crate::achievements::Achievements,
     overlay: &mut GameOverlay,
 ) -> InputResult {
     let GameOverlay::Vessel { confirm_pending } = overlay else {
@@ -420,13 +422,16 @@ fn handle_vessel_overlay(
             if *confirm_pending {
                 *confirm_pending = false;
                 if crate::vessel::perform_launch(state, completed_patterns) {
+                    achievements.on_vessel_launched(Some(&state.character_name));
                     state.combat_state.add_log_entry(
                         "\u{2726} 250,000 Prestige Ranks burn. The Loom becomes a hull."
                             .to_string(),
                         false,
                         true,
                     );
-                    return InputResult::NeedsSave;
+                    return InputResult::NeedsSaveWithEvent(
+                        crate::history::SaveEvent::VesselLaunched,
+                    );
                 }
             } else if crate::vessel::can_launch(state, completed_patterns) {
                 *confirm_pending = true;

@@ -591,6 +591,48 @@ pub const SCENES: [SceneDef; 38] = [
     },
 ];
 
+// ── Chapter-close beats (the gateways) ──────────────────────────────────────
+// One authored beat per chapter, appended to its gateway waypoint's arrival
+// scene (`play_arrival_scene`; the Tree's plays inside the finale assembly).
+// The act's weekly rhythm, made a ceremony: each beat names what the chapter
+// was and what the water ahead stops being.
+
+/// The chapter-close beat for a chapter's gateway arrival.
+pub fn chapter_close_beat(chapter: super::route::Chapter) -> &'static str {
+    use super::route::Chapter;
+    match chapter {
+        Chapter::Shallows => {
+            "At the Shallows Gate the pilot-lights end in a double row, like \
+             a harbor mouth seen from the wrong side. Behind the ship: every \
+             port that still remembers the old world's mornings. Ahead, the \
+             charts stop agreeing with each other. The crew comes up on deck \
+             without being called, and the Vessel passes the last buoy of \
+             the water anyone calls home."
+        }
+        Chapter::DriftRoads => {
+            "Drift's End is where the roads stop being roads. The wrecks and \
+             way-stations of the Drift thin out behind; ahead the water is \
+             black glass to the horizon, and the horizon is a guess. Someone \
+             hangs a second lantern at the bow. It does not help, and nobody \
+             takes it down."
+        }
+        Chapter::StarlessDeep => {
+            "Deepgate is a door with no wall — two root-pillars standing in \
+             open water, older than any chart aboard. Passing between them, \
+             the silence of the Deep lets go all at once, the way a held \
+             breath does. Far off, faint and green and impossible, there is \
+             light in the water. The Roots. The crew does not cheer. It is \
+             better than cheering."
+        }
+        Chapter::RootsOfLight => {
+            "The last chapter closes the way it began: with the Tree filling \
+             the sky. Every road sailed, every port made, every night stood \
+             at the rail — all of it ends at this mooring. The crossing is \
+             done; what was carried is ashore."
+        }
+    }
+}
+
 // ── The finale's closing beats (spec 7) ─────────────────────────────────────
 // Appended to W37's authored beats by `take_finale_playback`: the rail
 // lines come from the souls aboard, then (if names were carved) the

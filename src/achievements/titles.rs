@@ -273,6 +273,11 @@ pub const ALL_TITLES: &[TitleDef] = &[
         achievement_id: AchievementId::GatewayOpened,
         title_text: "Unbinder",
     },
+    // The Vessel (Act 2)
+    TitleDef {
+        achievement_id: AchievementId::EveryStarAHarbor,
+        title_text: "Wayfarer",
+    },
 ];
 
 /// Get the title text for an achievement, if it grants a title.
