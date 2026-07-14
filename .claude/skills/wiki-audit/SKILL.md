@@ -46,13 +46,13 @@ Cross-reference against: `src/dungeon/`, `src/fishing/`, `src/haven/`, `src/enha
 
 **Agent 3 — Late-Game Systems**
 
-Scope: `quest.wiki/Challenges.md`, `quest.wiki/The-Deep.md`, `quest.wiki/Stormglass.md`, `quest.wiki/Achievements.md`
+Scope: `quest.wiki/Challenges.md`, `quest.wiki/The-Deep.md`, `quest.wiki/Stormglass.md`, `quest.wiki/Achievements.md`, `quest.wiki/Power-Cores.md`
 
-Cross-reference against: `src/challenges/`, `src/deep/`, `src/stormglass/`, `src/achievements/`
+Cross-reference against: `src/challenges/`, `src/deep/`, `src/stormglass/`, `src/achievements/`, `src/power_cores/`
 
 **Agent 4 — Guides & Meta**
 
-Scope: `quest.wiki/Home.md`, `quest.wiki/Getting-Started.md`, `quest.wiki/Strategy-Guide.md`, `quest.wiki/Stormbreaker-Path.md`, `quest.wiki/Controls-and-UI.md`
+Scope: `quest.wiki/Home.md`, `quest.wiki/Getting-Started.md`, `quest.wiki/Strategy-Guide.md`, `quest.wiki/Stormbreaker-Path.md`, `quest.wiki/Controls-and-UI.md`, `quest.wiki/Ascension.md`, `quest.wiki/Loom-of-Worlds.md`
 
 Cross-reference against: `src/core/constants.rs`, `src/input/`, `src/ascension/`, `src/loom/`
 
