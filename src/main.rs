@@ -1206,8 +1206,14 @@ fn main() -> io::Result<()> {
                         };
 
                         // Drain available events.
-                        // In realtime mode, first poll may block until next frame; subsequent polls
-                        // are non-blocking so we can flush queued input quickly.
+                        // The first poll may block (frame pacing); subsequent polls are
+                        // non-blocking so everything already queued is flushed before the
+                        // next frame. Draining matters in normal mode too: key auto-repeat
+                        // (~25-30/s) outruns the ~10 fps frame rate, and any events left
+                        // queued keep replaying after the key is released (reported on the
+                        // achievement browser). Bounded so a runaway paste can't starve
+                        // the tick loop.
+                        let mut drained_events = 0u32;
                         while event::poll(poll_duration)? {
                             let ev = event::read()?;
                             if let Event::Resize(_, _) = &ev {
@@ -1217,9 +1223,7 @@ fn main() -> io::Result<()> {
                             if let Event::Key(key_event) = ev {
                                 // Only handle key press events (ignore release/repeat)
                                 if key_event.kind != KeyEventKind::Press {
-                                    if !realtime_mode {
-                                        break;
-                                    }
+                                    poll_duration = Duration::ZERO;
                                     continue;
                                 }
                                 // Chrono Surge summary: any key dismisses
@@ -1442,8 +1446,10 @@ fn main() -> io::Result<()> {
                                     InputAction::Continue => {}
                                 }
                             }
-                            // Normal mode: process one event per frame. Realtime: drain all.
-                            if !realtime_mode {
+                            // Flush whatever is already queued before drawing the next
+                            // frame (bounded), in both normal and realtime mode.
+                            drained_events += 1;
+                            if drained_events >= 32 {
                                 break;
                             }
                             poll_duration = Duration::ZERO;

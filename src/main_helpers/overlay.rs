@@ -90,7 +90,7 @@ pub fn draw_game_overlays(
     extras: &OverlayExtras<'_>,
 ) {
     let state: &GameState = ctx.state;
-    let overlay: &GameOverlay = ctx.overlay;
+    let overlay: &mut GameOverlay = ctx.overlay;
     let haven: &haven::Haven = ctx.haven;
     let haven_ui: &HavenUiState = ctx.haven_ui;
     let soulforge_ui: &SoulforgeUiState = ctx.soulforge_ui;
