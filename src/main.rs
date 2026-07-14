@@ -1098,6 +1098,15 @@ fn main() -> io::Result<()> {
                         }
                         prev_scene_kind = scene_kind;
 
+                        // Achievement browser act/section switches force a
+                        // full repaint too (same desync class: emoji-wide
+                        // cells vs. the diff model — see the state field).
+                        if let input::GameOverlay::Achievements { browser, .. } = &mut overlay {
+                            if browser.take_full_repaint() {
+                                terminal.clear()?;
+                            }
+                        }
+
                         // Check if sigil rolling animation has timed out
                         crate::input::check_sigil_animation_timeout(&mut exchange_ui);
 

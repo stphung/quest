@@ -22,6 +22,11 @@ pub struct AchievementBrowserState {
     pub selected_act: Act,
     pub selected_category: AchievementCategory,
     pub selected_index: usize,
+    /// Set on act/section switches; `main.rs` consumes it to force a full
+    /// terminal repaint (the wide-scene pattern) — emoji-heavy views like
+    /// Stats can desync the terminal's cells from ratatui's diff model,
+    /// leaving orphan glyphs when the next view paints fewer rows.
+    pub needs_full_repaint: bool,
 }
 
 impl AchievementBrowserState {
@@ -31,7 +36,13 @@ impl AchievementBrowserState {
             selected_act: Act::ActI,
             selected_category: AchievementCategory::Combat,
             selected_index: 0,
+            needs_full_repaint: false,
         }
+    }
+
+    /// Consume the full-repaint request (see field docs).
+    pub fn take_full_repaint(&mut self) -> bool {
+        std::mem::take(&mut self.needs_full_repaint)
     }
 
     pub fn open(&mut self) {
@@ -51,6 +62,7 @@ impl AchievementBrowserState {
         };
         self.selected_category = self.selected_act.categories()[0];
         self.selected_index = 0;
+        self.needs_full_repaint = true;
     }
 
     /// Cycle subsections within the selected act (wrapping).
@@ -63,6 +75,7 @@ impl AchievementBrowserState {
         let next = (current as isize + delta).rem_euclid(categories.len() as isize) as usize;
         self.selected_category = categories[next];
         self.selected_index = 0;
+        self.needs_full_repaint = true;
     }
 
     pub fn next_category(&mut self) {

@@ -925,6 +925,12 @@ pub fn show_startup_splash_screen(
             enhancement,
             deep_state,
         );
+        // Achievement browser act/section switches request a full repaint
+        // (emoji-wide cells can desync the terminal from ratatui's diff
+        // model, leaving orphan glyphs — see AchievementBrowserState).
+        if achievement_browser.take_full_repaint() {
+            terminal.clear()?;
+        }
         terminal.draw(|f| {
             let area = f.area();
             let block = Block::default()
@@ -1177,6 +1183,7 @@ pub fn show_startup_splash_screen(
                             KeyCode::Right | KeyCode::Char('.') | KeyCode::Char('>') => {
                                 achievement_browser.next_category()
                             }
+                            KeyCode::Tab => achievement_browser.toggle_act(),
                             KeyCode::Esc | KeyCode::Char('a') | KeyCode::Char('A') => {
                                 global_achievements.clear_recently_unlocked();
                                 achievement_browser.close();
