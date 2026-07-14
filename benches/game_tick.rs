@@ -192,10 +192,66 @@ fn bench_combat_event_processing(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmark the endgame Loom per-tick production path (base production,
+/// direct-pull shuttle processing, neighbor unlocking). This is the
+/// unconditional per-tick allocation cluster identified by the 2026-07 perf
+/// audit and fixed with reusable scratch buffers on `LoomState` — the
+/// benchmark guards that path against regressing back to per-tick heap churn.
+fn bench_loom_tick(c: &mut Criterion) {
+    let mut group = c.benchmark_group("loom_tick");
+
+    group.bench_function("production_pull_unlock_100ms", |b| {
+        let mut loom = quest::fixtures::loom_state_with_shuttle();
+        b.iter(|| {
+            let produced = quest::loom::tick_base_production(&mut loom, 0.1);
+            let shuttle_produced = quest::loom::tick_shuttle_pull(&mut loom, 0.1);
+            let unlocked = quest::loom::tick_neighbor_unlocking(&mut loom, 0.1);
+            (produced, shuttle_produced, unlocked)
+        });
+    });
+
+    group.finish();
+}
+
+/// Benchmark the steady-state Deep mission-pool maintenance pass — it runs
+/// every tick once the Deep is discovered. The 2026-07 perf audit removed a
+/// redundant prune pass and its twice-per-tick HashSet allocation from this
+/// path; the steady state (full pool, nothing to prune or replenish) is what
+/// the tick loop pays 10x/sec.
+fn bench_deep_pool_refresh(c: &mut Criterion) {
+    let mut group = c.benchmark_group("deep_pool_refresh");
+
+    group.bench_function("steady_state_full_pool", |b| {
+        let now = chrono::Utc::now();
+        let mut deep = quest::fixtures::deep_state_active(now);
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
+        // First call performs the initial full pool generation; subsequent
+        // calls exercise the steady-state prune/replenish pass.
+        quest::deep::missions::maybe_refresh_mission_pool(
+            &mut deep.prestige,
+            &deep.persistent,
+            now,
+            &mut rng,
+        );
+        b.iter(|| {
+            quest::deep::missions::maybe_refresh_mission_pool(
+                &mut deep.prestige,
+                &deep.persistent,
+                now,
+                &mut rng,
+            )
+        });
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_game_tick,
     bench_combat_event_processing,
-    bench_achievement_milestones
+    bench_achievement_milestones,
+    bench_loom_tick,
+    bench_deep_pool_refresh
 );
 criterion_main!(benches);

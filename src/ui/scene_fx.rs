@@ -3,8 +3,6 @@
 use ratatui::{
     layout::Rect,
     style::{Color, Style},
-    text::{Line, Span},
-    widgets::Paragraph,
     Frame,
 };
 use std::cell::RefCell;
@@ -187,48 +185,52 @@ fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     lines
 }
 
-/// Flushes a scene buffer to the frame with run-length style batching by color.
+/// Flushes a scene buffer directly into the frame's cell buffer.
 /// Continuation cells (after wide characters) are skipped so the terminal
 /// renders wide chars at their correct 2-column width.
+///
+/// This is the per-frame flush for every layered scene (combat sprites and
+/// all animated overlays), so it writes cells in a single pass instead of
+/// building per-row `Span`/`String`/`Paragraph` allocations. The glyph
+/// placement rules deliberately mirror the previous `Paragraph` pipeline:
+/// control characters are dropped, zero-width characters render nothing
+/// (neither advances the column), a wide glyph advances two columns without
+/// touching the shadowed cell, and the row truncates at the first glyph that
+/// no longer fits.
 pub fn render_buffer(frame: &mut Frame, area: Rect, buffer: &[Vec<SceneCell>]) {
+    let buf = frame.buffer_mut();
     for (row, row_data) in buffer.iter().enumerate() {
         if row as u16 >= area.height {
             break;
         }
+        let y = area.y + row as u16;
 
-        let mut spans = Vec::new();
-        let mut current_fg = Color::Reset;
-        let mut current_bg = Color::Reset;
-        let mut current_text = String::new();
-
+        // Column offset within the area; advances only when a glyph renders,
+        // matching how the old string-based path laid out glyphs.
+        let mut x: u16 = 0;
         for cell in row_data.iter().take(area.width as usize) {
             // Skip continuation cells — the wide char in the previous cell
             // already occupies 2 terminal columns.
             if cell.wide_cont {
                 continue;
             }
-
-            if (cell.fg != current_fg || cell.bg != current_bg) && !current_text.is_empty() {
-                spans.push(Span::styled(
-                    std::mem::take(&mut current_text),
-                    Style::default().fg(current_fg).bg(current_bg),
-                ));
+            if cell.ch.is_control() {
+                continue;
             }
-
-            current_fg = cell.fg;
-            current_bg = cell.bg;
-            current_text.push(cell.ch);
+            let width = UnicodeWidthChar::width(cell.ch).unwrap_or(0) as u16;
+            if width == 0 {
+                continue;
+            }
+            if x + width > area.width {
+                break;
+            }
+            if let Some(frame_cell) = buf.cell_mut((area.x + x, y)) {
+                frame_cell
+                    .set_char(cell.ch)
+                    .set_style(Style::default().fg(cell.fg).bg(cell.bg));
+            }
+            x += width;
         }
-
-        if !current_text.is_empty() {
-            spans.push(Span::styled(
-                current_text,
-                Style::default().fg(current_fg).bg(current_bg),
-            ));
-        }
-
-        let row_area = Rect::new(area.x, area.y + row as u16, area.width, 1);
-        frame.render_widget(Paragraph::new(Line::from(spans)), row_area);
     }
 }
 

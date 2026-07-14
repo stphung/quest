@@ -60,10 +60,7 @@ pub fn node_level_multiplier(level: u32) -> f64 {
 
 /// Returns the effective production rate (native resource per hour) for a node.
 pub fn node_effective_rate(_loom: &LoomState, node: &LoomNode) -> f64 {
-    if !node.unlocked || node.upgrading {
-        return 0.0;
-    }
-    node.base_rate * node_level_multiplier(node.level)
+    node_effective_rate_from_node(node)
 }
 
 /// Tick base production for all unlocked nodes.
@@ -78,39 +75,26 @@ pub fn tick_base_production(
     loom: &mut LoomState,
     delta_seconds: f64,
 ) -> std::collections::HashMap<Resource, f64> {
+    let mut produced: std::collections::HashMap<Resource, f64> = std::collections::HashMap::new();
     if delta_seconds <= 0.0 {
-        return std::collections::HashMap::new();
+        return produced;
     }
     let delta_hours = delta_seconds / 3600.0;
-    let mut produced: std::collections::HashMap<Resource, f64> = std::collections::HashMap::new();
 
-    // Collect rates first to avoid borrow conflicts.
-    let node_data: Vec<(usize, NodeId, f64, f64)> = loom
-        .persistent
-        .nodes
-        .iter()
-        .enumerate()
-        .map(|(i, node)| {
-            let rate = node_effective_rate(loom, node);
-            (i, node.id, rate, node.buffer_capacity)
-        })
-        .collect();
-
-    for (idx, node_id, rate, capacity) in node_data {
+    // Single in-place pass: the effective rate only needs the node itself,
+    // so no snapshot Vec is required (this runs every tick).
+    for node in &mut loom.persistent.nodes {
+        let rate = node_effective_rate_from_node(node);
         if rate == 0.0 {
             continue;
         }
-        let node = &mut loom.persistent.nodes[idx];
-        if node.upgrading {
-            continue; // Nodes produce nothing while upgrading.
-        }
 
         let amount = rate * delta_hours;
-        node.buffer = (node.buffer + amount).min(capacity);
+        node.buffer = (node.buffer + amount).min(node.buffer_capacity);
         node.stalled = false;
 
         if amount > 0.0 {
-            let resource = node_native_resource(node_id);
+            let resource = node_native_resource(node.id);
             *produced.entry(resource).or_insert(0.0) += amount;
         }
     }
@@ -229,41 +213,42 @@ pub fn tick_neighbor_unlocking(loom: &mut LoomState, delta_seconds: f64) -> Vec<
     let delta_hours = delta_seconds / 3600.0;
     let mut newly_unlocked: Vec<NodeId> = Vec::new();
 
-    // Snapshot source info to avoid borrow conflicts.
-    let sources: Vec<(NodeId, bool, f64)> = loom
-        .persistent
-        .nodes
-        .iter()
-        .map(|n| (n.id, n.unlocked, n.buffer / n.buffer_capacity.max(1.0)))
-        .collect();
+    // Snapshot source qualification into a fixed-size stack array (this runs
+    // every tick — no heap allocation). Captures pre-tick unlock state so a
+    // node unlocked earlier in this pass cannot act as a source this tick.
+    const MAX_NODES: usize = NodeId::ALL.len();
+    let node_count = loom.persistent.nodes.len().min(MAX_NODES);
+    let mut sources = [(NodeId::EmberSpindle, false); MAX_NODES];
+    for (slot, n) in sources.iter_mut().zip(loom.persistent.nodes.iter()) {
+        let fill_ratio = n.buffer / n.buffer_capacity.max(1.0);
+        *slot = (
+            n.id,
+            n.unlocked && fill_ratio >= NEIGHBOR_UNLOCK_BUFFER_THRESHOLD,
+        );
+    }
 
-    for (src_id, src_unlocked, fill_ratio) in &sources {
-        if !src_unlocked || *fill_ratio < NEIGHBOR_UNLOCK_BUFFER_THRESHOLD {
+    for &(src_id, qualified) in sources.iter().take(node_count) {
+        if !qualified {
             continue;
         }
 
-        let unlock_count = NEIGHBOR_UNLOCK_COUNT;
-        let neighbors = node_neighbors(*src_id);
+        let neighbors = node_neighbors(src_id);
+        let mut remaining = NEIGHBOR_UNLOCK_COUNT;
 
-        let locked_neighbors: Vec<NodeId> = neighbors
-            .iter()
-            .filter(|&&nb| {
-                loom.persistent
-                    .nodes
-                    .iter()
-                    .any(|n| n.id == nb && !n.unlocked)
-            })
-            .take(unlock_count)
-            .copied()
-            .collect();
-
-        for neighbor_id in locked_neighbors {
+        for &neighbor_id in neighbors {
+            if remaining == 0 {
+                break;
+            }
+            // Each neighbor is checked immediately before its own mutation;
+            // neighbors of a node are distinct, so this matches the previous
+            // collect-then-mutate behavior exactly.
             if let Some(neighbor) = loom
                 .persistent
                 .nodes
                 .iter_mut()
-                .find(|n| n.id == neighbor_id)
+                .find(|n| n.id == neighbor_id && !n.unlocked)
             {
+                remaining -= 1;
                 neighbor.unlock_progress += delta_hours;
                 if neighbor.unlock_progress >= NEIGHBOR_UNLOCK_HOURS {
                     neighbor.unlocked = true;
@@ -412,10 +397,20 @@ pub fn tick_shuttle_pull(
     let delta_hours = delta_seconds / 3600.0;
     let mut produced: std::collections::HashMap<Resource, f64> = std::collections::HashMap::new();
 
+    // Split-borrow the state so the per-tick scratch buffers can be reused
+    // alongside the persistent shuttle data (this runs every tick — avoid
+    // reallocating the consumer-count map and rate vec 10x/sec).
+    let LoomState {
+        persistent,
+        scratch_consumer_count: consumer_count,
+        scratch_shuttle_rates: shuttle_output_rates,
+        time_warp,
+        ..
+    } = loom;
+
     // ── Step 1: Count consumers per source across all non-construction shuttles ──
-    let mut consumer_count: std::collections::HashMap<LoomNodeRef, usize> =
-        std::collections::HashMap::new();
-    for r in &loom.persistent.shuttles {
+    consumer_count.clear();
+    for r in &persistent.shuttles {
         if r.under_construction {
             continue;
         }
@@ -426,28 +421,22 @@ pub fn tick_shuttle_pull(
 
     // ── Step 2: Process shuttles by tier (T1 before T2 before T3) ──
     // Track effective output rates per shuttle index for higher-tier pulls.
-    let mut shuttle_output_rates: Vec<f64> = vec![0.0; loom.persistent.shuttles.len()];
+    shuttle_output_rates.clear();
+    shuttle_output_rates.resize(persistent.shuttles.len(), 0.0);
 
     for tier in 1u8..=3 {
-        let indices: Vec<usize> = loom
-            .persistent
-            .shuttles
-            .iter()
-            .enumerate()
-            .filter(|(_, r)| !r.under_construction && r.tier == tier)
-            .map(|(i, _)| i)
-            .collect();
-
-        for idx in indices {
-            let r = &loom.persistent.shuttles[idx];
+        for idx in 0..persistent.shuttles.len() {
+            let r = &persistent.shuttles[idx];
+            if r.under_construction || r.tier != tier {
+                continue;
+            }
 
             // Calculate available pull for input A (no intake cap — limited only by source rate and contention).
             let pull_a: f64 = r
                 .sources_a
                 .iter()
                 .map(|&src| {
-                    let available =
-                        source_available_rate(src, &loom.persistent, &shuttle_output_rates);
+                    let available = source_available_rate(src, persistent, shuttle_output_rates);
                     let consumers = consumer_count.get(&src).copied().unwrap_or(1).max(1);
                     available / consumers as f64
                 })
@@ -458,8 +447,7 @@ pub fn tick_shuttle_pull(
                 .sources_b
                 .iter()
                 .map(|&src| {
-                    let available =
-                        source_available_rate(src, &loom.persistent, &shuttle_output_rates);
+                    let available = source_available_rate(src, persistent, shuttle_output_rates);
                     let consumers = consumer_count.get(&src).copied().unwrap_or(1).max(1);
                     available / consumers as f64
                 })
@@ -472,16 +460,16 @@ pub fn tick_shuttle_pull(
             // Add to buffer (capped); excess is discarded but still counted for rate tracking.
             let output_this_tick = output_rate * delta_hours;
             if output_this_tick > 0.0 {
-                let r = &mut loom.persistent.shuttles[idx];
+                let r = &mut persistent.shuttles[idx];
                 r.buffer = (r.buffer + output_this_tick).min(r.buffer_capacity);
                 r.stalled = false;
                 *produced.entry(r.output).or_insert(0.0) += output_this_tick;
                 // Push un-warped amount so rate_per_hour() reflects logical rate,
                 // consistent with extractor rate_trackers in tick_stages.rs.
-                let warp = loom.time_warp.max(1.0);
+                let warp = time_warp.max(1.0);
                 r.output_rate_tracker.push(output_this_tick / warp);
             } else {
-                loom.persistent.shuttles[idx].output_rate_tracker.push(0.0);
+                persistent.shuttles[idx].output_rate_tracker.push(0.0);
             }
         }
     }

@@ -360,45 +360,67 @@ fn prune_invalid_pool_missions(
     persistent: &DeepPersistent,
     active_missions: &[Mission],
 ) -> bool {
+    // Runs every tick once the Deep is discovered, so this is an in-place
+    // compaction: keep-checks scan the already-kept prefix for duplicates
+    // instead of allocating a fresh HashSet per call (the pool is tiny —
+    // at most the guild-rank target count).
     let before = pool.len();
-    let mut seen: std::collections::HashSet<(u32, MissionType)> = std::collections::HashSet::new();
-    pool.retain(|m| {
-        // Gateway Expedition is exempt from window pruning — it pins at Layer 30
-        // until completed, regardless of how far the frontier has advanced.
-        if matches!(m.mission_type, MissionType::GatewayExpedition) {
-            return true;
+    let mut kept = 0;
+    for read in 0..pool.len() {
+        let keep = {
+            let m = &pool[read];
+            keep_pool_mission(m, persistent, active_missions, &pool[..kept])
+        };
+        if keep {
+            pool.swap(read, kept);
+            kept += 1;
         }
-        let valid =
-            layer_in_window(m.layer, persistent) && is_valid_construction_mission(m, persistent);
-        if !valid {
+    }
+    pool.truncate(kept);
+    before != pool.len()
+}
+
+/// Whether a pool mission survives a prune pass. `kept` is the prefix of
+/// already-retained missions, used for duplicate `(layer, type)` detection.
+fn keep_pool_mission(
+    m: &AvailableMission,
+    persistent: &DeepPersistent,
+    active_missions: &[Mission],
+    kept: &[AvailableMission],
+) -> bool {
+    // Gateway Expedition is exempt from window pruning — it pins at Layer 30
+    // until completed, regardless of how far the frontier has advanced.
+    if matches!(m.mission_type, MissionType::GatewayExpedition) {
+        return true;
+    }
+    let valid =
+        layer_in_window(m.layer, persistent) && is_valid_construction_mission(m, persistent);
+    if !valid {
+        return false;
+    }
+    // Breakthrough missions are invalid on cleared layers.
+    if matches!(m.mission_type, MissionType::Breakthrough) {
+        let cleared = persistent.layer_record(m.layer).is_some_and(|r| r.cleared);
+        if cleared {
             return false;
         }
-        // Breakthrough missions are invalid on cleared layers.
-        if matches!(m.mission_type, MissionType::Breakthrough) {
-            let cleared = persistent.layer_record(m.layer).is_some_and(|r| r.cleared);
-            if cleared {
-                return false;
-            }
-        }
-        // Construction missions are invalid if the same type is already in progress on the same layer.
-        if let MissionType::Construction(target_infra) = m.mission_type {
-            for active in active_missions {
-                if active.layer == m.layer {
-                    if let MissionType::Construction(active_infra) = active.mission_type {
-                        if active_infra == target_infra {
-                            return false;
-                        }
+    }
+    // Construction missions are invalid if the same type is already in progress on the same layer.
+    if let MissionType::Construction(target_infra) = m.mission_type {
+        for active in active_missions {
+            if active.layer == m.layer {
+                if let MissionType::Construction(active_infra) = active.mission_type {
+                    if active_infra == target_infra {
+                        return false;
                     }
                 }
             }
         }
-        let key = (m.layer, m.mission_type);
-        if !seen.insert(key) {
-            return false;
-        }
-        true
-    });
-    before != pool.len()
+    }
+    // Duplicate (layer, type) of an already-kept mission?
+    !kept
+        .iter()
+        .any(|k| k.layer == m.layer && k.mission_type == m.mission_type)
 }
 
 fn layer_filler_candidate(
@@ -628,24 +650,17 @@ pub fn maybe_refresh_mission_pool(
         prestige.pool_refreshed_at = Some(now);
         true
     } else {
-        let mut changed = false;
-        if prune_invalid_pool_missions(
-            &mut prestige.available_missions,
-            persistent,
-            &prestige.active_missions,
-        ) {
-            changed = true;
-        }
-        if replenish_mission_pool(
+        // `replenish_mission_pool` prunes first thing (and pruning is
+        // idempotent and RNG-free), so a separate prune pass here would be
+        // pure per-tick waste — its result is already folded into the
+        // replenish return value.
+        replenish_mission_pool(
             &mut prestige.available_missions,
             persistent,
             &prestige.active_missions,
             target_count,
             rng,
-        ) {
-            changed = true;
-        }
-        changed
+        )
     };
 
     // Softlock guard: if nothing in the pool is affordable, make one Supply Run free.
