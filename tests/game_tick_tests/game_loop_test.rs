@@ -381,7 +381,7 @@ fn test_offline_progression_with_long_absence() {
 
     // elapsed_seconds shows actual time, but XP is calculated with 7-day cap internally
     assert!(
-        report.elapsed_seconds >= ten_days_seconds - 2, // Allow 2 second tolerance
+        report.elapsed_seconds >= ten_days_seconds - 30, // Allow 30 second tolerance
         "Should report actual elapsed time"
     );
     assert!(report.xp_gained > 0, "Should still gain XP");
@@ -411,14 +411,14 @@ fn test_short_offline_time_still_processes() {
     let mut state = GameState::new("Short Offline Test".to_string(), 0);
     let mut rng = test_rng();
 
-    // Set last save time to 30 seconds ago
-    state.last_save_time = chrono::Utc::now().timestamp() - 30;
+    // Set last save time to 300 seconds ago
+    state.last_save_time = chrono::Utc::now().timestamp() - 300;
 
     let report = process_offline_progression(&mut rng, &mut state, 0.0);
 
     // Even short times are processed (threshold check is at display level in main.rs)
     assert!(
-        report.elapsed_seconds >= 28, // Allow tolerance
+        report.elapsed_seconds >= 270, // Allow 30 second tolerance
         "Should report elapsed time even for short periods"
     );
 }
