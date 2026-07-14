@@ -167,18 +167,20 @@ fn render_pixel_sprite(
             // Center relative to max_pixel_width
             let start_col = (buf_width.saturating_sub(max_pixel_width)) / 2;
 
-            // Collect pixels for this pair into aligned arrays
-            let top_pixels: Vec<char> = top_row_str.chars().collect();
-            let bot_pixels: Vec<char> = bottom_row_str.chars().collect();
+            // Walk both rows' chars in lockstep (padding the shorter row with
+            // transparent pixels) — the rows are static sprite data, so avoid
+            // re-collecting them into Vec<char> on every frame.
+            let mut top_pixels = top_row_str.chars();
+            let mut bot_pixels = bottom_row_str.chars();
 
             for col_idx in 0..max_pixel_width {
+                let top_px = top_pixels.next().unwrap_or('.');
+                let bot_px = bot_pixels.next().unwrap_or('.');
+
                 let buf_col = start_col + col_idx;
                 if buf_col >= buf_width {
                     break;
                 }
-
-                let top_px = top_pixels.get(col_idx).copied().unwrap_or('.');
-                let bot_px = bot_pixels.get(col_idx).copied().unwrap_or('.');
 
                 let top_color = pixel_color(top_px, palette);
                 let bot_color = pixel_color(bot_px, palette);

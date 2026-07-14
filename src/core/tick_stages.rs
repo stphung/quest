@@ -774,6 +774,7 @@ pub(super) fn sync_derived_stats(
     state: &mut GameState,
     enhancement: &crate::enhancement::EnhancementProgress,
     sigil_bonuses: &SigilBonuses,
+    ascension_mult: f64,
 ) {
     if state.derived_stats_dirty {
         state.recalculate_derived_stats(&enhancement.levels);
@@ -790,8 +791,7 @@ pub(super) fn sync_derived_stats(
         max_hp += prestige_combat.flat_hp;
     }
 
-    // Apply Ascension multiplier
-    let ascension_mult = crate::ascension::ascension_combat_multiplier(state.ascension_level);
+    // Apply Ascension multiplier (computed once per tick in `game_tick_with_context`)
     if ascension_mult > 1.0 {
         max_hp = (max_hp as f64 * ascension_mult) as u64;
     }
@@ -836,6 +836,7 @@ pub(super) fn run_combat<R: Rng>(
     delta_time: f64,
     haven_bonuses: &HavenBonuses,
     sigil_bonuses: &SigilBonuses,
+    ascension_mult: f64,
     achievements: &mut Achievements,
     deep: &mut crate::deep::DeepState,
     _loom: &crate::loom::LoomState,
@@ -868,7 +869,8 @@ pub(super) fn run_combat<R: Rng>(
         flat_damage: prestige_combat.flat_damage,
         flat_defense: prestige_combat.flat_defense,
         // Ascension multiplier from per-character Ascension level
-        ascension_multiplier: crate::ascension::ascension_combat_multiplier(state.ascension_level),
+        // (computed once per tick in `game_tick_with_context`)
+        ascension_multiplier: ascension_mult,
     };
     // NOTE: HP bonuses (flat_hp, ascension multiplier, sigil max HP%) are now
     // applied in sync_derived_stats (Stage 3) to prevent regen snap-back where
@@ -1178,15 +1180,16 @@ pub(super) fn tick_loom(
         }
     }
 
-    // Read measured rates from trackers for pattern sustain.
-    let rates: std::collections::HashMap<crate::loom::Resource, f64> = loom
-        .rate_trackers
-        .iter()
-        .map(|(resource, tracker)| (*resource, tracker.rate_per_hour()))
-        .collect();
+    // Read measured rates from trackers for pattern sustain, reusing the
+    // scratch map on LoomState (this runs every tick — avoid reallocating).
+    loom.scratch_rates.clear();
+    for (resource, tracker) in &loom.rate_trackers {
+        loom.scratch_rates
+            .insert(*resource, tracker.rate_per_hour());
+    }
 
     let pattern_completed =
-        crate::loom::tick_pattern_sustain(&mut loom.persistent, &rates, tick_seconds);
+        crate::loom::tick_pattern_sustain(&mut loom.persistent, &loom.scratch_rates, tick_seconds);
     if pattern_completed {
         result.loom_changed = true;
         loom.graph_dirty = true;
@@ -1215,7 +1218,10 @@ pub(super) fn tick_loom(
 
     // Tick WR→PR conversion (active after all 28 patterns complete).
     if crate::loom::all_patterns_complete(&loom.persistent) {
-        let now = chrono::Utc::now().timestamp();
+        // Reuse the wall-clock reading taken at the top of this stage — the
+        // sub-tick skew is irrelevant to elapsed-seconds bookkeeping and it
+        // saves a second clock read per tick.
+        let now = now.timestamp();
         if loom.persistent.wr_pr_last_granted_at == 0 || loom.persistent.wr_pr_last_granted_at > now
         {
             loom.persistent.wr_pr_last_granted_at = now;
@@ -2740,7 +2746,8 @@ mod tests {
             ..Default::default()
         };
 
-        sync_derived_stats(&mut state, &enhancement, &sigil_bonuses);
+        let ascension_mult = crate::ascension::ascension_combat_multiplier(state.ascension_level);
+        sync_derived_stats(&mut state, &enhancement, &sigil_bonuses, ascension_mult);
 
         assert!(!state.derived_stats_dirty);
         assert!(state.combat_state.player_max_hp > state.cached_derived_stats.max_hp);
@@ -2754,7 +2761,8 @@ mod tests {
         let enhancement = crate::enhancement::EnhancementProgress::new();
         let sigil_bonuses = SigilBonuses::default();
 
-        sync_derived_stats(&mut state, &enhancement, &sigil_bonuses);
+        let ascension_mult = crate::ascension::ascension_combat_multiplier(state.ascension_level);
+        sync_derived_stats(&mut state, &enhancement, &sigil_bonuses, ascension_mult);
 
         assert_eq!(state.combat_state.player_max_hp, expected);
     }
@@ -2800,7 +2808,13 @@ mod tests {
         let mut state = GameState::new("Hero".to_string(), 0);
         state.derived_stats_dirty = true;
         let enhancement = crate::enhancement::EnhancementProgress::new();
-        sync_derived_stats(&mut state, &enhancement, &SigilBonuses::default());
+        let ascension_mult = crate::ascension::ascension_combat_multiplier(state.ascension_level);
+        sync_derived_stats(
+            &mut state,
+            &enhancement,
+            &SigilBonuses::default(),
+            ascension_mult,
+        );
         crate::core::game_logic::spawn_enemy_if_needed(&mut state);
         state.combat_state.player_current_hp = state.combat_state.player_max_hp;
 
@@ -2816,6 +2830,7 @@ mod tests {
             1.6, // exceeds ATTACK_INTERVAL_SECONDS, guaranteeing at least one swing
             &haven_bonuses,
             &sigil_bonuses,
+            ascension_mult,
             &mut achievements,
             &mut deep,
             &loom,

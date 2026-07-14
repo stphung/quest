@@ -417,6 +417,20 @@ pub struct LoomState {
     /// Transient — initialized on first tick after load.
     #[serde(skip)]
     pub last_tick_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Reusable per-tick scratch buffer for shuttle consumer counts.
+    /// Cleared and refilled by `tick_shuttle_pull` each tick to avoid a
+    /// fresh HashMap allocation 10x/sec (transient, not serialized).
+    #[serde(skip)]
+    pub scratch_consumer_count: HashMap<LoomNodeRef, usize>,
+    /// Reusable per-tick scratch buffer for per-shuttle output rates.
+    /// Cleared and refilled by `tick_shuttle_pull` each tick (transient, not serialized).
+    #[serde(skip)]
+    pub scratch_shuttle_rates: Vec<f64>,
+    /// Reusable per-tick scratch buffer for measured resource rates.
+    /// Cleared and refilled by the Loom tick stage each tick before pattern
+    /// sustain processing (transient, not serialized).
+    #[serde(skip)]
+    pub scratch_rates: HashMap<Resource, f64>,
 }
 
 impl LoomState {
@@ -427,6 +441,9 @@ impl LoomState {
             time_warp: 1.0,
             graph_dirty: false,
             last_tick_at: None,
+            scratch_consumer_count: HashMap::new(),
+            scratch_shuttle_rates: Vec::new(),
+            scratch_rates: HashMap::new(),
         }
     }
 }

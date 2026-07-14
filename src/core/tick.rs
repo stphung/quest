@@ -56,7 +56,10 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
     tick_stages::tick_challenge_discovery(ctx.state, &haven_bonuses, rng, &mut result);
 
     // ── 3. Sync player max HP with cached derived stats ─────────
-    tick_stages::sync_derived_stats(ctx.state, ctx.enhancement, &sigil_bonuses);
+    // Ascension level cannot change mid-tick, so compute the combat
+    // multiplier once and share it between Stage 3 and Stage 6.
+    let ascension_mult = crate::ascension::ascension_combat_multiplier(ctx.state.ascension_level);
+    tick_stages::sync_derived_stats(ctx.state, ctx.enhancement, &sigil_bonuses, ascension_mult);
 
     // ── 4. Update dungeon exploration ───────────────────────────
     tick_stages::process_dungeon_events(ctx.state, delta_time, &haven_bonuses, &mut result, rng);
@@ -88,6 +91,7 @@ pub fn game_tick_with_context<R: Rng>(ctx: &mut TickContext, rng: &mut R) -> Tic
         delta_time,
         &haven_bonuses,
         &sigil_bonuses,
+        ascension_mult,
         ctx.achievements,
         ctx.deep,
         ctx.loom,
