@@ -1175,7 +1175,16 @@ pub fn show_startup_splash_screen(
                         match key_event.code {
                             KeyCode::Up => achievement_browser.move_up(),
                             KeyCode::Down => {
-                                achievement_browser.move_down(category_achievements.len())
+                                let count = if achievement_browser.selected_category
+                                    == achievements::AchievementCategory::Stats
+                                {
+                                    // Stats view scrolls by offset; the renderer
+                                    // clamps and persists the real maximum.
+                                    100
+                                } else {
+                                    category_achievements.len()
+                                };
+                                achievement_browser.move_down(count)
                             }
                             KeyCode::Left | KeyCode::Char(',') | KeyCode::Char('<') => {
                                 achievement_browser.prev_category()

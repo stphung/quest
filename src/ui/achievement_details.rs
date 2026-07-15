@@ -213,13 +213,17 @@ pub(super) fn render_achievement_detail(
 }
 
 /// Render the stats view (full-width, two columns).
+/// Renders the two stats columns and returns the scroll offset actually
+/// used — clamped so the last content line stops at the bottom of the
+/// viewport. Callers persist the returned value (see the browser scene)
+/// so a held Down key can't run the offset invisibly past the content.
 pub(super) fn render_stats_view(
     frame: &mut Frame,
     area: Rect,
     achievements: &Achievements,
     enhancement: &EnhancementProgress,
     scroll_offset: usize,
-) {
+) -> usize {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(super::themed_border_color(Color::DarkGray)));
@@ -245,6 +249,7 @@ pub(super) fn render_stats_view(
 
     render_lines(frame, columns[0], left_lines, scroll);
     render_lines(frame, columns[2], right_lines, scroll);
+    scroll
 }
 
 /// Build the left column lines: raw stats with dot-leaders.

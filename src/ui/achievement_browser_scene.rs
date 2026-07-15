@@ -110,7 +110,7 @@ pub fn render_achievement_browser(
     frame: &mut Frame,
     area: Rect,
     achievements: &Achievements,
-    ui_state: &AchievementBrowserState,
+    ui_state: &mut AchievementBrowserState,
     enhancement: &EnhancementProgress,
     _ctx: &super::responsive::LayoutContext,
 ) {
@@ -151,7 +151,11 @@ pub fn render_achievement_browser(
 
     // Content area: stats view or list+detail
     if ui_state.selected_category == AchievementCategory::Stats {
-        super::achievement_details::render_stats_view(
+        // Persist the renderer's clamped scroll: the input layer doesn't
+        // know the viewport, so without this a held Down runs the offset
+        // invisibly past the content and [Up] has to unwind the excess
+        // before anything moves again.
+        ui_state.selected_index = super::achievement_details::render_stats_view(
             frame,
             chunks[2],
             achievements,
@@ -406,12 +410,66 @@ mod tests {
 }
 
 #[cfg(test)]
+mod stats_scroll_clamp_tests {
+    use super::*;
+    use ratatui::{backend::TestBackend, Terminal};
+
+    fn render_at(ui: &mut AchievementBrowserState, w: u16, h: u16) {
+        let ach = Achievements::default();
+        let enh = crate::enhancement::EnhancementProgress::default();
+        let mut t = Terminal::new(TestBackend::new(w, h)).unwrap();
+        t.draw(|f| {
+            let area = f.area();
+            let ctx = crate::ui::responsive::LayoutContext::from_size(area.width, area.height);
+            render_achievement_browser(f, area, &ach, ui, &enh, &ctx);
+        })
+        .unwrap();
+    }
+
+    /// Regression (reported 2026-07-14): on the Stats tab a held Down ran
+    /// the scroll offset far past the content — the view stopped moving
+    /// but [Up] had to unwind the invisible excess before anything
+    /// scrolled back. The renderer now persists its clamped offset.
+    #[test]
+    fn stats_overscroll_is_clamped_back_by_the_renderer() {
+        let mut ui = AchievementBrowserState::new();
+        ui.selected_category = AchievementCategory::Stats;
+
+        // Way past any real content height (the input layer allows 100).
+        ui.selected_index = 100;
+        render_at(&mut ui, 120, 30);
+        let max_scroll = ui.selected_index;
+        assert!(
+            max_scroll < 100,
+            "the renderer must clamp the persisted offset ({max_scroll})"
+        );
+
+        // One Up from the clamp must move immediately — that's the bug.
+        ui.move_up();
+        assert_eq!(ui.selected_index, max_scroll.saturating_sub(1));
+
+        // The clamp is a fixed point: re-rendering doesn't drift it.
+        ui.selected_index = max_scroll;
+        render_at(&mut ui, 120, 30);
+        assert_eq!(ui.selected_index, max_scroll);
+
+        // On a terminal tall enough to show everything, no scroll at all.
+        ui.selected_index = 100;
+        render_at(&mut ui, 120, 200);
+        assert_eq!(
+            ui.selected_index, 0,
+            "content that fits entirely on screen has nothing to scroll"
+        );
+    }
+}
+
+#[cfg(test)]
 mod act_row_render_tests {
     use super::*;
     use crate::achievements::Act;
     use ratatui::{backend::TestBackend, Terminal};
 
-    fn render_rows(ui: &AchievementBrowserState) -> Vec<String> {
+    fn render_rows(ui: &mut AchievementBrowserState) -> Vec<String> {
         let ach = Achievements::default();
         let enh = crate::enhancement::EnhancementProgress::default();
         let mut t = Terminal::new(TestBackend::new(120, 20)).unwrap();
@@ -440,7 +498,7 @@ mod act_row_render_tests {
         let mut ui = AchievementBrowserState::new();
         ui.toggle_act();
         assert_eq!(ui.selected_act, Act::ActII);
-        let rows = render_rows(&ui);
+        let rows = render_rows(&mut ui);
         assert!(rows[1].contains("ACT II \u{00b7} The Crossing"));
         assert!(rows[2].contains("The Voyage"));
         assert!(rows.iter().any(|r| r.contains("The Burn")));
