@@ -1537,9 +1537,10 @@ fn test_consecutive_deaths_triggers_retreat() {
     state.consecutive_deaths = DEATH_LOOP_THRESHOLD - 1; // One more death = retreat
     let d = derived(&state);
 
-    // Run combat until the player dies
+    // Run combat until the player dies (enemy attacks every 2.0s = 20 ticks
+    // of 0.1s each; give a couple of attack cycles of margin)
     let mut retreat_triggered = false;
-    for _ in 0..100 {
+    for _ in 0..40 {
         let events = update_combat(
             &mut rng,
             &mut state,
