@@ -1,0 +1,9 @@
+id = "qbal-001-meadow-wall"
+domain = "balance"
+tier = "slow"
+source = "hand-authored"
+context_files = ["src/core/constants.rs"]
+graders = ["cargo run --release --bin simulator -- --check-progression"]
+edit_allowlist = ["src/core/constants.rs"]
+judge_rubric = "balance"
+show_failing_output = true

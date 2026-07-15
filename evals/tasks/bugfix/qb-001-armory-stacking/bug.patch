@@ -1,0 +1,21 @@
+diff --git a/src/combat/player_attack.rs b/src/combat/player_attack.rs
+index f794535..5f76bf9 100644
+--- a/src/combat/player_attack.rs
++++ b/src/combat/player_attack.rs
+@@ -45,12 +45,10 @@ pub(crate) fn resolve_player_attack<R: Rng>(
+     // Player attacks normally
+     // 1. Base damage from DerivedStats (STR/INT + equipment)
+     let base_damage = derived.total_damage();
+-    // 1b. Apply early damage percent (e.g. Giant's Might): +% base damage
+-    let early_boosted_damage =
+-        (base_damage as f64 * (1.0 + bonuses.early_damage_percent / 100.0)) as u64;
+-    // 2. Apply damage percent multiplier (e.g. Haven Armory): +% damage
+-    let boosted_damage =
+-        (early_boosted_damage as f64 * (1.0 + bonuses.damage_percent / 100.0)) as u64;
++    // 2. Apply damage percent bonuses (e.g. Giant's Might, Haven Armory): +% damage
++    let boosted_damage = (base_damage as f64
++        * (1.0 + (bonuses.early_damage_percent + bonuses.damage_percent) / 100.0))
++        as u64;
+     // 3. Apply flat damage bonus (e.g. prestige), added after % bonuses, before defense
+     let pre_defense_damage = boosted_damage.saturating_add(bonuses.flat_damage);
+     // 4. Apply Ascension multiplier to damage

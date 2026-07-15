@@ -21,3 +21,7 @@ Thumbs.db
 # insta pending snapshots (accepted snapshots in src/**/snapshots/ ARE committed)
 *.snap.new
 *.pending-snap
+
+# model-eval run artifacts (evals/tasks/ and the harness ARE committed)
+evals/results/
+__pycache__/

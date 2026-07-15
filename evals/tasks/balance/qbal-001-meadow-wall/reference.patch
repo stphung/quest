@@ -1,0 +1,17 @@
+diff --git b/src/core/constants.rs a/src/core/constants.rs
+index ad79eed..b3e8927 100644
+--- b/src/core/constants.rs
++++ a/src/core/constants.rs
+@@ -111,9 +111,9 @@ pub const FRONTIER_BACKOFF_MAX_CYCLES: u32 = 8;
+ // Index 0 = Zone 1, Index 10 = Zone 11 (The Expanse)
+ // hp_step/dmg_step/def_step are per-subzone depth increments above depth 1
+ pub const ZONE_ENEMY_STATS: [(u64, u64, u64, u64, u64, u64); 50] = [
+-    (550, 90, 40, 12, 0, 0),       // Zone 1: Meadow
+-    (900, 140, 75, 18, 6, 3),      // Zone 2: Dark Forest
+-    (1600, 220, 130, 24, 18, 6),   // Zone 3: Mountain Pass
++    (55, 9, 7, 2, 0, 0),           // Zone 1: Meadow
++    (90, 14, 13, 3, 2, 1),         // Zone 2: Dark Forest
++    (160, 22, 22, 4, 6, 2),        // Zone 3: Mountain Pass
+     (215, 27, 31, 6, 10, 3),       // Zone 4: Ancient Ruins
+     (305, 32, 42, 7, 16, 3),       // Zone 5: Volcanic Wastes
+     (380, 40, 53, 8, 22, 4),       // Zone 6: Frozen Tundra

@@ -1,0 +1,67 @@
+$ cargo test --test save_compat_tests
+   Compiling quest v0.1.0 (/home/user/quest/.worktrees/eval-scratch)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.91s
+     Running tests/save_compat_tests.rs (/home/user/quest/target/debug/deps/save_compat_tests-2fe3456fee849e6e)
+
+running 13 tests
+test generate_vessel_corpus_v1_addition ... ignored
+test regenerate_save_corpus ... ignored
+test character_corpus_loads ... FAILED
+test character_corpus_round_trips ... FAILED
+
+failures:
+
+---- character_corpus_loads stdout ----
+
+thread 'character_corpus_loads' (20398) panicked at tests/save_compat_tests.rs:59:54:
+called `Result::unwrap()` on an `Err` value: Custom { kind: InvalidData, error: Error("missing field `vessel_launched`", line: 70, column: 1) }
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/panicking.rs:80:14
+   2: core::result::unwrap_failed
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/result.rs:1867:5
+   3: unwrap<quest::core::game_state::GameState, std::io::error::Error>
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/result.rs:1233:23
+   4: character_corpus_loads
+             at ./tests/save_compat_tests.rs:59:54
+   5: save_compat_tests::character_corpus_loads::{{closure}}
+             at ./tests/save_compat_tests.rs:56:28
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- character_corpus_round_trips stdout ----
+
+thread 'character_corpus_round_trips' (20399) panicked at tests/save_compat_tests.rs:132:53:
+called `Result::unwrap()` on an `Err` value: Custom { kind: InvalidData, error: Error("missing field `vessel_launched`", line: 70, column: 1) }
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/panicking.rs:80:14
+   2: core::result::unwrap_failed
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/result.rs:1867:5
+   3: unwrap<quest::core::game_state::GameState, std::io::error::Error>
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/result.rs:1233:23
+   4: character_corpus_round_trips
+             at ./tests/save_compat_tests.rs:132:53
+   5: save_compat_tests::character_corpus_round_trips::{{closure}}
+             at ./tests/save_compat_tests.rs:120:34
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    character_corpus_loads
+    character_corpus_round_trips
+
+test result: FAILED. 9 passed; 2 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+error: test failed, to rerun pass `--test save_compat_tests`

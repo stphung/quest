@@ -1,0 +1,12 @@
+diff --git b/src/character/manager.rs a/src/character/manager.rs
+index 5d25436..27d90e6 100644
+--- b/src/character/manager.rs
++++ a/src/character/manager.rs
+@@ -37,6 +37,7 @@ pub(super) struct CharacterSaveData {
+     pub(super) ascension_level: u32,
+     #[serde(default)]
+     pub(super) vessel_signal_discovered: bool,
++    #[serde(default)]
+     pub(super) vessel_launched: bool,
+     #[serde(default)]
+     pub(super) vessel_arrived: bool,

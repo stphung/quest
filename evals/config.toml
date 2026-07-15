@@ -1,0 +1,38 @@
+# Quest model-eval suite configuration.
+#
+# base_commit is the "eval snapshot" every task's bug.patch is authored
+# against. Re-cutting it is a deliberate act (new suite version): re-validate
+# every task with `run.py validate` after changing it.
+
+[suite]
+version = "v1"
+base_commit = "5f5e3adc47fbb2909e630632e47e0a41b259089b" # main @ 2026-07-14
+
+# Paths a model diff may NEVER touch, regardless of the per-task allowlist.
+# This is what keeps the graders trustworthy: no editing tests, no
+# re-blessing snapshots, no touching the harness or the build definition.
+denied_prefixes = [
+    "tests/",
+    "evals/",
+    "benches/",
+    "scripts/",
+    ".github/",
+    "openspec/",
+    "docs/",
+    "quest.wiki/",
+    "src/ui/snapshots/",
+]
+denied_files = ["Cargo.toml", "Cargo.lock", "Makefile", "build.rs"]
+denied_suffixes = [".snap"]
+
+[run]
+# Default model under evaluation; override with --model.
+model = "claude-sonnet-5"
+max_tokens = 16384
+# Grader timeouts (seconds).
+fast_grader_timeout = 1200
+slow_grader_timeout = 3600
+
+[judge]
+model = "claude-opus-4-8"
+max_tokens = 2048

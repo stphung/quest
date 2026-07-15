@@ -1,0 +1,13 @@
+diff --git a/src/input/mod.rs b/src/input/mod.rs
+index ee6a374..c2c0b65 100644
+--- a/src/input/mod.rs
++++ b/src/input/mod.rs
+@@ -678,7 +678,7 @@ fn handle_base_game(
+             }
+             InputResult::Continue
+         }
+-        KeyCode::Char('h') | KeyCode::Char('H') => {
++        KeyCode::Char('h') => {
+             if haven.discovered {
+                 haven_ui.open();
+             }

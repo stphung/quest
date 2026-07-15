@@ -58,23 +58,21 @@ evals/
 └── results/               # gitignored; JSON + markdown reports per run
 ```
 
-### `task.yaml` schema
+### `task.toml` schema
 
-```yaml
-id: qb-001-crit-double-dip
-domain: bugfix            # bugfix | feature | ui | balance
-tier: fast                # fast | slow
-source_pr: 412            # provenance, for auditing
-context_files:            # exactly what the model sees, in order
-  - src/combat/damage.rs
-  - src/core/constants.rs
-show_failing_output: true # include grader output in the prompt
-graders:                  # hard gates, all must pass
-  - cargo test --test combat_tests crit_
-  - cargo test --lib combat::
-edit_allowlist:           # diff may only touch these paths
-  - src/combat/**
-judge_rubric: bugfix      # which rubric judge.py applies
+(TOML rather than YAML: Python 3.11's stdlib `tomllib` keeps the harness
+zero-dependency.)
+
+```toml
+id = "qb-001-armory-stacking"
+domain = "bugfix"              # bugfix | feature | ui | balance
+tier = "fast"                  # fast | slow
+source = "hand-authored"       # or "mined:<sha>" for provenance
+context_files = ["src/combat/player_attack.rs", "src/combat/events.rs"]
+show_failing_output = true     # include cached grader output in the prompt
+graders = ["cargo test --test combat_tests"]   # hard gates, all must pass
+edit_allowlist = ["src/combat/"]               # diff may only touch these
+judge_rubric = "bugfix"        # which rubric judge.py applies
 ```
 
 ### One base commit, one warm build
@@ -252,3 +250,10 @@ the model side shouldn't extend wall clock.
   (50 commits, `--unshallow` needed for mining), ~754 merged PRs upstream,
   recent history dominated by 1-line audit-log commits (mining filter
   required).
+- **2026-07-15 (same day)** — v1 implemented in `evals/` on this design:
+  stdlib-only Python harness (`run.py` / `mine.py` / `judge.py`), TOML task
+  metadata (deviation from the yaml sketch above, noted inline), and five
+  hand-authored seed tasks (2 bugfix, 1 ui, 1 feature, 1 slow-tier
+  balance), each red/green-validated against the real graders. See
+  `evals/README.md` for the operational docs; this exploration stays as
+  the rationale record.

@@ -1,0 +1,36 @@
+$ cargo test --test combat_tests
+   Compiling quest v0.1.0 (/home/user/quest/.worktrees/eval-scratch)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.27s
+     Running tests/combat_tests.rs (/home/user/quest/target/debug/deps/combat_tests-45df4f082fe8f91d)
+
+running 101 tests
+test combat_tests::combat_damage_pipeline_test::giants_might_and_armory_stack_multiplicatively ... FAILED
+
+failures:
+
+---- combat_tests::combat_damage_pipeline_test::giants_might_and_armory_stack_multiplicatively stdout ----
+
+thread 'combat_tests::combat_damage_pipeline_test::giants_might_and_armory_stack_multiplicatively' (17266) panicked at tests/combat_tests/combat_damage_pipeline_test.rs:337:5:
+Combined Giants Might + Armory should be ~5x, got ratio 3.50
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/panicking.rs:80:14
+   2: combat_tests::combat_tests::combat_damage_pipeline_test::giants_might_and_armory_stack_multiplicatively
+             at ./tests/combat_tests/combat_damage_pipeline_test.rs:337:5
+   3: combat_tests::combat_tests::combat_damage_pipeline_test::giants_might_and_armory_stack_multiplicatively::{{closure}}
+             at ./tests/combat_tests/combat_damage_pipeline_test.rs:310:52
+   4: core::ops::function::FnOnce::call_once
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/ops/function.rs:250:5
+   5: core::ops::function::FnOnce::call_once
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    combat_tests::combat_damage_pipeline_test::giants_might_and_armory_stack_multiplicatively
+
+test result: FAILED. 100 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+error: test failed, to rerun pass `--test combat_tests`

@@ -1,0 +1,9 @@
+id = "qf-001-shift-hotkeys"
+domain = "feature"
+tier = "fast"
+source = "hand-authored"
+context_files = ["src/input/mod.rs"]
+graders = ["cargo test --bin quest input::replay_tests"]
+edit_allowlist = ["src/input/"]
+judge_rubric = "feature"
+show_failing_output = true

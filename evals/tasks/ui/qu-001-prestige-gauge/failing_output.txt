@@ -1,0 +1,99 @@
+$ cargo test --lib snapshot
+: Reset, modifier: NONE,
+  190   190 │         x: 133, y: 8, fg: DarkGray, bg: Reset, underline: Reset, modifier: NONE,
+────────────┴───────────────────────────────────────────────────────────────────
+Stopped on the first failure. Run `cargo insta test` to run all snapshots.
+
+thread 'ui::snapshot_tests::snapshot_all_minigames' (23802) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/insta-1.48.0/src/runtime.rs:719:13:
+snapshot assertion for 'minigame_chess_xl_160x45' failed in line 113
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/panicking.rs:80:14
+   2: finalize
+             at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/insta-1.48.0/src/runtime.rs:719:13
+   3: assert_snapshot
+             at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/insta-1.48.0/src/runtime.rs:947:13
+   4: {closure#0}
+             at ./src/ui/snapshot_tests.rs:113:22
+   5: insta::settings::Settings::bind
+             at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/insta-1.48.0/src/settings.rs:617:9
+   6: quest::ui::snapshot_tests::assert_scene_snapshot
+             at ./src/ui/snapshot_tests.rs:113:14
+   7: quest::ui::snapshot_tests::assert_frame_snapshot
+             at ./src/ui/snapshot_tests.rs:100:5
+   8: snapshot_all_minigames
+             at ./src/ui/snapshot_tests.rs:187:9
+   9: quest::ui::snapshot_tests::snapshot_all_minigames::{{closure}}
+             at ./src/ui/snapshot_tests.rs:183:28
+  10: core::ops::function::FnOnce::call_once
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/ops/function.rs:250:5
+  11: core::ops::function::FnOnce::call_once
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- ui::snapshot_tests::snapshot_midgame_all_tiers stdout ----
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Snapshot Summary ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Snapshot file: src/ui/snapshots/midgame_xl_160x45.snap
+Snapshot: midgame_xl_160x45
+Source: src/ui/snapshot_tests.rs:113
+────────────────────────────────────────────────────────────────────────────────
+Expression: frame
+────────────────────────────────────────────────────────────────────────────────
+-old snapshot
++new results
+────────────┬───────────────────────────────────────────────────────────────────
+  213   213 │         x: 80, y: 7, fg: Magenta, bg: Reset, underline: Reset, modifier: NONE,
+  214   214 │         x: 0, y: 8, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+  215   215 │         x: 1, y: 8, fg: Rgb(180, 100, 255), bg: Rgb(20, 10, 30), underline: Reset, modifier: BOLD,
+  216   216 │         x: 28, y: 8, fg: Rgb(20, 10, 30), bg: Rgb(180, 100, 255), underline: Reset, modifier: BOLD,
+  217       │-        x: 40, y: 8, fg: Rgb(180, 100, 255), bg: Rgb(20, 10, 30), underline: Reset, modifier: BOLD,
+        217 │+        x: 39, y: 8, fg: Rgb(180, 100, 255), bg: Rgb(20, 10, 30), underline: Reset, modifier: BOLD,
+  218   218 │         x: 79, y: 8, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+  219   219 │         x: 80, y: 8, fg: Magenta, bg: Reset, underline: Reset, modifier: NONE,
+  220   220 │         x: 81, y: 8, fg: Reset, bg: Rgb(10, 30, 80), underline: Reset, modifier: NONE,
+  221   221 │         x: 90, y: 8, fg: Reset, bg: Rgb(9, 29, 79), underline: Reset, modifier: NONE,
+────────────┴───────────────────────────────────────────────────────────────────
+Stopped on the first failure. Run `cargo insta test` to run all snapshots.
+
+thread 'ui::snapshot_tests::snapshot_midgame_all_tiers' (23829) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/insta-1.48.0/src/runtime.rs:719:13:
+snapshot assertion for 'midgame_xl_160x45' failed in line 113
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/panicking.rs:80:14
+   2: finalize
+             at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/insta-1.48.0/src/runtime.rs:719:13
+   3: assert_snapshot
+             at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/insta-1.48.0/src/runtime.rs:947:13
+   4: {closure#0}
+             at ./src/ui/snapshot_tests.rs:113:22
+   5: insta::settings::Settings::bind
+             at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/insta-1.48.0/src/settings.rs:617:9
+   6: quest::ui::snapshot_tests::assert_scene_snapshot
+             at ./src/ui/snapshot_tests.rs:113:14
+   7: quest::ui::snapshot_tests::assert_frame_snapshot
+             at ./src/ui/snapshot_tests.rs:100:5
+   8: quest::ui::snapshot_tests::snapshot_midgame_all_tiers
+             at ./src/ui/snapshot_tests.rs:133:5
+   9: quest::ui::snapshot_tests::snapshot_midgame_all_tiers::{{closure}}
+             at ./src/ui/snapshot_tests.rs:131:32
+  10: core::ops::function::FnOnce::call_once
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/ops/function.rs:250:5
+  11: core::ops::function::FnOnce::call_once
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    ui::snapshot_tests::snapshot_all_minigames
+    ui::snapshot_tests::snapshot_boss_ready
+    ui::snapshot_tests::snapshot_combat_active
+    ui::snapshot_tests::snapshot_fresh_all_tiers
+    ui::snapshot_tests::snapshot_midgame_all_tiers
+
+test result: FAILED. 40 passed; 5 failed; 0 ignored; 0 measured; 2862 filtered out; finished in 0.52s
+
+error: test failed, to rerun pass `--lib`

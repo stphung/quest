@@ -1,0 +1,9 @@
+id = "qu-001-prestige-gauge"
+domain = "ui"
+tier = "fast"
+source = "hand-authored"
+context_files = ["src/ui/stats_panel.rs"]
+graders = ["cargo test --lib snapshot"]
+edit_allowlist = ["src/ui/"]
+judge_rubric = "ui"
+show_failing_output = true

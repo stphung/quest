@@ -141,6 +141,16 @@ Larger modules have their own `CLAUDE.md` with implementation patterns, integrat
 | Vessel | `src/vessel/` | [CLAUDE.md](src/vessel/CLAUDE.md) | Act 2: Vessel launch gate + Voyage engine, dark behind the `ACT2_ENABLED` kill-switch (`QUEST_ACT2=1` to preview) |
 | Main Helpers | `src/main_helpers/` | [CLAUDE.md](src/main_helpers/CLAUDE.md) | Orchestration between main.rs and domain modules |
 
+### Model Evals (`evals/`)
+
+A model-performance eval suite over this codebase: scoped "files in, diff
+out" tasks graded by the repo's own tests/snapshots/simulators. Tasks are
+pinned to `evals/config.toml`'s `base_commit`; `make eval-validate` proves
+every fast-tier task is still honest (graders red on the bug state, green on
+the reference fix) — run it when touching `evals/` or re-cutting the base
+commit. Design rationale: `docs/explorations/2026-07-15-model-eval-suite.md`;
+operational docs: [evals/README.md](evals/README.md).
+
 ### Simulators
 
 **Game Simulator** (`src/bin/simulator/`): Headless game balance simulator calling `game_tick_with_context()` with no UI/delay. Supports `--ticks`, `--seed`, `--prestige`, `--runs`, `--strategy <profile>` (casual/optimal/speedrun), `--stormbreaker`, `--assertions`, `--check-progression`. Strategy profiles inject challenge wins, enhancement, sigils, ascension, and auto-prestige.

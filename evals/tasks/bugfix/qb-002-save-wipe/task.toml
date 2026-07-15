@@ -1,0 +1,9 @@
+id = "qb-002-save-wipe"
+domain = "bugfix"
+tier = "fast"
+source = "hand-authored"
+context_files = ["src/character/manager.rs"]
+graders = ["cargo test --test save_compat_tests"]
+edit_allowlist = ["src/character/"]
+judge_rubric = "bugfix"
+show_failing_output = true

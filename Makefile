@@ -5,7 +5,7 @@
 # `/opsx:*` skills' bare `openspec ...` commands behave predictably.
 OPENSPEC_VERSION := 1.5.0
 
-.PHONY: check fmt lint test build audit all clean install setup openspec-setup coverage coverage-html coverage-check
+.PHONY: check fmt lint test build audit all clean install setup openspec-setup coverage coverage-html coverage-check eval-validate
 
 # Run all PR checks locally (uses same script as CI)
 check:
@@ -61,6 +61,11 @@ coverage-check:
 	@cargo llvm-cov --lib --summary-only --quiet \
 		--ignore-filename-regex "(ui/|utils/updater|utils/build_info|tick_events)" \
 		--fail-under-lines 90
+
+# Integrity-check the model-eval task suite (red on bug, green on reference).
+# Fast tier only; add "--tier all" manually to validate simulator-graded tasks.
+eval-validate:
+	@python3 evals/harness/run.py validate
 
 # Clean build artifacts
 clean:

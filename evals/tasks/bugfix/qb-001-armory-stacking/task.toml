@@ -1,0 +1,9 @@
+id = "qb-001-armory-stacking"
+domain = "bugfix"
+tier = "fast"
+source = "hand-authored"
+context_files = ["src/combat/player_attack.rs", "src/combat/events.rs"]
+graders = ["cargo test --test combat_tests"]
+edit_allowlist = ["src/combat/"]
+judge_rubric = "bugfix"
+show_failing_output = true

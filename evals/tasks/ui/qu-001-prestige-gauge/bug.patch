@@ -1,0 +1,16 @@
+diff --git a/src/ui/stats_panel.rs b/src/ui/stats_panel.rs
+index b43a61f..c28006d 100644
+--- a/src/ui/stats_panel.rs
++++ b/src/ui/stats_panel.rs
+@@ -416,8 +416,9 @@ fn draw_hero_panel(
+     frame.render_widget(Paragraph::new(prestige_lines), chunks[2]);
+ 
+     // Prestige gauge
+-    let prestige_ratio =
+-        (game_state.character_level as f64 / next_prestige.required_level as f64).min(1.0);
++    let prestige_ratio = (game_state.character_level.saturating_sub(1) as f64
++        / next_prestige.required_level as f64)
++        .min(1.0);
+     let prestige_eta = match game_state.xp_per_hour() {
+         Some(rate) if rate > 0 && game_state.character_level < next_prestige.required_level => {
+             let xp_remaining_current = xp_for_next_level(game_state.character_level)

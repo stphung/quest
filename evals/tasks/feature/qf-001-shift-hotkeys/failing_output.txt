@@ -1,0 +1,36 @@
+$ cargo test --bin quest input::replay_tests
+   Compiling quest v0.1.0 (/home/user/quest/.worktrees/eval-scratch)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 39.52s
+     Running unittests src/main.rs (/home/user/quest/target/debug/deps/quest-161316338b202bbd)
+
+running 46 tests
+test input::replay_tests::uppercase_hotkey_variant_also_opens_overlay ... FAILED
+
+failures:
+
+---- input::replay_tests::uppercase_hotkey_variant_also_opens_overlay stdout ----
+
+thread 'input::replay_tests::uppercase_hotkey_variant_also_opens_overlay' (22160) panicked at src/input/replay_tests.rs:55:5:
+[Shift+H] should open the Haven too
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/panicking.rs:80:14
+   2: quest::input::replay_tests::uppercase_hotkey_variant_also_opens_overlay
+             at ./src/input/replay_tests.rs:55:5
+   3: quest::input::replay_tests::uppercase_hotkey_variant_also_opens_overlay::{{closure}}
+             at ./src/input/replay_tests.rs:52:49
+   4: core::ops::function::FnOnce::call_once
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/ops/function.rs:250:5
+   5: core::ops::function::FnOnce::call_once
+             at /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    input::replay_tests::uppercase_hotkey_variant_also_opens_overlay
+
+test result: FAILED. 45 passed; 1 failed; 0 ignored; 0 measured; 3027 filtered out; finished in 0.20s
+
+error: test failed, to rerun pass `--bin quest`
