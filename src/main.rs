@@ -549,9 +549,16 @@ fn main() -> io::Result<()> {
                     'game_loop: loop {
                         // ── Act 2: The Crossing ─────────────────────────────
                         // After the launch burn, the loop belongs to the
-                        // voyage: chart, holds, junctions. Act 1 systems idle
-                        // untouched beneath it; spec 6 (the Going-Dark) owns
-                        // their eventual wind-down.
+                        // voyage: chart, holds, junctions. This branch ends in
+                        // `continue`, so everything below it — including both
+                        // `game_tick_with_context` call sites — is skipped while
+                        // launched. Act 1 is *frozen*, not idling: no zones
+                        // tick, no PR accrues, no Haven builds. And because
+                        // `vessel_launched` is only ever set true (never unset),
+                        // that is permanent for this character. Do not write
+                        // "Act 1 idles beneath" here — that phrasing has
+                        // misled design docs into assuming Act 1 output keeps
+                        // accumulating during the era. It does not.
                         if state.vessel_launched && vessel::act2_enabled() {
                             // The 5-beat launch transition (spec 4) plays once,
                             // between the burn and the first Voyage frame. It

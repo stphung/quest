@@ -82,6 +82,30 @@ most of Act 1's growth systems are already maxed.** Ascension X is the
 level cap. 28/28 patterns is Loom's completion state. The two hardest gates
 in the game are, definitionally, *finished* the moment Act 2 opens.
 
+> **⚠️ CORRECTION (2026-07-14) — the paragraph below is factually wrong. Do
+> not build on it.**
+>
+> Act 1 does **not** keep running during Act 2. `main.rs:555` takes the voyage
+> branch on `vessel_launched && act2_enabled()` and `main.rs:1018` `continue`s,
+> while both `game_tick_with_context` call sites sit at `main.rs:1253` / `:1608`
+> — *after* it. Zones don't tick, Power Cores don't generate, Haven doesn't
+> build, nothing is gettable. Act 1 is **frozen**, and permanently so
+> (`vessel_launched` is only ever set `true`). Confirmed intended design,
+> 2026-07-14.
+>
+> **What this voids:** there is no stranded output to redirect, so the "second
+> outlet" framing below — and the "Act 1 bridges" Phase 2 item it justified
+> (#734) — has no premise. Any such bridge is *new content*, not reuse, and
+> must be re-argued from scratch on its own merits.
+>
+> **What survives:** the opening observation still holds — Ascension X and 28/28
+> patterns *are* maxed at launch. But they're not "stranded and still
+> producing"; they're switched off. The real question this exploration should
+> have asked: **is it right that the hero a player built over hundreds of hours
+> goes inert for a 3–7 month era?** That is a live design question, unanswered.
+>
+> Preserved verbatim below as the record of how the item came to be proposed.
+
 So a player deep in a 3–5-month Ferryman era who keeps playing Act 1 in
 parallel (zones still tick, Power Cores still generate PR, Haven rooms
 still build, Fishing/Challenges/Achievements are all still gettable) is

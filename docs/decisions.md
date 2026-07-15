@@ -630,6 +630,20 @@ The Act 2 launch gate is simply **holding 250,000 prestige rank at the moment of
 
 **System**: vessel (`src/vessel/`, launch gate).
 
+### Vessel Launch Runway: ~828 Hours of Calendar Time — Arithmetic, Not a Simulation
+
+The 250,000 PR gate is reachable, and the answer is **closed-form rather than empirical**. The Loom's WR→PR conversion is the dominant endgame PR source: `wr_to_pr_per_hour(wr) = wr × (1 + wr/100)` (`src/loom/logic.rs:811`), documented peak **131 WR/hr → 302 PR/hr**. The grant (`src/core/tick_stages.rs:1235-1248`) computes `fill_secs = 3600 / pr_per_hour`, then adds `elapsed / fill_secs` PR, where `elapsed = (now - wr_pr_last_granted_at).min(604_800)` — **wall-clock seconds, capped at 7 days**.
+
+At peak: `250,000 ÷ 302 ≈ 828 hours ≈ 34.5 days` of *calendar* time, accruing with the game closed. The 7-day cap grants at most `302 × 168 ≈ 50,700` PR per catch-up, making the gate roughly **five weekly check-ins**. A player who leaves for a month and returns collects one week, not four — that cap is the only behavioral demand the runway makes.
+
+**Why this is not a simulator question**: there is no RNG in that path. `wr_to_pr_per_hour` is a pure function of WR; the grant is integer division on wall-clock elapsed. Nothing is emergent, so simulation can reveal nothing that division cannot. Worth recording because the headless simulator *structurally cannot* answer it: `src/bin/simulator/strategy.rs:361-363` notes the Loom's pattern sustain runs on wall clock "which doesn't advance meaningfully in the headless simulator" and injects pattern completions instead. Two 3,000-hour runs started at P50,000 and P250,000 with different seeds returned `pr_earned` of 17,995 and 17,994 — identical, because that PR came from injected challenge wins at ~6 PR/hr, not from the Loom. The simulator is not broken; it is answering a different question.
+
+**Scope of `balance-sim`, therefore**: it validates Act 1 progression to Z50 / Ascension X — the 28-pattern and Ascension X *prerequisites* of the gate. It does not and should not validate the PR runway. **Do not read a green balance-sim run as evidence about Act 2's entrance.**
+
+**Alternatives considered**: giving the simulator a virtual wall clock so the Loom economy runs headless (rejected for this purpose — it would spend real effort reproducing a closed-form constant; revisit only if the Loom gains RNG or cross-system feedback that makes its output genuinely emergent); leaving the runway unrecorded (rejected — it was mistaken for an open empirical question and briefly treated as a release blocker, which is what prompted this entry).
+
+**System**: vessel (launch gate) × loom (WR→PR) × simulator scope.
+
 ### Act 2 Souls: The Covenant — Nothing Harms a Soul While You Are Away
 
 A hard, CI-enforced invariant: **no tick-driven code path may reduce the roster.** Nights, weather, drift, hold-station, and offline resolution never touch souls; a property test simulates arbitrary offline windows and asserts roster count is invariant. Souls are lost **only in authored scenes** attached to named threats — the threat was on the junction card, the road was chosen, and the scene offered a priced alternative. There is no dice-based loss. A loss is memorialized: the soul's name is carved into the hull art for the rest of the game (Act 3 included), their arc becomes a memorial manifest line, and their counsel lines go silent.
