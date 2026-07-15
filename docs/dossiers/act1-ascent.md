@@ -1,7 +1,7 @@
 # Act 1: The Ascent — Design Dossier
 
-> Last refreshed: 2026-07-05 @ 64803b2 (prose de-cluttered: no inline code
-> references, bulleted structure; no source changed) | Sources: `src/core/` (incl.
+> Last refreshed: 2026-07-08 @ ee708f3 (doc-audit: fixed stale constants;
+> no source changed) | Sources: `src/core/` (incl.
 > `power_rating.rs`), `src/combat/`, `src/character/`, `src/zones/`,
 > `src/items/`, `src/enhancement/`, `src/ascension/`, `src/deep/`,
 > `src/loom/`, `src/power_cores/`, `src/god_items/`, `src/haven/`,

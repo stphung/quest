@@ -1,8 +1,8 @@
 # Act 2: The Pilgrimage of Souls — Design Dossier
 
-> Last refreshed: 2026-07-05 (the "Ignition" animated launch transition
-> shipped and Dock/Wormhole's balance evidence corrected against its own
-> shipped validation, see Refresh History) | Sources: `src/vessel/`, `src/main.rs` (vessel wiring), `src/vessel/CLAUDE.md`, `openspec/changes/archive/the-vessel-act2/design.md` (the 15 backported vessel specs, now consolidated into one file), `openspec/changes/archive/2026-07-05-act2-dock-wormhole-crossing/` (Dock/Wormhole, including its `tasks.md` balance validation), `openspec/specs/vessel-act2/spec.md`, `src/ui/vessel_transition_fx.rs` (the Ignition transition renderer), `docs/explorations/2026-07-05-act2-systems-braiding.md` (Dock/Wormhole's originating exploration and the deferred Session 5 braid), `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep`/`dock_time_across_charge_policies` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
+> Last refreshed: 2026-07-15 @ 304d015 (corrected the "Act 1 idles beneath
+> Act 2" premise — Act 1 stops, it does not idle, per `main.rs:555`'s
+> `continue`; see Refresh History for the full session log) | Sources: `src/vessel/`, `src/main.rs` (vessel wiring), `src/vessel/CLAUDE.md`, `openspec/changes/archive/the-vessel-act2/design.md` (the 15 backported vessel specs, now consolidated into one file), `openspec/changes/archive/2026-07-05-act2-dock-wormhole-crossing/` (Dock/Wormhole, including its `tasks.md` balance validation), `openspec/specs/vessel-act2/spec.md`, `src/ui/vessel_transition_fx.rs` (the Ignition transition renderer), `docs/explorations/2026-07-05-act2-systems-braiding.md` (Dock/Wormhole's originating exploration and the deferred Session 5 braid), `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep`/`dock_time_across_charge_policies` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
 
 > **Status: living, deep-refreshed across several sessions.** This dossier
 > holds Act 2's cross-system, player-eye synthesis — how the launch gate,
