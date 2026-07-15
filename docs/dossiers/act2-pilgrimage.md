@@ -283,7 +283,7 @@ Act 1 (everything)                Act 2: launch → crossing 1 → the Ferryman 
   250,000 PR (burn)   ─┘        │               │             (Act 3 hook #1 —
   Zone 50 kill ─► signal ───────┘               │              spec-normative)
                                                 ▼                     │
-  Deep/Loom/etc. idle beneath ◄── untouched   Colony founded ◄────────┘
+  Deep/Loom/etc. STOP (frozen, no ticks)      Colony founded ◄────────┘
                                                 │
                           ┌───────────────────► Reckoning: Salvage
                           │                     ─► Drive / Shipwright / Ward
@@ -304,8 +304,14 @@ Act 1 (everything)                Act 2: launch → crossing 1 → the Ferryman 
 - **In**: the launch gate deliberately braids *all* of Act 1 (Loom, Ascension,
   PR economy, Zone 50) into one burn — the act's strongest cross-system edge.
 - **During**: zero mechanical interaction with Act 1 — deliberate ("one-way
-  passage"); Act 1 idles untouched beneath. Narrative callbacks only
-  (Torvald is the Deep guild's captain).
+  passage"). Act 1 does not *idle* beneath: it **stops**. `main.rs:555` takes
+  the voyage branch and `continue`s past both `game_tick_with_context` call
+  sites, so no zone ticks, no PR accrues, no Haven builds — and permanently,
+  since `vessel_launched` is never unset. The hero the player spent hundreds of
+  hours building is inert for the whole era. Confirmed intended (2026-07-14);
+  noted here because the earlier "idles untouched" phrasing was read as "keeps
+  running" and became the (void) premise for the "Act 1 bridges" Phase 2 idea.
+  Narrative callbacks only (Torvald is the Deep guild's captain).
 - **The ferry loop is the act's second major cross-system braid**, but an
   internal one: Reckoning spend (Drive/Shipwright/Ward) feeds directly back
   into how much of the old world the next crossing can rescue before the
