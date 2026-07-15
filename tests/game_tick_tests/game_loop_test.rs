@@ -20,11 +20,6 @@ fn test_rng() -> ChaCha8Rng {
     ChaCha8Rng::seed_from_u64(42)
 }
 
-/// Simulate a single game tick (100ms of game time)
-fn simulate_tick(state: &mut GameState) -> Vec<CombatEvent> {
-    simulate_tick_with_rng(state, &mut test_rng())
-}
-
 fn simulate_tick_with_rng<R: rand::Rng>(state: &mut GameState, rng: &mut R) -> Vec<CombatEvent> {
     let delta_time = TICK_INTERVAL_MS as f64 / 1000.0;
     let mut achievements = Achievements::default();
@@ -50,11 +45,13 @@ fn simulate_tick_with_rng<R: rand::Rng>(state: &mut GameState, rng: &mut R) -> V
     )
 }
 
-/// Simulate multiple game ticks
+/// Simulate multiple game ticks, threading one RNG across the whole run
+/// (a fresh `test_rng()` per tick would replay the same roll every time)
 fn simulate_ticks(state: &mut GameState, count: u32) -> Vec<CombatEvent> {
+    let mut rng = test_rng();
     let mut all_events = Vec::new();
     for _ in 0..count {
-        all_events.extend(simulate_tick(state));
+        all_events.extend(simulate_tick_with_rng(state, &mut rng));
     }
     all_events
 }
@@ -155,8 +152,9 @@ fn test_enemy_spawns_after_ticks_without_enemy() {
     assert!(state.combat_state.current_enemy.is_none());
 
     // Simulate enough ticks for enemy to spawn (usually happens quickly)
+    let mut rng = test_rng();
     for _ in 0..100 {
-        simulate_tick(&mut state);
+        simulate_tick_with_rng(&mut state, &mut rng);
         if state.combat_state.current_enemy.is_some() {
             break;
         }
@@ -173,8 +171,9 @@ fn test_combat_produces_attack_events() {
     let mut state = GameState::new("Attack Test".to_string(), 0);
 
     // Spawn an enemy
+    let mut rng = test_rng();
     for _ in 0..100 {
-        simulate_tick(&mut state);
+        simulate_tick_with_rng(&mut state, &mut rng);
         if state.combat_state.current_enemy.is_some() {
             break;
         }
@@ -248,8 +247,9 @@ fn test_player_hp_regenerates_after_combat() {
     let mut state = GameState::new("Regen Test".to_string(), 0);
 
     // Spawn enemy and take some damage
+    let mut rng = test_rng();
     for _ in 0..500 {
-        let events = simulate_tick(&mut state);
+        let events = simulate_tick_with_rng(&mut state, &mut rng);
         for event in &events {
             if matches!(event, CombatEvent::EnemyDied { .. }) {
                 // Enemy died, now test regen
@@ -276,8 +276,9 @@ fn test_kills_tracked_in_zone_progression() {
     let initial_kills = state.zone_progression.kills_in_subzone;
 
     // Kill an enemy
+    let mut rng = test_rng();
     for _ in 0..1000 {
-        let events = simulate_tick(&mut state);
+        let events = simulate_tick_with_rng(&mut state, &mut rng);
         for event in events {
             if matches!(event, CombatEvent::EnemyDied { .. }) {
                 assert!(
