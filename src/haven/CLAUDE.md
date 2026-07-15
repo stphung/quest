@@ -78,7 +78,9 @@ Special: Fishing Dock T4 costs 10 PR. Storm Forge (single tier) costs 25 PR.
 The ultimate Haven room, requiring both capstones (War Room + Vault) to unlock:
 - Single tier, costs 25 prestige ranks
 - Enables forging of Stormbreaker weapon
-- Requires catching the Storm Leviathan first (tracked via achievements)
+- Forging (`can_forge_stormbreaker()`) requires both catching the Storm
+  Leviathan (tracked via achievements) and Prestige Rank 25+
+  (`STORMBREAKER_PRESTIGE_REQUIREMENT`)
 - Stormbreaker is required to defeat Zone 10's final boss
 
 ## Integration Points

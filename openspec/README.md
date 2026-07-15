@@ -19,7 +19,7 @@ folded back into those specs.
 
 The specs in `specs/` were **reverse-engineered from the existing
 implementation** — they document the game as it is actually coded today, not a
-wishlist. Twenty capability specs (215 requirements, 517 scenarios) were each
+wishlist. Twenty capability specs (216 requirements, 525 scenarios) were each
 produced by reading the relevant `src/<module>/` code, its module `CLAUDE.md`,
 the root `CLAUDE.md` "Key Constants", and the design notes under `docs/`, then
 grounding every number against the source. All twenty pass
@@ -51,7 +51,8 @@ than silently editing the spec to match a regression.
 | [`god-items`](specs/god-items/spec.md) | 7 | Asprika / Sleipnir / Megingjord — fixed God-rarity artifacts, passives, auto-equip protection |
 | [`time-vault`](specs/time-vault/spec.md) | 9 | git-backed save snapshots on milestones, browse/restore/fork/delete, no auto-prune |
 | [`persistence`](specs/persistence/spec.md) | 10 | JSON save files, `QUEST_DIR`, run vs account state, backward-compat contract, silent-wipe hazard |
-| [`vessel-act2`](specs/vessel-act2/spec.md) | 19 | Act 2 kill-switch, Zone-50 launch gate (250k PR burn), the Voyage loop, the ferry era's balance envelope, the Last Crossing |
+| [`vessel-act2`](specs/vessel-act2/spec.md) | 20 | Act 2 kill-switch, Zone-50 launch gate (250k PR burn), the Voyage loop, the ferry era's balance envelope, the Last Crossing |
+| [`challenges`](specs/challenges/spec.md) | 9 | 14 challenge minigames, discovery weights, difficulty tiers, reward tables |
 
 ## Setup
 
