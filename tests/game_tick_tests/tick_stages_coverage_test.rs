@@ -1223,8 +1223,8 @@ fn test_discoveries_skipped_when_dungeon_active() {
     let bonuses = default_haven_bonuses();
     let mut deep = DeepState::new();
 
-    // Try many times
-    for seed in 0..100u64 {
+    // Try many times (structurally blocked before any RNG roll; a handful of seeds suffices)
+    for seed in 0..5u64 {
         let mut rng = seeded_rng(seed);
         result = TickResult::default();
         let events = vec![CombatEvent::EnemyDied { xp_gained: 100 }];

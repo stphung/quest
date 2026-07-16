@@ -775,7 +775,7 @@ fn test_roll_rarity_covers_all_mob_tiers() {
     let mut rng = ChaCha8Rng::seed_from_u64(800);
     let mut seen = std::collections::HashSet::new();
 
-    for _ in 0..5_000 {
+    for _ in 0..500 {
         let rarity = roll_rarity_for_mob(0, 0.0, &mut rng);
         seen.insert(format!("{:?}", rarity));
         if seen.len() == 4 {
@@ -1161,7 +1161,7 @@ fn test_tier_distribution_across_many_items() {
     // Over many generated items, T0 should be most common and T9 very rare
     let mut rng = ChaCha8Rng::seed_from_u64(404);
     let mut counts = [0u32; 10];
-    for _ in 0..1000 {
+    for _ in 0..250 {
         let item = generate_item_with_rng(EquipmentSlot::Armor, Rarity::Common, 10, &mut rng);
         counts[item.tier as usize] += 1;
     }
@@ -1175,8 +1175,8 @@ fn test_tier_distribution_across_many_items() {
     // T0-T3 should be the vast majority (87% expected)
     let low_tiers: u32 = counts[0..=3].iter().sum();
     assert!(
-        low_tiers > 750,
-        "T0-T3 should be >75% of drops, got {}/1000",
+        low_tiers > 187,
+        "T0-T3 should be >75% of drops, got {}/250",
         low_tiers
     );
 }

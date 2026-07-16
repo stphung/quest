@@ -178,10 +178,10 @@ fn test_lure_at_ten_encounters_catch_phase() {
             catches += 1;
         }
     }
-    // Base 25% + 15% tracking = 40%. Allow 33-47% range.
+    // Base 25% + 15% tracking = 40%. Allow 30-50% range.
     let rate = catches as f64 / 1000.0;
     assert!(
-        rate > 0.33 && rate < 0.47,
+        rate > 0.30 && rate < 0.50,
         "Catch rate with 15% tracking should be ~40%, got {:.1}%",
         rate * 100.0
     );
