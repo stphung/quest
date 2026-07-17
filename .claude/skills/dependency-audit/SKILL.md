@@ -28,6 +28,23 @@ Spawn 2 Explore agents simultaneously.
 > (e.g. "observed via live `cargo update --dry-run`/`cargo audit` run; Cargo.lock is
 > gitignored, not re-derivable from git history") rather than stating a locked
 > version as if it were a stable, checkable fact.
+>
+> **Known pitfall — phantom transitive-dependency findings.** A `meta-audit`
+> re-verification pass (2026-07-17) checked the recurring "`generic-array` pinned by
+> `crypto-common`'s exact `=0.14.7` requirement via ratatui's optional termwiz
+> backend" and "a second `rand` 0.8.x pulled in transitively via criterion's
+> `phf_generator`" findings, logged across roughly ten runs since March 2026 with
+> inconsistent details each time (0.14.7 sometimes reachable, sometimes "0 packages
+> to lock"; the second `rand` cited as both 0.8.6 and 0.8.7). Independent
+> verification found **neither dependency edge exists at all** in the current
+> resolved graph — `cargo tree -i generic-array` / `cargo tree -i rand` show nothing
+> beyond this project's own direct deps, and `ratatui`'s locked deps never include a
+> termwiz backend. Before reporting an "orphaned" or "transitive-only" dependency as
+> a finding, confirm it's actually reachable with `cargo tree -i <crate>` (or `cargo
+> tree -e normal,build,dev | grep -B5 "<crate> v"`) in *this run's* freshly generated
+> lockfile — if that comes back empty, it isn't a real finding, don't log it (a
+> stale mention in `cargo update --dry-run --verbose`'s unchanged-deps list is not by
+> itself evidence of a live edge in the graph).
 
 **Agent 1 — Versions & Security**
 
@@ -68,6 +85,19 @@ Tasks:
 > this", "not gated to tests"), grep for the specific counter-evidence (test module
 > boundaries, the assertion pattern itself) rather than inferring absence from a
 > plausible-sounding hit count.
+
+> **Known pitfall — unverified "is exercised" claims.** A `meta-audit`
+> re-verification pass (2026-07-17) found a past run's fix reasoning wrong in the
+> other direction from the pitfall above: it justified keeping ratatui's
+> `underline-color` feature enabled by claiming it "IS exercised," with no call-site
+> evidence cited. Independent re-verification found zero `.underline_color(...)`
+> call sites and that every `underline:` field across all committed snapshots was
+> `Reset` — the feature was actually dead, and a later run had to catch and remove it
+> a full audit cycle after this one kept it. Before asserting a feature or dependency
+> capability "is used"/"is exercised" as grounds for keeping it, cite the specific
+> call site (or specific non-default rendered value, e.g. a non-`Reset` snapshot
+> field) — the same rigor the negative-claims pitfall above demands, applied to
+> positive claims too.
 
 Produce a ranked report:
 
