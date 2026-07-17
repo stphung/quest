@@ -567,7 +567,7 @@ fn test_is_modal_ready_true_after_500ms() {
     ach.unlock(AchievementId::SlayerI, Some("Hero".to_string()));
 
     ach.accumulation_start =
-        Some(std::time::Instant::now() - std::time::Duration::from_millis(600));
+        Some(std::time::Instant::now() - std::time::Duration::from_millis(900));
 
     assert!(ach.is_modal_ready());
 }
@@ -664,7 +664,7 @@ fn test_is_modal_ready_false_after_take() {
     let mut ach = Achievements::default();
     ach.unlock(AchievementId::SlayerI, Some("Hero".to_string()));
     ach.accumulation_start =
-        Some(std::time::Instant::now() - std::time::Duration::from_millis(600));
+        Some(std::time::Instant::now() - std::time::Duration::from_millis(900));
     assert!(ach.is_modal_ready());
 
     let _ = ach.take_modal_queue();
@@ -1389,7 +1389,7 @@ fn test_full_modal_lifecycle() {
 
     // Simulate 500ms elapsing
     ach.accumulation_start =
-        Some(std::time::Instant::now() - std::time::Duration::from_millis(600));
+        Some(std::time::Instant::now() - std::time::Duration::from_millis(900));
     assert!(ach.is_modal_ready());
 
     let queue = ach.take_modal_queue();

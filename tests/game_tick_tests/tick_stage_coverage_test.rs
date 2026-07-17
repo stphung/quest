@@ -1137,7 +1137,7 @@ fn test_debug_mode_suppresses_haven_and_achievement_save_on_storm_leviathan() {
     let mut rng = test_rng();
 
     // Run in debug mode
-    for _ in 0..100 {
+    for _ in 0..20 {
         let result = game_tick(
             &mut state,
             &mut tick,

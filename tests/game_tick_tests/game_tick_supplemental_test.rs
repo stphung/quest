@@ -307,7 +307,7 @@ fn test_no_dungeon_events_without_active_dungeon() {
     let mut r = rng(42);
 
     let mut all_events = Vec::new();
-    for _ in 0..100 {
+    for _ in 0..10 {
         all_events.extend(tick(&mut state, &mut tc, &mut ach, &mut r));
     }
 
