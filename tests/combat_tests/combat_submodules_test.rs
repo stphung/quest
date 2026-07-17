@@ -341,7 +341,7 @@ fn regen_is_triggered_after_enemy_death() {
     // State should now be regenerating
     assert!(state.combat_state.is_regenerating);
     assert!(state.combat_state.current_enemy.is_none());
-    assert_eq!(state.combat_state.regen_timer, 0.0);
+    assert!(state.combat_state.regen_timer.abs() < 1e-9);
 }
 
 #[test]
@@ -725,7 +725,7 @@ fn handle_enemy_death_starts_regen() {
 
     assert!(state.combat_state.is_regenerating);
     assert!(state.combat_state.current_enemy.is_none());
-    assert_eq!(state.combat_state.enemy_attack_timer, 0.0);
+    assert!(state.combat_state.enemy_attack_timer.abs() < 1e-9);
     assert_eq!(state.combat_state.regen_start_hp, 30);
 }
 

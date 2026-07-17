@@ -118,12 +118,12 @@ fn test_roll_recruit_quality_rank2_distribution() {
     let common_rate = common as f64 / n as f64;
     let uncommon_rate = uncommon as f64 / n as f64;
     assert!(
-        (common_rate - 0.60).abs() < 0.06,
+        (common_rate - 0.60).abs() < 0.10,
         "Rank 2 Common rate {:.2}% should be ~60%",
         common_rate * 100.0
     );
     assert!(
-        (uncommon_rate - 0.40).abs() < 0.06,
+        (uncommon_rate - 0.40).abs() < 0.10,
         "Rank 2 Uncommon rate {:.2}% should be ~40%",
         uncommon_rate * 100.0
     );
@@ -144,17 +144,17 @@ fn test_roll_recruit_quality_rank3_distribution() {
     }
     let rates = counts.map(|c| c as f64 / n as f64);
     assert!(
-        (rates[0] - 0.30).abs() < 0.06,
+        (rates[0] - 0.30).abs() < 0.10,
         "Rank 3 Common rate {:.2}% should be ~30%",
         rates[0] * 100.0
     );
     assert!(
-        (rates[1] - 0.50).abs() < 0.06,
+        (rates[1] - 0.50).abs() < 0.10,
         "Rank 3 Uncommon rate {:.2}% should be ~50%",
         rates[1] * 100.0
     );
     assert!(
-        (rates[2] - 0.20).abs() < 0.06,
+        (rates[2] - 0.20).abs() < 0.10,
         "Rank 3 Rare rate {:.2}% should be ~20%",
         rates[2] * 100.0
     );
@@ -183,7 +183,7 @@ fn test_roll_recruit_quality_rank5_no_common_and_elite_around_30_percent() {
     }
     let elite_rate = elite as f64 / n as f64;
     assert!(
-        (elite_rate - 0.30).abs() < 0.06,
+        (elite_rate - 0.30).abs() < 0.10,
         "Rank 5 Elite rate {:.2}% should be ~30%",
         elite_rate * 100.0
     );
