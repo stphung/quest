@@ -1,7 +1,7 @@
 # Act 2: The Pilgrimage of Souls — Design Dossier
 
 > Last refreshed: 2026-07-15 @ 304d015 (corrected the "Act 1 idles beneath
-> Act 2" premise — Act 1 stops, it does not idle, per `main.rs:555`'s
+> Act 2" premise — Act 1 stops, it does not idle, per `main.rs:562`'s
 > `continue`; see Refresh History for the full session log) | Sources: `src/vessel/`, `src/main.rs` (vessel wiring), `src/vessel/CLAUDE.md`, `openspec/changes/archive/the-vessel-act2/design.md` (the 15 backported vessel specs, now consolidated into one file), `openspec/changes/archive/2026-07-05-act2-dock-wormhole-crossing/` (Dock/Wormhole, including its `tasks.md` balance validation), `openspec/specs/vessel-act2/spec.md`, `src/ui/vessel_transition_fx.rs` (the Ignition transition renderer), `docs/explorations/2026-07-05-act2-systems-braiding.md` (Dock/Wormhole's originating exploration and the deferred Session 5 braid), `tests/ferryman_tests.rs`, `src/vessel/colony.rs` unit tests, `src/vessel/transition.rs`, voyage_simulator + ferryman `strategy_sweep`/`dock_time_across_charge_policies` runs, `overlay_snapshot_tests.rs`, played via `QUEST_ACT2=1` fixtures
 
 > **Status: living, deep-refreshed across several sessions.** This dossier
@@ -304,7 +304,7 @@ Act 1 (everything)                Act 2: launch → crossing 1 → the Ferryman 
 - **In**: the launch gate deliberately braids *all* of Act 1 (Loom, Ascension,
   PR economy, Zone 50) into one burn — the act's strongest cross-system edge.
 - **During**: zero mechanical interaction with Act 1 — deliberate ("one-way
-  passage"). Act 1 does not *idle* beneath: it **stops**. `main.rs:555` takes
+  passage"). Act 1 does not *idle* beneath: it **stops**. `main.rs:562` takes
   the voyage branch and `continue`s past both `game_tick_with_context` call
   sites, so no zone ticks, no PR accrues, no Haven builds — and permanently,
   since `vessel_launched` is never unset. The hero the player spent hundreds of
@@ -759,8 +759,8 @@ or anywhere else. Checked against source rather than assumed: the ferry
 loop (repeatable crossings, `souls_remaining` racing toward zero) and its
 end-state (`ColonyState::era_over()` blocking `SailAgain`, and a second
 persistent flag, `GameState::last_crossing_complete`, distinct from
-`vessel_arrived`) are fully implemented (`colony.rs:571-572`,
-`main.rs:746-747,834`) and named outright in `colony.rs`'s own module doc
+`vessel_arrived`) are fully implemented (`colony.rs:645`,
+`main.rs:740-741,805`) and named outright in `colony.rs`'s own module doc
 ("sub-project 9, The Ferryman" / "the next arrival is the Last Crossing:
 Act 3's gate") — but were absent from this dossier, from
 `openspec/specs/vessel-act2/spec.md`, and from `src/vessel/CLAUDE.md`
