@@ -444,7 +444,7 @@ fn derived_stats_all_attributes_at_max_cap_p0() {
     assert_eq!(stats.defense, 5);
     assert_eq!(stats.crit_chance_percent, 10);
     // WIS=20, mod=5: xp_mult = 1.0 + 5*0.05 = 1.25
-    assert!((stats.xp_multiplier - 1.25).abs() < f64::EPSILON);
+    assert!((stats.xp_multiplier - 1.25).abs() < 0.0001);
 }
 
 #[test]

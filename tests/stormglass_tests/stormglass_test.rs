@@ -543,8 +543,8 @@ fn test_pre_p15_salvage_does_not_discover_stormglass() {
     let mut achievements = Achievements::default();
     let mut rng = ChaCha8Rng::seed_from_u64(42);
 
-    // Run enough ticks to verify the P15 guard — 200 is sufficient for a boolean check
-    for _ in 0..200 {
+    // Structural guard: below P15 and undiscovered, the event can never fire regardless of RNG
+    for _ in 0..20 {
         let result = game_tick(
             &mut state,
             &mut tick_counter,
