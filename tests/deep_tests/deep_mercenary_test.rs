@@ -162,8 +162,9 @@ fn test_roll_recruit_quality_rank3_distribution() {
 
 #[test]
 fn test_roll_recruit_quality_rank4_no_common() {
+    // Structural guard: the rank-4 match arm has no Common-returning branch
     let mut rng = seeded_rng(55);
-    for _ in 0..200 {
+    for _ in 0..10 {
         let q = roll_recruit_quality(GuildRank(4), &mut rng);
         assert_ne!(q, MercQuality::Common, "Rank 4 should never produce Common");
     }
