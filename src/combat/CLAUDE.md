@@ -49,9 +49,9 @@ Struct whose fields encode the combat flow:
 
 1. **Enemy spawn**: Triggered by zone progression or dungeon room entry
 2. **Turn loop**: Player attacks every 1.5s (15 ticks); enemy attack intervals vary by tier (2.0s normal, 1.8s boss, 1.5s zone boss, 1.6s dungeon elite, 1.4s dungeon boss)
-3. **Player damage pipeline**: base damage (from DerivedStats) -> Giant's Might % (god item) -> Haven % bonus (Armory) -> prestige flat damage -> ascension multiplier -> subtract enemy defense -> min 1 -> crit roll (2x)
+3. **Player damage pipeline**: base damage (from DerivedStats) -> Giant's Might % (god item) -> Haven % bonus (Armory) -> prestige flat damage -> ascension multiplier -> subtract enemy defense -> min 1 -> crit roll (base 2x, boosted by CritMultiplier item affixes)
 4. **Enemy damage pipeline**: enemy.damage -> subtract total defense (derived.defense + prestige flat_defense, then x ascension multiplier) -> min 1 -> Divine Bulwark DR % (god item) -> min 1
-5. **Critical hits**: Chance from DEX modifier + prestige crit bonus (capped at 15%), deals 2x damage
+5. **Critical hits**: Chance from DEX modifier + prestige crit bonus (capped at 15%), deals `crit_multiplier` damage (`DerivedStats`, base 2.0x + CritMultiplier affix bonus)
 6. **Enemy death**: Awards XP, triggers item drop roll, enters Regen state
 7. **Player death**:
    - In zone, to a **boss**: Retreats immediately to Subzone 1 of the highest zone with a defeated boss (Zone 1 if none), resets `kills_in_subzone = 0`, preserves prestige
@@ -60,7 +60,7 @@ Struct whose fields encode the combat flow:
 
 ## Enemy Generation (Zone-Based Static Scaling)
 
-Enemies scale from a static `ZONE_ENEMY_STATS` table in `core/constants.rs`, **not** from player HP. Each zone has `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)` tuples. Subzone depth adds incremental stats via `hp_step`/`dmg_step`/`def_step`.
+Enemies scale from a static `ZONE_ENEMY_STATS` table in `core/constants.rs`, **not** from player HP. Each zone has `(base_hp, hp_step, base_dmg, dmg_step, base_def, def_step)` tuples. Subzone depth adds incremental stats via `hp_step`/`dmg_step`/`def_step`. On spawn, HP and damage each get an additional random ±10% variance roll (`ENEMY_STAT_VARIANCE_MIN`/`MAX`, `enemy_generation.rs`); defense is not varied.
 
 ### Zone Enemy Generators (`enemy_generation.rs`)
 
@@ -109,7 +109,7 @@ Zone 11 has dramatically higher stats than Zone 10 (~6.2x HP, ~4.6x DMG, ~4.8x D
 
 ## Combat Pipelines (Quick Reference)
 
-- **Damage pipeline**: base damage --> Giant's Might % --> Haven Armory % --> prestige flat damage --> ascension multiplier --> enemy defense --> min 1 --> crit (2x)
+- **Damage pipeline**: base damage --> Giant's Might % --> Haven Armory % --> prestige flat damage --> ascension multiplier --> enemy defense --> min 1 --> crit (base 2x + CritMultiplier affix bonus)
 - **Enemy damage pipeline**: enemy.damage --> subtract total defense (defense + prestige flat_defense, then x ascension multiplier) --> min 1 --> Divine Bulwark DR % --> min 1
 - **Defense pipeline**: base defense --> prestige flat defense --> ascension multiplier --> damage reduction %
 - **Ascension multiplier**: Also applied to player max HP in `core/tick.rs` (default 1.0x, up to 64x+ at Ascension VI)

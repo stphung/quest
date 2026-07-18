@@ -92,10 +92,10 @@ Base attribute ranges at ilvl 10 (scaled by `ilvl_multiplier × tier_multiplier`
 | Rarity    | Base Attr Range | Affixes | At ilvl 10 T9 | At ilvl 100 T9 (4.0x) | At ilvl 100 T0 (1.6x) |
 |-----------|----------------|---------|--------------|----------------------|----------------------|
 | Common    | 1              | 0       | 1-3 total    | 4-12 total           | 2-6 total            |
-| Magic     | 1-2            | 1       | 1-6 total    | 4-24 total           | 1-10 total           |
-| Rare      | 2-3            | 2-3     | 2-9 total    | 8-36 total           | 3-14 total           |
-| Epic      | 3-4            | 3-4     | 3-12 total   | 12-48 total          | 5-19 total           |
-| Legendary | 4-6            | 4-5     | 4-18 total   | 16-72 total          | 6-29 total           |
+| Magic     | 1-2            | 1       | 1-6 total    | 4-24 total           | 2-9 total            |
+| Rare      | 2-3            | 2-3     | 2-9 total    | 8-36 total           | 3-15 total           |
+| Epic      | 3-4            | 3-4     | 3-12 total   | 12-48 total          | 5-18 total           |
+| Legendary | 4-6            | 4-5     | 4-18 total   | 16-72 total          | 6-30 total           |
 
 ## Intrinsic Power Score (`types.rs` + `scoring.rs`)
 

@@ -94,7 +94,7 @@ Content/read-model types for each sub-system; see their file headers for the aut
 ### The Launch Gate (sub-project 1)
 1. **Discovery**: the first time the player defeats the Zone 50 final boss (`BossDefeatResult::LoomZoneCycle { zone_id: 50 }`), `tick_stages.rs::process_combat_events` sets `state.vessel_signal_discovered = true` and emits `TickEvent::VesselSignalDiscovered` — unconditionally, not gated on `act2_enabled()` (see kill-switch note above).
 2. **Whispers**: once discovered and until launch, `tick_stages::tick_vessel_whispers()` (tick Stage 12c, gated on `act2_enabled()`) emits an atmospheric `TickEvent::VesselWhisper` roughly every `WHISPER_INTERVAL_SECONDS` (60s) of play time, rotating deterministically through `VESSEL_WHISPERS` by `whisper_message(index)`.
-3. **Gate**: `can_launch(state, completed_patterns)` requires all four: signal discovered, not already launched, `ascension_level >= LAUNCH_REQUIRED_ASCENSION` (X), `completed_patterns >= LAUNCH_REQUIRED_PATTERNS` (28), and `prestige_rank >= LAUNCH_PR_COST` (250,000).
+3. **Gate**: `can_launch(state, completed_patterns)` requires all five: signal discovered, not already launched, `ascension_level >= LAUNCH_REQUIRED_ASCENSION` (X), `completed_patterns >= LAUNCH_REQUIRED_PATTERNS` (28), and `prestige_rank >= LAUNCH_PR_COST` (250,000).
 4. **Burn**: `perform_launch()` subtracts `LAUNCH_PR_COST` from `prestige_rank` in one all-or-nothing action, recalculates prestige bonuses, and sets `vessel_launched = true`. No partial spend — it's refused entirely if any gate is unmet.
 5. **Transition**: before the Voyage takes the screen, the 5-beat launch transition (`transition.rs`) plays once — see below.
 
