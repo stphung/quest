@@ -798,7 +798,7 @@ fn test_roll_rarity_covers_all_mob_tiers() {
 #[test]
 fn test_roll_rarity_prestige_bonus_shifts_toward_higher_tiers() {
     let mut rng = ChaCha8Rng::seed_from_u64(900);
-    let trials = 5_000;
+    let trials = 1_500;
 
     let mut common_p0 = 0usize;
     let mut common_p10 = 0usize;

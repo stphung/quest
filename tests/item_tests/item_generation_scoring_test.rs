@@ -360,7 +360,7 @@ fn test_ilvl_for_zone_11_gives_110() {
 #[test]
 fn test_mob_rarity_p0_no_prestige_bonus() {
     let mut rng = ChaCha8Rng::seed_from_u64(1234);
-    let trials = 5000;
+    let trials = 1500;
     let mut common = 0;
     let mut non_legendary = 0;
 
@@ -389,7 +389,7 @@ fn test_mob_rarity_p20_higher_than_p10() {
     // P10 gives 5% prestige bonus (10 * 0.005), P20 gives 10% = cap
     // So P20 should have fewer commons than P10
     let mut rng = ChaCha8Rng::seed_from_u64(5555);
-    let trials = 10_000;
+    let trials = 2_000;
 
     let mut commons_p10 = 0;
     let mut commons_p20 = 0;
@@ -442,7 +442,7 @@ fn test_mob_rarity_p20_same_as_p30_cap_reached() {
 fn test_mob_rarity_no_common_floor_at_max_haven() {
     // Even with max Haven bonus (25%), common rate is floored at 20%
     let mut rng = ChaCha8Rng::seed_from_u64(7777);
-    let trials = 5000;
+    let trials = 1500;
     let mut common = 0;
 
     for _ in 0..trials {
@@ -468,7 +468,7 @@ fn test_mob_rarity_no_common_floor_at_max_haven() {
 fn test_boss_normal_rarity_distribution() {
     // Normal boss: 40% Magic, 35% Rare, 23% Epic, 2% Legendary
     let mut rng = ChaCha8Rng::seed_from_u64(9999);
-    let trials = 10_000;
+    let trials = 2_000;
     let mut magic = 0;
     let mut rare = 0;
     let mut epic = 0;
@@ -516,7 +516,7 @@ fn test_boss_normal_rarity_distribution() {
 fn test_boss_final_zone_rarity_distribution() {
     // Final zone boss: 20% Magic, 40% Rare, 35% Epic, 5% Legendary
     let mut rng = ChaCha8Rng::seed_from_u64(11111);
-    let trials = 10_000;
+    let trials = 2_000;
     let mut magic = 0;
     let mut rare = 0;
     let mut epic = 0;

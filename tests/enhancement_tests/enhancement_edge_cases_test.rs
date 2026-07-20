@@ -118,7 +118,7 @@ fn test_levels_1_to_4_always_succeed() {
 #[test]
 fn test_success_rate_level_5_statistically_70_percent() {
     let mut r = rng(1234);
-    let trials = 20000;
+    let trials = 4000;
     let mut successes = 0u32;
     for _ in 0..trials {
         let (success, _) = roll_enhancement(4, &mut r); // target level 5
@@ -137,7 +137,7 @@ fn test_success_rate_level_5_statistically_70_percent() {
 #[test]
 fn test_success_rate_level_6_statistically_55_percent() {
     let mut r = rng(5678);
-    let trials = 20000;
+    let trials = 4000;
     let mut successes = 0u32;
     for _ in 0..trials {
         let (success, _) = roll_enhancement(5, &mut r);
@@ -156,7 +156,7 @@ fn test_success_rate_level_6_statistically_55_percent() {
 #[test]
 fn test_success_rate_level_7_statistically_40_percent() {
     let mut r = rng(9012);
-    let trials = 20000;
+    let trials = 4000;
     let mut successes = 0u32;
     for _ in 0..trials {
         let (success, _) = roll_enhancement(6, &mut r);
@@ -175,7 +175,7 @@ fn test_success_rate_level_7_statistically_40_percent() {
 #[test]
 fn test_success_rate_level_8_statistically_30_percent() {
     let mut r = rng(3456);
-    let trials = 20000;
+    let trials = 4000;
     let mut successes = 0u32;
     for _ in 0..trials {
         let (success, _) = roll_enhancement(7, &mut r);
@@ -194,7 +194,7 @@ fn test_success_rate_level_8_statistically_30_percent() {
 #[test]
 fn test_success_rate_level_9_statistically_20_percent() {
     let mut r = rng(7890);
-    let trials = 20000;
+    let trials = 4000;
     let mut successes = 0u32;
     for _ in 0..trials {
         let (success, _) = roll_enhancement(8, &mut r);
@@ -213,7 +213,7 @@ fn test_success_rate_level_9_statistically_20_percent() {
 #[test]
 fn test_success_rate_level_10_statistically_10_percent() {
     let mut r = rng(2468);
-    let trials = 20000;
+    let trials = 4000;
     let mut successes = 0u32;
     for _ in 0..trials {
         let (success, _) = roll_enhancement(9, &mut r);

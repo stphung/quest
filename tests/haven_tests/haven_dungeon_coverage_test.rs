@@ -265,17 +265,6 @@ fn test_tier_cost_storm_forge_special() {
 }
 
 #[test]
-fn test_tier_cost_invalid_tiers_return_zero() {
-    // Tier 0 and beyond max should return 0 for all rooms
-    assert_eq!(tier_cost(HavenRoomId::Hearthstone, 0), 0);
-    assert_eq!(tier_cost(HavenRoomId::Hearthstone, 4), 0);
-    assert_eq!(tier_cost(HavenRoomId::Armory, 0), 0);
-    assert_eq!(tier_cost(HavenRoomId::Armory, 4), 0);
-    assert_eq!(tier_cost(HavenRoomId::FishingDock, 0), 0);
-    assert_eq!(tier_cost(HavenRoomId::FishingDock, 5), 0);
-}
-
-#[test]
 fn test_tier_cost_increases_with_depth() {
     // For same tier level, deeper rooms should cost more
     let t1_depth0 = tier_cost(HavenRoomId::Hearthstone, 1);

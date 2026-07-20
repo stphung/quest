@@ -41,9 +41,7 @@ fn test_on_enemy_killed_boss_increments_both_counters() {
 #[test]
 fn test_slayer_i_at_exactly_100_kills() {
     let mut ach = Achievements::default();
-    for _ in 0..99 {
-        ach.on_enemy_killed(false, None);
-    }
+    ach.total_kills = 99;
     assert!(!ach.is_unlocked(AchievementId::SlayerI));
     ach.on_enemy_killed(false, Some("Hero"));
     assert!(ach.is_unlocked(AchievementId::SlayerI));
