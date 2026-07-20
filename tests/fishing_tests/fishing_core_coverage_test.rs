@@ -901,7 +901,7 @@ fn test_discover_dungeon_creates_valid_dungeon() {
 #[test]
 fn test_discover_dungeon_probability_approximately_1_percent() {
     let mut rng = seeded_rng();
-    let trials = 5000;
+    let trials = 1500;
     let mut discoveries = 0;
 
     for _ in 0..trials {

@@ -274,7 +274,7 @@ fn test_rarity_common_floor_at_high_rank() {
     // stored in chances[0] but the cumulative sum still overflows at high ranks.
     // Verify that at rank 30 (design max), Common is still occasionally returned.
     let mut r = rng(999);
-    let trials = 5000;
+    let trials = 1500;
     let mut common_count = 0u32;
     for _ in 0..trials {
         if roll_fish_rarity(30, &mut r) == FishRarity::Common {

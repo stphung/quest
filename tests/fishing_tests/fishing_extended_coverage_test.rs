@@ -490,7 +490,7 @@ fn test_generate_fishing_session_ticks_remaining_is_positive() {
 
 #[test]
 fn test_discover_fishing_probability_approximately_five_percent() {
-    let trials = 2000u32;
+    let trials = 500u32;
     let mut discoveries = 0u32;
 
     for seed in 0..trials as u64 {

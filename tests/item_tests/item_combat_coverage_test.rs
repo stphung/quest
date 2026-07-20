@@ -903,14 +903,30 @@ mod tick_tests {
         ChaCha8Rng::seed_from_u64(42)
     }
 
+    fn setup_game_tick_env(
+        name: &str,
+    ) -> (
+        GameState,
+        u32,
+        Haven,
+        EnhancementProgress,
+        Achievements,
+        ChaCha8Rng,
+    ) {
+        (
+            GameState::new(name.to_string(), 0),
+            0u32,
+            Haven::default(),
+            EnhancementProgress::new(),
+            Achievements::default(),
+            test_rng(),
+        )
+    }
+
     #[test]
     fn game_tick_debug_mode_suppresses_achievement_save_flags() {
-        let mut state = GameState::new("Debug Test".to_string(), 0);
-        let mut tick_counter = 0u32;
-        let mut haven = Haven::default();
-        let mut enhancement = EnhancementProgress::new();
-        let mut achievements = Achievements::default();
-        let mut rng = test_rng();
+        let (mut state, mut tick_counter, mut haven, mut enhancement, mut achievements, mut rng) =
+            setup_game_tick_env("Debug Test");
 
         // With debug_mode=true, even if haven/achievements change,
         // the save flags should be suppressed for those triggered by discovery
@@ -934,13 +950,9 @@ mod tick_tests {
 
     #[test]
     fn game_tick_recalculates_derived_stats_when_dirty() {
-        let mut state = GameState::new("Stats Test".to_string(), 0);
+        let (mut state, mut tick_counter, mut haven, mut enhancement, mut achievements, mut rng) =
+            setup_game_tick_env("Stats Test");
         state.derived_stats_dirty = true;
-        let mut tick_counter = 0u32;
-        let mut haven = Haven::default();
-        let mut enhancement = EnhancementProgress::new();
-        let mut achievements = Achievements::default();
-        let mut rng = test_rng();
 
         game_tick(
             &mut state,
@@ -959,14 +971,9 @@ mod tick_tests {
 
     #[test]
     fn game_tick_idle_state_spawns_enemy() {
-        let mut state = GameState::new("Spawn Test".to_string(), 0);
+        let (mut state, mut tick_counter, mut haven, mut enhancement, mut achievements, mut rng) =
+            setup_game_tick_env("Spawn Test");
         assert!(state.combat_state.current_enemy.is_none());
-
-        let mut tick_counter = 0u32;
-        let mut haven = Haven::default();
-        let mut enhancement = EnhancementProgress::new();
-        let mut achievements = Achievements::default();
-        let mut rng = test_rng();
 
         game_tick(
             &mut state,
@@ -984,12 +991,8 @@ mod tick_tests {
 
     #[test]
     fn game_tick_increments_tick_counter() {
-        let mut state = GameState::new("Counter Test".to_string(), 0);
-        let mut tick_counter = 0u32;
-        let mut haven = Haven::default();
-        let mut enhancement = EnhancementProgress::new();
-        let mut achievements = Achievements::default();
-        let mut rng = test_rng();
+        let (mut state, mut tick_counter, mut haven, mut enhancement, mut achievements, mut rng) =
+            setup_game_tick_env("Counter Test");
 
         game_tick(
             &mut state,
@@ -1007,12 +1010,8 @@ mod tick_tests {
 
     #[test]
     fn game_tick_play_time_increments_after_10_ticks() {
-        let mut state = GameState::new("Time Test".to_string(), 0);
-        let mut tick_counter = 0u32;
-        let mut haven = Haven::default();
-        let mut enhancement = EnhancementProgress::new();
-        let mut achievements = Achievements::default();
-        let mut rng = test_rng();
+        let (mut state, mut tick_counter, mut haven, mut enhancement, mut achievements, mut rng) =
+            setup_game_tick_env("Time Test");
 
         let initial_time = state.play_time_seconds;
 
@@ -1046,13 +1045,9 @@ mod tick_tests {
 
     #[test]
     fn game_tick_no_haven_discovery_at_rank_0() {
-        let mut state = GameState::new("No Haven".to_string(), 0);
+        let (mut state, mut tick_counter, mut haven, mut enhancement, mut achievements, mut rng) =
+            setup_game_tick_env("No Haven");
         state.prestige_rank = 0; // Below HAVEN_MIN_PRESTIGE_RANK (10)
-        let mut tick_counter = 0u32;
-        let mut haven = Haven::default();
-        let mut enhancement = EnhancementProgress::new();
-        let mut achievements = Achievements::default();
-        let mut rng = test_rng();
 
         // Haven discovery is structurally gated on prestige_rank at P0, so a
         // handful of ticks is enough to prove it never fires.
@@ -1074,13 +1069,9 @@ mod tick_tests {
 
     #[test]
     fn game_tick_no_soulforge_discovery_at_rank_0() {
-        let mut state = GameState::new("No Forge".to_string(), 0);
+        let (mut state, mut tick_counter, mut haven, mut enhancement, mut achievements, mut rng) =
+            setup_game_tick_env("No Forge");
         state.prestige_rank = 0; // Below SOULFORGE_MIN_PRESTIGE_RANK (15)
-        let mut tick_counter = 0u32;
-        let mut haven = Haven::default();
-        let mut enhancement = EnhancementProgress::new();
-        let mut achievements = Achievements::default();
-        let mut rng = test_rng();
 
         // Soulforge discovery is structurally gated on prestige_rank at P0, so
         // a handful of ticks is enough to prove it never fires.
@@ -1102,12 +1093,8 @@ mod tick_tests {
 
     #[test]
     fn game_tick_xp_rate_samples_populated_after_10_ticks() {
-        let mut state = GameState::new("XP Rate".to_string(), 0);
-        let mut tick_counter = 0u32;
-        let mut haven = Haven::default();
-        let mut enhancement = EnhancementProgress::new();
-        let mut achievements = Achievements::default();
-        let mut rng = test_rng();
+        let (mut state, mut tick_counter, mut haven, mut enhancement, mut achievements, mut rng) =
+            setup_game_tick_env("XP Rate");
 
         for _ in 0..10 {
             game_tick(
