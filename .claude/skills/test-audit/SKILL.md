@@ -93,6 +93,7 @@ Spawn fix agents based on audit findings.
 | Ignoring Monte Carlo tests as "probably fine" | Check margins are generous (2-5x expected range) |
 | Skipping the 10x verification | Flakiness is probabilistic; 1 run proves nothing |
 | Re-flagging the same ~40 brute-force RNG-search loops every run as if new | This category has recurred, unresolved, across every run since 2026-07-02 — fixing it needs seed research or a production-code RNG-injection change, both outside this skill's auto-fix scope. Note it as known, tracked debt rather than re-deriving it from scratch each cycle; only act on it if actually doing that research. |
+| Bundling multiple locations under one aggregated finding without verifying each individually | A 2026-07-20 meta-audit re-verification found 7 of 20 findings from that run overstated uniformity across a cited location list: two outright misattributed a loop to the wrong same-file test (and the wrong file path) when two similarly-named tests sat near each other, and five more conflated distinct helpers/tests as one duplicated pattern or claimed uniform N-way duplication when only some cited locations actually matched. When a finding spans more than one location, read the exact test name and line at *each* one — don't extrapolate from the first-verified instance to the rest of the list. |
 
 ## Output
 
