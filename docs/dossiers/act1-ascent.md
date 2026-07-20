@@ -10,6 +10,13 @@
 > `openspec/README.md`'s discrepancy log, `docs/decisions.md`,
 > `docs/storyboards/act1-the-ascent.html`, and simulator runs
 > (`--check-progression`, three-strategy sweeps at a P300 baseline)
+>
+> **doc-audit note (2026-07-20)**: the refreshed-at sha above does not
+> resolve in current repo history, and source paths this dossier covers
+> have changed since (e.g. perf work touching combat/ascension/loom/deep
+> tick paths). Spot checks this run found the Mechanics & Constants and
+> Interrelations sections still accurate, but this dossier needs a manual
+> refresh to restore a resolvable provenance sha.
 
 > **Status: new.** This is the first dossier for Act 1 — the whole 50-zone
 > climb and every system hanging off it. `openspec/specs/` and the per-module

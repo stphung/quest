@@ -21,7 +21,7 @@ src/core/
 ├── xp.rs            # XP curves, leveling, combat kill XP, distribute_level_up_points
 ├── power_rating.rs  # Character power rating (sqrt of DPS x eHP)
 ├── tick_context.rs  # TickContext struct — bundles all mutable references (state, haven, deep, loom, etc.) for game_tick_with_context()
-├── game_state_serde.rs # FlatGameState intermediate for backward-compatible JSON serialization during sub-struct migration (dead code — unreferenced elsewhere; the real save/load path is `character/manager.rs` + `character/persistence.rs`)
+├── game_state_serde.rs # FlatGameState intermediate for backward-compatible JSON serialization during sub-struct migration; the sole Serialize/Deserialize impl for GameState, but not part of the production save/load path — only exercised by tests that serialize `GameState` directly (the real save/load path is `character/manager.rs` + `character/persistence.rs`)
 ├── discovery_facade.rs # DiscoveryInput/DiscoveryResult structs and roll_discoveries_facade() for decoupled discovery rolls
 └── paths.rs             # Centralized save path resolution for ~/.quest/ directory
 ```
