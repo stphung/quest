@@ -105,5 +105,5 @@ Scenarios cover the key states of Act 1 plus a dedicated Act 2 net (Act 2/Vessel
 ## Integration Points
 
 - **Imports from**: `challenges/` (menu processing, all 14 minigame input handlers), `character/prestige` (can_prestige, perform_prestige), `haven/` (try_build_room, can_forge_stormbreaker), `enhancement/` (roll_enhancement, costs), `deep/` (mission management, guild rank), `stormglass/` (sigils, spending), `achievements/` (browser, titles, sync), `ascension/` (ascend), `zones/` (sync_account_zone_unlocks), `loom/` (Loom of Worlds state), `vessel/` (functions: `can_launch`, `perform_launch`; types: `route`, `voyage::*`, `SceneModal`, `VoyageUiState`, `VoyageView`), `utils/debug_menu` (DebugMenu), `history/` (SaveEvent)
-- **Consumed by**: `main.rs` and `main_helpers/input_routing.rs` call `handle_game_input()` and route the `InputResult`
+- **Consumed by**: `main.rs` calls `handle_game_input()`; `main_helpers/input_routing.rs::route_game_input()` consumes the returned `InputResult`
 - **UI coupling**: References `ui::achievement_browser_scene`, `ui::title_browser_scene`, `ui::time_vault_scene`, `ui::stats_prestige` for type imports only (no rendering)

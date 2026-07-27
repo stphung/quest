@@ -456,7 +456,7 @@ P0 (no prestige combat bonuses) is left as the hardest baseline, with the first 
 
 ### Soften the Boss-Death Penalty Instead of a Full Kill-Counter Reset
 
-Reduce the friction of dying to a boss rather than resetting `kills_in_subzone` to 0 and forcing 10 fresh kills. The shipped form (`boss_retry_kills`) drops the requirement from 10 to 5 for the retry, then resets to 10 on kill or zone change.
+Reduce the friction of dying to a boss rather than resetting `kills_in_subzone` to 0 and forcing 10 fresh kills. The source doc proposed a `boss_retry_kills` field that would drop the requirement from 10 to 5 for the retry, then reset to 10 on kill or zone change — but this softened form was never shipped. The actual shipped behavior is the full reset this decision set out to soften: `resolve_combat_retreat()` (`src/combat/orchestration.rs`) unconditionally sets `kills_in_subzone = 0` on boss death, requiring all 10 fresh kills to retry.
 
 **Why**: with static scaling, zone bosses are legitimately beatable but at only a 30-40% win rate; a full 10-kill grind-back (75-105 s) punishes players for attempting challenging content after a close loss. A softer penalty keeps players engaged rather than frustrated while retaining some cost via the regen timer.
 
