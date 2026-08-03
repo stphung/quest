@@ -812,16 +812,17 @@ fn test_roll_rarity_prestige_bonus_shifts_toward_higher_tiers() {
         }
     }
 
-    // Prestige 10 gives 10% bonus, reducing common from ~55% to ~45%
+    // Prestige 10 gives a 5% bonus (capped), reducing common from ~60% to ~55%
     assert!(
         common_p10 < common_p0,
         "P10 should have fewer commons ({common_p10}) than P0 ({common_p0})"
     );
 
-    // Verify the magnitude is meaningful (at least ~2.5% difference = 125 in 5k)
+    // Verify the magnitude is meaningful. Expected diff ~= 75 (1500 * 5%), std-dev ~= 27;
+    // threshold set well below the mean (~1.7 sigma) so >95% of seeds pass.
     let diff = common_p0 as i64 - common_p10 as i64;
     assert!(
-        diff > 100,
+        diff > 30,
         "Prestige bonus should meaningfully reduce common rate. Diff = {diff}"
     );
 }

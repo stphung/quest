@@ -407,8 +407,9 @@ fn test_try_discover_soulforge_high_prestige_discovers_faster() {
 
     let mut ep_low = EnhancementProgress::new();
     let mut ticks_low = 0u64;
-    // At P15, expected discovery in ~71K ticks; 200K gives ample margin
-    for i in 0..200_000u64 {
+    // At P15, expected discovery in ~71K ticks; chance of zero hits in 700K tries
+    // is ~e^-9.8 (~0.006%), a much safer margin than 200K (~6% failure chance).
+    for i in 0..700_000u64 {
         if try_discover_soulforge(&mut ep_low, 15, &mut rng_low) {
             ticks_low = i;
             break;
