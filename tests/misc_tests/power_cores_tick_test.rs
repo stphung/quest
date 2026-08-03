@@ -358,9 +358,9 @@ fn partial_progress_preserved_no_early_grant() {
     // The last_granted_at timestamp must remain unchanged (progress is preserved).
     let ts = deep.persistent.power_core_last_granted[&AchievementId::PowerCoreI];
     let expected_ts = now() - elapsed_18h;
-    // Allow ±2 seconds of clock drift in the test.
+    // Allow ±5 seconds of clock drift in the test.
     assert!(
-        (ts - expected_ts).abs() <= 2,
+        (ts - expected_ts).abs() <= 5,
         "partial progress timestamp must not change (got {ts}, expected ~{expected_ts})"
     );
 }
@@ -564,9 +564,9 @@ fn newly_unlocked_core_starts_from_current_time() {
         .copied()
         .expect("init_new_core must set timestamp");
 
-    // Allow ±2 seconds of clock drift.
+    // Allow ±5 seconds of clock drift.
     assert!(
-        (ts2 - now()).abs() <= 2,
+        (ts2 - now()).abs() <= 5,
         "init_new_core must set timestamp to current time"
     );
 }

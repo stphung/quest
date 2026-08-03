@@ -209,8 +209,8 @@ fn test_prestige_at_exact_level() {
         apply_tick_xp(&mut rng, &mut state, remaining as f64);
         iterations += 1;
         assert!(
-            iterations < 1000,
-            "Should reach level 10 within 1000 iterations"
+            iterations < 20,
+            "Should reach level 10 within 20 iterations"
         );
     }
 

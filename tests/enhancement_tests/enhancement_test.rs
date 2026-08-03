@@ -1051,8 +1051,9 @@ fn test_try_discover_soulforge_at_exactly_min_prestige() {
     let mut discovered = false;
 
     // At exactly P15, discovery should be possible (chance = 0.000014/tick).
-    // Expected discovery within ~71K ticks on average; 200K gives ample margin.
-    for _ in 0..200_000 {
+    // Expected discovery within ~71K ticks on average; chance of zero hits in 700K
+    // tries is ~e^-9.8 (~0.006%), a much safer margin than 200K (~6% failure chance).
+    for _ in 0..700_000 {
         if try_discover_soulforge(&mut ep, SOULFORGE_MIN_PRESTIGE_RANK, &mut rng) {
             discovered = true;
             break;

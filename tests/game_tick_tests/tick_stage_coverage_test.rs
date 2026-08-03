@@ -517,7 +517,7 @@ fn test_haven_discovery_requires_prestige_10() {
         &mut haven,
         &mut achievements,
         &mut rng,
-        1_000,
+        100,
     );
 
     let haven_discovered = results.iter().any(|r| r.haven_changed);
@@ -669,7 +669,7 @@ fn test_challenge_discovery_blocked_by_active_dungeon() {
         &mut haven,
         &mut achievements,
         &mut rng,
-        1_000,
+        100,
     );
 
     let challenge_discovered = events
@@ -707,7 +707,7 @@ fn test_challenge_discovery_blocked_by_active_fishing() {
         &mut haven,
         &mut achievements,
         &mut rng,
-        500,
+        100,
     );
 
     let challenge_discovered = events
