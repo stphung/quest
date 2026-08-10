@@ -219,7 +219,7 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 ## Combat Mechanics
 
 - **Enemy scaling**: Static zone-based stats from `ZONE_ENEMY_STATS` table. Fracture zones scale 1.6x per zone from Zone 11 base. Loom zones scale 1.25x per zone from Zone 30 base
-- **Damage pipeline** (player -> enemy): base -> Giant's Might % -> Haven % -> prestige flat -> ascension mult -> defense -> min 1 -> crit (2x)
+- **Damage pipeline** (player -> enemy): base -> Giant's Might % -> Haven % -> prestige flat -> ascension mult -> defense -> min 1 -> crit (base 2x + CritMultiplier affix bonus)
 - **Defense pipeline** (enemy -> player): base -> prestige flat -> ascension mult -> Bulwark DR %
 - **Death**: Boss death retreats to Subzone 1 of the highest zone with a defeated boss (Zone 1 if none), preserving prestige; dungeon death exits dungeon (no prestige loss)
 - **Weapon gates**: Zone 10 final boss requires Stormbreaker
