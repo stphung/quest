@@ -245,10 +245,11 @@ fn offline_catchup_48h_one_core_grants_four_pr() {
 
     let fill = fill_duration_secs(2); // 43200s
     let elapsed_48h: i64 = 48 * 3600; // 172800s = exactly 4 fill cycles
+    let old_ts = now() - elapsed_48h - 1;
 
     deep.persistent
         .power_core_last_granted
-        .insert(AchievementId::PowerCoreI, now() - elapsed_48h - 1);
+        .insert(AchievementId::PowerCoreI, old_ts);
 
     let pr_before = state.prestige_rank;
     let granted = apply_offline_power_cores(&mut state, &mut deep, &achievements);
@@ -266,7 +267,6 @@ fn offline_catchup_48h_one_core_grants_four_pr() {
     // Timestamp should have advanced by 4 fill durations.
     let new_ts = deep.persistent.power_core_last_granted[&AchievementId::PowerCoreI];
     let expected_advance = fill * 4;
-    let old_ts = now() - elapsed_48h - 1;
     assert_eq!(
         new_ts,
         old_ts + expected_advance,

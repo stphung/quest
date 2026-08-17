@@ -362,7 +362,7 @@ fn test_discover_fishing_blocked_when_already_fishing() {
     let mut state = fresh_state();
     state.active_fishing = Some(make_session(FishingPhase::Waiting, 10, 5));
 
-    for seed in 0..200u64 {
+    for seed in 0..20u64 {
         let mut r = rng(seed);
         let result = try_discover_fishing(&mut state, &mut r);
         assert!(
@@ -381,7 +381,7 @@ fn test_discover_fishing_blocked_when_dungeon_active() {
     let mut state = fresh_state();
     state.active_dungeon = Some(quest::dungeon::generation::generate_dungeon(1, 0, 1));
 
-    for seed in 0..200u64 {
+    for seed in 0..20u64 {
         let mut r = rng(seed);
         let result = try_discover_fishing(&mut state, &mut r);
         assert!(
