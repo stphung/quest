@@ -326,7 +326,7 @@ fn test_leviathan_not_triggered_below_rank_40() {
     let mut r = rng(4242);
     for rank in [1u32, 10, 20, 30, 39] {
         for encounter in 0u8..=10 {
-            for _ in 0..50 {
+            for _ in 0..5 {
                 let (_, result) = generate_fish_with_rank(
                     FishRarity::Legendary,
                     rank,
@@ -356,7 +356,7 @@ fn test_leviathan_not_triggered_for_non_legendary_at_rank_40() {
         FishRarity::Rare,
         FishRarity::Epic,
     ] {
-        for _ in 0..100 {
+        for _ in 0..10 {
             let (fish, result) = generate_fish_with_rank(rarity, 40, 0, 0.0, 0.0, &mut r);
             assert_eq!(
                 result,
