@@ -99,6 +99,23 @@ Tasks:
 > field) — the same rigor the negative-claims pitfall above demands, applied to
 > positive claims too.
 
+> **Known pitfall — leaving a feature "unverifiable" when consumption evidence is
+> already decisive.** A `meta-audit` re-verification pass (2026-08-17) found
+> criterion's `html_reports` feature was logged as "enabled but usage unverifiable"
+> and kept as flagged-for-review across the 2026-08-03 *and* 2026-08-10 runs, even
+> though both runs had already gathered the decisive evidence needed to resolve it:
+> no CI job (`ci.yml`, `scripts/ci-checks.sh`) ever runs `cargo bench`, and the one
+> doc that mentions it (`perf-audit/SKILL.md`) only checks that the command runs
+> without errors — it never opens, references, or ships the HTML report the feature
+> exists to produce. A feature with no source-level API call site can't be resolved
+> by grep alone, but when you've already checked whether anything in the repo's
+> automation *runs the producing command and consumes its output* and found nothing
+> — across CI config, scripts, and referencing docs — that's a decisive "unused,"
+> not an "unverifiable" to defer another cycle. This sat unresolved for two audit
+> cycles before a third run finally auto-fixed it. When a feature's own producing
+> command has zero CI/script/doc consumers of its output, auto-fix it as unused
+> rather than flagging it for review again.
+
 Produce a ranked report:
 
 | Pattern | Dep | Severity | Notes |
