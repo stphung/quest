@@ -842,7 +842,7 @@ fn run_simulation(config: &DeepSimConfig, seed: u64) -> DeepSimStats {
         let _tick_summary = tick_all_missions(&mut prestige, &mut persistent, now, &mut rng);
 
         // ── Phase B: Collect completed missions from pending_results ──
-        let completed: Vec<_> = prestige.pending_results.drain(..).collect();
+        let completed: Vec<_> = std::mem::take(&mut prestige.pending_results);
         for mission in &completed {
             if let Some(ref result) = mission.result {
                 stats.record_outcome(&result.outcome);
