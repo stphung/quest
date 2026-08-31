@@ -172,7 +172,7 @@ Progressive 10-encounter hunt, only available at rank 40 on legendary fish catch
 
 ## Extending the Fishing System
 
-**Adding a new fish rarity**: Update `FishRarity` enum, add name array in `generation.rs`, add XP range to `XP_REWARDS`, add base chance to `BASE_CHANCES` and rank bonus to `RANK_BONUS_PER_5`, add drop chance constant and mapping in `logic.rs`.
+**Adding a new fish rarity**: Update `FishRarity` enum, add name array in `generation.rs`, add XP range to `XP_REWARDS`, add base chance to `BASE_CHANCES` and rank bonus to `RANK_BONUS_PER_5`, add drop chance constant and mapping in `drops.rs`.
 
 **Adding a new Haven bonus**: Add field to `HavenFishingBonuses`, wire it in `tick_fishing_with_haven_result()`, define the room/upgrade in `haven/types.rs`.
 
