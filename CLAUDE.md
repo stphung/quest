@@ -226,4 +226,4 @@ Haven bonuses are passed as explicit parameters rather than accessed globally. T
 
 ## Dependencies
 
-Ratatui 0.30, Serde (JSON), serde_json 1.0, Rand 0.10, Rand_chacha 0.10 (seeded RNG for simulator), Chrono, dirs 6.0, Chess-engine 0.1, ureq 3.3, flate2 1.1, zip 8.5, unicode-width 0.2, git2 0.21 (vendored-openssl), tar 0.4, uuid 1.23, petgraph 0.8 (Loom DAG), tempfile 3 (dev), criterion 0.8 (dev/bench), insta 1 (dev, UI snapshot tests)
+Ratatui 0.30, Serde (JSON), serde_json 1.0, Rand 0.10, Rand_chacha 0.10 (seeded RNG for simulator), Chrono 0.4, dirs 6.0, Chess-engine 0.1, ureq 3.3, flate2 1.1, zip 8.5, unicode-width 0.2, git2 0.21 (vendored-openssl), tar 0.4, uuid 1.23, petgraph 0.8 (Loom DAG), tempfile 3 (dev), criterion 0.8 (dev/bench), insta 1 (dev, UI snapshot tests)
