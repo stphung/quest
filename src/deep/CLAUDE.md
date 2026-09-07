@@ -318,7 +318,7 @@ The game tick does **not** simulate mission progress. It only checks for pending
 - **`tick_events.rs`**: `TickFlags::deep_discovered` field, combat log message on discovery
 - **`input/mod.rs`**: `[D]` keybind opens overlay when `deep.discovered`. Routes to `handle_deep()`.
 - **`input/deep_input.rs`**: Deep overlay input handler (navigation, mission selection, event response)
-- **`input/types.rs`**: `GameOverlay::DeepDiscovery` and `GameOverlay::DeepOverlay` variants
+- **`input/types.rs`**: `GameOverlay::DeepDiscovery` variant; the Deep overlay itself is tracked via `DeepUiState.open` (set by `open_at_frontier()`), not a `GameOverlay` variant
 - **`input/prestige_input.rs`**: Calls `deep.on_prestige()` after `perform_prestige()`
 - **`main.rs`**: Loads/saves Deep state alongside Haven and Enhancement. Passes `&mut deep` to `game_tick()` and `save_all()`
 - **`main_helpers/persistence.rs`**: `save_all()` includes `deep` parameter, calls `save_deep()` when discovered
