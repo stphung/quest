@@ -317,12 +317,12 @@ Winning a minigame emits a `MinigameWinInfo` (defined in `mod.rs`) with `game_ty
 
 | Challenge | Board | AI Type | Special Features |
 |-----------|-------|---------|------------------|
-| Chess | 8x8 | chess-engine crate | Move history, piece selection |
-| Morris | 24 points | Minimax (`ai.rs`) | Mill detection, 3 phases |
-| Gomoku | 15x15 | Minimax depth 2-5 (`ai.rs`) | Win line detection |
-| Minesweeper | Variable | N/A (puzzle) | Flood fill reveal, flags |
-| Rune | 3-5 slots | N/A (puzzle) | Mastermind-style feedback |
-| Go | 9x9 | MCTS | Captures, ko rule, territory scoring |
+| Chess | 8x8 | chess-engine crate | Move history, piece selection, requires P1+ |
+| Morris | 24 points | Minimax (`ai.rs`) | Mill detection, 3 phases, requires P1+ |
+| Gomoku | 15x15 | Minimax depth 2-5 (`ai.rs`) | Win line detection, requires P1+ |
+| Minesweeper | Variable | N/A (puzzle) | Flood fill reveal, flags, requires P1+ |
+| Rune | 3-5 slots | N/A (puzzle) | Mastermind-style feedback, requires P1+ |
+| Go | 9x9 | MCTS | Captures, ko rule, territory scoring, requires P1+ |
 | Snake (Serpent's Path) | 26×26 grid | N/A (action) | Real-time ~60 FPS, direction-based movement, 4 difficulties (Novice 10 food/200ms, Master 25 food/90ms), requires P1+ |
 | Flappy Bird (Skyward Gauntlet) | 50×18 area | N/A (action) | Real-time ~60 FPS, gravity/flap physics, pipe obstacles with gap sizes (7→4 rows), 3 lives, 4 difficulties, requires P1+ |
 | JezzBall (Containment Breach) | 34×22 grid | N/A (action) | Real-time ~60 FPS, ball physics, wall-building to capture area, 3 lives, 2-5 balls (Novice→Master), target 60-84%, 4 difficulties, requires P1+ |
