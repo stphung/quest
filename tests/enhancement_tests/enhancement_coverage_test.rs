@@ -444,8 +444,10 @@ fn test_try_discover_soulforge_idempotent_after_discovery() {
     let mut ep = EnhancementProgress::new();
     ep.discovered = true;
 
-    // Should always return false once already discovered
-    for _ in 0..100 {
+    // Should always return false once already discovered. This is a
+    // deterministic early-return guard clause (checked before any RNG
+    // roll), so a handful of calls is enough to verify it.
+    for _ in 0..3 {
         assert!(
             !try_discover_soulforge(&mut ep, 100, &mut rng),
             "Should never re-discover"
@@ -460,8 +462,8 @@ fn test_try_discover_soulforge_at_prestige_14_never_discovers() {
 
     // Probability is exactly 0.0 at P14 (below min prestige rank),
     // so this always returns false via an early-return guard clause.
-    // 100 iterations is sufficient to verify the guard.
-    for _ in 0..100 {
+    // A handful of iterations is sufficient to verify the guard.
+    for _ in 0..3 {
         assert!(!try_discover_soulforge(&mut ep, 14, &mut rng));
     }
     assert!(!ep.discovered);
