@@ -200,7 +200,7 @@ Twenty zones across five chapters, triple-gated by pattern completion, ascension
 `reset_for_prestige(new_prestige_rank)`:
 - Resets position to Zone 1, Subzone 1
 - Clears all defeated bosses and kill tracking
-- Recalculates `unlocked_zones` based on new prestige rank (zones whose `prestige_requirement <= rank`)
+- Recalculates `unlocked_zones` based on new prestige rank (zones whose `prestige_requirement <= rank`), excluding Loom zones (id > 30) -- those are handled separately by `sync_account_zone_unlocks()`
 - Player can immediately `travel_to()` any unlocked zone's first subzone
 
 ## Lookup Functions (`data.rs`)
