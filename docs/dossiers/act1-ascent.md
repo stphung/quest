@@ -243,7 +243,7 @@ rank layer flat damage, defense, crit, and HP directly into the combat
 pipeline on top of it. One quirk worth knowing: the cosmetic *tier names*
 attached to prestige rank (Bronze, Silver, ... Eternal) stop advancing
 well before the multiplier does — "Eternal" is the name for every rank
-from the mid-20s onward, even though the game's own late-game content
+from rank 20 onward, even though the game's own late-game content
 expects ranks in the tens of thousands.
 
 ### Zones
