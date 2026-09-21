@@ -1047,7 +1047,7 @@ fn test_enemy_died_can_trigger_item_drop() {
 }
 
 #[test]
-fn test_boss_kill_always_drops_item() {
+fn test_boss_kill_always_drops_item_via_process_combat_events() {
     // Boss kills (fighting_boss = true) always drop items
     let mut state = fresh_state();
     state.zone_progression.fighting_boss = true;
