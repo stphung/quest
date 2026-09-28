@@ -46,7 +46,7 @@ Returned by `ascend()`:
 | III | Layer 12 (Hollows) | 120 PR | 8x |
 | IV | Layer 18 (Sunken Reach) | 200 PR | 16x |
 | V | Layer 25 (Abyss) | 325 PR | 32x |
-| VI | Layer 30 (Gateway) | 500 PR | 64x |
+| VI | Layer 30 (Void) | 500 PR | 64x |
 | VII | 8 Patterns | 1,500 PR | 96x |
 | VIII | 16 Patterns | 4,000 PR | 144x |
 | IX | 22 Patterns | 8,000 PR | 216x |

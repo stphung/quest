@@ -57,7 +57,7 @@ Up to 5 sigil slots that provide permanent percentage-based bonuses. Character-l
 | ChronoOverchargePercent | 5-20% | Sigil of Overcharge |
 
 ### Sigil Grades
-Values are rolled on an exponential curve (`e^(3p) - 1`) that compresses low rolls and stretches high rolls. Grades are assigned by percentile (F- through S+), with 21 total grades across 7 letter tiers (F, E, D, C, B, A, S).
+Values are rolled on an exponential curve (`(e^(3p) - 1) / (e^3 - 1)`) that compresses low rolls and stretches high rolls. Grades are assigned by percentile (F- through S+), with 21 total grades across 7 letter tiers (F, E, D, C, B, A, S).
 
 ### SigilBonuses Aggregation
 `SigilBonuses::compute(&StormSigils)` sums all etched sigil values by effect type into a single struct. These bonuses are injected into `CombatBonuses` (for combat effects) and other systems (fishing speed, offline XP, drop rate) via explicit parameter passing.

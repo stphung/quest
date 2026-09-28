@@ -45,7 +45,7 @@ Enum with 254 variants covering all trackable milestones. Organized by domain:
 
 Twelve categories for browsing, grouped under two acts (`Act` enum, same file): **Act I · The Ascent** — `Combat`, `Level`, `Prestige`, `Progression`, `Challenges`, `Exploration`, `Deep`, `Loom`, `Stats`; **Act II · The Crossing** — `Voyage` ("The Voyage"), `Ferry` ("The Ferry"), `Era` ("The Era"). `Act::categories()` / `AchievementCategory::act()` define the partition (test-pinned). The browser shows an act selector row above the act's own subsection tabs: `[Tab]` toggles act, `</>`/arrows cycle within the act; Act II's label dims while the kill-switch is off (rows stay browsable — the teaser ruling).
 
-### `AchievementDef` (`data.rs`)
+### `AchievementDef` (`types.rs`)
 
 Static definition with `id`, `name`, `description`, `category`, `icon`, and `points`. All definitions live in the `ALL_ACHIEVEMENTS` const slice. Points use a 7-tier system: Trivial (5), Easy (10), Medium (25), Hard (50), Very Hard (100), Elite (250), Pinnacle (500). 254 achievements total. Note: `VaultWardenJourneyman` is currently set to 15 points (`data.rs`), which doesn't match any tier — the other three Vault Warden achievements follow Trivial/Easy/Medium (5/10/25), so this looks like a data entry slip rather than an intentional off-tier value; left as-is pending a balance decision.
 
