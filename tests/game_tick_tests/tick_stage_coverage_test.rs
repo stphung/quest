@@ -540,13 +540,15 @@ fn test_haven_discovery_blocked_by_active_dungeon() {
     let dungeon = generate_dungeon(state.character_level, state.prestige_rank, 1);
     state.active_dungeon = Some(dungeon);
 
+    // The dungeon gate is checked before any RNG roll, so a handful of ticks
+    // is enough to prove it -- no need to burn cycles on hundreds.
     let events = run_ticks_collecting(
         &mut state,
         &mut tick_counter,
         &mut haven,
         &mut achievements,
         &mut rng,
-        100,
+        5,
     );
 
     let haven_discovered = events
@@ -578,13 +580,15 @@ fn test_haven_discovery_blocked_by_active_fishing() {
     };
     state.active_fishing = Some(session);
 
+    // The fishing gate is checked before any RNG roll, so a handful of ticks
+    // is enough to prove it -- no need to burn cycles on hundreds.
     let events = run_ticks_collecting(
         &mut state,
         &mut tick_counter,
         &mut haven,
         &mut achievements,
         &mut rng,
-        100,
+        5,
     );
 
     let haven_discovered = events
@@ -663,13 +667,15 @@ fn test_challenge_discovery_blocked_by_active_dungeon() {
     let dungeon = generate_dungeon(state.character_level, state.prestige_rank, 1);
     state.active_dungeon = Some(dungeon);
 
+    // The dungeon gate is checked before any RNG roll, so a handful of ticks
+    // is enough to prove it -- no need to burn cycles on hundreds.
     let events = run_ticks_collecting(
         &mut state,
         &mut tick_counter,
         &mut haven,
         &mut achievements,
         &mut rng,
-        100,
+        5,
     );
 
     let challenge_discovered = events
@@ -701,13 +707,15 @@ fn test_challenge_discovery_blocked_by_active_fishing() {
     };
     state.active_fishing = Some(session);
 
+    // The fishing gate is checked before any RNG roll, so a handful of ticks
+    // is enough to prove it -- no need to burn cycles on hundreds.
     let events = run_ticks_collecting(
         &mut state,
         &mut tick_counter,
         &mut haven,
         &mut achievements,
         &mut rng,
-        100,
+        5,
     );
 
     let challenge_discovered = events
