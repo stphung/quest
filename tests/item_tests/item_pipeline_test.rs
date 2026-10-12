@@ -798,7 +798,7 @@ fn test_roll_rarity_covers_all_mob_tiers() {
 #[test]
 fn test_roll_rarity_prestige_bonus_shifts_toward_higher_tiers() {
     let mut rng = ChaCha8Rng::seed_from_u64(900);
-    let trials = 1_500;
+    let trials = 8_000;
 
     let mut common_p0 = 0usize;
     let mut common_p10 = 0usize;
@@ -818,11 +818,11 @@ fn test_roll_rarity_prestige_bonus_shifts_toward_higher_tiers() {
         "P10 should have fewer commons ({common_p10}) than P0 ({common_p0})"
     );
 
-    // Verify the magnitude is meaningful. Expected diff ~= 75 (1500 * 5%), std-dev ~= 27;
-    // threshold set well below the mean (~1.7 sigma) so >95% of seeds pass.
+    // Verify the magnitude is meaningful. Expected diff ~= 400 (8000 * 5%), std-dev ~= 62;
+    // threshold set well below the mean (~3.2 sigma) so false failures are negligible (<0.1%).
     let diff = common_p0 as i64 - common_p10 as i64;
     assert!(
-        diff > 30,
+        diff > 200,
         "Prestige bonus should meaningfully reduce common rate. Diff = {diff}"
     );
 }
