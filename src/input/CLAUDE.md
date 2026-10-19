@@ -39,7 +39,7 @@ Keyboard input routing for the Game screen, dispatching to overlay handlers, min
 5. **Step 1**: Discovery/celebration modals (Haven, Soulforge, Stormglass, Deep, Loom, Vessel signal, fracture region, pattern milestone) -- Enter/Esc dismisses
    - **Step 1c**: Achievement unlock modal -- Enter, Esc, or Space dismisses
    - **Step 1f**: Ascension confirm dialog -- Y confirms, N/Esc cancels
-6. **Step 2**: Full-screen overlays (Haven, Soulforge, Stormglass Exchange, The Deep) -- each delegates to its own handler
+6. **Steps 2 / 2.5 / 2.7 / 2.8**: Haven, Soulforge, Stormglass Exchange, and The Deep overlays respectively -- each delegates to its own handler
 7. **Step 2.9**: Loom of Worlds overlay (delegates to `loom_input::handle_loom` when `loom_ui.open`)
 8. **Step 2.95**: The Vessel overlay -- `if matches!(overlay, GameOverlay::Vessel { .. }) { return handle_vessel_overlay(...) }`
 9. **Step 3**: Vault item selection (prestige equipment preservation)
