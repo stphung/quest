@@ -71,6 +71,6 @@ Generates a compact game state snapshot and opens a pre-filled GitHub issue.
 ## Integration Points
 
 - **build_info.rs**: Referenced by `updater.rs`, `bug_report.rs`, `main.rs` (window title, splash screen)
-- **updater.rs**: Called from `main_helpers/update.rs` for background update checks; also provides `run_update_command()` for CLI `quest update`
+- **updater.rs**: `check_update_info()` is spawned in a background thread directly from `main.rs` for update checks; `main_helpers/update.rs` supplies the jittered check interval and renders the result on the splash screen; `run_update_command()` handles the CLI `quest update`
 - **bug_report.rs**: Called from `input/mod.rs` (! hotkey) for overlay generation and browser launch
 - **debug_menu.rs**: State managed by `main.rs`; input handled in `input/mod.rs`; rendered by `ui/debug_menu_scene.rs`
