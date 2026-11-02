@@ -39,18 +39,21 @@ Keyboard input routing for the Game screen, dispatching to overlay handlers, min
 5. **Step 1**: Discovery/celebration modals (Haven, Soulforge, Stormglass, Deep, Loom, Vessel signal, fracture region, pattern milestone) -- Enter/Esc dismisses
    - **Step 1c**: Achievement unlock modal -- Enter, Esc, or Space dismisses
    - **Step 1f**: Ascension confirm dialog -- Y confirms, N/Esc cancels
-6. **Step 2**: Full-screen overlays (Haven, Soulforge, Stormglass Exchange, The Deep) -- each delegates to its own handler
-7. **Step 2.9**: Loom of Worlds overlay (delegates to `loom_input::handle_loom` when `loom_ui.open`)
-8. **Step 2.95**: The Vessel overlay -- `if matches!(overlay, GameOverlay::Vessel { .. }) { return handle_vessel_overlay(...) }`
-9. **Step 3**: Vault item selection (prestige equipment preservation)
-10. **Step 4**: Prestige confirmation dialog
-11. **Step 4.5**: Quit confirmation (pending challenges warning)
-12. **Step 5**: Debug menu (backtick toggles, Tab/arrows navigate, Enter triggers)
-13. **Step 6**: Active minigame (delegates to `minigame_input`)
-14. **Step 7**: Challenge menu (open/navigate/select)
-15. **Step 8**: Tab opens challenge menu
-16. **Step 8.5**: Loom of Worlds toggle (`l`/`L` opens the Loom overlay, gated on `loom_state.persistent.discovered`)
-17. **Step 9**: Base game hotkeys (P=prestige, H=haven, S=soulforge, G=stormglass, D=deep, A=achievements, T=time vault, U=ascension, W=wiki, V=vessel, !=bug report)
+6. **Step 2**: Haven screen (delegates to `haven_input`)
+7. **Step 2.5**: Soulforge overlay (delegates to `soulforge_input`)
+8. **Step 2.7**: Stormglass Exchange overlay (delegates to `stormglass_input`)
+9. **Step 2.8**: The Deep overlay (delegates to `deep_input`)
+10. **Step 2.9**: Loom of Worlds overlay (delegates to `loom_input::handle_loom` when `loom_ui.open`)
+11. **Step 2.95**: The Vessel overlay -- `if matches!(overlay, GameOverlay::Vessel { .. }) { return handle_vessel_overlay(...) }`
+12. **Step 3**: Vault item selection (prestige equipment preservation)
+13. **Step 4**: Prestige confirmation dialog
+14. **Step 4.5**: Quit confirmation (pending challenges warning)
+15. **Step 5**: Debug menu (backtick toggles, Tab/arrows navigate, Enter triggers)
+16. **Step 6**: Active minigame (delegates to `minigame_input`)
+17. **Step 7**: Challenge menu (open/navigate/select)
+18. **Step 8**: Tab opens challenge menu
+19. **Step 8.5**: Loom of Worlds toggle (`l`/`L` opens the Loom overlay, gated on `loom_state.persistent.discovered`)
+20. **Step 9**: Base game hotkeys (P=prestige, H=haven, S=soulforge, G=stormglass, D=deep, A=achievements, T=time vault, U=ascension, W=wiki, V=vessel, !=bug report)
 
 **Key pattern**: Overlays intercept before game input. Higher-numbered steps only execute if all earlier overlays/modals are inactive. This ensures modals always block background input.
 
