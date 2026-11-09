@@ -1,11 +1,11 @@
 ---
 name: add-challenge
-description: Complete checklist for adding a new challenge minigame to Quest. Use this skill whenever someone wants to add a new challenge, minigame, puzzle, or game — even if they don't say "challenge" explicitly. Covers all 15 integration points across the codebase so nothing gets missed. Use PROACTIVELY when implementing any new challenge from a spec or plan.
+description: Complete checklist for adding a new challenge minigame to Quest. Use this skill whenever someone wants to add a new challenge, minigame, puzzle, or game — even if they don't say "challenge" explicitly. Covers all 17 integration points across the codebase so nothing gets missed. Use PROACTIVELY when implementing any new challenge from a spec or plan.
 ---
 
 # Add Challenge
 
-Complete integration checklist for adding a new challenge minigame to Quest. This skill exists because challenges touch 15+ files across 6 modules, and it's easy to miss one — causing compiler errors or runtime bugs that are hard to trace back to a missing match arm.
+Complete integration checklist for adding a new challenge minigame to Quest. This skill exists because challenges touch 17 files across 6 modules, and it's easy to miss one — causing compiler errors or runtime bugs that are hard to trace back to a missing match arm.
 
 The checklist below is ordered so that each step compiles (or at least doesn't break unrelated code). Follow the order.
 

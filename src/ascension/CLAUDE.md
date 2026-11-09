@@ -77,4 +77,4 @@ Total PR for I-VI: 1,245 PR.
 - **Deep** (`deep/types.rs`): Deep layer milestones gate Ascension availability (account-level check)
 - **Achievements** (`achievements/handlers.rs`): `on_ascended(level)` unlocks `AscensionI` through `AscensionX` (one achievement per level, I-X)
 - **UI** (`ui/stats_panel.rs`): Shows "✦ Ascension {roman} — ×{mult} power" alongside prestige info when level > 0 (`stats_prestige.rs` only supplies the `to_roman()` helper used in the format string)
-- **Loom** (`loom/`): `completed_pattern_count()` provides pattern gate checks for VII-X; `max_shuttle_level(ascension_level)` gates shuttle upgrade caps
+- **Loom** (`loom/`): `completed_pattern_count()` provides pattern gate checks for VII-X; `max_shuttle_level(ascension_level)` gates shuttle upgrade caps in the engine, but shuttle upgrading isn't currently wired into player input (see `src/loom/CLAUDE.md`'s "Shuttle Upgrades" section) — shuttles stay at level 1 in the live game regardless of Ascension tier
