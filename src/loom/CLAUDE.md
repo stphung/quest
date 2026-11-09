@@ -168,6 +168,8 @@ Three debug actions in `utils/debug_menu.rs`:
 
 ## Shuttle Upgrades
 
+**Not currently reachable from the live UI.** `src/input/loom_input.rs`'s `U` handler no-ops for `LoomGraphNode::Shuttle(_)` (comment: "Shuttle upgrading removed — shuttles stay at level 1."), so in the shipped game shuttles stay at level 1 regardless of Ascension tier; only Extractors can be upgraded via `U`. The engine-level mechanics below are still implemented and exercised by the balance simulator (`src/bin/simulator/strategy.rs`), just not wired into player input.
+
 Shuttles can be upgraded to increase their intake cap. Each level adds 0.5x to the base multiplier:
 
 - `node_level_multiplier(level)` = `1.0 + (level - 1) * 0.5` (level 1 = 1.0x, level 2 = 1.5x, level 3 = 2.0x, etc.)

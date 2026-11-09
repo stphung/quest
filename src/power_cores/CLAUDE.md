@@ -42,6 +42,7 @@ There is no separate `PowerCoreState` runtime struct. Core-grant timestamps live
 - `get_unlocked_cores(achievements) -> Vec<&PowerCoreDef>` — All cores whose achievement is unlocked
 - `fill_duration_secs(pr_per_day) -> i64` — Seconds per cycle: `86400 / pr_per_day`
 - `fill_ratio(elapsed, fill_secs) -> f64` — Current cycle progress as a 0.0-1.0 fraction; used by `ui/stats_prestige.rs` to render the power-core fill progress bar
+- `format_core_time_remaining(remaining_secs, ratio) -> String` — Human-readable time-to-next-grant ("Ready!" / "Xh Ym" / "Ym"); currently unused outside its own re-export (no call site found)
 
 ### `tick.rs`
 
