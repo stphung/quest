@@ -898,8 +898,10 @@ pub fn show_startup_splash_screen(
             }
         }
 
+        crate::utils::perf_log::mark("splash_update");
         // Refresh character list
         let characters = character_manager.list_characters()?;
+        crate::utils::perf_log::mark("splash_list");
 
         // Auto-show cloud restore prompt on first launch (no characters, cloud offline, not dismissed)
         if characters.is_empty()
@@ -999,7 +1001,11 @@ pub fn show_startup_splash_screen(
             }
         })?;
 
-        if event::poll(Duration::from_millis(100))? {
+        crate::utils::perf_log::mark("splash_draw");
+
+        let event_ready = event::poll(Duration::from_millis(100))?;
+        crate::utils::perf_log::mark("splash_wait");
+        if event_ready {
             let ev = event::read()?;
             if let event::Event::Resize(_, _) = &ev {
                 terminal.clear()?;

@@ -11,6 +11,7 @@ Development and operational utilities: compile-time build metadata, self-update 
 | `updater.rs` | Self-update system: checks GitHub releases API, compares commits, downloads platform-specific archives, extracts and replaces binary; includes `UpdateInfo`, `UpdateCheck`, `UpdateInfoStatus` types |
 | `bug_report.rs` | Bug report generation: builds compact game state summary, constructs pre-filled GitHub issue URL, copies full save JSON to clipboard, opens browser; includes `BugReportData` struct |
 | `debug_menu.rs` | Debug menu with 10 tabbed categories and 120+ actions for testing; `DebugMenu` struct, `DebugCategory` enum, `DebugAction` enum |
+| `perf_log.rs` | Opt-in frame-timing log for diagnosing UI lag: set `QUEST_PERF_LOG=/path/file` and `perf_log::mark(phase)` calls in the game and splash loops write `<ms since start>\t<phase>\t<micros>` per phase (`update`/`draw`/`wait`/`input`, `splash_*`). No-op when the variable is unset |
 
 ## Key Types
 
