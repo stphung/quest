@@ -38,6 +38,12 @@ zip = { version = "9.1", default-features = false, features = ["deflate"] }
 [lints.rust]
 unused_imports = "deny"
 
+[lints.clippy]
+# Clippy 1.100 widened this lint to flag grid scans like
+# `for row in 0..H { for col in 0..W { grid[row][col] ... } }`, which read
+# more clearly than iterator chains in the minigame, Loom, and scene code.
+needless_range_loop = "allow"
+
 [profile.dev]
 # "unpacked" skips the slow dsymutil pass on macOS, speeding up linking
 split-debuginfo = "unpacked"
