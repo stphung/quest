@@ -1144,6 +1144,10 @@ fn main() -> io::Result<()> {
                         // Check if sigil rolling animation has timed out
                         crate::input::check_sigil_animation_timeout(&mut exchange_ui);
 
+                        // Opt-in frame timing (QUEST_PERF_LOG): everything since input
+                        // handling — ticks, saves, housekeeping — is "update".
+                        utils::perf_log::mark("update");
+
                         // Draw UI
                         terminal.draw(|frame| {
                             let ctx = ui::responsive::LayoutContext::from_frame(frame);
@@ -1196,6 +1200,8 @@ fn main() -> io::Result<()> {
                             }
                         })?;
 
+                        utils::perf_log::mark("draw");
+
                         // Adaptive polling:
                         // - Realtime minigames: block only until the next frame boundary to avoid
                         //   busy-spinning and burning CPU between updates.
@@ -1221,7 +1227,7 @@ fn main() -> io::Result<()> {
                         // achievement browser). Bounded so a runaway paste can't starve
                         // the tick loop.
                         let mut drained_events = 0u32;
-                        while event::poll(poll_duration)? {
+                        while poll_event_timed(poll_duration)? {
                             let ev = event::read()?;
                             if let Event::Resize(_, _) = &ev {
                                 terminal.clear()?;
@@ -1461,6 +1467,8 @@ fn main() -> io::Result<()> {
                             }
                             poll_duration = Duration::ZERO;
                         }
+
+                        utils::perf_log::mark("input");
 
                         // Flappy Bird real-time tick (~30 FPS)
                         if realtime_mode {
@@ -1925,4 +1933,13 @@ fn main() -> io::Result<()> {
     println!("Goodbye!");
 
     Ok(())
+}
+
+/// `event::poll` that records the time spent waiting as the "wait" phase of
+/// the opt-in perf log, so idle frame pacing isn't mistaken for slow input
+/// handling.
+fn poll_event_timed(timeout: Duration) -> io::Result<bool> {
+    let ready = event::poll(timeout)?;
+    utils::perf_log::mark("wait");
+    Ok(ready)
 }

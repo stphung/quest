@@ -1,10 +1,11 @@
-//! Utility modules: build info, updater, debug menu.
+//! Utility modules: build info, updater, debug menu, perf log.
 
 #![allow(unused_imports)]
 
 pub mod bug_report;
 pub mod build_info;
 pub mod debug_menu;
+pub mod perf_log;
 pub mod updater;
 
 pub use build_info::*;

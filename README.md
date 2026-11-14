@@ -53,6 +53,16 @@ Controls are shown in-game, and pressing **W** opens the [wiki](https://github.c
 
 **For the full picture — zones, attributes, prestige, dungeons, fishing, items, Haven, Ascension, the Deep, the Loom, and every other system — see the [Quest Wiki](https://github.com/stphung/quest/wiki).**
 
+### Reporting lag
+
+If the game feels slow to respond, capture a timing log and attach it to your bug report:
+
+```bash
+QUEST_PERF_LOG=/tmp/quest-perf.log quest
+```
+
+Play until the lag happens, quit, and attach the file. It records how long each frame spent updating, drawing, waiting for input, and handling keys — no save data.
+
 ## Development
 
 Contributions welcome. The wiki covers gameplay; this section and [CLAUDE.md](CLAUDE.md) cover the code.
